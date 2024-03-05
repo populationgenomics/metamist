@@ -7,15 +7,14 @@ from metamist.models import CohortBody, CohortCriteria
 
 def main(
     project: str,
-    cohort_name: str,
-    cohort_description: str,
-    cohort_template_id: int,
+    cohort_body_spec: CohortBody,
     projects: list[str],
     sg_ids_internal: list[str],
     excluded_sg_ids: list[str],
     sg_technologies: list[str],
     sg_platforms: list[str],
     sg_types: list[str],
+    dry_run: bool = False
 ):
     """ Create a custom cohort"""
 
@@ -29,6 +28,19 @@ def main(
         sg_type=sg_types or []
     )
 
+    capi.create_cohort_from_criteria(
+        project=project,
+        body_create_cohort_from_criteria={'cohort_spec': cohort_body_spec, 'cohort_criteria': cohort_criteria, 'dry_run': dry_run}
+    )
+
+
+def get_cohort_spec(
+    cohort_name: str,
+    cohort_description: str,
+    cohort_template_id: int
+) -> CohortBody:
+    """ Get the cohort spec """
+
     cohort_body_spec: dict[str, int | str] = {}
 
     if cohort_name:
@@ -38,9 +50,7 @@ def main(
     if cohort_template_id:
         cohort_body_spec['derived_from'] = cohort_template_id
 
-    cohort_spec = CohortBody(**cohort_body_spec)
-
-    capi.create_cohort_from_criteria(project=project, body_create_cohort_from_criteria={'cohort_spec': cohort_spec, 'cohort_criteria': cohort_criteria})
+    return CohortBody(**cohort_body_spec)
 
 
 if __name__ == '__main__':
@@ -56,18 +66,24 @@ if __name__ == '__main__':
     parser.add_argument('--sg_technology', required=False, type=list[str], help='Sequencing group technologies')
     parser.add_argument('--sg_platform', required=False, type=list[str], help='Sequencing group platforms')
     parser.add_argument('--sg_type', required=False, type=list[str], help='Sequencing group types, e.g. exome, genome')
+    parser.add_argument('--dry_run', required=False, type=bool, help='Dry run mode')
 
     args = parser.parse_args()
 
-    main(
-        project=args.project,
+    cohort_spec = get_cohort_spec(
         cohort_name=args.name,
         cohort_description=args.description,
-        cohort_template_id=args.template_id,
+        cohort_template_id=args.template_id
+    )
+
+    main(
+        project=args.project,
+        cohort_body_spec=cohort_spec,
         projects=args.projects,
         sg_ids_internal=args.sg_ids_internal,
         excluded_sg_ids=args.excluded_sgs_internal,
         sg_technologies=args.sg_technology,
         sg_platforms=args.sg_platform,
-        sg_types=args.sg_type
+        sg_types=args.sg_type,
+        dry_run=args.dry_run
     )

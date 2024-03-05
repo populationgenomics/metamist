@@ -72,6 +72,7 @@ class CohortLayer(BaseLayer):
             author: str,
             description: str,
             cohort_name: str,
+            dry_run: bool,
             cohort_criteria: CohortCriteria = None,
             template_id: int = None,
     ):
@@ -92,15 +93,15 @@ class CohortLayer(BaseLayer):
             if not template:
                 raise ValueError(f'Cohort template with ID {template_id} not found')
 
+        if template and cohort_criteria:
+            # TODO: Handle this case. For now, not supported.
+            raise ValueError('A cohort cannot have both criteria and be derived from a template')
+
         # Only provide a template id
         if template and not cohort_criteria:
             create_cohort_template = False
             criteria_dict = json.loads(template['criteria'])
             cohort_criteria = CohortCriteria(**criteria_dict)
-
-        if template and cohort_criteria:
-            # TODO: Handle this case. For now, not supported.
-            raise ValueError('A cohort cannot have both criteria and be derived from a template')
 
         projects_to_pull = await self.pt.get_and_check_access_to_projects_for_names(
             user=self.connection.author, project_names=cohort_criteria.projects, readonly=True
@@ -151,6 +152,9 @@ class CohortLayer(BaseLayer):
 
         assert template_id, 'Template ID must be set'
 
+        if dry_run:
+            return {'template_id': template_id, 'sequencing_group_ids': [sg.id for sg in sgs]}
+
         # 2. Create Cohort
         cohort_id = await self.ct.create_cohort(
             project=project_to_write,
@@ -161,4 +165,4 @@ class CohortLayer(BaseLayer):
             derived_from=template_id,
         )
 
-        return cohort_id
+        return {'cohort_id': cohort_id}

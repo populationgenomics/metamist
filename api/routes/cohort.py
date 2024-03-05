@@ -14,6 +14,7 @@ async def create_cohort_from_criteria(
     cohort_spec: CohortBody,
     connection: Connection = get_project_write_connection,
     cohort_criteria: CohortCriteria = None,
+    dry_run: bool = False,
 ) -> dict[str, Any]:
     """
     Create a cohort with the given name and sample/sequencing group IDs.
@@ -26,16 +27,17 @@ async def create_cohort_from_criteria(
     if not cohort_criteria and not cohort_spec.derived_from:
         raise ValueError('A cohort must have either criteria or be derived from a template')
 
-    cohort_id = await cohortlayer.create_cohort_from_criteria(
+    cohort_output = await cohortlayer.create_cohort_from_criteria(
         project_to_write=connection.project,
         description=cohort_spec.description,
         author=connection.author,
         cohort_name=cohort_spec.name,
+        dry_run=dry_run,
         cohort_criteria=cohort_criteria,
         template_id=cohort_spec.derived_from,
     )
 
-    return {'cohort_id': cohort_id}
+    return cohort_output
 
 
 @router.post('/{project}/cohort_template', operation_id='createCohortTemplate')
