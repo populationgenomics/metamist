@@ -14,12 +14,13 @@ import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/Stac
 import BillingCostByMonthTable from './components/BillingCostByMonthTable'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import generateUrl from '../../shared/utilities/generateUrl'
+import FieldSelector from './components/FieldSelector'
 
 const BillingCostByTime: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
 
-    const [start, setStart] = React.useState<string>(searchParams.get('start') ?? '2022-01-01')
-    const [end, setEnd] = React.useState<string>(searchParams.get('end') ?? '2022-12-31')
+    const [start, setStart] = React.useState<string>(searchParams.get('start') ?? '202201')
+    const [end, setEnd] = React.useState<string>(searchParams.get('end') ?? '202212')
 
     // Data loading
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
@@ -48,6 +49,15 @@ const BillingCostByTime: React.FunctionComponent = () => {
         setStart(start_update)
         setEnd(end_update)
         updateNav(start_update, end_update)
+    }
+
+    const convertInvoiceMonth = (invoiceMonth: string, start: Boolean) => {
+        const year = invoiceMonth.substring(0, 4)
+        const month = invoiceMonth.substring(4, 6)
+        if (start) return `${year}-${month}-01`
+        // get last day of month
+        const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate()
+        return `${year}-${month}-${lastDay}`
     }
 
     const convertCostCategory = (costCategory: string) => {
@@ -162,21 +172,26 @@ const BillingCostByTime: React.FunctionComponent = () => {
         )
     }
 
+    const onMonthStart = (event: any, data: any) => {
+        changeDate('start', data.value)
+    }
+
+    const onMonthEnd = (event: any, data: any) => {
+        changeDate('end', data.value)
+    }
+
     React.useEffect(() => {
         if (Boolean(start) && Boolean(end)) {
             // valid selection, retrieve data
             getData({
                 fields: [BillingColumn.Topic, BillingColumn.CostCategory],
-                start_date: getAdjustedDay(start, -2),
-                end_date: getAdjustedDay(end, 2),
+                start_date: getAdjustedDay(convertInvoiceMonth(start, true), -2),
+                end_date: getAdjustedDay(convertInvoiceMonth(end, false), 2),
                 order_by: { day: false },
                 source: BillingSource.Aggregate,
                 time_periods: 'invoice_month',
                 filters: {
-                    invoice_month: generateInvoiceMonths(
-                        getAdjustedDay(start, 2),
-                        getAdjustedDay(end, -2)
-                    ),
+                    invoice_month: generateInvoiceMonths(start, end),
                 },
             })
         } else {
@@ -205,22 +220,20 @@ const BillingCostByTime: React.FunctionComponent = () => {
 
                 <Grid columns="equal" stackable doubling>
                     <Grid.Column className="field-selector-label">
-                        <Input
+                        <FieldSelector
                             label="Start"
-                            fluid
-                            type="date"
-                            onChange={(e) => changeDate('start', e.target.value)}
-                            value={start}
+                            fieldName={BillingColumn.InvoiceMonth}
+                            onClickFunction={onMonthStart}
+                            selected={start}
                         />
                     </Grid.Column>
 
                     <Grid.Column className="field-selector-label">
-                        <Input
+                        <FieldSelector
                             label="Finish"
-                            fluid
-                            type="date"
-                            onChange={(e) => changeDate('end', e.target.value)}
-                            value={end}
+                            fieldName={BillingColumn.InvoiceMonth}
+                            onClickFunction={onMonthEnd}
+                            selected={end}
                         />
                     </Grid.Column>
                 </Grid>

@@ -9,11 +9,17 @@ const getAdjustedDay = (value: string, days: number): string => {
 }
 
 const generateInvoiceMonths = (start: string, end: string): string[] => {
+
     const invoiceMonths = []
-    const dateStart = new Date(start)
-    const dateEnd = new Date(end)
-    const yearStart = dateStart.getFullYear()
-    const yearEnd = dateEnd.getFullYear()
+    const yearStart = start.substring(0, 4)
+    const yearEnd = end.substring(0, 4)
+
+    const mthStart = start.substring(4, 6)
+    const mthEnd = end.substring(4, 6)
+
+    const dateStart = new Date(yearStart + '-' + mthStart + '-01')
+    const dateEnd = new Date(yearEnd + '-' + mthEnd + '-01')
+
     for (let i = yearStart; i <= yearEnd; i++) {
         const startMonth = i === yearStart ? dateStart.getMonth() : 0
         const endMonth = i === yearEnd ? dateEnd.getMonth() : 11
@@ -22,7 +28,10 @@ const generateInvoiceMonths = (start: string, end: string): string[] => {
             const monthString = month.toString().padStart(2, '0')
             const yearString = i.toString()
             const dateString = `${yearString}${monthString}`
-            invoiceMonths.push(dateString)
+            const currentDate = new Date(`${yearString}-${monthString}-01`)
+            if (currentDate >= dateStart && currentDate <= dateEnd) {
+                invoiceMonths.push(dateString)
+            }
         }
     }
     return invoiceMonths;
