@@ -9,7 +9,12 @@ import {
     BillingTotalCostRecord,
 } from '../../sm-api'
 
-import { getAdjustedDay, generateInvoiceMonths } from '../../shared/utilities/formatDates'
+import {
+    getAdjustedDay,
+    generateInvoiceMonths,
+    getCurrentInvoiceMonth,
+    getCurrentInvoiceYearStart,
+} from '../../shared/utilities/formatDates'
 import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
 import BillingCostByMonthTable from './components/BillingCostByMonthTable'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
@@ -19,8 +24,12 @@ import FieldSelector from './components/FieldSelector'
 const BillingCostByTime: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
 
-    const [start, setStart] = React.useState<string>(searchParams.get('start') ?? '202201')
-    const [end, setEnd] = React.useState<string>(searchParams.get('end') ?? '202212')
+    const [start, setStart] = React.useState<string>(
+        searchParams.get('start') ?? getCurrentInvoiceYearStart()
+    )
+    const [end, setEnd] = React.useState<string>(
+        searchParams.get('end') ?? getCurrentInvoiceMonth()
+    )
 
     // Data loading
     const [isLoading, setIsLoading] = React.useState<boolean>(true)

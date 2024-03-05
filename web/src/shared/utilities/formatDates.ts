@@ -8,6 +8,22 @@ const getAdjustedDay = (value: string, days: number): string => {
     ].join('-')
 }
 
+const getCurrentInvoiceMonth = () => {
+    const date = new Date()
+    return [
+        date.getFullYear(),
+        (date.getMonth() + 1).toString().padStart(2, '0')
+    ].join('')
+}
+
+const getCurrentInvoiceYearStart = () => {
+    const date = new Date()
+    return [
+        date.getFullYear(),
+        '01'
+    ].join('')
+}
+
 const generateInvoiceMonths = (start: string, end: string): string[] => {
 
     const invoiceMonths = []
@@ -37,4 +53,4 @@ const generateInvoiceMonths = (start: string, end: string): string[] => {
     return invoiceMonths;
 }
 
-export {getAdjustedDay, generateInvoiceMonths}
+export {getAdjustedDay, generateInvoiceMonths, getCurrentInvoiceMonth, getCurrentInvoiceYearStart}
