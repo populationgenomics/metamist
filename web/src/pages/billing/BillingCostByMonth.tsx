@@ -9,7 +9,7 @@ import {
     BillingTotalCostRecord,
 } from '../../sm-api'
 
-import { getMonthStartDate, getMonthEndDate } from '../../shared/utilities/monthStartEndDate'
+import { getAdjustedDay, generateInvoiceMonths } from '../../shared/utilities/formatDates'
 import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
 import BillingCostByMonthTable from './components/BillingCostByMonthTable'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
@@ -18,10 +18,8 @@ import generateUrl from '../../shared/utilities/generateUrl'
 const BillingCostByTime: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
 
-    const [start, setStart] = React.useState<string>(
-        searchParams.get('start') ?? getMonthStartDate()
-    )
-    const [end, setEnd] = React.useState<string>(searchParams.get('end') ?? getMonthEndDate())
+    const [start, setStart] = React.useState<string>(searchParams.get('start') ?? '2022-01-01')
+    const [end, setEnd] = React.useState<string>(searchParams.get('end') ?? '2022-12-31')
 
     // Data loading
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
@@ -165,22 +163,21 @@ const BillingCostByTime: React.FunctionComponent = () => {
     }
 
     React.useEffect(() => {
-        if (
-            start !== undefined &&
-            start !== '' &&
-            start !== null &&
-            end !== undefined &&
-            end !== '' &&
-            end !== null
-        ) {
+        if (Boolean(start) && Boolean(end)) {
             // valid selection, retrieve data
             getData({
                 fields: [BillingColumn.Topic, BillingColumn.CostCategory],
-                start_date: start,
-                end_date: end,
+                start_date: getAdjustedDay(start, -2),
+                end_date: getAdjustedDay(end, 2),
                 order_by: { day: false },
                 source: BillingSource.Aggregate,
                 time_periods: 'invoice_month',
+                filters: {
+                    invoice_month: generateInvoiceMonths(
+                        getAdjustedDay(start, 2),
+                        getAdjustedDay(end, -2)
+                    ),
+                },
             })
         } else {
             // invalid selection,
@@ -203,7 +200,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         fontSize: 40,
                     }}
                 >
-                    Monthly Cost By Topic
+                    Cost Across Invoice Months (Topic only)
                 </h1>
 
                 <Grid columns="equal" stackable doubling>

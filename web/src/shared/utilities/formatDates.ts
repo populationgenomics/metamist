@@ -1,0 +1,31 @@
+const getAdjustedDay = (value: string, days: number): string => {
+    const date = new Date(value)
+    date.setDate(date.getDate() + days)
+    return [
+        date.getFullYear(),
+        (date.getMonth() + 1).toString().padStart(2, '0'),
+        date.getDate().toString().padStart(2, '0')
+    ].join('-')
+}
+
+const generateInvoiceMonths = (start: string, end: string): string[] => {
+    const invoiceMonths = []
+    const dateStart = new Date(start)
+    const dateEnd = new Date(end)
+    const yearStart = dateStart.getFullYear()
+    const yearEnd = dateEnd.getFullYear()
+    for (let i = yearStart; i <= yearEnd; i++) {
+        const startMonth = i === yearStart ? dateStart.getMonth() : 0
+        const endMonth = i === yearEnd ? dateEnd.getMonth() : 11
+        for (let j = startMonth; j <= endMonth; j++) {
+            const month = j + 1
+            const monthString = month.toString().padStart(2, '0')
+            const yearString = i.toString()
+            const dateString = `${yearString}${monthString}`
+            invoiceMonths.push(dateString)
+        }
+    }
+    return invoiceMonths;
+}
+
+export {getAdjustedDay, generateInvoiceMonths}
