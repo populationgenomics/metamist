@@ -33,13 +33,13 @@ const HailBatchGridNew: React.FunctionComponent<{
     // combine data and resource for each ar_guid, batch_id, job_id
     console.log('data', data)
 
-    const [openRows, setOpenRows] = React.useState<number[]>([])
+    const [openRows, setOpenRows] = React.useState<string[]>([])
 
-    const handleToggle = (position: number) => {
+    const handleToggle = (position: string) => {
         if (!openRows.includes(position)) {
             setOpenRows([...openRows, position])
         } else {
-            setOpenRows(openRows.filter((i) => i !== position))
+            setOpenRows(openRows.filter((value) => value !== position))
         }
     }
 
@@ -295,6 +295,131 @@ const HailBatchGridNew: React.FunctionComponent<{
 
     const idx = 0
 
+    const displayCheckBoxRow = (parentToggle:string, key:string, toggle:string, text:string) => {
+        return (<SUITable.Row
+            style={{
+                display: openRows.includes(parentToggle) ? 'table-row' : 'none',
+                backgroundColor: 'var(--color-bg)',
+            }}
+            key={key}
+        >
+            <SUITable.Cell style={{ border: 'none' }} />
+            <SUITable.Cell style={{ width: 50 }}>
+                <Checkbox
+                    checked={openRows.includes(toggle)}
+                    toggle
+                    onChange={() => handleToggle(toggle)}
+                />
+            </SUITable.Cell>
+            <SUITable.Cell>{text}</SUITable.Cell>
+        </SUITable.Row>
+    );
+}
+
+    const displayRow = (toggle:string, key:string, label:string, text:string) => {
+            return (<SUITable.Row 
+            style={{
+                display: openRows.includes(toggle) ? 'table-row' : 'none',
+                backgroundColor: 'var(--color-bg)',
+            }}
+            key={key}
+            >
+                <SUITable.Cell style={{ border: 'none' }} />
+                <SUITable.Cell style={{ width: 250 }}>
+                    <b>{label}</b>
+                </SUITable.Cell>
+                <SUITable.Cell>{text}</SUITable.Cell>
+            </SUITable.Row>
+        );
+    }
+
+    const displayCostBySkuRow = (parentToggle:string, key:string, toggle:string, textCheckbox:string, chartId:string, data:any) => (<>
+        {displayCheckBoxRow(parentToggle, key, toggle, textCheckbox)}
+        <SUITable.Row
+            style={{
+                display: (openRows.includes(parentToggle) && openRows.includes(toggle))
+                    ? 'table-row'
+                    : 'none',
+                backgroundColor: 'var(--color-bg)',
+            }}
+            key={toggle}
+        >
+            <SUITable.Cell style={{ border: 'none' }} />
+            <SUITable.Cell />
+            <SUITable.Cell style={{textAlign: 'center'}}>
+                <DonutChart
+                    id={`${chartId}`}
+                    data={data.skus.map((srec) => ({
+                        label: srec.sku,
+                        value: srec.cost,
+                    }))}
+                    maxSlices={data.skus.length}
+                    showLegend={false} isLoading={false}                
+                />
+
+                <SUITable celled compact>
+                    <SUITable.Header>
+                        <SUITable.Row>
+                            <SUITable.HeaderCell>SKU</SUITable.HeaderCell>
+                            <SUITable.HeaderCell>COST</SUITable.HeaderCell>
+                        </SUITable.Row>
+                    </SUITable.Header>
+                    <SUITable.Body>
+                        {data.skus.map((srec, sidx) => (
+                            <SUITable.Row key={`${toggle}-sku-${sidx}`} id={`${chartId}-lgd${sidx}`}>
+                                <SUITable.Cell>{srec.sku}</SUITable.Cell>
+                                <SUITable.Cell>
+                                    {formatMoney(srec.cost, 4)}
+                                </SUITable.Cell>
+                            </SUITable.Row>
+                        ))}
+                    </SUITable.Body>
+                </SUITable>
+            </SUITable.Cell>
+        </SUITable.Row>
+        </>)
+
+    const displayCostBySeqGrpRow = (parentToggle:string, key:string, toggle:string, textCheckbox:string, data:any) => (<>
+            {displayCheckBoxRow(parentToggle, key, toggle, textCheckbox)}
+            <SUITable.Row
+                style={{
+                    display: (openRows.includes(parentToggle) && openRows.includes(toggle))
+                        ? 'table-row'
+                        : 'none',
+                    backgroundColor: 'var(--color-bg)',
+                }}
+                key={toggle}
+            >
+                <SUITable.Cell style={{ border: 'none' }} />
+                <SUITable.Cell style={{ width: 250 }}>
+                </SUITable.Cell>
+                <SUITable.Cell>
+                    <SUITable celled compact>
+                        <SUITable.Header>
+                            <SUITable.Row>
+                                <SUITable.HeaderCell>SEQ GROUP</SUITable.HeaderCell>
+                                <SUITable.HeaderCell>STAGE</SUITable.HeaderCell>
+                                <SUITable.HeaderCell>COST</SUITable.HeaderCell>
+                            </SUITable.Row>
+                        </SUITable.Header>
+                        <SUITable.Body>
+                            {data.seq_groups
+                                .sort((a, b) => b.cost - a.cost) // Sort by cost in descending order
+                                .map((gcat, gidx) => (
+                                <SUITable.Row key={`${toggle}-seq-grp-${gidx}`}>
+                                    <SUITable.Cell>{gcat.sequencing_group}</SUITable.Cell>
+                                    <SUITable.Cell>{gcat.stage}</SUITable.Cell>
+                                    <SUITable.Cell>
+                                        {formatMoney(gcat.cost, 4)}
+                                    </SUITable.Cell>
+                                </SUITable.Row>
+                            ))}
+                        </SUITable.Body>
+                    </SUITable>
+                </SUITable.Cell>
+            </SUITable.Row>
+        </>)
+
     return (
         <>
             <SUITable celled compact>
@@ -303,100 +428,41 @@ const HailBatchGridNew: React.FunctionComponent<{
                         <SUITable.Row key={idx}>
                             <SUITable.Cell style={{ width: 50 }}>
                                 <Checkbox
-                                    checked={openRows.includes(idx)}
+                                    checked={openRows.includes(`row-${idx}`)}
                                     toggle
-                                    onChange={() => handleToggle(idx)}
+                                    onChange={() => handleToggle(`row-${idx}`)}
                                 />
                             </SUITable.Cell>
 
-                            <SUITable.Cell colspan="2">
+                            <SUITable.Cell colSpan="2">
                                 AR-GUID: {data.total.ar_guid}
                             </SUITable.Cell>
                         </SUITable.Row>
 
-                        <SUITable.Row
-                            style={{
-                                display: openRows.includes(idx) ? 'table-row' : 'none',
-                                backgroundColor: 'var(--color-bg)',
-                            }}
-                            key={`${idx}-detail-2`}
-                        >
-                            <SUITable.Cell style={{ border: 'none' }} />
-                            <SUITable.Cell style={{ width: 250 }}>
-                                <b>Start</b>
-                            </SUITable.Cell>
-                            <SUITable.Cell>${data.total.usage_start_time}</SUITable.Cell>
-                        </SUITable.Row>
-
-                        <SUITable.Row
-                            style={{
-                                display: openRows.includes(idx) ? 'table-row' : 'none',
-                                backgroundColor: 'var(--color-bg)',
-                            }}
-                            key={`${idx}-detail-3`}
-                        >
-                            <SUITable.Cell style={{ border: 'none' }} />
-                            <SUITable.Cell style={{ width: 250 }}>
-                                <b>End</b>
-                            </SUITable.Cell>
-                            <SUITable.Cell>${data.total.usage_end_time}</SUITable.Cell>
-                        </SUITable.Row>
-
-                        <SUITable.Row
-                            style={{
-                                display: openRows.includes(idx) ? 'table-row' : 'none',
-                                backgroundColor: 'var(--color-bg)',
-                            }}
-                            key={`${idx}-detail-3`}
-                        >
-                            <SUITable.Cell style={{ border: 'none' }} />
-                            <SUITable.Cell style={{ width: 250 }}>
-                                <b>Status</b>
-                            </SUITable.Cell>
-                            <SUITable.Cell>{data.analysisRunnerLog.status}</SUITable.Cell>
-                        </SUITable.Row>
+                        {displayRow(`row-${idx}`, `${idx}-detail-1`, 'Start', data.total.usage_start_time)}
+                        {displayRow(`row-${idx}`, `${idx}-detail-2`, 'End', data.total.usage_end_time)}
+                        {displayRow(`row-${idx}`, `${idx}-detail-3`, 'Total Cost', formatMoney(data.total.cost, 2))}
 
                         {/* all meta */}
-
                         {Object.keys(data.analysisRunnerLog.meta).map((key) => {
                             const mcat = data.analysisRunnerLog.meta[key];
-                            return (
-                                <SUITable.Row
-                                    style={{
-                                        display: openRows.includes(idx) ? 'table-row' : 'none',
-                                        backgroundColor: 'var(--color-bg)',
-                                    }}
-                                    key={`${idx}-detail-${key}`}
-                                >
-                                    <SUITable.Cell style={{ border: 'none' }} />
-                                    <SUITable.Cell style={{ width: 250 }}>
-                                        <b>{key}</b>
-                                    </SUITable.Cell>
-                                    <SUITable.Cell>{mcat}</SUITable.Cell>
-                                </SUITable.Row>
-                            );
+                            return displayRow(`row-${idx}`, `${idx}-meta-${key}`, key, mcat);
                         })}
-    
-                        <SUITable.Row
-                            style={{
-                                display: openRows.includes(idx) ? 'table-row' : 'none',
-                                backgroundColor: 'var(--color-bg)',
-                            }}
-                            key={`${idx}-detail-1`}
-                        >
-                            <SUITable.Cell style={{ border: 'none' }} />
-                            <SUITable.Cell style={{ width: 250 }}>
-                                <b>Total Cost</b>
-                            </SUITable.Cell>
-                            <SUITable.Cell>{formatMoney(data.total.cost, 2)}</SUITable.Cell>
-                        </SUITable.Row>
 
+                        {/* cost by categories */}
+                        {data.categories.map((tcat, cidx) => {
+                            const workflows = tcat.workflows !== null ? ` (across ${tcat.workflows} workflows)` : '';
+                            return displayRow(`row-${idx}`, `categories-${idx}-${cidx}`, tcat.category, `${formatMoney(tcat.cost, 2)} ${workflows}`)
+                        })}
+
+                        {/* cost by topics */}
+                        {displayCheckBoxRow(`row-${idx}`, `topics-toggle-${idx}`, `topics-${idx}`, 'Cost By Topic')}
                         <SUITable.Row
                             style={{
-                                display: openRows.includes(idx) ? 'table-row' : 'none',
+                                display: (openRows.includes(`row-${idx}`) && openRows.includes(`topics-${idx}`)) ? 'table-row' : 'none',
                                 backgroundColor: 'var(--color-bg)',
                             }}
-                            key={`${idx}-detail-1`}
+                            key={`topics-${idx}`}
                         >
                             <SUITable.Cell style={{ border: 'none' }} />
                             <SUITable.Cell style={{ width: 250 }}></SUITable.Cell>
@@ -422,142 +488,11 @@ const HailBatchGridNew: React.FunctionComponent<{
                             </SUITable.Cell>
                         </SUITable.Row>
 
-                        {data.categories.map((tcat, cidx) => (
-                            <SUITable.Row
-                                style={{
-                                    display: openRows.includes(idx) ? 'table-row' : 'none',
-                                    backgroundColor: 'var(--color-bg)',
-                                }}
-                                key={`${idx}-detail-1`}
-                            >
-                                <SUITable.Cell style={{ border: 'none' }} />
-                                <SUITable.Cell style={{ width: 250 }}>
-                                    <b>{tcat.category}</b>
-                                </SUITable.Cell>
-                                <SUITable.Cell>
-                                    {formatMoney(tcat.cost, 2)}{' '}
-                                    {tcat.workflows !== null
-                                        ? `(across ${tcat.workflows} workflows)`
-                                        : ''}
-                                </SUITable.Cell>
-                            </SUITable.Row>
-                        ))}
+                        {/* cost by seq groups */}
+                        {displayCostBySeqGrpRow(`row-${idx}`, `seq-grp-toggle-${idx}`, `seq-grp-${idx}`, 'Cost By Sequencing Group', data)}
 
-                        <SUITable.Row
-                            style={{
-                                display: openRows.includes(idx) ? 'table-row' : 'none',
-                                backgroundColor: 'var(--color-bg)',
-                            }}
-                            key={`BySeqGrp${idx}`}
-                        >
-                            <SUITable.Cell style={{ border: 'none' }} />
-                            <SUITable.Cell style={{ width: 50 }}>
-                                <Checkbox
-                                    checked={openRows.includes(`BySeqGrp${idx}`)}
-                                    toggle
-                                    onChange={() => handleToggle(`BySeqGrp${idx}`)}
-                                />
-                            </SUITable.Cell>
-                            <SUITable.Cell>Cost By Sequencing Group</SUITable.Cell>
-                        </SUITable.Row>
-
-                        <SUITable.Row
-                            style={{
-                                display: openRows.includes(`BySeqGrp${idx}`)
-                                    ? 'table-row'
-                                    : 'none',
-                                backgroundColor: 'var(--color-bg)',
-                            }}
-                            key={`BySeqGrp${idx}-details`}
-                        >
-                            <SUITable.Cell style={{ border: 'none' }} />
-                            <SUITable.Cell style={{ width: 250 }}>
-                            </SUITable.Cell>
-                            <SUITable.Cell>
-                                <SUITable celled compact>
-                                    <SUITable.Header>
-                                        <SUITable.Row>
-                                            <SUITable.HeaderCell>SEQ GROUP</SUITable.HeaderCell>
-                                            <SUITable.HeaderCell>STAGE</SUITable.HeaderCell>
-                                            <SUITable.HeaderCell>COST</SUITable.HeaderCell>
-                                        </SUITable.Row>
-                                    </SUITable.Header>
-                                    <SUITable.Body>
-                                        {data.seq_groups
-                                            .sort((a, b) => b.cost - a.cost) // Sort by cost in descending order
-                                            .map((gcat, gidx) => (
-                                            <SUITable.Row>
-                                                <SUITable.Cell>{gcat.sequencing_group}</SUITable.Cell>
-                                                <SUITable.Cell>{gcat.stage}</SUITable.Cell>
-                                                <SUITable.Cell>
-                                                    {formatMoney(gcat.cost, 4)}
-                                                </SUITable.Cell>
-                                            </SUITable.Row>
-                                        ))}
-                                    </SUITable.Body>
-                                </SUITable>
-                            </SUITable.Cell>
-                        </SUITable.Row>
-
-                        <SUITable.Row
-                            style={{
-                                display: openRows.includes(idx) ? 'table-row' : 'none',
-                                backgroundColor: 'var(--color-bg)',
-                            }}
-                            key={`ByLabels${idx}`}
-                        >
-                            <SUITable.Cell style={{ border: 'none' }} />
-                            <SUITable.Cell style={{ width: 50 }}>
-                                <Checkbox
-                                    checked={openRows.includes(`ByLabels${idx}`)}
-                                    toggle
-                                    onChange={() => handleToggle(`ByLabels${idx}`)}
-                                />
-                            </SUITable.Cell>
-                            <SUITable.Cell>Cost By SKU</SUITable.Cell>
-                        </SUITable.Row>
-
-                        <SUITable.Row
-                            style={{
-                                display: openRows.includes(`ByLabels${idx}`)
-                                    ? 'table-row'
-                                    : 'none',
-                                backgroundColor: 'var(--color-bg)',
-                            }}
-                            key={`ByLabels${idx}-details`}
-                        >
-                            <SUITable.Cell style={{ border: 'none' }} />
-                            <SUITable.Cell />
-                            <SUITable.Cell>
-                                <DonutChart
-                                    data={data.skus.map((srec) => ({
-                                        label: srec.sku,
-                                        value: srec.cost,
-                                    }))}
-                                    maxSlices={data.skus.length}
-                                    legendSize={0.6}
-                                />
-
-                                <SUITable celled compact>
-                                    <SUITable.Header>
-                                        <SUITable.Row>
-                                            <SUITable.HeaderCell>SKU</SUITable.HeaderCell>
-                                            <SUITable.HeaderCell>COST</SUITable.HeaderCell>
-                                        </SUITable.Row>
-                                    </SUITable.Header>
-                                    <SUITable.Body>
-                                        {data.skus.map((srec, sidx) => (
-                                            <SUITable.Row>
-                                                <SUITable.Cell>{srec.sku}</SUITable.Cell>
-                                                <SUITable.Cell>
-                                                    {formatMoney(srec.cost, 4)}
-                                                </SUITable.Cell>
-                                            </SUITable.Row>
-                                        ))}
-                                    </SUITable.Body>
-                                </SUITable>
-                            </SUITable.Cell>
-                        </SUITable.Row>
+                        {/* cost by SKU */}
+                        {displayCostBySkuRow(`row-${idx}`, `sku-toggle-${idx}`, `sku-${idx}`, 'Cost By SKU', 'total-donut-chart', data)}
                     </>
                 </SUITable.Body>
             </SUITable>
@@ -570,252 +505,40 @@ const HailBatchGridNew: React.FunctionComponent<{
                                 <SUITable.Row key={brec.batch_id}>
                                     <SUITable.Cell style={{ width: 50 }}>
                                         <Checkbox
-                                            checked={openRows.includes(brec.batch_id)}
+                                            checked={openRows.includes(`row-${brec.batch_id}`)}
                                             toggle
-                                            onChange={() => handleToggle(brec.batch_id)}
+                                            onChange={() => handleToggle(`row-${brec.batch_id}`)}
                                         />
                                     </SUITable.Cell>
 
-                                    <SUITable.Cell colspan="2">
+                                    <SUITable.Cell colSpan="2">
                                         BATCH: {brec.batch_id}
                                     </SUITable.Cell>
                                 </SUITable.Row>
 
-                                <SUITable.Row
-                                    style={{
-                                        display: openRows.includes(brec.batch_id)
-                                            ? 'table-row'
-                                            : 'none',
-                                        backgroundColor: 'var(--color-bg)',
-                                    }}
-                                    key={`${brec.batch_id}-detail-2`}
-                                >
-                                    <SUITable.Cell style={{ border: 'none' }} />
-                                    <SUITable.Cell style={{ width: 250 }}>
-                                        <b>Batch Name</b>
-                                    </SUITable.Cell>
-                                    <SUITable.Cell>{brec.batch_name}</SUITable.Cell>
-                                </SUITable.Row>
+                                {displayRow(`row-${brec.batch_id}`, `${brec.batch_id}-detail-1`, 'Batch Name', brec.batch_name)}
+                                {displayRow(`row-${brec.batch_id}`, `${brec.batch_id}-detail-2`, 'Start', brec.usage_start_time)}
+                                {displayRow(`row-${brec.batch_id}`, `${brec.batch_id}-detail-3`, 'End', brec.usage_end_time)}
+                                {displayRow(`row-${brec.batch_id}`, `${brec.batch_id}-detail-4`, 'Total Cost',
+                                    `${formatMoney(brec.cost, 4)} ${brec.jobs_cnt !== null ? ` (across ${brec.jobs_cnt} jobs)` : ''}`)
+                                }
 
-                                <SUITable.Row
-                                    style={{
-                                        display: openRows.includes(brec.batch_id)
-                                            ? 'table-row'
-                                            : 'none',
-                                        backgroundColor: 'var(--color-bg)',
-                                    }}
-                                    key={`${brec.batch_id}-detail-2`}
-                                >
-                                    <SUITable.Cell style={{ border: 'none' }} />
-                                    <SUITable.Cell style={{ width: 250 }}>
-                                        <b>Start</b>
-                                    </SUITable.Cell>
-                                    <SUITable.Cell>{brec.usage_start_time}</SUITable.Cell>
-                                </SUITable.Row>
+                                {/* cost by seq groups */}
+                                {displayCostBySeqGrpRow(`row-${brec.batch_id}`, `seq-grp-toggle-${brec.batch_id}`, `seq-grp-${brec.batch_id}`, 'Cost By Sequencing Group', brec)}
 
-                                <SUITable.Row
-                                    style={{
-                                        display: openRows.includes(brec.batch_id)
-                                            ? 'table-row'
-                                            : 'none',
-                                        backgroundColor: 'var(--color-bg)',
-                                    }}
-                                    key={`${brec.batch_id}-detail-3`}
-                                >
-                                    <SUITable.Cell style={{ border: 'none' }} />
-                                    <SUITable.Cell style={{ width: 250 }}>
-                                        <b>End</b>
-                                    </SUITable.Cell>
-                                    <SUITable.Cell>{brec.usage_end_time}</SUITable.Cell>
-                                </SUITable.Row>
+                                {/* cost by SKU */}
+                                {displayCostBySkuRow(`row-${brec.batch_id}`, `sku-toggle-${brec.batch_id}`, `sku-${brec.batch_id}`, 'Cost By SKU', `donut-chart-${brec.batch_id}`, brec)}
 
+                                {/* cost by jobs */}
+                                {displayCheckBoxRow(`row-${brec.batch_id}`, `jobs-toggle-${brec.batch_id}`, `jobs-${brec.batch_id}`, 'Cost By JOBS')}
                                 <SUITable.Row
                                     style={{
-                                        display: openRows.includes(brec.batch_id)
+                                        display: openRows.includes(`jobs-${brec.batch_id}`)
                                             ? 'table-row'
                                             : 'none',
                                         backgroundColor: 'var(--color-bg)',
                                     }}
-                                    key={`${brec.batch_id}-detail-1`}
-                                >
-                                    <SUITable.Cell style={{ border: 'none' }} />
-                                    <SUITable.Cell style={{ width: 250 }}>
-                                        <b>Total Cost</b>
-                                    </SUITable.Cell>
-                                    <SUITable.Cell>
-                                        {formatMoney(brec.cost, 4)}{' '}
-                                        {brec.jobs_cnt !== null
-                                            ? `(across ${brec.jobs_cnt} jobs)`
-                                            : ''}
-                                    </SUITable.Cell>
-                                </SUITable.Row>
-
-                                <SUITable.Row
-                                    style={{
-                                        display: openRows.includes(brec.batch_id)
-                                            ? 'table-row'
-                                            : 'none',
-                                        backgroundColor: 'var(--color-bg)',
-                                    }}
-                                    key={`ByLabels${brec.batch_id}`}
-                                >
-                                    <SUITable.Cell style={{ border: 'none' }} />
-                                    <SUITable.Cell style={{ width: 50 }}>
-                                        <Checkbox
-                                            checked={openRows.includes(
-                                                `ByLabels${brec.batch_id}`
-                                            )}
-                                            toggle
-                                            onChange={() =>
-                                                handleToggle(`ByLabels${brec.batch_id}`)
-                                            }
-                                        />
-                                    </SUITable.Cell>
-                                    <SUITable.Cell>Cost By SKU</SUITable.Cell>
-                                </SUITable.Row>
-
-                                <SUITable.Row
-                                    style={{
-                                        display: openRows.includes(`ByLabels${brec.batch_id}`)
-                                            ? 'table-row'
-                                            : 'none',
-                                        backgroundColor: 'var(--color-bg)',
-                                    }}
-                                    key={`ByLabels${brec.batch_id}-details`}
-                                >
-                                    <SUITable.Cell style={{ border: 'none' }} />
-                                    <SUITable.Cell />
-                                    <SUITable.Cell>
-                                        <DonutChart
-                                            data={brec.skus.map((srec) => ({
-                                                label: srec.sku,
-                                                value: srec.cost,
-                                            }))}
-                                            maxSlices={brec.skus.length}
-                                            legendSize={0.6}
-                                        />
-
-                                        <SUITable celled compact>
-                                            <SUITable.Header>
-                                                <SUITable.Row>
-                                                    <SUITable.HeaderCell>
-                                                        SKU
-                                                    </SUITable.HeaderCell>
-                                                    <SUITable.HeaderCell>
-                                                        COST
-                                                    </SUITable.HeaderCell>
-                                                </SUITable.Row>
-                                            </SUITable.Header>
-                                            <SUITable.Body>
-                                                {brec.skus.map((srec, sidx) => (
-                                                    <SUITable.Row>
-                                                        <SUITable.Cell>
-                                                            {srec.sku}
-                                                        </SUITable.Cell>
-                                                        <SUITable.Cell>
-                                                            {formatMoney(srec.cost, 4)}
-                                                        </SUITable.Cell>
-                                                    </SUITable.Row>
-                                                ))}
-                                            </SUITable.Body>
-                                        </SUITable>
-                                    </SUITable.Cell>
-                                </SUITable.Row>
-
-                                <SUITable.Row
-                                    style={{
-                                        display: openRows.includes(brec.batch_id)
-                                            ? 'table-row'
-                                            : 'none',
-                                        backgroundColor: 'var(--color-bg)',
-                                    }}
-                                    key={`BySeqGrp${brec.batch_id}`}
-                                >
-                                    <SUITable.Cell style={{ border: 'none' }} />
-                                    <SUITable.Cell style={{ width: 50 }}>
-                                        <Checkbox
-                                            checked={openRows.includes(
-                                                `BySeqGrp${brec.batch_id}`
-                                            )}
-                                            toggle
-                                            onChange={() =>
-                                                handleToggle(`BySeqGrp${brec.batch_id}`)
-                                            }
-                                        />
-                                    </SUITable.Cell>
-                                    <SUITable.Cell>Cost By Sequencing Group</SUITable.Cell>
-                                </SUITable.Row>
-                                
-                                <SUITable.Row
-                                    style={{
-                                        display: openRows.includes(`BySeqGrp${brec.batch_id}`)
-                                            ? 'table-row'
-                                            : 'none',
-                                        backgroundColor: 'var(--color-bg)',
-                                    }}
-                                    key={`BySeqGrp${brec.batch_id}-details`}
-                                >
-                                    <SUITable.Cell style={{ border: 'none' }} />
-                                    <SUITable.Cell style={{ width: 250 }}>
-                                    </SUITable.Cell>
-                                    <SUITable.Cell>
-                                        <SUITable celled compact>
-                                            <SUITable.Header>
-                                                <SUITable.Row>
-                                                    <SUITable.HeaderCell>SEQ GROUP</SUITable.HeaderCell>
-                                                    <SUITable.HeaderCell>STAGE</SUITable.HeaderCell>
-                                                    <SUITable.HeaderCell>COST</SUITable.HeaderCell>
-                                                </SUITable.Row>
-                                            </SUITable.Header>
-                                            <SUITable.Body>
-                                                {brec.seq_groups
-                                                    .sort((a, b) => b.cost - a.cost) // Sort by cost in descending order
-                                                    .map((gcat, gidx) => (
-                                                    <SUITable.Row>
-                                                        <SUITable.Cell>{gcat.sequencing_group}</SUITable.Cell>
-                                                        <SUITable.Cell>{gcat.stage}</SUITable.Cell>
-                                                        <SUITable.Cell>
-                                                            {formatMoney(gcat.cost, 4)}
-                                                        </SUITable.Cell>
-                                                    </SUITable.Row>
-                                                ))}
-                                            </SUITable.Body>
-                                        </SUITable>
-                                    </SUITable.Cell>
-                                </SUITable.Row>
-
-                                <SUITable.Row
-                                    style={{
-                                        display: openRows.includes(brec.batch_id)
-                                            ? 'table-row'
-                                            : 'none',
-                                        backgroundColor: 'var(--color-bg)',
-                                    }}
-                                    key={`ByLabels${brec.batch_id}`}
-                                >
-                                    <SUITable.Cell style={{ border: 'none' }} />
-                                    <SUITable.Cell style={{ width: 50 }}>
-                                        <Checkbox
-                                            checked={openRows.includes(
-                                                `ByJobs${brec.batch_id}`
-                                            )}
-                                            toggle
-                                            onChange={() =>
-                                                handleToggle(`ByJobs${brec.batch_id}`)
-                                            }
-                                        />
-                                    </SUITable.Cell>
-                                    <SUITable.Cell>Cost By JOBS</SUITable.Cell>
-                                </SUITable.Row>
-
-                                <SUITable.Row
-                                    style={{
-                                        display: openRows.includes(`ByJobs${brec.batch_id}`)
-                                            ? 'table-row'
-                                            : 'none',
-                                        backgroundColor: 'var(--color-bg)',
-                                    }}
-                                    key={`ByJobs${brec.batch_id}-details`}
+                                    key={`jobs-${brec.batch_id}`}
                                 >
                                     <SUITable.Cell style={{ border: 'none' }} />
                                     <SUITable.Cell />
@@ -823,7 +546,7 @@ const HailBatchGridNew: React.FunctionComponent<{
                                         <TableVirtuoso
                                             style={{ height: 600 }}
                                             useWindowScroll
-                                            class="ui celled table compact"
+                                            className="ui celled table compact"
                                             data={brec.jobs.sort((a, b) => {
                                                 // Sorts an array of objects first by 'batch_id' and then by 'job_id' in ascending order.
                                                 if (a.job_id < b.job_id) {
@@ -879,7 +602,7 @@ const HailBatchGridNew: React.FunctionComponent<{
                                         />
                                     </SUITable.Cell>
 
-                                    <SUITable.Cell colspan="2">
+                                    <SUITable.Cell colSpan="2">
                                         WDL TASK NAME: {brec.wdl_task_name}
                                     </SUITable.Cell>
                                 </SUITable.Row>
@@ -981,8 +704,7 @@ const HailBatchGridNew: React.FunctionComponent<{
                                                 value: srec.cost,
                                             }))}
                                             maxSlices={brec.skus.length}
-                                            legendSize={0.6}
-                                        />
+                                            legendSize={0.6} isLoading={false}                                        />
 
                                         <SUITable celled compact>
                                             <SUITable.Header>
@@ -1141,8 +863,7 @@ const HailBatchGridNew: React.FunctionComponent<{
                                                 value: srec.cost,
                                             }))}
                                             maxSlices={brec.skus.length}
-                                            legendSize={0.6}
-                                        />
+                                            legendSize={0.6} isLoading={false}                                        />
 
                                         <SUITable celled compact>
                                             <SUITable.Header>
@@ -1292,8 +1013,7 @@ const HailBatchGridNew: React.FunctionComponent<{
                                                 value: srec.cost,
                                             }))}
                                             maxSlices={brec.skus.length}
-                                            legendSize={0.6}
-                                        />
+                                            legendSize={0.6} isLoading={false}                                        />
 
                                         <SUITable celled compact>
                                             <SUITable.Header>
