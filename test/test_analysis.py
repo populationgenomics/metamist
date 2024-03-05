@@ -262,6 +262,110 @@ class TestAnalysis(DbIsolatedTest):
         self.assertEqual(analyses, expected)
 
     @run_as_sync
+    async def test_analysis_output_gspath_str(self):
+        """
+        Test adding an analysis of type ANALYSIS_RUNNER
+        with valid gs path output file as a string via `output` field
+        """
+
+        a_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='analysis-runner',
+                status=AnalysisStatus.UNKNOWN,
+                sequencing_group_ids=[],
+                meta={},
+                output='gs://fakegcs/file1.txt'
+            )
+        )
+
+        analyses = await self.al.query(
+            AnalysisFilter(
+                id=GenericFilter(eq=a_id),
+            )
+        )
+        expected = [
+            AnalysisInternal(
+                id=a_id,
+                type='analysis-runner',
+                status=AnalysisStatus.UNKNOWN,
+                sequencing_group_ids=[],
+                output='gs://fakegcs/file1.txt',
+                outputs='gs://fakegcs/file1.txt',
+                timestamp_completed=None,
+                project=1,
+                meta={},
+                active=True,
+                author=None,
+            )
+        ]
+
+        self.assertEqual(analyses, expected)
+
+    @run_as_sync
+    async def test_analysis_output_gspath_dict(self):
+        """
+        Test adding an analysis of type ANALYSIS_RUNNER
+        with valid gs path output file as a string via `output` field
+        """
+
+        a_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='analysis-runner',
+                status=AnalysisStatus.UNKNOWN,
+                sequencing_group_ids=[],
+                meta={},
+                outputs={'basename': 'gs://fakegcs/file1.txt'}
+            )
+        )
+
+        analyses = await self.al.query(
+            AnalysisFilter(
+                id=GenericFilter(eq=a_id),
+            )
+        )
+        expected = [
+            AnalysisInternal(
+                id=a_id,
+                type='analysis-runner',
+                status=AnalysisStatus.UNKNOWN,
+                sequencing_group_ids=[],
+                output={
+                    'id': 1,
+                    'path': 'gs://fakegcs/file1.txt',
+                    'basename': 'file1.txt',
+                    'dirname': 'gs://fakegcs',
+                    'nameroot': 'file1',
+                    'nameext': '.txt',
+                    'file_checksum': 'DG+fhg==',
+                    'size': 19,
+                    'meta': None,
+                    'valid': True,
+                    'secondary_files': []
+                },
+                outputs={
+                    'id': 1,
+                    'path': 'gs://fakegcs/file1.txt',
+                    'basename': 'file1.txt',
+                    'dirname': 'gs://fakegcs',
+                    'nameroot': 'file1',
+                    'nameext': '.txt',
+                    'file_checksum': 'DG+fhg==',
+                    'size': 19,
+                    'meta': None,
+                    'valid': True,
+                    'secondary_files': []
+                },
+                timestamp_completed=None,
+                project=1,
+                meta={},
+                active=True,
+                author=None,
+            )
+        ]
+
+        self.assertEqual(analyses, expected)
+
+    @run_as_sync
     async def test_analysis_output_files_json(self):
         """
         Test adding an analysis of type ANALYSIS_RUNNER
