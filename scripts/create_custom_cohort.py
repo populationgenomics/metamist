@@ -28,10 +28,12 @@ def main(
         sg_type=sg_types or []
     )
 
-    capi.create_cohort_from_criteria(
+    cohort = capi.create_cohort_from_criteria(
         project=project,
         body_create_cohort_from_criteria={'cohort_spec': cohort_body_spec, 'cohort_criteria': cohort_criteria, 'dry_run': dry_run}
     )
+
+    print(f'Awesome! You have created a custom cohort with id {cohort["cohort_id"]}')
 
 
 def get_cohort_spec(

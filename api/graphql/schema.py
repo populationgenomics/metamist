@@ -45,6 +45,7 @@ from models.models import (
     SequencingGroupInternal,
 )
 from models.models.sample import sample_id_transform_to_raw
+from models.utils.cohort_id_format import cohort_id_format, cohort_id_transform_to_raw
 from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
@@ -77,7 +78,7 @@ GraphQLEnum = strawberry.type(type('GraphQLEnum', (object,), enum_methods))
 class GraphQLCohort:
     """Cohort GraphQL model"""
 
-    id: int
+    id: str
     name: str
     description: str
     author: str
@@ -86,9 +87,8 @@ class GraphQLCohort:
     @staticmethod
     def from_internal(internal: Cohort) -> 'GraphQLCohort':
         return GraphQLCohort(
-            id=internal.id,
+            id=cohort_id_format(internal.id),
             name=internal.name,
-            project=internal.project,
             description=internal.description,
             author=internal.author,
             derived_from=internal.derived_from,
@@ -100,7 +100,7 @@ class GraphQLCohort:
     ) -> list['GraphQLSequencingGroup']:
         connection = info.context['connection']
         cohort_layer = CohortLayer(connection)
-        sg_ids = await cohort_layer.get_cohort_sequencing_group_ids(root.id)
+        sg_ids = await cohort_layer.get_cohort_sequencing_group_ids(cohort_id_transform_to_raw(root.id))
 
         sg_layer = SequencingGroupLayer(connection)
         sequencing_groups = await sg_layer.get_sequencing_groups_by_ids(sg_ids)
@@ -286,7 +286,7 @@ class GraphQLProject:
         connection.project = root.id
 
         c_filter = CohortFilter(
-            id=id.to_internal_filter() if id else None,
+            id=id.to_internal_filter(cohort_id_transform_to_raw) if id else None,
             name=name.to_internal_filter() if name else None,
             author=author.to_internal_filter() if author else None,
             derived_from=derived_from.to_internal_filter() if derived_from else None,
@@ -737,7 +737,7 @@ class Query:  # entry point to graphql.
     async def cohort(
         self,
         info: Info,
-        id: GraphQLFilter[int] | None = None,
+        id: GraphQLFilter[str] | None = None,
         project: GraphQLFilter[str] | None = None,
         name: GraphQLFilter[str] | None = None,
         author: GraphQLFilter[str] | None = None,
@@ -760,15 +760,15 @@ class Query:  # entry point to graphql.
             )
 
         filter_ = CohortFilter(
-            id=id.to_internal_filter() if id else None,
+            id=id.to_internal_filter(cohort_id_transform_to_raw) if id else None,
             name=name.to_internal_filter() if name else None,
             project=project_filter,
             author=author.to_internal_filter() if author else None,
             derived_from=derived_from.to_internal_filter() if derived_from else None,
         )
 
-        cohort = await clayer.query(filter_)
-        return cohort
+        cohorts = await clayer.query(filter_)
+        return [GraphQLCohort.from_internal(cohort) for cohort in cohorts]
 
     @strawberry.field()
     async def project(self, info: Info, name: str) -> GraphQLProject:

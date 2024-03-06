@@ -13,6 +13,7 @@ from db.python.tables.sequencing_group import (
 )
 from db.python.utils import GenericFilter, get_logger
 from models.models.cohort import Cohort, CohortCriteria, CohortTemplate
+from models.utils.cohort_id_format import cohort_id_format
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format_list,
     sequencing_group_id_transform_to_raw_list,
@@ -168,4 +169,4 @@ class CohortLayer(BaseLayer):
             derived_from=template_id,
         )
 
-        return {'cohort_id': cohort_id, 'sequencing_group_ids': rich_ids}
+        return {'cohort_id': cohort_id_format(cohort_id), 'sequencing_group_ids': rich_ids}
