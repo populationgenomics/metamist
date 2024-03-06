@@ -9,6 +9,7 @@ const getAdjustedDay = (value: string, days: number): string => {
 }
 
 const getCurrentInvoiceMonth = () => {
+    // get current month and year in the format YYYYMM
     const date = new Date()
     return [
         date.getFullYear(),
@@ -44,10 +45,7 @@ const generateInvoiceMonths = (start: string, end: string): string[] => {
             const monthString = month.toString().padStart(2, '0')
             const yearString = i.toString()
             const dateString = `${yearString}${monthString}`
-            const currentDate = new Date(`${yearString}-${monthString}-01`)
-            if (currentDate >= dateStart && currentDate <= dateEnd) {
-                invoiceMonths.push(dateString)
-            }
+            invoiceMonths.push(dateString)
         }
     }
     return invoiceMonths;
