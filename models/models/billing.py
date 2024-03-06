@@ -371,6 +371,7 @@ class BillingBatchCostRecord(SMBase):
     wdl_tasks: list[dict] | None
     cromwell_sub_workflows: list[dict] | None
     cromwell_workflows: list[dict] | None
+    dataproc: list[dict] | None
 
     @staticmethod
     def from_json(record):
@@ -385,6 +386,7 @@ class BillingBatchCostRecord(SMBase):
             wdl_tasks=record.get('wdl_tasks'),
             cromwell_sub_workflows=record.get('cromwell_sub_workflows'),
             cromwell_workflows=record.get('cromwell_workflows'),
+            dataproc=record.get('dataproc'),
         )
 
     # ar_guid: str | None

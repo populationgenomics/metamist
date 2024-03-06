@@ -16,6 +16,7 @@ export interface IDonutChartProps {
     isLoading: boolean
     legendSize?: number | undefined
     showLegend?: boolean | undefined
+    maxWidth?: string | undefined
 }
 
 interface IDonutChartPreparadData {
@@ -40,6 +41,7 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
     isLoading,
     legendSize,
     showLegend,
+    maxWidth,
 }) => {
     if (isLoading) {
         return (
@@ -240,5 +242,5 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
                 })
             }
     }
-    return <div ref={containerDivRef}></div>
+    return <div ref={containerDivRef} style={{ maxWidth: maxWidth }} ></div>
 }

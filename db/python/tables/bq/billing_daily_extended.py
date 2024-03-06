@@ -82,16 +82,21 @@ class BillingDailyExtendedTable(BillingBaseTable):
         else:
             raise ValueError('Either ar_guid or batch_ids must be provided')
 
-        # The query will locate all the records for the given time range and batch_ids or ar_guid
-        # Then it aggregate the cost per topic (top 3),
+        # The query will locate all the records for the given time range
+        # and batch_ids or ar_guid
+        # getting all records in one go to limit number of queries,
+        # cutting the total cost of BQ
+        # After getting all the needed data,
+        # aggregate:
+        # the cost per topic,
         # get counts of batches,
         # cost per hail, cromwell and dataproc
         # start and end date of the usage
         # total cost,
         # including cost by sku
-        # by all labels (if any) - only predfined labels are used
 
         _query = f"""
+            -- get all data we need for aggregations in one go
             WITH d AS (
                     SELECT topic, ar_guid,
                     CASE WHEN compute_category IS NULL AND batch_id IS NOT NULL THEN
@@ -106,6 +111,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
                         AND day <= @end_time
                         AND {condition}
                 )
+            -- sku per ar-guid record
             , arsku AS (
                 SELECT sku, SUM(cost) as cost
                 FROM d
@@ -117,6 +123,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
                 SELECT ARRAY_AGG(STRUCT(sku, cost)) AS skus,
                 FROM arsku
             )
+            -- sequencing group record
             ,seqgrp AS (
                 select sequencing_group, stage, sum(cost) as cost from d group by stage, sequencing_group
             )
@@ -124,18 +131,19 @@ class BillingDailyExtendedTable(BillingBaseTable):
                 SELECT ARRAY_AGG(STRUCT(sequencing_group, stage, cost)) as seq_groups
                 FROM seqgrp
             )
+            -- topics record
             , t3 AS (
                     SELECT topic, SUM(cost) AS cost
                     FROM d
                     WHERE topic IS NOT NULL
                     GROUP BY topic
                     ORDER BY cost DESC
-                    LIMIT 3 -- pick top 3 topics
                 )
             , t3acc AS (
                 SELECT ARRAY_AGG(STRUCT(topic, cost)) AS topics,
                 FROM t3
                 )
+            -- category specific record
             , cc AS (
                 SELECT category, sum(cost) AS cost,
                 CASE WHEN category = 'hail batch' THEN COUNT(DISTINCT batch_id) ELSE NULL END as workflows
@@ -146,6 +154,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
                 SELECT ARRAY_AGG(STRUCT(cc.category, cc.cost, cc.workflows)) AS categories
                 FROM cc
                 )
+            -- total record per ar-guid
             ,t AS (
                 SELECT STRUCT(
                     ar_guid, sum(d.cost) AS cost,
@@ -155,6 +164,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
                 FROM d
                 GROUP BY ar_guid
             )
+            -- hail batch job record
             , jsku AS (
                 SELECT batch_id, job_id, sku, SUM(cost) as cost
                 FROM d
@@ -183,6 +193,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
                 from j INNER JOIN jskuacc on jskuacc.batch_id = j.batch_id AND jskuacc.job_id = j.job_id
                 GROUP BY j.batch_id
             )
+            -- hail batch record
             , bsku AS (
                 SELECT batch_id, sku, SUM(cost) as cost
                 FROM d
@@ -222,7 +233,8 @@ class BillingDailyExtendedTable(BillingBaseTable):
                 INNER JOIN jacc ON jacc.batch_id = b.batch_id
                 INNER JOIN bseqgrpacc ON bseqgrpacc.batch_id = b.batch_id
             )
-            -- cromwell specific
+            -- cromwell specific records:
+            -- wdl_task record
             , wdlsku AS (
                 SELECT wdl_task_name, sku, SUM(cost) as cost
                 FROM d
@@ -252,6 +264,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
                 from wdl
                 INNER JOIN wdlskuacc on wdlskuacc.wdl_task_name = wdl.wdl_task_name
             )
+            -- cromwell_workflow record
             , cwisku AS (
                 SELECT cromwell_workflow_id, sku, SUM(cost) as cost
                 FROM d
@@ -281,6 +294,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
                 from cwi
                 INNER JOIN cwiskuacc on cwiskuacc.cromwell_workflow_id = cwi.cromwell_workflow_id
             )
+            -- cromwell_sub_workflow record
             , cswsku AS (
                 SELECT cromwell_sub_workflow_name, sku, SUM(cost) as cost
                 FROM d
@@ -310,10 +324,37 @@ class BillingDailyExtendedTable(BillingBaseTable):
                 from csw
                 INNER JOIN cswskuacc on cswskuacc.cromwell_sub_workflow_name = csw.cromwell_sub_workflow_name
             )
+            -- dataproc specific record
+            , dprocsku AS (
+                SELECT category as dataproc, sku, SUM(cost) as cost
+                FROM d
+                WHERE category = 'dataproc'
+                AND cost != 0
+                GROUP BY dataproc, sku
+                ORDER BY cost DESC
+            )
+            , dprocskuacc AS (
+                SELECT dataproc, ARRAY_AGG(STRUCT(sku, cost)) AS skus,
+                FROM dprocsku
+                GROUP BY dataproc
+            )
+            ,dproc AS (
+                SELECT category as dataproc, sum(cost) AS cost,
+                    MIN(usage_start_time) AS usage_start_time,
+                    max(usage_end_time) AS usage_end_time
+                FROM d
+                WHERE category = 'dataproc'
+                GROUP BY dataproc
+            )
+            , dprocacc as (
+                SELECT ARRAY_AGG(STRUCT(dproc.dataproc, cost, usage_start_time, usage_end_time, dprocskuacc.skus)) AS dataproc
+                from dproc
+                INNER JOIN dprocskuacc on dprocskuacc.dataproc = dproc.dataproc
+            )
             -- merge all in one record
-            SELECT t.total, t3acc.topics, ccacc.categories, bacc.batches, arskuacc.skus, wdlacc.wdl_tasks, cswacc.cromwell_sub_workflows, cwiacc.cromwell_workflows, seqgrpacc.seq_groups
-            FROM t, t3acc, ccacc, bacc, arskuacc, wdlacc, cswacc, cwiacc, seqgrpacc
-
+            SELECT t.total, t3acc.topics, ccacc.categories, bacc.batches, arskuacc.skus,
+            wdlacc.wdl_tasks, cswacc.cromwell_sub_workflows, cwiacc.cromwell_workflows, seqgrpacc.seq_groups, dprocacc.dataproc
+            FROM t, t3acc, ccacc, bacc, arskuacc, wdlacc, cswacc, cwiacc, seqgrpacc, dprocacc
 
         """
 
