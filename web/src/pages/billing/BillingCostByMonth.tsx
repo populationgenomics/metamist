@@ -195,7 +195,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
             getData({
                 fields: [BillingColumn.Topic, BillingColumn.CostCategory],
                 start_date: getAdjustedDay(convertInvoiceMonth(start, true), -2),
-                end_date: getAdjustedDay(convertInvoiceMonth(end, false), 2),
+                end_date: getAdjustedDay(convertInvoiceMonth(end, false), 3),
                 order_by: { day: false },
                 source: BillingSource.Aggregate,
                 time_periods: 'invoice_month',
