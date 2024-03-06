@@ -63,7 +63,7 @@ choco install mariadb --version=10.8.3
 - Additional dev requirements are listed in `requirements-dev.txt`.
 - Packages for the sever-side code are listed in `requirements.txt`.
 
-We *STRONGLY* encourage the use of `pyenv` for managing Python versions. Debugging and the server will run on a minimum python version of 3.10. Refer to the [team-docs](https://github.com/populationgenomics/team-docs/blob/main/python.md) for more instructions on how to set this up.
+We *STRONGLY* encourage the use of `pyenv` for managing Python versions. Debugging and the server will run on a minimum python version of 3.11. Refer to the [team-docs](https://github.com/populationgenomics/team-docs/blob/main/python.md) for more instructions on how to set this up.
 
 Use of a virtual environment to contain all requirements is highly recommended:
 
