@@ -96,10 +96,10 @@ class DbTest(unittest.TestCase):
             logger = logging.getLogger()
             try:
                 set_all_access(True)
-                db = MySqlContainer('mariadb:10.8.3')
+                db = MySqlContainer('mariadb:11.2.2')
                 port_to_expose = find_free_port()
                 # override the default port to map the container to
-                db.with_bind_ports(db.port_to_expose, port_to_expose)
+                db.with_bind_ports(db.port, port_to_expose)
                 logger.disabled = True
                 db.start()
                 logger.disabled = False
@@ -111,7 +111,7 @@ class DbTest(unittest.TestCase):
 
                 con_string = db.get_connection_url()
                 con_string = 'mysql://' + con_string.split('://', maxsplit=1)[1]
-                lcon_string = f'jdbc:mariadb://{db.get_container_host_ip()}:{port_to_expose}/{db.MYSQL_DATABASE}'
+                lcon_string = f'jdbc:mariadb://{db.get_container_host_ip()}:{port_to_expose}/{db.dbname}'
                 # apply the liquibase schema
                 command = [
                     'liquibase',
@@ -120,8 +120,8 @@ class DbTest(unittest.TestCase):
                     *('--url', lcon_string),
                     *('--driver', 'org.mariadb.jdbc.Driver'),
                     *('--classpath', db_prefix + '/mariadb-java-client-3.0.3.jar'),
-                    *('--username', db.MYSQL_USER),
-                    *('--password', db.MYSQL_PASSWORD),
+                    *('--username', db.username),
+                    *('--password', db.password),
                     'update',
                 ]
                 subprocess.check_output(command, stderr=subprocess.STDOUT)
@@ -175,7 +175,7 @@ class DbTest(unittest.TestCase):
     def tearDownClass(cls) -> None:
         db = cls.dbs.get(cls.__name__)
         if db:
-            db.exec(f'DROP DATABASE {db.MYSQL_DATABASE};')
+            db.exec(f'DROP DATABASE {db.dbname};')
             db.stop()
 
     def setUp(self) -> None:
