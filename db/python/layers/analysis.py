@@ -441,9 +441,9 @@ class AnalysisLayer(BaseLayer):
         sample_create_dates = await sglayer.get_samples_create_date_from_sgs(
             list(crams.keys())
         )
-        by_date: dict[
-            SequencingGroupInternalId, list[tuple[datetime.date, int]]
-        ] = defaultdict(list)
+        by_date: dict[SequencingGroupInternalId, list[tuple[datetime.date, int]]] = (
+            defaultdict(list)
+        )
 
         for sg_id, analyses in crams.items():
             if len(analyses) == 1:
@@ -531,7 +531,9 @@ class AnalysisLayer(BaseLayer):
 
         return by_day
 
-    async def get_audit_logs_by_analysis_ids(self, analysis_ids: list[int]) -> dict[int, list[AuditLogInternal]]:
+    async def get_audit_logs_by_analysis_ids(
+        self, analysis_ids: list[int]
+    ) -> dict[int, list[AuditLogInternal]]:
         """Get audit logs for analysis IDs"""
         return await self.at.get_audit_log_for_analysis_ids(analysis_ids)
 
@@ -594,12 +596,16 @@ class AnalysisLayer(BaseLayer):
     async def get_analysis_runner_log(
         self,
         project_ids: list[int] = None,
-        author: str = None,
+        # author: str = None,
         output_dir: str = None,
+        ar_guid: str = None,
     ) -> list[AnalysisInternal]:
         """
         Get log for the analysis-runner, useful for checking this history of analysis
         """
         return await self.at.get_analysis_runner_log(
-            project_ids, author=author, output_dir=output_dir
+            project_ids,
+            # author=author,
+            output_dir=output_dir,
+            ar_guid=ar_guid,
         )

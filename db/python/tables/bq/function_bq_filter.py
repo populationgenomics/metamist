@@ -27,14 +27,14 @@ class FunctionBQFilter:
 
     def __init__(self, name: str, implementation: str):
         self.func_name = name
-        self.fun_implementation = implementation
+        self.func_implementation = implementation
         # param_id is a counter for parameterised values
         self._param_id = 0
 
     def to_sql(
         self,
         column_name: BillingColumn,
-        func_params: str | list[Any] | dict[Any, Any],
+        func_params: str | list[Any] | dict[Any, Any] | None = None,
         func_operator: str = None,
     ) -> tuple[str, list[bigquery.ScalarQueryParameter | bigquery.ArrayQueryParameter]]:
         """
@@ -103,7 +103,9 @@ class FunctionBQFilter:
         if isinstance(value, float):
             return bigquery.ScalarQueryParameter(key, 'FLOAT64', value)
         if isinstance(value, datetime):
-            return bigquery.ScalarQueryParameter(key, 'STRING', value)
+            return bigquery.ScalarQueryParameter(
+                key, 'STRING', value.isoformat(timespec='seconds')
+            )
 
         # otherwise as string parameter
         return bigquery.ScalarQueryParameter(key, 'STRING', value)

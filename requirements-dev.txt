@@ -7,7 +7,7 @@ flake8-bugbear
 nest-asyncio
 pre-commit
 pylint
-testcontainers[mariadb]
+testcontainers[mariadb]==3.7.1
 types-PyMySQL
 # some strawberry dependency
 strawberry-graphql[debug-server]==0.206.0
@@ -15,3 +15,5 @@ strawberry-graphql[debug-server]==0.206.0
 functions_framework
 google-cloud-bigquery
 google-cloud-pubsub
+# following required to unit test some billing functions
+pytz

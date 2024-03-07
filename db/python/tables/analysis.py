@@ -486,8 +486,9 @@ ORDER BY a.timestamp_completed DESC;
     async def get_analysis_runner_log(
         self,
         project_ids: List[int] = None,
-        author: str = None,
+        # author: str = None,
         output_dir: str = None,
+        ar_guid: str = None,
     ) -> List[AnalysisInternal]:
         """
         Get log for the analysis-runner, useful for checking this history of analysis
@@ -501,14 +502,14 @@ ORDER BY a.timestamp_completed DESC;
             wheres.append('project in :project_ids')
             values['project_ids'] = project_ids
 
-        if author:
-            wheres.append('audit_log_id = :audit_log_id')
-            values['audit_log_id'] = await self.audit_log_id()
-
         if output_dir:
             wheres.append('(output = :output OR output LIKE :output_like)')
             values['output'] = output_dir
             values['output_like'] = f'%{output_dir}'
+
+        if ar_guid:
+            wheres.append('JSON_EXTRACT(meta, "$.ar_guid") = :ar_guid')
+            values['ar_guid'] = ar_guid
 
         wheres_str = ' AND '.join(wheres)
         _query = f'SELECT * FROM analysis WHERE {wheres_str}'
