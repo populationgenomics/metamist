@@ -5,6 +5,7 @@ import asyncio
 import datetime
 import random
 from pathlib import Path
+from pprint import pprint
 
 from metamist.apis import (
     AnalysisApi,
@@ -163,10 +164,8 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
                         )
                     )
 
-    # response = await sapi.upsert_samples_async(project, samples)
-    # pprint(response)
-
-    # practice what you preach I guess
+    response = await sapi.upsert_samples_async(project, samples)
+    pprint(response)
 
     sgid_response = await query_async(QUERY_SG_ID, {'project': project})
     sequencing_group_ids = [
@@ -196,12 +195,12 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
                 ar_api.create_analysis_runner_log_async(
                     project=project,
                     ar_guid=f'fake-guid-{s}',
-                    output_path=f'FAKE://greek-myth-test/joint-calling/{s}.joint',
-                    access_level=random.choice(['full', 'standard', 'restricted']),
-                    repository="metamist",
-                    config_path="gs://path/to/config.toml",
-                    environment="gcp",
-                    submitting_user="fake-user",
+                    output_path=f'FAKE://greek-myth-test/output-dir/{s}',
+                    access_level=random.choice(['full', 'standard', 'test']),
+                    repository='metamist',
+                    config_path='gs://path/to/config.toml',
+                    environment='gcp',
+                    submitting_user='fake-user',
                     # meta
                     request_body={},
                     commit='some-hash',
@@ -212,7 +211,7 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
                     driver_image='fake-australia-southeast1-fake-docker.pkg',
                     batch_url=f'FAKE://batch.hail.populationgenomics.org.au/batches/fake_{s}',
                 )
-                for s in random.choices(sequencing_group_ids, k=10)
+                for s in range(15)
             ]
         )
     )
@@ -233,7 +232,7 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
 
     for ans in chunk(analyses_to_insert, 50):
         print(f'Inserting {len(ans)} analysis entries')
-        # await asyncio.gather(*[aapi.create_analysis_async(project, a) for a in ans])
+        await asyncio.gather(*[aapi.create_analysis_async(project, a) for a in ans])
 
 
 if __name__ == '__main__':

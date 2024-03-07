@@ -20,7 +20,7 @@ const PAGE_SIZES = [20, 40, 100, 1000]
 const GET_ANALYSIS_RUNNER_LOGS = gql(`
 query AnalysisRunnerLogs($project_name: String!) {
     project(name: $project_name) {
-        analysisRunnerLogs {
+        analysisRunner {
             arGuid
             timestamp
             accessLevel
@@ -36,10 +36,13 @@ query AnalysisRunnerLogs($project_name: String!) {
             batchUrl
             submittingUser
             meta
+            outputPath
         }
       }
   }
 `)
+
+
 
 const AnalysisRunnerSummary: React.FunctionComponent = () => {
     const navigate = useNavigate()
@@ -91,9 +94,7 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
         ])
     }
 
-
-
-    const flatData = data?.project.analysisRunnerLogs.map((arLog, i) => {
+    const flatData = data?.project.analysisRunner.map((arLog, i) => {
         // author is technically the "sample-metadata-pubsub" service, so we'll
         // which is the user who triggered the analysis
 

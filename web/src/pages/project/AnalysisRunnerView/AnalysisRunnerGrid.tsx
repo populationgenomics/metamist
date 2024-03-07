@@ -6,34 +6,10 @@ import sanitiseValue from '../../../shared/utilities/sanitiseValue'
 
 import { Filter } from './Filter'
 import './AnalysisGrid.css'
+import { access } from 'fs'
 
-const EXCLUDED_FIELDS = [
-    'id',
-    'commit',
-    'source',
-    'position',
-    'batch_url',
-    'repo',
-    'email',
-    'timestamp',
-]
 
-const MAIN_FIELDS = [
-    {
-        category: 'Hail Batch',
-        title: 'Hail Batch',
-    },
-    { category: 'GitHub', title: 'GitHub' },
-    { category: 'Author', title: 'Author' },
-    { category: 'Date', title: 'Date' },
-    { category: 'script', title: 'Script' },
-    { category: 'accessLevel', title: 'Access Level' },
-    { category: 'Image', title: 'Driver Image' },
-    { category: 'description', title: 'Description' },
-    { category: 'mode', title: 'Mode' },
-]
-
-interface AnalysisRunnerGridValues {
+export interface AnalysisRunnerGridItem {
     arGuid: string
     timestamp: any
     accessLevel: string
@@ -51,25 +27,199 @@ interface AnalysisRunnerGridValues {
     meta: any
 }
 
-const AnalysisRunnerGrid: React.FunctionComponent<{
-    data: AnalysisRunnerGridValues[]
+type AnalysisRunnerGridItemKeys = keyof AnalysisRunnerGridItem;
+
+
+interface IMainField {
+    field: AnalysisRunnerGridItemKeys
+    title: string
+}
+
+const MAIN_FIELDS: IMainField[] = [
+    { field: "arGuid", title: "AR GUID" },
+    { field: 'batchUrl', title: 'Hail Batch' },
+    { field: 'repository', title: 'GitHub' },
+    { field: 'submittingUser', title: 'Author' },
+    { field: 'timestamp', title: 'Date' },
+    // { field: 'script', title: 'Script' },
+    { field: 'accessLevel', title: 'Access Level' },
+    { field: 'driverImage', title: 'Driver Image' },
+    // { field: 'description', title: 'Description' },
+]
+
+const EXCLUDED_FIELDS: AnalysisRunnerGridItemKeys[] = [
+    'arGuid',
+    'commit',
+    'batchUrl',
+    'repository',
+    'submittingUser',
+    'timestamp',
+    'environment',
+
+]
+
+interface IAnalysisRunnerGridProps {
+    data: AnalysisRunnerGridItem[]
     filters: Filter[]
-    updateFilter: (value: string, category: string) => void
+    updateFilter: (value: string, field: string) => void
     handleSort: (clickedColumn: string) => void
     sort: { column: string | null; direction: string | null }
-}> = ({ data, filters, updateFilter, handleSort, sort }) => {
+
+}
+
+interface IFieldCellProps {
+    log: AnalysisRunnerGridItem
+}
+const FieldToCell: { [value: AnalysisRunnerGridItemKeys]: React.FunctionComponent<IFieldCellProps> } = {
+    hailBatch: ({ log, ...props }: IFieldCellProps) => (
+        <SUITable.Cell
+            {...props}
+            style={{ width: '100px' }}
+        >
+            <a
+                href={`${log.batchUrl}`}
+                rel="noopener noreferrer"
+                target="_blank"
+            >
+                {log.batchUrl}
+            </a>
+        </SUITable.Cell>
+    ),
+    arGuid: ({ log, ...props }: IFieldCellProps) => (
+        <SUITable.Cell
+            {...props}
+            style={{ width: '100px' }}
+        >
+            {log.arGuid}
+        </SUITable.Cell>
+    ),
+    repository: ({ log, ...props }: IFieldCellProps) => (
+
+        <SUITable.Cell
+            {...props}
+            style={{ width: '200px' }}
+        >
+            <a
+                href={`${`https://www.github.com/populationgenomics/${log.repository}/tree/${log.commit}`}`}
+                rel="noopener noreferrer"
+                target="_blank"
+            >
+                {log.repository}
+            </a>
+        </SUITable.Cell>
+    ),
+    author: ({ log, ...props }: IFieldCellProps) => (
+        <SUITable.Cell
+            {...props}
+            style={{ width: '100px' }}
+        >
+            <Popup
+                trigger={
+                    <span
+                        style={{
+                            textDecoration: 'underline',
+                            cursor: 'pointer',
+                        }}
+                    // onClick={() => {
+                    //     const author = _.get(log, field)
+                    //     if (
+                    //         filters.find(
+                    //             (f) =>
+                    //                 f.field === field
+                    //         )?.value === author
+                    //     ) {
+                    //         updateFilter('', 'Author')
+                    //     } else {
+                    //         updateFilter(
+                    //             _.get(log, field),
+                    //             'Author'
+                    //         )
+                    //     }
+                    // }}
+                    >
+                        {log.submittingUser}
+                    </span>
+                }
+                hoverable
+                position="bottom center"
+            >
+                {log.submittingUser}
+            </Popup>
+        </SUITable.Cell>
+    ),
+    date: ({ log, ...props }: IFieldCellProps) => (
+        <SUITable.Cell
+            {...props}
+            style={{ width: '100px' }}
+        >
+            <Popup
+                trigger={<span>{_.get(log, 'Date')}</span>}
+                hoverable
+                position="bottom center"
+            >
+                log.timestamp
+            </Popup>
+        </SUITable.Cell>
+    ),
+    // image: ({log, ...props}: IFieldCellProps) => (
+    // case 'script':
+    //     return (
+    //         <SUITable.Cell key={field} className="scriptField">
+    //             <code
+    //                 onClick={() => handleToggle(log.arGuid)}
+    //                 style={{
+    //                     cursor: 'pointer',
+    //                 }}
+    //             >
+    //                 {sanitiseValue(_.get(log, field))}
+    //             </code>
+    //         </SUITable.Cell>
+    //     )
+    accessLevel: ({ log, ...props }: IFieldCellProps) => (
+        <SUITable.Cell
+            {...props}
+            style={{ width: '100px' }}
+        >
+            <span
+                style={{
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                    width: '100px',
+                }}
+            // onClick={() => {
+            //     if (
+            //         filters.filter(
+            //             (f) => f.field === field
+            //         ).length > 0
+            //     ) {
+            //         updateFilter('', 'accessLevel')
+            //     } else {
+            //         updateFilter(
+            //             _.get(log, field),
+            //             'accessLevel'
+            //         )
+            //     }
+            // }}
+            >
+                {log.accessLevel}
+            </span>
+        </SUITable.Cell>
+    )
+}
+
+const AnalysisRunnerGrid: React.FC<IAnalysisRunnerGridProps> = ({ data, filters, updateFilter, handleSort, sort }) => {
     const [openRows, setOpenRows] = React.useState<Set<string>>(new Set())
 
     const handleToggle = (arGuid: string) => {
         if (!openRows.has(arGuid)) {
-            setOpenRows(new Set(...openRows, arGuid))
+            setOpenRows(new Set([...openRows, arGuid]))
         } else {
             setOpenRows(new Set([...openRows].filter((r) => r !== arGuid)))
         }
     }
 
-    const checkDirection = (category: string) => {
-        if (sort.column === category && sort.direction !== null) {
+    const checkDirection = (field: string) => {
+        if (sort.column === field && sort.direction !== null) {
             return sort.direction === 'ascending' ? 'ascending' : 'descending'
         }
         return undefined
@@ -80,11 +230,11 @@ const AnalysisRunnerGrid: React.FunctionComponent<{
             <SUITable.Header>
                 <SUITable.Row>
                     <SUITable.HeaderCell style={{ borderBottom: 'none' }} />
-                    {MAIN_FIELDS.map(({ category, title }, i) => (
+                    {MAIN_FIELDS.map(({ field, title }, i) => (
                         <SUITable.HeaderCell
-                            key={`${category}-${i}`}
-                            sorted={checkDirection(category)}
-                            onClick={() => handleSort(category)}
+                            key={`${field}-${i}`}
+                            sorted={checkDirection(field)}
+                            onClick={() => handleSort(field)}
                             style={{
                                 borderBottom: 'none',
                                 position: 'sticky',
@@ -103,9 +253,9 @@ const AnalysisRunnerGrid: React.FunctionComponent<{
                             backgroundColor: 'var(--color-table-header)',
                         }}
                     />
-                    {MAIN_FIELDS.map(({ category }) => (
+                    {MAIN_FIELDS.map(({ field }) => (
                         <SUITable.Cell
-                            key={`${category}-filter`}
+                            key={`${field}-filter`}
                             style={{
                                 borderBottom: 'none',
                                 borderTop: 'none',
@@ -114,14 +264,14 @@ const AnalysisRunnerGrid: React.FunctionComponent<{
                         >
                             <input
                                 type="text"
-                                key={category}
-                                id={category}
-                                onChange={(e) => updateFilter(e.target.value, category)}
+                                key={field}
+                                id={field}
+                                onChange={(e) => updateFilter(e.target.value, field)}
                                 placeholder="Filter..."
                                 value={
                                     filters.find(
-                                        ({ category: FilterCategory }) =>
-                                            FilterCategory === category
+                                        ({ category: Filterfield }) =>
+                                            Filterfield === field
                                     )?.value ?? ''
                                 }
                                 style={{ border: 'none', width: '100%', borderRadius: '25px' }}
@@ -136,10 +286,10 @@ const AnalysisRunnerGrid: React.FunctionComponent<{
                             backgroundColor: 'var(--color-table-header)',
                         }}
                     />
-                    {MAIN_FIELDS.map(({ category }) => (
+                    {MAIN_FIELDS.map(({ field }) => (
                         <SUITable.Cell
                             className="sizeRow"
-                            key={`${category}-resize`}
+                            key={`${field}-resize`}
                             style={{
                                 borderTop: 'none',
                                 backgroundColor: 'var(--color-table-header)',
@@ -150,7 +300,7 @@ const AnalysisRunnerGrid: React.FunctionComponent<{
             </SUITable.Header>
             <SUITable.Body>
                 {data.map((log) => (
-                    <React.Fragment key={log.arGuid}>
+                    <React.Fragment key={`asdasdad-{log.arGuid}`}>
                         <SUITable.Row>
                             <SUITable.Cell collapsing>
                                 <Checkbox
@@ -159,155 +309,26 @@ const AnalysisRunnerGrid: React.FunctionComponent<{
                                     onChange={() => handleToggle(log.arGuid)}
                                 />
                             </SUITable.Cell>
-                            {MAIN_FIELDS.map(({ category }) => {
-                                switch (category) {
-                                    case 'Hail Batch':
-                                        return (
-                                            <SUITable.Cell
-                                                key={category}
-                                                style={{ width: '100px' }}
-                                            >
-                                                <a
-                                                    href={`${log.batchUrl}`}
-                                                    rel="noopener noreferrer"
-                                                    target="_blank"
-                                                >
-                                                    {_.get(log, category)}
-                                                </a>
-                                            </SUITable.Cell>
-                                        )
-                                    case 'GitHub':
-                                        return (
-                                            <SUITable.Cell
-                                                key={category}
-                                                style={{ width: '200px' }}
-                                            >
-                                                <a
-                                                    href={`${`https://www.github.com/populationgenomics/${log.repo}/tree/${log.commit}`}`}
-                                                    rel="noopener noreferrer"
-                                                    target="_blank"
-                                                >
-                                                    {_.get(log, category)}
-                                                </a>
-                                            </SUITable.Cell>
-                                        )
-                                    case 'Author':
-                                        return (
-                                            <SUITable.Cell
-                                                key={category}
-                                                style={{ width: '100px' }}
-                                            >
-                                                <Popup
-                                                    trigger={
-                                                        <span
-                                                            style={{
-                                                                textDecoration: 'underline',
-                                                                cursor: 'pointer',
-                                                            }}
-                                                            onClick={() => {
-                                                                const author = _.get(log, category)
-                                                                if (
-                                                                    filters.find(
-                                                                        (f) =>
-                                                                            f.category === category
-                                                                    )?.value === author
-                                                                ) {
-                                                                    updateFilter('', 'Author')
-                                                                } else {
-                                                                    updateFilter(
-                                                                        _.get(log, category),
-                                                                        'Author'
-                                                                    )
-                                                                }
-                                                            }}
-                                                        >
-                                                            {_.get(log, category)}
-                                                        </span>
-                                                    }
-                                                    hoverable
-                                                    position="bottom center"
-                                                >
-                                                    {_.get(log, 'email')}
-                                                </Popup>
-                                            </SUITable.Cell>
-                                        )
-                                    case 'Date':
-                                        return (
-                                            <SUITable.Cell
-                                                key={category}
-                                                style={{ width: '100px' }}
-                                            >
-                                                <Popup
-                                                    trigger={<span>{_.get(log, 'Date')}</span>}
-                                                    hoverable
-                                                    position="bottom center"
-                                                >
-                                                    {_.get(log, 'timestamp')}
-                                                </Popup>
-                                            </SUITable.Cell>
-                                        )
-                                    case 'Image':
-                                    case 'mode':
-                                        return (
-                                            <SUITable.Cell
-                                                key={category}
-                                                style={{ width: '100px' }}
-                                            >
-                                                {_.get(log, category)}
-                                            </SUITable.Cell>
-                                        )
+                            {MAIN_FIELDS.map(({ field }) => {
+                                const component = FieldToCell[field]
+                                if (component) {
+                                    const FieldComponent = FieldToCell[field]
+                                    return (
+                                        <FieldComponent
+                                            key={`cell-{field}`}
+                                            log={log}
+                                        />
+                                    )
+                                }
+                                switch (field) {
 
-                                    case 'script':
-                                        return (
-                                            <SUITable.Cell key={category} className="scriptField">
-                                                <code
-                                                    onClick={() => handleToggle(log.position)}
-                                                    style={{
-                                                        cursor: 'pointer',
-                                                    }}
-                                                >
-                                                    {sanitiseValue(_.get(log, category))}
-                                                </code>
-                                            </SUITable.Cell>
-                                        )
-                                    case 'accessLevel':
-                                        return (
-                                            <SUITable.Cell
-                                                key={category}
-                                                style={{ width: '100px' }}
-                                            >
-                                                <span
-                                                    style={{
-                                                        textDecoration: 'underline',
-                                                        cursor: 'pointer',
-                                                        width: '100px',
-                                                    }}
-                                                    onClick={() => {
-                                                        if (
-                                                            filters.filter(
-                                                                (f) => f.category === category
-                                                            ).length > 0
-                                                        ) {
-                                                            updateFilter('', 'accessLevel')
-                                                        } else {
-                                                            updateFilter(
-                                                                _.get(log, category),
-                                                                'accessLevel'
-                                                            )
-                                                        }
-                                                    }}
-                                                >
-                                                    {_.get(log, category)}
-                                                </span>
-                                            </SUITable.Cell>
-                                        )
                                     default:
                                         return (
                                             <SUITable.Cell
-                                                key={category}
+                                                key={field}
                                                 style={{ width: '300px' }}
                                             >
-                                                {sanitiseValue(_.get(log, category))}
+                                                {sanitiseValue(_.get(log, field))}
                                             </SUITable.Cell>
                                         )
                                 }
@@ -315,15 +336,15 @@ const AnalysisRunnerGrid: React.FunctionComponent<{
                         </SUITable.Row>
                         {Object.entries(log)
                             .filter(
-                                ([c]) =>
-                                    (!MAIN_FIELDS.map(({ category }) => category).includes(c) ||
+                                ([c]: AnalysisRunnerGridItemKeys[]) =>
+                                    (!MAIN_FIELDS.map(({ field }) => field).includes(c) ||
                                         c === 'script') &&
                                     !EXCLUDED_FIELDS.includes(c)
                             )
-                            .map(([category, value], i) => (
+                            .map(([field, value], i) => (
                                 <SUITable.Row
                                     style={{
-                                        display: openRows.includes(log.position)
+                                        display: openRows.has(log.arGuid)
                                             ? 'table-row'
                                             : 'none',
                                     }}
@@ -331,7 +352,7 @@ const AnalysisRunnerGrid: React.FunctionComponent<{
                                 >
                                     <SUITable.Cell style={{ border: 'none' }} />
                                     <SUITable.Cell>
-                                        <b>{_.capitalize(category)}</b>
+                                        <b>{_.capitalize(field)}</b>
                                     </SUITable.Cell>
                                     <SUITable.Cell colSpan={MAIN_FIELDS.length - 1}>
                                         <code>{value}</code>
