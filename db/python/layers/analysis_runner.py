@@ -19,6 +19,8 @@ class AnalysisRunnerLayer(BaseLayer):
     ) -> list[AnalysisRunnerInternal]:
         """Get analysis runner logs"""
         logs = await self.at.query(filter_)
+        if not logs:
+            return []
 
         if check_project_ids:
             project_ids = set(log.project for log in logs)

@@ -18,10 +18,16 @@ from strawberry.types import Info
 from api.graphql.filters import GraphQLFilter, GraphQLMetaFilter
 from api.graphql.loaders import LoaderKeys, get_context
 from db.python import enum_tables
-from db.python.layers import AnalysisLayer, SampleLayer, SequencingGroupLayer
-from db.python.layers.assay import AssayLayer
-from db.python.layers.family import FamilyLayer
+from db.python.layers import (
+    AnalysisLayer,
+    AnalysisRunnerLayer,
+    AssayLayer,
+    FamilyLayer,
+    SampleLayer,
+    SequencingGroupLayer,
+)
 from db.python.tables.analysis import AnalysisFilter
+from db.python.tables.analysis_runner import AnalysisRunnerFilter
 from db.python.tables.assay import AssayFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter
@@ -86,11 +92,11 @@ class GraphQLProject:
         )
 
     @strawberry.field()
-    async def analysis_runner_logs(
+    async def analysis_runner(
         self,
         info: Info,
         root: 'Project',
-        ar_guids: GraphQLFilter[str] | None = None,
+        ar_guid: GraphQLFilter[str] | None = None,
         author: GraphQLFilter[str] | None = None,
         repository: GraphQLFilter[str] | None = None,
         access_level: GraphQLFilter[str] | None = None,
@@ -99,8 +105,8 @@ class GraphQLProject:
         connection = info.context['connection']
         alayer = AnalysisRunnerLayer(connection)
         filter_ = AnalysisRunnerFilter(
-            project=root.id,
-            ar_guids=ar_guids.to_internal_filter() if ar_guids else None,
+            project=GenericFilter(eq=root.id),
+            ar_guid=ar_guids.to_internal_filter() if ar_guid else None,
             submitting_user=author.to_internal_filter() if author else None,
             repository=repository.to_internal_filter() if repository else None,
             access_level=access_level.to_internal_filter() if access_level else None,
@@ -660,7 +666,7 @@ class GraphQLAnalysisRunner:
     @staticmethod
     def from_internal(internal: AnalysisRunnerInternal) -> 'GraphQLAnalysisRunner':
         return GraphQLAnalysisRunner(
-            id=internal.ar_guid,
+            ar_guid=internal.ar_guid,
             timestamp=internal.timestamp,
             access_level=internal.access_level,
             repository=internal.repository,

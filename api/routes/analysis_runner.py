@@ -85,12 +85,12 @@ async def get_analysis_runner_logs(
         raise ValueError('Project not set')
 
     filter_ = AnalysisRunnerFilter(
-        ar_guids=GenericFilter(eq=ar_guids),
+        ar_guid=GenericFilter(eq=ar_guids),
         submitting_user=GenericFilter(eq=submitting_user),
         repository=GenericFilter(eq=repository),
         access_level=GenericFilter(eq=access_level),
         environment=GenericFilter(eq=environment),
-        project=connection.project,
+        project=GenericFilter(eq=connection.project),
     )
 
     logs = await atable.query(filter_)

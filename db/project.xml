@@ -1121,7 +1121,7 @@
 				/>
 
 			</column>
-			<column name="timestamp" type="date" />
+			<column name="timestamp" type="timestamp" />
 			<column name="access_level" type="VARCHAR(255)">
 				<constraints nullable="false" />
 			</column>

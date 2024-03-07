@@ -2,15 +2,15 @@ import dataclasses
 import datetime
 
 from db.python.tables.base import DbBase
-from db.python.utils import GenericFilter, GenericFilterModel
+from db.python.utils import GenericFilter, GenericFilterModel, to_db_json
 from models.models.analysis_runner import AnalysisRunnerInternal
 from models.models.project import ProjectId
 
 
 @dataclasses.dataclass
 class AnalysisRunnerFilter(GenericFilterModel):
-    project: ProjectId
-    ar_guids: GenericFilter[str] | None = None
+    project: GenericFilter[ProjectId] | None = None
+    ar_guid: GenericFilter[str] | None = None
     submitting_user: GenericFilter[str] | None = None
     repository: GenericFilter[str] | None = None
     access_level: GenericFilter[str] | None = None
@@ -34,9 +34,9 @@ class AnalysisRunnerTable(DbBase):
         where_str, values = filter_.to_sql()
 
         _query = f"""
-SELECT 
-    ar_guid, timestamp, access_level, repository, commit, script,
-    description, driver_image, config_path, cwd, environment, 
+SELECT
+    project, ar_guid, timestamp, access_level, repository, commit, script,
+    description, driver_image, config_path, cwd, environment,
     hail_version, batch_url, submitting_user, meta, output_path, audit_log_id
 FROM analysis_runner
 WHERE {where_str}
@@ -53,12 +53,12 @@ WHERE {where_str}
 
         _query = """
 INSERT INTO analysis_runner (
-    ar_guid, timestamp, access_level, repository, commit, script,
-    description, driver_image, config_path, cwd, environment, 
+    project, ar_guid, timestamp, access_level, repository, commit, script,
+    description, driver_image, config_path, cwd, environment,
     hail_version, batch_url, submitting_user, meta, output_path, audit_log_id
 )
 VALUES (
-    :ar_guid, :timestamp, :access_level, :repository, :commit, :script,
+    :project, :ar_guid, :timestamp, :access_level, :repository, :commit, :script,
     :description, :driver_image, :config_path, :cwd, :environment,
     :hail_version, :batch_url, :submitting_user, :meta, :output_path, :audit_log_id
 )
@@ -78,9 +78,10 @@ VALUES (
             'hail_version': analysis_runner.hail_version,
             'batch_url': analysis_runner.batch_url,
             'submitting_user': analysis_runner.submitting_user,
-            'meta': analysis_runner.meta,
+            'meta': to_db_json(analysis_runner.meta),
             'output_path': analysis_runner.output_path,
             'audit_log_id': await self.audit_log_id(),
+            'project': self.project,
         }
 
         await self.connection.execute(_query, values)

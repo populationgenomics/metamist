@@ -25,7 +25,7 @@ class AnalysisRunnerInternal(SMBase):
     meta: dict[str, str]
 
     # on insert
-    audit_log_id: int | None
+    audit_log_id: int | None = None
 
     @staticmethod
     def from_db(**kwargs):
@@ -33,10 +33,14 @@ class AnalysisRunnerInternal(SMBase):
         if meta:
             meta = json.loads(meta)
 
+        _timestamp = kwargs.pop('timestamp')
+        # if _timestamp:
+        #     _timestamp = datetime.datetime.fromisoformat(_timestamp)
+
         return AnalysisRunnerInternal(
             ar_guid=kwargs.pop('ar_guid'),
             project=kwargs.pop('project'),
-            timestamp=kwargs.pop('timestamp'),
+            timestamp=_timestamp,
             access_level=kwargs.pop('access_level'),
             repository=kwargs.pop('repository'),
             commit=kwargs.pop('commit'),
