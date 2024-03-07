@@ -201,7 +201,9 @@ def main(
     logger.info(f'Found {len(all_sids)} sample ids in {project}')
 
     # 3. Randomly select from the remaining sgs
-    additional_samples.update(random.sample(all_sids - additional_samples, samples_n))
+    additional_samples.update(
+        random.sample(list(all_sids - additional_samples), samples_n)
+    )
 
     # 4. Query all the samples from the selected sgs
     logger.info(f'Transfering {len(additional_samples)} samples. Querying metadata.')
