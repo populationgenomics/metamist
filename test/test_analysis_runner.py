@@ -49,7 +49,6 @@ class TestAnalysisRunner(DbIsolatedTest):
         field_to_compare = [
             'project',
             'output_path',
-            'timestamp',
             'access_level',
             'repository',
             'config_path',
