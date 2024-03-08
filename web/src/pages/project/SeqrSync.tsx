@@ -3,6 +3,7 @@ import _ from 'lodash'
 import { Button, CheckboxProps, DropdownProps, Form, Message, Modal } from 'semantic-ui-react'
 import { SeqrDatasetType, WebApi } from '../../sm-api'
 import MuckTheDuck from '../../shared/components/MuckTheDuck'
+import './SeqrSync.css'
 
 interface SeqrSyncProps {
     project: string
@@ -138,35 +139,37 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
                             onChange={updateStateFromCheckbox}
                             label="Sync individuals metadata"
                         />
-                        <Form.Checkbox
-                            id="syncEsIndex"
-                            checked={syncOptions.syncEsIndex}
-                            onChange={updateStateFromCheckbox}
-                            label="Sync elastic-search index"
-                        />
-                        <Form.Dropdown
-                            id="esIndexTypes"
-                            options={[
-                                {
-                                    key: 'SNV_INDEL',
-                                    text: 'SNV_INDEL',
-                                    value: 'SNV_INDEL',
-                                },
-                                { key: 'SV', text: 'SV', value: 'SV' },
-                                { key: 'CNV', text: 'CNV', value: 'CNV' },
-                                {
-                                    key: 'MITO',
-                                    text: 'MITO',
-                                    value: 'MITO',
-                                },
-                            ]}
-                            value={syncOptions.esIndexTypes}
-                            onChange={updateStateFromDropdown}
-                            label="ES index type"
-                            multiple
-                            selection
-                            disabled={dropdownDisabled}
-                        />
+                        <div className="checkbox-dropdown-container">
+                            <Form.Checkbox
+                                id="syncEsIndex"
+                                checked={syncOptions.syncEsIndex}
+                                onChange={updateStateFromCheckbox}
+                                label="Sync elastic-search index"
+                            />
+                            <Form.Dropdown
+                                id="esIndexTypes"
+                                options={[
+                                    {
+                                        key: 'SNV_INDEL',
+                                        text: 'SNV_INDEL',
+                                        value: 'SNV_INDEL',
+                                    },
+                                    { key: 'SV', text: 'SV', value: 'SV' },
+                                    { key: 'CNV', text: 'CNV', value: 'CNV' },
+                                    {
+                                        key: 'MITO',
+                                        text: 'MITO',
+                                        value: 'MITO',
+                                    },
+                                ]}
+                                value={syncOptions.esIndexTypes}
+                                onChange={updateStateFromDropdown}
+                                label="ES index type"
+                                multiple
+                                selection
+                                disabled={dropdownDisabled}
+                            />
+                        </div>
                         <Form.Checkbox
                             id="syncCramMap"
                             checked={syncOptions.syncCramMap}

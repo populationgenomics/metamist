@@ -1,0 +1,20 @@
+.checkbox-dropdown-container {
+    display: flex;
+    align-items: flex-start;
+    gap: 0px;
+    justify-content: flex-start;
+}
+
+.checkbox-dropdown-container > *:first-child {
+    display: flex; /* Prevent the checkbox from growing */
+    flex-grow: 0;
+    align-items: center;
+    /* ignore text overflow, show all text on the one line regardless of length */
+    text-wrap: nowrap;
+}
+
+.checkbox-dropdown-container > *:not(:first-child) {
+    align-self: flex-start;
+    padding: 30px 0; /* Vertical padding for dropdown */
+    width: fit-content; /* Make the dropdown width fit its content */
+}
