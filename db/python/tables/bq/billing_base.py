@@ -109,9 +109,6 @@ class BillingBaseTable(BqDbBase):
         else:
             job_config = bigquery.QueryJobConfig(labels=BQ_LABELS)
 
-        print('query', query)
-        print('params', params)
-
         # We need to dry run to calulate the costs
         # executing query does not provide the cost
         # more info here:

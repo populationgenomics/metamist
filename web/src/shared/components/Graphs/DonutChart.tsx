@@ -203,7 +203,7 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
             .text((d) => d)
 
         // add legend
-        if(showLegend === true) {
+        if (showLegend === true) {
             const svgLegend = select(contDiv)
                 .append('svg')
                 .attr('width', '45%')
@@ -240,7 +240,7 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
                             onHoverOut(element.node(), d)
                         })
                 })
-            }
+        }
     }
-    return <div ref={containerDivRef} style={{ maxWidth: maxWidth }} ></div>
+    return <div ref={containerDivRef} style={{ maxWidth: maxWidth }}></div>
 }

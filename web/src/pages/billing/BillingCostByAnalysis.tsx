@@ -6,9 +6,6 @@ import SearchIcon from '@mui/icons-material/Search'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { BillingApi, BillingTotalCostRecord, AnalysisApi } from '../../sm-api'
 import HailBatchGrid from './components/HailBatchGrid'
-import HailBatchGridTemp from './components/HailBatchGridTemp'
-import HailBatchGridTempVirtuoso from './components/HailBatchGridTempVirtouso'
-import HailBatchGridNew from './components/HailBatchGridNew'
 
 import { getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
 import generateUrl from '../../shared/utilities/generateUrl'
@@ -39,10 +36,10 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         if (arData === undefined || arData.length === 0) {
             // nothing found
             setIsLoading(false)
-            return;
+            return
         }
         const ar_record = arData[0]
-        if(
+        if (
             ar_record !== undefined &&
             ar_record.total !== undefined &&
             ar_record.total.ar_guid !== undefined
@@ -226,40 +223,23 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
                 <br />
                 Ar guid: f5a065d2-c51f-46b7-a920-a89b639fc4ba
                 <br />
-                Batch id: 430604, 430605,
+                Batch id: 430604
                 <br />
-                433599, ec3f961f-7e16-4fb0-a3e3-9fc93006ab42, a449eea5-7150-441a-9ffe-bd71587c3fe2
+                Hail Batch + DataProc: 433599
+                <br />
+                Cromwell: ec3f961f-7e16-4fb0-a3e3-9fc93006ab42
+                <br />
+                Large Hail Batch with 7.5K jobs: a449eea5-7150-441a-9ffe-bd71587c3fe2
             </p>
         </Card>
     )
 
-    // const gridCard = (gridData: BillingTotalCostRecord[]) => (
-    //     <Card fluid style={{ padding: '20px', overflowX: 'scroll' }} id="billing-container-data">
-    //         <HailBatchGrid data={gridData} />
-    //     </Card>
-    // )
-
-    // const gridCard = (gridData: BillingTotalCostRecord[]) => (
-    //     <Card fluid style={{ padding: '20px', overflowX: 'scroll' }} id="billing-container-data">
-    //         <HailBatchGridTempVirtuoso data={gridData} />
-    //     </Card>
-    // )
-
-    const gridCard = (gridData: BillingTotalCostRecord) => (
-        <Card fluid style={{ padding: '20px', overflowX: 'scroll' }} id="billing-container-data">
-            <HailBatchGridNew data={gridData} />
-        </Card>
-    )
+    const batchGrid = (gridData: BillingTotalCostRecord) => <HailBatchGrid data={gridData} />
 
     const dataComponent = () => {
-        // if (data !== undefined && data.costs.length > 0) {
-        //     // only render grid if there are available cost data
-        //     return gridCard(data.costs)
-        // }
-
         if (data !== undefined) {
             // only render grid if there are available cost data
-            return gridCard(data)
+            return batchGrid(data)
         }
 
         // if valid search text and no data return return No data message
