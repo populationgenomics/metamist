@@ -1,6 +1,7 @@
 # pylint: disable=invalid-overridden-method
 
 import asyncio
+import dataclasses
 import logging
 import os
 import socket
@@ -223,6 +224,19 @@ class DbTest(unittest.TestCase):
     async def audit_log_id(self):
         """Get audit_log_id for the test"""
         return await self.connection.audit_log_id()
+
+    def assertDataclassEqual(self, a, b):
+        """Assert two dataclasses are equal"""
+
+        def to_dict(obj):
+            d = dataclasses.asdict(obj)
+            for k, v in d.items():
+                if dataclasses.is_dataclass(v):
+                    d[k] = to_dict(v)
+            return d
+
+        self.maxDiff = None
+        self.assertDictEqual(to_dict(a), to_dict(b))
 
 
 class DbIsolatedTest(DbTest):
