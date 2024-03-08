@@ -74,7 +74,9 @@ class TestAnalysisRunner(DbIsolatedTest):
 
     @run_as_sync
     async def test_query(self):
-        # fields: project ar_guid submitting_user repository access_level environment
+        """
+        Query all the Filter fields to check they work correctly
+        """
         analyses = [
             AnalysisRunnerInternal(
                 ar_guid=f'<ar-guid-{i+1}>',

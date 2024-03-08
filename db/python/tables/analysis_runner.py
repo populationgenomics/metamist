@@ -9,6 +9,8 @@ from models.models.project import ProjectId
 
 @dataclasses.dataclass
 class AnalysisRunnerFilter(GenericFilterModel):
+    """Filter model for AR records"""
+
     project: GenericFilter[ProjectId] | None = None
     ar_guid: GenericFilter[str] | None = None
     submitting_user: GenericFilter[str] | None = None

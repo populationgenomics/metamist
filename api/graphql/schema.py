@@ -661,7 +661,7 @@ class GraphQLAnalysisRunner:
     submitting_user: str
     meta: strawberry.scalars.JSON
 
-    _project: strawberry.Private[int]
+    internal_project: strawberry.Private[int]
 
     @staticmethod
     def from_internal(internal: AnalysisRunnerInternal) -> 'GraphQLAnalysisRunner':
@@ -683,7 +683,7 @@ class GraphQLAnalysisRunner:
             meta=internal.meta,
             output_path=internal.output_path,
             # internal
-            _project=internal.project,
+            internal_project=internal.project,
         )
 
     @strawberry.field
@@ -691,7 +691,7 @@ class GraphQLAnalysisRunner:
         self, info: Info, root: 'GraphQLAnalysisRunner'
     ) -> GraphQLProject:
         loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
-        project = await loader.load(root._project)
+        project = await loader.load(root.internal_project)
         return GraphQLProject.from_internal(project)
 
 

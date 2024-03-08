@@ -4,7 +4,7 @@ import { useQuery } from '@apollo/client'
 import { Dropdown } from 'semantic-ui-react'
 import _ from 'lodash'
 import ProjectSelector from '../ProjectSelector'
-import AnalysisRunnerGrid from './AnalysisRunnerGrid'
+import AnalysisRunnerGrid, { AnalysisRunnerGridItem } from './AnalysisRunnerGrid'
 import { gql } from '../../../__generated__/gql'
 import MuckError from '../../../shared/components/MuckError'
 import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
@@ -41,8 +41,6 @@ query AnalysisRunnerLogs($project_name: String!) {
       }
   }
 `)
-
-
 
 const AnalysisRunnerSummary: React.FunctionComponent = () => {
     const navigate = useNavigate()
@@ -94,24 +92,33 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
         ])
     }
 
-    const flatData = data?.project.analysisRunner.map((arLog, i) => {
-        // author is technically the "sample-metadata-pubsub" service, so we'll
-        // which is the user who triggered the analysis
+    const flatData: AnalysisRunnerGridItem[] | undefined = data?.project.analysisRunner.map(
+        (arLog, i) => {
+            // author is technically the "sample-metadata-pubsub" service, so we'll
+            // which is the user who triggered the analysis
 
-        return {
-            email: arLog.submittingUser,
-            arGuid: arLog.arGuid,
-            outputPath: arLog.outputPath,
-            position: i,
-            hailBatch: arLog.batchUrl
-                ? arLog.batchUrl.replace('https://batch.hail.populationgenomics.org.au/', '')
-                : '',
-            GitHub: `${arLog.repository}@${arLog.commit.substring(0, 7)}`,
-            Date: `${parseDate(sanitiseValue(arLog?.timestamp))}`,
-            Author: `${parseEmail(sanitiseValue(arLog.submittingUser))}`,
-            Image: arLog.driverImage ? `${parseDriverImage(sanitiseValue(arLog.driverImage))}` : '',
+            return {
+                email: arLog.submittingUser,
+                arGuid: arLog.arGuid,
+                outputPath: arLog.outputPath,
+                position: i,
+                batchUrl: arLog.batchUrl,
+                repository: arLog.repository,
+                commit: arLog.commit,
+                timestamp: new Date(sanitiseValue(arLog?.timestamp)),
+                submittingUser: arLog.submittingUser,
+                driverImage: arLog.driverImage,
+                description: arLog.description,
+                script: arLog.script,
+                configPath: arLog.configPath,
+                cwd: arLog.cwd,
+                environment: arLog.environment,
+                hailVersion: arLog.hailVersion,
+                meta: arLog.meta,
+                accessLevel: arLog.accessLevel,
+            } as AnalysisRunnerGridItem
         }
-    })
+    )
 
     return (
         <>
@@ -140,7 +147,7 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
                             value={pageLimit}
                             options={PAGE_SIZES.map((s) => ({
                                 key: s,
-                                text: `${s} samples`,
+                                text: `${s} records`,
                                 value: s,
                             }))}
                         />
@@ -153,7 +160,7 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
                                     )
                                 ).length || 0) / pageLimit
                             )}
-                            totalSamples={Math.ceil(
+                            total={Math.ceil(
                                 flatData.filter((log) =>
                                     filters.every(({ category, value }) =>
                                         _.get(log, category, '').includes(value)
@@ -162,17 +169,17 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
                             )}
                             pageNumber={pageNumber}
                             handleOnClick={handleOnClick}
-                            title={'logs'}
+                            title="records"
                         />
                     </div>
                     <AnalysisRunnerGrid
                         data={(!sort.column
                             ? flatData
                             : _.orderBy(
-                                flatData,
-                                [sort.column],
-                                sort.direction === 'ascending' ? ['asc'] : ['desc']
-                            )
+                                  flatData,
+                                  [sort.column],
+                                  sort.direction === 'ascending' ? ['asc'] : ['desc']
+                              )
                         )
                             .filter((log) =>
                                 filters.every(({ category, value }) =>
@@ -194,13 +201,14 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
                                 )
                             ).length || 0) / pageLimit
                         )}
-                        totalSamples={Math.ceil(
+                        total={Math.ceil(
                             flatData.filter((log) =>
                                 filters.every(
                                     ({ category, value }) => _.get(log, category) === value
                                 )
                             ).length
                         )}
+                        title="records"
                         pageNumber={pageNumber}
                         handleOnClick={handleOnClick}
                     />

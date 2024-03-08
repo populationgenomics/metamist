@@ -16,7 +16,7 @@ router = APIRouter(prefix='/analysis-runner', tags=['analysis-runner'])
 
 
 @router.put('/{project}/', operation_id='createAnalysisRunnerLog')
-async def create_analysis_runner_log(
+async def create_analysis_runner_log(  # pylint: disable=too-many-arguments
     ar_guid: str,
     access_level: str,
     repository: str,

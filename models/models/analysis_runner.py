@@ -6,6 +6,10 @@ from models.models.project import ProjectId
 
 
 class AnalysisRunnerInternal(SMBase):
+    """
+    Internal class for AnalysisRunner records
+    """
+
     ar_guid: str
     project: ProjectId
     output_path: str
@@ -29,6 +33,7 @@ class AnalysisRunnerInternal(SMBase):
 
     @staticmethod
     def from_db(**kwargs):
+        """Convert from db Record"""
         meta = kwargs.pop('meta')
         if meta:
             meta = json.loads(meta)
@@ -59,6 +64,7 @@ class AnalysisRunnerInternal(SMBase):
         )
 
     def to_external(self, project_map: dict[ProjectId, str]):
+        """Convert to transport model"""
         return AnalysisRunner(
             ar_guid=self.ar_guid,
             project=project_map.get(self.project, str(self.project)),
@@ -82,6 +88,10 @@ class AnalysisRunnerInternal(SMBase):
 
 
 class AnalysisRunner(SMBase):
+    """
+    Transport / external class for AnalysisRunner records
+    """
+
     ar_guid: str
     output_path: str
     timestamp: str
