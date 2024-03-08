@@ -6,6 +6,7 @@ Requires:
 
     pip install requests google-auth requests urllib3
 """
+
 import os
 
 import google.auth.transport.requests
@@ -14,7 +15,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 
-URL = 'https://metamist-etl-mnrpw3mdza-ts.a.run.app'
+URL = 'https://metamist-extract.popgen.rocks'
 TYPE = 'NAME_OF_EXTERNAL_PARTY/v1'
 
 
@@ -60,4 +61,10 @@ def make_request(body: dict | list):
 
 
 if __name__ == '__main__':
+    # simple payload which would be sent to the server
     print(make_request({'test-value': 'test'}))
+
+    # This will raise a 400 with an error message 'Potentially detected PII, the following keys were found in the body'
+    # it won't update anything in the database
+    payload = {'first_name': 'This is a test to demonstrate PII detection'}
+    make_request(payload)

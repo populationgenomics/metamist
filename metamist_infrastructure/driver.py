@@ -550,7 +550,10 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
     @cached_property
     def etl_extract_function(self):
         """etl_extract_function"""
-        return self._etl_function('extract', self.etl_extract_service_account)
+        return self._etl_function(
+            'extract',
+            self.etl_extract_service_account,
+        )
 
     @cached_property
     def etl_load_function(self):
@@ -646,6 +649,16 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             opts=pulumi.ResourceOptions(replace_on_changes=['*']),
         )
 
+        # prepare custom audience_list
+        custom_audience_list = None
+        if (
+            self.config.metamist.etl.custom_audience_list
+            and self.config.metamist.etl.custom_audience_list.get(f_name)
+        ):
+            custom_audience_list = json.dumps(
+                self.config.metamist.etl.custom_audience_list.get(f_name)
+            )
+
         fxn = gcp.cloudfunctionsv2.Function(
             f'metamist-etl-{f_name}',
             name=f'metamist-etl-{f_name}',
@@ -694,6 +707,11 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                     'SM_ENVIRONMENT': self.config.metamist.etl.environment,
                     'CONFIGURATION_SECRET': self.etl_configuration_secret_version.id,
                 },  # type: ignore
+                annotations=(
+                    {'run.googleapis.com/custom-audiences': custom_audience_list}
+                    if custom_audience_list
+                    else None
+                ),
                 ingress_settings='ALLOW_ALL',
                 all_traffic_on_latest_revision=True,
                 service_account_email=sa.email,
