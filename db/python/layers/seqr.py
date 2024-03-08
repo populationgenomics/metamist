@@ -221,7 +221,8 @@ class SeqrLayer(BaseLayer):
                     )
                 )
             if sync_saved_variants:
-                promises.append(self.update_saved_variants(**params))
+                # promises.append(self.update_saved_variants(**params))
+                pass
             if sync_cram_map:
                 promises.append(
                     self.sync_cram_map(
@@ -367,7 +368,7 @@ class SeqrLayer(BaseLayer):
             f'Uploaded individual metadata for {len(processed_records)} individuals'
         ]
         
-    async def check_updated_sequencing_group_ids(sequencing_group_ids: set[int], es_index_analyses: list[AnalysisInternal]):
+    def check_updated_sequencing_group_ids(self, sequencing_group_ids: set[int], es_index_analyses: list[AnalysisInternal]):
         """Check if the sequencing group IDs have been updated"""
         messages = []
         if sequencing_group_ids:
@@ -384,7 +385,7 @@ class SeqrLayer(BaseLayer):
                 )
                 if sequencing_groups_diff:
                     messages.append(
-                        'Samples added to index: ' + ', '.join(sequencing_groups_diff),
+                        'Sequencing groups added to index: ' + ', '.join(sequencing_groups_diff),
                     )
 
             sg_ids_missing_from_index = sequencing_group_id_format_list(
@@ -392,14 +393,14 @@ class SeqrLayer(BaseLayer):
             )
             if sg_ids_missing_from_index:
                 messages.append(
-                    'Sequencing groups missing from index: '
+                    f'Sequencing groups missing from {es_index_analyses[-1].output}: '
                     + ', '.join(sg_ids_missing_from_index),
                 )
         return messages
     
-    async def post_es_index_update(post_request: dict):
+    async def post_es_index_update(self, session: aiohttp.ClientSession, post_request: dict):
         """Post request to update ES index"""
-        async with aiohttp.ClientSession() as session:
+        async with session:
             resp = await session.post(
                 post_request['url'],
                 json=post_request['json'],
@@ -462,9 +463,9 @@ class SeqrLayer(BaseLayer):
         )
         if len(es_index_analyses) == 0:
             return ['No ES index to synchronise']
-        message_calls = []
+
         messages = []
-        requests = []
+        requests = [] # for POST requests to gather
         for es_index_type in es_index_types:
             es_indexes_for_type = [
                 a
@@ -481,24 +482,23 @@ class SeqrLayer(BaseLayer):
 
             es_index = es_indexes_for_type[-1].output
 
-            message_calls.extend(self.check_updated_sequencing_group_ids(sequencing_group_ids, es_index_analyses))
+            messages.extend(self.check_updated_sequencing_group_ids(sequencing_group_ids, es_indexes_for_type))
 
             req1_url = SEQR_URL + _url_update_es_index.format(projectGuid=project_guid)
             post_request = {
                 'url': req1_url,
                 'json': {
                     'elasticsearchIndex': es_index,
-                    'datasetType': es_index_type,
+                    'datasetType': es_index_type.value,
                     'mappingFilePath': fn_path,
                     'ignoreExtraSamplesInCallset': True,
                 },
                 'headers': headers,
             }
-            requests.append(self.post_es_index_update(post_request))
+            requests.append(self.post_es_index_update(session, post_request))
             messages.append(f'Updated ES index {es_index}')
-        
-        await asyncio.gather(*message_calls)
-        await asyncio.gather(*requests)
+
+        messages.extend(await asyncio.gather(*requests))
         return messages
 
     async def update_saved_variants(
