@@ -106,7 +106,7 @@ class GraphQLProject:
         alayer = AnalysisRunnerLayer(connection)
         filter_ = AnalysisRunnerFilter(
             project=GenericFilter(eq=root.id),
-            ar_guid=ar_guids.to_internal_filter() if ar_guid else None,
+            ar_guid=ar_guid.to_internal_filter() if ar_guid else None,
             submitting_user=author.to_internal_filter() if author else None,
             repository=repository.to_internal_filter() if repository else None,
             access_level=access_level.to_internal_filter() if access_level else None,

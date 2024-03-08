@@ -70,7 +70,7 @@ async def create_analysis_runner_log(  # pylint: disable=too-many-arguments
 @router.get('/{project}/', operation_id='getAnalysisRunnerLogs')
 async def get_analysis_runner_logs(
     project: str,
-    ar_guids: str | None = None,
+    ar_guid: str | None = None,
     submitting_user: str | None = None,
     repository: str | None = None,
     access_level: str | None = None,
@@ -85,7 +85,7 @@ async def get_analysis_runner_logs(
         raise ValueError('Project not set')
 
     filter_ = AnalysisRunnerFilter(
-        ar_guid=GenericFilter(eq=ar_guids),
+        ar_guid=GenericFilter(eq=ar_guid),
         submitting_user=GenericFilter(eq=submitting_user),
         repository=GenericFilter(eq=repository),
         access_level=GenericFilter(eq=access_level),
