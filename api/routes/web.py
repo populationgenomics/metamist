@@ -18,6 +18,7 @@ from db.python.layers.web import SearchItem, WebLayer
 from db.python.tables.project import ProjectPermissionsTable
 from models.models.search import SearchResponse
 from models.models.web import PagingLinks, ProjectSummary
+from models.enums.seqr import SeqrDatasetType
 
 
 class SearchResponseModel(BaseModel):
@@ -102,7 +103,7 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
 )
 async def sync_seqr_project(
     sequencing_type: str,
-    es_index_types: list[str],
+    es_index_types: list[SeqrDatasetType],
     sync_families: bool = True,
     sync_individual_metadata: bool = True,
     sync_individuals: bool = True,

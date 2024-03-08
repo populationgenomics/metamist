@@ -1,7 +1,7 @@
 import * as React from 'react'
 import _ from 'lodash'
 import { Button, CheckboxProps, DropdownProps, Form, Message, Modal } from 'semantic-ui-react'
-import { WebApi } from '../../sm-api'
+import { SeqrDatasetType, WebApi } from '../../sm-api'
 import MuckTheDuck from '../../shared/components/MuckTheDuck'
 
 interface SeqrSyncProps {
@@ -14,7 +14,7 @@ interface SeqrSyncFormOptions {
     syncIndividualMetadata?: boolean
     syncIndividuals?: boolean
     syncEsIndex?: boolean
-    esIndexTypes: string[]
+    esIndexTypes: SeqrDatasetType[]
     syncSavedVariants?: boolean
     syncCramMap?: boolean
     postSlackNotification?: boolean
@@ -31,7 +31,7 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
         syncIndividualMetadata: true,
         syncIndividuals: true,
         syncEsIndex: true,
-        esIndexTypes: ['Haplotypecaller'],
+        esIndexTypes: [SeqrDatasetType.SnvIndel],
         syncSavedVariants: true,
         syncCramMap: true,
         postSlackNotification: true,
@@ -76,9 +76,14 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
             })
     }
 
+    const [dropdownDisabled, setDropdownDisabled] = React.useState(!syncOptions.syncEsIndex);
+
     const updateStateFromCheckbox = (e: React.FormEvent<HTMLInputElement>, data: CheckboxProps) => {
         const value = data.checked
         setSyncOptions({ ...syncOptions, [data.id || '']: value })
+        if (data.id === 'syncEsIndex') {
+            setDropdownDisabled(!value);
+        }
     }
 
     const updateStateFromDropdown = (
@@ -90,6 +95,8 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
             : [(data as any).value]
         setSyncOptions({ ...syncOptions, [data.id || '']: value })
     }
+
+    
 
     return (
         <>
@@ -141,15 +148,16 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
                             id="esIndexTypes"
                             options={[
                                 {
-                                    key: 'Haplotypecaller',
-                                    text: 'Haplotypecaller',
-                                    value: 'Haplotypecaller',
+                                    key: 'SNV_INDEL',
+                                    text: 'SNV_INDEL',
+                                    value: 'SNV_INDEL',
                                 },
-                                { key: 'SV_Caller', text: 'SV_Caller', value: 'SV_Caller' },
+                                { key: 'SV', text: 'SV', value: 'SV' },
+                                { key: 'CNV', text: 'CNV', value: 'CNV' },
                                 {
-                                    key: 'Mitochondria_Caller',
-                                    text: 'Mitochondria_Caller',
-                                    value: 'Mitochondria_Caller',
+                                    key: 'MITO',
+                                    text: 'MITO',
+                                    value: 'MITO',
                                 },
                             ]}
                             value={syncOptions.esIndexTypes}
@@ -157,6 +165,7 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
                             label="ES index type"
                             multiple
                             selection
+                            disabled={dropdownDisabled}
                         />
                         <Form.Checkbox
                             id="syncCramMap"
