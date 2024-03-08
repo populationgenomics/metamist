@@ -33,8 +33,13 @@ const billingPages = {
             icon: <HomeIcon />,
         },
         {
-            title: 'Invoice Month Cost',
+            title: 'Cost By Invoice Month',
             url: '/billing/invoiceMonthCost',
+            icon: <TableRowsIcon />,
+        },
+        {
+            title: 'Cost Across Invoice Months (Topics only)',
+            url: '/billing/costByMonth',
             icon: <TableRowsIcon />,
         },
         {
