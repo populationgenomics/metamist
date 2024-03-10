@@ -1178,6 +1178,29 @@
 
 
 		<sql> ALTER TABLE analysis_runner ADD SYSTEM VERSIONING; </sql>
+		<sql> INSERT INTO analysis_runner ( ar_guid, project, timestamp, access_level, repository,
+			`commit`, output_path, script, description, driver_image, config_path, cwd, environment,
+			hail_version, batch_url, submitting_user, meta, audit_log_id ) SELECT
+			COALESCE(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.ar-guid')), UUID()) as ar_guid,
+			analysis.project as project,
+			STR_TO_DATE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp')), 'T', ' '),
+			'%Y-%m-%d %H:%i:%s.%f') as timestamp, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta,
+			'$.accessLevel')) as access_level, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.repo'))
+			as repository, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.commit')) as `commit`,
+			analysis.output as output_path, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.script')) as
+			script, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.description')) as description,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.driverImage')) as driver_image,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.configPath')) as config_path,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.cwd')) as cwd,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.environment')) as environment,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.hailVersion')) as hail_version,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.batch_url')) as batch_url,
+			COALESCE(audit_log.on_behalf_of, analysis.author) as submitting_user, JSON_REMOVE(
+			analysis.meta, '$.ar-guid', '$.timestamp', '$.accessLevel', '$.repo', '$.commit',
+			'$.script', '$.description', '$.driverImage', '$.configPath', '$.cwd', '$.environment',
+			'$.hailVersion', '$.batch_url' ) as meta, analysis.audit_log_id FROM analysis LEFT JOIN
+			audit_log ON analysis.audit_log_id = audit_log.id WHERE analysis.type =
+			"analysis-runner" </sql>
 
 	</changeSet>
 </databaseChangeLog>
