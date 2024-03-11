@@ -221,8 +221,7 @@ class SeqrLayer(BaseLayer):
                     )
                 )
             if sync_saved_variants:
-                # promises.append(self.update_saved_variants(**params))
-                pass
+                promises.append(self.update_saved_variants(**params))
             if sync_cram_map:
                 promises.append(
                     self.sync_cram_map(
