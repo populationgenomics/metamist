@@ -21,7 +21,7 @@ class AnalysisRunnerInternal(SMBase):
     description: str
     driver_image: str
     config_path: str
-    cwd: str
+    cwd: str | None
     environment: str
     hail_version: str
     batch_url: str
@@ -102,7 +102,7 @@ class AnalysisRunner(SMBase):
     description: str
     driver_image: str
     config_path: str
-    cwd: str
+    cwd: str | None
     environment: str
     hail_version: str
     batch_url: str

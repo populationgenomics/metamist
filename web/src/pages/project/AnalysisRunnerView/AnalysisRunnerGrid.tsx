@@ -17,7 +17,7 @@ export interface AnalysisRunnerGridItem {
     description: string
     driverImage: string
     configPath: string
-    cwd: string
+    cwd?: string
     environment: string
     hailVersion: string
     batchUrl: string

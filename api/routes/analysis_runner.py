@@ -25,7 +25,7 @@ async def create_analysis_runner_log(  # pylint: disable=too-many-arguments
     description: str,
     driver_image: str,
     config_path: str,
-    cwd: str,
+    cwd: str | None,
     environment: str,
     hail_version: str,
     batch_url: str,

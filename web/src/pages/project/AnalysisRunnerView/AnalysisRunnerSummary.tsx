@@ -176,10 +176,10 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
                         data={(!sort.column
                             ? flatData
                             : _.orderBy(
-                                  flatData,
-                                  [sort.column],
-                                  sort.direction === 'ascending' ? ['asc'] : ['desc']
-                              )
+                                flatData,
+                                [sort.column],
+                                sort.direction === 'ascending' ? ['asc'] : ['desc']
+                            )
                         )
                             .filter((log) =>
                                 filters.every(({ category, value }) =>
