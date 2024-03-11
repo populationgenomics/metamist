@@ -77,13 +77,13 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
             })
     }
 
-    const [dropdownDisabled, setDropdownDisabled] = React.useState(!syncOptions.syncEsIndex);
+    const [dropdownDisabled, setDropdownDisabled] = React.useState(!syncOptions.syncEsIndex)
 
     const updateStateFromCheckbox = (e: React.FormEvent<HTMLInputElement>, data: CheckboxProps) => {
         const value = data.checked
         setSyncOptions({ ...syncOptions, [data.id || '']: value })
         if (data.id === 'syncEsIndex') {
-            setDropdownDisabled(!value);
+            setDropdownDisabled(!value)
         }
     }
 
@@ -96,8 +96,6 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
             : [(data as any).value]
         setSyncOptions({ ...syncOptions, [data.id || '']: value })
     }
-
-    
 
     return (
         <>
@@ -121,25 +119,25 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
                 <Modal.Content>
                     Select sync options:
                     <Form style={{ paddingTop: '20px', paddingLeft: '20px' }}>
-                        <Form.Checkbox
-                            id="syncIndividuals"
-                            checked={syncOptions.syncIndividuals}
-                            onChange={updateStateFromCheckbox}
-                            label="Sync pedigree"
-                        />
-                        <Form.Checkbox
-                            id="syncFamilies"
-                            checked={syncOptions.syncFamilies}
-                            onChange={updateStateFromCheckbox}
-                            label="Sync families"
-                        />
-                        <Form.Checkbox
-                            id="syncIndividualMetadata"
-                            checked={syncOptions.syncIndividualMetadata}
-                            onChange={updateStateFromCheckbox}
-                            label="Sync individuals metadata"
-                        />
                         <div className="checkbox-dropdown-container">
+                            <Form.Checkbox
+                                id="syncIndividuals"
+                                checked={syncOptions.syncIndividuals}
+                                onChange={updateStateFromCheckbox}
+                                label="Sync pedigree"
+                            />
+                            <Form.Checkbox
+                                id="syncFamilies"
+                                checked={syncOptions.syncFamilies}
+                                onChange={updateStateFromCheckbox}
+                                label="Sync families"
+                            />
+                            <Form.Checkbox
+                                id="syncIndividualMetadata"
+                                checked={syncOptions.syncIndividualMetadata}
+                                onChange={updateStateFromCheckbox}
+                                label="Sync individuals metadata"
+                            />
                             <Form.Checkbox
                                 id="syncEsIndex"
                                 checked={syncOptions.syncEsIndex}
@@ -147,6 +145,7 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
                                 label="Sync elastic-search index"
                             />
                             <Form.Dropdown
+                                className="indented-dropdown"
                                 id="esIndexTypes"
                                 options={[
                                     {
@@ -169,21 +168,20 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
                                 selection
                                 disabled={dropdownDisabled}
                             />
+                            <Form.Checkbox
+                                id="syncCramMap"
+                                checked={syncOptions.syncCramMap}
+                                onChange={updateStateFromCheckbox}
+                                label="Sync CRAMs"
+                            />
+                            <br />
+                            <Form.Checkbox
+                                id="postSlackNotification"
+                                checked={syncOptions.postSlackNotification}
+                                onChange={updateStateFromCheckbox}
+                                label="Post slack notification"
+                            />
                         </div>
-                        <Form.Checkbox
-                            id="syncCramMap"
-                            checked={syncOptions.syncCramMap}
-                            onChange={updateStateFromCheckbox}
-                            label="Sync CRAMs"
-                        />
-                        <br />
-                        <Form.Checkbox
-                            id="postSlackNotification"
-                            checked={syncOptions.postSlackNotification}
-                            onChange={updateStateFromCheckbox}
-                            label="Post slack notification"
-                        />
-
                         {!!errors && (
                             <Message negative onDismiss={() => setErrors(null)}>
                                 <h4>

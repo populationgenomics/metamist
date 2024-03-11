@@ -16,9 +16,9 @@ from db.python.layers.search import SearchLayer
 from db.python.layers.seqr import SeqrLayer
 from db.python.layers.web import SearchItem, WebLayer
 from db.python.tables.project import ProjectPermissionsTable
+from models.enums.web import SeqrDatasetType
 from models.models.search import SearchResponse
 from models.models.web import PagingLinks, ProjectSummary
-from models.enums.seqr import SeqrDatasetType
 
 
 class SearchResponseModel(BaseModel):

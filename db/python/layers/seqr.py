@@ -24,7 +24,7 @@ from api.settings import (
 )
 from db.python.connect import Connection
 from db.python.enum_tables import SequencingTypeTable
-from db.python.layers.analysis import AnalysisLayer, AnalysisInternal
+from db.python.layers.analysis import AnalysisInternal, AnalysisLayer
 from db.python.layers.base import BaseLayer
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
@@ -33,7 +33,7 @@ from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.project import Project
 from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
-from models.enums.seqr import SeqrDatasetType
+from models.enums.web import SeqrDatasetType
 
 # literally the most temporary thing ever, but for complete
 # automation need to have sample inclusion / exclusion
@@ -367,7 +367,7 @@ class SeqrLayer(BaseLayer):
         return [
             f'Uploaded individual metadata for {len(processed_records)} individuals'
         ]
-        
+
     def check_updated_sequencing_group_ids(self, sequencing_group_ids: set[int], es_index_analyses: list[AnalysisInternal]):
         """Check if the sequencing group IDs have been updated"""
         messages = []
@@ -397,17 +397,16 @@ class SeqrLayer(BaseLayer):
                     + ', '.join(sg_ids_missing_from_index),
                 )
         return messages
-    
-    async def post_es_index_update(self, session: aiohttp.ClientSession, post_request: dict):
+
+    async def post_es_index_update(self, session: aiohttp.ClientSession, url: str, post_json: dict, headers: dict[str, str]):
         """Post request to update ES index"""
-        async with session:
-            resp = await session.post(
-                post_request['url'],
-                json=post_request['json'],
-                headers=post_request['headers'],
-            )
-            resp.raise_for_status()
-            return await resp.text()
+        resp = await session.post(
+            url=url,
+            json=post_json,
+            headers=headers,
+        )
+        resp.raise_for_status()
+        return await resp.text()
 
     async def update_es_index(
         self,
@@ -465,37 +464,34 @@ class SeqrLayer(BaseLayer):
             return ['No ES index to synchronise']
 
         messages = []
-        requests = [] # for POST requests to gather
+        requests = []  # for POST requests to gather
         for es_index_type in es_index_types:
-            es_indexes_for_type = [
+            es_indexes_filtered_by_type: list[AnalysisInternal] = [
                 a
                 for a in es_index_analyses
                 if a.meta.get('stage') == ES_INDEX_STAGES[es_index_type]
             ]
-            if not es_indexes_for_type:
+            if not es_indexes_filtered_by_type:
                 messages.append(f'No ES index to synchronise for {es_index_type}')
+                continue
 
-            es_indexes_for_type = sorted(
-                es_indexes_for_type,
+            es_indexes_filtered_by_type = sorted(
+                es_indexes_filtered_by_type,
                 key=lambda el: el.timestamp_completed,
             )
 
-            es_index = es_indexes_for_type[-1].output
+            es_index = es_indexes_filtered_by_type[-1].output
 
-            messages.extend(self.check_updated_sequencing_group_ids(sequencing_group_ids, es_indexes_for_type))
+            messages.extend(self.check_updated_sequencing_group_ids(sequencing_group_ids, es_indexes_filtered_by_type))
 
             req1_url = SEQR_URL + _url_update_es_index.format(projectGuid=project_guid)
-            post_request = {
-                'url': req1_url,
-                'json': {
-                    'elasticsearchIndex': es_index,
-                    'datasetType': es_index_type.value,
-                    'mappingFilePath': fn_path,
-                    'ignoreExtraSamplesInCallset': True,
-                },
-                'headers': headers,
+            post_json = {
+                'elasticsearchIndex': es_index,
+                'datasetType': es_index_type.value,
+                'mappingFilePath': fn_path,
+                'ignoreExtraSamplesInCallset': True,
             }
-            requests.append(self.post_es_index_update(session, post_request))
+            requests.append(self.post_es_index_update(session, req1_url, post_json, headers))
             messages.append(f'Updated ES index {es_index}')
 
         messages.extend(await asyncio.gather(*requests))
