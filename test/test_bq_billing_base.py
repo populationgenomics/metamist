@@ -362,9 +362,10 @@ class TestBillingBaseTable(BqTest):
         given_bq_results = [[], [123], ['a', 'b', 'c']]
         for bq_result in given_bq_results:
             # mock BigQuery result
-            self.bq_client.query.return_value = bq_result
+            self.bq_result.result.return_value = bq_result
+            self.bq_result.total_bytes_processed = 0
             results = self.table_obj._execute_query(
-                sql_query, sql_params, results_as_list=False
+                sql_query, sql_params, results_as_list=True
             )
             self.assertEqual(bq_result, results)
 
@@ -380,9 +381,10 @@ class TestBillingBaseTable(BqTest):
         given_bq_results = [[], [123], ['a', 'b', 'c']]
         for bq_result in given_bq_results:
             # mock BigQuery result
-            self.bq_client.query.return_value = bq_result
+            self.bq_result.result.return_value = bq_result
+            self.bq_result.total_bytes_processed = 0
             results = self.table_obj._execute_query(
-                sql_query, sql_params, results_as_list=False
+                sql_query, sql_params, results_as_list=True
             )
             self.assertEqual(bq_result, results)
 

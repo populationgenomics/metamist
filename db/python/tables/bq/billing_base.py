@@ -99,8 +99,10 @@ class BillingBaseTable(BqDbBase):
         raise NotImplementedError('Calling Abstract method directly')
 
     def _execute_query(
-        self, query: str, params: list[Any] = None, results_as_list: bool = True
-    ) -> list[Any]:
+        self, query: str, params: list[Any] | None = None, results_as_list: bool = True
+    ) -> (
+        list[Any] | bigquery.table.RowIterator | bigquery.table._EmptyRowIterator | None
+    ):
         """Execute query, add BQ labels"""
         if params:
             job_config = bigquery.QueryJobConfig(
