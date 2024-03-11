@@ -27,7 +27,7 @@ async def create_analysis_runner_log(  # pylint: disable=too-many-arguments
     config_path: str,
     cwd: str | None,
     environment: str,
-    hail_version: str,
+    hail_version: str | None,
     batch_url: str,
     submitting_user: str,
     meta: dict[str, str],

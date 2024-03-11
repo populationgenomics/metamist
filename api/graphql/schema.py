@@ -656,7 +656,7 @@ class GraphQLAnalysisRunner:
     config_path: str
     cwd: str | None
     environment: str
-    hail_version: str
+    hail_version: str | None
     batch_url: str
     submitting_user: str
     meta: strawberry.scalars.JSON

@@ -19,7 +19,7 @@ export interface AnalysisRunnerGridItem {
     configPath: string
     cwd?: string
     environment: string
-    hailVersion: string
+    hailVersion?: string
     batchUrl: string
     submittingUser: string
     outputPath: string

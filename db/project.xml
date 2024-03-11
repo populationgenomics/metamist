@@ -1153,7 +1153,7 @@
 				<constraints nullable="false" />
 			</column>
 			<column name="hail_version" type="VARCHAR(255)">
-				<constraints nullable="false" />
+				<constraints nullable="true" />
 			</column>
 			<column name="batch_url" type="VARCHAR(255)">
 				<constraints nullable="false" />

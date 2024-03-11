@@ -23,7 +23,7 @@ class AnalysisRunnerInternal(SMBase):
     config_path: str
     cwd: str | None
     environment: str
-    hail_version: str
+    hail_version: str | None
     batch_url: str
     submitting_user: str
     meta: dict[str, str]
@@ -104,7 +104,7 @@ class AnalysisRunner(SMBase):
     config_path: str
     cwd: str | None
     environment: str
-    hail_version: str
+    hail_version: str | None
     batch_url: str
     submitting_user: str
     meta: dict[str, str]
