@@ -1,46 +1,24 @@
-# Use an official Python runtime as a parent image
-FROM python:3.9-slim
+# Use the official lightweight Python image.
+FROM python:3.11-slim
 
 # Set environment variables
-ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
 
-# Install JDK 17 (Temurin distribution)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends wget ca-certificates gnupg software-properties-common && \
-    wget -O - https://packages.adoptium.net/artifactory/api/gpg/key/public | apt-key add - && \
-    add-apt-repository --yes https://packages.adoptium.net/artifactory/deb/ && \
-    apt-get update && \
-    apt-get install -y temurin-17-jdk && \
-    rm -rf /var/lib/apt/lists/*
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends gcc git ssh
 
-# Set the working directory in the container
-WORKDIR /usr/src/app
+# Use a gcloud image based on debian:buster-slim for a lean production container.
+# https://docs.docker.com/develop/develop-images/multistage-build/#use-multi-stage-builds
+FROM gcr.io/google.com/cloudsdktool/cloud-sdk:slim
 
-# Copy the Liquibase project file
-COPY project.xml .
-# Copy the modified Python script for fetching credentials and executing Liquibase
-COPY deploy/liquibase_schema_update.py .
+# Copy local code to the container image.
+ENV APP_HOME /app
+WORKDIR $APP_HOME
+COPY . ./
 
-# Install Google Cloud SDK and Python Secret Manager library
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl && \
-    echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && \
-    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg  add - && \
-    apt-get update && \
-    apt-get install -y google-cloud-sdk && \
-    pip install --no-cache-dir google-cloud-secret-manager && \
-    rm -rf /var/lib/apt/lists/*
+# Install Python dependencies
+RUN python3 -m pip install --no-cache-dir --break-system-packages -r requirements.txt
 
-# Download Liquibase
-RUN wget https://github.com/liquibase/liquibase/releases/download/v4.26.0/liquibase-4.26.0.zip -O liquibase.zip && \
-    unzip liquibase.zip -d liquibase && \
-    rm liquibase.zip
-
-# Download MariaDB JDBC Driver
-RUN wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.0.3/mariadb-java-client-3.0.3.jar -O mariadb-java-client-3.0.3.jar
-
-# Ensure the script is executable
-RUN chmod +x fetch_credentials.py
-
-# Set the ENTRYPOINT to run the Liquibase command
-ENTRYPOINT ["./fetch_credentials.py"]
+# Run the FastAPI app on container startup
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
