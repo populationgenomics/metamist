@@ -254,6 +254,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         for row in rows:
             file_id = row['id']
             if file_id:
+                # If no json_structure, just set to the output.
+                if row['json_structure'] is None:
+                    analysis_files[row['analysis_id']] = row['path']
                 # Building OutputFileInternal object with secondary files if available
                 file_internal = OutputFileInternal.from_db(**dict(row))
                 file_internal_with_secondary = file_internal.copy(update={
