@@ -98,8 +98,6 @@ class OutputFileTable(DbBase):
         async with self.connection.transaction():
             if 'main_files' in files:
                 for primary_file in files['main_files']:
-                    # parent_file_id = None
-                    # if primary_file['json_path'] is not None:
                     parent_file_id = await self.create_or_update_output_file(path=primary_file['basename'], client=client)
                     await self.add_output_file_to_analysis(
                         analysis_id,
