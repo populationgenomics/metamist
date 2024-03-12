@@ -204,7 +204,7 @@ class BillingLayer(BqBaseLayer):
     async def get_cost_by_ar_guid(
         self,
         ar_guid: str | None = None,
-    ) -> list[BillingBatchCostRecord]:  # BillingHailBatchCostRecord:
+    ) -> list[BillingBatchCostRecord]:
         """
         Get Costs by AR GUID
         """
@@ -229,7 +229,7 @@ class BillingLayer(BqBaseLayer):
     async def get_cost_by_batch_id(
         self,
         batch_id: str | None = None,
-    ) -> list[BillingBatchCostRecord]:  # BillingHailBatchCostRecord:
+    ) -> list[BillingBatchCostRecord]:
         """
         Get Costs by Batch ID
         """
@@ -246,9 +246,7 @@ class BillingLayer(BqBaseLayer):
         ) = await ar_batch_lookup_table.get_batches_by_ar_guid(ar_guid)
 
         if not batches:
-            return (
-                []
-            )  # BillingHailBatchCostRecord(ar_guid=ar_guid, batch_ids=[], costs=[])
+            return []
 
         billing_table = BillingDailyExtendedTable(self.connection)
         results = await billing_table.get_batch_cost_summary(
