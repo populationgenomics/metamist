@@ -183,7 +183,7 @@ const BillingCurrentCost = () => {
 
     return (
         <>
-            <h1>Billing By Invoice Month</h1>
+            <h1>Cost By Invoice Month</h1>
 
             <Grid columns="equal" stackable doubling>
                 <Grid.Column>

@@ -200,13 +200,15 @@ class TestEtlLoad(TestCase):
         """Test get_parser_instance success"""
 
         mock_get_accessor_config.return_value = {
-            'user@test.com': [
-                {
-                    'name': 'test/v1',
-                    'default_parameters': {},
-                    # 'parser_name': 'test',
-                }
-            ]
+            'user@test.com': {
+                'parsers': [
+                    {
+                        'name': 'test/v1',
+                        'default_parameters': {},
+                        # 'parser_name': 'test',
+                    }
+                ]
+            }
         }
 
         mock_prepare_parser_map.return_value = {
@@ -234,13 +236,15 @@ class TestEtlLoad(TestCase):
         """Test get_parser_instance success"""
 
         mock_get_accessor_config.return_value = {
-            'user@test.com': [
-                {
-                    'name': 'test/v1',
-                    'default_parameters': {'project': 'test'},
-                    'parser_name': 'different_parser/name',
-                }
-            ]
+            'user@test.com': {
+                'parsers': [
+                    {
+                        'name': 'test/v1',
+                        'default_parameters': {'project': 'test'},
+                        'parser_name': 'different_parser/name',
+                    }
+                ]
+            }
         }
 
         mock_prepare_parser_map.return_value = {
@@ -284,12 +288,14 @@ class TestEtlLoad(TestCase):
         """Test get_parser_instance success"""
 
         mock_get_accessor_config.return_value = {
-            'user@test.com': [
-                {
-                    'name': 'test/v1',
-                    'default_parameters': {'project': 'test'},
-                }
-            ]
+            'user@test.com': {
+                'parsers': [
+                    {
+                        'name': 'test/v1',
+                        'default_parameters': {'project': 'test'},
+                    }
+                ]
+            }
         }
 
         # this doesn't need to be mocked as it fails before here
@@ -316,12 +322,14 @@ class TestEtlLoad(TestCase):
         """Test get_parser_instance success"""
 
         mock_get_accessor_config.return_value = {
-            'user@test.com': [
-                {
-                    'name': 'a/b',
-                    'default_parameters': {'project': 'test'},
-                }
-            ]
+            'user@test.com': {
+                'parsers': [
+                    {
+                        'name': 'a/b',
+                        'default_parameters': {'project': 'test'},
+                    }
+                ]
+            }
         }
 
         mock_prepare_parser_map.return_value = {

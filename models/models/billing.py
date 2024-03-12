@@ -243,7 +243,11 @@ class BillingTotalCostQueryModel(SMBase):
             # add filters as attributes
             for fk, fv in self.filters.items():
                 # fk is BillColumn, fv is value
-                setattr(billing_filter, fk.value, GenericBQFilter(eq=fv))
+                # if fv is a list, then use IN filter
+                if isinstance(fv, list):
+                    setattr(billing_filter, fk.value, GenericBQFilter(in_=fv))
+                else:
+                    setattr(billing_filter, fk.value, GenericBQFilter(eq=fv))
 
         return billing_filter
 
