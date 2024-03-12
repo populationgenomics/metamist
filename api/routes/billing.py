@@ -283,7 +283,7 @@ async def get_namespaces(
 async def get_cost_by_ar_guid(
     ar_guid: str,
     author: str = get_author,
-) -> JSONResponse:  # list[BillingBatchCostRecord]:
+) -> JSONResponse:
     """Get Hail Batch costs by AR GUID"""
     billing_layer = _get_billing_layer_from(author)
     records = await billing_layer.get_cost_by_ar_guid(ar_guid)
@@ -294,14 +294,14 @@ async def get_cost_by_ar_guid(
 
 @router.get(
     '/cost-by-batch-id/{batch_id}',
-    response_model=list[BillingBatchCostRecord],  # BillingHailBatchCostRecord,
+    response_model=list[BillingBatchCostRecord],
     operation_id='costByBatchId',
 )
 @alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_cost_by_batch_id(
     batch_id: str,
     author: str = get_author,
-) -> JSONResponse:  # list[BillingBatchCostRecord]:  # BillingHailBatchCostRecord:
+) -> JSONResponse:
     """Get Hail Batch costs by Batch ID"""
     billing_layer = _get_billing_layer_from(author)
     records = await billing_layer.get_cost_by_batch_id(batch_id)

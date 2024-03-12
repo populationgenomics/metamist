@@ -135,25 +135,13 @@ class BillingColumn(str, Enum):
     def raw_cols(cls) -> list[str]:
         """Return list of raw column names"""
         return [
-            # BillingColumn.ID.value,
             BillingColumn.TOPIC.value,
-            # BillingColumn.SERVICE.value,
             BillingColumn.SKU.value,
             BillingColumn.USAGE_START_TIME.value,
             BillingColumn.USAGE_END_TIME.value,
-            # BillingColumn.PROJECT.value,
             BillingColumn.LABELS.value,
-            # BillingColumn.SYSTEM_LABELS.value,
-            # BillingColumn.LOCATION.value,
-            # BillingColumn.EXPORT_TIME.value,
             BillingColumn.COST.value,
             BillingColumn.CURRENCY.value,
-            # BillingColumn.CURRENCY_CONVERSION_RATE.value,
-            # BillingColumn.USAGE.value,
-            # BillingColumn.CREDITS.value,
-            # BillingColumn.INVOICE.value,
-            # BillingColumn.COST_TYPE.value,
-            # BillingColumn.ADJUSTMENT_INFO.value,
         ]
 
     @classmethod
