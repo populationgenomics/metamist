@@ -1,0 +1,43 @@
+name: Trigger Schema Updater
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment (prod or dev)'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - prod
+          - dev
+
+jobs:
+  invoke-cloud-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - id: "google-cloud-auth"
+        name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v1"
+        with:
+          workload_identity_provider: "projects/774248915715/locations/global/workloadIdentityPools/gh-deploy-pool/providers/gh-provider"
+          service_account: "sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com"
+
+      - id: "google-cloud-sdk-setup"
+        name: "Set up Cloud SDK"
+        uses: google-github-actions/setup-gcloud@v1
+
+      - id: get_url
+        name: Get Cloud Run service URL
+        run: |
+          echo "CLOUD_RUN_URL=$(gcloud run services describe schema-updater --format 'value(status.url)')/execute-liquibase?environment=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
+        env:
+          YOUR_REGION: 'your-region' # replace 'your-region' with your Google Cloud region
+
+      - name: Manual Trigger - Invoke Cloud Run
+        run: |
+          curl -X POST -H "Authorization: Bearer $(gcloud auth print-identity-token)" -H "Content-Type: application/xml" --data-binary "@db/project.xml" $CLOUD_RUN_URL
+        env:
+          CLOUD_RUN_URL: ${{ env.CLOUD_RUN_URL }}
