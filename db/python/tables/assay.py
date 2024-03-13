@@ -199,7 +199,8 @@ class AssayTable(DbBase):
         """
         rows = await self.connection.fetch_all(_query, {'project': project})
         batch_result: dict[str, dict[str, str]] = defaultdict(dict)
-        for batch, seqType, count in rows:
+        for row in rows:
+            batch, seqType, count = row['batch'], row['type'], row['n']
             batch = str(batch).strip('\"') if batch != 'null' else 'no-batch'
             batch_result[batch][seqType] = str(count)
         if len(batch_result) == 1 and 'no-batch' in batch_result:

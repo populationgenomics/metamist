@@ -20,7 +20,7 @@ class FamilyParticipantTable(DbBase):
         paternal_id: int,
         maternal_id: int,
         affected: int,
-        notes: str = None,
+        notes: str | None = None,
     ) -> Tuple[int, int]:
         """
         Create a new sample, and add it to database
@@ -111,8 +111,8 @@ ON DUPLICATE KEY UPDATE
         keys = [
             'fp.family_id',
             'p.id as individual_id',
-            'fp.paternal_participant_id',
-            'fp.maternal_participant_id',
+            'fp.paternal_participant_id as paternal_id',
+            'fp.maternal_participant_id as maternal_id',
             'p.reported_sex as sex',
             'fp.affected',
         ]
@@ -153,7 +153,7 @@ ON DUPLICATE KEY UPDATE
             'sex',
             'affected',
         ]
-        ds = [dict(zip(ordered_keys, row)) for row in rows]
+        ds = [{k: row[k] for k in ordered_keys} for row in rows]
 
         return ds
 
@@ -161,7 +161,7 @@ ON DUPLICATE KEY UPDATE
         self,
         family_id: int,
         participant_id: int,
-    ):
+    ) -> dict | None:
         """Get a single row from the family_participant table"""
         values: Dict[str, Any] = {
             'family_id': family_id,
@@ -169,7 +169,13 @@ ON DUPLICATE KEY UPDATE
         }
 
         _query = """
-SELECT fp.family_id, p.id as individual_id, fp.paternal_participant_id, fp.maternal_participant_id, p.reported_sex as sex, fp.affected
+SELECT
+    fp.family_id as family_id,
+    p.id as individual_id,
+    fp.paternal_participant_id as paternal_id,
+    fp.maternal_participant_id as maternal_id,
+    p.reported_sex as sex,
+    fp.affected
 FROM family_participant fp
 INNER JOIN family f ON f.id = fp.family_id
 INNER JOIN participant p on fp.participant_id = p.id
@@ -177,6 +183,8 @@ WHERE f.id = :family_id AND p.id = :participant_id
 """
 
         row = await self.connection.fetch_one(_query, values)
+        if not row:
+            return None
 
         ordered_keys = [
             'family_id',
@@ -186,7 +194,7 @@ WHERE f.id = :family_id AND p.id = :participant_id
             'sex',
             'affected',
         ]
-        ds = dict(zip(ordered_keys, row))
+        ds = {k: row[k] for k in ordered_keys}
 
         return ds
 
