@@ -6,11 +6,22 @@ ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends gcc git ssh
+RUN apt-get update && apt-get install -y --no-install-recommends gcc git ssh default-jdk wget unzip
 
-# Use a gcloud image based on debian:buster-slim for a lean production container.
-# https://docs.docker.com/develop/develop-images/multistage-build/#use-multi-stage-builds
-FROM gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+# Download and install Liquibase
+ENV LIQUIBASE_VERSION=4.26.0
+RUN wget https://github.com/liquibase/liquibase/releases/download/v${LIQUIBASE_VERSION}/liquibase-${LIQUIBASE_VERSION}.zip \
+    && unzip liquibase-${LIQUIBASE_VERSION}.zip -d /opt/liquibase \
+    && chmod +x /opt/liquibase/liquibase \
+    # Clean up to reduce layer size
+    && rm liquibase-${LIQUIBASE_VERSION}.zip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Download the MariaDB JDBC driver
+ENV MARIADB_JDBC_VERSION=3.0.3
+RUN wget https://downloads.mariadb.com/Connectors/java/connector-java-${MARIADB_JDBC_VERSION}/mariadb-java-client-${MARIADB_JDBC_VERSION}.jar
+RUN mv mariadb-java-client-${MARIADB_JDBC_VERSION}.jar /opt/
 
 # Copy local code to the container image.
 ENV APP_HOME /app

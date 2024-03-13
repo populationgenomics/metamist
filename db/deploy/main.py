@@ -1,7 +1,6 @@
 import json
 import os
 import subprocess
-import tempfile
 from typing import Dict, Literal
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -15,10 +14,11 @@ LOGGING_CLIENT = logging.Client()
 SECRET_PROJECT = 'sample-metadata'
 SECRET_NAME = 'liquibase-schema-updater'
 log_name = 'lb_schema_update_log'
+changelog_file = 'project.xml'
 logger = LOGGING_CLIENT.logger(log_name)
 
 
-def read_db_credentials(env: Literal['prod', 'dev']) -> Dict[Literal['dbname', 'username', 'password', 'host', 'vm-name', 'vm-zone', 'vm-project'], str]:
+def read_db_credentials(env: Literal['prod', 'dev']) -> Dict[Literal['dbname', 'username', 'password', 'host'], str]:
     """Get database credentials from Secret Manager."""
     try:
         secret_path = SECRET_CLIENT.secret_version_path(SECRET_PROJECT, SECRET_NAME, 'latest')
@@ -36,7 +36,7 @@ async def execute_liquibase(request: Request, environment: Literal['prod', 'dev'
     xml_content = await request.body()
 
     # Temporary file creation with XML content
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.xml') as temp_file:
+    with open(changelog_file, 'wb') as temp_file:
         temp_file.write(xml_content)
         temp_file_path = temp_file.name  # Store file path to use later
 
@@ -47,64 +47,26 @@ async def execute_liquibase(request: Request, environment: Literal['prod', 'dev'
     db_hostname = credentials['host']
     db_name = credentials['dbname']
 
-    # Define VM details
-    vm_name = credentials['vm-name']
-    zone = credentials['vm-zone']
-    project = credentials['vm-project']
-    remote_directory = '/tmp'  # Directory on VM where the file should be copied
     remote_file_path = f'{os.path.basename(temp_file_path)}'
-    remote_abs_file_path = f'{remote_directory}/{remote_file_path}'
-
-    # Command to copy the file to the VM
-    scp_command = [
-        'gcloud',
-        'compute',
-        'scp',
-        temp_file_path,
-        f'{vm_name}:{remote_abs_file_path}',
-        '--zone',
-        zone,
-        '--project',
-        project
-    ]
-
-    try:
-        # Copy XML file to VM
-        subprocess.run(scp_command, check=True, capture_output=True, text=True)
-        logger.log_text('Copied XML file successfully.', severity='INFO')
-    except subprocess.CalledProcessError as e:
-        text = f'Failed to copy XML content: {e.stderr}'
-        logger.log_text(text, severity='ERROR')
-        raise HTTPException(status_code=500, detail=text) from e
 
     # The actual command to run on the VM
-    liquibase_command = f"""
-        echo 'Running Liquibase updates...' &&
-        liquibase --search-path={remote_directory} --changeLogFile={remote_file_path} --url=jdbc:mariadb://{db_hostname}/{db_name} --driver=org.mariadb.jdbc.Driver --classpath=/opt/mariadb-java-client-3.0.3.jar update --log-level=FINE --username={db_username} --password={db_password}
-        """
-
-    # Command to SSH into the VM and run the Liquibase update script
-    ssh_command = [
-        'gcloud',
-        'compute',
-        'ssh',
-        vm_name,
-        '--zone',
-        zone,
-        '--project',
-        project,
-        '--command',
-        liquibase_command,
+    liquibase_command = [
+        'liquibase',
+        f'--changeLogFile={remote_file_path}',
+        f'--url=jdbc:mariadb://{db_hostname}/{db_name}'
+        f'--driver=org.mariadb.jdbc.Driver',
+        f'--classpath=/opt/mariadb-java-client-3.0.3.jar',
+        'update',
     ]
 
     try:
         # Execute the gcloud command
-        result = subprocess.run(ssh_command, check=True, capture_output=True, text=True)
+        result = subprocess.run(liquibase_command, check=True, capture_output=True, text=True, env={'LIQUIBASE_COMMAND_PASSWORD': db_password, 'LIQUIBASE_COMMAND_USERNAME': db_username, **os.environ},)
         logger.log_text(f'Liquibase update successful: {result.stdout}', severity='INFO')
         os.remove(temp_file_path)
         return {'message': 'Liquibase update executed successfully', 'output': result.stdout}
     except subprocess.CalledProcessError as e:
-        text = f'Failed to execute Liquibase update via SSH: {e.stderr}'
+        text = f'Failed to execute Liquibase update: {e.stderr}'
         logger.log_text(text, severity='ERROR')
         raise HTTPException(status_code=500, detail=text) from e
 

@@ -1,0 +1,31 @@
+name: Deploy Schema Updater
+
+on:
+  workflow_dispatch:
+
+
+jobs:
+  build image:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - id: "google-cloud-auth"
+        name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v1"
+        with:
+          workload_identity_provider: "projects/774248915715/locations/global/workloadIdentityPools/gh-deploy-pool/providers/gh-provider"
+          service_account: "sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com"
+
+      - id: "google-cloud-sdk-setup"
+        name: "Set up Cloud SDK"
+        uses: google-github-actions/setup-gcloud@v1
+
+      - name: Build image with Cloud Build
+        run: |
+          gcloud builds submit --tag gcr.io/sample-metadata/schema-updater:latest ./db/deploy
+
+      - name: Deploy image to Cloud Run
+        run: |
+          gcloud run deploy schema-updater --image gcr.io/sample-metadata/schema-updater --platform managed
