@@ -52,7 +52,8 @@ async def execute_liquibase(request: Request, environment: Literal['prod', 'dev'
     zone = credentials['vm-zone']
     project = credentials['vm-project']
     remote_directory = '/tmp'  # Directory on VM where the file should be copied
-    remote_file_path = f'{remote_directory}/{os.path.basename(temp_file_path)}'
+    remote_file_path = f'{os.path.basename(temp_file_path)}'
+    remote_abs_file_path = f'{remote_directory}/{remote_file_path}'
 
     # Command to copy the file to the VM
     scp_command = [
@@ -60,7 +61,7 @@ async def execute_liquibase(request: Request, environment: Literal['prod', 'dev'
         'compute',
         'scp',
         temp_file_path,
-        f'{vm_name}:{remote_file_path}',
+        f'{vm_name}:{remote_abs_file_path}',
         '--zone',
         zone,
         '--project',
@@ -72,23 +73,14 @@ async def execute_liquibase(request: Request, environment: Literal['prod', 'dev'
         subprocess.run(scp_command, check=True, capture_output=True, text=True)
         logger.log_text('Copied XML file successfully.', severity='INFO')
     except subprocess.CalledProcessError as e:
-        text = f'Failed to execute remote commands: {e.stderr}'
+        text = f'Failed to copy XML content: {e.stderr}'
         logger.log_text(text, severity='ERROR')
         raise HTTPException(status_code=500, detail=text) from e
 
     # The actual command to run on the VM
     liquibase_command = f"""
         echo 'Running Liquibase updates...' &&
-        liquibase \
-            --changeLogFile=project.xml \
-            --url=jdbc:mariadb://{db_hostname}/{db_name} \
-            --driver=org.mariadb.jdbc.Driver \
-            --classpath=mariadb-java-client-3.0.3.jar \
-            update \
-            --username={db_username} \
-            --password={db_password} \
-            LIQUIBASE_COMMAND_PASSWORD='{db_password}' \
-            LIQUIBASE_COMMAND_USERNAME='{db_username}'"
+        liquibase --search-path={remote_directory} --changeLogFile={remote_file_path} --url=jdbc:mariadb://{db_hostname}/{db_name} --driver=org.mariadb.jdbc.Driver --classpath=/opt/mariadb-java-client-3.0.3.jar update --log-level=FINE --username={db_username} --password={db_password}
         """
 
     # Command to SSH into the VM and run the Liquibase update script
