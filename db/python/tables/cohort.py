@@ -159,8 +159,8 @@ class CohortTable(DbBase):
         # left in an incomplete state if the query fails part way through.
         async with self.connection.transaction():
             _query = """
-            INSERT INTO cohort (name, derived_from, author, description, project)
-            VALUES (:name, :derived_from, :author, :description, :project) RETURNING id
+            INSERT INTO cohort (name, derived_from, author, description, project, timestamp)
+            VALUES (:name, :derived_from, :author, :description, :project, NULL) RETURNING id
             """
 
             cohort_id = await self.connection.fetch_val(
