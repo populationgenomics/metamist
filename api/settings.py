@@ -44,6 +44,9 @@ BQ_BUDGET_VIEW = os.getenv('SM_GCP_BQ_BUDGET_VIEW')
 BQ_GCP_BILLING_VIEW = os.getenv('SM_GCP_BQ_BILLING_VIEW')
 BQ_BATCHES_VIEW = os.getenv('SM_GCP_BQ_BATCHES_VIEW')
 
+# BQ cost per 1 TB, used to calculate cost of BQ queries
+BQ_COST_PER_TB = 6.25
+
 # This is to optimise BQ queries, DEV table has data only for Mar 2023
 BQ_DAYS_BACK_OPTIMAL = 30  # Look back 30 days for optimal query
 BILLING_CACHE_RESPONSE_TTL = 3600  # 1 Hour

@@ -6,7 +6,7 @@ from typing import Any
 
 from google.cloud import bigquery
 
-from api.settings import BQ_BUDGET_VIEW, BQ_DAYS_BACK_OPTIMAL
+from api.settings import BQ_BUDGET_VIEW, BQ_COST_PER_TB, BQ_DAYS_BACK_OPTIMAL
 from api.utils.dates import get_invoice_month_range, reformat_datetime
 from db.python.gcp_connect import BqDbBase
 from db.python.tables.bq.billing_filter import BillingFilter
@@ -99,8 +99,10 @@ class BillingBaseTable(BqDbBase):
         raise NotImplementedError('Calling Abstract method directly')
 
     def _execute_query(
-        self, query: str, params: list[Any] = None, results_as_list: bool = True
-    ) -> list[Any]:
+        self, query: str, params: list[Any] | None = None, results_as_list: bool = True
+    ) -> (
+        list[Any] | bigquery.table.RowIterator | bigquery.table._EmptyRowIterator | None
+    ):
         """Execute query, add BQ labels"""
         if params:
             job_config = bigquery.QueryJobConfig(
@@ -109,13 +111,31 @@ class BillingBaseTable(BqDbBase):
         else:
             job_config = bigquery.QueryJobConfig(labels=BQ_LABELS)
 
+        # We need to dry run to calulate the costs
+        # executing query does not provide the cost
+        # more info here:
+        # https://stackoverflow.com/questions/58561153/what-is-the-python-api-i-can-use-to-calculate-the-cost-of-a-bigquery-query/58561358#58561358
+        job_config.dry_run = True
+        job_config.use_query_cache = False
+        query_job = self._connection.connection.query(query, job_config=job_config)
+
+        # This should be thread/async safe as each request
+        # creates a new connection instance
+        # and queries per requests are run in sequencial order,
+        # waiting for the previous one to finish
+        self._connection.cost += (
+            query_job.total_bytes_processed / 1024**4
+        ) * BQ_COST_PER_TB
+
+        # now execute the query
+        job_config.dry_run = False
+        job_config.use_query_cache = True
+        query_job = self._connection.connection.query(query, job_config=job_config)
         if results_as_list:
-            return list(
-                self._connection.connection.query(query, job_config=job_config).result()
-            )
+            return list(query_job.result())
 
         # otherwise return as BQ iterator
-        return self._connection.connection.query(query, job_config=job_config)
+        return query_job
 
     @staticmethod
     def _query_to_partitioned_filter(
@@ -129,12 +149,16 @@ class BillingBaseTable(BqDbBase):
 
         # initial partition filter
         billing_filter.day = GenericBQFilter[datetime](
-            gte=datetime.strptime(query.start_date, '%Y-%m-%d')
-            if query.start_date
-            else None,
-            lte=datetime.strptime(query.end_date, '%Y-%m-%d')
-            if query.end_date
-            else None,
+            gte=(
+                datetime.strptime(query.start_date, '%Y-%m-%d')
+                if query.start_date
+                else None
+            ),
+            lte=(
+                datetime.strptime(query.end_date, '%Y-%m-%d')
+                if query.end_date
+                else None
+            ),
         )
         return billing_filter
 
@@ -362,17 +386,19 @@ class BillingBaseTable(BqDbBase):
                 total_monthly=(
                     total_monthly[COMPUTE]['ALL'] + total_monthly[STORAGE]['ALL']
                 ),
-                total_daily=(total_daily[COMPUTE]['ALL'] + total_daily[STORAGE]['ALL'])
-                if is_current_month
-                else None,
+                total_daily=(
+                    (total_daily[COMPUTE]['ALL'] + total_daily[STORAGE]['ALL'])
+                    if is_current_month
+                    else None
+                ),
                 compute_monthly=total_monthly[COMPUTE]['ALL'],
-                compute_daily=(total_daily[COMPUTE]['ALL'])
-                if is_current_month
-                else None,
+                compute_daily=(
+                    (total_daily[COMPUTE]['ALL']) if is_current_month else None
+                ),
                 storage_monthly=total_monthly[STORAGE]['ALL'],
-                storage_daily=(total_daily[STORAGE]['ALL'])
-                if is_current_month
-                else None,
+                storage_daily=(
+                    (total_daily[STORAGE]['ALL']) if is_current_month else None
+                ),
                 details=all_details,
                 budget_spent=None,
                 budget=None,
@@ -422,17 +448,19 @@ class BillingBaseTable(BqDbBase):
                     {
                         'field': key,
                         'total_monthly': monthly,
-                        'total_daily': (compute_daily + storage_daily)
-                        if is_current_month
-                        else None,
+                        'total_daily': (
+                            (compute_daily + storage_daily)
+                            if is_current_month
+                            else None
+                        ),
                         'compute_monthly': compute_monthly,
                         'compute_daily': compute_daily,
                         'storage_monthly': storage_monthly,
                         'storage_daily': storage_daily,
                         'details': details,
-                        'budget_spent': 100 * monthly / budget_monthly
-                        if budget_monthly
-                        else None,
+                        'budget_spent': (
+                            100 * monthly / budget_monthly if budget_monthly else None
+                        ),
                         'budget': budget_monthly,
                         'last_loaded_day': last_loaded_day,
                     }

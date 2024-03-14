@@ -4,10 +4,12 @@ import { Button, Card, Grid, Input, Message, Select, Dropdown } from 'semantic-u
 import SearchIcon from '@mui/icons-material/Search'
 
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
-import { BillingApi, BillingTotalCostRecord } from '../../sm-api'
-import HailBatchGrid from './components/HailBatchGrid'
+import { BillingApi, BillingTotalCostRecord, AnalysisApi } from '../../sm-api'
+import BatchGrid from './components/BatchGrid'
+
 import { getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
 import generateUrl from '../../shared/utilities/generateUrl'
+import { List } from 'lodash'
 
 enum SearchType {
     Ar_guid,
@@ -26,6 +28,32 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
     )
 
     const [data, setData] = React.useState<any>(undefined)
+
+    const setArData = (arData: []) => {
+        setIsLoading(false)
+        // arData is an array of objects, we use only the first obejct
+        // in the future we maye have search by several ar_guids / author etc.
+        if (arData === undefined || arData.length === 0) {
+            // nothing found
+            setIsLoading(false)
+            return
+        }
+        const ar_record = arData[0]
+        if (!!ar_record?.total?.ar_guid) {
+            new AnalysisApi()
+                .getAnalysisRunnerLog(undefined, undefined, ar_record.total.ar_guid, undefined)
+                .then((response) => {
+                    // combine arData and getAnalysisRunnerLog
+                    if (response.data.length > 0) {
+                        // use only the first record for now
+                        ar_record.analysisRunnerLog = response.data[0]
+                    }
+                    setData(ar_record)
+                })
+                .catch((er) => setError(er.message))
+        }
+        setIsLoading(false)
+    }
 
     const [searchTxt, setSearchTxt] = React.useState<string>(searchParams.get('searchTxt') ?? '')
 
@@ -51,7 +79,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         navigate(url)
     }
 
-    const getData = (sType: SearchType | undefined | string, sTxt: string) => {
+    const getArData = (sType: SearchType | undefined | string, sTxt: string) => {
         if ((sType === undefined || sTxt === undefined) && sTxt.length < 6) {
             // Seaarch text is not large enough
             setIsLoading(false)
@@ -67,16 +95,14 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
             new BillingApi()
                 .costByArGuid(sTxt)
                 .then((response) => {
-                    setIsLoading(false)
-                    setData(response.data)
+                    setArData(response.data)
                 })
                 .catch((er) => setError(er.message))
         } else if (convertedType === SearchType.Batch_id) {
             new BillingApi()
                 .costByBatchId(sTxt)
                 .then((response) => {
-                    setIsLoading(false)
-                    setData(response.data)
+                    setArData(response.data)
                 })
                 .catch((er) => setError(er.message))
         } else {
@@ -86,11 +112,11 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
 
     const handleSearch = () => {
         if (searchByType === undefined || searchTxt === undefined || searchTxt.length < 6) {
-            // Seaarch text is not large enough
+            // Search text is not large enough
             setIsLoading(false)
             return
         }
-        getData(searchByType, searchTxt)
+        getArData(searchByType, searchTxt)
     }
 
     const handleSearchChange = (event: any, dt: any) => {
@@ -193,21 +219,23 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
                 <br />
                 Ar guid: f5a065d2-c51f-46b7-a920-a89b639fc4ba
                 <br />
-                Batch id: 430604, 430605
+                Batch id: 430604
+                <br />
+                Hail Batch + DataProc: 433599
+                <br />
+                Cromwell: ec3f961f-7e16-4fb0-a3e3-9fc93006ab42
+                <br />
+                Large Hail Batch with 7.5K jobs: a449eea5-7150-441a-9ffe-bd71587c3fe2
             </p>
         </Card>
     )
 
-    const gridCard = (gridData: BillingTotalCostRecord[]) => (
-        <Card fluid style={{ padding: '20px', overflowX: 'scroll' }} id="billing-container-data">
-            <HailBatchGrid data={gridData} />
-        </Card>
-    )
+    const batchGrid = (gridData: BillingTotalCostRecord) => <BatchGrid data={gridData} />
 
     const dataComponent = () => {
-        if (data !== undefined && data.costs.length > 0) {
+        if (data !== undefined) {
             // only render grid if there are available cost data
-            return gridCard(data.costs)
+            return batchGrid(data)
         }
 
         // if valid search text and no data return return No data message
