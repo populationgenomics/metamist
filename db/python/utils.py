@@ -4,9 +4,10 @@ import logging
 import os
 import re
 from enum import Enum
-from typing import Any, Generic, Sequence, TypeVar
+from typing import Any, Generic, TypeVar
 
 from models.base import SMBase
+from models.models.group import GroupProjectRole
 
 T = TypeVar('T')
 
@@ -64,21 +65,19 @@ class NoProjectAccess(Forbidden):
 
     def __init__(
         self,
-        project_names: Sequence[str] | None,
+        project_names: list[str],
         author: str,
-        *args,
-        readonly: bool | None = None,
+        allowed_roles: list[GroupProjectRole],
+        *args: tuple[Any, ...],
     ):
         project_names_str = (
             ', '.join(repr(p) for p in project_names) if project_names else ''
         )
-        access_type = ''
-        if readonly is False:
-            access_type = 'write '
+        allowed_roles_str = ' or '.join([r.name for r in allowed_roles])
 
         super().__init__(
-            f'{author} does not have {access_type}access to resources from the '
-            f'following project(s), or they may not exist: {project_names_str}',
+            f'{author} does not have {allowed_roles_str} access to resources from the '
+            f'follgroowing project(s), or they may not exist: {project_names_str}',
             *args,
         )
 
@@ -431,9 +430,8 @@ def get_logger():
     return _logger
 
 
-def to_db_json(val):
+def to_db_json(val: Any):
     """Convert val to json for DB"""
-    # return psycopg2.extras.Json(val)
     return json.dumps(val)
 
 

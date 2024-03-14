@@ -8,12 +8,12 @@ from api.settings import is_all_access
 from db.python.connect import Connection, SMConnections
 from db.python.utils import (
     Forbidden,
-    InternalError,
     NoProjectAccess,
     NotFoundError,
     get_logger,
     to_db_json,
 )
+from models.models.group import GroupProjectRole
 from models.models.project import Project, ProjectId
 
 logger = get_logger()
@@ -30,13 +30,12 @@ class ProjectPermissionsTable:
     table_name = 'project'
 
     @staticmethod
-    def get_project_group_name(project_name: str, readonly: bool) -> str:
+    def get_project_group_name(project_name: str, role: GroupProjectRole) -> str:
         """
         Get group name for a project, for readonly / write
         """
-        if readonly:
-            return f'{project_name}-read'
-        return f'{project_name}-write'
+
+        return f'{project_name}-{role.name}'
 
     def __init__(
         self,
@@ -102,7 +101,7 @@ class ProjectPermissionsTable:
         Internally cached get_project_rows
         """
         _query = """
-        SELECT id, name, meta, dataset, read_group_id, write_group_id
+        SELECT id, name, meta, dataset
         FROM project
         """
         rows = await self.connection.fetch_all(_query)
@@ -114,9 +113,13 @@ class ProjectPermissionsTable:
         """
         return {p.id: p for p in await self._get_project_rows_internal()}
 
-    async def _get_project_name_map(self) -> Dict[str, int]:
+    async def _get_project_name_map(self) -> Dict[str, int | None]:
         """Get {project_name: project_id} map"""
-        return {p.name: p.id for p in await self._get_project_rows_internal()}
+        return {
+            p.name: p.id
+            for p in await self._get_project_rows_internal()
+            if p.name is not None
+        }
 
     async def _get_project_by_id(self, project_id: ProjectId) -> Project:
         """Get project by id"""
@@ -153,25 +156,38 @@ class ProjectPermissionsTable:
         return await self._get_project_rows_internal()
 
     async def get_projects_accessible_by_user(
-        self, author: str, readonly=True
+        self,
+        user: str,
+        allowed_roles: list[GroupProjectRole],
+        project_id_filter: list[int] | None,
     ) -> list[Project]:
         """
         Get projects that are accessible by the specified user
         """
-        assert author
-        if self.gtable.allow_full_access:
-            return await self._get_project_rows_internal()
 
-        group_name = 'read_group_id' if readonly else 'write_group_id'
-        _query = f"""
-            SELECT p.id
+        parameters: dict[str, str | list[str] | list[int]] = {
+            'user': user,
+            'allowed_roles': list(role.name for role in allowed_roles),
+        }
+
+        project_id_filter_str = ''
+        if project_id_filter is not None:
+            parameters['project_ids'] = project_id_filter
+            project_id_filter_str = 'AND p.id in :project_ids'
+
+        query = f"""
+            SELECT DISTINCT p.id
             FROM project p
-            INNER JOIN group_member gm ON gm.group_id = p.{group_name}
-            WHERE gm.member = :author
+            INNER JOIN project_groups pg
+                ON pg.project_id = p.id
+                AND pg.role IN :allowed_roles
+            INNER JOIN group_member gm ON gm.group_id = pg.group_id
+            WHERE gm.member = :user
+            {project_id_filter_str}
         """
-        relevant_project_ids = await self.connection.fetch_all(
-            _query, {'author': author}
-        )
+
+        relevant_project_ids = await self.connection.fetch_all(query, parameters)
+
         projects = await self._get_projects_by_ids(
             [p['id'] for p in relevant_project_ids]
         )
@@ -179,35 +195,43 @@ class ProjectPermissionsTable:
         return projects
 
     async def get_and_check_access_to_project_for_id(
-        self, user: str, project_id: ProjectId, readonly: bool
-    ) -> Project:
+        self,
+        user: str,
+        project_id: ProjectId,
+        allowed_roles: list[GroupProjectRole],
+        raise_exception: bool = True,
+    ) -> Project | None:
         """Get project by id"""
         project = await self._get_project_by_id(project_id)
-        has_access = await self.gtable.check_if_member_in_group(
-            group_id=project.read_group_id if readonly else project.write_group_id,
-            member=user,
+
+        projects = await self.get_projects_accessible_by_user(
+            user, allowed_roles, [project_id]
         )
+        has_access = len(projects) == 1
         if not has_access:
-            raise NoProjectAccess([project.name], readonly=readonly, author=user)
+            if raise_exception:
+                raise NoProjectAccess(
+                    [project.name], allowed_roles=allowed_roles, author=user
+                )
+            return None
 
         return project
 
     async def get_and_check_access_to_project_for_name(
-        self, user: str, project_name: str, readonly: bool
-    ) -> Project:
+        self,
+        user: str,
+        project_name: str,
+        allowed_roles: list[GroupProjectRole],
+        raise_exception: bool = True,
+    ) -> Project | None:
         """Get project by name + perform access checks"""
         project = await self._get_project_by_name(project_name)
-        has_access = await self.gtable.check_if_member_in_group(
-            group_id=project.read_group_id if readonly else project.write_group_id,
-            member=user,
+        return await self.get_and_check_access_to_project_for_id(
+            user, project.id, allowed_roles, raise_exception
         )
-        if not has_access:
-            raise NoProjectAccess([project.name], readonly=readonly, author=user)
-
-        return project
 
     async def get_and_check_access_to_projects_for_names(
-        self, user: str, project_names: list[str], readonly: bool
+        self, user: str, project_names: list[str], allowed_roles: list[GroupProjectRole]
     ):
         """Get projects by names + perform access checks"""
         project_name_map = await self._get_project_name_map()
@@ -216,19 +240,22 @@ class ProjectPermissionsTable:
         missing_project_names = set(project_names) - set(project_name_map.keys())
         if missing_project_names:
             raise NotFoundError(
-                f'Could not find projects {", ".join(missing_project_names)}'
+                f'Could not find projects {', '.join(missing_project_names)}'
             )
+        project_ids = [project_name_map[name] for name in project_names]
+        # this extra filter is needed for the type sytem to be happy
+        # that there's no Nones in the list
+        filtered_project_ids = [p for p in project_ids if p is not None]
 
-        projects = await self.get_and_check_access_to_projects_for_ids(
-            user=user,
-            project_ids=[project_name_map[name] for name in project_names],
-            readonly=readonly,
+        return await self.get_and_check_access_to_projects_for_ids(
+            user, filtered_project_ids, allowed_roles
         )
 
-        return projects
-
     async def get_and_check_access_to_projects_for_ids(
-        self, user: str, project_ids: list[ProjectId], readonly: bool
+        self,
+        user: str,
+        project_ids: list[ProjectId],
+        allowed_roles: list[GroupProjectRole],
     ) -> list[Project]:
         """Get project by id"""
         if not project_ids:
@@ -238,83 +265,57 @@ class ProjectPermissionsTable:
             )
 
         projects = await self._get_projects_by_ids(project_ids)
-        # do this all at once to save time
-        if readonly:
-            group_id_project_map = {p.read_group_id: p for p in projects}
-        else:
-            group_id_project_map = {p.write_group_id: p for p in projects}
 
-        group_ids = set(gid for gid in group_id_project_map.keys() if gid)
+        # Check is any of the provided ids aren't valid project ids
+        missing_project_ids = set(project_ids) - set(p.id for p in projects)
+        missing_project_id_strs = [str(p) for p in missing_project_ids]
+        if missing_project_ids:
+            raise NotFoundError(
+                f'Could not find projects with ids {', '.join(missing_project_id_strs)}'
+            )
 
-        present_group_ids = await self.gtable.check_which_groups_member_has(
-            group_ids=group_ids, member=user
+        accessible_projects = await self.get_projects_accessible_by_user(
+            user, allowed_roles, project_ids
         )
-        missing_group_ids = group_ids - present_group_ids
 
-        if missing_group_ids:
-            # so we can directly return the project names they're missing
-            missing_project_names = [
-                group_id_project_map[gid].name or str(gid) for gid in missing_group_ids
-            ]
-            raise NoProjectAccess(missing_project_names, readonly=readonly, author=user)
+        accessible_project_ids = set(p.id for p in accessible_projects)
+        missing_project_names = [
+            p.name for p in projects if p.id not in accessible_project_ids
+        ]
 
-        return projects
+        if missing_project_names:
+            raise NoProjectAccess(
+                missing_project_names, allowed_roles=allowed_roles, author=user
+            )
+
+        return accessible_projects
 
     async def check_access_to_project_id(
-        self, user: str, project_id: ProjectId, readonly: bool, raise_exception=True
+        self,
+        user: str,
+        project_id: ProjectId,
+        allowed_roles: list[GroupProjectRole],
+        raise_exception: bool = True,
     ) -> bool:
-        """Check whether a user has access to project_id"""
-        project = await self._get_project_by_id(project_id)
-        has_access = await self.gtable.check_if_member_in_group(
-            group_id=project.read_group_id if readonly else project.write_group_id,
-            member=user,
+        project = await self.get_and_check_access_to_project_for_id(
+            user, project_id, allowed_roles, raise_exception
         )
-        if not has_access and raise_exception:
-            raise NoProjectAccess([project.name], readonly=readonly, author=user)
-
-        return has_access
+        return project is not None
 
     async def check_access_to_project_ids(
         self,
         user: str,
         project_ids: Iterable[ProjectId],
-        readonly: bool,
-        raise_exception=True,
+        allowed_roles: list[GroupProjectRole],
     ) -> bool:
         """Check user has access to list of project_ids"""
-        if not project_ids:
-            raise Forbidden(
-                "You don't have access to this resources, as the resource you "
-                "requested didn't belong to a project"
-            )
-
-        projects = await self._get_projects_by_ids(project_ids)
-        # do this all at once to save time
-        if readonly:
-            group_id_project_map = {p.read_group_id: p for p in projects}
-        else:
-            group_id_project_map = {p.write_group_id: p for p in projects}
-
-        group_ids = set(gid for gid in group_id_project_map.keys() if gid)
-        present_group_ids = await self.gtable.check_which_groups_member_has(
-            group_ids=group_ids, member=user
+        # This will raise an exception if any of the specified project ids are missing
+        await self.get_and_check_access_to_projects_for_ids(
+            user, list(project_ids), allowed_roles
         )
-        missing_group_ids = group_ids - present_group_ids
-
-        if missing_group_ids:
-            # so we can directly return the project names they're missing
-            missing_project_names = [
-                group_id_project_map[gid].name or str(gid) for gid in missing_group_ids
-            ]
-            if raise_exception:
-                raise NoProjectAccess(
-                    missing_project_names, readonly=readonly, author=user
-                )
-            return False
-
         return True
 
-    async def check_project_creator_permissions(self, author):
+    async def check_project_creator_permissions(self, author: str):
         """Check author has project_creator permissions"""
         # check permissions in here
         is_in_group = await self.gtable.check_if_member_in_group_name(
@@ -328,21 +329,6 @@ class ProjectPermissionsTable:
 
     # endregion AUTH
 
-    async def get_project_ids_from_names_and_user(
-        self, user: str, project_names: List[str], readonly: bool
-    ) -> List[ProjectId]:
-        """Get project ids from project names and the user"""
-        if not user:
-            raise InternalError('An internal error occurred during authorization')
-
-        project_name_map = await self._get_project_name_map()
-        ordered_project_ids = [project_name_map[name] for name in project_names]
-        await self.check_access_to_project_ids(
-            user, ordered_project_ids, readonly=readonly, raise_exception=True
-        )
-
-        return ordered_project_ids
-
     # region CREATE / UPDATE
 
     async def create_project(
@@ -350,23 +336,13 @@ class ProjectPermissionsTable:
         project_name: str,
         dataset_name: str,
         author: str,
-        check_permissions=True,
+        check_permissions: bool = True,
     ):
         """Create project row"""
         if check_permissions:
             await self.check_project_creator_permissions(author)
 
         async with self.connection.transaction():
-            audit_log_id = await self.audit_log_id()
-            read_group_id = await self.gtable.create_group(
-                self.get_project_group_name(project_name, readonly=True),
-                audit_log_id=audit_log_id,
-            )
-            write_group_id = await self.gtable.create_group(
-                self.get_project_group_name(project_name, readonly=False),
-                audit_log_id=audit_log_id,
-            )
-
             _query = """\
     INSERT INTO project (name, dataset, audit_log_id, read_group_id, write_group_id)
     VALUES (:name, :dataset, :audit_log_id, :read_group_id, :write_group_id)
@@ -375,8 +351,6 @@ class ProjectPermissionsTable:
                 'name': project_name,
                 'dataset': dataset_name,
                 'audit_log_id': await self.audit_log_id(),
-                'read_group_id': read_group_id,
-                'write_group_id': write_group_id,
             }
 
             project_id = await self.connection.fetch_val(_query, values)
@@ -465,18 +439,21 @@ DELETE FROM analysis WHERE project = :project;
             """
             values: dict = {'project': project_id}
             if delete_project:
-                group_ids = await self.connection.fetch_one(
+                group_ids_rows = await self.connection.fetch_all(
                     """
-                    SELECT read_group_id, write_group_id
-                    FROM project WHERE id = :project'
+                    SELECT group_id
+                    FROM project_groups WHERE project_id = :project'
                     """
                 )
+                group_ids = set(r['group_id'] for r in group_ids_rows)
+
                 _query += 'DELETE FROM project WHERE id = :project;\n'
-                _query += 'DELETE FROM `group` WHERE id IN :group_ids\n'
-                values['group_ids'] = [
-                    group_ids['read_group_id'],
-                    group_ids['write_group_id'],
-                ]
+                if len(group_ids) > 0:
+                    _query += 'DELETE FROM `group` WHERE id IN :group_ids\n'
+                    _query += (
+                        'DELETE FROM `project_groups` WHERE project_id = :project\n'
+                    )
+                    values['group_ids'] = list(group_ids)
 
             await self.connection.execute(_query, {'project': project_id})
 
@@ -519,12 +496,12 @@ DELETE FROM analysis WHERE project = :project;
 
 class GroupTable:
     """
-    Capture Analysis table operations and queries
+    Capture Group table operations and queries
     """
 
     table_name = 'group'
 
-    def __init__(self, connection: Database, allow_full_access: bool = None):
+    def __init__(self, connection: Database, allow_full_access: bool | None = None):
         if not isinstance(connection, Database):
             raise ValueError(
                 f'Invalid type connection, expected Database, got {type(connection)}, '

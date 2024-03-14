@@ -1281,4 +1281,78 @@
 		<sql>ALTER TABLE cohort_sequencing_group ADD SYSTEM VERSIONING;</sql>
 		<sql>ALTER TABLE analysis_cohort ADD SYSTEM VERSIONING;</sql>
 	</changeSet>
+
+	<changeSet id="2024-03-20_project_group_roles" author="dan.coates">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<createTable tableName="project_groups">
+			<column name="project_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_PROJECT_GROUPS_PROJECT_ID"
+					references="project(id)" />
+			</column>
+			<column name="group_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_PROJECT_GROUPS_GROUP_ID"
+					references="group(id)" />
+			</column>
+			<column name="role" type="ENUM('read', 'write', 'contribute')">
+				<constraints nullable="false" />
+			</column>
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_PROJECT_GROUPS_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+
+		<sql>
+			-- copy across read and write roles from existing project table
+			INSERT INTO project_groups (
+				SELECT
+					id AS project_id,
+					read_group_id AS group_id,
+					'read' AS role,
+					audit_log_id
+				FROM project
+				WHERE read_group_id IS NOT NULL
+
+				UNION ALL
+
+				SELECT
+					id AS project_id,
+					write_group_id AS group_id,
+					'write' AS role,
+					audit_log_id
+				FROM project
+				WHERE write_group_id IS NOT NULL
+			)
+		</sql>
+
+		<dropForeignKeyConstraint
+			baseTableName="project"
+			constraintName="FK_PROJECT_WRITE_GROUP_GROUP_ID"
+		/>
+
+		<dropForeignKeyConstraint
+			baseTableName="project"
+			constraintName="FK_PROJECT_READ_GROUP_GROUP_ID"
+		/>
+
+		<dropColumn
+			tableName="project"
+			columnName="read_group_id"
+		/>
+		<dropColumn
+			tableName="project"
+			columnName="write_group_id"
+		/>
+
+		<dropColumn
+			tableName="project"
+			columnName="read_group_name"
+		/>
+		<dropColumn
+			tableName="project"
+			columnName="write_group_name"
+		/>
+	</changeSet>
 </databaseChangeLog>
