@@ -9,14 +9,14 @@ export interface IDonutChartData {
 }
 
 export interface IDonutChartProps {
-    id?: string | undefined
+    id?: string
     data?: IDonutChartData[]
     maxSlices: number
-    colors?: (t: number) => string | undefined
+    colors?: (t: number) => string
     isLoading: boolean
-    legendSize?: number | undefined
-    showLegend?: boolean | undefined
-    maxWidth?: string | undefined
+    legendSize?: number
+    showLegend?: boolean
+    maxWidth?: string
 }
 
 interface IDonutChartPreparadData {

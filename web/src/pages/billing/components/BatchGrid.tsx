@@ -15,7 +15,7 @@ import formatMoney from '../../../shared/utilities/formatMoney'
 
 const hailBatchUrl = 'https://batch.hail.populationgenomics.org.au/batches'
 
-const HailBatchGrid: React.FunctionComponent<{
+const BatchGrid: React.FunctionComponent<{
     data: any
 }> = ({ data }) => {
     const [openRows, setOpenRows] = React.useState<string[]>([])
@@ -570,4 +570,4 @@ const HailBatchGrid: React.FunctionComponent<{
     )
 }
 
-export default HailBatchGrid
+export default BatchGrid

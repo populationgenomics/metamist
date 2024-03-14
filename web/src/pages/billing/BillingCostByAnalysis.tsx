@@ -5,7 +5,7 @@ import SearchIcon from '@mui/icons-material/Search'
 
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { BillingApi, BillingTotalCostRecord, AnalysisApi } from '../../sm-api'
-import HailBatchGrid from './components/HailBatchGrid'
+import BatchGrid from './components/BatchGrid'
 
 import { getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
 import generateUrl from '../../shared/utilities/generateUrl'
@@ -39,11 +39,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
             return
         }
         const ar_record = arData[0]
-        if (
-            ar_record !== undefined &&
-            ar_record.total !== undefined &&
-            ar_record.total.ar_guid !== undefined
-        ) {
+        if (!!ar_record?.total?.ar_guid) {
             new AnalysisApi()
                 .getAnalysisRunnerLog(undefined, undefined, ar_record.total.ar_guid, undefined)
                 .then((response) => {
@@ -234,7 +230,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         </Card>
     )
 
-    const batchGrid = (gridData: BillingTotalCostRecord) => <HailBatchGrid data={gridData} />
+    const batchGrid = (gridData: BillingTotalCostRecord) => <BatchGrid data={gridData} />
 
     const dataComponent = () => {
         if (data !== undefined) {
