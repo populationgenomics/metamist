@@ -57,6 +57,6 @@ And metamist maintains two clients:
 
 - [Installation and developer setup](docs/installation.md)
 
-## License
+## License 
 
 This project is licensed under the MIT License. You can see it in the [LICENSE](LICENSE) file in the root directory of this source tree.
