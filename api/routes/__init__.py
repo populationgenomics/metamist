@@ -1,4 +1,5 @@
 from api.routes.analysis import router as analysis_router
+from api.routes.analysis_runner import router as analysis_runner_router
 from api.routes.assay import router as assay_router
 from api.routes.billing import router as billing_router
 from api.routes.enum import router as enum_router
