@@ -141,6 +141,12 @@ class CohortLayer(BaseLayer):
             )
         )
 
+        rich_ids = sequencing_group_id_format_list([sg.id for sg in sgs])
+
+        if dry_run:
+            return {'dry_run': True, 'template_id': template_id or 'CREATE NEW', 'sequencing_group_ids': rich_ids}
+
+        # 2. Create cohort template, if required.
         if create_cohort_template:
             cohort_template = CohortTemplate(
                 name=cohort_name,
@@ -154,12 +160,7 @@ class CohortLayer(BaseLayer):
 
         assert template_id, 'Template ID must be set'
 
-        rich_ids = sequencing_group_id_format_list([sg.id for sg in sgs])
-
-        if dry_run:
-            return {'dry_run': True, 'template_id': template_id, 'sequencing_group_ids': rich_ids}
-
-        # 2. Create Cohort
+        # 3. Create Cohort
         cohort_id = await self.ct.create_cohort(
             project=project_to_write,
             cohort_name=cohort_name,

@@ -22,7 +22,7 @@ class TestCohort(DbIsolatedTest):
                 project_to_write=self.project_id,
                 author='bob@example.org',
                 description='No criteria or template',
-                cohort_name='Borken cohort',
+                cohort_name='Broken cohort',
                 dry_run=False,
                 )
 
