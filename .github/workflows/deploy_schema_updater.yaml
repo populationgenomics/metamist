@@ -27,7 +27,7 @@ jobs:
 
       - name: Build image with Cloud Build
         run: |
-          gcloud builds submit --tag gcr.io/sample-metadata/schema-updater:latest ./db/deploy
+          gcloud builds submit --tag gcr.io/sample-metadata/schema-updater:latest --gcs-log-dir=gs://sample-metadata_cloudbuild ./db/deploy
 
       - name: Deploy image to Cloud Run
         run: |
