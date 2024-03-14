@@ -179,6 +179,9 @@ class DbTest(unittest.TestCase):
             db.exec(f'DROP DATABASE {db.dbname};')
             db.stop()
 
+        # gcs = cls.gcs
+        # gcs.stop()
+
     def setUp(self) -> None:
         self._connection = self.connections[self.__class__.__name__]
         # create a connection on each test so we can generate a new

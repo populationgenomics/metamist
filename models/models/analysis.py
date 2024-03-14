@@ -1,9 +1,9 @@
 import enum
 import json
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from models.base import SMBase
 from models.enums import AnalysisStatus
@@ -15,17 +15,19 @@ from models.utils.sequencing_group_id_format import (
 
 class AnalysisInternal(SMBase):
     """Model for Analysis"""
+    model_config = ConfigDict(extra='allow')
 
-    id: int | None = None
+    id: Optional[int] = None
     type: str
     status: AnalysisStatus
-    output: str = None
+    output: Optional[Union[str, dict]] = None
+    outputs: Optional[Union[str, dict]] = {}
     sequencing_group_ids: list[int] = []
-    timestamp_completed: datetime | None = None
-    project: int | None = None
-    active: bool | None = None
+    timestamp_completed: Optional[datetime] = None
+    project: Optional[int] = None
+    active: Optional[bool] = None
     meta: dict[str, Any] = {}
-    author: str | None = None
+    author: Optional[str] = None
 
     @staticmethod
     def from_db(**kwargs):
@@ -52,7 +54,8 @@ class AnalysisInternal(SMBase):
             type=analysis_type,
             status=AnalysisStatus(status),
             sequencing_group_ids=sequencing_group_ids or [],
-            output=kwargs.pop('output', []),
+            output=kwargs.pop('output', None),  # TODO deprecate
+            outputs=kwargs.pop('outputs', []),
             timestamp_completed=timestamp_completed,
             project=kwargs.get('project'),
             meta=meta,
@@ -72,6 +75,7 @@ class AnalysisInternal(SMBase):
                 self.sequencing_group_ids
             ),
             output=self.output,
+            outputs=self.outputs,
             timestamp_completed=self.timestamp_completed.isoformat()
             if self.timestamp_completed
             else None,
@@ -87,13 +91,14 @@ class Analysis(BaseModel):
 
     type: str
     status: AnalysisStatus
-    id: int | None = None
-    output: str | None = None
+    id: Optional[int] = None
+    output: Optional[Union[str, dict]] = None
+    outputs: Optional[Union[str, dict]] = {}
     sequencing_group_ids: list[str] = []
-    author: str | None = None
-    timestamp_completed: str | None = None
-    project: int | None = None
-    active: bool | None = None
+    author: Optional[str] = None
+    timestamp_completed: Optional[str] = None
+    project: Optional[int] = None
+    active: Optional[bool] = None
     meta: dict[str, Any] = {}
 
     def to_internal(self):
@@ -108,6 +113,7 @@ class Analysis(BaseModel):
                 self.sequencing_group_ids
             ),
             output=self.output,
+            outputs=self.outputs,
             # don't allow this to be set
             timestamp_completed=None,
             project=self.project,

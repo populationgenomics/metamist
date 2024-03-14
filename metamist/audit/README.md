@@ -80,7 +80,9 @@ print(json.dumps(participant_data))
               "analyses": [
                 {
                   "id": 456,
-                  "output": "gs://cpg-test-dataset-main/cram/CPG123456.cram",
+                  "outputs": {
+                    "basename": "gs://cpg-test-dataset-main/cram/CPG123456.cram"
+                  },
                   "timestampCompleted": "2023-09-01T05:04:24"
                 }
               ]

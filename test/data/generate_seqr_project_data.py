@@ -349,7 +349,7 @@ async def generate_cram_analyses(project: str, analyses_to_insert: list[Analysis
                 sequencing_group_ids=[sg['id']],
                 type='cram',
                 status=AnalysisStatus('completed'),
-                output=f'FAKE://{project}/crams/{sg["id"]}.cram',
+                outputs={'basename': f'FAKE://{project}/crams/{sg["id"]}.cram'},
                 timestamp_completed=(
                     datetime.datetime.now() - datetime.timedelta(days=random.randint(1, 15))
                 ).isoformat(),
@@ -386,14 +386,14 @@ async def generate_joint_called_analyses(project: str, aligned_sgs: list[dict], 
                     sequencing_group_ids=joint_called_sgs,
                     type='custom',
                     status=AnalysisStatus('completed'),
-                    output=f'FAKE::{project}-{seq_type}-{datetime.date.today()}.mt',
+                    outputs={'basename': f'FAKE::{project}-{seq_type}-{datetime.date.today()}.mt'},
                     meta={'stage': 'AnnotateDataset', 'sequencing_type': seq_type},
                 ),
                 Analysis(
                     sequencing_group_ids=joint_called_sgs,
                     type='es-index',
                     status=AnalysisStatus('completed'),
-                    output=f'FAKE::{project}-{seq_type}-es-{datetime.date.today()}',
+                    outputs={'basename': f'FAKE::{project}-{seq_type}-es-{datetime.date.today()}'},
                     meta={'stage': 'MtToEs', 'sequencing_type': seq_type},
                 )
             ]

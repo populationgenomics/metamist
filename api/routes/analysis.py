@@ -1,7 +1,7 @@
 import csv
 import io
 from datetime import date
-from typing import Any
+from typing import Any, Optional, Union
 
 from fastapi import APIRouter
 from fastapi.params import Body, Query
@@ -45,7 +45,7 @@ class AnalysisModel(BaseModel):
     type: str
     status: AnalysisStatus
     meta: dict[str, Any] | None = None
-    output: str | None = None
+    outputs: Optional[Union[str, dict]] = None
     active: bool = True
     # please don't use this, unless you're the analysis-runner,
     # the usage is tracked ... (Ծ_Ծ)
@@ -56,7 +56,7 @@ class AnalysisUpdateModel(BaseModel):
     """Update analysis model"""
 
     status: AnalysisStatus
-    output: str | None = None
+    outputs: str | None = None
     meta: dict[str, Any] | None = None
     active: bool | None = None
 
@@ -73,7 +73,7 @@ class AnalysisQueryModel(BaseModel):
     type: str | None = None
     status: AnalysisStatus | None = None
     meta: dict[str, Any] | None = None
-    output: str | None = None
+    outputs: str | None = None
     active: bool | None = None
 
     def to_filter(self, project_id_map: dict[str, int]) -> AnalysisFilter:
@@ -130,7 +130,7 @@ async def update_analysis(
     """Update status of analysis"""
     atable = AnalysisLayer(connection)
     await atable.update_analysis(
-        analysis_id, status=analysis.status, output=analysis.output, meta=analysis.meta
+        analysis_id, status=analysis.status, outputs=analysis.outputs, meta=analysis.meta
     )
     return True
 

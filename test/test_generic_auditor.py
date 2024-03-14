@@ -384,7 +384,9 @@ class TestGenericAuditor(unittest.TestCase):
                                         'CPGaaa',
                                     ],
                                 },
-                                'output': 'gs://cpg-dataset-main/cram/CPGaaa.cram',
+                                'outputs': {
+                                    'basename': 'gs://cpg-dataset-main/cram/CPGaaa.cram'
+                                },
                             },
                         ],
                     },
@@ -395,7 +397,7 @@ class TestGenericAuditor(unittest.TestCase):
         test_result = await auditor.get_analysis_cram_paths_for_dataset_sgs(
             assay_sg_id_map={1: 'CPGaaa'}
         )
-        expected_result = {'CPGaaa': {1: 'gs://cpg-dataset-main/cram/CPGaaa.cram'}}
+        expected_result = {'CPGaaa': {1:  {'basename': 'gs://cpg-dataset-main/cram/CPGaaa.cram'}}}
 
         self.assertDictEqual(test_result, expected_result)
 
@@ -421,7 +423,9 @@ class TestGenericAuditor(unittest.TestCase):
                                         'CPGaaa',
                                     ],
                                 },
-                                'output': 'gs://cpg-dataset-main/cram/CPGaaa.cram',
+                                'outputs': {
+                                    'basename': 'gs://cpg-dataset-main/cram/CPGaaa.cram'
+                                },
                             },
                         ],
                     },
@@ -437,7 +441,9 @@ class TestGenericAuditor(unittest.TestCase):
                                         'CPGbbb',
                                     ],
                                 },
-                                'output': 'gs://cpg-dataset-main/exome/cram/CPGaaa.cram',
+                                'outputs': {
+                                    'basename': 'gs://cpg-dataset-main/exome/cram/CPGaaa.cram'}
+                                ,
                             },
                         ],
                     },
@@ -450,8 +456,8 @@ class TestGenericAuditor(unittest.TestCase):
         )
 
         expected_result = {
-            'CPGaaa': {1: 'gs://cpg-dataset-main/cram/CPGaaa.cram'},
-            'CPGbbb': {2: 'gs://cpg-dataset-main/exome/cram/CPGaaa.cram'},
+            'CPGaaa': {1:  {'basename': 'gs://cpg-dataset-main/cram/CPGaaa.cram'}},
+            'CPGbbb': {2:  {'basename': 'gs://cpg-dataset-main/exome/cram/CPGaaa.cram'}},
         }
 
         self.assertDictEqual(test_result, expected_result)
@@ -479,7 +485,7 @@ class TestGenericAuditor(unittest.TestCase):
                             'sample_ids': [
                                 'CPGaaa',
                             ],
-                            'output': '',
+                            'outputs': {},
                         },
                     ],
                 },
@@ -508,7 +514,9 @@ class TestGenericAuditor(unittest.TestCase):
                             'meta': {
                                 'sequencing_type': 'genome',
                             },
-                            'output': 'gs://cpg-dataset-main/cram/CPGaaa.notcram',
+                            'outputs': {
+                                'basename': 'gs://cpg-dataset-main/cram/CPGaaa.notcram'
+                                },
                         },
                     ],
                 }
@@ -563,7 +571,9 @@ class TestGenericAuditor(unittest.TestCase):
                         {
                             'id': 1,
                             'meta': {'sequencing_type': 'genome', 'sample': 'CPGaaa'},
-                            'output': 'gs://cpg-dataset-main/gvcf/CPGaaa.g.vcf.gz',
+                            'outputs': {
+                                'basename': 'gs://cpg-dataset-main/gvcf/CPGaaa.g.vcf.gz'
+                                },
                             'type': 'gvcf',
                             'timestampCompleted': '2023-05-11T16:33:00',
                         }
@@ -584,7 +594,7 @@ class TestGenericAuditor(unittest.TestCase):
             self.assertEqual(len(log.output), 1)
             self.assertEqual(len(log.records), 1)
             self.assertIn(
-                "WARNING:root:dev :: SG CPGaaa missing CRAM but has analysis {'analysis_id': 1, 'analysis_type': 'gvcf', 'analysis_output': 'gs://cpg-dataset-main/gvcf/CPGaaa.g.vcf.gz', 'timestamp_completed': '2023-05-11T16:33:00'}",
+                "WARNING:root:dev :: SG CPGaaa missing CRAM but has analysis {'analysis_id': 1, 'analysis_type': 'gvcf', 'analysis_output': {'basename': 'gs://cpg-dataset-main/gvcf/CPGaaa.g.vcf.gz'}, 'timestamp_completed': '2023-05-11T16:33:00'}",
                 log.output[0],
             )
 

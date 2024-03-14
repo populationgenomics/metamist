@@ -61,3 +61,9 @@ web/src/__generated__
 
 # pulumi config files
 Pulumi*.yaml
+
+# pnpm package manager
+pnpm-lock.yaml
+
+# env
+.env

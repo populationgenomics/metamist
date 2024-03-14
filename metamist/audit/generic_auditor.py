@@ -53,7 +53,7 @@ QUERY_SG_ANALYSES = gql(
             analyses(status: {eq: COMPLETED}, type: {in_: $analysisTypes}, project: {eq: $dataset}) {
               id
               meta
-              output
+              outputs
               type
               timestampCompleted
             }
@@ -277,14 +277,15 @@ class GenericAuditor(AuditHelper):
         # For each sg id, collect the analysis id and cram paths
         sg_cram_paths: dict[str, dict[int, str]] = defaultdict(dict)
         for sg_id, analysis in analyses.items():
-            cram_path = analysis['output']
+            logging.info(analysis['outputs'])
+            cram_path = analysis['outputs']['basename']
             if not cram_path.startswith('gs://') or not cram_path.endswith('.cram'):
                 logging.warning(
-                    f'Analysis {analysis["id"]} invalid output path: {analysis["output"]}'
+                    f'Analysis {analysis["id"]} invalid output path: {analysis["outputs"]["basename"]}'
                 )
                 continue
 
-            sg_cram_paths[sg_id][analysis['id']] = analysis['output']
+            sg_cram_paths[sg_id][analysis['id']] = analysis['outputs']
 
         return sg_cram_paths
 
@@ -313,7 +314,7 @@ class GenericAuditor(AuditHelper):
                 analysis_entry = {
                     'analysis_id': analysis['id'],
                     'analysis_type': analysis['type'],
-                    'analysis_output': analysis['output'],
+                    'analysis_output': analysis['outputs'],
                     'timestamp_completed': analysis['timestampCompleted'],
                 }
                 all_sg_analyses[sg_id].append(analysis_entry)
