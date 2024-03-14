@@ -24,7 +24,7 @@ class TestCohort(DbIsolatedTest):
                 description='No criteria or template',
                 cohort_name='Broken cohort',
                 dry_run=False,
-                )
+            )
 
     @run_as_sync
     async def test_create_empty_cohort(self):
@@ -35,10 +35,8 @@ class TestCohort(DbIsolatedTest):
             description='Cohort with no entries',
             cohort_name='Empty cohort',
             dry_run=False,
-            cohort_criteria=CohortCriteria(
-                projects=['test']
-                )
-            )
+            cohort_criteria=CohortCriteria(projects=['test']),
+        )
         self.assertIsInstance(result, dict)
         self.assertIsInstance(result['cohort_id'], str)
         self.assertEqual([], result['sequencing_group_ids'])
@@ -52,8 +50,8 @@ class TestCohort(DbIsolatedTest):
             description='Cohort with no entries',
             cohort_name='Trial duplicate cohort',
             dry_run=False,
-            cohort_criteria=CohortCriteria(projects=['test'])
-            )
+            cohort_criteria=CohortCriteria(projects=['test']),
+        )
 
         _ = await self.cohortl.create_cohort_from_criteria(
             project_to_write=self.project_id,
@@ -61,8 +59,8 @@ class TestCohort(DbIsolatedTest):
             description='Cohort with no entries',
             cohort_name='Trial duplicate cohort',
             dry_run=True,
-            cohort_criteria=CohortCriteria(projects=['test'])
-            )
+            cohort_criteria=CohortCriteria(projects=['test']),
+        )
 
         with self.assertRaises(IntegrityError):
             _ = await self.cohortl.create_cohort_from_criteria(
@@ -71,5 +69,5 @@ class TestCohort(DbIsolatedTest):
                 description='Cohort with no entries',
                 cohort_name='Trial duplicate cohort',
                 dry_run=False,
-                cohort_criteria=CohortCriteria(projects=['test'])
-                )
+                cohort_criteria=CohortCriteria(projects=['test']),
+            )
