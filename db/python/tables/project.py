@@ -421,7 +421,7 @@ class ProjectPermissionsTable:
         """
         if delete_project:
             # stop allowing delete project with analysis-runner entries
-            raise ValueError('2024-03-08: delete_project is no loner allowed')
+            raise ValueError('2024-03-08: delete_project is no longer allowed')
         await self.check_project_creator_permissions(author)
 
         async with self.connection.transaction():
