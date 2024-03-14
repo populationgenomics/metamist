@@ -4,12 +4,13 @@ FROM python:3.11-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
+ENV LIQUIBASE_VERSION=4.26.0
+ENV MARIADB_JDBC_VERSION=3.0.3
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends gcc git ssh default-jdk wget unzip
 
 # Download and install Liquibase
-ENV LIQUIBASE_VERSION=4.26.0
 RUN wget https://github.com/liquibase/liquibase/releases/download/v${LIQUIBASE_VERSION}/liquibase-${LIQUIBASE_VERSION}.zip \
     && unzip liquibase-${LIQUIBASE_VERSION}.zip -d /opt/liquibase \
     && chmod +x /opt/liquibase/liquibase \
@@ -19,7 +20,6 @@ RUN wget https://github.com/liquibase/liquibase/releases/download/v${LIQUIBASE_V
     && rm -rf /var/lib/apt/lists/*
 
 # Download the MariaDB JDBC driver
-ENV MARIADB_JDBC_VERSION=3.0.3
 RUN wget https://downloads.mariadb.com/Connectors/java/connector-java-${MARIADB_JDBC_VERSION}/mariadb-java-client-${MARIADB_JDBC_VERSION}.jar
 RUN mv mariadb-java-client-${MARIADB_JDBC_VERSION}.jar /opt/
 
