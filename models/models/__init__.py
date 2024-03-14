@@ -12,10 +12,10 @@ from models.models.analysis import (
 from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
 from models.models.audit_log import AuditLogId, AuditLogInternal
 from models.models.billing import (
+    BillingBatchCostRecord,
     BillingColumn,
     BillingCostBudgetRecord,
     BillingCostDetailsRecord,
-    BillingHailBatchCostRecord,
     BillingInternal,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
