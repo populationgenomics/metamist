@@ -3,13 +3,25 @@ name: Deploy Schema Updater
 on:
   workflow_dispatch:
 
+permissions:
+  contents: 'read'
+  id-token: 'write'
 
 jobs:
-  build image:
+  build-image:
     runs-on: ubuntu-latest
+
+    if: github.ref == 'refs/heads/main'
 
     steps:
       - uses: actions/checkout@v3
+
+      - id: "branch-check"
+        name: Fail if branch is not main or dev
+        if: github.event_name == 'workflow_dispatch' && (github.ref != 'refs/heads/main' || github.ref != 'refs/heads/dev')
+        run: |
+          echo "This workflow should not be triggered with workflow_dispatch on a branch other than main or dev"
+          exit 1
 
       - id: "google-cloud-auth"
         name: "Authenticate to Google Cloud"
@@ -24,7 +36,7 @@ jobs:
 
       - name: Build image with Cloud Build
         run: |
-          gcloud builds submit --tag gcr.io/sample-metadata/schema-updater:latest ./db/deploy
+          gcloud builds submit --tag gcr.io/sample-metadata/schema-updater:latest --gcs-log-dir=gs://sample-metadata_cloudbuild ./db/deploy
 
       - name: Deploy image to Cloud Run
         run: |
