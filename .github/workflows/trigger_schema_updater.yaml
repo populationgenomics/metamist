@@ -32,9 +32,7 @@ jobs:
       - id: get_url
         name: Get Cloud Run service URL
         run: |
-          echo "CLOUD_RUN_URL=$(gcloud run services describe schema-updater --format 'value(status.url)')/execute-liquibase?environment=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
-        env:
-          YOUR_REGION: 'your-region' # replace 'your-region' with your Google Cloud region
+          echo "CLOUD_RUN_URL=$(gcloud run services describe schema-updater --region australia-southeast1 --format 'value(status.url)')/execute-liquibase?environment=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
 
       - name: Manual Trigger - Invoke Cloud Run
         run: |

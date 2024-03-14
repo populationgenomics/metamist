@@ -28,4 +28,4 @@ jobs:
 
       - name: Deploy image to Cloud Run
         run: |
-          gcloud run deploy schema-updater --image gcr.io/sample-metadata/schema-updater --platform managed
+          gcloud run deploy schema-updater --image gcr.io/sample-metadata/schema-updater --platform managed --region australia-southeast1 --no-allow-unauthenticated

@@ -51,9 +51,9 @@ async def execute_liquibase(request: Request, environment: Literal['prod', 'dev'
 
     # The actual command to run on the VM
     liquibase_command = [
-        'liquibase',
+        '/opt/liquibase/liquibase',
         f'--changeLogFile={remote_file_path}',
-        f'--url=jdbc:mariadb://{db_hostname}/{db_name}'
+        f'--url=jdbc:mariadb://{db_hostname}/{db_name}',
         f'--driver=org.mariadb.jdbc.Driver',
         f'--classpath=/opt/mariadb-java-client-3.0.3.jar',
         'update',
