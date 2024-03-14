@@ -3,7 +3,6 @@ import _ from 'lodash'
 import { Button, CheckboxProps, DropdownProps, Form, Message, Modal } from 'semantic-ui-react'
 import { SeqrDatasetType, WebApi } from '../../sm-api'
 import MuckTheDuck from '../../shared/components/MuckTheDuck'
-import './SeqrSync.css'
 
 interface SeqrSyncProps {
     project: string
@@ -119,7 +118,15 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
                 <Modal.Content>
                     Select sync options:
                     <Form style={{ paddingTop: '20px', paddingLeft: '20px' }}>
-                        <div className="checkbox-dropdown-container">
+                        <div
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'flex-start',
+                                justifyContent: 'space-between',
+                                gap: '5px',
+                            }}
+                        >
                             <Form.Checkbox
                                 id="syncIndividuals"
                                 checked={syncOptions.syncIndividuals}
@@ -144,30 +151,31 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
                                 onChange={updateStateFromCheckbox}
                                 label="Sync elastic-search index"
                             />
-                            <Form.Dropdown
-                                className="indented-dropdown"
-                                id="esIndexTypes"
-                                options={[
-                                    {
-                                        key: 'SNV_INDEL',
-                                        text: 'SNV_INDEL',
-                                        value: 'SNV_INDEL',
-                                    },
-                                    { key: 'SV', text: 'SV', value: 'SV' },
-                                    { key: 'CNV', text: 'CNV', value: 'CNV' },
-                                    {
-                                        key: 'MITO',
-                                        text: 'MITO',
-                                        value: 'MITO',
-                                    },
-                                ]}
-                                value={syncOptions.esIndexTypes}
-                                onChange={updateStateFromDropdown}
-                                label="ES index type"
-                                multiple
-                                selection
-                                disabled={dropdownDisabled}
-                            />
+                            <div style={{ marginLeft: '25px', marginBottom: '30px' }}>
+                                <Form.Dropdown
+                                    id="esIndexTypes"
+                                    options={[
+                                        {
+                                            key: 'SNV_INDEL',
+                                            text: 'SNV_INDEL',
+                                            value: 'SNV_INDEL',
+                                        },
+                                        { key: 'SV', text: 'SV', value: 'SV' },
+                                        { key: 'CNV', text: 'CNV', value: 'CNV' },
+                                        {
+                                            key: 'MITO',
+                                            text: 'MITO',
+                                            value: 'MITO',
+                                        },
+                                    ]}
+                                    value={syncOptions.esIndexTypes}
+                                    onChange={updateStateFromDropdown}
+                                    label="ES index type"
+                                    multiple
+                                    selection
+                                    disabled={dropdownDisabled}
+                                />
+                            </div>
                             <Form.Checkbox
                                 id="syncCramMap"
                                 checked={syncOptions.syncCramMap}
