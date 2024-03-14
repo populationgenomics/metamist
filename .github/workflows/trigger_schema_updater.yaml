@@ -12,6 +12,10 @@ on:
           - prod
           - dev
 
+permissions:
+  contents: 'read'
+  id-token: 'write'
+
 jobs:
   invoke-cloud-run:
     runs-on: ubuntu-latest

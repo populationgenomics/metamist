@@ -3,6 +3,9 @@ name: Deploy Schema Updater
 on:
   workflow_dispatch:
 
+permissions:
+  contents: 'read'
+  id-token: 'write'
 
 jobs:
   build-image:
