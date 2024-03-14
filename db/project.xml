@@ -1175,9 +1175,10 @@
 		<createIndex tableName="analysis_runner" indexName="idx_ar_submitting_user">
 			<column name="submitting_user" />
 		</createIndex>
-
-
 		<sql> ALTER TABLE analysis_runner ADD SYSTEM VERSIONING; </sql>
+	</changeSet>
+	<changeSet id="2024-03-15_analysis-runner-table-migration" author="michael.franklin">
+	<!-- Migrate all the old analysis_runner records into the new table (don't delete existing ones for now) -->
 		<sql> INSERT INTO analysis_runner ( ar_guid, project, timestamp, access_level, repository,
 			`commit`, output_path, script, description, driver_image, config_path, cwd, environment,
 			hail_version, batch_url, submitting_user, meta, audit_log_id ) SELECT
