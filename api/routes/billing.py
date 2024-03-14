@@ -1,17 +1,20 @@
 """
 Billing routes
 """
+
 from async_lru import alru_cache
 from fastapi import APIRouter
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 
 from api.settings import BILLING_CACHE_RESPONSE_TTL, BQ_AGGREG_VIEW
 from api.utils.db import BqConnection, get_author
 from db.python.layers.billing import BillingLayer
 from models.enums import BillingSource
 from models.models import (
+    BillingBatchCostRecord,
     BillingColumn,
     BillingCostBudgetRecord,
-    BillingHailBatchCostRecord,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 )
@@ -273,34 +276,38 @@ async def get_namespaces(
 
 @router.get(
     '/cost-by-ar-guid/{ar_guid}',
-    response_model=BillingHailBatchCostRecord,
+    response_model=list[BillingBatchCostRecord],
     operation_id='costByArGuid',
 )
 @alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_cost_by_ar_guid(
     ar_guid: str,
     author: str = get_author,
-) -> BillingHailBatchCostRecord:
+) -> JSONResponse:
     """Get Hail Batch costs by AR GUID"""
     billing_layer = _get_billing_layer_from(author)
     records = await billing_layer.get_cost_by_ar_guid(ar_guid)
-    return records
+    headers = {'x-bq-cost': str(billing_layer.connection.cost)}
+    json_compatible_item_data = jsonable_encoder(records)
+    return JSONResponse(content=json_compatible_item_data, headers=headers)
 
 
 @router.get(
     '/cost-by-batch-id/{batch_id}',
-    response_model=BillingHailBatchCostRecord,
+    response_model=list[BillingBatchCostRecord],
     operation_id='costByBatchId',
 )
 @alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_cost_by_batch_id(
     batch_id: str,
     author: str = get_author,
-) -> BillingHailBatchCostRecord:
+) -> JSONResponse:
     """Get Hail Batch costs by Batch ID"""
     billing_layer = _get_billing_layer_from(author)
     records = await billing_layer.get_cost_by_batch_id(batch_id)
-    return records
+    headers = {'x-bq-cost': str(billing_layer.connection.cost)}
+    json_compatible_item_data = jsonable_encoder(records)
+    return JSONResponse(content=json_compatible_item_data, headers=headers)
 
 
 @router.post(
