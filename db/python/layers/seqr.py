@@ -371,6 +371,9 @@ class SeqrLayer(BaseLayer):
         """Check if the sequencing group IDs have been updated"""
         messages = []
         if sequencing_group_ids:
+            es_index_analyses = sorted(
+                es_index_analyses, key=lambda el: el.timestamp_completed
+            )
             sequencing_groups_in_new_index = set(
                 es_index_analyses[-1].sequencing_group_ids
             )
