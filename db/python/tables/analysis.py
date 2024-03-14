@@ -22,16 +22,16 @@ from models.models.project import ProjectId
 class AnalysisFilter(GenericFilterModel):
     """Filter for analysis"""
 
-    id: GenericFilter[int] = None
-    sample_id: GenericFilter[int] = None
-    sequencing_group_id: GenericFilter[int] = None
-    project: GenericFilter[int] = None
-    type: GenericFilter[str] = None
-    status: GenericFilter[AnalysisStatus] = None
-    meta: GenericMetaFilter = None
-    output: GenericFilter[str] = None
-    active: GenericFilter[bool] = None
-    timestamp_completed: GenericFilter[datetime.datetime] = None
+    id: GenericFilter[int] | None = None
+    sample_id: GenericFilter[int] | None = None
+    sequencing_group_id: GenericFilter[int] | None = None
+    project: GenericFilter[int] | None = None
+    type: GenericFilter[str] | None = None
+    status: GenericFilter[AnalysisStatus] | None = None
+    meta: GenericMetaFilter | None = None
+    output: GenericFilter[str] | None = None
+    active: GenericFilter[bool] | None = None
+    timestamp_completed: GenericFilter[datetime.datetime] | None = None
 
     def __hash__(self):  # pylint: disable=useless-parent-delegation
         return super().__hash__()
