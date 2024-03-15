@@ -24,7 +24,7 @@ jobs:
 
       - id: "branch-check"
         name: Fail if branch is not main or dev
-        if: github.event_name == 'workflow_dispatch' && (github.ref != 'refs/heads/main' || github.ref != 'refs/heads/dev')
+        if: github.event_name == 'workflow_dispatch' && (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev')
         run: |
           echo "This workflow should not be triggered with workflow_dispatch on a branch other than main or dev"
           exit 1
