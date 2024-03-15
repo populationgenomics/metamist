@@ -2,7 +2,9 @@
 Small script to update external family IDs
 """
 import json
+
 import click
+
 from metamist.apis import FamilyApi
 from metamist.model.family_update_model import FamilyUpdateModel
 

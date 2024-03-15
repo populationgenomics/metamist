@@ -1,6 +1,6 @@
 from datetime import date
 
-from db.python.connect import Connection, NotFoundError
+from db.python.connect import Connection
 from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer
 from db.python.tables.assay import AssayTable, NoOpAenter
@@ -9,9 +9,11 @@ from db.python.tables.sequencing_group import (
     SequencingGroupFilter,
     SequencingGroupTable,
 )
-from db.python.utils import ProjectId
+from db.python.utils import NotFoundError
+from models.models.project import ProjectId
 from models.models.sequencing_group import (
     SequencingGroupInternal,
+    SequencingGroupInternalId,
     SequencingGroupUpsertInternal,
 )
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
@@ -117,7 +119,9 @@ class SequencingGroupLayer(BaseLayer):
 
         return await self.seqgt.get_sequencing_groups_create_date(sequencing_group_ids)
 
-    async def get_samples_create_date_from_sgs(self, sequencing_group_ids: list[int]):
+    async def get_samples_create_date_from_sgs(
+        self, sequencing_group_ids: list[int]
+    ) -> dict[SequencingGroupInternalId, date]:
         """
         Get a map of {internal_sg_id: sample_date_created}
         for a list of sequencing_groups
@@ -258,7 +262,6 @@ class SequencingGroupLayer(BaseLayer):
                 platform=seqgroup.platform,
                 meta={**seqgroup.meta, **meta},
                 assay_ids=assays,
-                author=self.author,
                 open_transaction=False,
             )
 

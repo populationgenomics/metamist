@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v4.5.0
     hooks:
       - id: check-yaml
         exclude: '\.*conda/.*'
@@ -14,13 +14,31 @@ repos:
       - id: check-added-large-files
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.33.0
+    rev: v0.38.0
     hooks:
       - id: markdownlint
         args: ["--config", ".markdownlint.json"]
 
+  - repo: https://github.com/populationgenomics/pre-commits
+    rev: "v0.1.3"
+    hooks:
+      - id: cpg-id-checker
+        args: ["--extra-pattern", 'TOB\d+']
+        exclude: >-
+          (?x)^(
+              test/test_generic_auditor\.py|
+              models/utils/sequencing_group_id_format\.py|
+              metamist/audit/README\.md
+          )$
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: isort (python)
+
   - repo: https://github.com/ambv/black
-    rev: 23.3.0
+    rev: 23.12.1
     hooks:
       - id: black
         args: [.]
@@ -29,7 +47,7 @@ repos:
         exclude: ^metamist/
 
   - repo: https://github.com/PyCQA/flake8
-    rev: "6.0.0"
+    rev: "6.1.0"
     hooks:
       - id: flake8
         additional_dependencies: [flake8-bugbear, flake8-quotes]
@@ -45,7 +63,7 @@ repos:
 
   # mypy
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.5.1
+    rev: v1.8.0
     hooks:
       - id: mypy
         args: [

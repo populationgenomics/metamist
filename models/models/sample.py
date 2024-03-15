@@ -1,6 +1,6 @@
 import json
 
-from models.base import OpenApiGenNoneType, SMBase
+from models.base import OpenApiGenNoneType, SMBase, parse_sql_bool
 from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
 from models.models.sequencing_group import (
     NestedSequencingGroup,
@@ -31,9 +31,8 @@ class SampleInternal(SMBase):
         _id = d.pop('id', None)
         type_ = d.pop('type', None)
         meta = d.pop('meta', None)
-        active = d.pop('active', None)
-        if active is not None:
-            active = bool(ord(active))
+        active = parse_sql_bool(d.pop('active', None))
+
         if meta:
             if isinstance(meta, bytes):
                 meta = meta.decode()

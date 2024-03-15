@@ -1,6 +1,7 @@
 # pylint: disable=invalid-overridden-method
 
 import asyncio
+import dataclasses
 import logging
 import os
 import socket
@@ -9,6 +10,7 @@ import unittest
 from functools import wraps
 from typing import Dict
 
+import databases.core
 import nest_asyncio
 from pymysql import IntegrityError
 from testcontainers.mysql import MySqlContainer
@@ -23,6 +25,7 @@ from db.python.connect import (
     SMConnections,
 )
 from db.python.tables.project import ProjectPermissionsTable
+from models.models.project import ProjectId
 
 # use this to determine where the db directory is relatively,
 # as pycharm runs in "test/" folder, and GH runs them in git root
@@ -74,8 +77,10 @@ class DbTest(unittest.TestCase):
     # store connections here, so they can be created PER-CLASS
     # and don't get recreated per test.
     dbs: Dict[str, MySqlContainer] = {}
-    connections: Dict[str, Connection] = {}
+    connections: Dict[str, databases.Database] = {}
     author: str
+    project_id: ProjectId
+    project_name: str
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -92,10 +97,10 @@ class DbTest(unittest.TestCase):
             logger = logging.getLogger()
             try:
                 set_all_access(True)
-                db = MySqlContainer('mariadb:10.8.3')
+                db = MySqlContainer('mariadb:11.2.2')
                 port_to_expose = find_free_port()
                 # override the default port to map the container to
-                db.with_bind_ports(db.port_to_expose, port_to_expose)
+                db.with_bind_ports(db.port, port_to_expose)
                 logger.disabled = True
                 db.start()
                 logger.disabled = False
@@ -107,7 +112,7 @@ class DbTest(unittest.TestCase):
 
                 con_string = db.get_connection_url()
                 con_string = 'mysql://' + con_string.split('://', maxsplit=1)[1]
-                lcon_string = f'jdbc:mariadb://{db.get_container_host_ip()}:{port_to_expose}/{db.MYSQL_DATABASE}'
+                lcon_string = f'jdbc:mariadb://{db.get_container_host_ip()}:{port_to_expose}/{db.dbname}'
                 # apply the liquibase schema
                 command = [
                     'liquibase',
@@ -116,8 +121,8 @@ class DbTest(unittest.TestCase):
                     *('--url', lcon_string),
                     *('--driver', 'org.mariadb.jdbc.Driver'),
                     *('--classpath', db_prefix + '/mariadb-java-client-3.0.3.jar'),
-                    *('--username', db.MYSQL_USER),
-                    *('--password', db.MYSQL_PASSWORD),
+                    *('--username', db.username),
+                    *('--password', db.password),
                     'update',
                 ]
                 subprocess.check_output(command, stderr=subprocess.STDOUT)
@@ -127,23 +132,28 @@ class DbTest(unittest.TestCase):
                 )
                 await sm_db.connect()
                 cls.author = 'testuser'
-                connection = Connection(
-                    connection=sm_db,
-                    project=1,
-                    author=cls.author,
-                )
-                cls.connections[cls.__name__] = connection
 
+                cls.connections[cls.__name__] = sm_db
+                formed_connection = Connection(
+                    connection=sm_db,
+                    author=cls.author,
+                    readonly=False,
+                    on_behalf_of=None,
+                    ar_guid=None,
+                    project=None,
+                )
                 ppt = ProjectPermissionsTable(
-                    connection.connection, allow_full_access=True
+                    connection=formed_connection,
+                    allow_full_access=True,
                 )
                 cls.project_name = 'test'
                 cls.project_id = await ppt.create_project(
                     project_name=cls.project_name,
                     dataset_name=cls.project_name,
-                    author='testuser',
+                    author=cls.author,
                     check_permissions=False,
                 )
+                formed_connection.project = cls.project_id
 
             except subprocess.CalledProcessError as e:
                 logging.exception(e)
@@ -166,13 +176,21 @@ class DbTest(unittest.TestCase):
     def tearDownClass(cls) -> None:
         db = cls.dbs.get(cls.__name__)
         if db:
-            db.exec(f'DROP DATABASE {db.MYSQL_DATABASE};')
+            db.exec(f'DROP DATABASE {db.dbname};')
             db.stop()
 
     def setUp(self) -> None:
-        self.project_id = 1
-        self.project_name = 'test'
-        self.connection = self.connections[self.__class__.__name__]
+        self._connection = self.connections[self.__class__.__name__]
+        # create a connection on each test so we can generate a new
+        # audit_log ID for each test
+        self.connection = Connection(
+            connection=self._connection,
+            project=self.project_id,
+            author=self.author,
+            readonly=False,
+            ar_guid=None,
+            on_behalf_of=None,
+        )
 
     @run_as_sync
     async def run_graphql_query(self, query, variables=None):
@@ -202,6 +220,23 @@ class DbTest(unittest.TestCase):
         if value.errors:
             raise value.errors[0]
         return value.data
+
+    async def audit_log_id(self):
+        """Get audit_log_id for the test"""
+        return await self.connection.audit_log_id()
+
+    def assertDataclassEqual(self, a, b):
+        """Assert two dataclasses are equal"""
+
+        def to_dict(obj):
+            d = dataclasses.asdict(obj)
+            for k, v in d.items():
+                if dataclasses.is_dataclass(v):
+                    d[k] = to_dict(v)
+            return d
+
+        self.maxDiff = None
+        self.assertDictEqual(to_dict(a), to_dict(b))
 
 
 class DbIsolatedTest(DbTest):

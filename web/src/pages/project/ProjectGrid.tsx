@@ -289,8 +289,8 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                         const samplesRowSpan = lengthOfSamples > 0 ? lengthOfSamples : undefined
 
                         let sgs = s.sequencing_groups || []
-                        // @ts-ignore
                         if (!sgs || sgs.length === 0) {
+                            // @ts-ignore
                             sgs = [{}]
                         }
                         return sgs.map((sg, sgidx) =>

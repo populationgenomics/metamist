@@ -7,6 +7,7 @@ Schema for GraphQL.
 Note, we silence a lot of linting here because GraphQL looks at type annotations
 and defaults to decide the GraphQL schema, so it might not necessarily look correct.
 """
+import datetime
 from inspect import isclass
 
 import strawberry
@@ -17,10 +18,16 @@ from strawberry.types import Info
 from api.graphql.filters import GraphQLFilter, GraphQLMetaFilter
 from api.graphql.loaders import LoaderKeys, get_context
 from db.python import enum_tables
-from db.python.layers import AnalysisLayer, SampleLayer, SequencingGroupLayer
-from db.python.layers.assay import AssayLayer
-from db.python.layers.family import FamilyLayer
+from db.python.layers import (
+    AnalysisLayer,
+    AnalysisRunnerLayer,
+    AssayLayer,
+    FamilyLayer,
+    SampleLayer,
+    SequencingGroupLayer,
+)
 from db.python.tables.analysis import AnalysisFilter
+from db.python.tables.analysis_runner import AnalysisRunnerFilter
 from db.python.tables.assay import AssayFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter
@@ -30,12 +37,14 @@ from models.enums import AnalysisStatus
 from models.models import (
     AnalysisInternal,
     AssayInternal,
+    AuditLogInternal,
     FamilyInternal,
     ParticipantInternal,
     Project,
     SampleInternal,
     SequencingGroupInternal,
 )
+from models.models.analysis_runner import AnalysisRunnerInternal
 from models.models.sample import sample_id_transform_to_raw
 from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import (
@@ -81,6 +90,30 @@ class GraphQLProject:
             dataset=internal.dataset,
             meta=internal.meta,
         )
+
+    @strawberry.field()
+    async def analysis_runner(
+        self,
+        info: Info,
+        root: 'Project',
+        ar_guid: GraphQLFilter[str] | None = None,
+        author: GraphQLFilter[str] | None = None,
+        repository: GraphQLFilter[str] | None = None,
+        access_level: GraphQLFilter[str] | None = None,
+        environment: GraphQLFilter[str] | None = None,
+    ) -> list['GraphQLAnalysisRunner']:
+        connection = info.context['connection']
+        alayer = AnalysisRunnerLayer(connection)
+        filter_ = AnalysisRunnerFilter(
+            project=GenericFilter(eq=root.id),
+            ar_guid=ar_guid.to_internal_filter() if ar_guid else None,
+            submitting_user=author.to_internal_filter() if author else None,
+            repository=repository.to_internal_filter() if repository else None,
+            access_level=access_level.to_internal_filter() if access_level else None,
+            environment=environment.to_internal_filter() if environment else None,
+        )
+        analysis_runners = await alayer.query(filter_)
+        return [GraphQLAnalysisRunner.from_internal(ar) for ar in analysis_runners]
 
     @strawberry.field()
     async def pedigree(
@@ -159,16 +192,20 @@ class GraphQLProject:
     ) -> list['GraphQLSequencingGroup']:
         loader = info.context[LoaderKeys.SEQUENCING_GROUPS_FOR_PROJECTS]
         filter_ = SequencingGroupFilter(
-            id=id.to_internal_filter(sequencing_group_id_transform_to_raw)
-            if id
-            else None,
+            id=(
+                id.to_internal_filter(sequencing_group_id_transform_to_raw)
+                if id
+                else None
+            ),
             external_id=external_id.to_internal_filter() if external_id else None,
             type=type.to_internal_filter() if type else None,
             technology=technology.to_internal_filter() if technology else None,
             platform=platform.to_internal_filter() if platform else None,
-            active_only=active_only.to_internal_filter()
-            if active_only
-            else GenericFilter(eq=True),
+            active_only=(
+                active_only.to_internal_filter()
+                if active_only
+                else GenericFilter(eq=True)
+            ),
         )
         sequencing_groups = await loader.load({'id': root.id, 'filter': filter_})
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sequencing_groups]
@@ -182,21 +219,52 @@ class GraphQLProject:
         status: GraphQLFilter[strawberry.enum(AnalysisStatus)] | None = None,
         active: GraphQLFilter[bool] | None = None,
         meta: GraphQLMetaFilter | None = None,
+        timestamp_completed: GraphQLFilter[datetime.datetime] | None = None,
     ) -> list['GraphQLAnalysis']:
         connection = info.context['connection']
         connection.project = root.id
         internal_analysis = await AnalysisLayer(connection).query(
             AnalysisFilter(
                 type=type.to_internal_filter() if type else None,
-                status=status.to_internal_filter()
-                if status
-                else GenericFilter(eq=AnalysisStatus.COMPLETED),
+                status=(
+                    status.to_internal_filter()
+                    if status
+                    else GenericFilter(eq=AnalysisStatus.COMPLETED)
+                ),
                 active=active.to_internal_filter() if active else None,
                 project=GenericFilter(eq=root.id),
                 meta=meta,
+                timestamp_completed=(
+                    timestamp_completed.to_internal_filter()
+                    if timestamp_completed
+                    else None
+                ),
             )
         )
         return [GraphQLAnalysis.from_internal(a) for a in internal_analysis]
+
+
+@strawberry.type
+class GraphQLAuditLog:
+    """AuditLog GraphQL model"""
+
+    id: int
+    author: str
+    timestamp: datetime.datetime
+    ar_guid: str | None
+    comment: str | None
+    meta: strawberry.scalars.JSON
+
+    @staticmethod
+    def from_internal(audit_log: AuditLogInternal) -> 'GraphQLAuditLog':
+        return GraphQLAuditLog(
+            id=audit_log.id,
+            author=audit_log.author,
+            timestamp=audit_log.timestamp,
+            ar_guid=audit_log.ar_guid,
+            comment=audit_log.comment,
+            meta=audit_log.meta,
+        )
 
 
 @strawberry.type
@@ -207,10 +275,9 @@ class GraphQLAnalysis:
     type: str
     status: strawberry.enum(AnalysisStatus)
     output: str | None
-    timestamp_completed: str | None = None
+    timestamp_completed: datetime.datetime | None = None
     active: bool
     meta: strawberry.scalars.JSON
-    author: str
 
     @staticmethod
     def from_internal(internal: AnalysisInternal) -> 'GraphQLAnalysis':
@@ -222,7 +289,6 @@ class GraphQLAnalysis:
             timestamp_completed=internal.timestamp_completed,
             active=internal.active,
             meta=internal.meta,
-            author=internal.author,
         )
 
     @strawberry.field
@@ -238,6 +304,14 @@ class GraphQLAnalysis:
         loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
         project = await loader.load(root.project)
         return GraphQLProject.from_internal(project)
+
+    @strawberry.field
+    async def audit_logs(
+        self, info: Info, root: 'GraphQLAnalysis'
+    ) -> list[GraphQLAuditLog]:
+        loader = info.context[LoaderKeys.AUDIT_LOGS_BY_ANALYSIS_IDS]
+        audit_logs = await loader.load(root.id)
+        return [GraphQLAuditLog.from_internal(audit_log) for audit_log in audit_logs]
 
 
 @strawberry.type
@@ -292,6 +366,7 @@ class GraphQLParticipant:
     karyotype: str | None
 
     project_id: strawberry.Private[int]
+    audit_log_id: strawberry.Private[int | None]
 
     @staticmethod
     def from_internal(internal: ParticipantInternal) -> 'GraphQLParticipant':
@@ -303,6 +378,7 @@ class GraphQLParticipant:
             reported_gender=internal.reported_gender,
             karyotype=internal.karyotype,
             project_id=internal.project,
+            audit_log_id=internal.audit_log_id,
         )
 
     @strawberry.field
@@ -344,6 +420,16 @@ class GraphQLParticipant:
         project = await loader.load(root.project_id)
         return GraphQLProject.from_internal(project)
 
+    @strawberry.field
+    async def audit_log(
+        self, info: Info, root: 'GraphQLParticipant'
+    ) -> GraphQLAuditLog | None:
+        if root.audit_log_id is None:
+            return None
+        loader = info.context[LoaderKeys.AUDIT_LOGS_BY_IDS]
+        audit_log = await loader.load(root.audit_log_id)
+        return GraphQLAuditLog.from_internal(audit_log)
+
 
 @strawberry.type
 class GraphQLSample:
@@ -354,7 +440,6 @@ class GraphQLSample:
     active: bool
     meta: strawberry.scalars.JSON
     type: str
-    author: str | None
 
     # keep as integers, because they're useful to reference in the fields below
     internal_id: strawberry.Private[int]
@@ -362,14 +447,13 @@ class GraphQLSample:
     project_id: strawberry.Private[int]
 
     @staticmethod
-    def from_internal(sample: SampleInternal):
+    def from_internal(sample: SampleInternal) -> 'GraphQLSample':
         return GraphQLSample(
             id=sample_id_format(sample.id),
             external_id=sample.external_id,
             active=sample.active,
             meta=sample.meta,
             type=sample.type,
-            author=sample.author,
             # internals
             internal_id=sample.id,
             participant_id=sample.participant_id,
@@ -419,16 +503,20 @@ class GraphQLSample:
         loader = info.context[LoaderKeys.SEQUENCING_GROUPS_FOR_SAMPLES]
 
         _filter = SequencingGroupFilter(
-            id=id.to_internal_filter(sequencing_group_id_transform_to_raw)
-            if id
-            else None,
+            id=(
+                id.to_internal_filter(sequencing_group_id_transform_to_raw)
+                if id
+                else None
+            ),
             meta=meta,
             type=type.to_internal_filter() if type else None,
             technology=technology.to_internal_filter() if technology else None,
             platform=platform.to_internal_filter() if platform else None,
-            active_only=active_only.to_internal_filter()
-            if active_only
-            else GenericFilter(eq=True),
+            active_only=(
+                active_only.to_internal_filter()
+                if active_only
+                else GenericFilter(eq=True)
+            ),
         )
         obj = {'id': root.internal_id, 'filter': _filter}
         sequencing_groups = await loader.load(obj)
@@ -445,21 +533,20 @@ class GraphQLSequencingGroup:
     technology: str
     platform: str
     meta: strawberry.scalars.JSON
-    external_ids: strawberry.scalars.JSON | None
+    external_ids: strawberry.scalars.JSON
 
     internal_id: strawberry.Private[int]
     sample_id: strawberry.Private[int]
 
     @staticmethod
     def from_internal(internal: SequencingGroupInternal) -> 'GraphQLSequencingGroup':
-        # print(internal)
         return GraphQLSequencingGroup(
             id=sequencing_group_id_format(internal.id),
             type=internal.type,
             technology=internal.technology,
             platform=internal.platform,
             meta=internal.meta,
-            external_ids=internal.external_ids,
+            external_ids=internal.external_ids or {},
             # internal
             internal_id=internal.id,
             sample_id=internal.sample_id,
@@ -486,7 +573,7 @@ class GraphQLSequencingGroup:
         loader = info.context[LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS]
         project_id_map = {}
         if project:
-            ptable = ProjectPermissionsTable(connection.connection)
+            ptable = ProjectPermissionsTable(connection)
             project_ids = project.all_values()
             projects = await ptable.get_and_check_access_to_projects_for_names(
                 user=connection.author, project_names=project_ids, readonly=True
@@ -500,12 +587,16 @@ class GraphQLSequencingGroup:
                     status=status.to_internal_filter() if status else None,
                     type=type.to_internal_filter() if type else None,
                     meta=meta,
-                    active=active.to_internal_filter()
-                    if active
-                    else GenericFilter(eq=True),
-                    project=project.to_internal_filter(lambda val: project_id_map[val])
-                    if project
-                    else None,
+                    active=(
+                        active.to_internal_filter()
+                        if active
+                        else GenericFilter(eq=True)
+                    ),
+                    project=(
+                        project.to_internal_filter(lambda val: project_id_map[val])
+                        if project
+                        else None
+                    ),
                 ),
             }
         )
@@ -536,7 +627,7 @@ class GraphQLAssay:
             id=internal.id,
             type=internal.type,
             meta=internal.meta,
-            external_ids=internal.external_ids,
+            external_ids=internal.external_ids or {},
             # internal
             sample_id=internal.sample_id,
         )
@@ -546,6 +637,62 @@ class GraphQLAssay:
         loader = info.context[LoaderKeys.SAMPLES_FOR_IDS]
         sample = await loader.load(root.sample_id)
         return GraphQLSample.from_internal(sample)
+
+
+@strawberry.type
+class GraphQLAnalysisRunner:
+    """AnalysisRunner GraphQL model"""
+
+    ar_guid: str
+    output_path: str
+
+    timestamp: datetime.datetime
+    access_level: str
+    repository: str
+    commit: str
+    script: str
+    description: str
+    driver_image: str
+    config_path: str
+    cwd: str | None
+    environment: str
+    hail_version: str | None
+    batch_url: str
+    submitting_user: str
+    meta: strawberry.scalars.JSON
+
+    internal_project: strawberry.Private[int]
+
+    @staticmethod
+    def from_internal(internal: AnalysisRunnerInternal) -> 'GraphQLAnalysisRunner':
+        return GraphQLAnalysisRunner(
+            ar_guid=internal.ar_guid,
+            timestamp=internal.timestamp,
+            access_level=internal.access_level,
+            repository=internal.repository,
+            commit=internal.commit,
+            script=internal.script,
+            description=internal.description,
+            driver_image=internal.driver_image,
+            config_path=internal.config_path,
+            cwd=internal.cwd,
+            environment=internal.environment,
+            hail_version=internal.hail_version,
+            batch_url=internal.batch_url,
+            submitting_user=internal.submitting_user,
+            meta=internal.meta,
+            output_path=internal.output_path,
+            # internal
+            internal_project=internal.project,
+        )
+
+    @strawberry.field
+    async def project(
+        self, info: Info, root: 'GraphQLAnalysisRunner'
+    ) -> GraphQLProject:
+        loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
+        project = await loader.load(root.internal_project)
+        return GraphQLProject.from_internal(project)
 
 
 @strawberry.type
@@ -559,7 +706,7 @@ class Query:
     @strawberry.field()
     async def project(self, info: Info, name: str) -> GraphQLProject:
         connection = info.context['connection']
-        ptable = ProjectPermissionsTable(connection.connection)
+        ptable = ProjectPermissionsTable(connection)
         project = await ptable.get_and_check_access_to_project_for_name(
             user=connection.author, project_name=name, readonly=True
         )
@@ -578,7 +725,7 @@ class Query:
         active: GraphQLFilter[bool] | None = None,
     ) -> list[GraphQLSample]:
         connection = info.context['connection']
-        ptable = ProjectPermissionsTable(connection.connection)
+        ptable = ProjectPermissionsTable(connection)
         slayer = SampleLayer(connection)
 
         if not id and not project:
@@ -589,9 +736,9 @@ class Query:
 
         project_name_map: dict[str, int] = {}
         if project:
-            project_ids = project.all_values()
-            projects = await ptable.get_and_check_access_to_projects_for_ids(
-                user=connection.author, project_ids=project_ids, readonly=True
+            project_names = project.all_values()
+            projects = await ptable.get_and_check_access_to_projects_for_names(
+                user=connection.author, project_names=project_names, readonly=True
             )
             project_name_map = {p.name: p.id for p in projects}
 
@@ -600,12 +747,14 @@ class Query:
             type=type.to_internal_filter() if type else None,
             meta=meta,
             external_id=external_id.to_internal_filter() if external_id else None,
-            participant_id=participant_id.to_internal_filter()
-            if participant_id
-            else None,
-            project=project.to_internal_filter(lambda pname: project_name_map[pname])
-            if project
-            else None,
+            participant_id=(
+                participant_id.to_internal_filter() if participant_id else None
+            ),
+            project=(
+                project.to_internal_filter(lambda pname: project_name_map[pname])
+                if project
+                else None
+            ),
             active=active.to_internal_filter() if active else GenericFilter(eq=True),
         )
 
@@ -626,35 +775,43 @@ class Query:
     ) -> list[GraphQLSequencingGroup]:
         connection = info.context['connection']
         sglayer = SequencingGroupLayer(connection)
-        ptable = ProjectPermissionsTable(connection.connection)
+        ptable = ProjectPermissionsTable(connection)
         if not (project or sample_id or id):
             raise ValueError('Must filter by project, sample or id')
 
         # we list project names, but internally we want project ids
         project_id_map = {}
         if project:
-            project_ids = project.all_values()
-            projects = await ptable.get_and_check_access_to_projects_for_ids(
-                user=connection.author, project_ids=project_ids, readonly=True
+            project_names = project.all_values()
+            projects = await ptable.get_and_check_access_to_projects_for_names(
+                user=connection.author, project_names=project_names, readonly=True
             )
             project_id_map = {p.name: p.id for p in projects}
 
         filter_ = SequencingGroupFilter(
-            project=project.to_internal_filter(lambda val: project_id_map[val])
-            if project
-            else None,
-            sample_id=sample_id.to_internal_filter(sample_id_transform_to_raw)
-            if sample_id
-            else None,
-            id=id.to_internal_filter(sequencing_group_id_transform_to_raw)
-            if id
-            else None,
+            project=(
+                project.to_internal_filter(lambda val: project_id_map[val])
+                if project
+                else None
+            ),
+            sample_id=(
+                sample_id.to_internal_filter(sample_id_transform_to_raw)
+                if sample_id
+                else None
+            ),
+            id=(
+                id.to_internal_filter(sequencing_group_id_transform_to_raw)
+                if id
+                else None
+            ),
             type=type.to_internal_filter() if type else None,
             technology=technology.to_internal_filter() if technology else None,
             platform=platform.to_internal_filter() if platform else None,
-            active_only=active_only.to_internal_filter()
-            if active_only
-            else GenericFilter(eq=True),
+            active_only=(
+                active_only.to_internal_filter()
+                if active_only
+                else GenericFilter(eq=True)
+            ),
         )
         sgs = await sglayer.query(filter_)
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sgs]
@@ -680,7 +837,7 @@ class Query:
     @strawberry.field
     async def my_projects(self, info: Info) -> list[GraphQLProject]:
         connection = info.context['connection']
-        ptable = ProjectPermissionsTable(connection.connection)
+        ptable = ProjectPermissionsTable(connection)
         projects = await ptable.get_projects_accessible_by_user(
             connection.author, readonly=True
         )

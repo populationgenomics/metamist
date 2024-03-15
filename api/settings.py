@@ -37,11 +37,19 @@ SEQUENCING_GROUP_PREFIX = os.getenv('SM_SEQUENCINGGROUPPREFIX', 'CPGLCL').upper(
 SEQUENCING_GROUP_CHECKSUM_OFFSET = int(os.getenv('SM_SEQUENCINGGROUPCHECKOFFSET', '9'))
 
 # billing settings
-BQ_GCP_BILLING_PROJECT = os.getenv('SM_GCP_BILLING_PROJECT')
+BQ_AGGREG_VIEW = os.getenv('SM_GCP_BQ_AGGREG_VIEW')
+BQ_AGGREG_RAW = os.getenv('SM_GCP_BQ_AGGREG_RAW')
+BQ_AGGREG_EXT_VIEW = os.getenv('SM_GCP_BQ_AGGREG_EXT_VIEW')
+BQ_BUDGET_VIEW = os.getenv('SM_GCP_BQ_BUDGET_VIEW')
+BQ_GCP_BILLING_VIEW = os.getenv('SM_GCP_BQ_BILLING_VIEW')
+BQ_BATCHES_VIEW = os.getenv('SM_GCP_BQ_BATCHES_VIEW')
+
+# BQ cost per 1 TB, used to calculate cost of BQ queries
+BQ_COST_PER_TB = 6.25
+
 # This is to optimise BQ queries, DEV table has data only for Mar 2023
-# TODO change to 7 days or similar before merging into DEV
-BQ_DAYS_BACK_OPTIMAL = 210
-BILLING_CACHE_RESPONSE_TTL = 1800  # 30 minutes
+BQ_DAYS_BACK_OPTIMAL = 30  # Look back 30 days for optimal query
+BILLING_CACHE_RESPONSE_TTL = 3600  # 1 Hour
 
 
 def get_default_user() -> str | None:

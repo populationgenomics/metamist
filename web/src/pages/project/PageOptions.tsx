@@ -4,19 +4,19 @@ import { Button } from 'semantic-ui-react'
 interface PageOptionsProps {
     pageNumber: number
     handleOnClick: (e: number) => void
-    totalSamples?: number
+    total?: number
     totalPageNumbers: number
     isLoading: boolean
-    title?: string
+    title: string
 }
 
 const PageOptions: React.FunctionComponent<PageOptionsProps> = ({
     pageNumber,
     handleOnClick,
-    totalSamples,
+    total,
     totalPageNumbers,
     isLoading,
-    title = 'samples',
+    title,
 }) => (
     <>
         {pageNumber > 1 && (
@@ -30,9 +30,9 @@ const PageOptions: React.FunctionComponent<PageOptionsProps> = ({
                 Previous
             </Button>
         )}
-        {!!totalSamples && (
+        {!!total && (
             <span style={{ padding: '8px 10px 0 10px' }}>
-                Page {pageNumber} / {totalPageNumbers} ({totalSamples} {title})
+                Page {pageNumber} / {totalPageNumbers} ({total} {title})
             </span>
         )}
         {pageNumber < totalPageNumbers && (

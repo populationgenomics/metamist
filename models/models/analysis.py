@@ -1,6 +1,6 @@
 import enum
 import json
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel
@@ -21,7 +21,7 @@ class AnalysisInternal(SMBase):
     status: AnalysisStatus
     output: str = None
     sequencing_group_ids: list[int] = []
-    timestamp_completed: str | None = None
+    timestamp_completed: datetime | None = None
     project: int | None = None
     active: bool | None = None
     meta: dict[str, Any] = {}
@@ -40,8 +40,8 @@ class AnalysisInternal(SMBase):
         if meta and isinstance(meta, str):
             meta = json.loads(meta)
 
-        if timestamp_completed is not None and not isinstance(timestamp_completed, str):
-            timestamp_completed = timestamp_completed.isoformat()
+        if timestamp_completed and isinstance(timestamp_completed, str):
+            timestamp_completed = datetime.fromisoformat(timestamp_completed)
 
         sequencing_group_ids = []
         if sg := kwargs.pop('sequencing_group_id', None):
@@ -72,7 +72,9 @@ class AnalysisInternal(SMBase):
                 self.sequencing_group_ids
             ),
             output=self.output,
-            timestamp_completed=self.timestamp_completed,
+            timestamp_completed=self.timestamp_completed.isoformat()
+            if self.timestamp_completed
+            else None,
             project=self.project,
             active=self.active,
             meta=self.meta,
@@ -83,10 +85,10 @@ class AnalysisInternal(SMBase):
 class Analysis(BaseModel):
     """Model for Analysis"""
 
-    id: int | None
     type: str
     status: AnalysisStatus
-    output: str = None
+    id: int | None = None
+    output: str | None = None
     sequencing_group_ids: list[str] = []
     author: str | None = None
     timestamp_completed: str | None = None
@@ -106,7 +108,8 @@ class Analysis(BaseModel):
                 self.sequencing_group_ids
             ),
             output=self.output,
-            timestamp_completed=self.timestamp_completed,
+            # don't allow this to be set
+            timestamp_completed=None,
             project=self.project,
             active=self.active,
             meta=self.meta,

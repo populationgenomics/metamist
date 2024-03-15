@@ -1,9 +1,9 @@
 from collections import defaultdict
-from typing import Tuple, List, Dict, Optional, Set, Any
+from typing import Any, Dict, List, Optional, Set, Tuple
 
-from db.python.connect import DbBase
-from db.python.tables.project import ProjectId
+from db.python.tables.base import DbBase
 from models.models.family import PedRowInternal
+from models.models.project import ProjectId
 
 
 class FamilyParticipantTable(DbBase):
@@ -20,8 +20,7 @@ class FamilyParticipantTable(DbBase):
         paternal_id: int,
         maternal_id: int,
         affected: int,
-        notes: str = None,
-        author=None,
+        notes: str | None = None,
     ) -> Tuple[int, int]:
         """
         Create a new sample, and add it to database
@@ -33,7 +32,7 @@ class FamilyParticipantTable(DbBase):
             'maternal_participant_id': maternal_id,
             'affected': affected,
             'notes': notes,
-            'author': author or self.author,
+            'audit_log_id': await self.audit_log_id(),
         }
         keys = list(updater.keys())
         str_keys = ', '.join(keys)
@@ -52,7 +51,6 @@ VALUES
     async def create_rows(
         self,
         rows: list[PedRowInternal],
-        author=None,
     ):
         """
         Create many rows, dictionaries must have keys:
@@ -76,7 +74,7 @@ VALUES
                 'maternal_participant_id': row.maternal_id,
                 'affected': row.affected,
                 'notes': row.notes,
-                'author': author or self.author,
+                'audit_log_id': await self.audit_log_id(),
             }
 
             remapped_ds_by_keys[tuple(sorted(d.keys()))].append(d)
@@ -113,8 +111,8 @@ ON DUPLICATE KEY UPDATE
         keys = [
             'fp.family_id',
             'p.id as individual_id',
-            'fp.paternal_participant_id',
-            'fp.maternal_participant_id',
+            'fp.paternal_participant_id as paternal_id',
+            'fp.maternal_participant_id as maternal_id',
             'p.reported_sex as sex',
             'fp.affected',
         ]
@@ -155,7 +153,7 @@ ON DUPLICATE KEY UPDATE
             'sex',
             'affected',
         ]
-        ds = [dict(zip(ordered_keys, row)) for row in rows]
+        ds = [{k: row[k] for k in ordered_keys} for row in rows]
 
         return ds
 
@@ -163,7 +161,7 @@ ON DUPLICATE KEY UPDATE
         self,
         family_id: int,
         participant_id: int,
-    ):
+    ) -> dict | None:
         """Get a single row from the family_participant table"""
         values: Dict[str, Any] = {
             'family_id': family_id,
@@ -171,7 +169,13 @@ ON DUPLICATE KEY UPDATE
         }
 
         _query = """
-SELECT fp.family_id, p.id as individual_id, fp.paternal_participant_id, fp.maternal_participant_id, p.reported_sex as sex, fp.affected
+SELECT
+    fp.family_id as family_id,
+    p.id as individual_id,
+    fp.paternal_participant_id as paternal_id,
+    fp.maternal_participant_id as maternal_id,
+    p.reported_sex as sex,
+    fp.affected
 FROM family_participant fp
 INNER JOIN family f ON f.id = fp.family_id
 INNER JOIN participant p on fp.participant_id = p.id
@@ -179,6 +183,8 @@ WHERE f.id = :family_id AND p.id = :participant_id
 """
 
         row = await self.connection.fetch_one(_query, values)
+        if not row:
+            return None
 
         ordered_keys = [
             'family_id',
@@ -188,7 +194,7 @@ WHERE f.id = :family_id AND p.id = :participant_id
             'sex',
             'affected',
         ]
-        ds = dict(zip(ordered_keys, row))
+        ds = {k: row[k] for k in ordered_keys}
 
         return ds
 
@@ -225,11 +231,26 @@ WHERE fp.participant_id in :participant_ids
         if not participant_id or not family_id:
             return False
 
-        _query = """
-DELETE FROM family_participant
-WHERE participant_id = :participant_id
-AND family_id = :family_id
+        _update_before_delete = """
+        UPDATE family_participant
+        SET audit_log_id = :audit_log_id
+        WHERE family_id = :family_id AND participant_id = :participant_id
         """
+
+        _query = """
+        DELETE FROM family_participant
+        WHERE participant_id = :participant_id
+        AND family_id = :family_id
+        """
+
+        await self.connection.execute(
+            _update_before_delete,
+            {
+                'family_id': family_id,
+                'participant_id': participant_id,
+                'audit_log_id': await self.audit_log_id(),
+            },
+        )
 
         await self.connection.execute(
             _query, {'family_id': family_id, 'participant_id': participant_id}

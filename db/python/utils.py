@@ -7,7 +7,6 @@ from enum import Enum
 from typing import Any, Generic, Sequence, TypeVar
 
 T = TypeVar('T')
-ProjectId = int
 
 levels_map = {'DEBUG': logging.DEBUG, 'INFO': logging.INFO, 'WARNING': logging.WARNING}
 
@@ -88,19 +87,32 @@ class GenericFilter(Generic[T]):
     eq: T | None = None
     in_: list[T] | None = None
     nin: list[T] | None = None
+    gt: T | None = None
+    gte: T | None = None
+    lt: T | None = None
+    lte: T | None = None
 
     def __init__(
         self,
+        *,
         eq: T | None = None,
         in_: list[T] | None = None,
         nin: list[T] | None = None,
+        gt: T | None = None,
+        gte: T | None = None,
+        lt: T | None = None,
+        lte: T | None = None,
     ):
         self.eq = eq
         self.in_ = in_
         self.nin = nin
+        self.gt = gt
+        self.gte = gte
+        self.lt = lt
+        self.lte = lte
 
     def __repr__(self):
-        keys = ['eq', 'in_', 'nin']
+        keys = ['eq', 'in_', 'nin', 'gt', 'gte', 'lt', 'lte']
         inner_values = ', '.join(
             f'{k}={getattr(self, k)!r}' for k in keys if getattr(self, k) is not None
         )
@@ -113,6 +125,10 @@ class GenericFilter(Generic[T]):
                 self.eq,
                 tuple(self.in_) if self.in_ is not None else None,
                 tuple(self.nin) if self.nin is not None else None,
+                self.gt,
+                self.gte,
+                self.lt,
+                self.lte,
             )
         )
 
@@ -161,6 +177,23 @@ class GenericFilter(Generic[T]):
             k = self.generate_field_name(column + '_nin')
             conditionals.append(f'{column} NOT IN :{k}')
             values[k] = self._sql_value_prep(self.nin)
+        if self.gt is not None:
+            k = self.generate_field_name(column + '_gt')
+            conditionals.append(f'{column} > :{k}')
+            values[k] = self._sql_value_prep(self.gt)
+        if self.gte is not None:
+            k = self.generate_field_name(column + '_gte')
+            conditionals.append(f'{column} >= :{k}')
+            values[k] = self._sql_value_prep(self.gte)
+        if self.lt is not None:
+            k = self.generate_field_name(column + '_lt')
+            conditionals.append(f'{column} < :{k}')
+            values[k] = self._sql_value_prep(self.lt)
+        if self.lte is not None:
+            k = self.generate_field_name(column + '_lte')
+            conditionals.append(f'{column} <= :{k}')
+            values[k] = self._sql_value_prep(self.lte)
+
         return ' AND '.join(conditionals), values
 
     @staticmethod
@@ -252,6 +285,9 @@ class GenericFilterModel:
                     fconditionals, fvalues = filter_.to_sql(fcolumn)
                     conditionals.append(fconditionals)
                     values.update(fvalues)
+                elif not isinstance(field.type, (GenericFilter, dict)):
+                    values.update({fcolumn: filter_})
+                    conditionals.append(f'{fcolumn} = :{fcolumn}')
                 else:
                     raise ValueError(
                         f'Filter {field.name} must be a GenericFilter or dict[str, GenericFilter]'

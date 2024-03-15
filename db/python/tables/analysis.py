@@ -1,34 +1,37 @@
 # pylint: disable=too-many-instance-attributes
 import dataclasses
+import datetime
 from collections import defaultdict
-from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from db.python.connect import DbBase, NotFoundError
-from db.python.tables.project import ProjectId
+from db.python.tables.base import DbBase
 from db.python.utils import (
     GenericFilter,
     GenericFilterModel,
     GenericMetaFilter,
+    NotFoundError,
     to_db_json,
 )
 from models.enums import AnalysisStatus
 from models.models.analysis import AnalysisInternal
+from models.models.audit_log import AuditLogInternal
+from models.models.project import ProjectId
 
 
 @dataclasses.dataclass
 class AnalysisFilter(GenericFilterModel):
     """Filter for analysis"""
 
-    id: GenericFilter[int] = None
-    sample_id: GenericFilter[int] = None
-    sequencing_group_id: GenericFilter[int] = None
-    project: GenericFilter[int] = None
-    type: GenericFilter[str] = None
-    status: GenericFilter[AnalysisStatus] = None
-    meta: GenericMetaFilter = None
-    output: GenericFilter[str] = None
-    active: GenericFilter[bool] = None
+    id: GenericFilter[int] | None = None
+    sample_id: GenericFilter[int] | None = None
+    sequencing_group_id: GenericFilter[int] | None = None
+    project: GenericFilter[int] | None = None
+    type: GenericFilter[str] | None = None
+    status: GenericFilter[AnalysisStatus] | None = None
+    meta: GenericMetaFilter | None = None
+    output: GenericFilter[str] | None = None
+    active: GenericFilter[bool] | None = None
+    timestamp_completed: GenericFilter[datetime.datetime] | None = None
 
     def __hash__(self):  # pylint: disable=useless-parent-delegation
         return super().__hash__()
@@ -59,7 +62,6 @@ class AnalysisTable(DbBase):
         meta: Optional[Dict[str, Any]] = None,
         output: str = None,
         active: bool = True,
-        author: str = None,
         project: ProjectId = None,
     ) -> int:
         """
@@ -72,16 +74,13 @@ class AnalysisTable(DbBase):
                 ('status', status.value),
                 ('meta', to_db_json(meta or {})),
                 ('output', output),
-                ('author', author or self.author),
+                ('audit_log_id', await self.audit_log_id()),
                 ('project', project or self.project),
                 ('active', active if active is not None else True),
             ]
 
-            if author is not None:
-                kv_pairs.append(('on_behalf_of', self.author))
-
             if status == AnalysisStatus.COMPLETED:
-                kv_pairs.append(('timestamp_completed', datetime.utcnow()))
+                kv_pairs.append(('timestamp_completed', datetime.datetime.utcnow()))
 
             kv_pairs = [(k, v) for k, v in kv_pairs if v is not None]
             keys = [k for k, _ in kv_pairs]
@@ -109,12 +108,36 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         """Add samples to an analysis (through the linked table)"""
         _query = """
             INSERT INTO analysis_sequencing_group
-                (analysis_id, sequencing_group_id)
-            VALUES (:aid, :sid)
+                (analysis_id, sequencing_group_id, audit_log_id)
+            VALUES (:aid, :sid, :audit_log_id)
         """
 
-        values = map(lambda sid: {'aid': analysis_id, 'sid': sid}, sequencing_group_ids)
+        audit_log_id = await self.audit_log_id()
+        values = map(
+            lambda sid: {
+                'aid': analysis_id,
+                'sid': sid,
+                'audit_log_id': audit_log_id,
+            },
+            sequencing_group_ids,
+        )
         await self.connection.execute_many(_query, list(values))
+
+    async def find_sgs_in_joint_call_or_es_index_up_to_date(
+        self, date: datetime.date
+    ) -> set[int]:
+        """Find all the sequencing groups that have been in a joint-call or es-index up to a date"""
+        _query = """
+        SELECT DISTINCT asg.sequencing_group_id
+        FROM analysis_sequencing_group asg
+        INNER JOIN analysis a ON asg.analysis_id = a.id
+        WHERE
+            a.type IN ('joint-calling', 'es-index')
+            AND a.timestamp_completed <= :date
+        """
+
+        results = await self.connection.fetch_all(_query, {'date': date})
+        return {r['sequencing_group_id'] for r in results}
 
     async def update_analysis(
         self,
@@ -123,18 +146,17 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         meta: Dict[str, Any] = None,
         active: bool = None,
         output: Optional[str] = None,
-        author: Optional[str] = None,
     ):
         """
         Update the status of an analysis, set timestamp_completed if relevant
         """
 
         fields: Dict[str, Any] = {
-            'author': self.author or author,
-            'on_behalf_of': self.author,
             'analysis_id': analysis_id,
+            'on_behalf_of': self.author,
+            'audit_log_id': await self.audit_log_id(),
         }
-        setters = ['author = :author', 'on_behalf_of = :on_behalf_of']
+        setters = ['audit_log_id = :audit_log_id', 'on_behalf_of = :on_behalf_of']
         if status:
             setters.append('status = :status')
             fields['status'] = status.value
@@ -144,7 +166,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             fields['active'] = active
 
         if status == AnalysisStatus.COMPLETED:
-            fields['timestamp_completed'] = datetime.utcnow()
+            fields['timestamp_completed'] = datetime.datetime.utcnow()
             setters.append('timestamp_completed = :timestamp_completed')
 
         if output:
@@ -374,7 +396,7 @@ WHERE a.id = :analysis_id
         self,
         sample_ids: list[int],
         analysis_type: str | None,
-        status: AnalysisStatus,
+        status: AnalysisStatus | None,
     ) -> tuple[set[ProjectId], list[AnalysisInternal]]:
         """
         Get relevant analyses for a sample, optional type / status filters
@@ -464,8 +486,9 @@ ORDER BY a.timestamp_completed DESC;
     async def get_analysis_runner_log(
         self,
         project_ids: List[int] = None,
-        author: str = None,
+        # author: str = None,
         output_dir: str = None,
+        ar_guid: str = None,
     ) -> List[AnalysisInternal]:
         """
         Get log for the analysis-runner, useful for checking this history of analysis
@@ -479,14 +502,14 @@ ORDER BY a.timestamp_completed DESC;
             wheres.append('project in :project_ids')
             values['project_ids'] = project_ids
 
-        if author:
-            wheres.append('author = :author')
-            values['author'] = author
-
         if output_dir:
             wheres.append('(output = :output OR output LIKE :output_like)')
             values['output'] = output_dir
             values['output_like'] = f'%{output_dir}'
+
+        if ar_guid:
+            wheres.append('JSON_EXTRACT(meta, "$.ar_guid") = :ar_guid')
+            values['ar_guid'] = ar_guid
 
         wheres_str = ' AND '.join(wheres)
         _query = f'SELECT * FROM analysis WHERE {wheres_str}'
@@ -553,7 +576,7 @@ GROUP BY seq_type
 
     async def get_sg_add_to_project_es_index(
         self, sg_ids: list[int]
-    ) -> dict[int, date]:
+    ) -> dict[int, datetime.date]:
         """
         Get all the sequencing groups that should be added to seqr joint calls
         """
@@ -570,7 +593,13 @@ GROUP BY seq_type
         GROUP BY a_sg.sequencing_group_id
         """
 
-        rows = await self.connection.fetch_all(
-            _query, {'sg_ids': sg_ids}
-        )
+        rows = await self.connection.fetch_all(_query, {'sg_ids': sg_ids})
         return {r['sg_id']: r['timestamp_completed'].date() for r in rows}
+
+    async def get_audit_log_for_analysis_ids(
+        self, analysis_ids: list[int]
+    ) -> dict[int, list[AuditLogInternal]]:
+        """
+        Get audit logs for analysis IDs
+        """
+        return await self.get_all_audit_logs_for_table('analysis', analysis_ids)

@@ -4,15 +4,20 @@ from collections import defaultdict
 from datetime import date
 from typing import Any
 
-from db.python.connect import DbBase, NoOpAenter, NotFoundError
+from db.python.tables.base import DbBase
 from db.python.utils import (
     GenericFilter,
     GenericFilterModel,
     GenericMetaFilter,
-    ProjectId,
+    NoOpAenter,
+    NotFoundError,
     to_db_json,
 )
-from models.models.sequencing_group import SequencingGroupInternal
+from models.models.project import ProjectId
+from models.models.sequencing_group import (
+    SequencingGroupInternal,
+    SequencingGroupInternalId,
+)
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -213,7 +218,9 @@ class SequencingGroupTable(DbBase):
         rows = await self.connection.fetch_all(_query, {'sgids': sequencing_group_ids})
         return {r[0]: r[1].date() for r in rows}
 
-    async def get_samples_create_date_from_sgs(self, sequencing_group_ids: list[int]):
+    async def get_samples_create_date_from_sgs(
+        self, sequencing_group_ids: list[int]
+    ) -> dict[SequencingGroupInternalId, date]:
         """
         Get a map of {internal_sg_id: sample_date_created} for list of sg_ids
         """
@@ -271,7 +278,6 @@ class SequencingGroupTable(DbBase):
         platform: str,
         assay_ids: list[int],
         meta: dict = None,
-        author: str = None,
         open_transaction=True,
     ) -> int:
         """Create sequence group"""
@@ -302,16 +308,17 @@ class SequencingGroupTable(DbBase):
 
         _query = """
         INSERT INTO sequencing_group
-            (sample_id, type, technology, platform, meta, author, archived)
-        VALUES (:sample_id, :type, :technology, :platform, :meta, :author, false)
+            (sample_id, type, technology, platform, meta, audit_log_id, archived)
+        VALUES
+            (:sample_id, :type, :technology, :platform, :meta, :audit_log_id, false)
         RETURNING id;
         """
 
         _seqg_linker_query = """
         INSERT INTO sequencing_group_assay
-            (sequencing_group_id, assay_id, author)
+            (sequencing_group_id, assay_id, audit_log_id)
         VALUES
-            (:seqgroup, :assayid, :author)
+            (:seqgroup, :assayid, :audit_log_id)
         """
 
         values = {
@@ -334,13 +341,13 @@ class SequencingGroupTable(DbBase):
 
             id_of_seq_group = await self.connection.fetch_val(
                 _query,
-                {**values, 'author': author or self.author},
+                {**values, 'audit_log_id': await self.audit_log_id()},
             )
             assay_id_insert_values = [
                 {
                     'seqgroup': id_of_seq_group,
                     'assayid': s,
-                    'author': author or self.author,
+                    'audit_log_id': await self.audit_log_id(),
                 }
                 for s in assay_ids
             ]
@@ -356,9 +363,10 @@ class SequencingGroupTable(DbBase):
         """
         Update meta / platform on sequencing_group
         """
-        updaters = []
+        updaters = ['audit_log_id = :audit_log_id']
         values: dict[str, Any] = {
             'seqgid': sequencing_group_id,
+            'audit_log_id': await self.audit_log_id(),
         }
 
         if meta:
@@ -383,21 +391,28 @@ class SequencingGroupTable(DbBase):
         """
         _query = """
         UPDATE sequencing_group
-        SET archived = 1, author = :author
+        SET archived = 1, audit_log_id = :audit_log_id
         WHERE id = :sequencing_group_id;
         """
         # do this so we can reuse the sequencing_group_ids
         _external_id_query = """
         UPDATE sequencing_group_external_id
-        SET nullIfInactive = NULL
+        SET nullIfInactive = NULL, audit_log_id = :audit_log_id
         WHERE sequencing_group_id = :sequencing_group_id;
         """
         await self.connection.execute(
-            _query, {'sequencing_group_id': sequencing_group_id, 'author': self.author}
+            _query,
+            {
+                'sequencing_group_id': sequencing_group_id,
+                'audit_log_id': await self.audit_log_id(),
+            },
         )
         await self.connection.execute(
             _external_id_query,
-            {'sequencing_group_id': sequencing_group_id},
+            {
+                'sequencing_group_id': sequencing_group_id,
+                'audit_log_id': await self.audit_log_id(),
+            },
         )
 
     async def get_type_numbers_for_project(self, project) -> dict[str, int]:
