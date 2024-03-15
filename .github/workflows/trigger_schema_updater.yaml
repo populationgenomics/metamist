@@ -40,7 +40,7 @@ jobs:
         name: "Set up Cloud SDK"
         uses: google-github-actions/setup-gcloud@v2
 
-      - id: get_url
+      - id: "get-cloudrun-url"
         name: Get Cloud Run service URL
         run: |
           echo "CLOUD_RUN_URL=$(gcloud run services describe schema-updater --region australia-southeast1 --format 'value(status.url)')/execute-liquibase?environment=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
@@ -57,6 +57,6 @@ jobs:
 
       - name: Manual Trigger - Invoke Cloud Run
         run: |
-          curl -X POST -H "Authorization: Bearer ${{ steps.auth.outputs.id_token }}" -H "Content-Type: application/xml" --data-binary "@db/project.xml" $CLOUD_RUN_URL
+          curl -X POST -H "Authorization: Bearer ${{ steps.get-id-token.outputs.id_token }}" -H "Content-Type: application/xml" --data-binary "@db/project.xml" $CLOUD_RUN_URL
         env:
           CLOUD_RUN_URL: ${{ env.CLOUD_RUN_URL }}
