@@ -2,11 +2,13 @@ from test.testbase import DbIsolatedTest, run_as_sync
 
 from pymysql.err import IntegrityError
 
-from db.python.layers import CohortLayer
+from db.python.layers import CohortLayer, SampleLayer
+from models.models import SampleUpsertInternal, SequencingGroupUpsertInternal
 from models.models.cohort import CohortCriteria, CohortTemplate
+from models.utils.sequencing_group_id_format import sequencing_group_id_format
 
 
-class TestCohort(DbIsolatedTest):
+class TestCohortBasic(DbIsolatedTest):
     """Test custom cohort endpoints"""
 
     @run_as_sync
@@ -101,3 +103,74 @@ class TestCohort(DbIsolatedTest):
             dry_run=False,
             template_id=tid,
         )
+
+
+def get_sample_model(eid):
+    """Create a minimal sample"""
+    return SampleUpsertInternal(
+        meta={},
+        external_id=f'EXID{eid}',
+        sequencing_groups=[
+            SequencingGroupUpsertInternal(
+                type='genome',
+                technology='short-read',
+                platform='illumina',
+                meta={},
+                assays=[],
+            ),
+        ],
+    )
+
+
+class TestCohortData(DbIsolatedTest):
+    """Test custom cohort endpoints that need some sequencing groups already set up"""
+
+    @run_as_sync
+    async def setUp(self):
+        super().setUp()
+        self.cohortl = CohortLayer(self.connection)
+        self.samplel = SampleLayer(self.connection)
+
+        self.sA = await self.samplel.upsert_sample(get_sample_model('A'))
+        self.sB = await self.samplel.upsert_sample(get_sample_model('B'))
+        self.sC = await self.samplel.upsert_sample(get_sample_model('C'))
+
+    @run_as_sync
+    async def test_create_cohort_by_sgs(self):
+        """Create cohort by selecting sequencing groups"""
+        sgB = sequencing_group_id_format(self.sB.sequencing_groups[0].id)
+        result = await self.cohortl.create_cohort_from_criteria(
+            project_to_write=self.project_id,
+            author='bob@example.org',
+            description='Cohort with 1 SG',
+            cohort_name='SG cohort 1',
+            dry_run=False,
+            cohort_criteria=CohortCriteria(
+                projects=['test'],
+                sg_ids_internal=[sgB],
+            ),
+        )
+        self.assertIsInstance(result['cohort_id'], str)
+        self.assertEqual([sgB], result['sequencing_group_ids'])
+
+    @run_as_sync
+    async def test_create_cohort_by_excluded_sgs(self):
+        """Create cohort by excluding sequencing groups"""
+        sgA = sequencing_group_id_format(self.sA.sequencing_groups[0].id)
+        sgB = sequencing_group_id_format(self.sB.sequencing_groups[0].id)
+        sgC = sequencing_group_id_format(self.sC.sequencing_groups[0].id)
+        result = await self.cohortl.create_cohort_from_criteria(
+            project_to_write=self.project_id,
+            author='bob@example.org',
+            description='Cohort without 1 SG',
+            cohort_name='SG cohort 2',
+            dry_run=False,
+            cohort_criteria=CohortCriteria(
+                projects=['test'],
+                excluded_sgs_internal=[sgA],
+            ),
+        )
+        self.assertIsInstance(result['cohort_id'], str)
+        self.assertEqual(2, len(result['sequencing_group_ids']))
+        self.assertIn(sgB, result['sequencing_group_ids'])
+        self.assertIn(sgC, result['sequencing_group_ids'])
