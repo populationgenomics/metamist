@@ -3,7 +3,7 @@ from test.testbase import DbIsolatedTest, run_as_sync
 from pymysql.err import IntegrityError
 
 from db.python.layers import CohortLayer
-from models.models.cohort import CohortCriteria
+from models.models.cohort import CohortCriteria, CohortTemplate
 
 
 class TestCohort(DbIsolatedTest):
@@ -71,3 +71,33 @@ class TestCohort(DbIsolatedTest):
                 dry_run=False,
                 cohort_criteria=CohortCriteria(projects=['test']),
             )
+
+    @run_as_sync
+    async def test_create_template_then_cohorts(self):
+        """Test with template and cohort IDs out of sync, and creating from template"""
+        tid = await self.cohortl.create_cohort_template(
+            project=self.project_id,
+            cohort_template=CohortTemplate(
+                name='Empty template',
+                description='Template with no entries',
+                criteria=CohortCriteria(projects=['test']),
+            ),
+        )
+
+        _ = await self.cohortl.create_cohort_from_criteria(
+            project_to_write=self.project_id,
+            author='bob@example.org',
+            description='Cohort with no entries',
+            cohort_name='Another empty cohort',
+            dry_run=False,
+            cohort_criteria=CohortCriteria(projects=['test']),
+        )
+
+        _ = await self.cohortl.create_cohort_from_criteria(
+            project_to_write=self.project_id,
+            author='bob@example.org',
+            description='Cohort from template',
+            cohort_name='Cohort from empty template',
+            dry_run=False,
+            template_id=tid,
+        )
