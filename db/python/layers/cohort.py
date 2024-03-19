@@ -6,7 +6,7 @@ from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisTable
 from db.python.tables.cohort import CohortFilter, CohortTable, CohortTemplateFilter
 from db.python.tables.project import ProjectId, ProjectPermissionsTable
-from db.python.tables.sample import SampleTable
+from db.python.tables.sample import SampleFilter, SampleTable
 from db.python.tables.sequencing_group import (
     SequencingGroupFilter,
     SequencingGroupTable,
@@ -22,7 +22,15 @@ from models.utils.sequencing_group_id_format import (
 logger = get_logger()
 
 
-def get_sg_filter(projects, sg_ids_internal_rich, excluded_sgs_internal_rich, sg_technology, sg_platform, sg_type):
+def get_sg_filter(
+        projects,
+        sg_ids_internal_rich,
+        excluded_sgs_internal_rich,
+        sg_technology,
+        sg_platform,
+        sg_type,
+        sample_ids
+):
     """ Get the sequencing group filter for cohort attributes"""
 
     # Format inputs for filter
@@ -48,6 +56,7 @@ def get_sg_filter(projects, sg_ids_internal_rich, excluded_sgs_internal_rich, sg
             technology=GenericFilter(in_=sg_technology) if sg_technology else None,
             platform=GenericFilter(in_=sg_platform) if sg_platform else None,
             type=GenericFilter(in_=sg_type) if sg_type else None,
+            sample_id=GenericFilter(in_=sample_ids) if sample_ids else None,
         )
 
     return sg_filter
@@ -141,13 +150,22 @@ class CohortLayer(BaseLayer):
         )
         projects_to_pull = [p.id for p in projects_to_pull]
 
+        # Get sample IDs with sample type
+        sample_filter = SampleFilter(
+            project=GenericFilter(in_=projects_to_pull),
+            type=GenericFilter(in_=cohort_criteria.sample_type) if cohort_criteria.sample_type else None,
+        )
+
+        _, samples = await self.sampt.query(sample_filter)
+
         sg_filter = get_sg_filter(
             projects=projects_to_pull,
             sg_ids_internal_rich=cohort_criteria.sg_ids_internal,
             excluded_sgs_internal_rich=cohort_criteria.excluded_sgs_internal,
             sg_technology=cohort_criteria.sg_technology,
             sg_platform=cohort_criteria.sg_platform,
-            sg_type=cohort_criteria.sg_type
+            sg_type=cohort_criteria.sg_type,
+            sample_ids=[s.id for s in samples]
         )
 
         sgs = await self.sglayer.query(sg_filter)

@@ -86,7 +86,7 @@ class CohortCriteria(BaseModel):
     sg_technology: list[str] | None = None
     sg_platform: list[str] | None = None
     sg_type: list[str] | None = None
-    # TODO: Sample type as well.
+    sample_type: list[str] | None = None
 
 
 class CohortTemplate(BaseModel):
