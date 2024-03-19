@@ -24,7 +24,7 @@ async def create_cohort_from_criteria(
     if not connection.project:
         raise ValueError('A cohort must belong to a project')
 
-    if not cohort_criteria and not cohort_spec.derived_from:
+    if not cohort_criteria and not cohort_spec.template_id:
         raise ValueError('A cohort must have either criteria or be derived from a template')
 
     cohort_output = await cohortlayer.create_cohort_from_criteria(
@@ -34,7 +34,7 @@ async def create_cohort_from_criteria(
         cohort_name=cohort_spec.name,
         dry_run=dry_run,
         cohort_criteria=cohort_criteria,
-        template_id=cohort_spec.derived_from,
+        template_id=cohort_spec.template_id,
     )
 
     return cohort_output

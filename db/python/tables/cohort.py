@@ -17,7 +17,7 @@ class CohortFilter(GenericFilterModel):
     id: GenericFilter[int] | None = None
     name: GenericFilter[str] | None = None
     author: GenericFilter[str] | None = None
-    derived_from: GenericFilter[int] | None = None
+    template_id: GenericFilter[int] | None = None
     timestamp: GenericFilter[datetime.datetime] | None = None
     project: GenericFilter[ProjectId] | None = None
 
@@ -44,7 +44,7 @@ class CohortTable(DbBase):
     common_get_keys = [
         'id',
         'name',
-        'derived_from',
+        'template_id',
         'description',
         'author',
         'project',
@@ -149,7 +149,7 @@ class CohortTable(DbBase):
         sequencing_group_ids: list[int],
         author: str,
         description: str,
-        derived_from: int,
+        template_id: int,
     ) -> int:
         """
         Create a new cohort
@@ -159,14 +159,14 @@ class CohortTable(DbBase):
         # left in an incomplete state if the query fails part way through.
         async with self.connection.transaction():
             _query = """
-            INSERT INTO cohort (name, derived_from, author, description, project, timestamp)
-            VALUES (:name, :derived_from, :author, :description, :project, NULL) RETURNING id
+            INSERT INTO cohort (name, template_id, author, description, project, timestamp)
+            VALUES (:name, :template_id, :author, :description, :project, NULL) RETURNING id
             """
 
             cohort_id = await self.connection.fetch_val(
                 _query,
                 {
-                    'derived_from': derived_from,
+                    'template_id': template_id,
                     'author': author,
                     'description': description,
                     'project': project,

@@ -14,7 +14,7 @@ class Cohort(SMBase):
     author: str
     project: str
     description: str
-    derived_from: int | None
+    template_id: int | None
     sequencing_groups: list[SequencingGroup | SequencingGroupExternalId]
 
     @staticmethod
@@ -27,7 +27,7 @@ class Cohort(SMBase):
         description = d.pop('description', None)
         name = d.pop('name', None)
         author = d.pop('author', None)
-        derived_from = d.pop('derived_from', None)
+        template_id = d.pop('template_id', None)
         sequencing_groups = d.pop('sequencing_groups', [])
 
         return Cohort(
@@ -36,7 +36,7 @@ class Cohort(SMBase):
             author=author,
             project=project,
             description=description,
-            derived_from=derived_from,
+            template_id=template_id,
             sequencing_groups=sequencing_groups,
         )
 
@@ -74,7 +74,7 @@ class CohortBody(BaseModel):
 
     name: str
     description: str
-    derived_from: int | None = None
+    template_id: int | None = None
 
 
 class CohortCriteria(BaseModel):
@@ -86,6 +86,7 @@ class CohortCriteria(BaseModel):
     sg_technology: list[str] | None = None
     sg_platform: list[str] | None = None
     sg_type: list[str] | None = None
+    # TODO: Sample type as well.
 
 
 class CohortTemplate(BaseModel):

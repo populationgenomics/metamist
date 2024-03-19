@@ -1149,4 +1149,13 @@
 			</column>
 		</addColumn>
 	</changeSet>
+	<changeSet author="vivian.bakiris" id="2024-03-19_custom_cohorts_renames">
+		<renameColumn
+			columnDataType="INT"
+			newColumnName="template_id"
+			oldColumnName="derived_from"
+			remarks="Following user feedback session, we are renaming the derived_from column to template_id to better reflect its purpose."
+			tableName="cohort"
+		/>
+	</changeSet>
 </databaseChangeLog>

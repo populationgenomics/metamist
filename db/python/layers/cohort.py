@@ -167,7 +167,7 @@ class CohortLayer(BaseLayer):
             sequencing_group_ids=[sg.id for sg in sgs],
             description=description,
             author=author,
-            derived_from=template_id,
+            template_id=template_id,
         )
 
         return {'cohort_id': cohort_id_format(cohort_id), 'sequencing_group_ids': rich_ids}

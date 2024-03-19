@@ -50,7 +50,7 @@ def get_cohort_spec(
     if cohort_description:
         cohort_body_spec['description'] = cohort_description
     if cohort_template_id:
-        cohort_body_spec['derived_from'] = cohort_template_id
+        cohort_body_spec['template_id'] = cohort_template_id
 
     return CohortBody(**cohort_body_spec)
 

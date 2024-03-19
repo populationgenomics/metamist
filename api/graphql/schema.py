@@ -82,7 +82,7 @@ class GraphQLCohort:
     name: str
     description: str
     author: str
-    derived_from: int | None = None
+    template_id: int | None = None
 
     @staticmethod
     def from_internal(internal: Cohort) -> 'GraphQLCohort':
@@ -91,7 +91,7 @@ class GraphQLCohort:
             name=internal.name,
             description=internal.description,
             author=internal.author,
-            derived_from=internal.derived_from,
+            template_id=internal.template_id,
         )
 
     @strawberry.field()
@@ -279,7 +279,7 @@ class GraphQLProject:
         id: GraphQLFilter[int] | None = None,
         name: GraphQLFilter[str] | None = None,
         author: GraphQLFilter[str] | None = None,
-        derived_from: GraphQLFilter[int] | None = None,
+        template_id: GraphQLFilter[int] | None = None,
         timestamp: GraphQLFilter[datetime.datetime] | None = None,
     ) -> list['GraphQLCohort']:
         connection = info.context['connection']
@@ -289,7 +289,7 @@ class GraphQLProject:
             id=id.to_internal_filter(cohort_id_transform_to_raw) if id else None,
             name=name.to_internal_filter() if name else None,
             author=author.to_internal_filter() if author else None,
-            derived_from=derived_from.to_internal_filter() if derived_from else None,
+            template_id=template_id.to_internal_filter() if template_id else None,
             timestamp=timestamp.to_internal_filter() if timestamp else None,
         )
 
@@ -741,7 +741,7 @@ class Query:  # entry point to graphql.
         project: GraphQLFilter[str] | None = None,
         name: GraphQLFilter[str] | None = None,
         author: GraphQLFilter[str] | None = None,
-        derived_from: GraphQLFilter[int] | None = None,
+        template_id: GraphQLFilter[int] | None = None,
     ) -> list[GraphQLCohort]:
         connection = info.context['connection']
         clayer = CohortLayer(connection)
@@ -764,7 +764,7 @@ class Query:  # entry point to graphql.
             name=name.to_internal_filter() if name else None,
             project=project_filter,
             author=author.to_internal_filter() if author else None,
-            derived_from=derived_from.to_internal_filter() if derived_from else None,
+            template_id=template_id.to_internal_filter() if template_id else None,
         )
 
         cohorts = await clayer.query(filter_)
