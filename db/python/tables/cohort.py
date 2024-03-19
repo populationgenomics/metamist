@@ -112,8 +112,6 @@ class CohortTable(DbBase):
         """
         template = await self.connection.fetch_one(_query, {'template_id': template_id})
 
-        print(template)
-
         return {'id': template['id'], 'criteria': template['criteria']}
 
     async def create_cohort_template(
