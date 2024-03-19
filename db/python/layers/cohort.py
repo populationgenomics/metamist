@@ -22,6 +22,37 @@ from models.utils.sequencing_group_id_format import (
 logger = get_logger()
 
 
+def get_sg_filter(projects, sg_ids_internal_rich, excluded_sgs_internal_rich, sg_technology, sg_platform, sg_type):
+    """ Get the sequencing group filter for cohort attributes"""
+
+    # Format inputs for filter
+    sg_ids_internal_raw = []
+    excluded_sgs_internal_raw = []
+    if sg_ids_internal_rich:
+        sg_ids_internal_raw = sequencing_group_id_transform_to_raw_list(sg_ids_internal_rich)
+    if excluded_sgs_internal_rich:
+        excluded_sgs_internal_raw = sequencing_group_id_transform_to_raw_list(excluded_sgs_internal_rich)
+
+    if sg_ids_internal_raw and excluded_sgs_internal_raw:
+        sg_id_filter = GenericFilter(in_=sg_ids_internal_raw, nin=excluded_sgs_internal_raw)
+    elif sg_ids_internal_raw:
+        sg_id_filter = GenericFilter(in_=sg_ids_internal_raw)
+    elif excluded_sgs_internal_raw:
+        sg_id_filter = GenericFilter(nin=excluded_sgs_internal_raw)
+    else:
+        sg_id_filter = None
+
+    sg_filter = SequencingGroupFilter(
+            project=GenericFilter(in_=projects),
+            id=sg_id_filter,
+            technology=GenericFilter(in_=sg_technology) if sg_technology else None,
+            platform=GenericFilter(in_=sg_platform) if sg_platform else None,
+            type=GenericFilter(in_=sg_type) if sg_type else None,
+        )
+
+    return sg_filter
+
+
 class CohortLayer(BaseLayer):
     """Layer for cohort logic"""
 
@@ -110,36 +141,16 @@ class CohortLayer(BaseLayer):
         )
         projects_to_pull = [p.id for p in projects_to_pull]
 
-        # Unpack criteria
-        sg_ids_internal = []
-        excluded_sgs_internal = []
-        if cohort_criteria.sg_ids_internal:
-            sg_ids_internal = sequencing_group_id_transform_to_raw_list(cohort_criteria.sg_ids_internal)
-        if cohort_criteria.excluded_sgs_internal:
-            excluded_sgs_internal = sequencing_group_id_transform_to_raw_list(cohort_criteria.excluded_sgs_internal)
-        sg_technology = cohort_criteria.sg_technology
-        sg_platform = cohort_criteria.sg_platform
-        sg_type = cohort_criteria.sg_type
-
-        # 1. Pull SG's based on criteria
-        if sg_ids_internal and excluded_sgs_internal:
-            sg_id_filter = GenericFilter(in_=sg_ids_internal, nin=excluded_sgs_internal)
-        elif sg_ids_internal:
-            sg_id_filter = GenericFilter(in_=sg_ids_internal)
-        elif excluded_sgs_internal:
-            sg_id_filter = GenericFilter(nin=excluded_sgs_internal)
-        else:
-            sg_id_filter = None
-
-        sgs = await self.sglayer.query(
-            SequencingGroupFilter(
-                project=GenericFilter(in_=projects_to_pull),
-                id=sg_id_filter,
-                technology=GenericFilter(in_=sg_technology) if sg_technology else None,
-                platform=GenericFilter(in_=sg_platform) if sg_platform else None,
-                type=GenericFilter(in_=sg_type) if sg_type else None,
-            )
+        sg_filter = get_sg_filter(
+            projects=projects_to_pull,
+            sg_ids_internal_rich=cohort_criteria.sg_ids_internal,
+            excluded_sgs_internal_rich=cohort_criteria.excluded_sgs_internal,
+            sg_technology=cohort_criteria.sg_technology,
+            sg_platform=cohort_criteria.sg_platform,
+            sg_type=cohort_criteria.sg_type
         )
+
+        sgs = await self.sglayer.query(sg_filter)
 
         rich_ids = sequencing_group_id_format_list([sg.id for sg in sgs])
 
