@@ -1174,4 +1174,10 @@
         referencedColumnNames="id"
         />
     </changeSet>
+	<changeSet author="john.marshall" id="2024-03-19_custom_cohorts_system_versioning">
+		<sql>ALTER TABLE cohort_template ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE cohort ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE cohort_sequencing_group ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE analysis_cohort ADD SYSTEM VERSIONING;</sql>
+	</changeSet>
 </databaseChangeLog>
