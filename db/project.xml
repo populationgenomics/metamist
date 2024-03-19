@@ -1158,4 +1158,20 @@
 			tableName="cohort"
 		/>
 	</changeSet>
+	<changeSet author="vivian.bakiris" id="2024-03-19_custom_cohorts_fk_fix">
+    <!-- Drop the existing foreign key constraint -->
+    <dropForeignKeyConstraint
+        baseTableName="cohort"
+        constraintName="FK_COHORT_DERIVED_FROM_ID_COHORT"
+        />
+
+    <!-- Recreate the foreign key constraint with the new column name -->
+    <addForeignKeyConstraint
+        baseTableName="cohort"
+        constraintName="FK_COHORT_TEMPLATE_ID_COHORT"
+        referencedTableName="cohort_template"
+        baseColumnNames="template_id"
+        referencedColumnNames="id"
+        />
+    </changeSet>
 </databaseChangeLog>
