@@ -36,6 +36,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         if (arData === undefined || arData.length === 0) {
             // nothing found
             setIsLoading(false)
+            setData(null)
             return
         }
         const ar_record = arData[0]
@@ -233,14 +234,14 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
     const batchGrid = (gridData: BillingTotalCostRecord) => <BatchGrid data={gridData} />
 
     const dataComponent = () => {
-        if (data !== undefined) {
+        if (data !== undefined && data !== null) {
             // only render grid if there are available cost data
             return batchGrid(data)
         }
 
         // if valid search text and no data return return No data message
         if (
-            data !== undefined &&
+            data === null &&
             searchByType !== undefined &&
             searchTxt !== undefined &&
             searchTxt.length > 5
