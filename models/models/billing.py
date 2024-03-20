@@ -135,25 +135,13 @@ class BillingColumn(str, Enum):
     def raw_cols(cls) -> list[str]:
         """Return list of raw column names"""
         return [
-            BillingColumn.ID.value,
             BillingColumn.TOPIC.value,
-            BillingColumn.SERVICE.value,
             BillingColumn.SKU.value,
             BillingColumn.USAGE_START_TIME.value,
             BillingColumn.USAGE_END_TIME.value,
-            BillingColumn.PROJECT.value,
             BillingColumn.LABELS.value,
-            BillingColumn.SYSTEM_LABELS.value,
-            BillingColumn.LOCATION.value,
-            BillingColumn.EXPORT_TIME.value,
             BillingColumn.COST.value,
             BillingColumn.CURRENCY.value,
-            BillingColumn.CURRENCY_CONVERSION_RATE.value,
-            BillingColumn.USAGE.value,
-            BillingColumn.CREDITS.value,
-            BillingColumn.INVOICE.value,
-            BillingColumn.COST_TYPE.value,
-            BillingColumn.ADJUSTMENT_INFO.value,
         ]
 
     @classmethod
@@ -362,9 +350,33 @@ class BillingCostBudgetRecord(SMBase):
         )
 
 
-class BillingHailBatchCostRecord(SMBase):
+class BillingBatchCostRecord(SMBase):
     """Return class for the Billing Cost by batch_id/ar_guid"""
 
-    ar_guid: str | None
-    batch_ids: list[str] | None
-    costs: list[dict] | None
+    total: dict | None
+    topics: list[dict] | None
+    categories: list[dict] | None
+    batches: list[dict] | None
+    skus: list[dict] | None
+    seq_groups: list[dict] | None
+
+    wdl_tasks: list[dict] | None
+    cromwell_sub_workflows: list[dict] | None
+    cromwell_workflows: list[dict] | None
+    dataproc: list[dict] | None
+
+    @staticmethod
+    def from_json(record):
+        """Create BillingBatchCostRecord from json"""
+        return BillingBatchCostRecord(
+            total=record.get('total'),
+            topics=record.get('topics'),
+            categories=record.get('categories'),
+            batches=record.get('batches'),
+            skus=record.get('skus'),
+            seq_groups=record.get('seq_groups'),
+            wdl_tasks=record.get('wdl_tasks'),
+            cromwell_sub_workflows=record.get('cromwell_sub_workflows'),
+            cromwell_workflows=record.get('cromwell_workflows'),
+            dataproc=record.get('dataproc'),
+        )

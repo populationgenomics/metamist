@@ -1126,6 +1126,103 @@
 		<sql>ALTER TABLE sequencing_group_assay CHANGE author author VARCHAR(255) NULL;</sql>
 		<sql>ALTER TABLE sequencing_group_external_id CHANGE author author VARCHAR(255) NULL;</sql>
 	</changeSet>
+	<changeSet id="2024-02-27_analysis-runner-table" author="michael.franklin">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<createTable tableName="analysis_runner">
+			<column name="ar_guid" type="VARCHAR(255)">
+				<constraints nullable="false" unique="true" />
+			</column>
+			<column name="project" type="int">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_AR_PROJECT"
+					references="project(id)"
+				/>
+
+			</column>
+			<column name="timestamp" type="timestamp" />
+			<column name="access_level" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="repository" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="commit" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="output_path" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="script" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="description" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="driver_image" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="config_path" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="cwd" type="VARCHAR(255)">
+				<constraints nullable="true" />
+			</column>
+			<column name="environment" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="hail_version" type="VARCHAR(255)">
+				<constraints nullable="true" />
+			</column>
+			<column name="batch_url" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="submitting_user" type="VARCHAR(255)" />
+			<column name="meta" type="JSON" />
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_ANALYSIS_RUNNER_CHANGELOG_ID"
+					references="audit_log(id)"
+				/>
+			</column>
+		</createTable>
+
+		<createIndex indexName="idx_ar_guid" tableName="analysis_runner">
+			<column name="ar_guid" />
+		</createIndex>
+		<createIndex tableName="analysis_runner" indexName="idx_ar_submitting_user">
+			<column name="submitting_user" />
+		</createIndex>
+		<sql> ALTER TABLE analysis_runner ADD SYSTEM VERSIONING; </sql>
+	</changeSet>
+	<changeSet id="2024-03-15_analysis-runner-table-migration" author="michael.franklin">
+	<!-- Migrate all the old analysis_runner records into the new table (don't delete existing ones for now) -->
+		<sql> INSERT INTO analysis_runner ( ar_guid, project, timestamp, access_level, repository,
+			`commit`, output_path, script, description, driver_image, config_path, cwd, environment,
+			hail_version, batch_url, submitting_user, meta, audit_log_id ) SELECT
+			COALESCE(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.ar-guid')), UUID()) as ar_guid,
+			analysis.project as project,
+			STR_TO_DATE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp')), 'T', ' '),
+			'%Y-%m-%d %H:%i:%s.%f') as timestamp, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta,
+			'$.accessLevel')) as access_level, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.repo'))
+			as repository, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.commit')) as `commit`,
+			analysis.output as output_path, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.script')) as
+			script, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.description')) as description,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.driverImage')) as driver_image,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.configPath')) as config_path,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.cwd')) as cwd,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.environment')) as environment,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.hailVersion')) as hail_version,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.batch_url')) as batch_url,
+			COALESCE(audit_log.on_behalf_of, analysis.author) as submitting_user, JSON_REMOVE(
+			analysis.meta, '$.ar-guid', '$.timestamp', '$.accessLevel', '$.repo', '$.commit',
+			'$.script', '$.description', '$.driverImage', '$.configPath', '$.cwd', '$.environment',
+			'$.hailVersion', '$.batch_url' ) as meta, analysis.audit_log_id FROM analysis LEFT JOIN
+			audit_log ON analysis.audit_log_id = audit_log.id WHERE analysis.type =
+			"analysis-runner" </sql>
+
+	</changeSet>
 	<changeSet id="2024-04-27_custom-cohorts" author="vivian.bakiris">
 		<createTable tableName="cohort_template">
 			<column name="id" type="INT" autoIncrement="true">

@@ -38,6 +38,7 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'cohort',
     'cohort_sequencing_group',
     'analysis_cohort',
+    'analysis_runner',
 ][::-1]
 
 

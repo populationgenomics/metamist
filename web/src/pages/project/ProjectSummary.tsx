@@ -206,9 +206,10 @@ const ProjectSummaryView: React.FunctionComponent = () => {
                             <PageOptions
                                 isLoading={isLoading}
                                 totalPageNumbers={totalPageNumbers}
-                                totalSamples={summary?.total_samples_in_query}
+                                total={summary?.total_samples_in_query}
                                 pageNumber={pageNumber}
                                 handleOnClick={handleOnClick}
+                                title="samples"
                             />
                         </div>
                         <div style={{ position: 'absolute', paddingBottom: '80px' }}>
@@ -221,9 +222,10 @@ const ProjectSummaryView: React.FunctionComponent = () => {
                             <PageOptions
                                 isLoading={isLoading}
                                 totalPageNumbers={totalPageNumbers}
-                                totalSamples={summary?.total_samples_in_query}
+                                total={summary?.total_samples_in_query}
                                 pageNumber={pageNumber}
                                 handleOnClick={handleOnClick}
+                                title="samples"
                             />
                         </div>
                     </>

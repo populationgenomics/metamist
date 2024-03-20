@@ -11,3 +11,8 @@ class BqBaseLayer:
     def author(self):
         """Get author from connection"""
         return self.connection.author
+
+    @property
+    def cost(self):
+        """Get author from connection"""
+        return self.connection.cost
