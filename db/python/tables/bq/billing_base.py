@@ -37,7 +37,7 @@ COMPUTE = 'C'
 
 def abbrev_cost_category(cost_category: str) -> str:
     """abbreviate cost category"""
-    return STORAGE if cost_category == 'Cloud Storage' else COMPUTE
+    return STORAGE if cost_category.startswith('Cloud Storage') else COMPUTE
 
 
 def prepare_time_periods(
