@@ -161,7 +161,7 @@ class CohortTable(DbBase):
 
             _query = """
             INSERT INTO cohort (name, template_id, author, description, project, timestamp, audit_log_id)
-            VALUES (:name, :template_id, :author, :description, :project, NULL, :audit_log_id) RETURNING id
+            VALUES (:name, :template_id, :author, :description, :project, :timestamp, :audit_log_id) RETURNING id
             """
 
             cohort_id = await self.connection.fetch_val(
@@ -172,6 +172,7 @@ class CohortTable(DbBase):
                     'description': description,
                     'project': project,
                     'name': cohort_name,
+                    'timestamp': datetime.datetime.now(),
                     'audit_log_id': audit_log_id,
                 },
             )
