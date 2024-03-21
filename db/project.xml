@@ -1277,4 +1277,15 @@
 		<sql>ALTER TABLE cohort_sequencing_group ADD SYSTEM VERSIONING;</sql>
 		<sql>ALTER TABLE analysis_cohort ADD SYSTEM VERSIONING;</sql>
 	</changeSet>
+	<changeSet author="john.marshall" id="2024-03-21_custom_cohorts_audit_id">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<addColumn tableName="cohort_template">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_COHORT_TEMPLATE_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+	</changeSet>
 </databaseChangeLog>

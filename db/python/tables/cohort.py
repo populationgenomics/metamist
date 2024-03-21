@@ -125,8 +125,8 @@ class CohortTable(DbBase):
         Create new cohort template
         """
         _query = """
-        INSERT INTO cohort_template (name, description, criteria, project)
-        VALUES (:name, :description, :criteria, :project) RETURNING id;
+        INSERT INTO cohort_template (name, description, criteria, project, audit_log_id)
+        VALUES (:name, :description, :criteria, :project, :audit_log_id) RETURNING id;
         """
         cohort_template_id = await self.connection.fetch_val(
                 _query,
@@ -135,6 +135,7 @@ class CohortTable(DbBase):
                     'description': description,
                     'criteria': to_db_json(criteria),
                     'project': project,
+                    'audit_log_id': await self.audit_log_id(),
                 },
             )
 
@@ -156,9 +157,11 @@ class CohortTable(DbBase):
         # Use an atomic transaction for a mult-part insert query to prevent the database being
         # left in an incomplete state if the query fails part way through.
         async with self.connection.transaction():
+            audit_log_id = await self.audit_log_id()
+
             _query = """
-            INSERT INTO cohort (name, template_id, author, description, project, timestamp)
-            VALUES (:name, :template_id, :author, :description, :project, NULL) RETURNING id
+            INSERT INTO cohort (name, template_id, author, description, project, timestamp, audit_log_id)
+            VALUES (:name, :template_id, :author, :description, :project, NULL, :audit_log_id) RETURNING id
             """
 
             cohort_id = await self.connection.fetch_val(
@@ -169,12 +172,13 @@ class CohortTable(DbBase):
                     'description': description,
                     'project': project,
                     'name': cohort_name,
+                    'audit_log_id': audit_log_id,
                 },
             )
 
             _query = """
-            INSERT INTO cohort_sequencing_group (cohort_id, sequencing_group_id)
-            VALUES (:cohort_id, :sequencing_group_id)
+            INSERT INTO cohort_sequencing_group (cohort_id, sequencing_group_id, audit_log_id)
+            VALUES (:cohort_id, :sequencing_group_id, :audit_log_id)
             """
 
             for sg in sequencing_group_ids:
@@ -183,6 +187,7 @@ class CohortTable(DbBase):
                     {
                         'cohort_id': cohort_id,
                         'sequencing_group_id': sg,
+                        'audit_log_id': audit_log_id,
                     },
                 )
 
