@@ -105,16 +105,16 @@ class TestCohortBasic(DbIsolatedTest):
         )
 
 
-def get_sample_model(eid):
+def get_sample_model(eid, ty='genome', tech='short-read', plat='illumina'):
     """Create a minimal sample"""
     return SampleUpsertInternal(
         meta={},
         external_id=f'EXID{eid}',
         sequencing_groups=[
             SequencingGroupUpsertInternal(
-                type='genome',
-                technology='short-read',
-                platform='illumina',
+                type=ty,
+                technology=tech,
+                platform=plat,
                 meta={},
                 assays=[],
             ),
@@ -125,6 +125,8 @@ def get_sample_model(eid):
 class TestCohortData(DbIsolatedTest):
     """Test custom cohort endpoints that need some sequencing groups already set up"""
 
+    # pylint: disable=too-many-instance-attributes
+
     @run_as_sync
     async def setUp(self):
         super().setUp()
@@ -133,12 +135,15 @@ class TestCohortData(DbIsolatedTest):
 
         self.sA = await self.samplel.upsert_sample(get_sample_model('A'))
         self.sB = await self.samplel.upsert_sample(get_sample_model('B'))
-        self.sC = await self.samplel.upsert_sample(get_sample_model('C'))
+        self.sC = await self.samplel.upsert_sample(get_sample_model('C', 'exome', 'long-read', 'ONT'))
+
+        self.sgA = sequencing_group_id_format(self.sA.sequencing_groups[0].id)
+        self.sgB = sequencing_group_id_format(self.sB.sequencing_groups[0].id)
+        self.sgC = sequencing_group_id_format(self.sC.sequencing_groups[0].id)
 
     @run_as_sync
     async def test_create_cohort_by_sgs(self):
         """Create cohort by selecting sequencing groups"""
-        sgB = sequencing_group_id_format(self.sB.sequencing_groups[0].id)
         result = await self.cohortl.create_cohort_from_criteria(
             project_to_write=self.project_id,
             author='bob@example.org',
@@ -147,18 +152,15 @@ class TestCohortData(DbIsolatedTest):
             dry_run=False,
             cohort_criteria=CohortCriteria(
                 projects=['test'],
-                sg_ids_internal=[sgB],
+                sg_ids_internal=[self.sgB],
             ),
         )
         self.assertIsInstance(result['cohort_id'], str)
-        self.assertEqual([sgB], result['sequencing_group_ids'])
+        self.assertEqual([self.sgB], result['sequencing_group_ids'])
 
     @run_as_sync
     async def test_create_cohort_by_excluded_sgs(self):
         """Create cohort by excluding sequencing groups"""
-        sgA = sequencing_group_id_format(self.sA.sequencing_groups[0].id)
-        sgB = sequencing_group_id_format(self.sB.sequencing_groups[0].id)
-        sgC = sequencing_group_id_format(self.sC.sequencing_groups[0].id)
         result = await self.cohortl.create_cohort_from_criteria(
             project_to_write=self.project_id,
             author='bob@example.org',
@@ -167,10 +169,65 @@ class TestCohortData(DbIsolatedTest):
             dry_run=False,
             cohort_criteria=CohortCriteria(
                 projects=['test'],
-                excluded_sgs_internal=[sgA],
+                excluded_sgs_internal=[self.sgA],
             ),
         )
         self.assertIsInstance(result['cohort_id'], str)
         self.assertEqual(2, len(result['sequencing_group_ids']))
-        self.assertIn(sgB, result['sequencing_group_ids'])
-        self.assertIn(sgC, result['sequencing_group_ids'])
+        self.assertIn(self.sgB, result['sequencing_group_ids'])
+        self.assertIn(self.sgC, result['sequencing_group_ids'])
+
+    @run_as_sync
+    async def test_create_cohort_by_technology(self):
+        """Create cohort by selecting a technology"""
+        result = await self.cohortl.create_cohort_from_criteria(
+            project_to_write=self.project_id,
+            author='bob@example.org',
+            description='Short-read cohort',
+            cohort_name='Tech cohort 1',
+            dry_run=False,
+            cohort_criteria=CohortCriteria(
+                projects=['test'],
+                sg_technology=['short-read'],
+            ),
+        )
+        self.assertIsInstance(result['cohort_id'], str)
+        self.assertEqual(2, len(result['sequencing_group_ids']))
+        self.assertIn(self.sgA, result['sequencing_group_ids'])
+        self.assertIn(self.sgB, result['sequencing_group_ids'])
+
+    @run_as_sync
+    async def test_create_cohort_by_platform(self):
+        """Create cohort by selecting a platform"""
+        result = await self.cohortl.create_cohort_from_criteria(
+            project_to_write=self.project_id,
+            author='bob@example.org',
+            description='ONT cohort',
+            cohort_name='Platform cohort 1',
+            dry_run=False,
+            cohort_criteria=CohortCriteria(
+                projects=['test'],
+                sg_platform=['ONT'],
+            ),
+        )
+        self.assertIsInstance(result['cohort_id'], str)
+        self.assertEqual([self.sgC], result['sequencing_group_ids'])
+
+    @run_as_sync
+    async def test_create_cohort_by_type(self):
+        """Create cohort by selecting types"""
+        result = await self.cohortl.create_cohort_from_criteria(
+            project_to_write=self.project_id,
+            author='bob@example.org',
+            description='Genome cohort',
+            cohort_name='Type cohort 1',
+            dry_run=False,
+            cohort_criteria=CohortCriteria(
+                projects=['test'],
+                sg_type=['genome'],
+            ),
+        )
+        self.assertIsInstance(result['cohort_id'], str)
+        self.assertEqual(2, len(result['sequencing_group_ids']))
+        self.assertIn(self.sgA, result['sequencing_group_ids'])
+        self.assertIn(self.sgB, result['sequencing_group_ids'])
