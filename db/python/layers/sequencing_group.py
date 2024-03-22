@@ -10,6 +10,7 @@ from db.python.tables.sequencing_group import (
     SequencingGroupTable,
 )
 from db.python.utils import NotFoundError
+from models.models.group import ReadAccessRoles
 from models.models.project import ProjectId
 from models.models.sequencing_group import (
     SequencingGroupInternal,
@@ -54,7 +55,7 @@ class SequencingGroupLayer(BaseLayer):
 
         if check_project_ids:
             await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
+                self.author, projects, allowed_roles=ReadAccessRoles
             )
 
         if len(groups) != len(sequencing_group_ids):
@@ -84,7 +85,7 @@ class SequencingGroupLayer(BaseLayer):
 
         if check_project_ids:
             await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
+                self.author, projects, allowed_roles=ReadAccessRoles
             )
 
         return groups
@@ -103,7 +104,7 @@ class SequencingGroupLayer(BaseLayer):
 
         if check_project_ids and not (filter_.project and filter_.project.in_):
             await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
+                self.author, projects, allowed_roles=ReadAccessRoles
             )
 
         return sequencing_groups
@@ -154,7 +155,7 @@ class SequencingGroupLayer(BaseLayer):
 
         if check_project_ids:
             await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
+                self.author, projects, allowed_roles=ReadAccessRoles
             )
 
         return pids

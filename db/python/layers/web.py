@@ -25,6 +25,7 @@ from models.models import (
     SearchItem,
     parse_sql_bool,
 )
+from models.models.group import ReadAccessRoles
 from models.models.web import ProjectSummaryInternal, WebProject
 
 
@@ -282,7 +283,7 @@ class WebDb(DbBase):
         sample_query, values = self._project_summary_sample_query(grid_filter)
         ptable = ProjectPermissionsTable(self._connection)
         project_db = await ptable.get_and_check_access_to_project_for_id(
-            self.author, self.project, readonly=True
+            self.author, self.project, allowed_roles=ReadAccessRoles
         )
         project = WebProject(
             id=project_db.id,

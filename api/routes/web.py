@@ -19,6 +19,7 @@ from db.python.layers.seqr import SeqrLayer
 from db.python.layers.web import SearchItem, WebLayer
 from db.python.tables.project import ProjectPermissionsTable
 from models.enums.web import SeqrDatasetType
+from models.models.group import ReadAccessRoles
 from models.models.search import SearchResponse
 from models.models.web import PagingLinks, ProjectSummary
 
@@ -82,7 +83,7 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
     # raise ValueError("Test")
     pt = ProjectPermissionsTable(connection)
     projects = await pt.get_projects_accessible_by_user(
-        connection.author, readonly=True
+        connection.author, allowed_roles=ReadAccessRoles
     )
     pmap = {p.id: p for p in projects}
     responses = await SearchLayer(connection).search(

@@ -9,6 +9,7 @@ from db.python.tables.assay import NoOpAenter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter, SampleTable
 from db.python.utils import GenericFilter, NotFoundError
+from models.models.group import FullWriteAccessRoles, ReadAccessRoles
 from models.models.project import ProjectId
 from models.models.sample import SampleInternal, SampleUpsertInternal
 from models.utils.sample_id_format import sample_id_format_list
@@ -29,7 +30,7 @@ class SampleLayer(BaseLayer):
         project, sample = await self.st.get_sample_by_id(sample_id)
         if check_project_id:
             await self.pt.check_access_to_project_ids(
-                self.connection.author, [project], readonly=True
+                self.connection.author, [project], allowed_roles=ReadAccessRoles
             )
 
         return sample
@@ -44,7 +45,7 @@ class SampleLayer(BaseLayer):
 
         if check_project_ids:
             await self.pt.check_access_to_project_ids(
-                self.connection.author, projects, readonly=True
+                self.connection.author, projects, allowed_roles=ReadAccessRoles
             )
 
         return samples
@@ -65,7 +66,7 @@ class SampleLayer(BaseLayer):
 
         if check_project_ids:
             await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
+                self.author, projects, allowed_roles=ReadAccessRoles
             )
 
         grouped_samples = group_by(samples, lambda s: s.participant_id)
@@ -83,7 +84,7 @@ class SampleLayer(BaseLayer):
         project, sample = await self.st.get_sample_by_id(sample_id)
         if check_project_id:
             await self.pt.check_access_to_project_ids(
-                self.author, [project], readonly=True
+                self.author, [project], allowed_roles=ReadAccessRoles
             )
 
         return sample
@@ -148,7 +149,7 @@ class SampleLayer(BaseLayer):
 
         if check_project_ids:
             await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
+                self.author, projects, allowed_roles=ReadAccessRoles
             )
 
         return sample_id_map
@@ -177,7 +178,7 @@ class SampleLayer(BaseLayer):
             # so no else required
             pjcts = await self.st.get_project_ids_for_sample_ids(sample_ids)
             await self.ptable.check_access_to_project_ids(
-                self.author, pjcts, readonly=True
+                self.author, pjcts, allowed_roles=ReadAccessRoles
             )
 
         _returned_project_ids, samples = await self.st.query(
@@ -194,7 +195,7 @@ class SampleLayer(BaseLayer):
 
         if not project_ids and check_project_ids:
             await self.ptable.check_access_to_project_ids(
-                self.author, _returned_project_ids, readonly=True
+                self.author, _returned_project_ids, allowed_roles=ReadAccessRoles
             )
 
         return samples
@@ -211,7 +212,9 @@ class SampleLayer(BaseLayer):
     ) -> dict[int, datetime.date]:
         """Get a map of {internal_sample_id: date_created} for list of sample_ids"""
         pjcts = await self.st.get_project_ids_for_sample_ids(sample_ids)
-        await self.pt.check_access_to_project_ids(self.author, pjcts, readonly=True)
+        await self.pt.check_access_to_project_ids(
+            self.author, pjcts, allowed_roles=ReadAccessRoles
+        )
         return await self.st.get_samples_create_date(sample_ids)
 
     # CREATE / UPDATES
@@ -287,7 +290,7 @@ class SampleLayer(BaseLayer):
             if sids:
                 pjcts = await self.st.get_project_ids_for_sample_ids(sids)
                 await self.ptable.check_access_to_project_ids(
-                    self.author, pjcts, readonly=False
+                    self.author, pjcts, allowed_roles=FullWriteAccessRoles
                 )
 
         async with with_function():
@@ -329,7 +332,9 @@ class SampleLayer(BaseLayer):
         if check_project_id:
             projects = await self.st.get_project_ids_for_sample_ids([id_keep, id_merge])
             await self.ptable.check_access_to_project_ids(
-                user=self.author, project_ids=projects, readonly=False
+                user=self.author,
+                project_ids=projects,
+                allowed_roles=FullWriteAccessRoles,
             )
 
         return await self.st.merge_samples(
@@ -351,7 +356,7 @@ class SampleLayer(BaseLayer):
         if check_sample_ids:
             project_ids = await self.st.get_project_ids_for_sample_ids(ids)
             await self.ptable.check_access_to_project_ids(
-                self.author, project_ids, readonly=False
+                self.author, project_ids, allowed_roles=FullWriteAccessRoles
             )
 
         await self.st.update_many_participant_ids(
@@ -368,7 +373,7 @@ class SampleLayer(BaseLayer):
         if check_sample_ids:
             project_ids = set(r.project for r in rows)
             await self.ptable.check_access_to_project_ids(
-                self.author, project_ids, readonly=True
+                self.author, project_ids, allowed_roles=ReadAccessRoles
             )
 
         return rows

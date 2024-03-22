@@ -255,6 +255,6 @@ class SMConnections:
             project=None,
             on_behalf_of=None,
             ar_guid=ar_guid,
-            allowed_roles={r for r in GroupProjectRole},
+            allowed_roles=set(GroupProjectRole),
             meta=meta,
         )

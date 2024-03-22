@@ -13,8 +13,8 @@ from starlette.responses import FileResponse
 from api import routes
 from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
 from api.settings import PROFILE_REQUESTS, SKIP_DATABASE_CONNECTION
-from api.utils import get_openapi_schema_func
 from api.utils.exceptions import determine_code_from_error
+from api.utils.openapi import get_openapi_schema_func
 from db.python.connect import SMConnections
 from db.python.tables.project import is_all_access
 from db.python.utils import get_logger

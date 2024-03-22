@@ -26,6 +26,7 @@ from models.models.analysis import (
     AnalysisInternal,
     ProportionalDateTemporalMethod,
 )
+from models.models.group import ReadAccessRoles
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
     sequencing_group_id_format_list,
@@ -230,7 +231,9 @@ async def query_analyses(
 
     pt = ProjectPermissionsTable(connection)
     projects = await pt.get_and_check_access_to_projects_for_names(
-        user=connection.author, project_names=query.projects, readonly=True
+        user=connection.author,
+        project_names=query.projects,
+        allowed_roles=ReadAccessRoles,
     )
     project_name_map = {p.name: p.id for p in projects}
     atable = AnalysisLayer(connection)
@@ -253,9 +256,10 @@ async def get_analysis_runner_log(
     project_ids = None
     if project_names:
         pt = ProjectPermissionsTable(connection)
-        project_ids = await pt.get_project_ids_from_names_and_user(
-            connection.author, project_names, readonly=True
+        projects = await pt.get_and_check_access_to_projects_for_names(
+            connection.author, project_names, allowed_roles=ReadAccessRoles
         )
+        project_ids = [p.id for p in projects]
 
     results = await atable.get_analysis_runner_log(
         project_ids=project_ids,
@@ -342,9 +346,10 @@ async def get_proportionate_map(
     }
     """
     pt = ProjectPermissionsTable(connection)
-    project_ids = await pt.get_project_ids_from_names_and_user(
-        connection.author, projects, readonly=True
+    project_list = await pt.get_and_check_access_to_projects_for_names(
+        connection.author, projects, allowed_roles=ReadAccessRoles
     )
+    project_ids = [p.id for p in project_list]
 
     start_date = parse_date_only_string(start) if start else None
     end_date = parse_date_only_string(end) if end else None

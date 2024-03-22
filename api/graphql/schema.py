@@ -53,6 +53,7 @@ from models.models import (
 )
 from models.models.analysis_runner import AnalysisRunnerInternal
 from models.models.family import PedRowInternal
+from models.models.group import ReadAccessRoles
 from models.models.project import ProjectId
 from models.models.sample import sample_id_transform_to_raw
 from models.utils.cohort_id_format import cohort_id_format, cohort_id_transform_to_raw
@@ -824,7 +825,9 @@ class GraphQLSequencingGroup:
             ptable = ProjectPermissionsTable(connection)
             project_ids = project.all_values()
             projects = await ptable.get_and_check_access_to_projects_for_names(
-                user=connection.author, project_names=project_ids, readonly=True
+                user=connection.author,
+                project_names=project_ids,
+                allowed_roles=ReadAccessRoles,
             )
             project_id_map: dict[str, int] = {
                 p.name: p.id for p in projects if p.name and p.id
@@ -1053,7 +1056,7 @@ class Query:  # entry point to graphql.
         connection = info.context['connection']
         ptable = ProjectPermissionsTable(connection)
         project = await ptable.get_and_check_access_to_project_for_name(
-            user=connection.author, project_name=name, readonly=True
+            user=connection.author, project_name=name, allowed_roles=ReadAccessRoles
         )
         return GraphQLProject.from_internal(project)
 
@@ -1083,7 +1086,9 @@ class Query:  # entry point to graphql.
         if project:
             project_names = project.all_values()
             projects = await ptable.get_and_check_access_to_projects_for_names(
-                user=connection.author, project_names=project_names, readonly=True
+                user=connection.author,
+                project_names=project_names,
+                allowed_roles=ReadAccessRoles,
             )
             project_name_map = {p.name: p.id for p in projects if p.name and p.id}
 
@@ -1135,7 +1140,9 @@ class Query:  # entry point to graphql.
         if project:
             project_names = project.all_values()
             projects = await ptable.get_and_check_access_to_projects_for_names(
-                user=connection.author, project_names=project_names, readonly=True
+                user=connection.author,
+                project_names=project_names,
+                allowed_roles=ReadAccessRoles,
             )
             project_id_map = {p.name: p.id for p in projects if p.name and p.id}
             _project_filter = project.to_internal_filter_mapped(
@@ -1193,7 +1200,7 @@ class Query:  # entry point to graphql.
         connection = info.context['connection']
         ptable = ProjectPermissionsTable(connection)
         projects = await ptable.get_projects_accessible_by_user(
-            connection.author, readonly=True
+            connection.author, allowed_roles=ReadAccessRoles
         )
         return [GraphQLProject.from_internal(p) for p in projects]
 

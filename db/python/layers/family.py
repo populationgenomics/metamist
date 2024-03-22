@@ -13,6 +13,7 @@ from db.python.tables.participant import ParticipantTable
 from db.python.tables.sample import SampleTable
 from db.python.utils import GenericFilter, NotFoundError
 from models.models.family import FamilyInternal, PedRow, PedRowInternal
+from models.models.group import FullWriteAccessRoles, ReadAccessRoles
 from models.models.participant import ParticipantUpsertInternal
 from models.models.project import ProjectId
 
@@ -48,7 +49,7 @@ class FamilyLayer(BaseLayer):
         family = families[0]
         if check_project_id:
             await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
+                self.author, [project], allowed_roles=ReadAccessRoles
             )
 
         return family
@@ -101,7 +102,7 @@ class FamilyLayer(BaseLayer):
 
         if check_project_ids:
             await self.ptable.check_access_to_project_ids(
-                self.connection.author, projects, readonly=True
+                self.connection.author, projects, allowed_roles=ReadAccessRoles
             )
 
         if check_missing and len(family_ids) != len(families):
@@ -124,7 +125,7 @@ class FamilyLayer(BaseLayer):
 
         if check_project_ids:
             await self.ptable.check_access_to_project_ids(
-                self.connection.author, projects, readonly=True
+                self.connection.author, projects, allowed_roles=ReadAccessRoles
             )
 
         return participant_map
@@ -141,7 +142,7 @@ class FamilyLayer(BaseLayer):
         if check_project_ids:
             project_ids = await self.ftable.get_projects_by_family_ids([id_])
             await self.ptable.check_access_to_project_ids(
-                self.author, project_ids, readonly=False
+                self.author, project_ids, allowed_roles=FullWriteAccessRoles
             )
 
         return await self.ftable.update_family(

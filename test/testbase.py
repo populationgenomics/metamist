@@ -25,6 +25,7 @@ from db.python.connect import (
     SMConnections,
 )
 from db.python.tables.project import ProjectPermissionsTable
+from models.models.group import FullWriteAccessRoles
 from models.models.project import ProjectId
 
 # use this to determine where the db directory is relatively,
@@ -137,7 +138,7 @@ class DbTest(unittest.TestCase):
                 formed_connection = Connection(
                     connection=sm_db,
                     author=cls.author,
-                    readonly=False,
+                    allowed_roles=FullWriteAccessRoles,
                     on_behalf_of=None,
                     ar_guid=None,
                     project=None,
@@ -187,7 +188,7 @@ class DbTest(unittest.TestCase):
             connection=self._connection,
             project=self.project_id,
             author=self.author,
-            readonly=False,
+            allowed_roles=FullWriteAccessRoles,
             ar_guid=None,
             on_behalf_of=None,
         )

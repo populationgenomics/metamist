@@ -6,6 +6,7 @@ from db.python.tables.assay import AssayFilter, AssayTable
 from db.python.tables.sample import SampleTable
 from db.python.utils import NoOpAenter
 from models.models.assay import AssayInternal, AssayUpsertInternal
+from models.models.group import FullWriteAccessRoles, ReadAccessRoles
 
 
 class AssayLayer(BaseLayer):
@@ -27,7 +28,7 @@ class AssayLayer(BaseLayer):
 
         if check_project_id:
             await self.ptable.check_access_to_project_ids(
-                user=self.author, project_ids=projects, readonly=True
+                user=self.author, project_ids=projects, allowed_roles=ReadAccessRoles
             )
 
         return assays
@@ -40,7 +41,7 @@ class AssayLayer(BaseLayer):
 
         if check_project_id:
             await self.ptable.check_access_to_project_id(
-                self.author, project, readonly=True
+                self.author, project, allowed_roles=ReadAccessRoles
             )
 
         return assay
@@ -59,7 +60,7 @@ class AssayLayer(BaseLayer):
         return assay
 
     async def get_assays_for_sequencing_group_ids(
-        self, sequencing_group_ids: list[int], check_project_ids=True
+        self, sequencing_group_ids: list[int], check_project_ids: bool = True
     ) -> dict[int, list[AssayInternal]]:
         """Get assays for a list of sequencing group IDs"""
         projects, assays = await self.seqt.get_assays_for_sequencing_group_ids(
@@ -71,7 +72,7 @@ class AssayLayer(BaseLayer):
 
         if check_project_ids:
             await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
+                self.author, projects, allowed_roles=ReadAccessRoles
             )
 
         return assays
@@ -108,7 +109,7 @@ class AssayLayer(BaseLayer):
             # if we didn't specify a project, we need to check access
             # to the projects we got back
             await self.ptable.check_access_to_project_ids(
-                self.author, projs, readonly=True
+                self.author, projs, allowed_roles=ReadAccessRoles
             )
 
         return seqs
@@ -128,7 +129,7 @@ class AssayLayer(BaseLayer):
                 [assay.sample_id]
             )
             await self.ptable.check_access_to_project_ids(
-                self.author, project_ids, readonly=False
+                self.author, project_ids, allowed_roles=FullWriteAccessRoles
             )
 
             seq_id = await self.seqt.insert_assay(
@@ -144,7 +145,7 @@ class AssayLayer(BaseLayer):
                 # can check the project id of the assay we're updating
                 project_ids = await self.seqt.get_projects_by_assay_ids([assay.id])
                 await self.ptable.check_access_to_project_ids(
-                    self.author, project_ids, readonly=False
+                    self.author, project_ids, allowed_roles=FullWriteAccessRoles
                 )
             # Otherwise update
             await self.seqt.update_assay(
@@ -170,7 +171,7 @@ class AssayLayer(BaseLayer):
             st = SampleTable(self.connection)
             project_ids = await st.get_project_ids_for_sample_ids(list(sample_ids))
             await self.ptable.check_access_to_project_ids(
-                self.author, project_ids, readonly=False
+                self.author, project_ids, allowed_roles=FullWriteAccessRoles
             )
 
         with_function = (

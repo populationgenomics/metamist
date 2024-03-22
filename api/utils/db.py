@@ -196,9 +196,9 @@ async def dependable_get_read_project_connection(
     extra_values: dict | None = Depends(get_extra_audit_log_values),
 ) -> Connection:
     """FastAPI handler for getting connection WITH project"""
-    meta = {"path": request.url.path}
+    meta = {'path': request.url.path}
     if request.client:
-        meta["ip"] = request.client.host
+        meta['ip'] = request.client.host
 
     if extra_values:
         meta.update(extra_values)
@@ -225,6 +225,9 @@ async def dependable_get_contribute_project_connection(
     extra_values: dict | None = Depends(get_extra_audit_log_values),
 ) -> Connection:
     """FastAPI handler for getting connection WITH project"""
+    meta = {"path": request.url.path}
+    if request.client:
+        meta["ip"] = request.client.host
     return await ProjectPermissionsTable.get_project_connection(
         project_name=project,
         author=author,

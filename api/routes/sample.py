@@ -9,6 +9,7 @@ from api.utils.db import (
 from db.python.layers.sample import SampleLayer
 from db.python.tables.project import ProjectPermissionsTable
 from models.base import SMBase
+from models.models.group import ReadAccessRoles
 from models.models.sample import SampleUpsert
 from models.utils.sample_id_format import (  # Sample,
     sample_id_format,
@@ -129,6 +130,11 @@ class GetSamplesCriteria(SMBase):
 @router.post('/', operation_id='getSamples')
 async def get_samples(
     criteria: GetSamplesCriteria,
+    meta: dict = None,
+    participant_ids: list[int] = None,
+    # project_ids is inaccurately named, it should be `project_names`
+    project_ids: list[str] = None,
+    active: bool = Body(default=True),
     connection: Connection = get_projectless_db_connection,
 ):
     """
@@ -139,9 +145,10 @@ async def get_samples(
     pt = ProjectPermissionsTable(connection)
     pids: list[int] | None = None
     if criteria.project_ids:
-        pids = await pt.get_project_ids_from_names_and_user(
-            connection.author, criteria.project_ids, readonly=True
+        projects = await pt.get_and_check_access_to_projects_for_names(
+            connection.author, criteria.project_ids, allowed_roles=ReadAccessRoles
         )
+        pids = [p.id for p in projects]
 
     sample_ids_raw = (
         sample_id_transform_to_raw_list(criteria.sample_ids)

@@ -21,6 +21,7 @@ from db.python.utils import (
     split_generic_terms,
 )
 from models.models.family import PedRowInternal
+from models.models.group import FullWriteAccessRoles, ReadAccessRoles
 from models.models.participant import ParticipantInternal, ParticipantUpsertInternal
 from models.models.project import ProjectId
 
@@ -258,7 +259,7 @@ class ParticipantLayer(BaseLayer):
 
         if check_project_ids:
             await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
+                self.author, projects, allowed_roles=ReadAccessRoles
             )
 
         if not allow_missing and len(participants) != len(pids):
@@ -532,7 +533,7 @@ class ParticipantLayer(BaseLayer):
 
         if check_project_ids:
             await self.ptable.check_access_to_project_ids(
-                self.connection.author, projects, readonly=True
+                self.connection.author, projects, allowed_roles=ReadAccessRoles
             )
 
         return family_map
@@ -601,7 +602,9 @@ class ParticipantLayer(BaseLayer):
                     )
 
                     await self.ptable.check_access_to_project_ids(
-                        self.connection.author, project_ids, readonly=False
+                        self.connection.author,
+                        project_ids,
+                        allowed_roles=FullWriteAccessRoles,
                     )
                 await self.pttable.update_participant(
                     participant_id=participant.id,
@@ -664,7 +667,9 @@ class ParticipantLayer(BaseLayer):
                 list(internal_to_external_id.keys())
             )
             await self.ptable.check_access_to_project_ids(
-                user=self.author, project_ids=projects, readonly=False
+                user=self.author,
+                project_ids=projects,
+                allowed_roles=FullWriteAccessRoles,
             )
 
         return await self.pttable.update_many_participant_external_ids(
@@ -950,7 +955,7 @@ class ParticipantLayer(BaseLayer):
         return await self.ptable.check_access_to_project_ids(
             self.connection.author,
             list(pprojects | fprojects),
-            readonly=True,
+            allowed_roles=ReadAccessRoles,
         )
 
     async def update_participant_family(

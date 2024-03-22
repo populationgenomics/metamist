@@ -32,7 +32,7 @@ class ProjectPermissionsTable:
     @staticmethod
     def get_project_group_name(project_name: str, role: GroupProjectRole) -> str:
         """
-        Get group name for a project, for readonly / write
+        Get group name for a project, for the given role
         """
 
         return f'{project_name}-{role.name}'
@@ -163,7 +163,7 @@ class ProjectPermissionsTable:
         self,
         user: str,
         allowed_roles: set[GroupProjectRole],
-        project_id_filter: list[int] | None,
+        project_id_filter: list[int] | None = None,
     ) -> list[Project]:
         """
         Get projects that are accessible by the specified user
@@ -301,6 +301,7 @@ class ProjectPermissionsTable:
         allowed_roles: set[GroupProjectRole],
         raise_exception: bool = True,
     ) -> bool:
+        """Check user has access to a single project id"""
         project = await self.get_and_check_access_to_project_for_id(
             user, project_id, allowed_roles, raise_exception
         )
