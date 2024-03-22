@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from api.utils import get_project_readonly_connection
+from api.utils import get_project_read_connection
 from api.utils.db import Connection, get_projectless_db_connection
 from db.python.layers.assay import AssayLayer
 from db.python.tables.assay import AssayFilter
@@ -53,7 +53,7 @@ async def get_assay_by_id(
     '/{project}/external_id/{external_id}/details', operation_id='getAssayByExternalId'
 )
 async def get_assay_by_external_id(
-    external_id: str, connection=get_project_readonly_connection
+    external_id: str, connection=get_project_read_connection
 ):
     """Get an assay by ONE of its external identifiers"""
     assay_layer = AssayLayer(connection)

@@ -67,7 +67,7 @@ class NoProjectAccess(Forbidden):
         self,
         project_names: list[str],
         author: str,
-        allowed_roles: list[GroupProjectRole],
+        allowed_roles: set[GroupProjectRole],
         *args: tuple[Any, ...],
     ):
         project_names_str = (

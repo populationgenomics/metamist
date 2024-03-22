@@ -3,6 +3,7 @@
 """
 Code for connecting to Postgres database
 """
+
 import abc
 import asyncio
 import json
@@ -13,6 +14,7 @@ import databases
 
 from api.settings import LOG_DATABASE_QUERIES
 from db.python.utils import InternalError
+from models.models.group import GroupProjectRole
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -51,7 +53,7 @@ class Connection:
         project: int | None,
         author: str,
         on_behalf_of: str | None,
-        readonly: bool,
+        allowed_roles: set[GroupProjectRole],
         ar_guid: str | None,
         meta: dict[str, str] | None = None,
     ):
@@ -59,7 +61,7 @@ class Connection:
         self.project: int | None = project
         self.author: str = author
         self.on_behalf_of: str | None = on_behalf_of
-        self.readonly: bool = readonly
+        self.allowed_roles: set[GroupProjectRole] = allowed_roles
         self.ar_guid: str | None = ar_guid
         self.meta = meta
 
@@ -68,7 +70,11 @@ class Connection:
 
     async def audit_log_id(self):
         """Get audit_log ID for write operations, cached per connection"""
-        if self.readonly:
+        # If connection doesn't have a writeable role, don't allow getting an audit log id
+        if not self.allowed_roles & {
+            GroupProjectRole.write,
+            GroupProjectRole.contribute,
+        }:
             raise InternalError(
                 'Trying to get a audit_log ID, but not a write connection'
             )
@@ -114,7 +120,7 @@ class DatabaseConfiguration(abc.ABC):
 class ConnectionStringDatabaseConfiguration(DatabaseConfiguration):
     """Database Configuration that takes a literal DatabaseConfiguration"""
 
-    def __init__(self, connection_string):
+    def __init__(self, connection_string: str):
         self.connection_string = connection_string
 
     def get_connection_string(self):
@@ -240,8 +246,8 @@ class SMConnections:
 
         conn = await SMConnections.get_made_connection()
 
-        # we don't authenticate project-less connection, but rely on the
-        # the endpoint to validate the resources
+        # all roles are allowed here as we don't authenticate project-less connection,
+        # but rely on the the endpoint to validate the resources
 
         return Connection(
             connection=conn,
@@ -249,6 +255,6 @@ class SMConnections:
             project=None,
             on_behalf_of=None,
             ar_guid=ar_guid,
-            readonly=False,
+            allowed_roles={r for r in GroupProjectRole},
             meta=meta,
         )

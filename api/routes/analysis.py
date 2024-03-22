@@ -11,7 +11,7 @@ from starlette.responses import StreamingResponse
 from api.utils.dates import parse_date_only_string
 from api.utils.db import (
     Connection,
-    get_project_readonly_connection,
+    get_project_read_connection,
     get_project_write_connection,
     get_projectless_db_connection,
 )
@@ -135,7 +135,7 @@ async def update_analysis(
 )
 async def get_all_sample_ids_without_analysis_type(
     analysis_type: str,
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_read_connection,
 ):
     """get_all_sample_ids_without_analysis_type"""
     atable = AnalysisLayer(connection)
@@ -155,7 +155,7 @@ async def get_all_sample_ids_without_analysis_type(
     operation_id='getIncompleteAnalyses',
 )
 async def get_incomplete_analyses(
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_read_connection,
 ):
     """Get analyses with status queued or in-progress"""
     atable = AnalysisLayer(connection)
@@ -170,7 +170,7 @@ async def get_incomplete_analyses(
 )
 async def get_latest_complete_analysis_for_type(
     analysis_type: str,
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_read_connection,
 ):
     """Get (SINGLE) latest complete analysis for some analysis type"""
     alayer = AnalysisLayer(connection)
@@ -188,7 +188,7 @@ async def get_latest_complete_analysis_for_type(
 async def get_latest_complete_analysis_for_type_post(
     analysis_type: str,
     meta: dict[str, Any] = Body(..., embed=True),  # type: ignore[assignment]
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_read_connection,
 ):
     """
     Get SINGLE latest complete analysis for some analysis type
@@ -274,7 +274,7 @@ async def get_analysis_runner_log(
 async def get_sample_reads_map(
     export_type: ExportType = ExportType.JSON,
     sequencing_types: list[str] = Query(None),  # type: ignore
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_read_connection,
 ):
     """
     Get map of ExternalSampleId  pathToCram  InternalSeqGroupID for seqr

@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from api.utils.db import (
     Connection,
-    get_project_readonly_connection,
+    get_project_read_connection,
     get_project_write_connection,
     get_projectless_db_connection,
 )
@@ -42,7 +42,7 @@ async def get_project_summary(
     grid_filter: list[SearchItem],
     limit: int = 20,
     token: Optional[int] = 0,
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_read_connection,
 ) -> ProjectSummary:
     """Creates a new sample, and returns the internal sample ID"""
     st = WebLayer(connection)

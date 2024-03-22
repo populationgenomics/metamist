@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from api.utils.db import (
     Connection,
-    get_project_readonly_connection,
+    get_project_read_connection,
     get_project_write_connection,
     get_projectless_db_connection,
 )
@@ -62,7 +62,7 @@ async def upsert_samples(
 async def get_sample_id_map_by_external(
     external_ids: list[str],
     allow_missing: bool = False,
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_read_connection,
 ):
     """Get map of sample IDs, { [externalId]: internal_sample_id }"""
     st = SampleLayer(connection)
@@ -91,7 +91,7 @@ async def get_sample_id_map_by_internal(
     '/{project}/id-map/internal/all', operation_id='getAllSampleIdMapByInternal'
 )
 async def get_all_sample_id_map_by_internal(
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_read_connection,
 ):
     """Get map of ALL sample IDs, { [internal_id]: external_sample_id }"""
     st = SampleLayer(connection)
@@ -107,7 +107,7 @@ async def get_all_sample_id_map_by_internal(
     operation_id='getSampleByExternalId',
 )
 async def get_sample_by_external_id(
-    external_id: str, connection: Connection = get_project_readonly_connection
+    external_id: str, connection: Connection = get_project_read_connection
 ):
     """Get sample by external ID"""
     st = SampleLayer(connection)

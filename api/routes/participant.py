@@ -9,7 +9,7 @@ from starlette.responses import JSONResponse, StreamingResponse
 from api.utils import get_projectless_db_connection
 from api.utils.db import (
     Connection,
-    get_project_readonly_connection,
+    get_project_read_connection,
     get_project_write_connection,
 )
 from api.utils.export import ExportType
@@ -47,7 +47,7 @@ async def get_individual_metadata_template_for_seqr(
     external_participant_ids: list[str] | None = Query(default=None),  # type: ignore[assignment]
     # pylint: disable=invalid-name
     replace_with_participant_external_ids: bool = True,
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_read_connection,
 ):
     """Get individual metadata template for SEQR as a CSV"""
     participant_layer = ParticipantLayer(connection)
@@ -90,7 +90,7 @@ async def get_individual_metadata_template_for_seqr(
 async def get_id_map_by_external_ids(
     external_participant_ids: list[str],
     allow_missing: bool = False,
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_read_connection,
 ):
     """Get ID map of participants, by external_id"""
     player = ParticipantLayer(connection)
@@ -121,7 +121,7 @@ async def get_external_participant_id_to_sequencing_group_id(
     sequencing_type: str = None,
     export_type: ExportType = ExportType.JSON,
     flip_columns: bool = False,
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_read_connection,
 ):
     """
     Get csv / tsv export of external_participant_id to sequencing_group_id
@@ -214,7 +214,7 @@ class QueryParticipantCriteria(SMBase):
 )
 async def get_participants(
     criteria: QueryParticipantCriteria,
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_read_connection,
 ):
     """Get participants, default ALL participants in project"""
     player = ParticipantLayer(connection)

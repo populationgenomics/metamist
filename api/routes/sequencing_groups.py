@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from api.utils.db import (
     Connection,
-    get_project_readonly_connection,
+    get_project_read_connection,
     get_project_write_connection,
     get_projectless_db_connection,
 )
@@ -42,7 +42,7 @@ async def get_sequencing_group(
 
 @router.get('/project/{project}', operation_id='getAllSequencingGroupIdsBySampleByType')
 async def get_all_sequencing_group_ids_by_sample_by_type(
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_read_connection,
 ) -> dict[str, dict[str, list[str]]]:
     """Creates a new sample, and returns the internal sample ID"""
     st = SequencingGroupLayer(connection)

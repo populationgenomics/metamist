@@ -12,7 +12,7 @@ from starlette.responses import StreamingResponse
 from api.utils import get_projectless_db_connection
 from api.utils.db import (
     Connection,
-    get_project_readonly_connection,
+    get_project_read_connection,
     get_project_write_connection,
 )
 from api.utils.export import ExportType
@@ -75,7 +75,7 @@ async def get_pedigree(
     replace_with_family_external_ids: bool = True,
     include_header: bool = True,
     empty_participant_value: Optional[str] = None,
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_read_connection,
     include_participants_not_in_families: bool = False,
 ):
     """
@@ -142,7 +142,7 @@ async def get_pedigree(
 async def get_families(
     participant_ids: Optional[List[int]] = Query(None),
     sample_ids: Optional[List[str]] = Query(None),
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_read_connection,
 ) -> List[Family]:
     """Get families for some project"""
     family_layer = FamilyLayer(connection)

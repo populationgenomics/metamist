@@ -57,7 +57,7 @@ class ProjectPermissionsTable:
         *,
         author: str,
         project_name: str,
-        readonly: bool,
+        allowed_roles: set[GroupProjectRole],
         ar_guid: str,
         on_behalf_of: str | None = None,
         meta: dict[str, str] | None = None,
@@ -70,14 +70,18 @@ class ProjectPermissionsTable:
         pt = ProjectPermissionsTable(connection=None, database_connection=conn)
 
         project = await pt.get_and_check_access_to_project_for_name(
-            user=author, project_name=project_name, readonly=readonly
+            user=author, project_name=project_name, allowed_roles=allowed_roles
         )
+
+        # python types doesn't know this can't be none due
+        # to the default raise_exception of true
+        assert project
 
         return Connection(
             connection=conn,
             author=author,
             project=project.id,
-            readonly=readonly,
+            allowed_roles=allowed_roles,
             on_behalf_of=on_behalf_of,
             ar_guid=ar_guid,
             meta=meta,
@@ -158,7 +162,7 @@ class ProjectPermissionsTable:
     async def get_projects_accessible_by_user(
         self,
         user: str,
-        allowed_roles: list[GroupProjectRole],
+        allowed_roles: set[GroupProjectRole],
         project_id_filter: list[int] | None,
     ) -> list[Project]:
         """
@@ -198,7 +202,7 @@ class ProjectPermissionsTable:
         self,
         user: str,
         project_id: ProjectId,
-        allowed_roles: list[GroupProjectRole],
+        allowed_roles: set[GroupProjectRole],
         raise_exception: bool = True,
     ) -> Project | None:
         """Get project by id"""
@@ -221,7 +225,7 @@ class ProjectPermissionsTable:
         self,
         user: str,
         project_name: str,
-        allowed_roles: list[GroupProjectRole],
+        allowed_roles: set[GroupProjectRole],
         raise_exception: bool = True,
     ) -> Project | None:
         """Get project by name + perform access checks"""
@@ -231,7 +235,7 @@ class ProjectPermissionsTable:
         )
 
     async def get_and_check_access_to_projects_for_names(
-        self, user: str, project_names: list[str], allowed_roles: list[GroupProjectRole]
+        self, user: str, project_names: list[str], allowed_roles: set[GroupProjectRole]
     ):
         """Get projects by names + perform access checks"""
         project_name_map = await self._get_project_name_map()
@@ -255,7 +259,7 @@ class ProjectPermissionsTable:
         self,
         user: str,
         project_ids: list[ProjectId],
-        allowed_roles: list[GroupProjectRole],
+        allowed_roles: set[GroupProjectRole],
     ) -> list[Project]:
         """Get project by id"""
         if not project_ids:
@@ -294,7 +298,7 @@ class ProjectPermissionsTable:
         self,
         user: str,
         project_id: ProjectId,
-        allowed_roles: list[GroupProjectRole],
+        allowed_roles: set[GroupProjectRole],
         raise_exception: bool = True,
     ) -> bool:
         project = await self.get_and_check_access_to_project_for_id(
@@ -306,7 +310,7 @@ class ProjectPermissionsTable:
         self,
         user: str,
         project_ids: Iterable[ProjectId],
-        allowed_roles: list[GroupProjectRole],
+        allowed_roles: set[GroupProjectRole],
     ) -> bool:
         """Check user has access to list of project_ids"""
         # This will raise an exception if any of the specified project ids are missing
