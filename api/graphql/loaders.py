@@ -9,7 +9,8 @@ from typing import Any
 from fastapi import Request
 from strawberry.dataloader import DataLoader
 
-from api.utils import get_projectless_db_connection, group_by
+from api.utils import group_by
+from api.utils.db import get_projectless_db_connection
 from db.python.layers import (
     AnalysisLayer,
     AssayLayer,
@@ -36,6 +37,7 @@ from models.models import (
     SequencingGroupInternal,
 )
 from models.models.audit_log import AuditLogInternal
+from models.models.group import ReadAccessRoles
 
 
 class LoaderKeys(enum.Enum):
@@ -364,7 +366,7 @@ async def load_projects_for_ids(project_ids: list[int], connection) -> list[Proj
     """
     pttable = ProjectPermissionsTable(connection)
     projects = await pttable.get_and_check_access_to_projects_for_ids(
-        user=connection.user, project_ids=project_ids, readonly=True
+        user=connection.user, project_ids=project_ids, allowed_roles=ReadAccessRoles
     )
     p_by_id = {p.id: p for p in projects}
     return [p_by_id.get(p) for p in project_ids]

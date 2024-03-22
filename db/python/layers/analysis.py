@@ -19,6 +19,7 @@ from models.models import (
     ProportionalDateTemporalMethod,
     SequencingGroupInternal,
 )
+from models.models.group import FullWriteAccessRoles, ReadAccessRoles
 from models.models.project import ProjectId
 from models.models.sequencing_group import SequencingGroupInternalId
 
@@ -73,17 +74,17 @@ class AnalysisLayer(BaseLayer):
 
         if check_project_id:
             await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
+                self.author, projects, allowed_roles=ReadAccessRoles
             )
 
         return analysis
 
-    async def get_analysis_by_id(self, analysis_id: int, check_project_id=True):
+    async def get_analysis_by_id(self, analysis_id: int, check_project_id: bool = True):
         """Get analysis by ID"""
         project, analysis = await self.at.get_analysis_by_id(analysis_id)
         if check_project_id:
             await self.ptable.check_access_to_project_id(
-                self.author, project, readonly=True
+                self.author, project, allowed_roles=ReadAccessRoles
             )
 
         return analysis
@@ -130,7 +131,9 @@ class AnalysisLayer(BaseLayer):
             participant_ids=participant_ids,
         )
 
-    async def query(self, filter_: AnalysisFilter, check_project_ids=True):
+    async def query(
+        self, filter_: AnalysisFilter, check_project_ids: bool = True
+    ) -> list[AnalysisInternal]:
         """Query analyses"""
         analyses = await self.at.query(filter_)
 
@@ -139,7 +142,9 @@ class AnalysisLayer(BaseLayer):
 
         if check_project_ids and not filter_.project:
             await self.ptable.check_access_to_project_ids(
-                self.author, set(a.project for a in analyses), readonly=True
+                self.author,
+                set(a.project for a in analyses if a.project is not None),
+                allowed_roles=ReadAccessRoles,
             )
 
         return analyses
@@ -172,7 +177,7 @@ class AnalysisLayer(BaseLayer):
             raise ValueError(f'start_date ({start_date}) must be after 2020-01-01')
 
         project_objs = await self.ptable.get_and_check_access_to_projects_for_ids(
-            project_ids=projects, user=self.author, readonly=True
+            project_ids=projects, user=self.author, allowed_roles=ReadAccessRoles
         )
         project_name_map = {p.id: p.name for p in project_objs}
 
@@ -562,7 +567,7 @@ class AnalysisLayer(BaseLayer):
         if check_project_id:
             project_ids = await self.at.get_project_ids_for_analysis_ids([analysis_id])
             await self.ptable.check_access_to_project_ids(
-                self.author, project_ids, readonly=False
+                self.author, project_ids, allowed_roles=FullWriteAccessRoles
             )
 
         return await self.at.add_sequencing_groups_to_analysis(
@@ -583,7 +588,7 @@ class AnalysisLayer(BaseLayer):
         if check_project_id:
             project_ids = await self.at.get_project_ids_for_analysis_ids([analysis_id])
             await self.ptable.check_access_to_project_ids(
-                self.author, project_ids, readonly=False
+                self.author, project_ids, allowed_roles=FullWriteAccessRoles
             )
 
         await self.at.update_analysis(

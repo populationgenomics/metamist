@@ -6,11 +6,11 @@ from fastapi import APIRouter
 from fastapi.params import Query
 from starlette.responses import JSONResponse, StreamingResponse
 
-from api.utils import get_projectless_db_connection
 from api.utils.db import (
     Connection,
     get_project_read_connection,
     get_project_write_connection,
+    get_projectless_db_connection,
 )
 from api.utils.export import ExportType
 from db.python.layers.participant import ParticipantLayer

@@ -36,6 +36,7 @@ from models.enums import AnalysisStatus
 
 # literally the most temporary thing ever, but for complete
 # automation need to have sample inclusion / exclusion
+from models.models.group import ReadAccessRoles
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
     sequencing_group_id_format_list,
@@ -126,7 +127,7 @@ class SeqrLayer(BaseLayer):
         project = await self.ptable.get_and_check_access_to_project_for_id(
             self.connection.author,
             project_id=self.connection.project,
-            readonly=True,
+            allowed_roles=ReadAccessRoles,
         )
 
         seqr_guid = project.meta.get(
@@ -691,9 +692,11 @@ class SeqrLayer(BaseLayer):
 
         def process_row(row):
             return {
-                seqr_key: key_processor[sm_key](row[sm_key])
-                if sm_key in key_processor
-                else row[sm_key]
+                seqr_key: (
+                    key_processor[sm_key](row[sm_key])
+                    if sm_key in key_processor
+                    else row[sm_key]
+                )
                 for seqr_key, sm_key in seqr_map.items()
                 if sm_key in row
             }

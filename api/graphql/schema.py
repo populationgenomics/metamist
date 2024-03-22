@@ -38,6 +38,7 @@ from models.models import (
     SampleInternal,
     SequencingGroupInternal,
 )
+from models.models.group import ReadAccessRoles
 from models.models.sample import sample_id_transform_to_raw
 from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import (
@@ -161,16 +162,20 @@ class GraphQLProject:
     ) -> list['GraphQLSequencingGroup']:
         loader = info.context[LoaderKeys.SEQUENCING_GROUPS_FOR_PROJECTS]
         filter_ = SequencingGroupFilter(
-            id=id.to_internal_filter(sequencing_group_id_transform_to_raw)
-            if id
-            else None,
+            id=(
+                id.to_internal_filter(sequencing_group_id_transform_to_raw)
+                if id
+                else None
+            ),
             external_id=external_id.to_internal_filter() if external_id else None,
             type=type.to_internal_filter() if type else None,
             technology=technology.to_internal_filter() if technology else None,
             platform=platform.to_internal_filter() if platform else None,
-            active_only=active_only.to_internal_filter()
-            if active_only
-            else GenericFilter(eq=True),
+            active_only=(
+                active_only.to_internal_filter()
+                if active_only
+                else GenericFilter(eq=True)
+            ),
         )
         sequencing_groups = await loader.load({'id': root.id, 'filter': filter_})
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sequencing_groups]
@@ -191,15 +196,19 @@ class GraphQLProject:
         internal_analysis = await AnalysisLayer(connection).query(
             AnalysisFilter(
                 type=type.to_internal_filter() if type else None,
-                status=status.to_internal_filter()
-                if status
-                else GenericFilter(eq=AnalysisStatus.COMPLETED),
+                status=(
+                    status.to_internal_filter()
+                    if status
+                    else GenericFilter(eq=AnalysisStatus.COMPLETED)
+                ),
                 active=active.to_internal_filter() if active else None,
                 project=GenericFilter(eq=root.id),
                 meta=meta,
-                timestamp_completed=timestamp_completed.to_internal_filter()
-                if timestamp_completed
-                else None,
+                timestamp_completed=(
+                    timestamp_completed.to_internal_filter()
+                    if timestamp_completed
+                    else None
+                ),
             )
         )
         return [GraphQLAnalysis.from_internal(a) for a in internal_analysis]
@@ -464,16 +473,20 @@ class GraphQLSample:
         loader = info.context[LoaderKeys.SEQUENCING_GROUPS_FOR_SAMPLES]
 
         _filter = SequencingGroupFilter(
-            id=id.to_internal_filter(sequencing_group_id_transform_to_raw)
-            if id
-            else None,
+            id=(
+                id.to_internal_filter(sequencing_group_id_transform_to_raw)
+                if id
+                else None
+            ),
             meta=meta,
             type=type.to_internal_filter() if type else None,
             technology=technology.to_internal_filter() if technology else None,
             platform=platform.to_internal_filter() if platform else None,
-            active_only=active_only.to_internal_filter()
-            if active_only
-            else GenericFilter(eq=True),
+            active_only=(
+                active_only.to_internal_filter()
+                if active_only
+                else GenericFilter(eq=True)
+            ),
         )
         obj = {'id': root.internal_id, 'filter': _filter}
         sequencing_groups = await loader.load(obj)
@@ -533,7 +546,9 @@ class GraphQLSequencingGroup:
             ptable = ProjectPermissionsTable(connection)
             project_ids = project.all_values()
             projects = await ptable.get_and_check_access_to_projects_for_names(
-                user=connection.author, project_names=project_ids, readonly=True
+                user=connection.author,
+                project_names=project_ids,
+                allowed_roles=ReadAccessRoles,
             )
             project_id_map = {p.name: p.id for p in projects}
 
@@ -544,12 +559,16 @@ class GraphQLSequencingGroup:
                     status=status.to_internal_filter() if status else None,
                     type=type.to_internal_filter() if type else None,
                     meta=meta,
-                    active=active.to_internal_filter()
-                    if active
-                    else GenericFilter(eq=True),
-                    project=project.to_internal_filter(lambda val: project_id_map[val])
-                    if project
-                    else None,
+                    active=(
+                        active.to_internal_filter()
+                        if active
+                        else GenericFilter(eq=True)
+                    ),
+                    project=(
+                        project.to_internal_filter(lambda val: project_id_map[val])
+                        if project
+                        else None
+                    ),
                 ),
             }
         )
@@ -605,7 +624,7 @@ class Query:
         connection = info.context['connection']
         ptable = ProjectPermissionsTable(connection)
         project = await ptable.get_and_check_access_to_project_for_name(
-            user=connection.author, project_name=name, readonly=True
+            user=connection.author, project_name=name, allowed_roles=ReadAccessRoles
         )
         return GraphQLProject.from_internal(project)
 
@@ -635,7 +654,9 @@ class Query:
         if project:
             project_names = project.all_values()
             projects = await ptable.get_and_check_access_to_projects_for_names(
-                user=connection.author, project_names=project_names, readonly=True
+                user=connection.author,
+                project_names=project_names,
+                allowed_roles=ReadAccessRoles,
             )
             project_name_map = {p.name: p.id for p in projects}
 
@@ -644,12 +665,14 @@ class Query:
             type=type.to_internal_filter() if type else None,
             meta=meta,
             external_id=external_id.to_internal_filter() if external_id else None,
-            participant_id=participant_id.to_internal_filter()
-            if participant_id
-            else None,
-            project=project.to_internal_filter(lambda pname: project_name_map[pname])
-            if project
-            else None,
+            participant_id=(
+                participant_id.to_internal_filter() if participant_id else None
+            ),
+            project=(
+                project.to_internal_filter(lambda pname: project_name_map[pname])
+                if project
+                else None
+            ),
             active=active.to_internal_filter() if active else GenericFilter(eq=True),
         )
 
@@ -679,26 +702,36 @@ class Query:
         if project:
             project_names = project.all_values()
             projects = await ptable.get_and_check_access_to_projects_for_names(
-                user=connection.author, project_names=project_names, readonly=True
+                user=connection.author,
+                project_names=project_names,
+                allowed_roles=ReadAccessRoles,
             )
             project_id_map = {p.name: p.id for p in projects}
 
         filter_ = SequencingGroupFilter(
-            project=project.to_internal_filter(lambda val: project_id_map[val])
-            if project
-            else None,
-            sample_id=sample_id.to_internal_filter(sample_id_transform_to_raw)
-            if sample_id
-            else None,
-            id=id.to_internal_filter(sequencing_group_id_transform_to_raw)
-            if id
-            else None,
+            project=(
+                project.to_internal_filter(lambda val: project_id_map[val])
+                if project
+                else None
+            ),
+            sample_id=(
+                sample_id.to_internal_filter(sample_id_transform_to_raw)
+                if sample_id
+                else None
+            ),
+            id=(
+                id.to_internal_filter(sequencing_group_id_transform_to_raw)
+                if id
+                else None
+            ),
             type=type.to_internal_filter() if type else None,
             technology=technology.to_internal_filter() if technology else None,
             platform=platform.to_internal_filter() if platform else None,
-            active_only=active_only.to_internal_filter()
-            if active_only
-            else GenericFilter(eq=True),
+            active_only=(
+                active_only.to_internal_filter()
+                if active_only
+                else GenericFilter(eq=True)
+            ),
         )
         sgs = await sglayer.query(filter_)
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sgs]
@@ -726,7 +759,7 @@ class Query:
         connection = info.context['connection']
         ptable = ProjectPermissionsTable(connection)
         projects = await ptable.get_projects_accessible_by_user(
-            connection.author, readonly=True
+            connection.author, allowed_roles=ReadAccessRoles
         )
         return [GraphQLProject.from_internal(p) for p in projects]
 

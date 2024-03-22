@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from api.utils.db import Connection, get_projectless_db_connection
 from db.python.tables.project import ProjectPermissionsTable
+from models.models.group import FullWriteAccessRoles, GroupProjectRole, ReadAccessRoles
 from models.models.project import Project
 
 router = APIRouter(prefix='/project', tags=['project'])
@@ -21,7 +22,7 @@ async def get_my_projects(connection=get_projectless_db_connection):
     """Get projects I have access to"""
     ptable = ProjectPermissionsTable(connection)
     projects = await ptable.get_projects_accessible_by_user(
-        author=connection.author, readonly=True
+        user=connection.author, allowed_roles=ReadAccessRoles
     )
     return [p.name for p in projects]
 
@@ -86,7 +87,7 @@ async def delete_project_data(
     """
     ptable = ProjectPermissionsTable(connection)
     p_obj = await ptable.get_and_check_access_to_project_for_name(
-        user=connection.author, project_name=project, readonly=False
+        user=connection.author, project_name=project, allowed_roles=FullWriteAccessRoles
     )
     success = await ptable.delete_project_data(
         project_id=p_obj.id, delete_project=delete_project, author=connection.author
@@ -99,7 +100,8 @@ async def delete_project_data(
 async def update_project_members(
     project: str,
     members: list[str],
-    readonly: bool,
+    # @TODO change this to accept a role
+    role: str,
     connection: Connection = get_projectless_db_connection,
 ):
     """
@@ -108,7 +110,7 @@ async def update_project_members(
     """
     ptable = ProjectPermissionsTable(connection)
     await ptable.set_group_members(
-        group_name=ptable.get_project_group_name(project, readonly=readonly),
+        group_name=ptable.get_project_group_name(project, role=GroupProjectRole(role)),
         members=members,
         author=connection.author,
     )
