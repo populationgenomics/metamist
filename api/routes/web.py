@@ -1,6 +1,7 @@
 """
 Web routes
 """
+
 from typing import Optional
 
 from fastapi import APIRouter, Request
@@ -8,7 +9,7 @@ from pydantic import BaseModel
 
 from api.utils.db import (
     Connection,
-    get_project_readonly_connection,
+    get_project_read_connection,
     get_project_write_connection,
     get_projectless_db_connection,
 )
@@ -39,7 +40,7 @@ async def get_project_summary(
     grid_filter: list[SearchItem],
     limit: int = 20,
     token: Optional[int] = 0,
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_read_connection,
 ) -> ProjectSummary:
     """Creates a new sample, and returns the internal sample ID"""
     st = WebLayer(connection)
@@ -56,11 +57,11 @@ async def get_project_summary(
         new_token = max(int(sample.id) for p in participants for sample in p.samples)
 
     links = PagingLinks(
-        next=str(request.base_url)
-        + request.url.path.lstrip('/')
-        + f'?token={new_token}'
-        if new_token
-        else None,
+        next=(
+            str(request.base_url) + request.url.path.lstrip('/') + f'?token={new_token}'
+            if new_token
+            else None
+        ),
         self=str(request.url),
         token=str(new_token) if new_token else None,
     )

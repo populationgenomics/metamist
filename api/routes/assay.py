@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from api.utils import get_project_readonly_connection
+from api.utils import get_project_read_connection
 from api.utils.db import Connection, get_projectless_db_connection
 from db.python.layers.assay import AssayLayer
 from db.python.tables.assay import AssayFilter
@@ -52,7 +52,7 @@ async def get_assay_by_id(
     '/{project}/external_id/{external_id}/details', operation_id='getAssayByExternalId'
 )
 async def get_assay_by_external_id(
-    external_id: str, connection=get_project_readonly_connection
+    external_id: str, connection=get_project_read_connection
 ):
     """Get an assay by ONE of its external identifiers"""
     assay_layer = AssayLayer(connection)
@@ -86,13 +86,13 @@ async def get_assays_by_criteria(
         unwrapped_sample_ids = sample_id_transform_to_raw_list(sample_ids)
 
     filter_ = AssayFilter(
-        sample_id=GenericFilter(in_=unwrapped_sample_ids)
-        if unwrapped_sample_ids
-        else None,
+        sample_id=(
+            GenericFilter(in_=unwrapped_sample_ids) if unwrapped_sample_ids else None
+        ),
         id=GenericFilter(in_=assay_ids) if assay_ids else None,
-        external_id=GenericFilter(in_=external_assay_ids)
-        if external_assay_ids
-        else None,
+        external_id=(
+            GenericFilter(in_=external_assay_ids) if external_assay_ids else None
+        ),
         meta=assay_meta,
         sample_meta=sample_meta,
         project=GenericFilter(in_=pids) if pids else None,

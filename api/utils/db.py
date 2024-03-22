@@ -11,6 +11,7 @@ from api.utils.gcp import email_from_id_token
 from db.python.connect import Connection, SMConnections
 from db.python.gcp_connect import BqConnection, PubSubConnection
 from db.python.tables.project import ProjectPermissionsTable
+from models.models.group import GroupProjectRole
 
 EXPECTED_AUDIENCE = getenv('SM_OAUTHAUDIENCE')
 
@@ -78,23 +79,50 @@ async def dependable_get_write_project_connection(
     return await ProjectPermissionsTable.get_project_connection(
         project_name=project,
         author=author,
-        readonly=False,
+        allowed_roles={GroupProjectRole.write},
         ar_guid=ar_guid,
         on_behalf_of=on_behalf_of,
         meta=meta,
     )
 
 
-async def dependable_get_readonly_project_connection(
+async def dependable_get_read_project_connection(
     project: str,
+    request: Request,
     author: str = Depends(authenticate),
     ar_guid: str = Depends(get_ar_guid),
 ) -> Connection:
     """FastAPI handler for getting connection WITH project"""
+    meta = {"path": request.url.path}
+    if request.client:
+        meta["ip"] = request.client.host
     return await ProjectPermissionsTable.get_project_connection(
         project_name=project,
         author=author,
-        readonly=True,
+        allowed_roles={
+            GroupProjectRole.read,
+            GroupProjectRole.write,
+            GroupProjectRole.contribute,
+        },
+        on_behalf_of=None,
+        ar_guid=ar_guid,
+    )
+
+
+async def dependable_get_contribute_project_connection(
+    project: str,
+    request: Request,
+    author: str = Depends(authenticate),
+    ar_guid: str = Depends(get_ar_guid),
+) -> Connection:
+    """FastAPI handler for getting connection WITH project"""
+    meta = {"path": request.url.path}
+    if request.client:
+        meta["ip"] = request.client.host
+    return await ProjectPermissionsTable.get_project_connection(
+        project_name=project,
+        author=author,
+        allowed_roles={GroupProjectRole.write, GroupProjectRole.contribute},
         on_behalf_of=None,
         ar_guid=ar_guid,
     )
@@ -150,7 +178,10 @@ def validate_iap_jwt_and_get_email(iap_jwt, audience):
 
 
 get_author = Depends(authenticate)
-get_project_readonly_connection = Depends(dependable_get_readonly_project_connection)
+get_project_read_connection = Depends(dependable_get_read_project_connection)
+get_project_contribute_connection = Depends(
+    dependable_get_contribute_project_connection
+)
 get_project_write_connection = Depends(dependable_get_write_project_connection)
 get_projectless_db_connection = Depends(dependable_get_connection)
 get_projectless_bq_connection = Depends(dependable_get_bq_connection)
