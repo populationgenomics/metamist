@@ -101,6 +101,11 @@ class CohortLayer(BaseLayer):
         Create new cohort template
         """
 
+        # Validate projects specified in criteria are valid
+        _ = await self.pt.get_and_check_access_to_projects_for_names(
+            user=self.connection.author, project_names=cohort_template.criteria.projects, readonly=False
+        )
+
         return await self.ct.create_cohort_template(
             name=cohort_template.name,
             description=cohort_template.description,
