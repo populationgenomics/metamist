@@ -77,7 +77,7 @@ class NoProjectAccess(Forbidden):
 
         super().__init__(
             f'{author} does not have {allowed_roles_str} access to resources from the '
-            f'follgroowing project(s), or they may not exist: {project_names_str}',
+            f'following project(s), or they may not exist: {project_names_str}',
             *args,
         )
 
