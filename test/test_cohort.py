@@ -3,6 +3,7 @@ from test.testbase import DbIsolatedTest, run_as_sync
 from pymysql.err import IntegrityError
 
 from db.python.layers import CohortLayer, SampleLayer
+from db.python.utils import Forbidden, NotFoundError
 from models.models import SampleUpsertInternal, SequencingGroupUpsertInternal
 from models.models.cohort import CohortCriteria, CohortTemplate
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
@@ -26,6 +27,32 @@ class TestCohortBasic(DbIsolatedTest):
                 description='No criteria or template',
                 cohort_name='Broken cohort',
                 dry_run=False,
+            )
+
+    @run_as_sync
+    async def test_create_cohort_bad_project(self):
+        """Can't create cohort in invalid project"""
+        with self.assertRaises((Forbidden, NotFoundError)):
+            _ = await self.cohortl.create_cohort_from_criteria(
+                project_to_write=self.project_id,
+                author='bob@example.org',
+                description='Cohort based on a missing project',
+                cohort_name='Bad-project cohort',
+                dry_run=False,
+                cohort_criteria=CohortCriteria(projects=['nonexistent']),
+            )
+
+    @run_as_sync
+    async def test_create_template_bad_project(self):
+        """Can't create template in invalid project"""
+        with self.assertRaises((Forbidden, NotFoundError)):
+            _ = await self.cohortl.create_cohort_template(
+                project=self.project_id,
+                cohort_template=CohortTemplate(
+                    name='Bad-project template',
+                    description='Template based on a missing project',
+                    criteria=CohortCriteria(projects=['nonexistent']),
+                ),
             )
 
     @run_as_sync
