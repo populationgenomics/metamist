@@ -7,6 +7,7 @@ from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter, AnalysisTable
+from db.python.tables.cohort import CohortTable
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import SequencingGroupFilter
 from db.python.utils import GenericFilter, get_logger
@@ -48,6 +49,7 @@ class AnalysisLayer(BaseLayer):
 
         self.sampt = SampleTable(connection)
         self.at = AnalysisTable(connection)
+        self.ct = CohortTable(connection)
 
     # GETS
 
@@ -545,10 +547,23 @@ class AnalysisLayer(BaseLayer):
         project: ProjectId = None,
     ) -> int:
         """Create a new analysis"""
+
+        # Validate cohort sgs equal sgs
+        if analysis.cohort_ids and analysis.sequencing_group_ids:
+            all_cohort_sgs: list[int] = []
+            for cohort_id in analysis.cohort_ids:
+                cohort_sgs = await self.ct.get_cohort_sequencing_group_ids(cohort_id)
+                all_cohort_sgs.extend(cohort_sgs)
+            if set(all_cohort_sgs) != set(analysis.sequencing_group_ids):
+                raise ValueError(
+                    'Cohort sequencing groups do not match analysis sequencing groups'
+                )
+
         return await self.at.create_analysis(
             analysis_type=analysis.type,
             status=analysis.status,
             sequencing_group_ids=analysis.sequencing_group_ids,
+            cohort_ids=analysis.cohort_ids,
             meta=analysis.meta,
             output=analysis.output,
             active=analysis.active,
