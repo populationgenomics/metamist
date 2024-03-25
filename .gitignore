@@ -15,7 +15,7 @@ tmp/
 !sample_metadata/
 sample_metadata/*
 !metamist/
-metamist/*
+metamist/graphql/schema.graphql
 
 # We don't want to ignore the parser sub folder
 # since we do have sample_metadata/parsers that are not generated
@@ -29,7 +29,6 @@ db/liquibase.jar
 node_modules/
 web/build
 api/public
-web/src/static/sm_docs
 sm/
 web/src/sm-api/
 dist/
