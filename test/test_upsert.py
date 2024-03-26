@@ -18,7 +18,7 @@ all_participants = [
         meta={},
         samples=[
             SampleUpsertInternal(
-                external_id='sample_id001',
+                external_ids={'default': 'sample_id001'},
                 meta={},
                 sequencing_groups=[
                     SequencingGroupUpsertInternal(
@@ -93,7 +93,7 @@ all_participants = [
         meta={},
         samples=[
             SampleUpsertInternal(
-                external_id='sample_id002',
+                external_ids={'default': 'sample_id002'},
                 meta={},
                 sequencing_groups=[
                     SequencingGroupUpsertInternal(
@@ -131,7 +131,7 @@ all_participants = [
                 type='blood',
             ),
             SampleUpsertInternal(
-                external_id='sample_id004',
+                external_ids={'default': 'sample_id004'},
                 meta={},
                 sequencing_groups=[
                     SequencingGroupUpsertInternal(
@@ -175,7 +175,7 @@ all_participants = [
         meta={},
         samples=[
             SampleUpsertInternal(
-                external_id='sample_id003',
+                external_ids={'default': 'sample_id003'},
                 meta={},
                 sequencing_groups=[
                     SequencingGroupUpsertInternal(
@@ -237,7 +237,9 @@ class TestUpsert(DbIsolatedTest):
         await pt.upsert_participants(all_participants, open_transaction=False)
 
         expected_sample_eid_to_participant_eid = {
-            sample.external_id: participant.external_id
+            # FIXME aaarrrrggghhh
+            external_id: participant.external_id
+            for external_id in sample.external_ids
             for participant in all_participants
             for sample in participant.samples
         }

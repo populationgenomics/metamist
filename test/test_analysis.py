@@ -30,7 +30,7 @@ class TestAnalysis(DbIsolatedTest):
 
         sample = await self.sl.upsert_sample(
             SampleUpsertInternal(
-                external_id='Test01',
+                external_ids={'default': 'Test01'},
                 type='blood',
                 meta={'meta': 'meta ;)'},
                 active=True,
