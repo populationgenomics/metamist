@@ -136,18 +136,25 @@ const InsightsStats: React.FC = () => {
                     <tr>
                         <th>Dataset</th>
                         <th>Sequencing Type</th>
+                        <th>Sample Type</th>
                         <th>Families</th>
                         <th>Participants</th>
                         <th>Samples</th>
                         <th>Sequencing Groups</th>
                         <th>CRAMs</th>
                         <th>% Aligned</th>
-                        <th>ES-Index Analysis ID</th>
-                        <th>ES-Index SGs</th>
-                        <th>% in Index</th>
                         <th>Joint Call Analysis ID</th>
                         <th>Joint Call SGs</th>
                         <th>% in Joint Call</th>
+                        <th>SNV ES-Index Analysis ID</th>
+                        <th>SNV ES-Index SGs</th>
+                        <th>% in SNV-Index</th>
+                        <th>SV ES-Index Analysis ID</th>
+                        <th>SV ES-Index SGs</th>
+                        <th>% in SV-Index</th>
+                        <th>GCNV ES-Index Analysis ID</th>
+                        <th>GCNV ES-Index SGs</th>
+                        <th>% in GCNV-Index</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -157,17 +164,25 @@ const InsightsStats: React.FC = () => {
                                 ? (ss.total_crams / ss.total_sequencing_groups) * 100
                                 : 0
 
-                        const percentageInIndex =
-                            ss.total_sgs_in_latest_es_index > 0
-                                ? (ss.total_sgs_in_latest_es_index / ss.total_sequencing_groups) *
-                                  100
-                                : 0
-
                         const percentageInJointCall =
-                            ss.total_sgs_in_latest_annotate_dataset > 0
-                                ? (ss.total_sgs_in_latest_annotate_dataset /
-                                      ss.total_sequencing_groups) *
-                                  100
+                            ss.latest_annotate_dataset.sg_count ?? 0 > 0
+                                ? (ss.latest_annotate_dataset.sg_count ??
+                                      0 / ss.total_sequencing_groups) * 100
+                                : 0
+                        const percentageInSnvIndex =
+                            ss.latest_snv_es_index.sg_count ?? 0 > 0
+                                ? (ss.latest_snv_es_index.sg_count ??
+                                      0 / ss.total_sequencing_groups) * 100
+                                : 0
+                        const percentageInSvIndex =
+                            ss.latest_sv_es_index.sg_count ?? 0 > 0
+                                ? (ss.latest_sv_es_index.sg_count ??
+                                      0 / ss.total_sequencing_groups) * 100
+                                : 0
+                        const percentageInGcnvIndex =
+                            ss.latest_gcnv_es_index.sg_count ?? 0 > 0
+                                ? (ss.latest_gcnv_es_index.sg_count ??
+                                      0 / ss.total_sequencing_groups) * 100
                                 : 0
 
                         const rowClass =
@@ -193,23 +208,41 @@ const InsightsStats: React.FC = () => {
                                 >
                                     {percentageAligned.toFixed(2)}%
                                 </td>
-                                <td>{ss.latest_es_index_id}</td>
-                                <td>{ss.total_sgs_in_latest_es_index}</td>
-                                <td
-                                    style={{
-                                        backgroundColor: getPercentageColor(percentageInIndex),
-                                    }}
-                                >
-                                    {percentageInIndex.toFixed(2)}%
-                                </td>
-                                <td>{ss.latest_annotate_dataset_id}</td>
-                                <td>{ss.total_sgs_in_latest_annotate_dataset}</td>
+                                <td>{ss.latest_annotate_dataset.id}</td>
+                                <td>{ss.latest_annotate_dataset.sg_count}</td>
                                 <td
                                     style={{
                                         backgroundColor: getPercentageColor(percentageInJointCall),
                                     }}
                                 >
                                     {percentageInJointCall.toFixed(2)}%
+                                </td>
+                                <td>{ss.latest_snv_es_index.id}</td>
+                                <td>{ss.latest_snv_es_index.sg_count}</td>
+                                <td
+                                    style={{
+                                        backgroundColor: getPercentageColor(percentageInSnvIndex),
+                                    }}
+                                >
+                                    {percentageInSnvIndex.toFixed(2)}%
+                                </td>
+                                <td>{ss.latest_sv_es_index.id}</td>
+                                <td>{ss.latest_sv_es_index.sg_count}</td>
+                                <td
+                                    style={{
+                                        backgroundColor: getPercentageColor(percentageInSvIndex),
+                                    }}
+                                >
+                                    {percentageInSvIndex.toFixed(2)}%
+                                </td>
+                                <td>{ss.latest_gcnv_es_index.id}</td>
+                                <td>{ss.latest_gcnv_es_index.sg_count}</td>
+                                <td
+                                    style={{
+                                        backgroundColor: getPercentageColor(percentageInGcnvIndex),
+                                    }}
+                                >
+                                    {percentageInGcnvIndex.toFixed(2)}%
                                 </td>
                             </tr>
                         )

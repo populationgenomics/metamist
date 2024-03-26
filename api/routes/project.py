@@ -80,7 +80,7 @@ async def update_project(
     operation_id='getProjectsInsightsStats',
     response_model=list[ProjectInsightsStats],
 )
-async def get_projects_insights_stats(
+async def get_project_insights_stats(
     projects: list[int] = None,
     sequencing_types: list[str] = None,
     connection: Connection = get_projectless_db_connection,
@@ -89,7 +89,7 @@ async def get_projects_insights_stats(
     Get the insights stats for a list of projects
     """
     pilayer = ProjectInsightsLayer(connection)
-    projects_insights_stats = await pilayer.get_projects_insights_stats(
+    projects_insights_stats = await pilayer.get_project_insights_stats(
         projects=projects, sequencing_types=sequencing_types
     )
 
