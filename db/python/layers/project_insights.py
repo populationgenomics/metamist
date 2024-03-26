@@ -4,7 +4,11 @@ import asyncio
 from db.python.layers.base import BaseLayer
 from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectPermissionsTable
-from models.models import ProjectInsightsDetailsInternal, ProjectInsightsStatsInternal
+from models.models import (
+    AnalysisStats,
+    ProjectInsightsDetailsInternal,
+    ProjectInsightsStatsInternal,
+)
 from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
 
@@ -12,7 +16,7 @@ from models.utils.sequencing_group_id_format import sequencing_group_id_format
 class ProjectInsightsLayer(BaseLayer):
     """Project Insights layer - business logic for the project insights dashboard"""
 
-    async def get_projects_insights_stats(
+    async def get_project_insights_stats(
         self,
         projects: list[int],
         sequencing_types: list[str],
@@ -21,7 +25,7 @@ class ProjectInsightsLayer(BaseLayer):
         Get summary and analysis stats for a list of projects
         """
         pidb = ProjectsInsightsDb(self.connection)
-        return await pidb.get_projects_insights_stats(
+        return await pidb.get_project_insights_stats(
             projects=projects, sequencing_types=sequencing_types
         )
 
@@ -42,13 +46,14 @@ class ProjectInsightsLayer(BaseLayer):
 class ProjectsInsightsDb(DbBase):
     """Db layer for project insights stats and details routes"""
 
-    async def _projects_insights_details_families_query(
+    async def _details_families_query(
         self, projects: list[int], sequencing_types: list[str]
     ):
         _query = """
 SELECT
     f.project,
     sg.type as sequencing_type,
+    s.type as sample_type,
     f.id as family_id,
     f.external_id as family_external_id,
     fp.participant_id as participant_id,
@@ -68,6 +73,7 @@ WHERE
 ORDER BY
     f.project,
     sg.type,
+    s.type,
     f.id,
     fp.participant_id,
     sg.id;
@@ -83,7 +89,7 @@ ORDER BY
 
         return families
 
-    async def _projects_insights_stats_families_query(
+    async def _stats_families_query(
         self, projects: list[int], sequencing_types: list[str]
     ):
         _query = """
@@ -112,7 +118,7 @@ GROUP BY
         )
         return total_families_by_project_id_and_seq_type
 
-    async def _projects_insights_stats_participants_query(
+    async def _stats_participants_query(
         self, projects: list[int], sequencing_types: list[str]
     ):
         _query = """
@@ -140,7 +146,7 @@ GROUP BY
         )
         return total_participants_by_project_id_and_seq_type
 
-    async def _projects_insights_stats_samples_query(
+    async def _stats_samples_query(
         self, projects: list[int], sequencing_types: list[str]
     ):
         _query = """
@@ -167,7 +173,7 @@ GROUP BY
         )
         return total_samples_by_project_id_and_seq_type
 
-    async def _projects_insights_stats_sequencing_groups_query(
+    async def _stats_sequencing_groups_query(
         self, projects: list[int], sequencing_types: list[str]
     ):
         _query = """
@@ -196,7 +202,7 @@ GROUP BY
         )
         return total_sequencing_groups_by_project_id_and_seq_type
 
-    async def _projects_insights_stats_crams_query(
+    async def _stats_crams_query(
         self, projects: list[int], sequencing_types: list[str]
     ):
         _query = """
@@ -223,55 +229,42 @@ WHERE
         )
         return total_crams_by_project_id_and_seq_type
 
-    async def _projects_insights_stats_es_indices_query(
+    async def _stats_es_indexes_query(
         self, projects: list[int], sequencing_types: list[str]
     ):
         _query = """
 SELECT
     a.project,
-    a.sequencing_type,
     a.id,
+    JSON_EXTRACT(a.meta, '$.sequencing_type') as sequencing_type,
+    JSON_EXTRACT(a.meta, '$.stage') as stage,
     a.output,
-    a.timestamp_completed
-FROM
-    ( -- nested query returns the latest es-index for each project and sequencing type combination at rn=1
-        SELECT
-            a.project,
-            a.id,
-            a.output,
-            a.timestamp_completed,
-            sg.type as sequencing_type,
-            ROW_NUMBER() OVER (
-                PARTITION BY a.project,
-                sg.type
-                ORDER BY
-                    a.timestamp_completed DESC
-            ) AS rn
-        FROM
-            analysis a
-            LEFT JOIN analysis_sequencing_group asg ON a.id = asg.analysis_id
-            LEFT JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
-        WHERE
-            a.status = 'COMPLETED'
-            AND a.type = 'ES-INDEX'
-            AND sg.type IN :sequencing_types
-            AND a.output NOT LIKE '%sv%'
-    ) a
-WHERE
-    a.rn = 1
-AND
-    a.project in :projects
+    a.timestamp_completed,
+FROM analysis a
+INNER JOIN (
+    SELECT
+        project,
+        MAX(a.timestamp_completed) as max_timestamp,
+        JSON_EXTRACT(meta, '$.sequencing_type') as sequencing_type,
+        JSON_EXTRACT(meta, '$.stage') as stage,
+    FROM analysis
+    GROUP BY project, JSON_EXTRACT(meta, '$.sequencing_type'), JSON_EXTRACT(meta, '$.stage')
+) max_timestamps ON a.project = max_timestamps.project
+AND a.timestamp_completed = max_timestamps.max_timestamp
+AND JSON_EXTRACT(a.meta, '$.sequencing_type') = max_timestamps.sequencing_type
+AND JSON_EXTRACT(a.meta, '$.stage') = max_timestamps.stage
+AND a.project in :projects
         """
-        latest_es_index_by_project_id_and_seq_type = await self.connection.fetch_all(
+        latest_es_indexes_by_project_id_and_seq_type_and_stage = await self.connection.fetch_all(
             _query,
             {
                 'projects': projects,
                 'sequencing_types': sequencing_types,
             },
         )
-        return latest_es_index_by_project_id_and_seq_type
+        return latest_es_indexes_by_project_id_and_seq_type_and_stage
 
-    async def _projects_insights_stats_annotate_dataset_query(
+    async def _stats_annotate_dataset_query(
         self, projects: list[int], sequencing_types: list[str]
     ):
         _query = """
@@ -321,7 +314,7 @@ AND
         )
         return latest_annotate_dataset_by_project_id_and_seq_type
 
-    async def _projects_insights_details_sequencing_groups_report_links(
+    async def _details_sequencing_groups_report_links(
         self, projects: list[int], sequencing_types: list[str]
     ):
         """Get sequencing group web report links"""
@@ -421,7 +414,26 @@ WHERE
                 return row[field]
         return 0
 
-    async def get_projects_insights_stats(
+    @staticmethod
+    def get_val_for_project_and_sequencing_type_and_stage(
+        project, sequencing_type, stage, field, rows
+    ):
+        """
+        Filter returned records for a specific project, sequencing type and
+        stage and return the value of a specific field
+        """
+        if not rows:
+            return 0
+        for row in rows:
+            if (
+                row['project'] == project
+                and row['sequencing_type'] == sequencing_type
+                and row['stage'] == stage
+            ):
+                return row[field]
+        return 0
+
+    async def get_project_insights_stats(
         self, projects: list[int], sequencing_types: list[str]
     ):
         """Combines the results of the above insights stats queries into a response"""
@@ -437,20 +449,20 @@ WHERE
             samples,
             sequencing_groups,
             crams,
-            latest_es_index,
             latest_annotate_dataset,
+            latest_es_indexes,
         ) = await asyncio.gather(
-            self._projects_insights_stats_families_query(projects, sequencing_types),
-            self._projects_insights_stats_participants_query(projects, sequencing_types),
-            self._projects_insights_stats_samples_query(projects, sequencing_types),
-            self._projects_insights_stats_sequencing_groups_query(
+            self._stats_families_query(projects, sequencing_types),
+            self._stats_participants_query(projects, sequencing_types),
+            self._stats_samples_query(projects, sequencing_types),
+            self._stats_sequencing_groups_query(
                 projects, sequencing_types
             ),
-            self._projects_insights_stats_crams_query(projects, sequencing_types),
-            self._projects_insights_stats_es_indices_query(projects, sequencing_types),
-            self._projects_insights_stats_annotate_dataset_query(
+            self._stats_crams_query(projects, sequencing_types),
+            self._stats_annotate_dataset_query(
                 projects, sequencing_types
             ),
+            self._stats_es_indexes_query(projects, sequencing_types,),
         )
 
         response = []
@@ -463,13 +475,19 @@ WHERE
                     if cram['project'] == project.id
                     and cram['sequencing_type'] == sequencing_type
                 ]
-                latest_es_index_id = self.get_val_for_project_and_sequencing_type(
-                    project.id, sequencing_type, 'id', latest_es_index
-                )
                 latest_annotate_dataset_id = (
                     self.get_val_for_project_and_sequencing_type(
                         project.id, sequencing_type, 'id', latest_annotate_dataset
                     )
+                )
+                latest_snv_index_id = self.get_val_for_project_and_sequencing_type_and_stage(
+                    project.id, sequencing_type, 'MtToEs', 'id', latest_es_indexes
+                )
+                latest_sv_index_id = self.get_val_for_project_and_sequencing_type_and_stage(
+                    project.id, sequencing_type, 'MtToEsSv', 'id', latest_es_indexes
+                )
+                latest_gcnv_index_id = self.get_val_for_project_and_sequencing_type_and_stage(
+                    project.id, sequencing_type, 'MtToEsCNV', 'id', latest_es_indexes
                 )
                 response.append(
                     ProjectInsightsStatsInternal(
@@ -492,17 +510,37 @@ WHERE
                             project.id, sequencing_type, 'num_sgs', sequencing_groups
                         ),
                         total_crams=len(set(crams_in_project_and_sequencing_type)),
-                        latest_es_index_id=latest_es_index_id,
-                        total_sgs_in_latest_es_index=len(
-                            await self._get_sequencing_groups_from_analysis_id(
-                                latest_es_index_id
+                        latest_annotate_dataset=AnalysisStats(
+                            id=latest_annotate_dataset_id,
+                            sg_count=len(
+                                await self._get_sequencing_groups_from_analysis_id(
+                                    latest_annotate_dataset_id
+                                )
                             )
                         ),
-                        latest_annotate_dataset_id=latest_annotate_dataset_id,
-                        total_sgs_in_latest_annotate_dataset=len(
-                            await self._get_sequencing_groups_from_analysis_id(
-                                latest_annotate_dataset_id
-                            )
+                        latest_snv_es_index=AnalysisStats(
+                            id=latest_snv_index_id,
+                            sg_count=len(
+                                await self._get_sequencing_groups_from_analysis_id(
+                                    latest_snv_index_id
+                                )
+                            ),
+                        ),
+                        latest_sv_es_index=AnalysisStats(
+                            id=latest_sv_index_id,
+                            sg_count=len(
+                                await self._get_sequencing_groups_from_analysis_id(
+                                    latest_sv_index_id
+                                )
+                            ),
+                        ),
+                        latest_gcnv_es_index=AnalysisStats(
+                            id=latest_gcnv_index_id,
+                            sg_count=len(
+                                await self._get_sequencing_groups_from_analysis_id(
+                                    latest_gcnv_index_id
+                                )
+                            ),
                         ),
                     )
                 )
@@ -521,17 +559,17 @@ WHERE
         (
             families,
             crams,
-            latest_es_index,
             latest_annotate_dataset,
+            latest_es_indexes,
             sequencing_group_report_links,
         ) = await asyncio.gather(
-            self._projects_insights_details_families_query(projects, sequencing_types),
-            self._projects_insights_stats_crams_query(projects, sequencing_types),
-            self._projects_insights_stats_es_indices_query(projects, sequencing_types),
-            self._projects_insights_stats_annotate_dataset_query(
+            self._details_families_query(projects, sequencing_types),
+            self._stats_crams_query(projects, sequencing_types),
+            self._stats_annotate_dataset_query(
                 projects, sequencing_types
             ),
-            self._projects_insights_details_sequencing_groups_report_links(
+            self._stats_es_indexes_query(projects, sequencing_types),
+            self._details_sequencing_groups_report_links(
                 projects, sequencing_types
             ),
         )
@@ -543,15 +581,6 @@ WHERE
                 sequencing_groups_with_crams = [
                     cram['sequencing_group_id'] for cram in crams
                 ]
-                latest_es_index_id = self.get_val_for_project_and_sequencing_type(
-                    project.id, sequencing_type, 'id', latest_es_index
-                )
-                sequencing_groups_in_latest_es_index = [
-                    row['sequencing_group_id']
-                    for row in await self._get_sequencing_groups_from_analysis_id(
-                        latest_es_index_id
-                    )
-                ]
                 latest_annotate_dataset_id = (
                     self.get_val_for_project_and_sequencing_type(
                         project.id, sequencing_type, 'id', latest_annotate_dataset
@@ -561,6 +590,33 @@ WHERE
                     row['sequencing_group_id']
                     for row in await self._get_sequencing_groups_from_analysis_id(
                         latest_annotate_dataset_id
+                    )
+                ]
+                latest_snv_es_index_id = self.get_val_for_project_and_sequencing_type_and_stage(
+                    project.id, sequencing_type, 'MtToEs', 'id', latest_es_indexes
+                )
+                sequencing_groups_in_latest_snv_es_index = [
+                    row['sequencing_group_id']
+                    for row in await self._get_sequencing_groups_from_analysis_id(
+                        latest_snv_es_index_id
+                    )
+                ]
+                latest_sv_es_index_id = self.get_val_for_project_and_sequencing_type_and_stage(
+                    project.id, sequencing_type, 'MtToEsSv', 'id', latest_es_indexes
+                )
+                sequencing_groups_in_latest_sv_es_index = [
+                    row['sequencing_group_id']
+                    for row in await self._get_sequencing_groups_from_analysis_id(
+                        latest_sv_es_index_id
+                    )
+                ]
+                latest_gcnv_es_index_id = self.get_val_for_project_and_sequencing_type_and_stage(
+                    project.id, sequencing_type, 'MtToEsCNV', 'id', latest_es_indexes
+                )
+                sequencing_groups_in_latest_gcnv_es_index = [
+                    row['sequencing_group_id']
+                    for row in await self._get_sequencing_groups_from_analysis_id(
+                        latest_gcnv_es_index_id
                     )
                 ]
                 for family_row in families:
@@ -601,6 +657,7 @@ WHERE
                             project=project.id,
                             dataset=project.name,
                             sequencing_type=sequencing_type,
+                            sample_type=family_row['sample_type'],
                             family_id=family_row['family_id'],
                             family_ext_id=family_row['family_external_id'],
                             participant_id=family_row['participant_id'],
@@ -610,10 +667,14 @@ WHERE
                             sequencing_group_id=sequencing_group_id,
                             completed_cram=family_row['sequencing_group_id']
                             in sequencing_groups_with_crams,
-                            in_latest_es_index=family_row['sequencing_group_id']
-                            in sequencing_groups_in_latest_es_index,
                             in_latest_annotate_dataset=family_row['sequencing_group_id']
                             in sequencing_groups_in_latest_annotate_dataset,
+                            in_latest_snv_es_index=family_row['sequencing_group_id']
+                            in sequencing_groups_in_latest_snv_es_index,
+                            in_latest_sv_es_index=family_row['sequencing_group_id']
+                            in sequencing_groups_in_latest_sv_es_index,
+                            in_latest_gcnv_es_index=family_row['sequencing_group_id']
+                            in sequencing_groups_in_latest_gcnv_es_index,
                             sequencing_group_report_links=report_links,
                         )
                     )

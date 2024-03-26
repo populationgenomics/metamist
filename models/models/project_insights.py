@@ -1,5 +1,5 @@
 # pylint: disable=too-many-instance-attributes
-import dataclasses
+from dataclasses import dataclass, field
 
 from models.base import SMBase
 
@@ -12,13 +12,21 @@ class PagingLinks(SMBase):
     token: str | None
 
 
-@dataclasses.dataclass
+@dataclass
+class AnalysisStats:
+    """Model for Analysis Sequencing Group Stats"""
+    id: int = 0
+    sg_count: int = 0
+
+
+@dataclass
 class ProjectInsightsDetailsInternal:
-    """Return class for the projects seqr details endpoint"""
+    """Return class for the project insights details endpoint"""
 
     project: int
     dataset: str
     sequencing_type: str
+    sample_type: str
     family_id: int
     family_ext_id: str
     participant_id: int
@@ -27,8 +35,10 @@ class ProjectInsightsDetailsInternal:
     sample_ext_id: str
     sequencing_group_id: str
     completed_cram: bool
-    in_latest_es_index: bool
     in_latest_annotate_dataset: bool
+    in_latest_snv_es_index: bool
+    in_latest_sv_es_index: bool
+    in_latest_gcnv_es_index: bool
     sequencing_group_report_links: dict[str, str]
 
     def to_external(self, links):
@@ -37,6 +47,7 @@ class ProjectInsightsDetailsInternal:
             project=self.project,
             dataset=self.dataset,
             sequencing_type=self.sequencing_type,
+            sample_type=self.sample_type,
             family_id=self.family_id,
             family_ext_id=self.family_ext_id,
             participant_id=self.participant_id,
@@ -45,19 +56,22 @@ class ProjectInsightsDetailsInternal:
             sample_ext_id=self.sample_ext_id,
             sequencing_group_id=self.sequencing_group_id,
             completed_cram=self.completed_cram,
-            in_latest_es_index=self.in_latest_es_index,
             in_latest_annotate_dataset=self.in_latest_annotate_dataset,
+            in_latest_snv_es_index=self.in_latest_snv_es_index,
+            in_latest_sv_es_index=self.in_latest_sv_es_index,
+            in_latest_gcnv_es_index=self.in_latest_gcnv_es_index,
             sequencing_group_report_links=self.sequencing_group_report_links,
             links=links,
         )
 
 
 class ProjectInsightsDetails(SMBase):
-    """Return class for the projects seqr details endpoint"""
+    """Return class for the project insights details endpoint"""
 
     project: int
     dataset: str
     sequencing_type: str
+    sample_type: str
     family_id: int
     family_ext_id: str
     participant_id: int
@@ -66,8 +80,10 @@ class ProjectInsightsDetails(SMBase):
     sample_ext_id: str
     sequencing_group_id: str
     completed_cram: bool
-    in_latest_es_index: bool
     in_latest_annotate_dataset: bool
+    in_latest_snv_es_index: bool
+    in_latest_sv_es_index: bool
+    in_latest_gcnv_es_index: bool
     sequencing_group_report_links: dict[str, str]
 
     links: PagingLinks | None
@@ -78,22 +94,22 @@ class ProjectInsightsDetails(SMBase):
         fields = {'links': '_links'}
 
 
-@dataclasses.dataclass
+@dataclass
 class ProjectInsightsStatsInternal:
-    """Return class for the projects seqr stats endpoint"""
+    """Return class for the project insights stats endpoint"""
 
     project: int
     dataset: str
     sequencing_type: str
-    total_families: int
-    total_participants: int
-    total_samples: int
-    total_sequencing_groups: int
-    total_crams: int
-    latest_es_index_id: int
-    total_sgs_in_latest_es_index: int
-    latest_annotate_dataset_id: int
-    total_sgs_in_latest_annotate_dataset: int
+    total_families: int = 0
+    total_participants: int = 0
+    total_samples: int = 0
+    total_sequencing_groups: int = 0
+    total_crams: int = 0
+    latest_annotate_dataset: AnalysisStats = field(default_factory=AnalysisStats)
+    latest_snv_es_index: AnalysisStats = field(default_factory=AnalysisStats)
+    latest_sv_es_index: AnalysisStats = field(default_factory=AnalysisStats)
+    latest_gcnv_es_index: AnalysisStats = field(default_factory=AnalysisStats)
 
     def to_external(self, links):
         """Convert to transport model"""
@@ -106,16 +122,16 @@ class ProjectInsightsStatsInternal:
             total_samples=self.total_samples,
             total_sequencing_groups=self.total_sequencing_groups,
             total_crams=self.total_crams,
-            latest_es_index_id=self.latest_es_index_id,
-            total_sgs_in_latest_es_index=self.total_sgs_in_latest_es_index,
-            latest_annotate_dataset_id=self.latest_annotate_dataset_id,
-            total_sgs_in_latest_annotate_dataset=self.total_sgs_in_latest_annotate_dataset,
+            latest_annotate_dataset=self.latest_annotate_dataset,
+            latest_snv_es_index=self.latest_snv_es_index,
+            latest_sv_es_index=self.latest_sv_es_index,
+            latest_gcnv_es_index=self.latest_gcnv_es_index,
             links=links,
         )
 
 
 class ProjectInsightsStats(SMBase):
-    """Return class for the projects seqr stats endpoint"""
+    """Return class for the project insights stats endpoint"""
 
     project: int
     dataset: str
@@ -125,10 +141,10 @@ class ProjectInsightsStats(SMBase):
     total_samples: int
     total_sequencing_groups: int
     total_crams: int
-    latest_es_index_id: int
-    total_sgs_in_latest_es_index: int
-    latest_annotate_dataset_id: int
-    total_sgs_in_latest_annotate_dataset: int
+    latest_annotate_dataset: AnalysisStats
+    latest_snv_es_index: AnalysisStats
+    latest_sv_es_index: AnalysisStats
+    latest_gcnv_es_index: AnalysisStats
 
     links: PagingLinks | None
 

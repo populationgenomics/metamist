@@ -4,7 +4,7 @@ import SeqrProjectSelector from './SeqrProjectSelector'
 import SequencingTypeSelector from './SequencingTypeSelector'
 import { Table, Checkbox } from 'semantic-ui-react'
 
-interface InsightsProjectProps {
+interface SeqrProjectProps {
     id: number
     name: string
 }
@@ -23,8 +23,8 @@ function getPercentageColor(percentage: number) {
 
 const InsightsStats: React.FC = () => {
     // Get the list of seqr projects from the project API
-    const [seqrProjectNames, setInsightsProjectNames] = React.useState<string[]>([])
-    const [seqrProjectIds, setInsightsProjectIds] = React.useState<number[]>([])
+    const [seqrProjectNames, setSeqrProjectNames] = React.useState<string[]>([])
+    const [seqrProjectIds, setSeqrProjectIds] = React.useState<number[]>([])
     const [selectedProjects, setSelectedProjects] = React.useState<SelectedProject[]>([])
 
     const handleProjectSelected = (projectName: string, isSelected: boolean) => {
@@ -48,9 +48,9 @@ const InsightsStats: React.FC = () => {
 
     React.useEffect(() => {
         new ProjectApi().getSeqrProjects({}).then((resp) => {
-            const projects: InsightsProjectProps[] = resp.data
-            setInsightsProjectNames(projects.map((project) => project.name))
-            setInsightsProjectIds(projects.map((project) => project.id))
+            const projects: SeqrProjectProps[] = resp.data
+            setSeqrProjectNames(projects.map((project) => project.name))
+            setSeqrProjectIds(projects.map((project) => project.id))
         })
     }, [])
 
