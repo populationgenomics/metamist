@@ -74,7 +74,7 @@ class CohortBody(BaseModel):
 
     name: str
     description: str
-    template_id: int | None = None
+    template_id: str | None = None
 
 
 class CohortCriteria(BaseModel):

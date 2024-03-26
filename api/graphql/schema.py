@@ -51,6 +51,10 @@ from models.models import (
 from models.models.analysis_runner import AnalysisRunnerInternal
 from models.models.sample import sample_id_transform_to_raw
 from models.utils.cohort_id_format import cohort_id_format, cohort_id_transform_to_raw
+from models.utils.cohort_template_id_format import (
+    cohort_template_id_format,
+    cohort_template_id_transform_to_raw,
+)
 from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
@@ -87,7 +91,7 @@ class GraphQLCohort:
     name: str
     description: str
     author: str
-    template_id: int | None = None
+    template_id: str | None = None
 
     @staticmethod
     def from_internal(internal: Cohort) -> 'GraphQLCohort':
@@ -96,7 +100,7 @@ class GraphQLCohort:
             name=internal.name,
             description=internal.description,
             author=internal.author,
-            template_id=internal.template_id,
+            template_id=cohort_template_id_format(internal.template_id),
         )
 
     @strawberry.field()
@@ -122,7 +126,7 @@ class GraphQLCohort:
 class GraphQLCohortTemplate:
     """CohortTemplate GraphQL model"""
 
-    id: int
+    id: str
     name: str
     description: str
     criteria: strawberry.scalars.JSON
@@ -130,7 +134,7 @@ class GraphQLCohortTemplate:
     @staticmethod
     def from_internal(internal: CohortTemplateModel) -> 'GraphQLCohortTemplate':
         return GraphQLCohortTemplate(
-            id=internal.id,
+            id=cohort_template_id_format(internal.id),
             name=internal.name,
             description=internal.description,
             criteria=internal.criteria,
@@ -326,7 +330,7 @@ class GraphQLProject:
             id=id.to_internal_filter(cohort_id_transform_to_raw) if id else None,
             name=name.to_internal_filter() if name else None,
             author=author.to_internal_filter() if author else None,
-            template_id=template_id.to_internal_filter() if template_id else None,
+            template_id=template_id.to_internal_filter(cohort_template_id_transform_to_raw) if template_id else None,
             timestamp=timestamp.to_internal_filter() if timestamp else None,
         )
 
@@ -803,7 +807,7 @@ class Query:  # entry point to graphql.
     async def cohort_template(
         self,
         info: Info,
-        id: GraphQLFilter[int] | None = None,
+        id: GraphQLFilter[str] | None = None,
         project: GraphQLFilter[str] | None = None,
     ) -> list[GraphQLCohortTemplate]:
         connection = info.context['connection']
@@ -823,7 +827,7 @@ class Query:  # entry point to graphql.
             )
 
         filter_ = CohortTemplateFilter(
-            id=id.to_internal_filter() if id else None,
+            id=id.to_internal_filter(cohort_template_id_transform_to_raw) if id else None,
             project=project_filter,
         )
 
@@ -861,7 +865,7 @@ class Query:  # entry point to graphql.
             name=name.to_internal_filter() if name else None,
             project=project_filter,
             author=author.to_internal_filter() if author else None,
-            template_id=template_id.to_internal_filter() if template_id else None,
+            template_id=template_id.to_internal_filter(cohort_template_id_transform_to_raw) if template_id else None,
         )
 
         cohorts = await clayer.query(filter_)

@@ -14,6 +14,10 @@ from db.python.tables.sequencing_group import (
 from db.python.utils import GenericFilter, get_logger
 from models.models.cohort import Cohort, CohortCriteria, CohortTemplate
 from models.utils.cohort_id_format import cohort_id_format
+from models.utils.cohort_template_id_format import (
+    cohort_template_id_format,
+    cohort_template_id_transform_to_raw,
+)
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format_list,
     sequencing_group_id_transform_to_raw_list,
@@ -106,12 +110,14 @@ class CohortLayer(BaseLayer):
             user=self.connection.author, project_names=cohort_template.criteria.projects, readonly=False
         )
 
-        return await self.ct.create_cohort_template(
+        template_id = await self.ct.create_cohort_template(
             name=cohort_template.name,
             description=cohort_template.description,
             criteria=dict(cohort_template.criteria),
             project=project
         )
+
+        return cohort_template_id_format(template_id)
 
     async def create_cohort_from_criteria(
             self,
@@ -121,7 +127,7 @@ class CohortLayer(BaseLayer):
             cohort_name: str,
             dry_run: bool,
             cohort_criteria: CohortCriteria = None,
-            template_id: int = None,
+            template_id: str = None,
     ):
         """
         Create a new cohort from the given parameters. Returns the newly created cohort_id.
@@ -136,7 +142,8 @@ class CohortLayer(BaseLayer):
         # Get template from ID
         template: dict[str, str] = {}
         if template_id:
-            template = await self.ct.get_cohort_template(template_id)
+            template_id_raw = cohort_template_id_transform_to_raw(template_id)
+            template = await self.ct.get_cohort_template(template_id_raw)
             if not template:
                 raise ValueError(f'Cohort template with ID {template_id} not found')
 
@@ -201,7 +208,7 @@ class CohortLayer(BaseLayer):
             sequencing_group_ids=[sg.id for sg in sgs],
             description=description,
             author=author,
-            template_id=template_id,
+            template_id=cohort_template_id_transform_to_raw(template_id),
         )
 
         return {'cohort_id': cohort_id_format(cohort_id), 'sequencing_group_ids': rich_ids}
