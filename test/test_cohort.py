@@ -278,6 +278,28 @@ class TestCohortData(DbIsolatedTest):
         self.assertEqual([self.sgC], result['sequencing_group_ids'])
 
     @run_as_sync
+    async def test_create_cohort_by_everything(self):
+        """Create cohort by selecting a variety of fields"""
+        result = await self.cohortl.create_cohort_from_criteria(
+            project_to_write=self.project_id,
+            author='bob@example.org',
+            description='Everything cohort',
+            cohort_name='Everything cohort 1',
+            dry_run=False,
+            cohort_criteria=CohortCriteria(
+                projects=['test'],
+                sg_ids_internal=[self.sgB, self.sgC],
+                excluded_sgs_internal=[self.sgA],
+                sg_technology=['short-read'],
+                sg_platform=['illumina'],
+                sg_type=['genome'],
+                sample_type=['blood'],
+            ),
+        )
+        self.assertEqual(1, len(result['sequencing_group_ids']))
+        self.assertIn(self.sgB, result['sequencing_group_ids'])
+
+    @run_as_sync
     async def test_reevaluate_cohort(self):
         """Add another sample, then reevaluate a cohort template"""
         template = await self.cohortl.create_cohort_template(
