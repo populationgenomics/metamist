@@ -28,6 +28,7 @@ from typing import (
 )
 
 from cloudpathlib import AnyPath
+from tabulate import tabulate
 
 from metamist.apis import AnalysisApi, AssayApi, ParticipantApi, SampleApi
 from metamist.graphql import gql, query_async
@@ -65,6 +66,7 @@ ALL_EXTENSIONS = (
     + GVCF_EXTENSIONS
     + VCF_EXTENSIONS
 )
+RNA_SEQ_TYPES = ['polyarna', 'totalrna', 'singlecellrna']
 
 # construct rmatch string to capture all fastq patterns
 rmatch_str = (
@@ -259,7 +261,7 @@ class ParsedSample:
 
 
 class ParsedSequencingGroup:
-    """Class for holding sequence metadata grouped by type"""
+    """Class for holding sequencing group metadata"""
 
     def __init__(
         self,
@@ -268,8 +270,8 @@ class ParsedSequencingGroup:
         internal_seqgroup_id: int | None,
         external_seqgroup_id: str | None,
         sequencing_type: str,
-        sequence_technology: str,
-        sequence_platform: str | None,
+        sequencing_technology: str,
+        sequencing_platform: str | None,
         meta: dict[str, Any] | None,
     ):
         self.sample = sample
@@ -278,8 +280,8 @@ class ParsedSequencingGroup:
         self.internal_seqgroup_id = internal_seqgroup_id
         self.external_seqgroup_id = external_seqgroup_id
         self.sequencing_type = sequencing_type
-        self.sequencing_technology = sequence_technology
-        self.sequencing_platform = sequence_platform
+        self.sequencing_technology = sequencing_technology
+        self.sequencing_platform = sequencing_platform
         self.meta = meta
 
         self.assays: list[ParsedAssay] = []
@@ -292,7 +294,7 @@ class ParsedSequencingGroup:
             technology=self.sequencing_technology,
             platform=self.sequencing_platform,
             meta=self.meta,
-            assays=[sq.to_sm() for sq in self.assays or []],
+            assays=[a.to_sm() for a in self.assays or []],
             id=self.internal_seqgroup_id,
         )
 
@@ -304,16 +306,16 @@ class ParsedAssay:
         self,
         group: ParsedSequencingGroup,
         rows: GroupedRow,
-        internal_seq_id: int | None,
-        external_seq_ids: dict[str, str],
+        internal_assay_id: int | None,
+        external_assay_ids: dict[str, str],
         assay_type: str | None,
         meta: dict[str, Any] | None,
     ):
         self.sequencing_group = group
         self.rows = rows
 
-        self.internal_id = internal_seq_id
-        self.external_ids = external_seq_ids
+        self.internal_id = internal_assay_id
+        self.external_ids = external_assay_ids
         self.assay_type = assay_type
         self.meta = meta
 
@@ -350,7 +352,7 @@ class ParsedAnalysis:
     def to_sm(self):
         """To SM model"""
         if not self.sequencing_group.internal_seqgroup_id:
-            raise ValueError('Sequence group ID must be filled in by now')
+            raise ValueError('Sequencing group ID must be filled in by now')
         return Analysis(
             status=AnalysisStatus(self.status),
             type=str(self.type),
@@ -360,9 +362,27 @@ class ParsedAnalysis:
         )
 
 
+class DefaultSequencing:
+    """Groups default sequencing information"""
+
+    def __init__(
+        self,
+        seq_type: str = 'genome',  # seq_type because `type` is a built-in
+        technology: str = 'short-read',
+        platform: str = 'illumina',
+        facility: str = None,
+        library: str = None,
+    ):
+        self.seq_type = seq_type
+        self.technology = technology
+        self.platform = platform
+        self.facility = facility
+        self.library = library
+
+
 def chunk(iterable: Iterable[T], chunk_size=50) -> Iterator[List[T]]:
     """
-    Chunk a sequence by yielding lists of `chunk_size`
+    Chunk an iterable by yielding lists of `chunk_size`
     """
     chnk: List[T] = []
     for element in iterable:
@@ -398,23 +418,23 @@ def run_as_sync(f):
 class GenericParser(
     CloudHelper
 ):  # pylint: disable=too-many-public-methods,too-many-arguments
-    """Parser for VCGS manifest"""
+    """Parser for ingesting rows of metadata"""
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
         path_prefix: Optional[str],
         search_paths: list[str],
         project: str,
-        default_sequencing_type='genome',
-        default_sequencing_technology='short-read',
-        default_sequencing_platform: str | None = None,
-        default_sample_type=None,
-        default_analysis_type='qc',
-        default_analysis_status='completed',
-        skip_checking_gcs_objects=False,
+        default_sample_type: str = None,
+        default_sequencing: DefaultSequencing = DefaultSequencing(),
+        default_read_end_type: str = None,
+        default_read_length: str | int = None,
+        default_analysis_type: str = None,
+        default_analysis_status: str = 'completed',
         key_map: Dict[str, str] = None,
-        ignore_extra_keys=False,
         required_keys: Set[str] = None,
+        ignore_extra_keys=False,
+        skip_checking_gcs_objects=False,
         verbose=True,
     ):
         self.path_prefix = path_prefix
@@ -430,12 +450,12 @@ class GenericParser(
 
         self.project = project
 
-        self.default_sequencing_type: str = default_sequencing_type
-        self.default_sequencing_technology: str = default_sequencing_technology
-        self.default_sequencing_platform: Optional[str] = default_sequencing_platform
+        self.default_sequencing = default_sequencing
+        self.default_read_end_type: Optional[str] = default_read_end_type
+        self.default_read_length: Optional[str] = default_read_length
         self.default_sample_type: Optional[str] = default_sample_type
-        self.default_analysis_type: str = default_analysis_type
-        self.default_analysis_status: str = default_analysis_status
+        self.default_analysis_type: Optional[str] = default_analysis_type
+        self.default_analysis_status: Optional[str] = default_analysis_status
 
         # gs specific
         self.default_bucket = None
@@ -500,8 +520,7 @@ class GenericParser(
     ) -> Any:
         """
         Parse manifest from iterable (file pointer / String.IO)
-
-        Returns a dict mapping external sample ID to CPG sample ID
+        Returns a summary of the parsed records.
         """
         rows = await self.file_pointer_to_rows(
             file_pointer=file_pointer, delimiter=delimiter
@@ -509,7 +528,16 @@ class GenericParser(
         return await self.from_json(rows, confirm, dry_run)
 
     async def from_json(self, rows, confirm=False, dry_run=False):
-        """Parse passed rows"""
+        """
+        Asynchronously parse rows of data, adding chunks of participants, samples, sequencing groups, assays, and analyses.
+
+        Groups rows of participants by their IDs. For each participant, group samples by their IDs.
+        If no participants are present, groups samples by their IDs.
+        For each sample, gets its sequencing groups by their keys. For each sequencing group, groups assays and analyses.
+        """
+        if not isinstance(rows, list):
+            rows = [rows]
+
         await self.validate_rows(rows)
 
         # one participant with no value
@@ -536,7 +564,9 @@ class GenericParser(
 
         sequencing_groups: list[ParsedSequencingGroup] = []
         for schunk in chunk(samples):
-            seq_groups_for_chunk = await asyncio.gather(*map(self.group_assays, schunk))
+            seq_groups_for_chunk = await asyncio.gather(
+                *map(self.get_sample_sequencing_groups, schunk)
+            )
 
             for sample, seqgroups in zip(schunk, seq_groups_for_chunk):
                 sample.sequencing_groups = seqgroups
@@ -581,6 +611,7 @@ class GenericParser(
 
         if dry_run:
             logger.info('Dry run, so returning without inserting / updating metadata')
+            self.prepare_detail(samples)
             return summary, (participants if participants else samples)
 
         if confirm:
@@ -601,7 +632,10 @@ class GenericParser(
                 [s.to_sm() for s in samples],
             )
 
-        print(json.dumps(result, indent=2))
+        if self.verbose:
+            logger.info(json.dumps(result, indent=2))
+        else:
+            self.prepare_detail(samples)
 
     def _get_dict_reader(self, file_pointer, delimiter: str):
         """
@@ -662,6 +696,33 @@ class GenericParser(
 
         return summary
 
+    def prepare_detail(self, samples: list[ParsedSample]):
+        """Uses tabulate to print a detailed summary of the samples being inserted / updated"""
+        sample_participants = {}
+        for sample in samples:
+            sample_participants[sample.external_sid] = (
+                sample.participant.external_pid if sample.participant else None
+            )
+        sample_sequencing_groups = {
+            sample.external_sid: sample.sequencing_groups for sample in samples
+        }
+
+        details = []
+        for sample, participant in sample_participants.items():
+            for sg in sample_sequencing_groups[sample]:
+                sg_details = {
+                    'Participant': participant if participant else '',
+                    'Sample': sample,
+                    'Sequencing Type': sg.sequencing_type,
+                    'Assays': sum(1 for a in sg.assays if not a.internal_id),
+                }
+                details.append(sg_details)
+
+        headers = ['Participant', 'Sample', 'Sequencing Type', 'Assays']
+        table = list(list(detail.values()) for detail in details)
+
+        print(tabulate(table, headers=headers, tablefmt='grid'))
+
     def prepare_message(
         self,
         summary,
@@ -681,32 +742,40 @@ class GenericParser(
             header = f'Processing samples: {external_sample_ids}'
 
         assays_count: dict[str, int] = defaultdict(int)
+        assays_types_count: dict[str, int] = defaultdict(int)
         sequencing_group_counts: dict[str, int] = defaultdict(int)
-        for s in assays:
-            assays_count[str(s.assay_type)] += 1
+        for a in assays:
+            assays_count[str(a.meta.get('sequencing_type'))] += 1
+            assays_types_count[str(a.assay_type)] += 1
         for sg in sequencing_groups:
             sequencing_group_counts[str(sg.sequencing_type)] += 1
 
-        str_seq_count = ', '.join(f'{k}={v}' for k, v in assays_count.items())
+        str_assay_count = ', '.join(f'{k}={v}' for k, v in assays_count.items())
+        str_assay_types_count = ', '.join(
+            f'{k}={v}' for k, v in assays_types_count.items()
+        )
         str_seqg_count = ', '.join(
             f'{k}={v}' for k, v in sequencing_group_counts.items()
         )
 
         message = f"""\
+
+
                 {self.project}: {header}
 
-                Sequence types: {str_seq_count}
-                Sequence group types: {str_seqg_count}
+                Assays count: {str_assay_count}
+                Assays types count: {str_assay_types_count}
+                Sequencing group count: {str_seqg_count}
 
                 Adding {summary['participants']['insert']} participants
                 Adding {summary['samples']['insert']} samples
-                Adding {summary['sequencing_groups']['insert']} sequence groups
+                Adding {summary['sequencing_groups']['insert']} sequencing groups
                 Adding {summary['assays']['insert']} assays
-                Adding {summary['analyses']['insert']} analysis
+                Adding {summary['analyses']['insert']} analyses
 
                 Updating {summary['participants']['update']} participants
                 Updating {summary['samples']['update']} samples
-                Updating {summary['sequencing_groups']['update']} sequence groups
+                Updating {summary['sequencing_groups']['update']} sequencing groups
                 Updating {summary['assays']['update']} assays
                 """
         return message
@@ -905,7 +974,7 @@ class GenericParser(
     ) -> list[ParsedSample]:
         """
         From a set of rows, group (by calling self.get_sample_id)
-        and parse sample other sample values.
+        and parse samples and their values.
         """
         samples = []
         for sid, sample_rows in group_by(rows, self.get_sample_id).items():
@@ -928,7 +997,7 @@ class GenericParser(
 
     def get_sequencing_group_key(self, row: SingleRow) -> Hashable:
         """
-        Get a key to group sequencing rows by.
+        Get a key to group sequencing group rows by.
         """
         if seq_group_id := self.get_sequencing_group_id(row):
             return seq_group_id
@@ -945,10 +1014,12 @@ class GenericParser(
 
         return tuple(v for _, v in keys)
 
-    async def group_assays(self, sample: ParsedSample) -> list[ParsedSequencingGroup]:
+    async def get_sample_sequencing_groups(
+        self, sample: ParsedSample
+    ) -> list[ParsedSequencingGroup]:
         """
-        From a set of rows, group (by calling self.get_sequencing_group_key)
-        and parse sequencing group other sequencing group values.
+        From a set of samples, group (by calling self.get_sequencing_group_key)
+        and parse sequencing groups and their values.
         """
         sequencing_groups = []
         for seq_rows in group_by(sample.rows, self.get_sequencing_group_key).values():
@@ -960,8 +1031,8 @@ class GenericParser(
                 internal_seqgroup_id=None,
                 external_seqgroup_id=self.get_sequencing_group_id(seq_rows[0]),
                 sequencing_type=seq_type,
-                sequence_technology=seq_tech,
-                sequence_platform=seq_platform,
+                sequencing_technology=seq_tech,
+                sequencing_platform=seq_platform,
                 meta={},
                 sample=sample,
                 rows=seq_rows,
@@ -998,6 +1069,28 @@ class GenericParser(
         return list[ParsedAssay] (does not have to equal number of rows).
         """
 
+    def get_sequencing_group_meta_from_assays(self, assays: list[ParsedAssay]) -> dict:
+        """
+        From a list of assays, get any relevant sequencing group meta
+        """
+        meta = {}
+        for assay in assays:
+            if assay.meta.get('sequencing_type') == 'exome':
+                keys = ('sequencing_facility', 'sequencing_library')
+            elif assay.meta.get('sequencing_type') in RNA_SEQ_TYPES:
+                keys = (
+                    'sequencing_facility',
+                    'sequencing_library',
+                    'read_end_type',
+                    'read_length',
+                )
+            else:
+                continue
+            for key in keys:
+                if assay.meta.get(key) is not None:
+                    meta[key] = assay.meta[key]
+        return meta
+
     def get_sample_type(self, row: GroupedRow) -> str:
         """Get sample type from row"""
         return self.default_sample_type
@@ -1014,15 +1107,31 @@ class GenericParser(
 
     def get_sequencing_type(self, row: SingleRow) -> str:
         """Get sequence types from row"""
-        return self.default_sequencing_type
+        return self.default_sequencing.seq_type
 
     def get_sequencing_technology(self, row: SingleRow) -> str:
         """Get sequencing technology from row"""
-        return self.default_sequencing_technology
+        return self.default_sequencing.technology
 
     def get_sequencing_platform(self, row: SingleRow) -> str | None:
         """Get sequencing platform from row"""
-        return self.default_sequencing_platform
+        return self.default_sequencing.platform
+
+    def get_sequencing_facility(self, row: SingleRow) -> str | None:
+        """Get sequencing facility from row"""
+        return self.default_sequencing.facility
+
+    def get_sequencing_library(self, row: SingleRow) -> str | None:
+        """Get library type from row"""
+        return self.default_sequencing.library
+
+    def get_read_end_type(self, row: SingleRow) -> str | None:
+        """Get read end type from row"""
+        return self.default_read_end_type
+
+    def get_read_length(self, row: SingleRow) -> str | None:
+        """Get read length from row"""
+        return self.default_read_length
 
     def get_analysis_type(self, sample_id: str, row: GroupedRow) -> str:
         """Get analysis type from row"""
@@ -1293,6 +1402,7 @@ class GenericParser(
 
         invalid_fastq_groups = [grp for grp in fastq_groups.values() if len(grp) != 2]
         if invalid_fastq_groups:
+            # TODO: implement handling for single-ended reads
             raise ValueError(f'Invalid fastq group {invalid_fastq_groups}')
 
         sorted_groups = sorted(

@@ -2,7 +2,7 @@
 import dataclasses
 
 from models.base import SMBase
-from models.models.participant import NestedParticipantInternal, NestedParticipant
+from models.models.participant import NestedParticipant, NestedParticipantInternal
 
 
 class WebProject(SMBase):

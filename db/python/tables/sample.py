@@ -1,16 +1,17 @@
 import asyncio
-from datetime import date
-from typing import Iterable, Any
 import dataclasses
+from datetime import date
+from typing import Any, Iterable
 
-from db.python.connect import DbBase, NotFoundError
+from db.python.tables.base import DbBase
 from db.python.utils import (
-    to_db_json,
-    GenericFilterModel,
     GenericFilter,
+    GenericFilterModel,
     GenericMetaFilter,
+    NotFoundError,
+    to_db_json,
 )
-from db.python.tables.project import ProjectId
+from models.models.project import ProjectId
 from models.models.sample import SampleInternal, sample_id_format
 
 
@@ -47,6 +48,7 @@ class SampleTable(DbBase):
         'active',
         'type',
         'project',
+        'audit_log_id',
     ]
 
     # region GETS
@@ -139,7 +141,6 @@ class SampleTable(DbBase):
         active: bool,
         meta: dict | None,
         participant_id: int | None,
-        author=None,
         project=None,
     ) -> int:
         """
@@ -152,7 +153,7 @@ class SampleTable(DbBase):
             ('meta', to_db_json(meta or {})),
             ('type', sample_type),
             ('active', active),
-            ('author', author or self.author),
+            ('audit_log_id', await self.audit_log_id()),
             ('project', project or self.project),
         ]
 
@@ -179,16 +180,13 @@ class SampleTable(DbBase):
         participant_id: int | None,
         external_id: str | None,
         type_: str | None,
-        author: str = None,
         active: bool = None,
     ):
         """Update a single sample"""
 
-        values: dict[str, Any] = {
-            'author': author or self.author,
-        }
+        values: dict[str, Any] = {'audit_log_id': await self.audit_log_id()}
         fields = [
-            'author = :author',
+            'audit_log_id = :audit_log_id',
         ]
         if participant_id:
             values['participant_id'] = participant_id
@@ -220,7 +218,6 @@ class SampleTable(DbBase):
         self,
         id_keep: int = None,
         id_merge: int = None,
-        author: str = None,
     ):
         """Merge two samples together"""
         sid_merge = sample_id_format(id_merge)
@@ -261,34 +258,43 @@ class SampleTable(DbBase):
             meta_original.get('merged_from'), sid_merge
         )
         meta: dict[str, Any] = dict_merge(meta_original, sample_merge.meta)
-
+        audit_log_id = await self.audit_log_id()
         values: dict[str, Any] = {
             'sample': {
                 'id': id_keep,
-                'author': author or self.author,
+                'audit_log_id': audit_log_id,
                 'meta': to_db_json(meta),
             },
-            'ids': {'id_keep': id_keep, 'id_merge': id_merge},
+            'ids': {
+                'id_keep': id_keep,
+                'id_merge': id_merge,
+                'audit_log_id': audit_log_id,
+            },
         }
 
         _query = """
             UPDATE sample
-            SET author = :author,
+            SET audit_log_id = :audit_log_id,
                 meta = :meta
             WHERE id = :id
         """
-        _query_seqs = f"""
-            UPDATE sample_sequencing
-            SET sample_id = :id_keep
+        _query_seqs = """
+            UPDATE assay
+            SET sample_id = :id_keep, audit_log_id = :audit_log_id
             WHERE sample_id = :id_merge
         """
         # TODO: merge sequencing groups I guess?
-        _query_analyses = f"""
-            UPDATE analysis_sample
-            SET sample_id = :id_keep
+        _query_analyses = """
+            UPDATE analysis_sequencing_group
+            SET sample_id = :id_keep, audit_log_id = :audit_log_id
             WHERE sample_id = :id_merge
         """
-        _del_sample = f"""
+        _query_update_sample_with_audit_log = """
+            UPDATE sample
+            SET audit_log_id = :audit_log_id
+            WHERE id = :id_merge
+        """
+        _del_sample = """
             DELETE FROM sample
             WHERE id = :id_merge
         """
@@ -297,11 +303,16 @@ class SampleTable(DbBase):
             await self.connection.execute(_query, {**values['sample']})
             await self.connection.execute(_query_seqs, {**values['ids']})
             await self.connection.execute(_query_analyses, {**values['ids']})
-            await self.connection.execute(_del_sample, {'id_merge': id_merge})
+            await self.connection.execute(
+                _query_update_sample_with_audit_log,
+                {'id_merge': id_merge, 'audit_log_id': audit_log_id},
+            )
+            await self.connection.execute(
+                _del_sample, {'id_merge': id_merge, 'audit_log_id': audit_log_id}
+            )
 
         project, new_sample = await self.get_sample_by_id(id_keep)
         new_sample.project = project
-        new_sample.author = author or self.author
 
         return new_sample
 
@@ -312,9 +323,15 @@ class SampleTable(DbBase):
         Update participant IDs for many samples
         Expected len(ids) == len(participant_ids)
         """
-        _query = 'UPDATE sample SET participant_id=:participant_id WHERE id = :id'
+        _query = """
+        UPDATE sample
+        SET participant_id=:participant_id, audit_log_id = :audit_log_id
+        WHERE id = :id
+        """
+        audit_log_id = await self.audit_log_id()
         values = [
-            {'id': i, 'participant_id': pid} for i, pid in zip(ids, participant_ids)
+            {'id': i, 'participant_id': pid, 'audit_log_id': audit_log_id}
+            for i, pid in zip(ids, participant_ids)
         ]
         await self.connection.execute_many(_query, values)
 
@@ -420,6 +437,7 @@ class SampleTable(DbBase):
             'type',
             'project',
             'author',
+            'audit_log_id',
         ]
         keys_str = ', '.join(keys)
         _query = f'SELECT {keys_str} FROM sample FOR SYSTEM_TIME ALL WHERE id = :id'

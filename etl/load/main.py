@@ -1,24 +1,45 @@
 import asyncio
 import base64
 import datetime
+import importlib.metadata
 import json
 import logging
 import os
-from typing import Any
+from functools import lru_cache
+from typing import Any, Literal
 
 import flask
 import functions_framework
 import google.cloud.bigquery as bq
+from google.cloud import pubsub_v1, secretmanager
 
-from google.cloud import pubsub_v1  # type: ignore
+from metamist.parser.generic_parser import GenericParser  # type: ignore
 
-import pkg_resources
-
-
+# strip whitespace, newlines and '/' for template matching
+STRIP_CHARS = '/ \n'
 BIGQUERY_TABLE = os.getenv('BIGQUERY_TABLE')
 BIGQUERY_LOG_TABLE = os.getenv('BIGQUERY_LOG_TABLE')
 NOTIFICATION_PUBSUB_TOPIC = os.getenv('NOTIFICATION_PUBSUB_TOPIC')
-DEFAULT_LOAD_CONFIG = os.getenv('DEFAULT_LOAD_CONFIG', '{}')
+ETL_ACCESSOR_CONFIG_SECRET = os.getenv('CONFIGURATION_SECRET')
+
+
+@lru_cache
+def _get_bq_client():
+    assert BIGQUERY_TABLE, 'BIGQUERY_TABLE is not set'
+    assert BIGQUERY_LOG_TABLE, 'BIGQUERY_LOG_TABLE is not set'
+    return bq.Client()
+
+
+@lru_cache
+def _get_secret_manager():
+    assert ETL_ACCESSOR_CONFIG_SECRET, 'CONFIGURATION_SECRET is not set'
+    return secretmanager.SecretManagerServiceClient()
+
+
+@lru_cache
+def _get_pubsub_client():
+    assert NOTIFICATION_PUBSUB_TOPIC, 'NOTIFICATION_PUBSUB_TOPIC is not set'
+    return pubsub_v1.PublisherClient()
 
 
 class ParsingStatus:
@@ -28,6 +49,17 @@ class ParsingStatus:
 
     SUCCESS = 'SUCCESS'
     FAILED = 'FAILED'
+
+
+@lru_cache
+def get_accessor_config() -> dict:
+    """
+    Read the secret from the full secret path: ETL_ACCESSOR_CONFIG_SECRET
+    """
+    response = _get_secret_manager().access_secret_version(
+        request={'name': ETL_ACCESSOR_CONFIG_SECRET}
+    )
+    return json.loads(response.payload.data.decode('UTF-8'))
 
 
 def call_parser(parser_obj, row_json) -> tuple[str, str]:
@@ -42,7 +74,7 @@ def call_parser(parser_obj, row_json) -> tuple[str, str]:
     async def run_parser_capture_result(parser_obj, row_data, res, status):
         try:
             # TODO better error handling
-            r = await parser_obj.from_json([row_data], confirm=False, dry_run=True)
+            r = await parser_obj.from_json(row_data, confirm=False)
             res.append(r)
             status.append(ParsingStatus.SUCCESS)
         except Exception as e:  # pylint: disable=broad-exception-caught
@@ -57,9 +89,8 @@ def call_parser(parser_obj, row_json) -> tuple[str, str]:
 
 def process_rows(
     bq_row: bq.table.Row,
-    delivery_attempt: int,
+    delivery_attempt: int | None,
     request_id: str,
-    parser_map: dict,
     bq_client: bq.Client,
 ) -> tuple[str, Any, Any]:
     """
@@ -69,17 +100,19 @@ def process_rows(
     # source_type should be in the format /ParserName/Version e.g.: /bbv/v1
 
     row_json = json.loads(bq_row.body)
+    submitting_user = bq_row.submitting_user
 
     # get config from payload and merge with the default
-    config_data = json.loads(DEFAULT_LOAD_CONFIG)
-    payload_config_data = row_json.get('config')
-    if payload_config_data:
-        config_data.update(payload_config_data)
+    config = {}
+    if payload_config_data := row_json.get('config'):
+        config.update(payload_config_data)
 
     # get data from payload or use payload as data
     record_data = row_json.get('data', row_json)
 
-    (parser_obj, err_msg) = get_parser_instance(parser_map, source_type, config_data)
+    (parser_obj, err_msg) = get_parser_instance(
+        submitting_user=submitting_user, request_type=source_type, init_params=config
+    )
 
     if parser_obj:
         # Parse bq_row.body -> Model and upload to metamist database
@@ -124,7 +157,7 @@ def process_rows(
             # publish to notification pubsub
             msg_title = 'Metamist ETL Load Failed'
             try:
-                pubsub_client = pubsub_v1.PublisherClient()
+                pubsub_client = _get_pubsub_client()
                 pubsub_client.publish(
                     NOTIFICATION_PUBSUB_TOPIC,
                     json.dumps({'title': msg_title} | log_record).encode(),
@@ -188,14 +221,15 @@ def etl_load(request: flask.Request):
             'message': f'Missing or empty request_id: {jbody_str}',
         }, 400
 
-    # prepare parser map
-    # parser_map = {
-    #     'gmp/v1': <class 'metamist.parser.generic_metadata_parser.GenericMetadataParser'>,
-    #     'sfmp/v1': <class 'metamist.parser.sample_file_map_parser.SampleFileMapParser'>,
-    #     'bbv/v1': bbv.BbvV1Parser, TODO: add bbv parser
-    # }
-    parser_map = prepare_parser_map()
+    return process_request(request_id, delivery_attempt)
 
+
+def process_request(
+    request_id: str, delivery_attempt: int | None = None
+) -> tuple[dict, int]:
+    """
+    Process request_id, delivery_attempt and return result
+    """
     # locate the request_id in bq
     query = f"""
         SELECT * FROM `{BIGQUERY_TABLE}` WHERE request_id = @request_id
@@ -204,12 +238,13 @@ def etl_load(request: flask.Request):
         bq.ScalarQueryParameter('request_id', 'STRING', request_id),
     ]
 
-    bq_client = bq.Client()
+    bq_client = _get_bq_client()
+
     job_config = bq.QueryJobConfig()
     job_config.query_parameters = query_params
     query_job_result = bq_client.query(query, job_config=job_config).result()
 
-    if query_job_result.total_rows == 0:
+    if not query_job_result.total_rows or query_job_result.total_rows == 0:
         # Request ID not found
         return {
             'success': False,
@@ -227,7 +262,7 @@ def etl_load(request: flask.Request):
     bq_job_result = list(query_job_result)[0]
 
     (status, parsing_result, uploaded_record) = process_rows(
-        bq_job_result, delivery_attempt, request_id, parser_map, bq_client
+        bq_job_result, delivery_attempt, request_id, bq_client
     )
 
     # return success
@@ -288,30 +323,79 @@ def extract_request_id(jbody: dict[str, Any]) -> tuple[int | None, str | None]:
 
 
 def get_parser_instance(
-    parser_map: dict, source_type: str | None, init_params: dict | None
-) -> tuple[object | None, str | None]:
+    submitting_user: str, request_type: str | None, init_params: dict
+) -> tuple[GenericParser | None, str | None]:
     """Extract parser name from source_type
 
     Args:
-        source_type (str | None): _description_
+        parser_type (str | None): The name of the config.etl.accessors.name to match
 
     Returns:
         object | None: _description_
     """
-    if not source_type:
-        return None, 'Empty source_type'
+    if not request_type:
+        return None, f'No "type" was provided on the request from {submitting_user}'
 
-    parser_class_ = parser_map.get(source_type, None)
+    # check that submitting_user has access to parser
+
+    accessor_config: dict[
+        str,
+        dict[
+            Literal['parsers'],
+            list[
+                dict[
+                    Literal['name']
+                    | Literal['parser_name']
+                    | Literal['default_parameters'],
+                    Any,
+                ]
+            ],
+        ],
+    ] = get_accessor_config()
+
+    if submitting_user not in accessor_config:
+        return None, (
+            f'Submitting user {submitting_user} is not allowed to access any parsers'
+        )
+
+    # find the config
+    etl_accessor_config = next(
+        (
+            accessor_config
+            for accessor_config in accessor_config[submitting_user].get('parsers', [])
+            if accessor_config['name'].strip(STRIP_CHARS)
+            == request_type.strip(STRIP_CHARS)
+        ),
+        None,
+    )
+    if not etl_accessor_config:
+        return None, (
+            f'Submitting user {submitting_user} is not allowed to access {request_type}'
+        )
+
+    parser_name = (etl_accessor_config.get('parser_name') or request_type).strip(
+        STRIP_CHARS
+    )
+
+    init_params.update(etl_accessor_config.get('default_parameters', {}))
+
+    parser_map = prepare_parser_map()
+
+    parser_class_ = parser_map.get(parser_name, None)
     if not parser_class_:
         # class not found
-        return None, f'Parser for {source_type} not found'
+        if request_type.strip(STRIP_CHARS) != parser_name:
+            return None, (
+                f'Submitting user {submitting_user} could not find parser for '
+                f'request type {request_type}, for parser: {parser_name}'
+            )
+        return (
+            None,
+            f'Submitting user {submitting_user} could not find parser for {request_type}',
+        )
 
-    # TODO: in case of generic metadata parser, we need to create instance
     try:
-        if init_params:
-            parser_obj = parser_class_(**init_params)
-        else:
-            parser_obj = parser_class_()
+        parser_obj = parser_class_(**(init_params or {}))
     except Exception as e:  # pylint: disable=broad-exception-caught
         logging.error(f'Failed to create parser instance {e}')
         return None, f'Failed to create parser instance {e}'
@@ -319,14 +403,15 @@ def get_parser_instance(
     return parser_obj, None
 
 
-def prepare_parser_map() -> dict:
+def prepare_parser_map() -> dict[str, type[GenericParser]]:
     """Prepare parser map
     loop through metamist_parser entry points and create map of parsers
     """
     parser_map = {}
-    for entry_point in pkg_resources.iter_entry_points('metamist_parser'):
+
+    for entry_point in importlib.metadata.entry_points().get('metamist_parser'):
         parser_cls = entry_point.load()
         parser_short_name, parser_version = parser_cls.get_info()
-        parser_map[f'/{parser_short_name}/{parser_version}'] = parser_cls
+        parser_map[f'{parser_short_name}/{parser_version}'] = parser_cls
 
     return parser_map

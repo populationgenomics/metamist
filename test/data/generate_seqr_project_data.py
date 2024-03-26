@@ -7,9 +7,7 @@ import logging
 import random
 import sys
 import tempfile
-
-from pprint import pprint
-from typing import Set, List
+from typing import List, Set
 
 from metamist.apis import AnalysisApi, FamilyApi, ParticipantApi, ProjectApi, SampleApi
 from metamist.graphql import gql, query_async
@@ -325,8 +323,7 @@ async def generate_sample_entries(
                         )
                     )
 
-    response = await sapi.upsert_samples_async(project, samples)
-    #pprint(response)
+    return sapi.upsert_samples_async(project, samples)
 
 
 async def generate_cram_analyses(project: str, analyses_to_insert: list[Analysis]):

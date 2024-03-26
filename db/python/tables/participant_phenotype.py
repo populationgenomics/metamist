@@ -1,9 +1,8 @@
-from typing import List, Tuple, Any, Dict
-
 import json
 from collections import defaultdict
+from typing import Any, Dict, List, Tuple
 
-from db.python.connect import DbBase
+from db.python.tables.base import DbBase
 
 
 class ParticipantPhenotypeTable(DbBase):
@@ -13,27 +12,28 @@ class ParticipantPhenotypeTable(DbBase):
 
     table_name = 'participant_phenotype'
 
-    async def add_key_value_rows(
-        self, rows: List[Tuple[int, str, Any]], author: str = None
-    ) -> None:
+    async def add_key_value_rows(self, rows: List[Tuple[int, str, Any]]) -> None:
         """
         Create a new sample, and add it to database
         """
         if not rows:
             return None
-        _query = f"""
-INSERT INTO participant_phenotypes (participant_id, description, value, author, hpo_term)
-VALUES (:participant_id, :description, :value, :author, 'DESCRIPTION')
+        _query = """
+INSERT INTO participant_phenotypes
+    (participant_id, description, value, audit_log_id, hpo_term)
+VALUES
+    (:participant_id, :description, :value, :audit_log_id, 'DESCRIPTION')
 ON DUPLICATE KEY UPDATE
-    description=:description, value=:value, author=:author
+    description=:description, value=:value, audit_log_id=:audit_log_id
         """
 
+        audit_log_id = await self.audit_log_id()
         formatted_rows = [
             {
                 'participant_id': r[0],
                 'description': r[1],
                 'value': json.dumps(r[2]),
-                'author': author or self.author,
+                'audit_log_id': audit_log_id,
             }
             for r in rows
         ]
@@ -44,7 +44,7 @@ ON DUPLICATE KEY UPDATE
         )
 
     async def get_key_value_rows_for_participant_ids(
-        self, participant_ids=List[int]
+        self, participant_ids: List[int]
     ) -> Dict[int, Dict[str, Any]]:
         """
         Get (participant_id, description, value),
@@ -64,7 +64,9 @@ WHERE participant_id in :participant_ids AND value IS NOT NULL
         )
         formed_key_value_pairs: Dict[int, Dict[str, Any]] = defaultdict(dict)
         for row in rows:
-            pid, key, value = row
+            pid = row['participant_id']
+            key = row['description']
+            value = row['value']
             formed_key_value_pairs[pid][key] = json.loads(value)
 
         return formed_key_value_pairs
@@ -86,7 +88,9 @@ WHERE p.project = :project AND pp.value IS NOT NULL
         rows = await self.connection.fetch_all(_query, {'project': project})
         formed_key_value_pairs: Dict[int, Dict[str, Any]] = defaultdict(dict)
         for row in rows:
-            pid, key, value = row
+            pid = row['participant_id']
+            key = row['description']
+            value = row['value']
             formed_key_value_pairs[pid][key] = json.loads(value)
 
         return formed_key_value_pairs

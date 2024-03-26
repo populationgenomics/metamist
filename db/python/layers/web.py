@@ -7,25 +7,26 @@ from collections import defaultdict
 from datetime import date
 
 from api.utils import group_by
-from db.python.connect import DbBase
 from db.python.layers.base import BaseLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.seqr import SeqrLayer
 from db.python.tables.analysis import AnalysisTable
 from db.python.tables.assay import AssayTable
+from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sequencing_group import SequencingGroupTable
 from models.models import (
     AssayInternal,
+    FamilySimpleInternal,
     NestedParticipantInternal,
     NestedSampleInternal,
     NestedSequencingGroupInternal,
-    SearchItem,
-    FamilySimpleInternal,
     ProjectSeqrDetailsInternal,
     ProjectSeqrStatsInternal,
     ProjectSummaryInternal,
+    SearchItem,
     WebProject,
+    parse_sql_bool,
 )
 from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
@@ -802,7 +803,7 @@ class WebProjectSummaryDb(DbBase):
                 created_date=str(sample_id_start_times.get(s['id'], '')),
                 sequencing_groups=sg_models_by_sample_id.get(s['id'], []),
                 non_sequencing_assays=filtered_assay_models_by_sid.get(s['id'], []),
-                active=bool(ord(s['active'])),
+                active=parse_sql_bool(s['active']),
             )
             for s in sample_rows
         ]
@@ -891,7 +892,7 @@ class WebProjectSummaryDb(DbBase):
         # do initial query to get sample info
         sampl = SampleLayer(self._connection)
         sample_query, values = self._project_summary_sample_query(grid_filter)
-        ptable = ProjectPermissionsTable(self.connection)
+        ptable = ProjectPermissionsTable(self._connection)
         project_db = await ptable.get_and_check_access_to_project_for_id(
             self.author, self.project, readonly=True
         )

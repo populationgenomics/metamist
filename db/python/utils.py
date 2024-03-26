@@ -7,7 +7,6 @@ from enum import Enum
 from typing import Any, Generic, Sequence, TypeVar
 
 T = TypeVar('T')
-ProjectId = int
 
 levels_map = {'DEBUG': logging.DEBUG, 'INFO': logging.INFO, 'WARNING': logging.WARNING}
 
@@ -95,6 +94,7 @@ class GenericFilter(Generic[T]):
 
     def __init__(
         self,
+        *,
         eq: T | None = None,
         in_: list[T] | None = None,
         nin: list[T] | None = None,
@@ -285,6 +285,9 @@ class GenericFilterModel:
                     fconditionals, fvalues = filter_.to_sql(fcolumn)
                     conditionals.append(fconditionals)
                     values.update(fvalues)
+                elif not isinstance(field.type, (GenericFilter, dict)):
+                    values.update({fcolumn: filter_})
+                    conditionals.append(f'{fcolumn} = :{fcolumn}')
                 else:
                     raise ValueError(
                         f'Filter {field.name} must be a GenericFilter or dict[str, GenericFilter]'

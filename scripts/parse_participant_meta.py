@@ -12,7 +12,6 @@ import io
 import traceback
 
 import click
-
 from google.cloud import storage
 
 from metamist import ApiException

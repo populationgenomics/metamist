@@ -33,13 +33,28 @@ const billingPages = {
             icon: <HomeIcon />,
         },
         {
-            title: 'Invoice Month Cost',
+            title: 'Cost By Invoice Month',
             url: '/billing/invoiceMonthCost',
+            icon: <TableRowsIcon />,
+        },
+        {
+            title: 'Cost Across Invoice Months (Topics only)',
+            url: '/billing/costByMonth',
             icon: <TableRowsIcon />,
         },
         {
             title: 'Cost By Time',
             url: '/billing/costByTime',
+            icon: <TableRowsIcon />,
+        },
+        {
+            title: 'Cost By Analysis',
+            url: '/billing/costByAnalysis',
+            icon: <TableRowsIcon />,
+        },
+        {
+            title: 'Cost By Category',
+            url: '/billing/costByCategory',
             icon: <TableRowsIcon />,
         },
         {
@@ -138,8 +153,8 @@ const NavBar: React.FC<NavBarProps> = ({ fixed }) => {
     ])
 
     React.useEffect(() => {
-        new BillingApi().getTopics().then((response) => {
-            if (response.status === 200) {
+        new BillingApi().isBillingEnabled().then((response) => {
+            if (response.status === 200 && response.data === true) {
                 setMenuItems([...menuItems.slice(0, 2), billingPages, ...menuItems.slice(2)])
             }
         })

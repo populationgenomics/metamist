@@ -16,6 +16,7 @@ from db.python.layers.search import SearchLayer
 from db.python.layers.seqr import SeqrLayer
 from db.python.layers.web import SearchItem, WebLayer
 from db.python.tables.project import ProjectPermissionsTable
+from models.enums.web import SeqrDatasetType
 from models.models.search import SearchResponse
 from models.models.web import (
     PagingLinks,
@@ -23,7 +24,6 @@ from models.models.web import (
     ProjectSeqrStats,
     ProjectSummary,
 )
-from models.models.web import PagingLinks, ProjectSummary
 
 
 class SearchResponseModel(BaseModel):
@@ -83,7 +83,7 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
     that you are a part of (automatically).
     """
     # raise ValueError("Test")
-    pt = ProjectPermissionsTable(connection.connection)
+    pt = ProjectPermissionsTable(connection)
     projects = await pt.get_projects_accessible_by_user(
         connection.author, readonly=True
     )
@@ -108,6 +108,7 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
 )
 async def sync_seqr_project(
     sequencing_type: str,
+    es_index_types: list[SeqrDatasetType],
     sync_families: bool = True,
     sync_individual_metadata: bool = True,
     sync_individuals: bool = True,
@@ -119,6 +120,7 @@ async def sync_seqr_project(
 ):
     """
     Sync a metamist project with its seqr project (for a specific sequence type)
+    es_index_types: list of any of 'Haplotypecaller', 'SV_Caller', 'Mitochondria_Caller'
     """
     seqr = SeqrLayer(connection)
     try:
@@ -128,6 +130,7 @@ async def sync_seqr_project(
             sync_individual_metadata=sync_individual_metadata,
             sync_individuals=sync_individuals,
             sync_es_index=sync_es_index,
+            es_index_types=es_index_types,
             sync_saved_variants=sync_saved_variants,
             sync_cram_map=sync_cram_map,
             post_slack_notification=post_slack_notification,
@@ -145,7 +148,7 @@ async def sync_seqr_project(
 )
 async def get_projects_seqr_stats(
     projects: list[int] = None,
-    sequencing_types: list[str] = ['genome', 'exome'],
+    sequencing_types: list[str] = None,
     connection: Connection = get_projectless_db_connection,
 ):
     """

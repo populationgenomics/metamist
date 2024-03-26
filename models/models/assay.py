@@ -12,7 +12,7 @@ class AssayInternal(SMBase):
     sample_id: int
     meta: dict[str, Any] | None
     type: str
-    external_ids: dict[str, str] | None = None
+    external_ids: dict[str, str] | None = {}
 
     def __repr__(self):
         return ', '.join(f'{k}={v}' for k, v in vars(self).items())

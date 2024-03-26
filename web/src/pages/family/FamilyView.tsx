@@ -28,7 +28,6 @@ query FamilyInfo($family_id: Int!) {
       id
       samples {
         active
-        author
         externalId
         id
         meta

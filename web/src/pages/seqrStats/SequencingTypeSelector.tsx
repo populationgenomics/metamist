@@ -7,10 +7,7 @@ interface SequencingTypeSelectorProps {
     onSeqTypeSelected: (seqType: string, isSelected: boolean) => void
 }
 
-const SequencingTypeSelector = ({
-    seqTypes,
-    onSeqTypeSelected,
-}: SequencingTypeSelectorProps) => {
+const SequencingTypeSelector = ({ seqTypes, onSeqTypeSelected }: SequencingTypeSelectorProps) => {
     const handleCheckboxChange = (event: FormEvent<HTMLInputElement>, data: CheckboxProps) => {
         const { name, checked } = data
         onSeqTypeSelected(name as string, checked || false)
@@ -18,17 +15,13 @@ const SequencingTypeSelector = ({
 
     return (
         <div className="seq-type-selector-flex">
-            {seqTypes.map(seqType => (
+            {seqTypes.map((seqType) => (
                 <div key={seqType}>
-                    <Checkbox
-                        label={seqType}
-                        name={seqType}
-                        onChange={handleCheckboxChange}
-                    />
+                    <Checkbox label={seqType} name={seqType} onChange={handleCheckboxChange} />
                 </div>
             ))}
         </div>
-    );
+    )
 }
 
 export default SequencingTypeSelector

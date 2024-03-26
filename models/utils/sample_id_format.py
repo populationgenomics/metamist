@@ -1,5 +1,6 @@
 from typing import Iterable
-from api.settings import SAMPLE_PREFIX, SAMPLE_CHECKSUM_OFFSET
+
+from api.settings import SAMPLE_CHECKSUM_OFFSET, SAMPLE_PREFIX
 from models.utils.luhn import luhn_compute, luhn_is_valid
 
 

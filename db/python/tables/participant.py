@@ -1,9 +1,10 @@
 from collections import defaultdict
 from typing import Any
 
-from db.python.connect import DbBase, NotFoundError
-from db.python.utils import ProjectId, to_db_json
+from db.python.tables.base import DbBase
+from db.python.utils import NotFoundError, to_db_json
 from models.models.participant import ParticipantInternal
+from models.models.project import ProjectId
 
 
 class ParticipantTable(DbBase):
@@ -20,6 +21,7 @@ class ParticipantTable(DbBase):
             'karyotype',
             'meta',
             'project',
+            'audit_log_id',
         ]
     )
 
@@ -75,7 +77,6 @@ class ParticipantTable(DbBase):
         reported_gender: str | None,
         karyotype: str | None,
         meta: dict | None,
-        author: str = None,
         project: ProjectId = None,
     ) -> int:
         """
@@ -84,9 +85,11 @@ class ParticipantTable(DbBase):
         if not (project or self.project):
             raise ValueError('Must provide project to create participant')
 
-        _query = f"""
-INSERT INTO participant (external_id, reported_sex, reported_gender, karyotype, meta, author, project)
-VALUES (:external_id, :reported_sex, :reported_gender, :karyotype, :meta, :author, :project)
+        _query = """
+INSERT INTO participant
+    (external_id, reported_sex, reported_gender, karyotype, meta, audit_log_id, project)
+VALUES
+    (:external_id, :reported_sex, :reported_gender, :karyotype, :meta, :audit_log_id, :project)
 RETURNING id
         """
 
@@ -98,7 +101,7 @@ RETURNING id
                 'reported_gender': reported_gender,
                 'karyotype': karyotype,
                 'meta': to_db_json(meta or {}),
-                'author': author or self.author,
+                'audit_log_id': await self.audit_log_id(),
                 'project': project or self.project,
             },
         )
@@ -110,18 +113,17 @@ RETURNING id
         reported_genders: list[str] | None,
         karyotypes: list[str] | None,
         metas: list[dict] | None,
-        author=None,
     ):
         """
         Update many participants, expects that all lists contain the same number of values.
         You can't update selective fields on selective samples, if you provide metas, this
         function will update EVERY participant with the provided meta values.
         """
-        _author = author or self.author
-        updaters = ['author = :author']
+        updaters = ['audit_log_id = :audit_log_id']
+        audit_log_id = await self.audit_log_id()
         values: dict[str, list[Any]] = {
             'pid': participant_ids,
-            'author': [_author] * len(participant_ids),
+            'audit_log_id': [audit_log_id] * len(participant_ids),
         }
         if reported_sexes:
             updaters.append('reported_sex = :reported_sex')
@@ -154,13 +156,12 @@ RETURNING id
         reported_gender: str | None,
         karyotype: str | None,
         meta: dict | None,
-        author=None,
     ):
         """
         Update participant
         """
-        updaters = ['author = :author']
-        fields = {'pid': participant_id, 'author': author or self.author}
+        updaters = ['audit_log_id = :audit_log_id']
+        fields = {'pid': participant_id, 'audit_log_id': await self.audit_log_id()}
 
         if external_id:
             updaters.append('external_id = :external_id')
@@ -248,7 +249,7 @@ RETURNING id
         self, family_ids: list[int]
     ) -> tuple[set[ProjectId], dict[int, list[ParticipantInternal]]]:
         """Get list of participants keyed by families, duplicates results"""
-        _query = f"""
+        _query = """
             SELECT project, fp.family_id, p.id, p.external_id, p.reported_sex, p.reported_gender, p.karyotype, p.meta
             FROM participant p
             INNER JOIN family_participant fp ON fp.participant_id = p.id
@@ -271,10 +272,11 @@ RETURNING id
         """Update many participant external_ids through the {internal: external} map"""
         _query = """
         UPDATE participant
-        SET external_id = :external_id
+        SET external_id = :external_id, audit_log_id = :audit_log_id
         WHERE id = :participant_id"""
+        audit_log_id = await self.audit_log_id()
         mapped_values = [
-            {'participant_id': k, 'external_id': v}
+            {'participant_id': k, 'external_id': v, 'audit_log_id': audit_log_id}
             for k, v in internal_to_external_id.items()
         ]
         await self.connection.execute_many(_query, mapped_values)

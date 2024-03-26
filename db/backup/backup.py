@@ -1,16 +1,15 @@
-#!/usr/bin/python3.7
+#!/usr/bin/python3
 # pylint: disable=broad-exception-caught,broad-exception-raised
 """ Daily back up function for databases within a local
 MariaDB instance """
 
 import json
+import os
 import subprocess
 from datetime import datetime
 from typing import Literal
 
-from google.cloud import storage
-from google.cloud import logging
-from google.cloud import secretmanager
+from google.cloud import logging, secretmanager, storage
 
 STORAGE_CLIENT = storage.Client()
 LOGGING_CLIENT = logging.Client()
@@ -52,7 +51,7 @@ def perform_backup():
     tmp_dir = f'backup_{timestamp_str}'
     subprocess.run(['mkdir', tmp_dir], check=True)
     # grant permissions, so that mariadb can read ib_logfile0
-    subprocess.run(['sudo', 'chmod', '-R', '777', tmp_dir], check=True)
+    subprocess.run(['sudo', 'chmod', '-R', '770', tmp_dir], check=True)
 
     credentials = read_db_credentials()
     db_username = credentials['username']
@@ -68,10 +67,11 @@ def perform_backup():
                 '--backup',
                 f'--target-dir={tmp_dir}/',
                 f'--user={db_username}',
-                f'-p{db_password}',
             ],
             check=True,
             stderr=subprocess.DEVNULL,
+            # pass the password with stdin to avoid it being visible in the process list
+            env={'MYSQL_PWD': db_password, **os.environ},
         )
 
     except subprocess.CalledProcessError as e:
@@ -85,7 +85,7 @@ def perform_backup():
 
     # mariabackup creates awkward permissions for the output files,
     # so we'll grant appropriate permissions for tmp_dir to later remove it
-    subprocess.run(['sudo', 'chmod', '-R', '777', tmp_dir], check=True)
+    subprocess.run(['sudo', 'chmod', '-R', '770', tmp_dir], check=True)
 
     # tar the archive to make it easier to upload to GCS
     tar_archive_path = f'{tmp_dir}.tar.gz'

@@ -26,6 +26,12 @@
 
     --color-check-green: #7ac142;
     --color-table-header: #f9fafb;
+
+    --color-bg-over-budget: rgba(128, 0, 0, 0.2);
+    --color-bg-half-budget: rgba(255, 165, 0, 0.2);
+    --color-bg-under-budget: rgba(0, 128, 0, 0.2);
+
+    --color-text-href: rgb(65, 131, 196);
 }
 
 html[data-theme='dark-mode'] {
@@ -45,6 +51,12 @@ html[data-theme='dark-mode'] {
 
     --color-check-green: #659251;
     --color-table-header: rgba(0, 0, 0, 0.15);
+
+    --color-bg-over-budget: rgba(128, 0, 0, 0.5);
+    --color-bg-half-budget: rgba(255, 165, 0, 0.5);
+    --color-bg-under-budget: rgba(0, 128, 0, 0.5);
+
+    --color-text-href: rgb(188, 188, 251);
 }
 
 /* poor man's dark mode: https://github.com/swagger-api/swagger-ui/issues/5327#issuecomment-742375520 */
@@ -201,24 +213,82 @@ html[data-theme='dark-mode'] .ui.table {
     border: none;
 }
 
-.project-selector-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr); /* 4 columns */
-    grid-gap: 10px; /* Adjust the gap as needed */
-    margin-bottom: 20px;
+#group-by-dropdown .menu {
+    background: #ffffff !important;
 }
 
-.seq-type-selector-flex {
-    display: flex;
-    flex-wrap: wrap; /* Allows wrapping if too many types */
-    gap: 10px; /* Adjust the gap as needed */
-    margin-bottom: 20px;
+.field-selector-label {
+    width: 200px !important;
 }
 
-.exome-row {
-    background-color: #ccf9ff; /* Light Blue */
+.field-selector-dropdown {
+    width: 80% !important;
 }
 
-.genome-row {
-    background-color: #d5d2f9; /* Light Orange */
+.donut-chart {
+    padding-top: 20px;
+}
+
+/* missing styles regarding dark/light theme */
+.ui.fluid.card {
+    color: var(--color-text-primary);
+    background: var(--color-bg);
+    fill: var(--color-text-primary);
+}
+
+.ui.header {
+    color: var(--color-text-primary);
+}
+
+.ui.input > input {
+    color: var(--color-text-primary);
+    background: var(--color-bg-card);
+}
+
+.ui.toggle.checkbox label {
+    color: var(--color-text-primary);
+}
+
+.ui.toggle.checkbox input:checked ~ .box,
+.ui.toggle.checkbox input:checked ~ label {
+    color: var(--color-text-primary) !important;
+}
+
+/* charts */
+.tooltip {
+    background-color: var(--color-bg-card);
+    color: var(--color-text-primary);
+}
+
+.chart-card {
+    background-color: var(--color-bg-card);
+    color: var(--color-text-primary) !important;
+}
+
+.chart-label {
+    color: var(--color-text-primary) !important;
+}
+
+.hb-chart-grid {
+    color: var(--color-divider) !important;
+}
+
+.billing-over-budget {
+    background-color: var(--color-bg-over-budget) !important;
+}
+
+.billing-half-budget {
+    background-color: var(--color-bg-half-budget) !important;
+}
+
+.billing-under-budget {
+    background-color: var(--color-bg-under-budget) !important;
+}
+
+.billing-href a {
+    color: var(--color-text-href) !important;
+}
+
+.bold-text {
+    font-weight: bold;
 }

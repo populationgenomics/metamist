@@ -6,7 +6,10 @@ import {
     BillingHome,
     BillingSeqrProp,
     BillingCostByTime,
+    BillingCostByAnalysis,
     BillingInvoiceMonthCost,
+    BillingCostByCategory,
+    BillingCostByMonth,
 } from './pages/billing'
 import DocumentationArticle from './pages/docs/Documentation'
 import SampleView from './pages/sample/SampleView'
@@ -38,7 +41,6 @@ const Routes: React.FunctionComponent = () => (
                 </ErrorBoundary>
             }
         />
-
         <Route
             path="/analysis-runner/:projectName?"
             element={
@@ -49,12 +51,36 @@ const Routes: React.FunctionComponent = () => (
         />
 
         <Route path="/billing/" element={<BillingHome />} />
+        <Route
+            path="/billing/costByMonth"
+            element={
+                <ErrorBoundary>
+                    <BillingCostByMonth />
+                </ErrorBoundary>
+            }
+        />
         <Route path="/billing/invoiceMonthCost" element={<BillingInvoiceMonthCost />} />
         <Route
             path="/billing/costByTime"
             element={
                 <ErrorBoundary>
                     <BillingCostByTime />
+                </ErrorBoundary>
+            }
+        />
+        <Route
+            path="/billing/costByAnalysis"
+            element={
+                <ErrorBoundary>
+                    <BillingCostByAnalysis />
+                </ErrorBoundary>
+            }
+        />
+        <Route
+            path="/billing/costByCategory"
+            element={
+                <ErrorBoundary>
+                    <BillingCostByCategory />
                 </ErrorBoundary>
             }
         />
@@ -98,12 +124,14 @@ const Routes: React.FunctionComponent = () => (
             }
         />
 
-        <Route path="seqr/stats" element={
+        <Route
+            path="seqr/stats"
+            element={
                 <ErrorBoundary>
                     <SeqrStats />
                 </ErrorBoundary>
-            } />
-
+            }
+        />
     </Switch>
 )
 

@@ -843,4 +843,365 @@
 		<sql>INSERT INTO `group` (name) VALUES ('project-creators');</sql>
 		<sql>INSERT INTO `group` (name) VALUES ('members-admin');</sql>
 	</changeSet>
+	<changeSet id="2023-11-03_audit_log" author="michael.franklin">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<createTable tableName="audit_log">
+			<column name="id" type="INT" autoIncrement="true">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="timestamp" type="TIMESTAMP" defaultValue="now()">
+				<constraints nullable="false" />
+			</column>
+			<column name="author" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="on_behalf_of" type="VARCHAR(255)">
+				<constraints nullable="true" />
+			</column>
+			<column name="ar_guid" type="VARCHAR(255)">
+				<constraints nullable="true" />
+			</column>
+			<column name="comment" type="TEXT">
+				<constraints nullable="true" />
+			</column>
+			<column name="auth_project" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_AUDIT_LOG_PROJECT"
+					references="project(id)" />
+			</column>
+			<column name="meta" type="JSON" />
+		</createTable>
+		<sql>ALTER TABLE `audit_log` ADD SYSTEM VERSIONING;</sql>
+
+		<addColumn tableName="analysis">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_ANALYSIS_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="analysis_cohort">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_ANALYSIS_COHORT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="analysis_sample">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_ANALYSIS_SAMPLE_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="analysis_sequencing_group">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_ANALYSIS_SEQUENCING_GROUP_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="analysis_type">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_ANALYSIS_TYPE_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="assay">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_ASSAY_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="assay_external_id">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_ASSAY_EXTERNAL_ID_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="assay_type">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_ASSAY_TYPE_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="cohort">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_COHORT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="cohort_sequencing_group">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_COHORT_SEQUENCING_GROUP_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="family">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_FAMILY_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="family_participant">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_FAMILY_PARTICIPANT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="group">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_GROUP_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="group_member">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_GROUP_MEMBER_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="participant">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_PARTICIPANT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="participant_phenotypes">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_PARTICIPANT_PHENOTYPES_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="project">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_PROJECT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="sample">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_SAMPLE_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="sample_sequencing">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_SAMPLE_SEQUENCING_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="sample_sequencing_eid">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_SAMPLE_SEQUENCING_EID_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="sample_type">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_SAMPLE_TYPE_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="sequencing_group">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_SEQUENCING_GROUP_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="sequencing_group_assay">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_SEQUENCING_GROUP_ASSAY_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="sequencing_group_external_id">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_SEQUENCING_GROUP_EXTERNAL_ID_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="sequencing_platform">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_SEQUENCING_PLATFORM_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="sequencing_technology">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_SEQUENCING_TECHNOLOGY_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<addColumn tableName="sequencing_type">
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_SEQUENCING_TYPE_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</addColumn>
+		<sql>ALTER TABLE analysis CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE assay CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE assay_external_id CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE cohort CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE family CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE family_participant CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE group_member CHANGE author author VARCHAR(255) NULL DEFAULT NULL;</sql>
+		<sql>ALTER TABLE participant CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE participant_phenotypes CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE project CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE sample CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE sample_sequencing CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE sample_sequencing_eid CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE sequencing_group CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE sequencing_group_assay CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE sequencing_group_external_id CHANGE author author VARCHAR(255) NULL;</sql>
+	</changeSet>
+	<changeSet id="2024-02-27_analysis-runner-table" author="michael.franklin">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<createTable tableName="analysis_runner">
+			<column name="ar_guid" type="VARCHAR(255)">
+				<constraints nullable="false" unique="true" />
+			</column>
+			<column name="project" type="int">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_AR_PROJECT"
+					references="project(id)"
+				/>
+
+			</column>
+			<column name="timestamp" type="timestamp" />
+			<column name="access_level" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="repository" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="commit" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="output_path" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="script" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="description" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="driver_image" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="config_path" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="cwd" type="VARCHAR(255)">
+				<constraints nullable="true" />
+			</column>
+			<column name="environment" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="hail_version" type="VARCHAR(255)">
+				<constraints nullable="true" />
+			</column>
+			<column name="batch_url" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="submitting_user" type="VARCHAR(255)" />
+			<column name="meta" type="JSON" />
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_ANALYSIS_RUNNER_CHANGELOG_ID"
+					references="audit_log(id)"
+				/>
+			</column>
+		</createTable>
+
+		<createIndex indexName="idx_ar_guid" tableName="analysis_runner">
+			<column name="ar_guid" />
+		</createIndex>
+		<createIndex tableName="analysis_runner" indexName="idx_ar_submitting_user">
+			<column name="submitting_user" />
+		</createIndex>
+		<sql> ALTER TABLE analysis_runner ADD SYSTEM VERSIONING; </sql>
+	</changeSet>
+	<changeSet id="2024-03-15_analysis-runner-table-migration" author="michael.franklin">
+	<!-- Migrate all the old analysis_runner records into the new table (don't delete existing ones for now) -->
+		<sql> INSERT INTO analysis_runner ( ar_guid, project, timestamp, access_level, repository,
+			`commit`, output_path, script, description, driver_image, config_path, cwd, environment,
+			hail_version, batch_url, submitting_user, meta, audit_log_id ) SELECT
+			COALESCE(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.ar-guid')), UUID()) as ar_guid,
+			analysis.project as project,
+			STR_TO_DATE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp')), 'T', ' '),
+			'%Y-%m-%d %H:%i:%s.%f') as timestamp, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta,
+			'$.accessLevel')) as access_level, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.repo'))
+			as repository, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.commit')) as `commit`,
+			analysis.output as output_path, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.script')) as
+			script, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.description')) as description,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.driverImage')) as driver_image,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.configPath')) as config_path,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.cwd')) as cwd,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.environment')) as environment,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.hailVersion')) as hail_version,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.batch_url')) as batch_url,
+			COALESCE(audit_log.on_behalf_of, analysis.author) as submitting_user, JSON_REMOVE(
+			analysis.meta, '$.ar-guid', '$.timestamp', '$.accessLevel', '$.repo', '$.commit',
+			'$.script', '$.description', '$.driverImage', '$.configPath', '$.cwd', '$.environment',
+			'$.hailVersion', '$.batch_url' ) as meta, analysis.audit_log_id FROM analysis LEFT JOIN
+			audit_log ON analysis.audit_log_id = audit_log.id WHERE analysis.type =
+			"analysis-runner" </sql>
+
+	</changeSet>
 </databaseChangeLog>
