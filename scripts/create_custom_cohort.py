@@ -35,7 +35,7 @@ def main(
         body_create_cohort_from_criteria={'cohort_spec': cohort_body_spec, 'cohort_criteria': cohort_criteria, 'dry_run': dry_run}
     )
 
-    print(f'Awesome! You have created a custom cohort with id {cohort["cohort_id"]}')
+    print(f'Awesome! You have created a custom cohort {cohort}')
 
 
 def get_cohort_spec(
