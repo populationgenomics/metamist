@@ -1240,6 +1240,12 @@
 			<column name="project" type="INT">
 				<constraints nullable="false" foreignKeyName="fk_project_cohort_template" references="project(id)" />
 			</column>
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_COHORT_TEMPLATE_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
 		</createTable>
 		<!-- Since we renamed derived_from to template_id, we also need to modify the FK name. -->
 		<dropForeignKeyConstraint
@@ -1254,23 +1260,9 @@
         baseColumnNames="template_id"
         referencedColumnNames="id"
         />
-	</changeSet>
-
-	<changeSet author="john.marshall" id="2024-03-19_custom_cohorts_system_versioning">
 		<sql>ALTER TABLE cohort_template ADD SYSTEM VERSIONING;</sql>
 		<sql>ALTER TABLE cohort ADD SYSTEM VERSIONING;</sql>
 		<sql>ALTER TABLE cohort_sequencing_group ADD SYSTEM VERSIONING;</sql>
 		<sql>ALTER TABLE analysis_cohort ADD SYSTEM VERSIONING;</sql>
-	</changeSet>
-	<changeSet author="john.marshall" id="2024-03-21_custom_cohorts_audit_id">
-		<sql>SET @@system_versioning_alter_history = 1;</sql>
-		<addColumn tableName="cohort_template">
-			<column name="audit_log_id" type="INT">
-				<constraints
-					nullable="true"
-					foreignKeyName="FK_COHORT_TEMPLATE_CHANGELOG_ID"
-					references="audit_log(id)" />
-			</column>
-		</addColumn>
 	</changeSet>
 </databaseChangeLog>
