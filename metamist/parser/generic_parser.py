@@ -364,6 +364,7 @@ class ParsedAnalysis:
 
 class DefaultSequencing:
     """Groups default sequencing information"""
+
     def __init__(
         self,
         seq_type: str = 'genome',  # seq_type because `type` is a built-in
@@ -699,8 +700,12 @@ class GenericParser(
         """Uses tabulate to print a detailed summary of the samples being inserted / updated"""
         sample_participants = {}
         for sample in samples:
-            sample_participants[sample.external_sid] = sample.participant.external_pid if sample.participant else None
-        sample_sequencing_groups = {sample.external_sid: sample.sequencing_groups for sample in samples}
+            sample_participants[sample.external_sid] = (
+                sample.participant.external_pid if sample.participant else None
+            )
+        sample_sequencing_groups = {
+            sample.external_sid: sample.sequencing_groups for sample in samples
+        }
 
         details = []
         for sample, participant in sample_participants.items():
@@ -746,7 +751,9 @@ class GenericParser(
             sequencing_group_counts[str(sg.sequencing_type)] += 1
 
         str_assay_count = ', '.join(f'{k}={v}' for k, v in assays_count.items())
-        str_assay_types_count = ', '.join(f'{k}={v}' for k, v in assays_types_count.items())
+        str_assay_types_count = ', '.join(
+            f'{k}={v}' for k, v in assays_types_count.items()
+        )
         str_seqg_count = ', '.join(
             f'{k}={v}' for k, v in sequencing_group_counts.items()
         )
@@ -1007,7 +1014,9 @@ class GenericParser(
 
         return tuple(v for _, v in keys)
 
-    async def get_sample_sequencing_groups(self, sample: ParsedSample) -> list[ParsedSequencingGroup]:
+    async def get_sample_sequencing_groups(
+        self, sample: ParsedSample
+    ) -> list[ParsedSequencingGroup]:
         """
         From a set of samples, group (by calling self.get_sequencing_group_key)
         and parse sequencing groups and their values.
@@ -1069,7 +1078,12 @@ class GenericParser(
             if assay.meta.get('sequencing_type') == 'exome':
                 keys = ('sequencing_facility', 'sequencing_library')
             elif assay.meta.get('sequencing_type') in RNA_SEQ_TYPES:
-                keys = ('sequencing_facility', 'sequencing_library', 'read_end_type', 'read_length')
+                keys = (
+                    'sequencing_facility',
+                    'sequencing_library',
+                    'read_end_type',
+                    'read_length',
+                )
             else:
                 continue
             for key in keys:
