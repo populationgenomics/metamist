@@ -18,12 +18,7 @@ from db.python.layers.web import SearchItem, WebLayer
 from db.python.tables.project import ProjectPermissionsTable
 from models.enums.web import SeqrDatasetType
 from models.models.search import SearchResponse
-from models.models.web import (
-    PagingLinks,
-    ProjectSeqrDetails,
-    ProjectSeqrStats,
-    ProjectSummary,
-)
+from models.models.web import PagingLinks, ProjectSummary
 
 
 class SearchResponseModel(BaseModel):
@@ -139,45 +134,3 @@ async def sync_seqr_project(
     except Exception as e:
         raise ConnectionError(f'Failed to synchronise seqr project: {str(e)}') from e
         # return {'success': False, 'message': str(e)}
-
-
-@router.post(
-    '/projects-seqr-stats',
-    operation_id='getProjectsSeqrStats',
-    response_model=list[ProjectSeqrStats],
-)
-async def get_projects_seqr_stats(
-    projects: list[int] = None,
-    sequencing_types: list[str] = None,
-    connection: Connection = get_projectless_db_connection,
-):
-    """
-    Get the seqr project stats for a list of projects
-    """
-    weblayer = WebLayer(connection)
-    projects_seqr_stats = await weblayer.get_projects_seqr_stats(
-        projects=projects, sequencing_types=sequencing_types
-    )
-
-    return [s.to_external(links={}) for s in projects_seqr_stats]
-
-
-@router.post(
-    '/projects-seqr-details',
-    operation_id='getProjectsSeqrDetails',
-    response_model=list[ProjectSeqrDetails],
-)
-async def get_projects_seqr_details(
-    projects: list[int] = None,
-    sequencing_types: list[str] = None,
-    connection: Connection = get_projectless_db_connection,
-):
-    """
-    Get the seqr project details for a list of projects
-    """
-    weblayer = WebLayer(connection)
-    projects_seqr_details = await weblayer.get_project_seqr_details(
-        projects=projects, sequencing_types=sequencing_types
-    )
-
-    return [s.to_external(links={}) for s in projects_seqr_details]

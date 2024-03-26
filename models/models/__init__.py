@@ -36,6 +36,12 @@ from models.models.participant import (
     ParticipantUpsertInternal,
 )
 from models.models.project import Project, ProjectId
+from models.models.project_insights import (
+    ProjectInsightsDetails,
+    ProjectInsightsDetailsInternal,
+    ProjectInsightsStats,
+    ProjectInsightsStatsInternal,
+)
 from models.models.sample import (
     NestedSample,
     NestedSampleInternal,
@@ -64,9 +70,6 @@ from models.models.sequencing_group import (
 )
 from models.models.web import (
     PagingLinks,
-    ProjectSeqrDetailsInternal,
-    ProjectSeqrStats,
-    ProjectSeqrStatsInternal,
     ProjectSummary,
     ProjectSummaryInternal,
     WebProject,

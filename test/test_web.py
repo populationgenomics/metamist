@@ -3,6 +3,7 @@ from test.testbase import DbIsolatedTest, run_as_sync
 from db.python.layers import (
     AssayLayer,
     ParticipantLayer,
+    ProjectInsightsLayer,
     SampleLayer,
     SequencingGroupLayer,
     WebLayer,
@@ -13,7 +14,7 @@ from models.models import (
     AssayInternal,
     AssayUpsertInternal,
     ParticipantUpsertInternal,
-    ProjectSeqrStatsInternal,
+    ProjectInsightsStatsInternal,
     ProjectSummaryInternal,
     SampleUpsertInternal,
     SearchItem,
@@ -197,21 +198,22 @@ class TestWeb(DbIsolatedTest):
         super().setUp()
         self.webl = WebLayer(self.connection)
         self.partl = ParticipantLayer(self.connection)
+        self.pil = ProjectInsightsLayer(self.connection)
         self.sampl = SampleLayer(self.connection)
         self.seql = AssayLayer(self.connection)
 
     @run_as_sync
-    async def test_projects_seqr_stats(self):
+    async def test_project_insights_stats(self):
         """Test getting the summaries for all available projects"""
 
         await self.partl.upsert_participant(get_test_participant())
 
-        result = await self.webl.get_projects_seqr_stats(
+        result = await self.pil.get_projects_insights_stats(
             projects=[self.project_id], sequencing_types=['genome', 'exome']
         )
 
         expected = [
-            ProjectSeqrStatsInternal(
+            ProjectInsightsStatsInternal(
                 project=self.project_id,
                 dataset='test',
                 sequencing_type='genome',
@@ -225,7 +227,7 @@ class TestWeb(DbIsolatedTest):
                 latest_annotate_dataset_id=0,
                 total_sgs_in_latest_annotate_dataset=0,
             ),
-            ProjectSeqrStatsInternal(
+            ProjectInsightsStatsInternal(
                 project=self.project_id,
                 dataset='test',
                 sequencing_type='exome',
