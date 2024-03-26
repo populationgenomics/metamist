@@ -1,10 +1,10 @@
 import React from 'react'
-import { ProjectSeqrStats, WebApi, ProjectApi, EnumsApi } from '../../sm-api'
+import { ProjectInsightsStats, ProjectApi, EnumsApi } from '../../sm-api'
 import SeqrProjectSelector from './SeqrProjectSelector'
 import SequencingTypeSelector from './SequencingTypeSelector'
-import { Table, Checkbox, CheckboxProps } from 'semantic-ui-react'
+import { Table, Checkbox } from 'semantic-ui-react'
 
-interface SeqrProjectProps {
+interface InsightsProjectProps {
     id: number
     name: string
 }
@@ -21,10 +21,10 @@ function getPercentageColor(percentage: number) {
     return `rgb(${red}, ${green}, ${blue})`
 }
 
-const SeqrStats: React.FC = () => {
+const InsightsStats: React.FC = () => {
     // Get the list of seqr projects from the project API
-    const [seqrProjectNames, setSeqrProjectNames] = React.useState<string[]>([])
-    const [seqrProjectIds, setSeqrProjectIds] = React.useState<number[]>([])
+    const [seqrProjectNames, setInsightsProjectNames] = React.useState<string[]>([])
+    const [seqrProjectIds, setInsightsProjectIds] = React.useState<number[]>([])
     const [selectedProjects, setSelectedProjects] = React.useState<SelectedProject[]>([])
 
     const handleProjectSelected = (projectName: string, isSelected: boolean) => {
@@ -48,13 +48,13 @@ const SeqrStats: React.FC = () => {
 
     React.useEffect(() => {
         new ProjectApi().getSeqrProjects({}).then((resp) => {
-            const projects: SeqrProjectProps[] = resp.data
-            setSeqrProjectNames(projects.map((project) => project.name))
-            setSeqrProjectIds(projects.map((project) => project.id))
+            const projects: InsightsProjectProps[] = resp.data
+            setInsightsProjectNames(projects.map((project) => project.name))
+            setInsightsProjectIds(projects.map((project) => project.id))
         })
     }, [])
 
-    const [responses, setResponses] = React.useState<ProjectSeqrStats[]>([])
+    const [responses, setResponses] = React.useState<ProjectInsightsStats[]>([])
     // 0-indexed page number
     const [pageNumber, setPageNumber] = React.useState<number>(0)
     const [pageSize, setPageSize] = React.useState<number>(10)
@@ -88,8 +88,11 @@ const SeqrStats: React.FC = () => {
     React.useEffect(() => {
         if (selectedProjects.length > 0 && selectedSeqTypes.length > 0) {
             const projectIds = selectedProjects.map((p) => p.id)
-            new WebApi()
-                .getProjectsSeqrStats({ projects: projectIds, sequencing_types: selectedSeqTypes })
+            new ProjectApi()
+                .getProjectsInsightsStats({
+                    projects: projectIds,
+                    sequencing_types: selectedSeqTypes,
+                })
                 .then((resp) => {
                     setResponses(resp.data)
                 })
@@ -226,4 +229,4 @@ const SeqrStats: React.FC = () => {
     )
 }
 
-export default SeqrStats
+export default InsightsStats
