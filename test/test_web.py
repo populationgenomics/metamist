@@ -9,6 +9,7 @@ from db.python.layers import (
 )
 from models.enums import MetaSearchEntityPrefix
 from models.models import (
+    PRIMARY_EXTERNAL_ORG,
     Assay,
     AssayInternal,
     AssayUpsertInternal,
@@ -54,11 +55,11 @@ def merge(d1: dict, d2: dict):
 def get_test_participant():
     """Do it like this to avoid an upsert writing the test value"""
     return ParticipantUpsertInternal(
-        external_id='Demeter',
+        external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'},
         meta={},
         samples=[
             SampleUpsertInternal(
-                external_id='sample_id001',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'sample_id001'},
                 meta={},
                 type='blood',
                 sequencing_groups=[
@@ -102,11 +103,11 @@ def get_test_participant():
 def get_test_participant_2():
     """Do it like this to avoid an upsert writing the test value"""
     return ParticipantUpsertInternal(
-        external_id='Meter',
+        external_ids={PRIMARY_EXTERNAL_ORG: 'Meter'},
         meta={},
         samples=[
             SampleUpsertInternal(
-                external_id='sample_id002',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'sample_id002'},
                 meta={},
                 type='blood',
                 sequencing_groups=[
