@@ -35,17 +35,17 @@ class TestSampleModels(TestCase):
 
     def test_sample_to_internal_basic(self):
         """Test converting a basic sample to internal model"""
-        external = SampleUpsert(external_id='hey-hey')
+        external = SampleUpsert(external_ids={'default': 'hey-hey'})
         internal = external.to_internal()
 
         self.assertIsInstance(internal, SampleUpsertInternal)
-        self.assertEqual('hey-hey', internal.external_id)
+        self.assertDictEqual({'default': 'hey-hey'}, internal.external_ids)
 
     def test_sample_to_external_basic(self):
         """Test converting a basic sample to external model"""
-        internal = SampleUpsertInternal(id=1, external_id='hey-hey')
+        internal = SampleUpsertInternal(id=1, external_ids={'default': 'hey-hey'})
         external = internal.to_external()
 
         self.assertIsInstance(external, SampleUpsert)
-        self.assertEqual(sample_id_format(1), external.id)
-        self.assertEqual('hey-hey', external.external_id)
+        self.assertEqual(sample_id_format(1), external.ids)
+        self.assertDictEqual({'default': 'hey-hey'}, external.external_ids)

@@ -435,6 +435,7 @@ DELETE FROM family_participant WHERE family_id IN (
 DELETE FROM family WHERE project = :project;
 DELETE FROM sequencing_group_external_id WHERE project = :project;
 DELETE FROM assay_external_id WHERE project = :project;
+DELETE FROM sample_external_id WHERE project = :project;
 DELETE FROM sequencing_group_assay WHERE sequencing_group_id IN (
     SELECT sg.id FROM sequencing_group sg
     INNER JOIN sample ON sample.id = sg.sample_id

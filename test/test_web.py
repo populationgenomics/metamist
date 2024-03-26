@@ -58,7 +58,7 @@ def get_test_participant():
         meta={},
         samples=[
             SampleUpsertInternal(
-                external_id='sample_id001',
+                external_ids={'default': 'sample_id001'},
                 meta={},
                 type='blood',
                 sequencing_groups=[
@@ -106,7 +106,7 @@ def get_test_participant_2():
         meta={},
         samples=[
             SampleUpsertInternal(
-                external_id='sample_id002',
+                external_ids={'default': 'sample_id002'},
                 meta={},
                 type='blood',
                 sequencing_groups=[
