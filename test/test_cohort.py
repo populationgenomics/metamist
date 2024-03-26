@@ -276,3 +276,44 @@ class TestCohortData(DbIsolatedTest):
         )
         self.assertIsInstance(result['cohort_id'], str)
         self.assertEqual([self.sgC], result['sequencing_group_ids'])
+
+    @run_as_sync
+    async def test_reevaluate_cohort(self):
+        """Add another sample, then reevaluate a cohort template"""
+        template = await self.cohortl.create_cohort_template(
+            project=self.project_id,
+            cohort_template=CohortTemplate(
+                name='Boold template',
+                description='Template selecting blood',
+                criteria=CohortCriteria(
+                    projects=['test'],
+                    sample_type=['blood'],
+                ),
+            ),
+        )
+
+        coh1 = await self.cohortl.create_cohort_from_criteria(
+            project_to_write=self.project_id,
+            author='bob@example.org',
+            description='Blood cohort',
+            cohort_name='Blood cohort 1',
+            dry_run=False,
+            template_id=template,
+        )
+        self.assertEqual(2, len(coh1['sequencing_group_ids']))
+
+        sD = await self.samplel.upsert_sample(get_sample_model('D'))
+        sgD = sequencing_group_id_format(sD.sequencing_groups[0].id)
+
+        coh2 = await self.cohortl.create_cohort_from_criteria(
+            project_to_write=self.project_id,
+            author='bob@example.org',
+            description='Blood cohort',
+            cohort_name='Blood cohort 2',
+            dry_run=False,
+            template_id=template,
+        )
+        self.assertEqual(3, len(coh2['sequencing_group_ids']))
+
+        self.assertNotIn(sgD, coh1['sequencing_group_ids'])
+        self.assertIn(sgD, coh2['sequencing_group_ids'])
