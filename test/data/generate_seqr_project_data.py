@@ -323,7 +323,7 @@ async def generate_sample_entries(
                         )
                     )
 
-    return sapi.upsert_samples_async(project, samples)
+    await sapi.upsert_samples_async(project, samples)
 
 
 async def generate_cram_analyses(project: str, analyses_to_insert: list[Analysis]):
@@ -393,9 +393,34 @@ async def generate_joint_called_analyses(project: str, aligned_sgs: list[dict], 
                     status=AnalysisStatus('completed'),
                     output=f'FAKE::{project}-{seq_type}-es-{datetime.date.today()}',
                     meta={'stage': 'MtToEs', 'sequencing_type': seq_type},
-                )
+                ),
             ]
         )
+
+        if seq_type == 'genome':
+            analyses_to_insert.extend(
+                [
+                    Analysis(
+                        sequencing_group_ids=joint_called_sgs,
+                        type='es-index',
+                        status=AnalysisStatus('completed'),
+                        output=f'FAKE::{project}-{seq_type}-sv-{datetime.date.today()}',
+                        meta={'stage': 'MtToEsSv', 'sequencing_type': seq_type},
+                    ),
+                ]
+            )
+        elif seq_type == 'exome':
+            analyses_to_insert.extend(
+                [
+                    Analysis(
+                        sequencing_group_ids=joint_called_sgs,
+                        type='es-index',
+                        status=AnalysisStatus('completed'),
+                        output=f'FAKE::{project}-{seq_type}-gcnv-{datetime.date.today()}',
+                        meta={'stage': 'MtToEsCNV', 'sequencing_type': seq_type},
+                    ),
+                ]
+            )
 
 
 async def main():
