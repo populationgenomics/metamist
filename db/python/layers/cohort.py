@@ -148,7 +148,7 @@ class CohortLayer(BaseLayer):
                 raise ValueError(f'Cohort template with ID {template_id} not found')
 
         if template and cohort_criteria:
-            # TODO: Handle this case. For now, not supported.
+            # TODO: Perhaps handle this case in future. For now, not supported.
             raise ValueError('A cohort cannot have both criteria and be derived from a template')
 
         # Only provide a template id

@@ -14,6 +14,7 @@ def main(
     sg_technologies: list[str],
     sg_platforms: list[str],
     sg_types: list[str],
+    sample_types: list[str],
     dry_run: bool = False
 ):
     """ Create a custom cohort"""
@@ -25,7 +26,8 @@ def main(
         excluded_sgs_internal=excluded_sg_ids or [],
         sg_technology=sg_technologies or [],
         sg_platform=sg_platforms or [],
-        sg_type=sg_types or []
+        sg_type=sg_types or [],
+        sample_types=sample_types or [],
     )
 
     cohort = capi.create_cohort_from_criteria(
@@ -68,6 +70,7 @@ if __name__ == '__main__':
     parser.add_argument('--sg_technology', required=False, type=list[str], help='Sequencing group technologies')
     parser.add_argument('--sg_platform', required=False, type=list[str], help='Sequencing group platforms')
     parser.add_argument('--sg_type', required=False, type=list[str], help='Sequencing group types, e.g. exome, genome')
+    parser.add_argument('--sample_type', required=False, type=list[str], help='sample type')
     parser.add_argument('--dry_run', required=False, type=bool, help='Dry run mode')
 
     args = parser.parse_args()
@@ -87,5 +90,6 @@ if __name__ == '__main__':
         sg_technologies=args.sg_technology,
         sg_platforms=args.sg_platform,
         sg_types=args.sg_type,
+        sample_types=args.sample_type,
         dry_run=args.dry_run
     )

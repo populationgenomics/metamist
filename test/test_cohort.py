@@ -305,7 +305,7 @@ class TestCohortData(DbIsolatedTest):
         template = await self.cohortl.create_cohort_template(
             project=self.project_id,
             cohort_template=CohortTemplate(
-                name='Boold template',
+                name='Blood template',
                 description='Template selecting blood',
                 criteria=CohortCriteria(
                     projects=['test'],
