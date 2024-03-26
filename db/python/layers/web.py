@@ -464,7 +464,7 @@ WHERE
     ):
         """Combines the results of the above seqr stats queries into a response"""
 
-        ptable = ProjectPermissionsTable(self.connection)
+        ptable = ProjectPermissionsTable(self._connection)
         await ptable.check_access_to_project_ids(
             user=self.author, project_ids=projects, readonly=True
         )
@@ -551,7 +551,7 @@ WHERE
         self, projects: list[int], sequencing_types: list[str]
     ):
         """Combines the results of the above seqr details queries into a response"""
-        ptable = ProjectPermissionsTable(self.connection)
+        ptable = ProjectPermissionsTable(self._connection)
         await ptable.check_access_to_project_ids(
             user=self.author, project_ids=projects, readonly=True
         )
