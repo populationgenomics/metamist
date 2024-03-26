@@ -1,7 +1,7 @@
 from typing import Iterable
 
 from api.settings import COHORT_TEMPLATE_CHECKSUM_OFFSET, COHORT_TEMPLATE_PREFIX
-from models.utils.luhn import luhn_compute
+from models.utils.luhn import luhn_compute, luhn_is_valid
 
 
 def cohort_template_id_format(cohort_template_id: int | str) -> str:
@@ -66,7 +66,7 @@ def cohort_template_id_transform_to_raw(cohort_template_id: int | str) -> int:
 
     cohort_template_id = int(stripped_identifier)
 
-    if not luhn_compute(cohort_template_id, offset=COHORT_TEMPLATE_CHECKSUM_OFFSET):
+    if not luhn_is_valid(cohort_template_id, offset=COHORT_TEMPLATE_CHECKSUM_OFFSET):
         raise ValueError(f'Invalid checksum found for cohort template identifier {cohort_template_id!r}')
 
     return int(stripped_identifier[:-1])
