@@ -18,6 +18,10 @@ class AnalysisStats:
     id: int = 0
     sg_count: int = 0
 
+    def to_external(self):
+        """Convert to transport model"""
+        return {'id': self.id, 'sg_count': self.sg_count}
+
 
 @dataclass
 class ProjectInsightsDetailsInternal:
@@ -122,10 +126,10 @@ class ProjectInsightsStatsInternal:
             total_samples=self.total_samples,
             total_sequencing_groups=self.total_sequencing_groups,
             total_crams=self.total_crams,
-            latest_annotate_dataset=self.latest_annotate_dataset,
-            latest_snv_es_index=self.latest_snv_es_index,
-            latest_sv_es_index=self.latest_sv_es_index,
-            latest_gcnv_es_index=self.latest_gcnv_es_index,
+            latest_annotate_dataset=self.latest_annotate_dataset.to_external(),
+            latest_snv_es_index=self.latest_snv_es_index.to_external(),
+            latest_sv_es_index=self.latest_sv_es_index.to_external(),
+            latest_gcnv_es_index=self.latest_gcnv_es_index.to_external(),
             links=links,
         )
 
@@ -141,10 +145,10 @@ class ProjectInsightsStats(SMBase):
     total_samples: int
     total_sequencing_groups: int
     total_crams: int
-    latest_annotate_dataset: AnalysisStats
-    latest_snv_es_index: AnalysisStats
-    latest_sv_es_index: AnalysisStats
-    latest_gcnv_es_index: AnalysisStats
+    latest_annotate_dataset: dict[str, int]
+    latest_snv_es_index: dict[str, int]
+    latest_sv_es_index: dict[str, int]
+    latest_gcnv_es_index: dict[str, int]
 
     links: PagingLinks | None
 

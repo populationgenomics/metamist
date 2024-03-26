@@ -229,79 +229,38 @@ WHERE
         )
         return total_crams_by_project_id_and_seq_type
 
-    async def _stats_es_indexes_query(
-        self, projects: list[int], sequencing_types: list[str]
-    ):
-        _query = """
-SELECT
-    a.project,
-    a.id,
-    JSON_EXTRACT(a.meta, '$.sequencing_type') as sequencing_type,
-    JSON_EXTRACT(a.meta, '$.stage') as stage,
-    a.output,
-    a.timestamp_completed,
-FROM analysis a
-INNER JOIN (
-    SELECT
-        project,
-        MAX(a.timestamp_completed) as max_timestamp,
-        JSON_EXTRACT(meta, '$.sequencing_type') as sequencing_type,
-        JSON_EXTRACT(meta, '$.stage') as stage,
-    FROM analysis
-    GROUP BY project, JSON_EXTRACT(meta, '$.sequencing_type'), JSON_EXTRACT(meta, '$.stage')
-) max_timestamps ON a.project = max_timestamps.project
-AND a.timestamp_completed = max_timestamps.max_timestamp
-AND JSON_EXTRACT(a.meta, '$.sequencing_type') = max_timestamps.sequencing_type
-AND JSON_EXTRACT(a.meta, '$.stage') = max_timestamps.stage
-AND a.project in :projects
-        """
-        latest_es_indexes_by_project_id_and_seq_type_and_stage = await self.connection.fetch_all(
-            _query,
-            {
-                'projects': projects,
-                'sequencing_types': sequencing_types,
-            },
-        )
-        return latest_es_indexes_by_project_id_and_seq_type_and_stage
-
     async def _stats_annotate_dataset_query(
         self, projects: list[int], sequencing_types: list[str]
     ):
         _query = """
 SELECT
     a.project,
-    a.sequencing_type,
+    JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) as sequencing_type,
     a.id,
     a.output,
     a.timestamp_completed
-FROM
-    (
-        SELECT
-            a.project,
-            a.id,
-            a.output,
-            a.timestamp_completed,
-            sg.type as sequencing_type,
-            ROW_NUMBER() OVER (
-                PARTITION BY a.project,
-                sg.type
-                ORDER BY
-                    a.timestamp_completed DESC
-            ) AS rn
-        FROM
-            analysis a
-            LEFT JOIN analysis_sequencing_group asg ON a.id = asg.analysis_id
-            LEFT JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
-        WHERE
-            a.status = 'COMPLETED'
-            AND a.type = 'CUSTOM'
-            AND a.meta LIKE '%AnnotateDataset%'
-            AND sg.type IN :sequencing_types
-    ) a
-WHERE
-    a.rn = 1
-AND
-    a.project IN :projects
+FROM analysis a
+INNER JOIN (
+    SELECT
+        project,
+        MAX(timestamp_completed) as max_timestamp,
+        JSON_UNQUOTE(JSON_EXTRACT(meta, '$.sequencing_type')) as sequencing_type
+    FROM analysis
+    WHERE
+        status = 'COMPLETED'
+        AND type = 'CUSTOM'
+        AND JSON_EXTRACT(meta, '$.stage') = 'AnnotateDataset'
+        AND JSON_UNQUOTE(JSON_EXTRACT(meta, '$.sequencing_type')) IN :sequencing_types
+    GROUP BY project, JSON_EXTRACT(meta, '$.sequencing_type')
+) max_timestamps ON a.project = max_timestamps.project
+AND a.timestamp_completed = max_timestamps.max_timestamp
+AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) = max_timestamps.sequencing_type
+WHERE a.type = 'CUSTOM'
+AND a.status = 'COMPLETED'
+AND a.project IN :projects
+AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) IN :sequencing_types
+AND JSON_EXTRACT(a.meta, '$.stage') = 'AnnotateDataset';
+    -- JSON_UNQUOTE is necessary to compare JSON values with IN operator
         """
         latest_annotate_dataset_by_project_id_and_seq_type = (
             await self.connection.fetch_all(
@@ -313,6 +272,43 @@ AND
             )
         )
         return latest_annotate_dataset_by_project_id_and_seq_type
+
+    async def _stats_es_indexes_query(
+        self, projects: list[int], sequencing_types: list[str]
+    ):
+        _query = """
+SELECT
+    a.project,
+    a.id,
+    JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) as sequencing_type,
+    JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.stage')) as stage,
+    a.output,
+    a.timestamp_completed
+FROM analysis a
+INNER JOIN (
+    SELECT
+        project,
+        MAX(timestamp_completed) as max_timestamp,
+        JSON_UNQUOTE(JSON_EXTRACT(meta, '$.sequencing_type')) as sequencing_type,
+        JSON_UNQUOTE(JSON_EXTRACT(meta, '$.stage')) as stage
+    FROM analysis
+    WHERE type='es-index'
+    GROUP BY project, JSON_EXTRACT(meta, '$.sequencing_type'), JSON_EXTRACT(meta, '$.stage')
+) max_timestamps ON a.project = max_timestamps.project
+AND a.timestamp_completed = max_timestamps.max_timestamp
+AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) = max_timestamps.sequencing_type
+AND JSON_EXTRACT(a.meta, '$.stage') = max_timestamps.stage
+WHERE a.project IN :projects
+AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) in :sequencing_types;
+        """
+        latest_es_indexes_by_project_id_and_seq_type_and_stage = await self.connection.fetch_all(
+            _query,
+            {
+                'projects': projects,
+                'sequencing_types': sequencing_types,
+            },
+        )
+        return latest_es_indexes_by_project_id_and_seq_type_and_stage
 
     async def _details_sequencing_groups_report_links(
         self, projects: list[int], sequencing_types: list[str]

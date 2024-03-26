@@ -10,6 +10,7 @@ from db.python.layers import (
 )
 from models.enums import MetaSearchEntityPrefix
 from models.models import (
+    AnalysisStats,
     Assay,
     AssayInternal,
     AssayUpsertInternal,
@@ -208,7 +209,7 @@ class TestWeb(DbIsolatedTest):
 
         await self.partl.upsert_participant(get_test_participant())
 
-        result = await self.pil.get_projects_insights_stats(
+        result = await self.pil.get_project_insights_stats(
             projects=[self.project_id], sequencing_types=['genome', 'exome']
         )
 
@@ -222,10 +223,10 @@ class TestWeb(DbIsolatedTest):
                 total_samples=1,
                 total_sequencing_groups=1,
                 total_crams=0,
-                latest_es_index_id=0,
-                total_sgs_in_latest_es_index=0,
-                latest_annotate_dataset_id=0,
-                total_sgs_in_latest_annotate_dataset=0,
+                latest_annotate_dataset=AnalysisStats(id=0, sg_count=0),
+                latest_snv_es_index=AnalysisStats(id=0, sg_count=0),
+                latest_sv_es_index=AnalysisStats(id=0, sg_count=0),
+                latest_gcnv_es_index=AnalysisStats(id=0, sg_count=0),
             ),
             ProjectInsightsStatsInternal(
                 project=self.project_id,
@@ -236,10 +237,10 @@ class TestWeb(DbIsolatedTest):
                 total_samples=0,
                 total_sequencing_groups=0,
                 total_crams=0,
-                latest_es_index_id=0,
-                total_sgs_in_latest_es_index=0,
-                latest_annotate_dataset_id=0,
-                total_sgs_in_latest_annotate_dataset=0,
+                latest_annotate_dataset=AnalysisStats(id=0, sg_count=0),
+                latest_snv_es_index=AnalysisStats(id=0, sg_count=0),
+                latest_sv_es_index=AnalysisStats(id=0, sg_count=0),
+                latest_gcnv_es_index=AnalysisStats(id=0, sg_count=0),
             ),
         ]
 
