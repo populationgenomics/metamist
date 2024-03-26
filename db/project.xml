@@ -844,24 +844,6 @@
 		<sql>INSERT INTO `group` (name) VALUES ('members-admin');</sql>
 	</changeSet>
 
-<changeSet id="2023-10-07_cohort-builder-changes" author="vivian.bakiris">
-    <!-- Modify the 'derived_from' column to make it nullable -->
-    <modifyDataType tableName="cohort" columnName="derived_from" newDataType="INT" />
-	<addColumn tableName="cohort">
-		<column name="project" type="INT">
-		<constraints nullable="false" foreignKeyName="fk_project_cohort" references="project(id)" />
-		</column>
-	</addColumn>
-</changeSet>
-
-<changeSet id="2023-11-23_cohort-builder-changes" author="daniel.esposito">
-	<addColumn tableName="cohort">
-		<column name="name" type="VARCHAR(255)">
-			<constraints nullable="false" unique="true" />
-		</column>
-	</addColumn>
-</changeSet>
-
 	<changeSet id="2023-11-03_audit_log" author="michael.franklin">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
 		<createTable tableName="audit_log">
@@ -1223,7 +1205,25 @@
 			"analysis-runner" </sql>
 
 	</changeSet>
-	<changeSet id="2024-04-27_custom-cohorts" author="vivian.bakiris">
+
+	<changeSet id="2024-03-27_custom-cohort-changes" author="vivian.bakiris">
+		<!-- Add columns 'project' and 'name' to the cohort table -->
+		<addColumn tableName="cohort">
+			<column name="project" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_project_cohort" references="project(id)" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" unique="true" />
+			</column>
+		</addColumn>
+		<renameColumn
+			columnDataType="INT"
+			newColumnName="template_id"
+			oldColumnName="derived_from"
+			remarks="Following user feedback session, we are renaming the derived_from column to template_id to better reflect its purpose."
+			tableName="cohort"
+		/>
+		<!-- Add 'cohort_template' table -->
 		<createTable tableName="cohort_template">
 			<column name="id" type="INT" autoIncrement="true">
 				<constraints primaryKey="true" nullable="false" />
@@ -1237,40 +1237,25 @@
 			<column name="criteria" type="JSON">
 				<constraints nullable="false" />
 			</column>
-		</createTable>
-	</changeSet>
-	<changeSet id="2024-02-28_custom-cohorts-templates" author="vivian.bakiris">
-		<addColumn tableName="cohort_template">
 			<column name="project" type="INT">
 				<constraints nullable="false" foreignKeyName="fk_project_cohort_template" references="project(id)" />
 			</column>
-		</addColumn>
-	</changeSet>
-	<changeSet author="vivian.bakiris" id="2024-03-19_custom_cohorts_renames">
-		<renameColumn
-			columnDataType="INT"
-			newColumnName="template_id"
-			oldColumnName="derived_from"
-			remarks="Following user feedback session, we are renaming the derived_from column to template_id to better reflect its purpose."
-			tableName="cohort"
-		/>
-	</changeSet>
-	<changeSet author="vivian.bakiris" id="2024-03-19_custom_cohorts_fk_fix">
-    <!-- Drop the existing foreign key constraint -->
-    <dropForeignKeyConstraint
+		</createTable>
+		<!-- Since we renamed derived_from to template_id, we also need to modify the FK name. -->
+		<dropForeignKeyConstraint
         baseTableName="cohort"
         constraintName="FK_COHORT_DERIVED_FROM_ID_COHORT"
         />
-
-    <!-- Recreate the foreign key constraint with the new column name -->
-    <addForeignKeyConstraint
+		<!-- Recreate the foreign key constraint with the new column name -->
+		<addForeignKeyConstraint
         baseTableName="cohort"
         constraintName="FK_COHORT_TEMPLATE_ID_COHORT"
         referencedTableName="cohort_template"
         baseColumnNames="template_id"
         referencedColumnNames="id"
         />
-    </changeSet>
+	</changeSet>
+
 	<changeSet author="john.marshall" id="2024-03-19_custom_cohorts_system_versioning">
 		<sql>ALTER TABLE cohort_template ADD SYSTEM VERSIONING;</sql>
 		<sql>ALTER TABLE cohort ADD SYSTEM VERSIONING;</sql>
