@@ -43,6 +43,9 @@ jobs:
             -f deploy/api/Dockerfile \
             .
 
+      - name: Get frozen client files
+        uses: ./.github/actions/get_frozen_client
+
       - name: Build + install packages
         run: |
           export OPENAPI_COMMAND="java -jar openapi-generator-cli.jar"

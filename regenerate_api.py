@@ -344,13 +344,6 @@ def main():
     try:
         assert_server_is_accessible()
 
-        # Generate the installable Python API
-        generate_api_and_copy(
-            'python',
-            copy_python_files_from,
-            ['--template-dir', 'openapi-templates'],
-        )
-
         # Generate the Typescript API for React application
         generate_api_and_copy(
             'typescript-axios',

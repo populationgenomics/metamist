@@ -30,7 +30,7 @@ It comprises three key components:
    - Storing frequently used queries.
    - Providing a GraphQL/HTTP API for efficient querying of the database.
 
-3. **Installable Python Library**: Wraps the Python Web API using the OpenAPI generator, facilitating easier interaction with the system.
+3. **Installable Python Library**: Wraps the Python Web API using the OpenAPI generator, facilitating easier interaction with the system. This is deprecated and will soon be replaced with a installable python library generated from the graphql schema.
 
 ### Schema
 
