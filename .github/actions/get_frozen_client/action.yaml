@@ -1,0 +1,9 @@
+name: Get frozen OpenAPI client files
+
+runs:
+  using: composite
+  steps:
+    - name: "Copy python api files"
+      run: |
+        python scripts/get_frozen_api_files.py f0a0e546c73202e3c90f152d8861448e1f4203f4
+      shell: bash -eo pipefail -l {0}

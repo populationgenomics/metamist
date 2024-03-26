@@ -347,11 +347,31 @@ You can now place breakpoints anywhere and debug the API with "Run API" under th
 
 ![Run and Debug](../resources/debug-api.png)
 
-### Generate and install the python installable API
+
+## Using OpenAPI
+
+As of March 2024 we are deprecating the generation of apis using OpenAPI due to ongoing issues with dependency and version conflicts caused by the openapi generator. As such, no changes should be made to OpenAPI routes unless absolutely necessary. A frozen version of the generated API has been stored in the `metamist-legacy-api` branch and can be downloaded as described below.
+
+### Downloading the Python installable API
+
+To get the python installable API you can run the `scripts/get_frozen_api_files.py` script:
+
+```bash
+python scripts/get_frozen_api_files.py <ref>
+```
+
+where `<ref>` is the ref that you want to download the frozen api files from, in most cases this will be the most recent commit on the `metamist-legacy-api` branch.
+
+This will fetch an archive of the frozen API and copy the necessary files into the correct locations.
+
+
+### Generate the typescript API client
+
+Despite the deprecation of the OpenAPI generation, the generator should still work to generate the typescript API.
 
 After making any changes to the logic, it is worth regenerating the API with the OpenAPI Generator.
 
-Generating the installable APIs (Python + Typescript) involves running the server, getting the `/openapi.json`, and running `openapi-generator`.
+Generating the Typescript API involves running the server, getting the `/openapi.json`, and running `openapi-generator`.
 
 The `regenerate_api.py` script does this for us in a few ways:
 
@@ -363,8 +383,7 @@ You can simply run:
 
 ```bash
 # this will start the api.server, so make sure you have the dependencies installed,
-python regenerate_api.py \
-    && pip install .
+python regenerate_api.py
 ```
 
 or if you prefer the Docker approach (eg: for CI), this command will build the docker container and supply it to `regenerate_api.py`:
@@ -375,6 +394,10 @@ export SM_DOCKER="cpg/metamist-server:dev"
 docker build --build-arg SM_ENVIRONMENT=local -t $SM_DOCKER -f deploy/api/Dockerfile .
 python regenerate_api.py
 ```
+
+
+
+
 
 ### Developing the UI
 
