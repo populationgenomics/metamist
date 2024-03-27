@@ -116,6 +116,17 @@ class GraphQLCohort:
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sequencing_groups]
 
     @strawberry.field()
+    async def analyses( self, info: Info, root:'Cohort') -> list['GraphQLAnalysis']:
+        connection = info.context['connection']
+        connection.project = root.project
+        internal_analysis = await AnalysisLayer(connection).query(
+            AnalysisFilter(
+                cohort_id=GenericFilter(in_=[cohort_id_transform_to_raw(root.id)]),
+            )
+        )
+        return [GraphQLAnalysis.from_internal(a) for a in internal_analysis]
+
+    @strawberry.field()
     async def project(self, info: Info, root: 'Cohort') -> 'GraphQLProject':
         loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
         project = await loader.load(root.project)
