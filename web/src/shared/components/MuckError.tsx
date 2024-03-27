@@ -6,8 +6,7 @@ const MuckError: React.FunctionComponent<{
     message: string
 }> = ({ message }) => (
     <p>
-        <em>{message}</em>
-        <MuckTheDuck height={28} style={{ transform: 'scaleY(-1)' }} />
+        <em>{message}</em> <MuckTheDuck height={28} style={{ transform: 'scaleY(-1)' }} />
     </p>
 )
 

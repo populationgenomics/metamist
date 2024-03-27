@@ -18,6 +18,8 @@ class GraphQLFilter(Generic[T]):
     gte: T | None = None
     lt: T | None = None
     lte: T | None = None
+    contains: T | None = None
+    icontains: T | None = None
 
     def all_values(self):
         """
@@ -38,6 +40,10 @@ class GraphQLFilter(Generic[T]):
             v.append(self.lt)
         if self.lte:
             v.append(self.lte)
+        if self.contains:
+            v.append(self.contains)
+        if self.icontains:
+            v.append(self.icontains)
 
         return v
 
@@ -53,6 +59,8 @@ class GraphQLFilter(Generic[T]):
                 gte=f(self.gte) if self.gte else None,
                 lt=f(self.lt) if self.lt else None,
                 lte=f(self.lte) if self.lte else None,
+                contains=f(self.contains) if self.contains else None,
+                icontains=f(self.icontains) if self.icontains else None,
             )
 
         return GenericFilter(
@@ -63,6 +71,8 @@ class GraphQLFilter(Generic[T]):
             gte=self.gte,
             lt=self.lt,
             lte=self.lte,
+            contains=self.contains,
+            icontains=self.icontains,
         )
 
 

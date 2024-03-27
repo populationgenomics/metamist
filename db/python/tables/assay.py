@@ -44,7 +44,9 @@ class AssayFilter(GenericFilterModel):
     type: GenericFilter | None = None
 
     def __hash__(self):  # pylint: disable=useless-super-delegation
-        return super().__hash__()
+        return hash(
+            (self.id, self.sample_id, self.external_id, self.project, self.type)
+        )
 
 
 class AssayTable(DbBase):
@@ -538,6 +540,11 @@ class AssayTable(DbBase):
         projects: set[ProjectId] = set()
         for row in rows:
             drow = dict(row)
+
+            # Set external_id map to empty dict since we don't fetch them for this query
+            # TODO: Get external_ids map for this query if/when they are needed.
+            drow['external_ids'] = drow.pop('external_ids', {})
+
             sequencing_group_id = drow.pop('sequencing_group_id')
             projects.add(drow.pop('project'))
             assay = AssayInternal.from_db(drow)
