@@ -112,6 +112,9 @@ class CohortTable(DbBase):
         """
         template = await self.connection.fetch_one(_query, {'template_id': template_id})
 
+        if not template:
+            raise ValueError(f'Cohort template with ID {template_id} not found')
+
         return {'id': template['id'], 'criteria': template['criteria']}
 
     async def create_cohort_template(
