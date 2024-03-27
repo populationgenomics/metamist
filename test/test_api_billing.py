@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from api.routes import billing
 from models.models import (
-    BillingBatchCostRecord,
+    AnalysisCostRecord,
     BillingColumn,
     BillingCostBudgetRecord,
     BillingTotalCostQueryModel,
@@ -68,7 +68,7 @@ class TestApiBilling(BqTest):
             'dataproc': None,
         }
 
-        mockup_record = [BillingBatchCostRecord.from_json(mockup_record_json)]
+        mockup_record = [AnalysisCostRecord.from_dict(mockup_record_json)]
         mock_get_billing_layer.return_value = self.layer
         mock_get_cost_by_ar_guid.return_value = mockup_record
         response = await billing.get_cost_by_ar_guid(
@@ -102,7 +102,7 @@ class TestApiBilling(BqTest):
             'dataproc': None,
         }
 
-        mockup_record = [BillingBatchCostRecord.from_json(mockup_record_json)]
+        mockup_record = [AnalysisCostRecord.from_dict(mockup_record_json)]
         mock_get_billing_layer.return_value = self.layer
         mock_get_cost_by_batch_id.return_value = mockup_record
         response = await billing.get_cost_by_batch_id(

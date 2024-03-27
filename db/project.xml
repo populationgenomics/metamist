@@ -1178,7 +1178,13 @@
 		<sql> ALTER TABLE analysis_runner ADD SYSTEM VERSIONING; </sql>
 	</changeSet>
 	<changeSet id="2024-03-15_analysis-runner-table-migration" author="michael.franklin">
+
+	<!-- make the configPath nullable -->
+
+	<sql>ALTER TABLE analysis_runner MODIFY COLUMN config_path VARCHAR(255) NULL;</sql>
+
 	<!-- Migrate all the old analysis_runner records into the new table (don't delete existing ones for now) -->
+
 		<sql> INSERT INTO analysis_runner ( ar_guid, project, timestamp, access_level, repository,
 			`commit`, output_path, script, description, driver_image, config_path, cwd, environment,
 			hail_version, batch_url, submitting_user, meta, audit_log_id ) SELECT

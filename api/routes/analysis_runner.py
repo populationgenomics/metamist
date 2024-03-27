@@ -25,13 +25,13 @@ async def create_analysis_runner_log(  # pylint: disable=too-many-arguments
     description: str,
     driver_image: str,
     config_path: str,
-    cwd: str | None,
     environment: str,
-    hail_version: str | None,
     batch_url: str,
     submitting_user: str,
     meta: dict[str, str],
     output_path: str,
+    hail_version: str | None = None,
+    cwd: str | None = None,
     connection: Connection = get_project_write_connection,
 ) -> str:
     """Create a new analysis runner log"""
