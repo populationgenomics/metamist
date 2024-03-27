@@ -1,29 +1,22 @@
+import _ from 'lodash'
 import * as React from 'react'
-import { Card, Checkbox } from 'semantic-ui-react'
-import _, { range } from 'lodash'
-import { DonutChart } from '../../../shared/components/Graphs/DonutChart'
+import { Card } from 'semantic-ui-react'
 import '../../project/AnalysisRunnerView/AnalysisGrid.css'
 
-import { Table as SUITable, TableProps } from 'semantic-ui-react'
+import { Table as SUITable } from 'semantic-ui-react'
 
 import Table, { CheckboxRow, DisplayRow } from '../../../shared/components/Table'
 
-import formatMoney from '../../../shared/utilities/formatMoney'
-import {
-    AnalysisCostRecord,
-    AnalysisCostRecordTotal,
-    AnalysisCostRecordBatch,
-    AnalysisCostRecordBatchJob,
-    Analysis,
-    AnalysisCostRecordSku,
-    AnalysisCostRecordSeqGroup,
-} from '../../../sm-api'
-import { Check } from '@mui/icons-material'
-import { CostBySkuRow, SeqGrpDisplay } from './BillingByAnalysisComponents'
-import { BatchJobsTable } from './BatchJobGrid'
 import { useQuery } from '@apollo/client'
 import { gql } from '../../../__generated__'
 import MuckTheDuck from '../../../shared/components/MuckTheDuck'
+import formatMoney from '../../../shared/utilities/formatMoney'
+import {
+    AnalysisCostRecord,
+    AnalysisCostRecordBatch
+} from '../../../sm-api'
+import { BatchJobsTable } from './BatchJobGrid'
+import { CostBySkuRow, SeqGrpDisplay } from './BillingByAnalysisComponents'
 
 interface IGenericCardData {
     cost: number
@@ -370,10 +363,9 @@ const BatchGrid: React.FunctionComponent<{
     }
 
     const GenericCard: React.FC<{
-        item: AnalysisCostRecord
         data: IGenericCardData
         label: string
-    }> = ({ item, data, label }) => {
+    }> = ({ data, label }) => {
         const [isOpen, setIsOpen] = React.useState(false)
         const [skuIsOpen, setSkuIsOpen] = React.useState(false)
 
@@ -417,13 +409,12 @@ const BatchGrid: React.FunctionComponent<{
             ))}
 
             {data.dataproc?.map((item, idx) => (
-                <GenericCard key={`dataproc-${idx}`} item={data} data={item} label="DATAPROC" />
+                <GenericCard key={`dataproc-${idx}`} data={item} label="DATAPROC" />
             ))}
 
             {data.wdl_tasks?.map((item) => (
                 <GenericCard
                     key={`wdl-task-${item.wdl_task_name}`}
-                    item={data}
                     data={item}
                     label={`WDL TASK NAME: ${item.wdl_task_name}`}
                 />
@@ -432,7 +423,6 @@ const BatchGrid: React.FunctionComponent<{
             {data.cromwell_sub_workflows?.map((item) => (
                 <GenericCard
                     key={`cromwell-sub-workflow-${item.cromwell_sub_workflow_name}`}
-                    item={data}
                     data={item}
                     label={`CROMWELL SUB WORKFLOW NAME: ${item.cromwell_sub_workflow_name}`}
                 />
@@ -441,7 +431,6 @@ const BatchGrid: React.FunctionComponent<{
             {data.cromwell_workflows?.map((item) => (
                 <GenericCard
                     key={`cromwell-workflow-${item.cromwell_workflow_id}`}
-                    item={data}
                     data={item}
                     label={`CROMWELL WORKFLOW ID: ${item.cromwell_workflow_id}`}
                 />
