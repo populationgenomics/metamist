@@ -226,7 +226,6 @@ class TestWeb(DbIsolatedTest):
                 latest_annotate_dataset=AnalysisStats(id=0, sg_count=0),
                 latest_snv_es_index=AnalysisStats(id=0, sg_count=0),
                 latest_sv_es_index=AnalysisStats(id=0, sg_count=0),
-                latest_gcnv_es_index=AnalysisStats(id=0, sg_count=0),
             ),
             ProjectInsightsStatsInternal(
                 project=self.project_id,
@@ -240,7 +239,6 @@ class TestWeb(DbIsolatedTest):
                 latest_annotate_dataset=AnalysisStats(id=0, sg_count=0),
                 latest_snv_es_index=AnalysisStats(id=0, sg_count=0),
                 latest_sv_es_index=AnalysisStats(id=0, sg_count=0),
-                latest_gcnv_es_index=AnalysisStats(id=0, sg_count=0),
             ),
         ]
 

@@ -42,7 +42,6 @@ class ProjectInsightsDetailsInternal:
     in_latest_annotate_dataset: bool
     in_latest_snv_es_index: bool
     in_latest_sv_es_index: bool
-    in_latest_gcnv_es_index: bool
     sequencing_group_report_links: dict[str, str]
 
     def to_external(self, links):
@@ -63,7 +62,6 @@ class ProjectInsightsDetailsInternal:
             in_latest_annotate_dataset=self.in_latest_annotate_dataset,
             in_latest_snv_es_index=self.in_latest_snv_es_index,
             in_latest_sv_es_index=self.in_latest_sv_es_index,
-            in_latest_gcnv_es_index=self.in_latest_gcnv_es_index,
             sequencing_group_report_links=self.sequencing_group_report_links,
             links=links,
         )
@@ -87,7 +85,6 @@ class ProjectInsightsDetails(SMBase):
     in_latest_annotate_dataset: bool
     in_latest_snv_es_index: bool
     in_latest_sv_es_index: bool
-    in_latest_gcnv_es_index: bool
     sequencing_group_report_links: dict[str, str]
 
     links: PagingLinks | None
@@ -113,7 +110,6 @@ class ProjectInsightsStatsInternal:
     latest_annotate_dataset: AnalysisStats = field(default_factory=AnalysisStats)
     latest_snv_es_index: AnalysisStats = field(default_factory=AnalysisStats)
     latest_sv_es_index: AnalysisStats = field(default_factory=AnalysisStats)
-    latest_gcnv_es_index: AnalysisStats = field(default_factory=AnalysisStats)
 
     def to_external(self, links):
         """Convert to transport model"""
@@ -129,7 +125,6 @@ class ProjectInsightsStatsInternal:
             latest_annotate_dataset=self.latest_annotate_dataset.to_external(),
             latest_snv_es_index=self.latest_snv_es_index.to_external(),
             latest_sv_es_index=self.latest_sv_es_index.to_external(),
-            latest_gcnv_es_index=self.latest_gcnv_es_index.to_external(),
             links=links,
         )
 
@@ -148,7 +143,6 @@ class ProjectInsightsStats(SMBase):
     latest_annotate_dataset: dict[str, int]
     latest_snv_es_index: dict[str, int]
     latest_sv_es_index: dict[str, int]
-    latest_gcnv_es_index: dict[str, int]
 
     links: PagingLinks | None
 

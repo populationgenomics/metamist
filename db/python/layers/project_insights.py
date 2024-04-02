@@ -479,12 +479,20 @@ WHERE
                 latest_snv_index_id = self.get_val_for_project_and_sequencing_type_and_stage(
                     project.id, sequencing_type, 'MtToEs', 'id', latest_es_indexes
                 )
-                latest_sv_index_id = self.get_val_for_project_and_sequencing_type_and_stage(
-                    project.id, sequencing_type, 'MtToEsSv', 'id', latest_es_indexes
-                )
-                latest_gcnv_index_id = self.get_val_for_project_and_sequencing_type_and_stage(
-                    project.id, sequencing_type, 'MtToEsCNV', 'id', latest_es_indexes
-                )
+                # SV index is only available for genome, treated as SV_WGS by seqr
+                # GCNV is only available for exome, treated as SV_WES by seqr
+                if sequencing_type == 'genome':
+                    sv_index_stage = 'MtToEsSv'
+                    latest_sv_index_id = self.get_val_for_project_and_sequencing_type_and_stage(
+                        project.id, sequencing_type, sv_index_stage, 'id', latest_es_indexes
+                    )
+                elif sequencing_type == 'exome':
+                    sv_index_stage = 'MtToEsCNV'
+                    latest_sv_index_id = self.get_val_for_project_and_sequencing_type_and_stage(
+                        project.id, sequencing_type, sv_index_stage, 'id', latest_es_indexes
+                    )
+                else:
+                    latest_sv_index_id = 0
                 response.append(
                     ProjectInsightsStatsInternal(
                         project=project.id,
@@ -527,14 +535,6 @@ WHERE
                             sg_count=len(
                                 await self._get_sequencing_groups_from_analysis_id(
                                     latest_sv_index_id
-                                )
-                            ),
-                        ),
-                        latest_gcnv_es_index=AnalysisStats(
-                            id=latest_gcnv_index_id,
-                            sg_count=len(
-                                await self._get_sequencing_groups_from_analysis_id(
-                                    latest_gcnv_index_id
                                 )
                             ),
                         ),
@@ -606,15 +606,6 @@ WHERE
                         latest_sv_es_index_id
                     )
                 ]
-                latest_gcnv_es_index_id = self.get_val_for_project_and_sequencing_type_and_stage(
-                    project.id, sequencing_type, 'MtToEsCNV', 'id', latest_es_indexes
-                )
-                sequencing_groups_in_latest_gcnv_es_index = [
-                    row['sequencing_group_id']
-                    for row in await self._get_sequencing_groups_from_analysis_id(
-                        latest_gcnv_es_index_id
-                    )
-                ]
                 for family_row in families:
                     sequencing_group_id = sequencing_group_id_format(
                         family_row['sequencing_group_id']
@@ -669,8 +660,6 @@ WHERE
                             in sequencing_groups_in_latest_snv_es_index,
                             in_latest_sv_es_index=family_row['sequencing_group_id']
                             in sequencing_groups_in_latest_sv_es_index,
-                            in_latest_gcnv_es_index=family_row['sequencing_group_id']
-                            in sequencing_groups_in_latest_gcnv_es_index,
                             sequencing_group_report_links=report_links,
                         )
                     )
