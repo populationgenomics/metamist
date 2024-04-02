@@ -406,7 +406,7 @@ class AnalysisCostRecordBatch(SMBase):
     """
 
     batch_id: str
-    batch_name: str
+    batch_name: str | None
     cost: float
     usage_start_time: datetime.datetime
     usage_end_time: datetime.datetime
@@ -419,7 +419,7 @@ class AnalysisCostRecordBatch(SMBase):
     def from_dict(cls, d: dict):
         return AnalysisCostRecordBatch(
             batch_id=d['batch_id'],
-            batch_name=d['batch_name'],
+            batch_name=d.get('batch_name'),
             cost=d['cost'],
             usage_start_time=d['usage_start_time'],
             usage_end_time=d['usage_end_time'],
