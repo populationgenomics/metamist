@@ -219,7 +219,7 @@ const AnalysisRunnerRecordCard: React.FC<{ data: AnalysisCostRecord }> = ({ data
                             <CostBySkuRow
                                 skus={data.skus || []}
                                 colSpan={1}
-                                chartMaxWidth="600"
+                                chartMaxWidth="600px"
                                 chartId="total-donut-chart"
                             />
                         </DisplayRow>
@@ -298,22 +298,13 @@ const BatchCard: React.FC<{ item: AnalysisCostRecordBatch }> = ({ item }) => {
                         Cost by SKU
                     </CheckboxRow>
                     <DisplayRow label="Cost By SKU" isVisible={isOpen && isSkuOpen}>
-                        <CostBySkuRow skus={item.skus} colSpan={1} chartMaxWidth="600" />
+                        <CostBySkuRow
+                            chartId={`donut-chart-${item.batch_id}`}
+                            skus={item.skus}
+                            colSpan={1}
+                            chartMaxWidth="600px"
+                        />
                     </DisplayRow>
-                    {/* {displayCheckBoxRow(
-                    `row-${item.batch_id}`,
-                    `sku-toggle-${item.batch_id}`,
-                    `sku-${item.batch_id}`,
-                    'Cost By SKU'
-                )}
-                {displayCostBySkuRow(
-                    [`row-${item.batch_id}`],
-                    `sku-${item.batch_id}`,
-                    `donut-chart-${item.batch_id}`,
-                    600,
-                    1,
-                    item
-                )} */}
 
                     {/* cost by jobs */}
                     {item.jobs_cnt > 1 && (
@@ -364,7 +355,8 @@ const BatchGrid: React.FunctionComponent<{
     const GenericCard: React.FC<{
         data: IGenericCardData
         label: string
-    }> = ({ data, label }) => {
+        pkey: string
+    }> = ({ data, label, pkey }) => {
         const [isOpen, setIsOpen] = React.useState(false)
         const [skuIsOpen, setSkuIsOpen] = React.useState(false)
 
@@ -372,7 +364,12 @@ const BatchGrid: React.FunctionComponent<{
             <Card fluid style={{ padding: '20px' }}>
                 <Table celled compact>
                     <SUITable.Body>
-                        <CheckboxRow isChecked={isOpen} setIsChecked={setIsOpen}>
+                        <CheckboxRow
+                            isChecked={isOpen}
+                            setIsChecked={setIsOpen}
+                            colSpan={2}
+                            rowStyle={{ backgroundColor: 'var(--color-bg-card)' }}
+                        >
                             {label}
                         </CheckboxRow>
 
@@ -383,15 +380,22 @@ const BatchGrid: React.FunctionComponent<{
                         <DisplayRow label="start">{data.usage_start_time}</DisplayRow>
                         <DisplayRow label="End">{data.usage_end_time}</DisplayRow>
 
+                        {/* cost by SKU */}
                         <CheckboxRow
                             isChecked={skuIsOpen}
                             setIsChecked={setSkuIsOpen}
                             isVisible={isOpen}
+                            leadingCells={1}
                         >
                             Cost by SKU
                         </CheckboxRow>
                         <DisplayRow isVisible={isOpen && skuIsOpen} label="SKU">
-                            <CostBySkuRow skus={data.skus} colSpan={1} chartMaxWidth="600" />
+                            <CostBySkuRow
+                                chartId={`donut-chart-${pkey}`}
+                                skus={data.skus}
+                                colSpan={1}
+                                chartMaxWidth="600px"
+                            />
                         </DisplayRow>
                     </SUITable.Body>
                 </Table>
@@ -408,7 +412,12 @@ const BatchGrid: React.FunctionComponent<{
             ))}
 
             {data.dataproc?.map((item, idx) => (
-                <GenericCard key={`dataproc-${idx}`} data={item} label="DATAPROC" />
+                <GenericCard
+                    key={`dataproc-${idx}`}
+                    data={item}
+                    label="DATAPROC"
+                    pkey={`dataproc-${idx}`}
+                />
             ))}
 
             {data.wdl_tasks?.map((item) => (
@@ -416,6 +425,7 @@ const BatchGrid: React.FunctionComponent<{
                     key={`wdl-task-${item.wdl_task_name}`}
                     data={item}
                     label={`WDL TASK NAME: ${item.wdl_task_name}`}
+                    pkey={`wdl-task-${item.wdl_task_name}`}
                 />
             ))}
 
@@ -424,6 +434,7 @@ const BatchGrid: React.FunctionComponent<{
                     key={`cromwell-sub-workflow-${item.cromwell_sub_workflow_name}`}
                     data={item}
                     label={`CROMWELL SUB WORKFLOW NAME: ${item.cromwell_sub_workflow_name}`}
+                    pkey={`cromwell-sub-workflow-${item.cromwell_sub_workflow_name}`}
                 />
             ))}
 
@@ -432,6 +443,7 @@ const BatchGrid: React.FunctionComponent<{
                     key={`cromwell-workflow-${item.cromwell_workflow_id}`}
                     data={item}
                     label={`CROMWELL WORKFLOW ID: ${item.cromwell_workflow_id}`}
+                    pkey={`cromwell-workflow-${item.cromwell_workflow_id}`}
                 />
             ))}
         </>

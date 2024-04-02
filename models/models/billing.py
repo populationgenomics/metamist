@@ -440,7 +440,7 @@ class AnalysisCostRecordCategory(SMBase):
 
     category: str
     cost: float
-    workflows: int
+    workflows: int | None
 
     @classmethod
     def from_dict(cls, d: dict):
