@@ -430,7 +430,7 @@ class AnalysisCostRecordBatch(SMBase):
             ],
             seq_groups=[
                 AnalysisCostRecordSeqGroup.from_dict(row)
-                for row in d.get('seq_groups', [])
+                for row in d.get('seq_groups') or []
             ],
         )
 
@@ -522,19 +522,19 @@ class AnalysisCostRecord(SMBase):
             skus=[AnalysisCostRecordSku.from_dict(row) for row in d.get('skus') or []],
             seq_groups=[
                 AnalysisCostRecordSeqGroup.from_dict(row)
-                for row in d.get('seq_groups', [])
+                for row in d.get('seq_groups') or []
             ],
             wdl_tasks=[
                 AnalysisCostRecordWdlTask.from_dict(row)
-                for row in d.get('wdl_tasks', [])
+                for row in d.get('wdl_tasks') or []
             ],
             cromwell_sub_workflows=[
                 AnalysisCostRecordCromwellSubworkflow.from_dict(row)
-                for row in d.get('cromwell_sub_workflows', [])
+                for row in d.get('cromwell_sub_workflows') or []
             ],
             cromwell_workflows=[
                 AnalysisCostRecordCromwellWorkflow.from_dict(row)
-                for row in d.get('cromwell_workflows', [])
+                for row in d.get('cromwell_workflows') or []
             ],
             dataproc=d.get('dataproc'),
         )
