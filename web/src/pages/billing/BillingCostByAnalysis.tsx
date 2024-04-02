@@ -35,6 +35,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         if (!records || records.length === 0) {
             // nothing found
             setIsLoading(false)
+            setData(null)
             return
         }
         setIsLoading(false)
