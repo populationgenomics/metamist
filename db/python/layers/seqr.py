@@ -408,7 +408,7 @@ class SeqrLayer(BaseLayer):
             headers=headers,
         )
         resp.raise_for_status()
-        return await resp.text()
+        return {f'{post_json["elasticsearchIndex"]} : {resp.status} - {resp.reason}'}
 
     async def update_es_index(
         self,
