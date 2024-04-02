@@ -360,17 +360,27 @@ class AnalysisCostRecordTotal(SMBase):
 
 
 class AnalysisCostRecordSku(SMBase):
+    """Cost for an SKU"""
+
     sku: str
     cost: float
 
 
 class AnalysisCostRecordSeqGroup(SMBase):
+    """
+    Cost of a sequencing_group for some stage
+        sequencing_group = None: cost of all jobs for a stage without a sg
+        stage = None: cost of all jobs for a sg without a stage
+    """
+
     sequencing_group: str | None
     stage: str | None
     cost: float
 
 
 class AnalysisCostRecordBatchJob(SMBase):
+    """Hail batch container cost record"""
+
     job_id: str
     job_name: str | None
     skus: list[AnalysisCostRecordSku]
@@ -383,7 +393,7 @@ class AnalysisCostRecordBatchJob(SMBase):
         return AnalysisCostRecordBatchJob(
             job_id=d['job_id'],
             job_name=d.get('job_name'),
-            skus=[AnalysisCostRecordSku.from_dict(row) for row in d.get('skus', [])],
+            skus=[AnalysisCostRecordSku.from_dict(row) for row in d.get('skus') or []],
             cost=d['cost'],
             usage_start_time=d['usage_start_time'],
             usage_end_time=d['usage_end_time'],
@@ -414,9 +424,9 @@ class AnalysisCostRecordBatch(SMBase):
             usage_start_time=d['usage_start_time'],
             usage_end_time=d['usage_end_time'],
             jobs_cnt=d['jobs_cnt'],
-            skus=[AnalysisCostRecordSku.from_dict(row) for row in d.get('skus', [])],
+            skus=[AnalysisCostRecordSku.from_dict(row) for row in d.get('skus') or []],
             jobs=[
-                AnalysisCostRecordBatchJob.from_dict(row) for row in d.get('jobs', [])
+                AnalysisCostRecordBatchJob.from_dict(row) for row in d.get('jobs') or []
             ],
             seq_groups=[
                 AnalysisCostRecordSeqGroup.from_dict(row)
@@ -449,6 +459,8 @@ class AnalysisCostRecordTopic(SMBase):
 
 
 class AnalysisCostRecordWdlTask(SMBase):
+    """Cost of a WDL task"""
+
     wdl_task_name: str
     cost: float
     usage_start_time: datetime.datetime
@@ -457,6 +469,8 @@ class AnalysisCostRecordWdlTask(SMBase):
 
 
 class AnalysisCostRecordCromwellSubworkflow(SMBase):
+    """Cost of a Cromwell subworkflow"""
+
     cromwell_sub_workflow_name: str
     cost: float
     usage_start_time: datetime.datetime
@@ -465,6 +479,8 @@ class AnalysisCostRecordCromwellSubworkflow(SMBase):
 
 
 class AnalysisCostRecordCromwellWorkflow(SMBase):
+    """Cost of a Cromwell workflow"""
+
     cromwell_workflow_id: str
     cost: float
     usage_start_time: datetime.datetime
@@ -494,16 +510,16 @@ class AnalysisCostRecord(SMBase):
         return AnalysisCostRecord(
             total=AnalysisCostRecordTotal.from_dict(d['total']),
             topics=[
-                AnalysisCostRecordTopic.from_dict(row) for row in d.get('topics', [])
+                AnalysisCostRecordTopic.from_dict(row) for row in d.get('topics') or []
             ],
             categories=[
                 AnalysisCostRecordCategory.from_dict(row)
-                for row in d.get('categories', [])
+                for row in d.get('categories') or []
             ],
             batches=[
-                AnalysisCostRecordBatch.from_dict(row) for row in d.get('batches', [])
+                AnalysisCostRecordBatch.from_dict(row) for row in d.get('batches') or []
             ],
-            skus=[AnalysisCostRecordSku.from_dict(row) for row in d.get('skus', [])],
+            skus=[AnalysisCostRecordSku.from_dict(row) for row in d.get('skus') or []],
             seq_groups=[
                 AnalysisCostRecordSeqGroup.from_dict(row)
                 for row in d.get('seq_groups', [])

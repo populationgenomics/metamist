@@ -11,10 +11,7 @@ import { useQuery } from '@apollo/client'
 import { gql } from '../../../__generated__'
 import MuckTheDuck from '../../../shared/components/MuckTheDuck'
 import formatMoney from '../../../shared/utilities/formatMoney'
-import {
-    AnalysisCostRecord,
-    AnalysisCostRecordBatch
-} from '../../../sm-api'
+import { AnalysisCostRecord, AnalysisCostRecordBatch } from '../../../sm-api'
 import { BatchJobsTable } from './BatchJobGrid'
 import { CostBySkuRow, SeqGrpDisplay } from './BillingByAnalysisComponents'
 
@@ -280,7 +277,9 @@ const BatchCard: React.FC<{ item: AnalysisCostRecordBatch }> = ({ item }) => {
                         isVisible={isOpen}
                         leadingCells={1}
                     >
-                        Cost by Sequencing Groups - {item.seq_groups?.filter(s => !!s.sequencing_group)?.length || 0} sequencing group(s)
+                        Cost by Sequencing Groups -{' '}
+                        {item.seq_groups?.filter((s) => !!s.sequencing_group)?.length || 0}{' '}
+                        sequencing group(s)
                     </CheckboxRow>
                     <DisplayRow
                         label="Cost By Sequencing Group"
