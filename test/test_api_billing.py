@@ -80,7 +80,6 @@ class TestApiBilling(BqTest):
         response = await billing.get_cost_by_ar_guid(
             ar_guid, author=TEST_API_BILLING_USER
         )
-        self.maxDiff = None
         resp_json = json.loads(response.body.decode('utf-8'))
         self.assertEqual(1, len(resp_json))
 
@@ -135,7 +134,6 @@ class TestApiBilling(BqTest):
         )
         resp_json = json.loads(response.body.decode('utf-8'))
 
-        self.maxDiff = None
         self.assertEqual(1, len(resp_json))
         self.assertDictEqual(mockup_record_json, resp_json[0])
 
