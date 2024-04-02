@@ -387,7 +387,7 @@ class SeqrLayer(BaseLayer):
                 )
                 if sequencing_groups_diff:
                     messages.append(
-                        'Sequencing groups added to index: ' + ', '.join(sequencing_groups_diff),
+                        f'Sequencing groups added to {es_index_analyses[-1].output}: ' + ', '.join(sequencing_groups_diff),
                     )
 
             sg_ids_missing_from_index = sequencing_group_id_format_list(
@@ -408,7 +408,7 @@ class SeqrLayer(BaseLayer):
             headers=headers,
         )
         resp.raise_for_status()
-        return {f'{post_json["elasticsearchIndex"]} : {resp.status} - {resp.reason}'}
+        return f'Updated ES index {post_json["elasticsearchIndex"]}: {resp.status} - {resp.reason}'
 
     async def update_es_index(
         self,
@@ -494,7 +494,6 @@ class SeqrLayer(BaseLayer):
                 'ignoreExtraSamplesInCallset': True,
             }
             requests.append(self.post_es_index_update(session, req1_url, post_json, headers))
-            messages.append(f'Updated ES index {es_index}')
 
         messages.extend(await asyncio.gather(*requests))
         return messages
