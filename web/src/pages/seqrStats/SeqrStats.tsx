@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { ProjectInsightsStats, ProjectApi, EnumsApi } from '../../sm-api'
 import ProjectAndSeqTypeSelector from './ProjectAndSeqTypeSelector'
-import { Table } from 'semantic-ui-react'
-import Papa from 'papaparse'
-import { saveAs } from 'file-saver'
+import { Table, TableFooter } from 'semantic-ui-react'
+import ToolTip from '@mui/material/Tooltip'
+import { styled } from '@mui/material/styles'
+import Tooltip, { TooltipProps, tooltipClasses } from '@mui/material/Tooltip'
+// import Papa from 'papaparse'
+// import { saveAs } from 'file-saver'
 
 interface SelectedProject {
     id: number
@@ -21,12 +24,38 @@ const styles: Record<string, React.CSSProperties> = {
         textAlign: 'center',
     },
     exomeRow: {
-        backgroundColor: '#f0f8ff', // Light blue tint for exome rows
+        // Light yellow for exome rows
+        backgroundColor: '#ffffe0',
     },
     genomeRow: {
-        backgroundColor: '#f5f5dc', // Beige tint for genome rows
+        // Faint peach for genome rows
+        backgroundColor: '#fff5ee',
+    },
+    rnaRow: {
+        backgroundColor: '#f0fff0', // Light green tint for RNA rows
+    },
+    pageTotalRow: {
+        // Light blue and emphasized for page total row
+        backgroundColor: '#f0f8ff',
+        fontWeight: 'bold',
+    },
+    grandTotalRow: {
+        // Light purple and emphasized for grand total row
+        backgroundColor: '#e6e6fa',
+        fontWeight: 'bold',
     },
 }
+const HtmlTooltip = styled(({ className, ...props }: TooltipProps) => (
+    <Tooltip {...props} classes={{ popper: className }} />
+))(({ theme }) => ({
+    [`& .${tooltipClasses.tooltip}`]: {
+        backgroundColor: '#f5f5f9',
+        color: 'rgba(0, 0, 0, 0.87)',
+        maxWidth: 220,
+        fontSize: theme.typography.pxToRem(12),
+        border: '1px solid #dadde9',
+    },
+}))
 
 const InsightsStats: React.FC = () => {
     // Get the list of seqr projects from the project API
@@ -154,34 +183,17 @@ const InsightsStats: React.FC = () => {
 
     const pagedResults = sortedData.slice(pageNumber * pageSize, (pageNumber + 1) * pageSize)
 
-    const grandTotals = pagedResults.reduce((acc, curr) => {
-        return {
-            project: '',
-            dataset: '',
-            sequencing_type: '',
-            total_families: acc.total_families + curr.total_families ?? 0,
-            total_participants: acc.total_participants + curr.total_participants ?? 0,
-            total_samples: acc.total_samples + curr.total_samples ?? 0,
-            total_sequencing_groups:
-                acc.total_sequencing_groups + curr.total_sequencing_groups ?? 0,
-            total_crams: acc.total_crams + curr.total_crams ?? 0,
-            latest_annotate_dataset: '',
-            latest_snv_es_index: '',
-            latest_sv_es_index: '',
-        }
-    })
-
-    const exportTableToCSV = (exportFormat: string) => {
-        if (exportFormat === 'csv') {
-            const csv = Papa.unparse(sortedData)
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-            saveAs(blob, 'table_export.csv')
-        } else {
-            const tsv = Papa.unparse(sortedData, { delimiter: '\t' })
-            const blob = new Blob([tsv], { type: 'text/tab-separated-values;charset=utf-8;' })
-            saveAs(blob, 'table_export.tsv')
-        }
-    }
+    // const exportTableToCSV = (exportFormat: string) => {
+    //     if (exportFormat === 'csv') {
+    //         const csv = Papa.unparse(sortedData)
+    //         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    //         saveAs(blob, 'table_export.csv')
+    //     } else {
+    //         const tsv = Papa.unparse(sortedData, { delimiter: '\t' })
+    //         const blob = new Blob([tsv], { type: 'text/tab-separated-values;charset=utf-8;' })
+    //         saveAs(blob, 'table_export.tsv')
+    //     }
+    // }
     return (
         <div>
             <ProjectAndSeqTypeSelector
@@ -209,8 +221,8 @@ const InsightsStats: React.FC = () => {
                     </option>
                 ))}
             </select>
-            <button onClick={exportTableToCSV.bind(null, 'csv')}>Export to CSV</button>
-            <button onClick={exportTableToCSV.bind(null, 'tsv')}>Export to TSV</button>
+            {/* <button onClick={exportTableToCSV.bind(null, 'csv')}>Export to CSV</button>
+            <button onClick={exportTableToCSV.bind(null, 'tsv')}>Export to TSV</button> */}
             <Table sortable>
                 <Table.Header>
                     <Table.Row>
@@ -301,7 +313,11 @@ const InsightsStats: React.FC = () => {
                                 : 0
 
                         const rowStyle =
-                            ss.sequencing_type === 'exome' ? styles.exomeRow : styles.genomeRow
+                            ss.sequencing_type === 'exome'
+                                ? styles.exomeRow
+                                : ss.sequencing_type === 'genome'
+                                ? styles.genomeRow
+                                : styles.rnaRow
 
                         return (
                             <Table.Row key={`${ss.project}-${ss.sequencing_type}`} style={rowStyle}>
@@ -326,15 +342,50 @@ const InsightsStats: React.FC = () => {
                                         backgroundColor: getPercentageColor(percentageAligned),
                                     }}
                                 >
-                                    {percentageAligned.toFixed(2)}%
+                                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                        <HtmlTooltip
+                                            title={
+                                                <React.Fragment>
+                                                    <div>
+                                                        {ss.total_crams} /{' '}
+                                                        {ss.total_sequencing_groups} Total
+                                                        Sequencing Groups with a Completed CRAM
+                                                        Analysis
+                                                    </div>
+                                                </React.Fragment>
+                                            }
+                                        >
+                                            <div>{percentageAligned.toFixed(2)}%</div>
+                                        </HtmlTooltip>
+                                    </div>
                                 </Table.Cell>
+
                                 <Table.Cell
                                     style={{
                                         ...styles.tableCell,
                                         backgroundColor: getPercentageColor(percentageInJointCall),
                                     }}
                                 >
-                                    {percentageInJointCall.toFixed(2)}%
+                                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                        <HtmlTooltip
+                                            title={
+                                                <React.Fragment>
+                                                    <div>
+                                                        {ss.latest_annotate_dataset.sg_count} /{' '}
+                                                        {ss.total_sequencing_groups} Total
+                                                        Sequencing Groups in the latest{' '}
+                                                        {ss.sequencing_type} AnnotateDataset
+                                                        analysis
+                                                    </div>
+                                                    <div>
+                                                        Analysis ID: {ss.latest_annotate_dataset.id}
+                                                    </div>
+                                                </React.Fragment>
+                                            }
+                                        >
+                                            <div>{percentageInJointCall.toFixed(2)}%</div>
+                                        </HtmlTooltip>
+                                    </div>
                                 </Table.Cell>
                                 <Table.Cell
                                     style={{
@@ -342,7 +393,25 @@ const InsightsStats: React.FC = () => {
                                         backgroundColor: getPercentageColor(percentageInSnvIndex),
                                     }}
                                 >
-                                    {percentageInSnvIndex.toFixed(2)}%
+                                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                        <HtmlTooltip
+                                            title={
+                                                <React.Fragment>
+                                                    <div>
+                                                        {ss.latest_snv_es_index.sg_count} /{' '}
+                                                        {ss.total_sequencing_groups} Total
+                                                        Sequencing Groups in the latest{' '}
+                                                        {ss.sequencing_type} SNV Elasticsearch Index
+                                                    </div>
+                                                    <div>
+                                                        Analysis ID: {ss.latest_snv_es_index.id}
+                                                    </div>
+                                                </React.Fragment>
+                                            }
+                                        >
+                                            <div>{percentageInSnvIndex.toFixed(2)}%</div>
+                                        </HtmlTooltip>
+                                    </div>
                                 </Table.Cell>
                                 <Table.Cell
                                     style={{
@@ -350,43 +419,139 @@ const InsightsStats: React.FC = () => {
                                         backgroundColor: getPercentageColor(percentageInSvIndex),
                                     }}
                                 >
-                                    {percentageInSvIndex.toFixed(2)}%
+                                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                        <HtmlTooltip
+                                            title={
+                                                <React.Fragment>
+                                                    <div>
+                                                        {ss.latest_sv_es_index.sg_count} /{' '}
+                                                        {ss.total_sequencing_groups} Total
+                                                        Sequencing Groups in the latest{' '}
+                                                        {ss.sequencing_type} SV Elasticsearch Index
+                                                    </div>
+                                                    <div>
+                                                        Analysis ID: {ss.latest_sv_es_index.id}
+                                                    </div>
+                                                </React.Fragment>
+                                            }
+                                        >
+                                            <div>{percentageInSvIndex.toFixed(2)}%</div>
+                                        </HtmlTooltip>
+                                    </div>
                                 </Table.Cell>
                             </Table.Row>
                         )
                     })}
-                    <Table.Row>
-                        <Table.Cell style={styles.tableCell}>Grand Totals</Table.Cell>
+
+                    {/* {filteredData.length > pageSize && (
+                        // TODO: Toggle to display these "Page totals"
+                        <Table.Row key="pageTotals" style={styles.pageTotalRow}>
+                            <Table.Cell style={styles.tableCell}>Page Total</Table.Cell>
+                            <Table.Cell style={styles.tableCell}></Table.Cell>
+                            <Table.Cell style={styles.tableCell}>
+                                {pagedResults.reduce((acc, curr) => acc + curr.total_families, 0)}
+                            </Table.Cell>
+                            <Table.Cell style={styles.tableCell}>
+                                {pagedResults.reduce((acc, curr) => acc + curr.total_participants, 0)}
+                            </Table.Cell>
+                            <Table.Cell style={styles.tableCell}>
+                                {pagedResults.reduce((acc, curr) => acc + curr.total_samples, 0)}
+                            </Table.Cell>
+                            <Table.Cell style={styles.tableCell}>
+                                {pagedResults.reduce((acc, curr) => acc + curr.total_sequencing_groups, 0)}
+                            </Table.Cell>
+                            <Table.Cell style={styles.tableCell}>
+                                {pagedResults.reduce((acc, curr) => acc + curr.total_crams, 0)}
+                            </Table.Cell>
+                            <Table.Cell style={styles.tableCell}></Table.Cell>
+                            <Table.Cell style={styles.tableCell}></Table.Cell>
+                            <Table.Cell style={styles.tableCell}></Table.Cell>
+                            <Table.Cell style={styles.tableCell}></Table.Cell>
+                        </Table.Row>
+                    )*/}
+                </Table.Body>
+                <Table.Footer>
+                    <Table.Row key="grandTotals" style={styles.grandTotalRow}>
+                        <Table.Cell style={styles.tableCell}>Grand Total</Table.Cell>
                         <Table.Cell style={styles.tableCell}></Table.Cell>
                         <Table.Cell style={styles.tableCell}>
-                            {grandTotals.total_families}
+                            {filteredData.reduce((acc, curr) => acc + curr.total_families, 0)}
                         </Table.Cell>
                         <Table.Cell style={styles.tableCell}>
-                            {grandTotals.total_participants}
+                            {filteredData.reduce((acc, curr) => acc + curr.total_participants, 0)}
                         </Table.Cell>
                         <Table.Cell style={styles.tableCell}>
-                            {grandTotals.total_samples}
+                            {filteredData.reduce((acc, curr) => acc + curr.total_samples, 0)}
                         </Table.Cell>
                         <Table.Cell style={styles.tableCell}>
-                            {grandTotals.total_sequencing_groups}
+                            {filteredData.reduce(
+                                (acc, curr) => acc + curr.total_sequencing_groups,
+                                0
+                            )}
                         </Table.Cell>
-                        <Table.Cell style={styles.tableCell}>{grandTotals.total_crams}</Table.Cell>
+                        <Table.Cell style={styles.tableCell}>
+                            {filteredData.reduce((acc, curr) => acc + curr.total_crams, 0)}
+                        </Table.Cell>
                         <Table.Cell style={styles.tableCell}></Table.Cell>
                         <Table.Cell style={styles.tableCell}></Table.Cell>
                         <Table.Cell style={styles.tableCell}></Table.Cell>
                         <Table.Cell style={styles.tableCell}></Table.Cell>
                     </Table.Row>
-                </Table.Body>
+
+                    {pagedResults.length > 0 && (
+                        <Table.Row>
+                            <Table.Cell
+                                colSpan={11}
+                                style={{ ...styles.tableCell, fontStyle: 'italic', color: 'gray' }}
+                            >
+                                {pageNumber * pageSize + 1} -{' '}
+                                {Math.min((pageNumber + 1) * pageSize, filteredData.length)} /{' '}
+                                {filteredData.length}
+                            </Table.Cell>
+                        </Table.Row>
+                    )}
+                </Table.Footer>
             </Table>
-            {
-                <button disabled={pageNumber === 0} onClick={() => setPageNumber(pageNumber - 1)}>
-                    Previous page
+
+            <div
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: '16px',
+                }}
+            >
+                <button
+                    style={{
+                        padding: '8px 16px',
+                        backgroundColor: pageNumber === 0 ? '#e0e0e0' : '#f0f0f0',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: pageNumber === 0 ? 'not-allowed' : 'pointer',
+                        marginRight: '8px',
+                    }}
+                    disabled={pageNumber === 0}
+                    onClick={() => setPageNumber(pageNumber - 1)}
+                >
+                    Previous
                 </button>
-            }
-            Page {pageNumber + 1}
-            {(pageNumber + 1) * pageSize < filteredData.length && (
-                <button onClick={() => setPageNumber(pageNumber + 1)}>Next page</button>
-            )}
+                <span style={{ marginRight: '8px', fontWeight: 'bold' }}>
+                    Page {pageNumber + 1}
+                </span>
+                <button
+                    style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#f0f0f0',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                    }}
+                    disabled={(pageNumber + 1) * pageSize >= filteredData.length}
+                    onClick={() => setPageNumber(pageNumber + 1)}
+                >
+                    Next
+                </button>
+            </div>
         </div>
     )
 }
