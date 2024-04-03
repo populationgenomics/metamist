@@ -10,7 +10,6 @@ from json.decoder import JSONDecodeError
 from typing import Any, Dict
 
 import backoff
-import metamist.configuration
 from gql import Client
 from gql import gql as gql_constructor
 from gql.transport.aiohttp import AIOHTTPTransport
@@ -24,6 +23,9 @@ from graphql import DocumentNode  # type: ignore
 from requests.exceptions import HTTPError
 
 from cpg_utils.cloud import get_google_identity_token
+
+import metamist.configuration
+
 
 _sync_client: Client | None = None
 _async_client: Client | None = None
