@@ -1181,7 +1181,11 @@
 
 	<!-- make the configPath nullable -->
 
-	<sql>ALTER TABLE analysis_runner MODIFY COLUMN config_path VARCHAR(255) NULL;</sql>
+	<sql>
+	SET @@system_versioning_alter_history = 1;
+	ALTER TABLE analysis_runner MODIFY COLUMN config_path VARCHAR(255) NULL;
+	SET @@system_versioning_alter_history = 0;
+	</sql>
 
 	<!-- Migrate all the old analysis_runner records into the new table (don't delete existing ones for now) -->
 
