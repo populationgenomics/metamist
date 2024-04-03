@@ -7,7 +7,7 @@ from db.python.tables.bq.billing_base import (
     BillingBaseTable,
     time_optimisation_parameter,
 )
-from models.models import BillingBatchCostRecord, BillingColumn
+from models.models import AnalysisCostRecord, BillingColumn
 
 
 class BillingDailyExtendedTable(BillingBaseTable):
@@ -60,7 +60,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
         end_time: datetime,
         batch_ids: list[str] | None,
         ar_guid: str | None,
-    ) -> list[BillingBatchCostRecord]:
+    ) -> list[AnalysisCostRecord]:
         """
         Get summary of AR run
         """
@@ -361,9 +361,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
         query_job_result = self._execute_query(_query, query_parameters, False)
 
         if query_job_result:
-            return [
-                BillingBatchCostRecord.from_json(dict(row)) for row in query_job_result
-            ]
+            return [AnalysisCostRecord.from_dict(dict(row)) for row in query_job_result]
 
         # return empty list if no record found
         return []

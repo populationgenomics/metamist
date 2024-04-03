@@ -4,7 +4,7 @@ import { Button, Card, Grid, Input, Message, Select, Dropdown } from 'semantic-u
 import SearchIcon from '@mui/icons-material/Search'
 
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
-import { BillingApi, BillingTotalCostRecord, AnalysisApi } from '../../sm-api'
+import { BillingApi, AnalysisCostRecord } from '../../sm-api'
 import BatchGrid from './components/BatchGrid'
 
 import { getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
@@ -22,35 +22,21 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
     // Data loading
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
     const [error, setError] = React.useState<string | undefined>()
-
+    const [data, setData] = React.useState<AnalysisCostRecord[] | undefined>()
     const [start, setStart] = React.useState<string>(
         searchParams.get('start') ?? getMonthStartDate()
     )
 
-    const [data, setData] = React.useState<any>(undefined)
-
-    const setArData = (arData: []) => {
+    const setBillingRecord = (records: AnalysisCostRecord[]) => {
         setIsLoading(false)
         // arData is an array of objects, we use only the first obejct
         // in the future we maye have search by several ar_guids / author etc.
-        if (arData === undefined || arData.length === 0) {
+        setData(records)
+        if (!records || records.length === 0) {
             // nothing found
             setIsLoading(false)
+            setData(null)
             return
-        }
-        const ar_record = arData[0]
-        if (!!ar_record?.total?.ar_guid) {
-            new AnalysisApi()
-                .getAnalysisRunnerLog(undefined, undefined, ar_record.total.ar_guid, undefined)
-                .then((response) => {
-                    // combine arData and getAnalysisRunnerLog
-                    if (response.data.length > 0) {
-                        // use only the first record for now
-                        ar_record.analysisRunnerLog = response.data[0]
-                    }
-                    setData(ar_record)
-                })
-                .catch((er) => setError(er.message))
         }
         setIsLoading(false)
     }
@@ -64,7 +50,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
     }))
 
     const [searchByType, setSearchByType] = React.useState<SearchType>(
-        SearchType[searchParams.get('searchType')] ?? SearchType[0]
+        (searchParams.get('searchType') as SearchType) ?? SearchType[0]
     )
 
     // use navigate and update url params
@@ -95,14 +81,14 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
             new BillingApi()
                 .costByArGuid(sTxt)
                 .then((response) => {
-                    setArData(response.data)
+                    setBillingRecord(response.data)
                 })
                 .catch((er) => setError(er.message))
         } else if (convertedType === SearchType.Batch_id) {
             new BillingApi()
                 .costByBatchId(sTxt)
                 .then((response) => {
-                    setArData(response.data)
+                    setBillingRecord(response.data)
                 })
                 .catch((er) => setError(er.message))
         } else {
@@ -230,21 +216,16 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         </Card>
     )
 
-    const batchGrid = (gridData: BillingTotalCostRecord) => <BatchGrid data={gridData} />
+    // const batchGrid = (gridData: BillingTotalCostRecord) =>
 
     const dataComponent = () => {
-        if (data !== undefined) {
+        if ((data?.length || 0) > 0) {
             // only render grid if there are available cost data
-            return batchGrid(data)
+            return data!.map((row, idx) => <BatchGrid key={`batch-grid-${idx}`} data={row} />)
         }
 
         // if valid search text and no data return return No data message
-        if (
-            data !== undefined &&
-            searchByType !== undefined &&
-            searchTxt !== undefined &&
-            searchTxt.length > 5
-        ) {
+        if (!!data && !!searchByType && searchTxt?.length > 5) {
             return (
                 <p style={{ textAlign: 'center', marginTop: '5px' }}>
                     <em>No data found.</em>

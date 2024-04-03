@@ -6,7 +6,7 @@ from db.python.tables.bq.billing_gcp_daily import BillingGcpDailyTable
 from db.python.tables.bq.billing_raw import BillingRawTable
 from models.enums import BillingSource
 from models.models import (
-    BillingBatchCostRecord,
+    AnalysisCostRecord,
     BillingColumn,
     BillingCostBudgetRecord,
     BillingTotalCostQueryModel,
@@ -204,7 +204,7 @@ class BillingLayer(BqBaseLayer):
     async def get_cost_by_ar_guid(
         self,
         ar_guid: str | None = None,
-    ) -> list[BillingBatchCostRecord]:
+    ) -> list[AnalysisCostRecord]:
         """
         Get Costs by AR GUID
         """
@@ -229,7 +229,7 @@ class BillingLayer(BqBaseLayer):
     async def get_cost_by_batch_id(
         self,
         batch_id: str | None = None,
-    ) -> list[BillingBatchCostRecord]:
+    ) -> list[AnalysisCostRecord]:
         """
         Get Costs by Batch ID
         """

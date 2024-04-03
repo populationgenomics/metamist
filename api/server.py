@@ -19,7 +19,7 @@ from db.python.tables.project import is_all_access
 from db.python.utils import get_logger
 
 # This tag is automatically updated by bump2version
-_VERSION = '6.8.0'
+_VERSION = '6.9.0'
 
 logger = get_logger()
 
