@@ -35,7 +35,11 @@ def get_extra_audit_log_values(request: Request) -> dict | None:
     if not headers:
         return None
 
-    return json.loads(headers)
+    try:
+        return json.loads(headers)
+    except json.JSONDecodeError:
+        logging.error(f'Could not parse sm-extra-values: {headers}')
+        return None
 
 
 def get_on_behalf_of(request: Request) -> str | None:
