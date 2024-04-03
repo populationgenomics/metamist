@@ -1199,7 +1199,7 @@
 			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.driverImage')) as driver_image,
 			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.configPath')) as config_path,
 			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.cwd')) as cwd,
-			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.environment')) as environment,
+			COALESCE(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.environment')), 'gcp') as environment,
 			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.hailVersion')) as hail_version,
 			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.batch_url')) as batch_url,
 			COALESCE(audit_log.on_behalf_of, analysis.author) as submitting_user, JSON_REMOVE(
