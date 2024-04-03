@@ -27,6 +27,7 @@ setup(
     license='MIT',
     packages=all_packages,
     install_requires=[
+        'backoff>=2.2.1',
         'click',
         'google-auth',
         'google-api-core',  # dependency to google-auth that however is not

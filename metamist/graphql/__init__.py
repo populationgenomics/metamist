@@ -4,22 +4,26 @@ GraphQL utilities for Metamist, allows you to:
     - construct queries using the `gql` function (which validates graphql syntax)
     - validate queries with metamist schema (by fetching the schema)
 """
+
 import os
+from json.decoder import JSONDecodeError
 from typing import Any, Dict
 
+import backoff
+import metamist.configuration
 from gql import Client
 from gql import gql as gql_constructor
 from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.aiohttp import log as aiohttp_logger
+from gql.transport.exceptions import TransportServerError
 from gql.transport.requests import RequestsHTTPTransport
 from gql.transport.requests import log as requests_logger
 
 # this does not import itself, it imports the module
 from graphql import DocumentNode  # type: ignore
+from requests.exceptions import HTTPError
 
 from cpg_utils.cloud import get_google_identity_token
-
-import metamist.configuration
 
 _sync_client: Client | None = None
 _async_client: Client | None = None
@@ -137,6 +141,7 @@ def validate(doc: DocumentNode, client=None, use_local_schema=False):
 
 
 # use older style typing to broaden supported Python versions
+@backoff.on_exception(backoff.expo, exception=[HTTPError, JSONDecodeError, TransportServerError], max_time=10, max_tries=3)
 def query(
     _query: str | DocumentNode, variables: Dict = None, client: Client = None, log_response: bool = False
 ) -> Dict[str, Any]:
@@ -159,6 +164,7 @@ def query(
     return response
 
 
+@backoff.on_exception(backoff.expo, exception=[HTTPError, JSONDecodeError, TransportServerError], max_time=10, max_tries=3)
 async def query_async(
     _query: str | DocumentNode, variables: Dict = None, client: Client = None, log_response: bool = False
 ) -> Dict[str, Any]:
