@@ -10,7 +10,6 @@ from json.decoder import JSONDecodeError
 from typing import Any, Dict
 
 import backoff
-from cpg_utils.cloud import get_google_identity_token
 from gql import Client
 from gql import gql as gql_constructor
 from gql.transport.aiohttp import AIOHTTPTransport
@@ -22,6 +21,8 @@ from gql.transport.requests import log as requests_logger
 # this does not import itself, it imports the module
 from graphql import DocumentNode  # type: ignore
 from requests.exceptions import HTTPError
+
+from cpg_utils.cloud import get_google_identity_token
 
 import metamist.configuration
 
