@@ -31,6 +31,7 @@ def get_ar_guid(request: Request) -> str | None:
 
 
 def get_extra_audit_log_values(request: Request) -> dict | None:
+    """Get a JSON encoded dictionary from the 'sm-extra-values' header if it exists"""
     headers = request.headers.get('sm-extra-values')
     if not headers:
         return None
