@@ -1184,7 +1184,7 @@
 	<sql>
 	SET @@system_versioning_alter_history = 1;
 	ALTER TABLE analysis_runner MODIFY COLUMN config_path VARCHAR(255) NULL;
-	SET @@system_versioning_alter_history = 0;
+	ALTER TABLE analysis_runner MODIFY COLUMN audit_log_id INT NULL;
 	</sql>
 
 	<!-- Migrate all the old analysis_runner records into the new table (don't delete existing ones for now) -->
