@@ -1,3 +1,4 @@
+import json
 import logging
 from os import getenv
 
@@ -27,6 +28,19 @@ def get_jwt_from_request(request: Request) -> str | None:
 def get_ar_guid(request: Request) -> str | None:
     """Get sm-ar-guid from the headers to provide with requests"""
     return request.headers.get('sm-ar-guid')
+
+
+def get_extra_audit_log_values(request: Request) -> dict | None:
+    """Get a JSON encoded dictionary from the 'sm-extra-values' header if it exists"""
+    headers = request.headers.get('sm-extra-values')
+    if not headers:
+        return None
+
+    try:
+        return json.loads(headers)
+    except json.JSONDecodeError:
+        logging.error(f'Could not parse sm-extra-values: {headers}')
+        return None
 
 
 def get_on_behalf_of(request: Request) -> str | None:
@@ -69,12 +83,16 @@ async def dependable_get_write_project_connection(
     request: Request,
     author: str = Depends(authenticate),
     ar_guid: str = Depends(get_ar_guid),
+    extra_values: dict | None = Depends(get_extra_audit_log_values),
     on_behalf_of: str | None = Depends(get_on_behalf_of),
 ) -> Connection:
     """FastAPI handler for getting connection WITH project"""
     meta = {'path': request.url.path}
     if request.client:
         meta['ip'] = request.client.host
+    if extra_values:
+        meta.update(extra_values)
+
     return await ProjectPermissionsTable.get_project_connection(
         project_name=project,
         author=author,
@@ -89,14 +107,20 @@ async def dependable_get_readonly_project_connection(
     project: str,
     author: str = Depends(authenticate),
     ar_guid: str = Depends(get_ar_guid),
+    extra_values: dict | None = Depends(get_extra_audit_log_values),
 ) -> Connection:
     """FastAPI handler for getting connection WITH project"""
+    meta = {}
+    if extra_values:
+        meta.update(extra_values)
+
     return await ProjectPermissionsTable.get_project_connection(
         project_name=project,
         author=author,
         readonly=True,
         on_behalf_of=None,
         ar_guid=ar_guid,
+        meta=meta,
     )
 
 
@@ -104,11 +128,15 @@ async def dependable_get_connection(
     request: Request,
     author: str = Depends(authenticate),
     ar_guid: str = Depends(get_ar_guid),
+    extra_values: dict | None = Depends(get_extra_audit_log_values),
 ):
     """FastAPI handler for getting connection withOUT project"""
     meta = {'path': request.url.path}
     if request.client:
         meta['ip'] = request.client.host
+
+    if extra_values:
+        meta.update(extra_values)
 
     return await SMConnections.get_connection_no_project(
         author, ar_guid=ar_guid, meta=meta

@@ -1,4 +1,5 @@
 # pylint: disable=protected-access too-many-public-methods
+import datetime
 import json
 from test.testbase import run_as_sync
 from test.testbqbase import BqTest
@@ -6,7 +7,7 @@ from unittest.mock import patch
 
 from api.routes import billing
 from models.models import (
-    BillingBatchCostRecord,
+    AnalysisCostRecord,
     BillingColumn,
     BillingCostBudgetRecord,
     BillingTotalCostQueryModel,
@@ -56,27 +57,33 @@ class TestApiBilling(BqTest):
         """
         ar_guid = 'test_ar_guid'
         mockup_record_json = {
-            'total': {'ar_guid': ar_guid},
-            'topics': None,
-            'categories': None,
+            'total': {
+                'ar_guid': ar_guid,
+                'cost': 0.0,
+                'usage_end_time': None,
+                'usage_start_time': None,
+            },
+            'topics': [],
+            'categories': [],
             'batches': [],
-            'skus': None,
-            'seq_groups': None,
-            'wdl_tasks': None,
-            'cromwell_sub_workflows': None,
-            'cromwell_workflows': None,
-            'dataproc': None,
+            'skus': [],
+            'seq_groups': [],
+            'wdl_tasks': [],
+            'cromwell_sub_workflows': [],
+            'cromwell_workflows': [],
+            'dataproc': [],
         }
 
-        mockup_record = [BillingBatchCostRecord.from_json(mockup_record_json)]
+        mockup_record = [AnalysisCostRecord.from_dict(mockup_record_json)]
         mock_get_billing_layer.return_value = self.layer
         mock_get_cost_by_ar_guid.return_value = mockup_record
         response = await billing.get_cost_by_ar_guid(
             ar_guid, author=TEST_API_BILLING_USER
         )
-        self.assertEqual(
-            [mockup_record_json], json.loads(response.body.decode('utf-8'))
-        )
+        resp_json = json.loads(response.body.decode('utf-8'))
+        self.assertEqual(1, len(resp_json))
+
+        self.assertDictEqual(mockup_record_json, resp_json[0])
 
     @run_as_sync
     @patch('api.routes.billing._get_billing_layer_from')
@@ -90,27 +97,45 @@ class TestApiBilling(BqTest):
         ar_guid = 'test_ar_guid'
         batch_id = 'test_batch_id'
         mockup_record_json = {
-            'total': {'ar_guid': ar_guid},
-            'topics': None,
-            'categories': None,
-            'batches': [{'batch_id': batch_id}],
-            'skus': None,
-            'seq_groups': None,
-            'wdl_tasks': None,
-            'cromwell_sub_workflows': None,
-            'cromwell_workflows': None,
-            'dataproc': None,
+            'total': {
+                'ar_guid': ar_guid,
+                'cost': 0.0,
+                'usage_end_time': None,
+                'usage_start_time': None,
+            },
+            'topics': [],
+            'categories': [],
+            'batches': [
+                {
+                    'batch_id': batch_id,
+                    'batch_name': None,
+                    'cost': 0.0,
+                    'usage_start_time': datetime.datetime.now().isoformat(),
+                    'usage_end_time': datetime.datetime.now().isoformat(),
+                    'jobs_cnt': 0,
+                    'skus': [],
+                    'jobs': [],
+                    'seq_groups': [],
+                }
+            ],
+            'skus': [],
+            'seq_groups': [],
+            'wdl_tasks': [],
+            'cromwell_sub_workflows': [],
+            'cromwell_workflows': [],
+            'dataproc': [],
         }
 
-        mockup_record = [BillingBatchCostRecord.from_json(mockup_record_json)]
+        mockup_record = [AnalysisCostRecord.from_dict(mockup_record_json)]
         mock_get_billing_layer.return_value = self.layer
         mock_get_cost_by_batch_id.return_value = mockup_record
         response = await billing.get_cost_by_batch_id(
             batch_id, author=TEST_API_BILLING_USER
         )
-        self.assertEqual(
-            [mockup_record_json], json.loads(response.body.decode('utf-8'))
-        )
+        resp_json = json.loads(response.body.decode('utf-8'))
+
+        self.assertEqual(1, len(resp_json))
+        self.assertDictEqual(mockup_record_json, resp_json[0])
 
     @run_as_sync
     @patch('api.routes.billing._get_billing_layer_from')

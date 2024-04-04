@@ -35,6 +35,21 @@ from {{packageName}}.model_utils import (
     validate_and_convert_types
 )
 
+def get_select_env_values():
+    env_values = {
+        'HAIL_ATTEMPT_ID': 'HAIL_ATTEMPT_ID',
+        'HAIL_BATCH_ID': 'HAIL_BATCH_ID',
+        'HAIL_JOB_ID': 'HAIL_JOB_ID',
+    }
+
+    as_map = {}
+    for env_key, dict_key in env_values.items():
+        value = os.getenv(env_key)
+        if value:
+            as_map[dict_key] = value
+
+    return as_map
+
 
 class ApiClient(object):
     """Generic API client for OpenAPI client library builds.
@@ -74,6 +89,10 @@ class ApiClient(object):
             self.default_headers['sm-ar-guid'] = ar_guid
         if header_name is not None:
             self.default_headers[header_name] = header_value
+        extra_values = get_select_env_values()
+        if extra_values:
+            self.default_headers['sm-extra-values'] = json.dumps(extra_values)
+
         self.cookie = cookie
         # Set default User-Agent.
         self.user_agent = '{{{httpUserAgent}}}{{^httpUserAgent}}OpenAPI-Generator/{{{packageVersion}}}/python{{/httpUserAgent}}'

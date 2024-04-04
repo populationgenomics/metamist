@@ -843,6 +843,24 @@ class Query:
         )
         return [GraphQLProject.from_internal(p) for p in projects]
 
+    @strawberry.field
+    async def analysis_runner(
+        self,
+        info: Info,
+        ar_guid: str,
+    ) -> GraphQLAnalysisRunner:
+        if not ar_guid:
+            raise ValueError('Must provide ar_guid')
+        connection = info.context['connection']
+        alayer = AnalysisRunnerLayer(connection)
+        filter_ = AnalysisRunnerFilter(ar_guid=GenericFilter(eq=ar_guid))
+        analysis_runners = await alayer.query(filter_)
+        if len(analysis_runners) != 1:
+            raise ValueError(
+                f'Expected exactly one analysis runner expected, found {len(analysis_runners)}'
+            )
+        return GraphQLAnalysisRunner.from_internal(analysis_runners[0])
+
 
 schema = strawberry.Schema(
     query=Query, mutation=None, extensions=[QueryDepthLimiter(max_depth=10)]
