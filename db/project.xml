@@ -1194,8 +1194,8 @@
 			hail_version, batch_url, submitting_user, meta, audit_log_id ) SELECT
 			COALESCE(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.ar-guid')), UUID()) as ar_guid,
 			analysis.project as project,
-			STR_TO_DATE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp')), 'T', ' '),
-			'%Y-%m-%d %H:%i:%s.%f') as timestamp, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta,
+			CONVERT(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp')), DATETIME) as timestamp,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta,
 			'$.accessLevel')) as access_level, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.repo'))
 			as repository, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.commit')) as `commit`,
 			analysis.output as output_path, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.script')) as
