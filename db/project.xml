@@ -1194,7 +1194,12 @@
 			hail_version, batch_url, submitting_user, meta, audit_log_id ) SELECT
 			COALESCE(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.ar-guid')), UUID()) as ar_guid,
 			analysis.project as project,
-			CONVERT(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp')), DATETIME) as timestamp,
+			STR_TO_DATE(SUBSTRING_INDEX(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp')), '.', 1), '%Y-%m-%dT%H:%i:%s') -- date portion
+				+ INTERVAL (
+					60 * SUBSTRING(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp')), LENGTH(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp'))) - 4, 2) -- hours offset
+					+ SUBSTRING(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp')), LENGTH(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp'))) - 1, 2) -- minutes offset
+				) * (CASE WHEN JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp')) LIKE '%+%' THEN 1 ELSE -1 END) MINUTE-- +/- offset
+			as timestamp,
 			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta,
 			'$.accessLevel')) as access_level, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.repo'))
 			as repository, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.commit')) as `commit`,
