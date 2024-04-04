@@ -125,7 +125,6 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
                 participant_id=pid,
                 assays=[],
                 sequencing_groups=[],
-                active=True,
             )
             samples.append(sample)
 
@@ -231,7 +230,6 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
         )
     )
 
-    aapi = AnalysisApi()
     for ans in chunk(analyses_to_insert, 50):
         print(f'Inserting {len(ans)} analysis entries')
         await asyncio.gather(*[aapi.create_analysis_async(project, a) for a in ans])
