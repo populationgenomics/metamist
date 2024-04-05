@@ -236,17 +236,30 @@ class BillingLayer(BqBaseLayer):
         ar_batch_lookup_table = BillingArBatchTable(self.connection)
 
         # First get all batches and the min/max day to use for the query
-        ar_guid = await ar_batch_lookup_table.get_ar_guid_by_batch_id(batch_id)
-
-        # The get all batches for the ar_guid
         (
             start_day,
             end_day,
-            batches,
-        ) = await ar_batch_lookup_table.get_batches_by_ar_guid(ar_guid)
+            ar_guid,
+        ) = await ar_batch_lookup_table.get_ar_guid_by_batch_id(batch_id)
 
-        if not batches:
+        if ar_guid is None:
             return []
+
+        if ar_guid != batch_id:
+            # found ar_guid for the batch_id
+            # The get all batches for the ar_guid
+            (
+                start_day,
+                end_day,
+                batches,
+            ) = await ar_batch_lookup_table.get_batches_by_ar_guid(ar_guid)
+
+            if not batches:
+                return []
+        else:
+            # ar_guid is not present, so use the batch_id
+            batches = [batch_id]
+            ar_guid = None
 
         billing_table = BillingDailyExtendedTable(self.connection)
         results = await billing_table.get_batch_cost_summary(
