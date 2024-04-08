@@ -63,8 +63,7 @@ class BillingArBatchTable(BillingBaseTable):
         FROM `{self.table_name}`
         WHERE batch_id = @batch_id
         GROUP BY ar_guid
-        ORDER BY ar_guid DESC
-        LIMIT 1;
+        ORDER BY ar_guid DESC;  -- make NULL values appear last
         """
 
         query_parameters = [
@@ -72,6 +71,9 @@ class BillingArBatchTable(BillingBaseTable):
         ]
         query_job_result = self._execute_query(_query, query_parameters)
         if query_job_result:
+            if len(query_job_result) > 1 and query_job_result[1]['ar_guid'] is not None:
+                raise ValueError(f'Multiple ARs found for batch_id: {batch_id}')
+
             ar_guid = query_job_result[0]['ar_guid']
             start_day = query_job_result[0]['start_day']
             end_day = query_job_result[0]['end_day'] + timedelta(days=1)
