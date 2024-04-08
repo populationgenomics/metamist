@@ -448,8 +448,6 @@ class TestBillingLayer(BqTest):
                 batch_id=dummy_batch_id,
                 start_day=given_start_day,
                 end_day=given_end_day,
-                # mockup __getitem__ to return dummy_ar_guid
-                __getitem__=mock.MagicMock(return_value=dummy_ar_guid),
             ),
         ]
         self.bq_result.result.return_value = mock_rows
