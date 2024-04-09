@@ -36,6 +36,7 @@ from models.models import (
     SequencingGroupInternal,
 )
 from models.models.audit_log import AuditLogInternal
+from models.models.family import PedRowInternal
 
 
 class LoaderKeys(enum.Enum):
@@ -65,6 +66,8 @@ class LoaderKeys(enum.Enum):
     PARTICIPANTS_FOR_PROJECTS = 'participants_for_projects'
 
     FAMILIES_FOR_PARTICIPANTS = 'families_for_participants'
+    FAMILY_PARTICIPANTS_FOR_FAMILIES = 'family_participants_for_families'
+    FAMILIES_FOR_IDS = 'families_for_ids'
 
     SEQUENCING_GROUPS_FOR_IDS = 'sequencing_groups_for_ids'
     SEQUENCING_GROUPS_FOR_SAMPLES = 'sequencing_groups_for_samples'
@@ -444,6 +447,31 @@ async def load_phenotypes_for_participants(
         participant_ids=participant_ids
     )
     return [participant_phenotypes.get(pid, {}) for pid in participant_ids]
+
+
+@connected_data_loader(LoaderKeys.FAMILIES_FOR_IDS)
+async def load_families_for_ids(
+    family_ids: list[int], connection
+) -> list[FamilyInternal]:
+    """
+    DataLoader: get_families_for_ids
+    """
+    flayer = FamilyLayer(connection)
+    families = await flayer.get_families_by_ids(family_ids)
+    f_by_id = {f.id: f for f in families}
+    return [f_by_id[f] for f in family_ids]
+
+
+@connected_data_loader(LoaderKeys.FAMILY_PARTICIPANTS_FOR_FAMILIES)
+async def load_family_participants_for_families(
+    family_ids: list[int], connection
+) -> list[list[PedRowInternal]]:
+    flayer = FamilyLayer(connection)
+    family_participants = await flayer.get_family_participants_for_family_ids(
+        family_ids
+    )
+
+    return [family_participants.get(fid, []) for fid in family_ids]
 
 
 async def get_context(
