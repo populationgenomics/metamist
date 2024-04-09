@@ -19,11 +19,11 @@ class AnalysisInternal(SMBase):
     id: int | None = None
     type: str
     status: AnalysisStatus
-    output: str = None
+    active: bool
+    output: str | None = None
     sequencing_group_ids: list[int] = []
     timestamp_completed: datetime | None = None
     project: int | None = None
-    active: bool | None = None
     meta: dict[str, Any] = {}
     author: str | None = None
 
@@ -72,9 +72,11 @@ class AnalysisInternal(SMBase):
                 self.sequencing_group_ids
             ),
             output=self.output,
-            timestamp_completed=self.timestamp_completed.isoformat()
-            if self.timestamp_completed
-            else None,
+            timestamp_completed=(
+                self.timestamp_completed.isoformat()
+                if self.timestamp_completed
+                else None
+            ),
             project=self.project,
             active=self.active,
             meta=self.meta,

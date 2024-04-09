@@ -257,3 +257,47 @@ WHERE fp.participant_id in :participant_ids
         )
 
         return True
+
+    async def get_family_participants_by_family_ids(
+        self, family_ids: list[int]
+    ) -> tuple[set[ProjectId], dict[int, list[PedRowInternal]]]:
+        """
+        Get all participants in a list of families
+        """
+        if not family_ids:
+            return set(), {}
+
+        _query = """
+            SELECT
+                p.project,
+                p.id,
+                fp.family_id,
+                fp.paternal_participant_id,
+                fp.maternal_participant_id,
+                fp.affected,
+                fp.notes
+            FROM
+                family_participant fp
+            INNER JOIN participant p ON p.id = fp.participant_id
+            WHERE fp.family_id IN :family_ids
+        """
+
+        rows = await self.connection.fetch_all(_query, {'family_ids': family_ids})
+
+        projects: set[ProjectId] = set()
+        by_family = defaultdict(list)
+
+        for row in rows:
+            projects.add(row['project'])
+            by_family[row['family_id']].append(
+                PedRowInternal(
+                    family_id=row['family_id'],
+                    participant_id=row['id'],
+                    paternal_id=row['paternal_participant_id'],
+                    maternal_id=row['maternal_participant_id'],
+                    affected=row['affected'],
+                    notes=row['notes'],
+                )
+            )
+
+        return projects, by_family

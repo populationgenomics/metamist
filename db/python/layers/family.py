@@ -570,9 +570,9 @@ class FamilyLayer(BaseLayer):
                             reported_sex=row.sex,
                         )
                     )
-                    external_participant_ids_map[
-                        row.individual_id
-                    ] = upserted_participant.id
+                    external_participant_ids_map[row.individual_id] = (
+                        upserted_participant.id
+                    )
 
             for external_family_id in missing_external_family_ids:
                 internal_family_id = await self.ftable.create_family(
@@ -682,3 +682,21 @@ class FamilyLayer(BaseLayer):
             coded_phenotypes=select_columns(phenotype_idx),
         )
         return True
+
+    async def get_family_participants_for_family_ids(
+        self, family_ids: list[int], check_project_ids: bool = True
+    ) -> dict[int, list[PedRowInternal]]:
+        """Get family participants for family IDs"""
+        projects, fps = await self.fptable.get_family_participants_by_family_ids(
+            family_ids
+        )
+
+        if not fps:
+            return {}
+
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.connection.author, projects, readonly=True
+            )
+
+        return fps

@@ -256,7 +256,7 @@ class GenericFilterModel:
                 setattr(self, field.name, GenericFilter(eq=value))
 
     def to_sql(
-        self, field_overrides: dict[str, str] = None
+        self, field_overrides: dict[str, str] | None = None
     ) -> tuple[str, dict[str, Any]]:
         """Convert the model to SQL, and avoid SQL injection"""
         _foverrides = field_overrides or {}

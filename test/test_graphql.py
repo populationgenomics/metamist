@@ -4,6 +4,7 @@ from graphql.error import GraphQLError, GraphQLSyntaxError
 
 import api.graphql.schema
 from db.python.layers import AnalysisLayer, ParticipantLayer
+from db.python.layers.family import FamilyLayer
 from metamist.graphql import configure_sync_client, gql, validate
 from models.enums import AnalysisStatus
 from models.models import (
@@ -257,3 +258,66 @@ query MyQuery($pid: Int!) {
         self.assertIn('participant', resp)
         self.assertIn('phenotypes', resp['participant'])
         self.assertDictEqual(phenotypes, resp['participant']['phenotypes'])
+
+    @run_as_sync
+    async def test_family_participants(self):
+        family_layer = FamilyLayer(self.connection)
+
+        rows = [
+            ["family1", "individual1", "paternal1", "maternal1", "m", "1", "note1"],
+            ["family1", "paternal1", None, None, "m", "0", "note2"],
+            ["family1", "maternal1", None, None, "f", "1", "note3"],
+        ]
+
+        await family_layer.import_pedigree(None, rows, create_missing_participants=True)
+
+        q = """
+query MyQuery($project: String!) {
+    project(name: $project) {
+        participants {
+            externalId
+            familyParticipants {
+                affected
+                notes
+                family {
+                    externalId
+                }
+            }
+        }
+        families {
+            id
+            familyParticipants {
+                affected
+                notes
+                participant {
+                    externalId
+                }
+            }
+        }
+    }
+}
+"""
+
+        resp = await self.run_graphql_query_async(q, {'project': self.project_name})
+
+        {
+            "project": {
+                "participants": [
+                    {"externalId": "individual1", "familyParticipants": []},
+                    {"externalId": "maternal1", "familyParticipants": []},
+                    {"externalId": "paternal1", "familyParticipants": []},
+                ],
+                "families": [
+                    {
+                        "id": 1,
+                        "familyParticipants": [
+                            {"affected": 0, "notes": "note2", "participant": {"id": 1}},
+                            {"affected": 1, "notes": "note3", "participant": {"id": 2}},
+                            {"affected": 1, "notes": "note1", "participant": {"id": 3}},
+                        ],
+                    }
+                ],
+            }
+        }
+
+        print(resp)
