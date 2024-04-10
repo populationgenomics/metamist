@@ -387,3 +387,27 @@ class TestCohortData(DbIsolatedTest):
 
         self.assertNotIn(sgD, coh1['sequencing_group_ids'])
         self.assertIn(sgD, coh2['sequencing_group_ids'])
+
+    @run_as_sync
+    async def test_query_cohort(self):
+        """Create a cohort and test that it is populated when queried"""
+        created = await self.cohortl.create_cohort_from_criteria(
+            project_to_write=self.project_id,
+            author='bob@example.org',
+            description='Cohort with two samples',
+            cohort_name='Duo cohort',
+            dry_run=False,
+            cohort_criteria=CohortCriteria(
+                projects=['test'],
+                sg_ids_internal=[self.sgA, self.sgB],
+            ),
+        )
+        self.assertEqual(2, len(created['sequencing_group_ids']))
+
+        queried = await self.cohortl.query(CohortFilter(name=GenericFilter(eq='Duo cohort')))
+        self.assertEqual(1, len(queried))
+
+        result = await self.cohortl.get_cohort_sequencing_group_ids(int(queried[0].id))
+        self.assertEqual(2, len(result))
+        self.assertIn(self.sA.sequencing_groups[0].id, result)
+        self.assertIn(self.sB.sequencing_groups[0].id, result)
