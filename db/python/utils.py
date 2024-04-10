@@ -3,11 +3,9 @@ import json
 import logging
 import os
 import re
-from enum import Enum
 from typing import Any, Generic, TypeVar
 
 from models.base import SMBase
-from models.models.group import GroupProjectRole
 
 T = TypeVar('T')
 
@@ -67,7 +65,7 @@ class NoProjectAccess(Forbidden):
         self,
         project_names: list[str],
         author: str,
-        allowed_roles: set[GroupProjectRole],
+        allowed_roles: list[str],
         *args: tuple[Any, ...],
     ):
         project_names_str = (

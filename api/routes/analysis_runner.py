@@ -4,7 +4,7 @@ from fastapi import APIRouter
 
 from api.utils.db import (
     Connection,
-    get_project_readonly_connection,
+    get_project_read_connection,
     get_project_write_connection,
 )
 from db.python.layers.analysis_runner import AnalysisRunnerLayer
@@ -75,7 +75,7 @@ async def get_analysis_runner_logs(
     repository: str | None = None,
     access_level: str | None = None,
     environment: str | None = None,
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_read_connection,
 ) -> list[AnalysisRunner]:
     """Get analysis runner logs"""
 

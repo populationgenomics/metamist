@@ -215,7 +215,9 @@ class ProjectPermissionsTable:
         if not has_access:
             if raise_exception:
                 raise NoProjectAccess(
-                    [project.name], allowed_roles=allowed_roles, author=user
+                    [project.name],
+                    allowed_roles=[r.name for r in allowed_roles],
+                    author=user,
                 )
             return None
 
@@ -289,7 +291,9 @@ class ProjectPermissionsTable:
 
         if missing_project_names:
             raise NoProjectAccess(
-                missing_project_names, allowed_roles=allowed_roles, author=user
+                missing_project_names,
+                allowed_roles=[r.name for r in allowed_roles],
+                author=user,
             )
 
         return accessible_projects
