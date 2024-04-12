@@ -8,11 +8,7 @@ import google.cloud.bigquery as bq
 
 from db.python.layers.billing import BillingLayer
 from models.enums import BillingSource
-from models.models import (
-    BillingColumn,
-    BillingHailBatchCostRecord,
-    BillingTotalCostQueryModel,
-)
+from models.models import BillingColumn, BillingTotalCostQueryModel
 
 
 class TestBillingLayer(BqTest):
@@ -359,7 +355,11 @@ class TestBillingLayer(BqTest):
 
     @run_as_sync
     async def test_get_cost_by_ar_guid(self):
-        """Test get_cost_by_ar_guid"""
+        """
+        Test get_cost_by_ar_guid
+        This test only paths in the layer,
+        the logic and processing is tested in test/test_bq_billing_base.py
+        """
 
         layer = BillingLayer(self.connection)
 
@@ -367,9 +367,7 @@ class TestBillingLayer(BqTest):
         records = await layer.get_cost_by_ar_guid(ar_guid=None)
 
         # return empty record
-        self.assertEqual(
-            BillingHailBatchCostRecord(ar_guid=None, batch_ids=[], costs=[]), records
-        )
+        self.assertEqual([], records)
 
         # dummy ar_guid, no mockup data, return empty results
         dummy_ar_guid = '12345678'
@@ -377,13 +375,11 @@ class TestBillingLayer(BqTest):
 
         # return empty record
         self.assertEqual(
-            BillingHailBatchCostRecord(ar_guid=dummy_ar_guid, batch_ids=[], costs=[]),
+            [],
             records,
         )
 
-        # dummy ar_guid, mockup batch_id
-
-        # mock BigQuery result
+        # mock BigQuery first query result
         given_start_day = datetime.datetime(2023, 1, 1, 0, 0)
         given_end_day = datetime.datetime(2023, 1, 1, 2, 3)
         dummy_batch_id = '12345'
@@ -401,19 +397,21 @@ class TestBillingLayer(BqTest):
         self.bq_result.result.return_value = mock_rows
 
         records = await layer.get_cost_by_ar_guid(ar_guid=dummy_ar_guid)
-        # returns ar_guid, batch_id and empty cost as those were not mocked up
+        # returns empty list as those were not mocked up
         # we do not need to test cost calculation here,
         # as those are tested in test/test_bq_billing_base.py
         self.assertEqual(
-            BillingHailBatchCostRecord(
-                ar_guid=dummy_ar_guid, batch_ids=[dummy_batch_id], costs=[{}]
-            ),
+            [],
             records,
         )
 
     @run_as_sync
     async def test_get_cost_by_batch_id(self):
-        """Test get_cost_by_batch_id"""
+        """
+        Test get_cost_by_batch_id
+        This test only paths in the layer,
+        the logic and processing is tested in test/test_bq_billing_base.py
+        """
 
         layer = BillingLayer(self.connection)
 
@@ -421,9 +419,7 @@ class TestBillingLayer(BqTest):
         records = await layer.get_cost_by_batch_id(batch_id=None)
 
         # return empty record
-        self.assertEqual(
-            BillingHailBatchCostRecord(ar_guid=None, batch_ids=[], costs=[]), records
-        )
+        self.assertEqual([], records)
 
         # dummy ar_guid, no mockup data, return empty results
         dummy_batch_id = '12345'
@@ -431,7 +427,7 @@ class TestBillingLayer(BqTest):
 
         # return empty record
         self.assertEqual(
-            BillingHailBatchCostRecord(ar_guid=None, batch_ids=[], costs=[]),
+            [],
             records,
         )
 
@@ -452,19 +448,15 @@ class TestBillingLayer(BqTest):
                 batch_id=dummy_batch_id,
                 start_day=given_start_day,
                 end_day=given_end_day,
-                # mockup __getitem__ to return dummy_ar_guid
-                __getitem__=mock.MagicMock(return_value=dummy_ar_guid),
             ),
         ]
         self.bq_result.result.return_value = mock_rows
 
         records = await layer.get_cost_by_batch_id(batch_id=dummy_batch_id)
-        # returns ar_guid, batch_id and empty cost as those were not mocked up
+        # returns elmpty list as those were not mocked up
         # we do not need to test cost calculation here,
         # as those are tested in test/test_bq_billing_base.py
         self.assertEqual(
-            BillingHailBatchCostRecord(
-                ar_guid=dummy_ar_guid, batch_ids=[dummy_batch_id], costs=[{}]
-            ),
+            [],
             records,
         )

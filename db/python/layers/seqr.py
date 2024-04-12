@@ -24,7 +24,7 @@ from api.settings import (
 )
 from db.python.connect import Connection
 from db.python.enum_tables import SequencingTypeTable
-from db.python.layers.analysis import AnalysisLayer
+from db.python.layers.analysis import AnalysisInternal, AnalysisLayer
 from db.python.layers.base import BaseLayer
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
@@ -33,6 +33,7 @@ from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.project import Project
 from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
+from models.enums.web import SeqrDatasetType
 
 # literally the most temporary thing ever, but for complete
 # automation need to have sample inclusion / exclusion
@@ -42,6 +43,14 @@ from models.utils.sequencing_group_id_format import (
 )
 
 SEQUENCING_GROUPS_TO_IGNORE = {22735, 22739}
+
+# production-pipelines stage names for each dataset type
+ES_INDEX_STAGES = {
+    SeqrDatasetType.SNV_INDEL: 'MtToEs',
+    SeqrDatasetType.SV: 'MtToEsSv',
+    SeqrDatasetType.GCNV: 'MtToEsCNV',
+    SeqrDatasetType.MITO: 'MtToEsMito',
+}
 
 _url_individuals_sync = '/api/project/sa/{projectGuid}/individuals/sync'
 _url_individual_meta_sync = '/api/project/sa/{projectGuid}/individuals_metadata/sync'
@@ -114,6 +123,7 @@ class SeqrLayer(BaseLayer):
         sync_individual_metadata: bool = True,
         sync_individuals: bool = True,
         sync_es_index: bool = True,
+        es_index_types: list[SeqrDatasetType] = None,
         sync_saved_variants: bool = True,
         sync_cram_map: bool = True,
         post_slack_notification: bool = True,
@@ -206,6 +216,7 @@ class SeqrLayer(BaseLayer):
                     self.update_es_index(
                         sequencing_type=sequencing_type,
                         sequencing_group_ids=sequencing_group_ids,
+                        es_index_types=es_index_types,
                         **params,
                     )
                 )
@@ -356,9 +367,53 @@ class SeqrLayer(BaseLayer):
             f'Uploaded individual metadata for {len(processed_records)} individuals'
         ]
 
+    def check_updated_sequencing_group_ids(self, sequencing_group_ids: set[int], es_index_analyses: list[AnalysisInternal]):
+        """Check if the sequencing group IDs have been updated"""
+        messages = []
+        if sequencing_group_ids:
+            es_index_analyses = sorted(
+                es_index_analyses, key=lambda el: el.timestamp_completed
+            )
+            sequencing_groups_in_new_index = set(
+                es_index_analyses[-1].sequencing_group_ids
+            )
+
+            if len(es_index_analyses) > 1:
+                sequencing_groups_in_old_index = set(
+                    es_index_analyses[-2].sequencing_group_ids
+                )
+                sequencing_groups_diff = sequencing_group_id_format_list(
+                    sequencing_groups_in_new_index - sequencing_groups_in_old_index
+                )
+                if sequencing_groups_diff:
+                    messages.append(
+                        f'Sequencing groups added to {es_index_analyses[-1].output}: ' + ', '.join(sequencing_groups_diff),
+                    )
+
+            sg_ids_missing_from_index = sequencing_group_id_format_list(
+                sequencing_group_ids - sequencing_groups_in_new_index
+            )
+            if sg_ids_missing_from_index:
+                messages.append(
+                    f'Sequencing groups missing from {es_index_analyses[-1].output}: '
+                    + ', '.join(sg_ids_missing_from_index),
+                )
+        return messages
+
+    async def post_es_index_update(self, session: aiohttp.ClientSession, url: str, post_json: dict, headers: dict[str, str]):
+        """Post request to update ES index"""
+        resp = await session.post(
+            url=url,
+            json=post_json,
+            headers=headers,
+        )
+        resp.raise_for_status()
+        return f'Updated ES index {post_json.get("elasticsearchIndex")}: {resp.status} - {resp.reason}'
+
     async def update_es_index(
         self,
         session: aiohttp.ClientSession,
+        es_index_types: list[SeqrDatasetType],
         sequencing_type: str,
         project_guid,
         headers,
@@ -392,72 +447,55 @@ class SeqrLayer(BaseLayer):
         fn_path = os.path.join(SEQR_MAP_LOCATION, filename)
         # pylint: disable=no-member
 
+        # Only need to write this once, as the POST request will ignore extra samples not in each index synced
+        with AnyPath(fn_path).open('w+') as f:  # type: ignore
+            f.write('\n'.join(rows_to_write))
+
         alayer = AnalysisLayer(connection=self.connection)
         es_index_analyses = await alayer.query(
             AnalysisFilter(
                 project=GenericFilter(eq=self.connection.project),
                 type=GenericFilter(eq='es-index'),
                 status=GenericFilter(eq=AnalysisStatus.COMPLETED),
-                meta={'sequencing_type': GenericFilter(eq=sequencing_type)},
+                meta={
+                    'sequencing_type': GenericFilter(eq=sequencing_type),
+                },
             )
         )
-
-        es_index_analyses = sorted(
-            es_index_analyses,
-            key=lambda el: el.timestamp_completed,
-        )
-
         if len(es_index_analyses) == 0:
             return ['No ES index to synchronise']
 
-        with AnyPath(fn_path).open('w+') as f:  # type: ignore
-            f.write('\n'.join(rows_to_write))
-
-        es_index = es_index_analyses[-1].output
-
         messages = []
+        requests = []  # for POST requests to gather
+        for es_index_type in es_index_types:
+            es_indexes_filtered_by_type: list[AnalysisInternal] = [
+                a
+                for a in es_index_analyses
+                if a.meta.get('stage') == ES_INDEX_STAGES[es_index_type]
+            ]
+            if not es_indexes_filtered_by_type:
+                messages.append(f'No ES index to synchronise for {es_index_type}')
+                continue
 
-        if sequencing_group_ids:
-            sequencing_groups_in_new_index = set(
-                es_index_analyses[-1].sequencing_group_ids
+            es_indexes_filtered_by_type = sorted(
+                es_indexes_filtered_by_type,
+                key=lambda el: el.timestamp_completed,
             )
 
-            if len(es_index_analyses) > 1:
-                sequencing_groups_in_old_index = set(
-                    es_index_analyses[-2].sequencing_group_ids
-                )
-                sequencing_groups_diff = sequencing_group_id_format_list(
-                    sequencing_groups_in_new_index - sequencing_groups_in_old_index
-                )
-                if sequencing_groups_diff:
-                    messages.append(
-                        'Samples added to index: ' + ', '.join(sequencing_groups_diff),
-                    )
+            es_index = es_indexes_filtered_by_type[-1].output
 
-            sg_ids_missing_from_index = sequencing_group_id_format_list(
-                sequencing_group_ids - sequencing_groups_in_new_index
-            )
-            if sg_ids_missing_from_index:
-                messages.append(
-                    'Sequencing groups missing from index: '
-                    + ', '.join(sg_ids_missing_from_index),
-                )
+            messages.extend(self.check_updated_sequencing_group_ids(sequencing_group_ids, es_indexes_filtered_by_type))
 
-        req1_url = SEQR_URL + _url_update_es_index.format(projectGuid=project_guid)
-        resp_1 = await session.post(
-            req1_url,
-            json={
+            req1_url = SEQR_URL + _url_update_es_index.format(projectGuid=project_guid)
+            post_json = {
                 'elasticsearchIndex': es_index,
-                'datasetType': 'VARIANTS',
+                'datasetType': es_index_type.value,
                 'mappingFilePath': fn_path,
                 'ignoreExtraSamplesInCallset': True,
-            },
-            headers=headers,
-        )
-        resp_1.raise_for_status()
+            }
+            requests.append(self.post_es_index_update(session, req1_url, post_json, headers))
 
-        messages.append(f'Updated ES index {es_index}')
-
+        messages.extend(await asyncio.gather(*requests))
         return messages
 
     async def update_saved_variants(

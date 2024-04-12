@@ -7,7 +7,14 @@ import random
 from pathlib import Path
 from pprint import pprint
 
-from metamist.apis import AnalysisApi, FamilyApi, ParticipantApi, ProjectApi, SampleApi
+from metamist.apis import (
+    AnalysisApi,
+    AnalysisRunnerApi,
+    FamilyApi,
+    ParticipantApi,
+    ProjectApi,
+    SampleApi,
+)
 from metamist.graphql import gql, query_async
 from metamist.model.analysis import Analysis
 from metamist.model.analysis_status import AnalysisStatus
@@ -50,6 +57,7 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
     papi = ProjectApi()
     sapi = SampleApi()
     aapi = AnalysisApi()
+    ar_api = AnalysisRunnerApi()
 
     enum_resp: dict[str, dict[str, list[str]]] = await query_async(QUERY_ENUMS)
     # analysis_types = enum_resp['enum']['analysisType']
@@ -159,8 +167,6 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
     response = await sapi.upsert_samples_async(project, samples)
     pprint(response)
 
-    # practice what you preach I guess
-
     sgid_response = await query_async(QUERY_SG_ID, {'project': project})
     sequencing_group_ids = [
         sg['id'] for sg in sgid_response['project']['sequencingGroups']
@@ -174,72 +180,66 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
             type='es-index',
             status=AnalysisStatus('completed'),
             outputs={
-                'qc_results': {
-                    'basename': 'gs://sm-dev-test/file1.txt'
-                    },
-                'cram': {
-                    'basename': 'gs://sm-dev-test/file1.cram'
-                },
+                'qc_results': {'basename': 'gs://sm-dev-test/file1.txt'},
+                'cram': {'basename': 'gs://sm-dev-test/file1.cram'},
                 'qc': {
                     'cram': {
                         'basename': 'gs://sm-dev-test/file2.cram',
-                        'secondaryFiles':
-                            {
-                                'cram_ext': {
-                                    'basename': 'gs://sm-dev-test/file2.cram.ext'
-                                },
-                                'cram_meta': {
-                                    'basename': 'gs://sm-dev-test/file2.cram.meta'
-                                }
-                            }
+                        'secondaryFiles': {
+                            'cram_ext': {'basename': 'gs://sm-dev-test/file2.cram.ext'},
+                            'cram_meta': {
+                                'basename': 'gs://sm-dev-test/file2.cram.meta'
+                            },
+                        },
                     },
                     'aggregate': {
                         'cram': {
                             'basename': 'gs://sm-dev-test/file3.cram',
                             'secondaryFiles': {
-                                    'cram_ext': {
-                                        'basename': 'gs://sm-dev-test/file3.cram.ext'
-                                    },
-                                    'cram_meta': {
-                                        'basename': 'gs://sm-dev-test/file3.cram.meta'
-                                    }
-                                }
+                                'cram_ext': {
+                                    'basename': 'gs://sm-dev-test/file3.cram.ext'
+                                },
+                                'cram_meta': {
+                                    'basename': 'gs://sm-dev-test/file3.cram.meta'
+                                },
+                            },
                         },
                         'qc': {
                             'basename': 'gs://sm-dev-test/file1.qc',
                             'secondaryFiles': {
-                                'qc_ext': {
-                                    'basename': 'gs://sm-dev-test/file1.qc.ext'
-                                },
+                                'qc_ext': {'basename': 'gs://sm-dev-test/file1.qc.ext'},
                                 'qc_meta': {
                                     'basename': 'gs://sm-dev-test/file1.qc.meta'
-                                }
-                            }
+                                },
+                            },
                         },
-                    }
-                }
+                    },
+                },
             },
             meta={},
         )
     ]
 
-    analyses_to_insert.extend([
-        Analysis(
-            sequencing_group_ids=[s],
-            type='cram',
-            status=AnalysisStatus('completed'),
-            outputs={'basename': f'FAKE://greek-myth/crams/{s}.cram'},
-            timestamp_completed=(
-                datetime.datetime.now() - datetime.timedelta(days=random.randint(1, 15))
-            ).isoformat(),
-            meta={
-                'sequencing_type': 'genome',
-                # random size between 5, 25 GB
-                'size': random.randint(5 * 1024, 25 * 1024) * 1024 * 1024,
-            },
-        )
-        for s in sequencing_group_ids
-    ])
+    analyses_to_insert.extend(
+        [
+            Analysis(
+                sequencing_group_ids=[s],
+                type='cram',
+                status=AnalysisStatus('completed'),
+                outputs={'basename': f'FAKE://greek-myth/crams/{s}.cram'},
+                timestamp_completed=(
+                    datetime.datetime.now()
+                    - datetime.timedelta(days=random.randint(1, 15))
+                ).isoformat(),
+                meta={
+                    'sequencing_type': 'genome',
+                    # random size between 5, 25 GB
+                    'size': random.randint(5 * 1024, 25 * 1024) * 1024 * 1024,
+                },
+            )
+            for s in sequencing_group_ids
+        ]
+    )
 
     analyses_to_insert.extend(
         [
@@ -265,6 +265,34 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
             for s in random.choices(sequencing_group_ids, k=10)
         ]
     )
+
+    ar_entries_inserted = len(
+        await asyncio.gather(
+            *[
+                ar_api.create_analysis_runner_log_async(
+                    project=project,
+                    ar_guid=f'fake-guid-{s}',
+                    output_path=f'FAKE://greek-myth-test/output-dir/{s}',
+                    access_level=random.choice(['full', 'standard', 'test']),
+                    repository='metamist',
+                    config_path='gs://path/to/config.toml',
+                    environment='gcp',
+                    submitting_user='fake-user',
+                    # meta
+                    request_body={},
+                    commit='some-hash',
+                    script='myFakeScript.py',
+                    description='just analysis things',
+                    hail_version='1.0',
+                    cwd='scripts',
+                    driver_image='fake-australia-southeast1-fake-docker.pkg',
+                    batch_url=f'FAKE://batch.hail.populationgenomics.org.au/batches/fake_{s}',
+                )
+                for s in range(15)
+            ]
+        )
+    )
+    print(f'Inserted {ar_entries_inserted} analysis runner entries')
 
     # es-index
     analyses_to_insert.append(

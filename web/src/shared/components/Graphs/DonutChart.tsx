@@ -9,10 +9,14 @@ export interface IDonutChartData {
 }
 
 export interface IDonutChartProps {
+    id?: string
     data?: IDonutChartData[]
     maxSlices: number
-    colors?: (t: number) => string | undefined
+    colors?: (t: number) => string
     isLoading: boolean
+    legendSize?: number
+    showLegend?: boolean
+    maxWidth?: string
 }
 
 interface IDonutChartPreparadData {
@@ -29,7 +33,16 @@ function calcTranslate(data: IDonutChartPreparadData, move = 4) {
     })`
 }
 
-export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors, isLoading }) => {
+export const DonutChart: React.FC<IDonutChartProps> = ({
+    id,
+    data,
+    maxSlices,
+    colors,
+    isLoading,
+    legendSize,
+    showLegend,
+    maxWidth,
+}) => {
     if (isLoading) {
         return (
             <div>
@@ -46,11 +59,14 @@ export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors
     const duration = 250
     const containerDivRef = React.useRef<HTMLDivElement>()
     const [graphWidth, setGraphWidth] = React.useState<number>(768)
+    // to distinquished between charts on the same page we need an id
+    const chartId = id ?? 'donutChart'
 
     const onHoverOver = (tg: HTMLElement, v: IDonutChartPreparadData) => {
-        select(`#lbl${v.index}`).select('tspan').attr('font-weight', 'bold')
-        select(`#legend${v.index}`).attr('font-weight', 'bold')
-        select(`#lgd${v.index}`).attr('font-weight', 'bold')
+        select(`#${chartId}-lbl${v.index}`).select('tspan').attr('font-weight', 'bold')
+        select(`#${chartId}-legend${v.index}`).attr('font-weight', 'bold')
+        select(`#${chartId}-lgd${v.index}`).attr('font-weight', 'bold')
+        select(`#${chartId}-lgd${v.index}`).attr('style', 'font-weight: bold')
         select(tg).transition().duration(duration).attr('transform', calcTranslate(v, 6))
         select(tg)
             .select('path')
@@ -62,9 +78,10 @@ export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors
     }
 
     const onHoverOut = (tg: HTMLElement, v: IDonutChartPreparadData) => {
-        select(`#lbl${v.index}`).select('tspan').attr('font-weight', 'normal')
-        select(`#legend${v.index}`).attr('font-weight', 'normal')
-        select(`#lgd${v.index}`).attr('font-weight', 'normal')
+        select(`#${chartId}-lbl${v.index}`).select('tspan').attr('font-weight', 'normal')
+        select(`#${chartId}-legend${v.index}`).attr('font-weight', 'normal')
+        select(`#${chartId}-lgd${v.index}`).attr('font-weight', 'normal')
+        select(`#${chartId}-lgd${v.index}`).attr('style', 'font-weight: normal')
         select(tg).transition().duration(duration).attr('transform', 'translate(0, 0)')
         select(tg)
             .select('path')
@@ -72,6 +89,20 @@ export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors
             .duration(duration)
             .attr('stroke', 'white')
             .attr('stroke-width', 1)
+    }
+
+    function createViewBox(legSize, w) {
+        // calculate the viewbox of Legend
+        const minX = 0
+        const minY = 0
+        let width = 200
+        let height = 200
+        if (legSize) {
+            width = legSize * w
+            height = legSize * w
+        }
+
+        return `${minX} ${minY} ${width} ${height}`
     }
 
     const width = graphWidth
@@ -138,7 +169,7 @@ export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors
             .style('stroke-width', '2')
             .style('opacity', '0.8')
             .style('cursor', 'pointer')
-            .attr('id', (d) => `path${d.index}`)
+            .attr('id', (d) => `${chartId}-path${d.index}`)
             .on('mouseover', (event, v) => {
                 onHoverOver(event.currentTarget, v)
             })
@@ -159,7 +190,7 @@ export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors
             .data(data_ready)
             .join('text')
             .attr('transform', (d) => `translate(${arcLabel.centroid(d)})`)
-            .attr('id', (d) => `lbl${d.index}`)
+            .attr('id', (d) => `${chartId}-lbl${d.index}`)
             .selectAll('tspan')
             .data((d) => {
                 const lines = `${formatMoney(d.data.value)}`.split(/\n/)
@@ -172,42 +203,44 @@ export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors
             .text((d) => d)
 
         // add legend
-        const svgLegend = select(contDiv)
-            .append('svg')
-            .attr('width', '45%')
-            .attr('viewBox', '0 0 200 200')
-            .attr('vertical-align', 'top')
+        if (showLegend === true) {
+            const svgLegend = select(contDiv)
+                .append('svg')
+                .attr('width', '45%')
+                .attr('viewBox', createViewBox(legendSize, width))
+                .attr('vertical-align', 'top')
 
-        svgLegend
-            .selectAll('g.legend')
-            .data(data_ready)
-            .enter()
-            .append('g')
-            .attr('transform', (d) => `translate(${margin},${margin + d.index * 20})`)
-            .each(function (d, i) {
-                select(this)
-                    .append('circle')
-                    .attr('r', 8)
-                    .attr('fill', (d) => colorFunc(d.index / maxSlices))
-                select(this)
-                    .append('text')
-                    .attr('text-anchor', 'start')
-                    .attr('x', 20)
-                    .attr('y', 0)
-                    .attr('dy', '0.35em')
-                    .attr('id', (d) => `legend${d.index}`)
-                    .text(d.data.label)
-                    .attr('font-size', '0.9em')
-                select(this)
-                    .on('mouseover', (event, v) => {
-                        const element = select(`#path${d.index}`)
-                        onHoverOver(element.node(), d)
-                    })
-                    .on('mouseout', (event, v) => {
-                        const element = select(`#path${d.index}`)
-                        onHoverOut(element.node(), d)
-                    })
-            })
+            svgLegend
+                .selectAll('g.legend')
+                .data(data_ready)
+                .enter()
+                .append('g')
+                .attr('transform', (d) => `translate(${margin},${margin + d.index * 20})`)
+                .each(function (d, i) {
+                    select(this)
+                        .append('circle')
+                        .attr('r', 8)
+                        .attr('fill', (d) => colorFunc(d.index / maxSlices))
+                    select(this)
+                        .append('text')
+                        .attr('text-anchor', 'start')
+                        .attr('x', 20)
+                        .attr('y', 0)
+                        .attr('dy', '0.35em')
+                        .attr('id', (d) => `${chartId}-legend${d.index}`)
+                        .text(d.data.label)
+                        .attr('font-size', '0.9em')
+                    select(this)
+                        .on('mouseover', (event, v) => {
+                            const element = select(`#${chartId}-path${d.index}`)
+                            onHoverOver(element.node(), d)
+                        })
+                        .on('mouseout', (event, v) => {
+                            const element = select(`#${chartId}-path${d.index}`)
+                            onHoverOut(element.node(), d)
+                        })
+                })
+        }
     }
-    return <div ref={containerDivRef}></div>
+    return <div ref={containerDivRef} style={{ maxWidth: maxWidth }}></div>
 }

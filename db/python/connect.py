@@ -35,6 +35,7 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'family_participant',
     'participant_phenotypes',
     'group_member',
+    'analysis_runner',
 ][::-1]
 
 
