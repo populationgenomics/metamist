@@ -164,7 +164,7 @@ class CohortTable(DbBase):
 
             _query = """
             INSERT INTO cohort (name, template_id, author, description, project, timestamp, audit_log_id)
-            VALUES (:name, :template_id, :author, :description, :project, :timestamp, :audit_log_id) 
+            VALUES (:name, :template_id, :author, :description, :project, :timestamp, :audit_log_id)
             RETURNING id
             """
 
