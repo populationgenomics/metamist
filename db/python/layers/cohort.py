@@ -27,14 +27,14 @@ logger = get_logger()
 
 
 def get_sg_filter(
-        projects,
-        sg_ids_internal_rich,
-        excluded_sgs_internal_rich,
-        sg_technology,
-        sg_platform,
-        sg_type,
-        sample_ids
-):
+        projects: list[int],
+        sg_ids_internal_rich: list[str],
+        excluded_sgs_internal_rich: list[str],
+        sg_technology: list[str],
+        sg_platform: list[str],
+        sg_type: list[str],
+        sample_ids: list[int],
+) -> SequencingGroupFilter:
     """ Get the sequencing group filter for cohort attributes"""
 
     # Format inputs for filter
