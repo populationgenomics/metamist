@@ -324,7 +324,7 @@ class GraphQLProject:
         return [GraphQLAnalysis.from_internal(a) for a in internal_analysis]
 
     @strawberry.field()
-    async def cohort(
+    async def cohorts(
         self,
         info: Info,
         root: 'Project',
