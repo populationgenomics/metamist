@@ -30,7 +30,6 @@ async def create_cohort_from_criteria(
     cohort_output = await cohortlayer.create_cohort_from_criteria(
         project_to_write=connection.project,
         description=cohort_spec.description,
-        author=connection.author,
         cohort_name=cohort_spec.name,
         dry_run=dry_run,
         cohort_criteria=cohort_criteria,

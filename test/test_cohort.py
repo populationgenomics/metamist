@@ -23,7 +23,6 @@ class TestCohortBasic(DbIsolatedTest):
         with self.assertRaises(ValueError):
             _ = await self.cohortl.create_cohort_from_criteria(
                 project_to_write=self.project_id,
-                author='bob@example.org',
                 description='No criteria or template',
                 cohort_name='Broken cohort',
                 dry_run=False,
@@ -35,7 +34,6 @@ class TestCohortBasic(DbIsolatedTest):
         with self.assertRaises((Forbidden, NotFoundError)):
             _ = await self.cohortl.create_cohort_from_criteria(
                 project_to_write=self.project_id,
-                author='bob@example.org',
                 description='Cohort based on a missing project',
                 cohort_name='Bad-project cohort',
                 dry_run=False,
@@ -60,7 +58,6 @@ class TestCohortBasic(DbIsolatedTest):
         """Create cohort from empty criteria"""
         result = await self.cohortl.create_cohort_from_criteria(
             project_to_write=self.project_id,
-            author='bob@example.org',
             description='Cohort with no entries',
             cohort_name='Empty cohort',
             dry_run=False,
@@ -75,7 +72,6 @@ class TestCohortBasic(DbIsolatedTest):
         """Can't create cohorts with duplicate names"""
         _ = await self.cohortl.create_cohort_from_criteria(
             project_to_write=self.project_id,
-            author='bob@example.org',
             description='Cohort with no entries',
             cohort_name='Trial duplicate cohort',
             dry_run=False,
@@ -84,7 +80,6 @@ class TestCohortBasic(DbIsolatedTest):
 
         _ = await self.cohortl.create_cohort_from_criteria(
             project_to_write=self.project_id,
-            author='bob@example.org',
             description='Cohort with no entries',
             cohort_name='Trial duplicate cohort',
             dry_run=True,
@@ -94,7 +89,6 @@ class TestCohortBasic(DbIsolatedTest):
         with self.assertRaises(IntegrityError):
             _ = await self.cohortl.create_cohort_from_criteria(
                 project_to_write=self.project_id,
-                author='bob@example.org',
                 description='Cohort with no entries',
                 cohort_name='Trial duplicate cohort',
                 dry_run=False,
@@ -115,7 +109,6 @@ class TestCohortBasic(DbIsolatedTest):
 
         _ = await self.cohortl.create_cohort_from_criteria(
             project_to_write=self.project_id,
-            author='bob@example.org',
             description='Cohort with no entries',
             cohort_name='Another empty cohort',
             dry_run=False,
@@ -124,7 +117,6 @@ class TestCohortBasic(DbIsolatedTest):
 
         _ = await self.cohortl.create_cohort_from_criteria(
             project_to_write=self.project_id,
-            author='bob@example.org',
             description='Cohort from template',
             cohort_name='Cohort from empty template',
             dry_run=False,
@@ -174,7 +166,6 @@ class TestCohortData(DbIsolatedTest):
         """Create cohort by selecting sequencing groups"""
         result = await self.cohortl.create_cohort_from_criteria(
             project_to_write=self.project_id,
-            author='bob@example.org',
             description='Cohort with 1 SG',
             cohort_name='SG cohort 1',
             dry_run=False,
@@ -191,7 +182,6 @@ class TestCohortData(DbIsolatedTest):
         """Create cohort by excluding sequencing groups"""
         result = await self.cohortl.create_cohort_from_criteria(
             project_to_write=self.project_id,
-            author='bob@example.org',
             description='Cohort without 1 SG',
             cohort_name='SG cohort 2',
             dry_run=False,
@@ -210,7 +200,6 @@ class TestCohortData(DbIsolatedTest):
         """Create cohort by selecting a technology"""
         result = await self.cohortl.create_cohort_from_criteria(
             project_to_write=self.project_id,
-            author='bob@example.org',
             description='Short-read cohort',
             cohort_name='Tech cohort 1',
             dry_run=False,
@@ -229,7 +218,6 @@ class TestCohortData(DbIsolatedTest):
         """Create cohort by selecting a platform"""
         result = await self.cohortl.create_cohort_from_criteria(
             project_to_write=self.project_id,
-            author='bob@example.org',
             description='ONT cohort',
             cohort_name='Platform cohort 1',
             dry_run=False,
@@ -246,7 +234,6 @@ class TestCohortData(DbIsolatedTest):
         """Create cohort by selecting types"""
         result = await self.cohortl.create_cohort_from_criteria(
             project_to_write=self.project_id,
-            author='bob@example.org',
             description='Genome cohort',
             cohort_name='Type cohort 1',
             dry_run=False,
@@ -265,7 +252,6 @@ class TestCohortData(DbIsolatedTest):
         """Create cohort by selecting sample types"""
         result = await self.cohortl.create_cohort_from_criteria(
             project_to_write=self.project_id,
-            author='bob@example.org',
             description='Sample cohort',
             cohort_name='Sample cohort 1',
             dry_run=False,
@@ -282,7 +268,6 @@ class TestCohortData(DbIsolatedTest):
         """Create cohort by selecting a variety of fields"""
         result = await self.cohortl.create_cohort_from_criteria(
             project_to_write=self.project_id,
-            author='bob@example.org',
             description='Everything cohort',
             cohort_name='Everything cohort 1',
             dry_run=False,
@@ -316,7 +301,6 @@ class TestCohortData(DbIsolatedTest):
 
         coh1 = await self.cohortl.create_cohort_from_criteria(
             project_to_write=self.project_id,
-            author='bob@example.org',
             description='Blood cohort',
             cohort_name='Blood cohort 1',
             dry_run=False,
@@ -329,7 +313,6 @@ class TestCohortData(DbIsolatedTest):
 
         coh2 = await self.cohortl.create_cohort_from_criteria(
             project_to_write=self.project_id,
-            author='bob@example.org',
             description='Blood cohort',
             cohort_name='Blood cohort 2',
             dry_run=False,

@@ -122,7 +122,6 @@ class CohortLayer(BaseLayer):
     async def create_cohort_from_criteria(
             self,
             project_to_write: ProjectId,
-            author: str,
             description: str,
             cohort_name: str,
             dry_run: bool,
@@ -207,7 +206,7 @@ class CohortLayer(BaseLayer):
             cohort_name=cohort_name,
             sequencing_group_ids=[sg.id for sg in sgs],
             description=description,
-            author=author,
+            author=self.connection.author,
             template_id=cohort_template_id_transform_to_raw(template_id),
         )
 
