@@ -1249,16 +1249,16 @@
 		</createTable>
 		<!-- Since we renamed derived_from to template_id, we also need to modify the FK name. -->
 		<dropForeignKeyConstraint
-        baseTableName="cohort"
-        constraintName="FK_COHORT_DERIVED_FROM_ID_COHORT"
+			baseTableName="cohort"
+			constraintName="FK_COHORT_DERIVED_FROM_ID_COHORT"
         />
 		<!-- Recreate the foreign key constraint with the new column name -->
 		<addForeignKeyConstraint
-        baseTableName="cohort"
-        constraintName="FK_COHORT_TEMPLATE_ID_COHORT"
-        referencedTableName="cohort_template"
-        baseColumnNames="template_id"
-        referencedColumnNames="id"
+			baseTableName="cohort"
+			constraintName="FK_COHORT_TEMPLATE_ID_COHORT"
+			referencedTableName="cohort_template"
+			baseColumnNames="template_id"
+			referencedColumnNames="id"
         />
 		<sql>ALTER TABLE cohort_template ADD SYSTEM VERSIONING;</sql>
 		<sql>ALTER TABLE cohort ADD SYSTEM VERSIONING;</sql>
