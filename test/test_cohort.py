@@ -376,7 +376,6 @@ class TestCohortData(DbIsolatedTest):
         """Create a cohort and test that it is populated when queried"""
         created = await self.cohortl.create_cohort_from_criteria(
             project_to_write=self.project_id,
-            author='bob@example.org',
             description='Cohort with two samples',
             cohort_name='Duo cohort',
             dry_run=False,
