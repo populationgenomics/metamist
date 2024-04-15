@@ -19,7 +19,7 @@ async def create_cohort_from_criteria(
     """
     Create a cohort with the given name and sample/sequencing group IDs.
     """
-    cohortlayer = CohortLayer(connection)
+    cohort_layer = CohortLayer(connection)
 
     if not connection.project:
         raise ValueError('A cohort must belong to a project')
@@ -27,7 +27,7 @@ async def create_cohort_from_criteria(
     if not cohort_criteria and not cohort_spec.template_id:
         raise ValueError('A cohort must have either criteria or be derived from a template')
 
-    cohort_output = await cohortlayer.create_cohort_from_criteria(
+    cohort_output = await cohort_layer.create_cohort_from_criteria(
         project_to_write=connection.project,
         description=cohort_spec.description,
         cohort_name=cohort_spec.name,
@@ -47,12 +47,12 @@ async def create_cohort_template(
     """
     Create a cohort template with the given name and sample/sequencing group IDs.
     """
-    cohortlayer = CohortLayer(connection)
+    cohort_layer = CohortLayer(connection)
 
     if not connection.project:
         raise ValueError('A cohort template must belong to a project')
 
-    return await cohortlayer.create_cohort_template(
+    return await cohort_layer.create_cohort_template(
         cohort_template=template,
         project=connection.project
     )

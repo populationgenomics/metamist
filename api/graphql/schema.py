@@ -822,7 +822,7 @@ class Query:  # entry point to graphql.
         project: GraphQLFilter[str] | None = None,
     ) -> list[GraphQLCohortTemplate]:
         connection = info.context['connection']
-        clayer = CohortLayer(connection)
+        cohort_layer = CohortLayer(connection)
 
         ptable = ProjectPermissionsTable(connection)
         project_name_map: dict[str, int] = {}
@@ -842,7 +842,7 @@ class Query:  # entry point to graphql.
             project=project_filter,
         )
 
-        cohort_templates = await clayer.query_cohort_templates(filter_)
+        cohort_templates = await cohort_layer.query_cohort_templates(filter_)
         return [GraphQLCohortTemplate.from_internal(cohort_template) for cohort_template in cohort_templates]
 
     @strawberry.field()
@@ -856,7 +856,7 @@ class Query:  # entry point to graphql.
         template_id: GraphQLFilter[int] | None = None,
     ) -> list[GraphQLCohort]:
         connection = info.context['connection']
-        clayer = CohortLayer(connection)
+        cohort_layer = CohortLayer(connection)
 
         ptable = ProjectPermissionsTable(connection)
         project_name_map: dict[str, int] = {}
@@ -879,7 +879,7 @@ class Query:  # entry point to graphql.
             template_id=template_id.to_internal_filter(cohort_template_id_transform_to_raw) if template_id else None,
         )
 
-        cohorts = await clayer.query(filter_)
+        cohorts = await cohort_layer.query(filter_)
         return [GraphQLCohort.from_internal(cohort) for cohort in cohorts]
 
     @strawberry.field()
