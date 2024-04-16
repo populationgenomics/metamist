@@ -14,7 +14,7 @@ class Cohort(SMBase):
     author: str
     project: str
     description: str
-    template_id: int | None
+    template_id: int
     sequencing_groups: list[SequencingGroup | SequencingGroupExternalId]
 
     @staticmethod
