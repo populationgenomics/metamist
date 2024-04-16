@@ -37,7 +37,7 @@ setup(
         'requests',
         'typing-extensions',
         # for get id-token
-        'cpg-utils >= 4.9.4',
+        'cpg-utils >= 5.0.5',
         'gql[aiohttp,requests]',
         'tabulate >= 0.9.0'
     ],
