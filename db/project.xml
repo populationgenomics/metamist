@@ -1179,14 +1179,30 @@
 		<sql> ALTER TABLE analysis_runner ADD SYSTEM VERSIONING; </sql>
 	</changeSet>
 	<changeSet id="2024-03-15_analysis-runner-table-migration" author="michael.franklin">
+
+	<!-- make the configPath nullable -->
+
+	<sql>
+	SET @@system_versioning_alter_history = 1;
+	ALTER TABLE analysis_runner MODIFY COLUMN config_path VARCHAR(255) NULL;
+	ALTER TABLE analysis_runner MODIFY COLUMN audit_log_id INT NULL;
+	ALTER TABLE analysis_runner MODIFY COLUMN script TEXT;
+	</sql>
+
 	<!-- Migrate all the old analysis_runner records into the new table (don't delete existing ones for now) -->
+
 		<sql> INSERT INTO analysis_runner ( ar_guid, project, timestamp, access_level, repository,
 			`commit`, output_path, script, description, driver_image, config_path, cwd, environment,
 			hail_version, batch_url, submitting_user, meta, audit_log_id ) SELECT
 			COALESCE(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.ar-guid')), UUID()) as ar_guid,
 			analysis.project as project,
-			STR_TO_DATE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp')), 'T', ' '),
-			'%Y-%m-%d %H:%i:%s.%f') as timestamp, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta,
+			STR_TO_DATE(SUBSTRING_INDEX(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp')), '.', 1), '%Y-%m-%dT%H:%i:%s') -- date portion
+				+ INTERVAL (
+					60 * SUBSTRING(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp')), LENGTH(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp'))) - 4, 2) -- hours offset
+					+ SUBSTRING(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp')), LENGTH(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp'))) - 1, 2) -- minutes offset
+				) * (CASE WHEN JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp')) LIKE '%+%' THEN 1 ELSE -1 END) MINUTE-- +/- offset
+			as timestamp,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta,
 			'$.accessLevel')) as access_level, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.repo'))
 			as repository, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.commit')) as `commit`,
 			analysis.output as output_path, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.script')) as
@@ -1194,7 +1210,7 @@
 			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.driverImage')) as driver_image,
 			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.configPath')) as config_path,
 			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.cwd')) as cwd,
-			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.environment')) as environment,
+			COALESCE(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.environment')), 'gcp') as environment,
 			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.hailVersion')) as hail_version,
 			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.batch_url')) as batch_url,
 			COALESCE(audit_log.on_behalf_of, analysis.author) as submitting_user, JSON_REMOVE(

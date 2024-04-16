@@ -168,7 +168,7 @@ class TestBillingArBatchTable(BqTest):
         self.bq_result.result.return_value = []
 
         # test get_ar_guid_by_batch_id function
-        ar_guid = await self.table_obj.get_ar_guid_by_batch_id(batch_id)
+        _, _, ar_guid = await self.table_obj.get_ar_guid_by_batch_id(batch_id)
 
         self.assertEqual(None, ar_guid)
 
@@ -180,9 +180,15 @@ class TestBillingArBatchTable(BqTest):
         expected_ar_guid = 'AR_GUID_1234'
 
         # mock BigQuery result
-        self.bq_result.result.return_value = [{'ar_guid': expected_ar_guid}]
+        self.bq_result.result.return_value = [
+            {
+                'ar_guid': expected_ar_guid,
+                'start_day': datetime.datetime(2024, 1, 1, 0, 0),
+                'end_day': datetime.datetime(2024, 1, 2, 0, 0),
+            }
+        ]
 
         # test get_ar_guid_by_batch_id function
-        ar_guid = await self.table_obj.get_ar_guid_by_batch_id(batch_id)
+        _, _, ar_guid = await self.table_obj.get_ar_guid_by_batch_id(batch_id)
 
         self.assertEqual(expected_ar_guid, ar_guid)

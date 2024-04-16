@@ -12,7 +12,7 @@ from api.utils.db import BqConnection, get_author
 from db.python.layers.billing import BillingLayer
 from models.enums import BillingSource
 from models.models import (
-    BillingBatchCostRecord,
+    AnalysisCostRecord,
     BillingColumn,
     BillingCostBudgetRecord,
     BillingTotalCostQueryModel,
@@ -276,7 +276,7 @@ async def get_namespaces(
 
 @router.get(
     '/cost-by-ar-guid/{ar_guid}',
-    response_model=list[BillingBatchCostRecord],
+    response_model=list[AnalysisCostRecord],
     operation_id='costByArGuid',
 )
 @alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
@@ -294,7 +294,7 @@ async def get_cost_by_ar_guid(
 
 @router.get(
     '/cost-by-batch-id/{batch_id}',
-    response_model=list[BillingBatchCostRecord],
+    response_model=list[AnalysisCostRecord],
     operation_id='costByBatchId',
 )
 @alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)

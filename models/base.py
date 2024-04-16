@@ -8,6 +8,11 @@ OpenApiGenNoneType = bytes | None
 class SMBase(BaseModel):
     """Base object for all models"""
 
+    @classmethod
+    def from_dict(cls, d: dict):
+        """Create an object from a dictionary"""
+        return cls(**d)
+
 
 def parse_sql_bool(val: str | int | bytes) -> bool | None:
     """Parse a string from a sql bool"""
