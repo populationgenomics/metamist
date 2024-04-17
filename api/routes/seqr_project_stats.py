@@ -13,7 +13,7 @@ router = APIRouter(prefix='/seqr-projects-stats', tags=['seqr-projects-stats'])
     response_model=list[SeqrProjectsSummary],
 )
 async def get_seqr_projects_stats_summary(
-    projects: list[int] = None,
+    project_ids: list[int] = None,
     sequencing_types: list[str] = None,
     connection: Connection = get_projectless_db_connection,
 ):
@@ -22,7 +22,7 @@ async def get_seqr_projects_stats_summary(
     """
     spslayer = SeqrProjectsStatsLayer(connection)
     projects_insights_stats = await spslayer.get_seqr_projects_stats_summary(
-        projects=projects, sequencing_types=sequencing_types
+        project_ids=project_ids, sequencing_types=sequencing_types
     )
 
     return [s.to_external(links={}) for s in projects_insights_stats]
@@ -34,7 +34,7 @@ async def get_seqr_projects_stats_summary(
     response_model=list[SeqrProjectsDetails],
 )
 async def get_seqr_projects_stats_details(
-    projects: list[int] = None,
+    project_ids: list[int] = None,
     sequencing_types: list[str] = None,
     connection: Connection = get_projectless_db_connection,
 ):
@@ -43,7 +43,7 @@ async def get_seqr_projects_stats_details(
     """
     spslayer = SeqrProjectsStatsLayer(connection)
     projects_insights_details = await spslayer.get_seqr_projects_stats_details(
-        projects=projects, sequencing_types=sequencing_types
+        project_ids=project_ids, sequencing_types=sequencing_types
     )
 
     return [s.to_external(links={}) for s in projects_insights_details]
