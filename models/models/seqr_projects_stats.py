@@ -16,11 +16,13 @@ class PagingLinks(SMBase):
 @dataclass
 class AnalysisStats:
     """Model for Analysis Sequencing Group Stats"""
-    id: int = 0
-    sg_count: int = 0
+    id: int = None
+    sg_count: int = None
 
     def to_external(self):
         """Convert to transport model"""
+        if self.id is None:
+            return None
         return {'id': self.id, 'sg_count': self.sg_count}
 
 
@@ -123,9 +125,9 @@ class SeqrProjectsSummaryInternal:
             total_samples=self.total_samples,
             total_sequencing_groups=self.total_sequencing_groups,
             total_crams=self.total_crams,
-            latest_annotate_dataset=self.latest_annotate_dataset.to_external(),
-            latest_snv_es_index=self.latest_snv_es_index.to_external(),
-            latest_sv_es_index=self.latest_sv_es_index.to_external(),
+            latest_annotate_dataset=self.latest_annotate_dataset.to_external() if self.latest_annotate_dataset else None,
+            latest_snv_es_index=self.latest_snv_es_index.to_external() if self.latest_snv_es_index else None,
+            latest_sv_es_index=self.latest_sv_es_index.to_external() if self.latest_sv_es_index else None,
             links=links,
         )
 
@@ -141,9 +143,9 @@ class SeqrProjectsSummary(SMBase):
     total_samples: int
     total_sequencing_groups: int
     total_crams: int
-    latest_annotate_dataset: dict[str, int]
-    latest_snv_es_index: dict[str, int]
-    latest_sv_es_index: dict[str, int]
+    latest_annotate_dataset: dict[str, int] | None
+    latest_snv_es_index: dict[str, int] | None
+    latest_sv_es_index: dict[str, int] | None
 
     links: PagingLinks | None
 

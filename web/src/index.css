@@ -32,6 +32,15 @@
     --color-bg-under-budget: rgba(0, 128, 0, 0.2);
 
     --color-text-href: rgb(65, 131, 196);
+
+    --color-header-row: #f9f9f9;
+    --color-exome-row: #ededa1;
+    --color-genome-row: #efc7aa;
+    --color-rna-row: #b2f5b2;
+    --color-page-total-row: #c0def8;
+    --color-grand-total-row: #a7a7ea;
+
+    --color-checkbox-bg: #f5f7f9;
 }
 
 html[data-theme='dark-mode'] {
@@ -57,6 +66,15 @@ html[data-theme='dark-mode'] {
     --color-bg-under-budget: rgba(0, 128, 0, 0.5);
 
     --color-text-href: rgb(188, 188, 251);
+
+    --color-header-row: #383838;
+    --color-exome-row: #887830;
+    --color-genome-row: #805223;
+    --color-rna-row: #155815;
+    --color-page-total-row: #163a5e;
+    --color-grand-total-row: #19195b;
+
+    --color-checkbox-bg: #ffffff;
 }
 
 /* poor man's dark mode: https://github.com/swagger-api/swagger-ui/issues/5327#issuecomment-742375520 */
@@ -291,4 +309,63 @@ html[data-theme='dark-mode'] .ui.table {
 
 .bold-text {
     font-weight: bold;
+}
+
+/* seqr projects stats dashboard */
+.html-tooltip .MuiTooltip-tooltip {
+    background-color: #f5f5f9;
+    color: rgba(0, 0, 0, 0.87);
+    max-width: 220px;
+    font-size: 12px;
+    border: 1px solid #dadde9;
+}
+
+.ui.table .table-cell {
+    text-align: center;
+    color: var(--color-text-primary) !important;
+}
+
+.ui.table .header-cell {
+    text-align: center;
+    font-size: 1.1em;
+    color: var(--color-text-primary) !important;
+    background-color: var(--color-header-row) !important;
+    border-color: var(--color-border-default) !important;
+}
+
+.ui.table .dataset-cell {
+    text-align: center;
+    color: var(--color-text-primary);
+}
+
+.exome-row {
+    background-color: var(--color-exome-row);
+    border-color: var(--color-border-default);
+}
+
+.genome-row {
+    background-color: var(--color-genome-row);
+    border-color: var(--color-border-default);
+}
+
+.rna-row {
+    background-color: var(--color-rna-row);
+    border-color: var(--color-border-default);
+}
+
+.page-total-row {
+    background-color: var(--color-page-total-row);
+    border-color: var(--color-border-default);
+    font-weight: bold;
+}
+
+.grand-total-row {
+    background-color: var(--color-grand-total-row);
+    font-weight: bold;
+}
+
+.seq-type-project-checkbox {
+    label {
+        color: var(--color-text-primary) !important;
+    };
 }

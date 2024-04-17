@@ -73,14 +73,15 @@ GROUP BY
     sg.type;
         """
         
-        total_families_by_project_id_and_seq_type = await self.connection.fetch_all(
+        _query_results = await self.connection.fetch_all(
             _query,
             {
                 'projects': project_ids,
                 'sequencing_types': sequencing_types,
             },
         )
-        return { (row['project'], row['sequencing_type']): row['num_families'] for row in total_families_by_project_id_and_seq_type }
+        total_families_by_project_id_and_seq_type = { (row['project'], row['sequencing_type']): row['num_families'] for row in _query_results }
+        return defaultdict(int, total_families_by_project_id_and_seq_type)
 
     async def _total_participants_by_project_id_and_seq_type(
         self, project_ids: list[ProjectId], sequencing_types: list[str]
@@ -101,14 +102,15 @@ GROUP BY
     p.project,
     sg.type;
         """
-        total_participants_by_project_id_and_seq_type = await self.connection.fetch_all(
+        _query_results = await self.connection.fetch_all(
             _query,
             {
                 'projects': project_ids,
                 'sequencing_types': sequencing_types,
             },
         )
-        return { (row['project'], row['sequencing_type']): row['num_participants'] for row in total_participants_by_project_id_and_seq_type}
+        total_participants_by_project_id_and_seq_type = { (row['project'], row['sequencing_type']): row['num_participants'] for row in _query_results}
+        return defaultdict(int, total_participants_by_project_id_and_seq_type)
 
     async def _total_samples_by_project_id_and_seq_type(
         self, project_ids: list[ProjectId], sequencing_types: list[str]
@@ -128,14 +130,15 @@ GROUP BY
     s.project,
     sg.type;
         """
-        total_samples_by_project_id_and_seq_type = await self.connection.fetch_all(
+        _query_results = await self.connection.fetch_all(
             _query,
             {
                 'projects': project_ids,
                 'sequencing_types': sequencing_types,
             },
         )
-        return { (row['project'], row['sequencing_type']): row['num_samples'] for row in total_samples_by_project_id_and_seq_type}
+        total_samples_by_project_id_and_seq_type = { (row['project'], row['sequencing_type']): row['num_samples'] for row in _query_results}
+        return defaultdict(int, total_samples_by_project_id_and_seq_type)
 
     async def _total_sequencing_groups_by_project_id_and_seq_type(
         self, project_ids: list[ProjectId], sequencing_types: list[str]
@@ -155,7 +158,7 @@ GROUP BY
     s.project,
     sg.type;
         """
-        total_sequencing_groups_by_project_id_and_seq_type = (
+        _query_results = (
             await self.connection.fetch_all(
                 _query,
                 {
@@ -164,7 +167,8 @@ GROUP BY
                 },
             )
         )
-        return { (row['project'], row['sequencing_type']): row['num_sgs'] for row in total_sequencing_groups_by_project_id_and_seq_type}
+        total_sequencing_groups_by_project_id_and_seq_type = { (row['project'], row['sequencing_type']): row['num_sgs'] for row in _query_results}
+        return defaultdict(int, total_sequencing_groups_by_project_id_and_seq_type)
 
     async def _crams_by_project_id_and_seq_type(
         self, project_ids: list[ProjectId], sequencing_types: list[str]
@@ -201,7 +205,7 @@ WHERE
 
     async def _latest_annotate_dataset_by_project_id_and_seq_type(
         self, project_ids: list[ProjectId], sequencing_types: list[str]
-    ) -> dict[tuple[ProjectId, str], dict[str, Any]]:
+    ) -> defaultdict[tuple[ProjectId, str], dict[str, Any]]:
         _query = """
 SELECT
     a.project,
@@ -232,7 +236,7 @@ AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) IN :sequencing_types
 AND JSON_EXTRACT(a.meta, '$.stage') = 'AnnotateDataset';
     -- JSON_UNQUOTE is necessary to compare JSON values with IN operator
         """
-        latest_annotate_dataset_by_project_id_and_seq_type = (
+        _query_results = (
             await self.connection.fetch_all(
                 _query,
                 {
@@ -241,7 +245,8 @@ AND JSON_EXTRACT(a.meta, '$.stage') = 'AnnotateDataset';
                 },
             )
         )
-        return { (row['project'], row['sequencing_type']): {'id': row['id'], 'output': row['output'], 'timestamp_completed': row['timestamp_completed']} for row in latest_annotate_dataset_by_project_id_and_seq_type}
+        latest_annotate_dataset_by_project_id_and_seq_type = { (row['project'], row['sequencing_type']): {'id': row['id'], 'output': row['output'], 'timestamp_completed': row['timestamp_completed']} for row in _query_results}
+        return defaultdict(dict, latest_annotate_dataset_by_project_id_and_seq_type)
 
     async def _latest_es_indices_by_project_id_and_seq_type_and_stage(
         self, project_ids: list[ProjectId], sequencing_types: list[str]
@@ -271,14 +276,15 @@ AND JSON_EXTRACT(a.meta, '$.stage') = max_timestamps.stage
 WHERE a.project IN :projects
 AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) in :sequencing_types;
         """
-        latest_es_indices_by_project_id_and_seq_type_and_stage = await self.connection.fetch_all(
+        _query_results = await self.connection.fetch_all(
             _query,
             {
                 'projects': project_ids,
                 'sequencing_types': sequencing_types,
             },
         )
-        return { (row['project'], row['sequencing_type'], row['stage']): {'id': row['id'], 'output': row['output'], 'timestamp_completed': row['timestamp_completed']} for row in latest_es_indices_by_project_id_and_seq_type_and_stage}
+        latest_es_indices_by_project_id_and_seq_type_and_stage = { (row['project'], row['sequencing_type'], row['stage']): {'id': row['id'], 'output': row['output'], 'timestamp_completed': row['timestamp_completed']} for row in _query_results}
+        return defaultdict(dict, latest_es_indices_by_project_id_and_seq_type_and_stage)
     
     # Details queries
     async def _families_by_project_and_sequencing_type(
@@ -483,16 +489,16 @@ WHERE
         for project in projects:
             for sequencing_type in sequencing_types:
                 crams_in_project_and_sequencing_type = crams_by_project_id_and_seq_type[(project.id, sequencing_type)]
-                latest_annotate_dataset_id = latest_annotate_dataset_by_project_id_and_seq_type[(project.id, sequencing_type)]['id']
-                latest_snv_index_id = latest_es_indices_by_project_id_and_seq_type_and_stage[(project.id, sequencing_type, 'MtToEs')]['id']
+                latest_annotate_dataset_id = latest_annotate_dataset_by_project_id_and_seq_type[(project.id, sequencing_type)].get('id')
+                latest_snv_index_id = latest_es_indices_by_project_id_and_seq_type_and_stage[(project.id, sequencing_type, 'MtToEs')].get('id')
                 # SV index is only available for genome, treated as SV_WGS by seqr
                 # GCNV is only available for exome, treated as SV_WES by seqr
                 if sequencing_type == 'genome':
                     sv_index_stage = 'MtToEsSv'
-                    latest_sv_index_id = latest_es_indices_by_project_id_and_seq_type_and_stage[(project.id, sequencing_type, sv_index_stage)]['id']
+                    latest_sv_index_id = latest_es_indices_by_project_id_and_seq_type_and_stage[(project.id, sequencing_type, sv_index_stage)].get('id')
                 elif sequencing_type == 'exome':
                     sv_index_stage = 'MtToEsCNV'
-                    latest_sv_index_id = latest_es_indices_by_project_id_and_seq_type_and_stage[(project.id, sequencing_type, sv_index_stage)]['id']
+                    latest_sv_index_id = latest_es_indices_by_project_id_and_seq_type_and_stage[(project.id, sequencing_type, sv_index_stage)].get('id')
                 else:
                     latest_sv_index_id = None
                 response.append(
@@ -557,14 +563,14 @@ WHERE
         for project in projects:
             for sequencing_type in sequencing_types:
                 sequencing_groups_with_crams = crams_by_project_id_and_seq_type[(project.id, sequencing_type)]
-                latest_annotate_dataset_id = latest_annotate_dataset_by_project_id_and_seq_type[(project.id, sequencing_type)]['id']
+                latest_annotate_dataset_id = latest_annotate_dataset_by_project_id_and_seq_type[(project.id, sequencing_type)].get('id')
                 sequencing_groups_in_latest_annotate_dataset = analysis_sequencing_groups[latest_annotate_dataset_id]
-                latest_snv_es_index_id = latest_es_indices_by_project_id_and_seq_type_and_stage[(project.id, sequencing_type, 'MtToEs')]['id']
+                latest_snv_es_index_id = latest_es_indices_by_project_id_and_seq_type_and_stage[(project.id, sequencing_type, 'MtToEs')].get('id')
                 sequencing_groups_in_latest_snv_es_index = analysis_sequencing_groups[latest_snv_es_index_id]
                 if sequencing_type == 'genome':
-                    latest_sv_es_index_id = latest_es_indices_by_project_id_and_seq_type_and_stage[(project.id, sequencing_type, 'MtToEsSv')]['id']
+                    latest_sv_es_index_id = latest_es_indices_by_project_id_and_seq_type_and_stage[(project.id, sequencing_type, 'MtToEsSv')].get('id')
                 elif sequencing_type == 'exome':
-                    latest_sv_es_index_id = latest_es_indices_by_project_id_and_seq_type_and_stage[(project.id, sequencing_type, 'MtToEsCNV')]['id']
+                    latest_sv_es_index_id = latest_es_indices_by_project_id_and_seq_type_and_stage[(project.id, sequencing_type, 'MtToEsCNV')].get('id')
                 else:
                     latest_sv_es_index_id = None
                 sequencing_groups_in_latest_sv_es_index = analysis_sequencing_groups[latest_sv_es_index_id]

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { ProjectInsightsStats, ProjectApi, EnumsApi } from '../../sm-api'
+import { SeqrProjectsSummary, ProjectApi, SeqrProjectsStatsApi, EnumsApi } from '../../sm-api'
 import ProjectAndSeqTypeSelector from './ProjectAndSeqTypeSelector'
 import StatsTable from './StatsTable'
 
@@ -10,7 +10,7 @@ interface SelectedProject {
 
 const InsightsStats: React.FC = () => {
     // Get the list of seqr projects from the project API
-    const [allData, setAllData] = useState<ProjectInsightsStats[]>([])
+    const [allData, setAllData] = useState<SeqrProjectsSummary[]>([])
     const [seqrProjectNames, setSeqrProjectNames] = React.useState<string[]>([])
     const [seqrProjectIds, setSeqrProjectIds] = React.useState<number[]>([])
     const [selectedProjects, setSelectedProjects] = React.useState<SelectedProject[]>([])
@@ -19,24 +19,21 @@ const InsightsStats: React.FC = () => {
     const [selectedSeqTypes, setSelectedSeqTypes] = React.useState<string[]>([])
 
     useEffect(() => {
-        let sequencingTypes: string[] = []
-
-        new EnumsApi()
-            .getSequencingTypes()
-            .then((seqTypesResp) => {
-                sequencingTypes = seqTypesResp.data
+        Promise.all([
+            new EnumsApi().getSequencingTypes(),
+            new ProjectApi().getSeqrProjects({}),
+        ])
+            .then(([seqTypesResp, projectsResp]) => {
+                const sequencingTypes: string[] = seqTypesResp.data
                 setSeqTypes(sequencingTypes)
-
-                return new ProjectApi().getSeqrProjects({})
-            })
-            .then((projectsResp) => {
+    
                 const projects: { id: number; name: string }[] = projectsResp.data
                 setSeqrProjectNames(projects.map((project) => project.name))
                 setSeqrProjectIds(projects.map((project) => project.id))
-
+    
                 // Call getProjectsInsightsStats with the project IDs and sequencing types
-                return new ProjectApi().getProjectsInsightsStats({
-                    projects: projects.map((project) => project.id),
+                return new SeqrProjectsStatsApi().getSeqrProjectsStats({
+                    project_ids: projects.map((project) => project.id),
                     sequencing_types: sequencingTypes,
                 })
             })
