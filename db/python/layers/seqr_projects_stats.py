@@ -294,7 +294,7 @@ SELECT
     fp.participant_id as participant_id,
     p.external_id as participant_external_id,
     s.id as sample_id,
-    s.external_id as sample_external_id,
+    s.external_id as sample_external_ids,
     sg.id as sequencing_group_id
 FROM
     family f
@@ -378,33 +378,17 @@ WHERE
         )
         return { (row['project'], row['sequencing_type'], row['sequencing_group_id']): {'stripy': row['stripy'], 'mito': row['mito']} for row in _query_results}
 
-    # Helper functions
-    async def _get_sequencing_groups_from_analysis_id(self, analysis_id: int):
-        """Get sequencing groups from an analysis id"""
-        _query = """
-SELECT
-    asg.sequencing_group_id
-FROM
-    analysis_sequencing_group asg
-WHERE
-    asg.analysis_id = :analysis_id
-        """
-        analysis_sequencing_groups = await self.connection.fetch_all(
-            _query,
-            {
-                'analysis_id': analysis_id,
-            },
-        )
-        return analysis_sequencing_groups
-    
-    async def _get_sequencing_groups_by_analysis_id(self, analysis_ids: list[int]) -> defaultdict[int, list[int]]:
+    # Helper functions    
+    async def _get_sequencing_groups_by_analysis_ids(self, analysis_ids: list[int]) -> defaultdict[int, list[int]]:
         """Get sequencing groups for a list of analysis ids"""
         _query = """
 SELECT
     analysis_id,
     sequencing_group_id
-FROM analysis_sequencing_group
-    WHERE analysis_id IN :analysis_ids
+FROM 
+    analysis_sequencing_group
+WHERE 
+    analysis_id IN :analysis_ids;
         """
         _query_results = await self.connection.fetch_all(
             _query,
@@ -419,57 +403,6 @@ FROM analysis_sequencing_group
 
         return sequencing_groups_by_analysis_id
 
-    @staticmethod
-    def get_val_for_project_and_sequencing_type(project, sequencing_type, field, rows):
-        """
-        Filter returned records for a specific project and sequencing type and
-        return the value of a specific field
-        """
-        if not rows:
-            return 0
-        for row in rows:
-            if row['project'] == project and row['sequencing_type'] == sequencing_type:
-                return row[field]
-        return 0
-
-    @staticmethod
-    def get_val_for_project_and_sequencing_type_and_sg_id(
-        project, sequencing_type, sg_id, field, rows
-    ):
-        """
-        Filter returned records for a specific project, sequencing type and
-        sequencing group id and return the value of a specific field
-        """
-        if not rows:
-            return 0
-        for row in rows:
-            if (
-                row['project'] == project
-                and row['sequencing_type'] == sequencing_type
-                and row['sequencing_group_id'] == sg_id
-            ):
-                return row[field]
-        return 0
-
-    @staticmethod
-    def get_val_for_project_and_sequencing_type_and_stage(
-        project, sequencing_type, stage, field, rows
-    ):
-        """
-        Filter returned records for a specific project, sequencing type and
-        stage and return the value of a specific field
-        """
-        if not rows:
-            return 0
-        for row in rows:
-            if (
-                row['project'] == project
-                and row['sequencing_type'] == sequencing_type
-                and row['stage'] == stage
-            ):
-                return row[field]
-        return 0
-
     async def get_analysis_sequencing_groups(self, all_group_analysis_rows: list[dict]):
         """
         Get the analysis IDs from the group analysis rows, which is a list of group analysis record dicts
@@ -479,7 +412,34 @@ FROM analysis_sequencing_group
             for row in group_analysis_rows.values():
                 analyses_to_query_sequencing_groups.append(row['id'])
         
-        return await self._get_sequencing_groups_by_analysis_id(analyses_to_query_sequencing_groups)
+        return await self._get_sequencing_groups_by_analysis_ids(analyses_to_query_sequencing_groups)
+    
+    def get_sg_web_report_links(self, sequencing_group_web_reports, project, sequencing_type: str, sequencing_group_id: int):
+        """
+        Get the web report links for a sequencing group
+        """
+        report_links = {}
+        sg_reports = sequencing_group_web_reports.get((project.id, sequencing_type, sequencing_group_id))
+        if not sg_reports:
+            return report_links
+        
+        stripy = sequencing_group_web_reports[(project.id, sequencing_type, sequencing_group_id)]['stripy']
+        if stripy:
+            report_links['stripy'] = (
+                f'https://main-web.populationgenomics.org.au/'
+                f'{project.name}/stripy/'
+                f'{sequencing_group_id}.stripy.html'
+            )
+
+        mito = sequencing_group_web_reports[(project.id, sequencing_type, sequencing_group_id)]['mito']
+        if mito:
+            report_links['mito'] = (
+                f'https://main-web.populationgenomics.org.au/'
+                f'{project.name}/mito/'
+                f'mitoreport-{sequencing_group_id}/index.html'
+            )
+        
+        return report_links
     
     # Main functions
     async def get_seqr_projects_stats_summary(
@@ -578,14 +538,14 @@ FROM analysis_sequencing_group
             latest_es_indices_by_project_id_and_seq_type_and_stage,
             sequencing_group_web_reports,
         ) = await asyncio.gather(
-            self._families_by_project_and_sequencing_type(projects, sequencing_types),
-            self._crams_by_project_id_and_seq_type(projects, sequencing_types),
+            self._families_by_project_and_sequencing_type(project_ids, sequencing_types),
+            self._crams_by_project_id_and_seq_type(project_ids, sequencing_types),
             self._latest_annotate_dataset_by_project_id_and_seq_type(
-                projects, sequencing_types
+                project_ids, sequencing_types
             ),
-            self._latest_es_indices_by_project_id_and_seq_type_and_stage(projects, sequencing_types),
+            self._latest_es_indices_by_project_id_and_seq_type_and_stage(project_ids, sequencing_types),
             self._details_sequencing_groups_report_links(
-                projects, sequencing_types
+                project_ids, sequencing_types
             ),
         )
         # Get the sequencing groups for each of the analyses in the grouped analyses rows 
@@ -610,22 +570,7 @@ FROM analysis_sequencing_group
                 sequencing_groups_in_latest_sv_es_index = analysis_sequencing_groups[latest_sv_es_index_id]
                 for family_row in families_by_project_id_and_seq_type[(project.id, sequencing_type)]:
                     sequencing_group_id = family_row['sequencing_group_id']
-                    report_links = {}
-                    stripy = sequencing_group_web_reports[(project.id, sequencing_type, sequencing_group_id)]['stripy']
-                    if stripy:
-                        report_links['stripy'] = (
-                            f'https://main-web.populationgenomics.org.au/'
-                            f'{project.name}/stripy/'
-                            f'{sequencing_group_id}.stripy.html'
-                        )
-
-                    mito = sequencing_group_web_reports[(project.id, sequencing_type, sequencing_group_id)]['mito']
-                    if mito:
-                        report_links['mito'] = (
-                            f'https://main-web.populationgenomics.org.au/'
-                            f'{project.name}/mito/'
-                            f'mitoreport-{sequencing_group_id}/index.html'
-                        )
+                    report_links = self.get_sg_web_report_links(sequencing_group_web_reports, project, sequencing_type, sequencing_group_id)
 
                     response.append(
                         SeqrProjectsDetailsInternal(
@@ -638,7 +583,7 @@ FROM analysis_sequencing_group
                             participant_id=family_row['participant_id'],
                             participant_ext_id=family_row['participant_external_id'],
                             sample_id=family_row['sample_id'],
-                            sample_ext_id=family_row['sample_external_id'],
+                            sample_ext_ids=[family_row['sample_external_ids']],
                             sequencing_group_id=sequencing_group_id,
                             completed_cram=family_row['sequencing_group_id']
                             in sequencing_groups_with_crams,

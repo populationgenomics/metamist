@@ -37,7 +37,7 @@ class SeqrProjectsDetailsInternal:
     participant_id: int
     participant_ext_id: str
     sample_id: int
-    sample_ext_id: list[str]
+    sample_ext_ids: list[str]
     sequencing_group_id: int
     completed_cram: bool
     in_latest_annotate_dataset: bool
@@ -57,7 +57,7 @@ class SeqrProjectsDetailsInternal:
             participant_id=self.participant_id,
             participant_ext_id=self.participant_ext_id,
             sample_id=sample_id_format.sample_id_format(self.sample_id),
-            sample_ext_id=self.sample_ext_id,
+            sample_ext_ids=self.sample_ext_ids,
             sequencing_group_id=sequencing_group_id_format.sequencing_group_id_format(self.sequencing_group_id),
             completed_cram=self.completed_cram,
             in_latest_annotate_dataset=self.in_latest_annotate_dataset,
@@ -80,7 +80,7 @@ class SeqrProjectsDetails(SMBase):
     participant_id: int
     participant_ext_id: str
     sample_id: str
-    sample_ext_id: list[str]
+    sample_ext_ids: list[str]
     sequencing_group_id: str
     completed_cram: bool
     in_latest_annotate_dataset: bool
