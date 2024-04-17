@@ -1,7 +1,8 @@
 # pylint: disable=too-many-instance-attributes
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from models.base import SMBase
+from models.utils import sample_id_format, sequencing_group_id_format
 
 
 class PagingLinks(SMBase):
@@ -24,8 +25,8 @@ class AnalysisStats:
 
 
 @dataclass
-class ProjectInsightsDetailsInternal:
-    """Return class for the project insights details endpoint"""
+class SeqrProjectsDetailsInternal:
+    """Return class for the seqr projects stats details endpoint"""
 
     project: int
     dataset: str
@@ -35,9 +36,9 @@ class ProjectInsightsDetailsInternal:
     family_ext_id: str
     participant_id: int
     participant_ext_id: str
-    sample_id: str
-    sample_ext_id: str
-    sequencing_group_id: str
+    sample_id: int
+    sample_ext_id: list[str]
+    sequencing_group_id: int
     completed_cram: bool
     in_latest_annotate_dataset: bool
     in_latest_snv_es_index: bool
@@ -46,7 +47,7 @@ class ProjectInsightsDetailsInternal:
 
     def to_external(self, links):
         """Convert to transport model"""
-        return ProjectInsightsDetails(
+        return SeqrProjectsDetails(
             project=self.project,
             dataset=self.dataset,
             sequencing_type=self.sequencing_type,
@@ -55,9 +56,9 @@ class ProjectInsightsDetailsInternal:
             family_ext_id=self.family_ext_id,
             participant_id=self.participant_id,
             participant_ext_id=self.participant_ext_id,
-            sample_id=self.sample_id,
+            sample_id=sample_id_format.sample_id_format(self.sample_id),
             sample_ext_id=self.sample_ext_id,
-            sequencing_group_id=self.sequencing_group_id,
+            sequencing_group_id=sequencing_group_id_format.sequencing_group_id_format(self.sequencing_group_id),
             completed_cram=self.completed_cram,
             in_latest_annotate_dataset=self.in_latest_annotate_dataset,
             in_latest_snv_es_index=self.in_latest_snv_es_index,
@@ -67,8 +68,8 @@ class ProjectInsightsDetailsInternal:
         )
 
 
-class ProjectInsightsDetails(SMBase):
-    """Return class for the project insights details endpoint"""
+class SeqrProjectsDetails(SMBase):
+    """External return class for the seqr projects stats details endpoint"""
 
     project: int
     dataset: str
@@ -79,7 +80,7 @@ class ProjectInsightsDetails(SMBase):
     participant_id: int
     participant_ext_id: str
     sample_id: str
-    sample_ext_id: str
+    sample_ext_id: list[str]
     sequencing_group_id: str
     completed_cram: bool
     in_latest_annotate_dataset: bool
@@ -90,14 +91,14 @@ class ProjectInsightsDetails(SMBase):
     links: PagingLinks | None
 
     class Config:
-        """Config for ProjectInsightsDetailsResponse"""
+        """Config for SeqrProjectsDetailsResponse"""
 
         fields = {'links': '_links'}
 
 
 @dataclass
-class ProjectInsightsStatsInternal:
-    """Return class for the project insights stats endpoint"""
+class SeqrProjectsSummaryInternal:
+    """Return class for the seqr projects summary endpoint"""
 
     project: int
     dataset: str
@@ -107,13 +108,13 @@ class ProjectInsightsStatsInternal:
     total_samples: int = 0
     total_sequencing_groups: int = 0
     total_crams: int = 0
-    latest_annotate_dataset: AnalysisStats = field(default_factory=AnalysisStats)
-    latest_snv_es_index: AnalysisStats = field(default_factory=AnalysisStats)
-    latest_sv_es_index: AnalysisStats = field(default_factory=AnalysisStats)
+    latest_annotate_dataset: AnalysisStats = None
+    latest_snv_es_index: AnalysisStats = None
+    latest_sv_es_index: AnalysisStats = None
 
     def to_external(self, links):
         """Convert to transport model"""
-        return ProjectInsightsStats(
+        return SeqrProjectsSummary(
             project=self.project,
             dataset=self.dataset,
             sequencing_type=self.sequencing_type,
@@ -129,7 +130,7 @@ class ProjectInsightsStatsInternal:
         )
 
 
-class ProjectInsightsStats(SMBase):
+class SeqrProjectsSummary(SMBase):
     """Return class for the project insights stats endpoint"""
 
     project: int

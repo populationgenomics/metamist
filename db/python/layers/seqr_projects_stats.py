@@ -6,48 +6,47 @@ from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectPermissionsTable
 from models.models import (
     AnalysisStats,
-    ProjectInsightsDetailsInternal,
-    ProjectInsightsStatsInternal,
+    SeqrProjectsDetailsInternal,
+    SeqrProjectsSummaryInternal,
 )
-from models.utils.sample_id_format import sample_id_format
-from models.utils.sequencing_group_id_format import sequencing_group_id_format
+from models.models.project import ProjectId
 
 
-class ProjectInsightsLayer(BaseLayer):
-    """Project Insights layer - business logic for the project insights dashboard"""
+class SeqrProjectsStatsLayer(BaseLayer):
+    """Seqr Projects Stats layer - business logic for the seqr projects stats dashboards"""
 
-    async def get_project_insights_stats(
+    async def get_seqr_projects_stats_summary(
         self,
-        projects: list[int],
+        projects: list[ProjectId],
         sequencing_types: list[str],
-    ) -> list[ProjectInsightsStatsInternal]:
+    ) -> list[SeqrProjectsSummaryInternal]:
         """
         Get summary and analysis stats for a list of projects
         """
-        pidb = ProjectsInsightsDb(self.connection)
-        return await pidb.get_project_insights_stats(
+        spsdb = SeqrProjectsStatsDb(self.connection)
+        return await spsdb.get_seqr_projects_stats_summary(
             projects=projects, sequencing_types=sequencing_types
         )
 
-    async def get_project_insights_details(
+    async def get_seqr_projects_stats_details(
         self,
-        projects: list[int],
+        projects: list[ProjectId],
         sequencing_types: list[str],
-    ) -> list[ProjectInsightsDetailsInternal]:
+    ) -> list[SeqrProjectsDetailsInternal]:
         """
         Get details for a list of projects
         """
-        pidb = ProjectsInsightsDb(self.connection)
-        return await pidb.get_project_insights_details(
+        spsdb = SeqrProjectsStatsDb(self.connection)
+        return await spsdb.get_seqr_projects_stats_details(
             projects=projects, sequencing_types=sequencing_types
         )
 
 
-class ProjectsInsightsDb(DbBase):
-    """Db layer for project insights stats and details routes"""
+class SeqrProjectsStatsDb(DbBase):
+    """Db layer for seqr projects stats summary and details routes"""
 
     async def _details_families_query(
-        self, projects: list[int], sequencing_types: list[str]
+        self, projects: list[ProjectId], sequencing_types: list[str]
     ):
         _query = """
 SELECT
@@ -90,7 +89,7 @@ ORDER BY
         return families
 
     async def _stats_families_query(
-        self, projects: list[int], sequencing_types: list[str]
+        self, projects: list[ProjectId], sequencing_types: list[str]
     ):
         _query = """
 SELECT
@@ -119,7 +118,7 @@ GROUP BY
         return total_families_by_project_id_and_seq_type
 
     async def _stats_participants_query(
-        self, projects: list[int], sequencing_types: list[str]
+        self, projects: list[ProjectId], sequencing_types: list[str]
     ):
         _query = """
 SELECT
@@ -147,7 +146,7 @@ GROUP BY
         return total_participants_by_project_id_and_seq_type
 
     async def _stats_samples_query(
-        self, projects: list[int], sequencing_types: list[str]
+        self, projects: list[ProjectId], sequencing_types: list[str]
     ):
         _query = """
 SELECT
@@ -174,7 +173,7 @@ GROUP BY
         return total_samples_by_project_id_and_seq_type
 
     async def _stats_sequencing_groups_query(
-        self, projects: list[int], sequencing_types: list[str]
+        self, projects: list[ProjectId], sequencing_types: list[str]
     ):
         _query = """
 SELECT
@@ -203,7 +202,7 @@ GROUP BY
         return total_sequencing_groups_by_project_id_and_seq_type
 
     async def _stats_crams_query(
-        self, projects: list[int], sequencing_types: list[str]
+        self, projects: list[ProjectId], sequencing_types: list[str]
     ):
         _query = """
 SELECT
@@ -230,7 +229,7 @@ WHERE
         return total_crams_by_project_id_and_seq_type
 
     async def _stats_annotate_dataset_query(
-        self, projects: list[int], sequencing_types: list[str]
+        self, projects: list[ProjectId], sequencing_types: list[str]
     ):
         _query = """
 SELECT
@@ -274,7 +273,7 @@ AND JSON_EXTRACT(a.meta, '$.stage') = 'AnnotateDataset';
         return latest_annotate_dataset_by_project_id_and_seq_type
 
     async def _stats_es_indexes_query(
-        self, projects: list[int], sequencing_types: list[str]
+        self, projects: list[ProjectId], sequencing_types: list[str]
     ):
         _query = """
 SELECT
@@ -311,7 +310,7 @@ AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) in :sequencing_types
         return latest_es_indexes_by_project_id_and_seq_type_and_stage
 
     async def _details_sequencing_groups_report_links(
-        self, projects: list[int], sequencing_types: list[str]
+        self, projects: list[ProjectId], sequencing_types: list[str]
     ):
         """Get sequencing group web report links"""
         _query = """
@@ -429,10 +428,10 @@ WHERE
                 return row[field]
         return 0
 
-    async def get_project_insights_stats(
-        self, projects: list[int], sequencing_types: list[str]
+    async def get_seqr_projects_stats_summary(
+        self, projects: list[ProjectId], sequencing_types: list[str]
     ):
-        """Combines the results of the above insights stats queries into a response"""
+        """Combines the results of the above queries into a response"""
 
         ptable = ProjectPermissionsTable(self._connection)
         await ptable.check_access_to_project_ids(
@@ -494,7 +493,7 @@ WHERE
                 else:
                     latest_sv_index_id = 0
                 response.append(
-                    ProjectInsightsStatsInternal(
+                    SeqrProjectsSummaryInternal(
                         project=project.id,
                         dataset=project.name,
                         sequencing_type=sequencing_type,
@@ -543,10 +542,10 @@ WHERE
 
         return response
 
-    async def get_project_insights_details(
-        self, projects: list[int], sequencing_types: list[str]
+    async def get_seqr_projects_stats_details(
+        self, projects: list[ProjectId], sequencing_types: list[str]
     ):
-        """Combines the results of the above insights details queries into a response"""
+        """Combines the results of the queries above into a response"""
         ptable = ProjectPermissionsTable(self._connection)
         await ptable.check_access_to_project_ids(
             user=self.author, project_ids=projects, readonly=True
@@ -607,9 +606,7 @@ WHERE
                     )
                 ]
                 for family_row in families:
-                    sequencing_group_id = sequencing_group_id_format(
-                        family_row['sequencing_group_id']
-                    )
+                    sequencing_group_id = family_row['sequencing_group_id']
                     report_links = {}
                     stripy = self.get_val_for_project_and_sequencing_type_and_sg_id(
                         project.id,
@@ -640,7 +637,7 @@ WHERE
                         )
 
                     response.append(
-                        ProjectInsightsDetailsInternal(
+                        SeqrProjectsDetailsInternal(
                             project=project.id,
                             dataset=project.name,
                             sequencing_type=sequencing_type,
@@ -649,7 +646,7 @@ WHERE
                             family_ext_id=family_row['family_external_id'],
                             participant_id=family_row['participant_id'],
                             participant_ext_id=family_row['participant_external_id'],
-                            sample_id=sample_id_format(family_row['sample_id']),
+                            sample_id=family_row['sample_id'],
                             sample_ext_id=family_row['sample_external_id'],
                             sequencing_group_id=sequencing_group_id,
                             completed_cram=family_row['sequencing_group_id']

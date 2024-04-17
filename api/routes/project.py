@@ -3,10 +3,8 @@ from typing import List
 from fastapi import APIRouter
 
 from api.utils.db import Connection, get_projectless_db_connection
-from db.python.layers.project_insights import ProjectInsightsLayer
 from db.python.tables.project import ProjectPermissionsTable
 from models.models.project import Project
-from models.models.project_insights import ProjectInsightsDetails, ProjectInsightsStats
 
 router = APIRouter(prefix='/project', tags=['project'])
 
@@ -73,48 +71,6 @@ async def update_project(
     return await ptable.update_project(
         project_name=project, update=project_update_model, author=connection.author
     )
-
-
-@router.post(
-    '/project-insights-stats',
-    operation_id='getProjectsInsightsStats',
-    response_model=list[ProjectInsightsStats],
-)
-async def get_project_insights_stats(
-    projects: list[int] = None,
-    sequencing_types: list[str] = None,
-    connection: Connection = get_projectless_db_connection,
-):
-    """
-    Get the insights stats for a list of projects
-    """
-    pilayer = ProjectInsightsLayer(connection)
-    projects_insights_stats = await pilayer.get_project_insights_stats(
-        projects=projects, sequencing_types=sequencing_types
-    )
-
-    return [s.to_external(links={}) for s in projects_insights_stats]
-
-
-@router.post(
-    '/project-insights-details',
-    operation_id='getProjectInsightsDetails',
-    response_model=list[ProjectInsightsDetails],
-)
-async def get_project_insights_details(
-    projects: list[int] = None,
-    sequencing_types: list[str] = None,
-    connection: Connection = get_projectless_db_connection,
-):
-    """
-    Get the detailed insights for a list of projects
-    """
-    pilayer = ProjectInsightsLayer(connection)
-    projects_insights_details = await pilayer.get_project_insights_details(
-        projects=projects, sequencing_types=sequencing_types
-    )
-
-    return [s.to_external(links={}) for s in projects_insights_details]
 
 
 @router.patch('/{project}/members', operation_id='updateProjectMembers')

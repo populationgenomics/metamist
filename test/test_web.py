@@ -3,22 +3,21 @@ from test.testbase import DbIsolatedTest, run_as_sync
 from db.python.layers import (
     AssayLayer,
     ParticipantLayer,
-    ProjectInsightsLayer,
     SampleLayer,
+    SeqrProjectsStatsLayer,
     SequencingGroupLayer,
     WebLayer,
 )
 from models.enums import MetaSearchEntityPrefix
 from models.models import (
-    AnalysisStats,
     Assay,
     AssayInternal,
     AssayUpsertInternal,
     ParticipantUpsertInternal,
-    ProjectInsightsStatsInternal,
     ProjectSummaryInternal,
     SampleUpsertInternal,
     SearchItem,
+    SeqrProjectsSummaryInternal,
     SequencingGroupUpsertInternal,
     WebProject,
 )
@@ -199,7 +198,7 @@ class TestWeb(DbIsolatedTest):
         super().setUp()
         self.webl = WebLayer(self.connection)
         self.partl = ParticipantLayer(self.connection)
-        self.pil = ProjectInsightsLayer(self.connection)
+        self.spsl = SeqrProjectsStatsLayer(self.connection)
         self.sampl = SampleLayer(self.connection)
         self.seql = AssayLayer(self.connection)
 
@@ -209,12 +208,12 @@ class TestWeb(DbIsolatedTest):
 
         await self.partl.upsert_participant(get_test_participant())
 
-        result = await self.pil.get_project_insights_stats(
+        result = await self.spsl.get_seqr_projects_stats_summary(
             projects=[self.project_id], sequencing_types=['genome', 'exome']
         )
 
         expected = [
-            ProjectInsightsStatsInternal(
+            SeqrProjectsSummaryInternal(
                 project=self.project_id,
                 dataset='test',
                 sequencing_type='genome',
@@ -223,11 +222,11 @@ class TestWeb(DbIsolatedTest):
                 total_samples=1,
                 total_sequencing_groups=1,
                 total_crams=0,
-                latest_annotate_dataset=AnalysisStats(id=0, sg_count=0),
-                latest_snv_es_index=AnalysisStats(id=0, sg_count=0),
-                latest_sv_es_index=AnalysisStats(id=0, sg_count=0),
+                latest_annotate_dataset=None,
+                latest_snv_es_index=None,
+                latest_sv_es_index=None,
             ),
-            ProjectInsightsStatsInternal(
+            SeqrProjectsSummaryInternal(
                 project=self.project_id,
                 dataset='test',
                 sequencing_type='exome',
@@ -236,9 +235,9 @@ class TestWeb(DbIsolatedTest):
                 total_samples=0,
                 total_sequencing_groups=0,
                 total_crams=0,
-                latest_annotate_dataset=AnalysisStats(id=0, sg_count=0),
-                latest_snv_es_index=AnalysisStats(id=0, sg_count=0),
-                latest_sv_es_index=AnalysisStats(id=0, sg_count=0),
+                latest_annotate_dataset=None,
+                latest_snv_es_index=None,
+                latest_sv_es_index=None,
             ),
         ]
 
