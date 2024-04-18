@@ -1,5 +1,3 @@
-import json
-
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
@@ -163,8 +161,8 @@ class CohortLayer(BaseLayer):
         if not cohort_criteria and not template_id:
             raise ValueError('A cohort must have either criteria or be derived from a template')
 
+        template : CohortTemplateInternal = None
         # Get template from ID
-        template: dict[str, str] = {}
         if template_id:
             template_id_raw = cohort_template_id_transform_to_raw(template_id)
             template = await self.ct.get_cohort_template(template_id_raw)

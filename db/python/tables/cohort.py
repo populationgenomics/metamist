@@ -103,7 +103,7 @@ class CohortTable(DbBase):
         cohort_templates = [CohortTemplateInternal.from_db(dict(row)) for row in rows]
         return cohort_templates
 
-    async def get_cohort_template(self, template_id: int):
+    async def get_cohort_template(self, template_id: int) -> CohortTemplateInternal:
         """
         Get a cohort template by ID
         """
