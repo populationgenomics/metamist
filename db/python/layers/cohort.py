@@ -178,7 +178,7 @@ class CohortLayer(BaseLayer):
         # Only provide a template id
         if template and not cohort_criteria:
             create_cohort_template = False
-            criteria_dict = json.loads(template['criteria'])
+            criteria_dict = template.criteria
             cohort_criteria = CohortCriteria(**criteria_dict)
 
         projects_to_pull = await self.pt.get_and_check_access_to_projects_for_names(
