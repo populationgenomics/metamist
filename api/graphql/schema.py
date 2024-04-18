@@ -41,7 +41,7 @@ from models.models import (
     AssayInternal,
     AuditLogInternal,
     Cohort,
-    CohortTemplateModel,
+    CohortTemplateInternal,
     FamilyInternal,
     ParticipantInternal,
     Project,
@@ -91,7 +91,6 @@ class GraphQLCohort:
     name: str
     description: str
     author: str
-    template_id: str | None = None
 
     @staticmethod
     def from_internal(internal: Cohort) -> 'GraphQLCohort':
@@ -100,8 +99,17 @@ class GraphQLCohort:
             name=internal.name,
             description=internal.description,
             author=internal.author,
-            template_id=cohort_template_id_format(internal.template_id),
         )
+    @strawberry.field()
+    async def template(
+        self, info: Info, root: 'Cohort'
+    ) -> 'GraphQLCohortTemplate':
+        connection = info.context['connection']
+        template = await CohortLayer(connection).get_template_by_cohort_id(
+            cohort_id_transform_to_raw(root.id)
+        )
+
+        return GraphQLCohortTemplate.from_internal(template)
 
     @strawberry.field()
     async def sequencing_groups(
@@ -143,7 +151,8 @@ class GraphQLCohortTemplate:
     criteria: strawberry.scalars.JSON
 
     @staticmethod
-    def from_internal(internal: CohortTemplateModel) -> 'GraphQLCohortTemplate':
+    def from_internal(internal: CohortTemplateInternal) -> 'GraphQLCohortTemplate':
+        # At this point, the object that comes in doesn't have an ID field.
         return GraphQLCohortTemplate(
             id=cohort_template_id_format(internal.id),
             name=internal.name,

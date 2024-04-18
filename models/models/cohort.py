@@ -41,7 +41,7 @@ class Cohort(SMBase):
         )
 
 
-class CohortTemplateModel(SMBase):
+class CohortTemplateInternal(SMBase):
     """Model for CohortTemplate"""
 
     id: int
@@ -61,7 +61,7 @@ class CohortTemplateModel(SMBase):
         if criteria and isinstance(criteria, str):
             criteria = json.loads(criteria)
 
-        return CohortTemplateModel(
+        return CohortTemplateInternal(
             id=_id,
             name=name,
             description=description,
@@ -92,6 +92,7 @@ class CohortCriteria(BaseModel):
 class CohortTemplate(BaseModel):
     """ Represents a cohort template, to be used to build cohorts. """
 
+    id: int | None
     name: str
     description: str
     criteria: CohortCriteria

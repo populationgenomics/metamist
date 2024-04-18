@@ -5,7 +5,7 @@ import datetime
 from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectId
 from db.python.utils import GenericFilter, GenericFilterModel, to_db_json
-from models.models.cohort import Cohort, CohortTemplateModel
+from models.models.cohort import Cohort, CohortTemplateInternal
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -100,7 +100,7 @@ class CohortTable(DbBase):
         """
 
         rows = await self.connection.fetch_all(_query, values)
-        cohort_templates = [CohortTemplateModel.from_db(dict(row)) for row in rows]
+        cohort_templates = [CohortTemplateInternal.from_db(dict(row)) for row in rows]
         return cohort_templates
 
     async def get_cohort_template(self, template_id: int):
@@ -108,14 +108,16 @@ class CohortTable(DbBase):
         Get a cohort template by ID
         """
         _query = """
-        SELECT id as id, criteria as criteria FROM cohort_template WHERE id = :template_id
+        SELECT id as id, name, description, criteria as criteria FROM cohort_template WHERE id = :template_id
         """
         template = await self.connection.fetch_one(_query, {'template_id': template_id})
 
         if not template:
             return None
 
-        return {'id': template['id'], 'criteria': template['criteria']}
+        cohort_template = CohortTemplateInternal.from_db(dict(template))
+
+        return cohort_template
 
     async def create_cohort_template(
             self,
@@ -197,3 +199,19 @@ class CohortTable(DbBase):
                 )
 
             return cohort_id
+
+    async def get_cohort_by_id(self, cohort_id: int) -> Cohort:
+        """
+        Get the cohort by its ID
+        """
+        _query = """
+        SELECT id, name, template_id, author, description, project, timestamp
+        FROM cohort
+        WHERE id = :cohort_id
+        """
+
+        cohort = await self.connection.fetch_one(_query, {'cohort_id': cohort_id})
+        if not cohort:
+            raise ValueError(f'Cohort with ID {cohort_id} not found')
+
+        return Cohort.from_db(dict(cohort))

@@ -49,6 +49,7 @@ class TestCohortBasic(DbIsolatedTest):
             _ = await self.cohortl.create_cohort_template(
                 project=self.project_id,
                 cohort_template=CohortTemplate(
+                    id=None,
                     name='Bad-project template',
                     description='Template based on a missing project',
                     criteria=CohortCriteria(projects=['nonexistent']),
@@ -103,6 +104,7 @@ class TestCohortBasic(DbIsolatedTest):
         tid = await self.cohortl.create_cohort_template(
             project=self.project_id,
             cohort_template=CohortTemplate(
+                id=None,
                 name='Empty template',
                 description='Template with no entries',
                 criteria=CohortCriteria(projects=['test']),
@@ -338,6 +340,7 @@ class TestCohortData(DbIsolatedTest):
         template = await self.cohortl.create_cohort_template(
             project=self.project_id,
             cohort_template=CohortTemplate(
+                id=None,
                 name='Blood template',
                 description='Template selecting blood',
                 criteria=CohortCriteria(

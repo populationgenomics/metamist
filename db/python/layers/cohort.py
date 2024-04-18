@@ -12,7 +12,12 @@ from db.python.tables.sequencing_group import (
     SequencingGroupTable,
 )
 from db.python.utils import GenericFilter, get_logger
-from models.models.cohort import Cohort, CohortCriteria, CohortTemplate
+from models.models.cohort import (
+    Cohort,
+    CohortCriteria,
+    CohortTemplate,
+    CohortTemplateInternal,
+)
 from models.utils.cohort_id_format import cohort_id_format
 from models.utils.cohort_template_id_format import (
     cohort_template_id_format,
@@ -89,6 +94,24 @@ class CohortLayer(BaseLayer):
         cohort_templates = await self.ct.query_cohort_templates(filter_)
         return cohort_templates
 
+    async def get_template_by_cohort_id(self, cohort_id: int) -> CohortTemplateInternal:
+        """
+        Get the cohort template for a given cohort ID.
+        """
+
+        cohort = await self.ct.get_cohort_by_id(cohort_id)
+
+        template_id = cohort.template_id
+        if not template_id:
+            raise ValueError(f'Cohort with ID {cohort_id} does not have a template')
+
+        template = await self.ct.get_cohort_template(template_id)
+
+        if not template:
+            raise ValueError(f'Cohort template with ID {template_id} not found')
+
+        return CohortTemplateInternal(**dict(template))
+
     async def get_cohort_sequencing_group_ids(self, cohort_id: int) -> list[int]:
         """
         Get the sequencing group IDs for the given cohort.
@@ -109,6 +132,8 @@ class CohortLayer(BaseLayer):
         _ = await self.pt.get_and_check_access_to_projects_for_names(
             user=self.connection.author, project_names=cohort_template.criteria.projects, readonly=False
         )
+
+        assert cohort_template.id is None, 'Cohort template ID must be None'
 
         template_id = await self.ct.create_cohort_template(
             name=cohort_template.name,
@@ -189,6 +214,7 @@ class CohortLayer(BaseLayer):
         # 2. Create cohort template, if required.
         if create_cohort_template:
             cohort_template = CohortTemplate(
+                id=None,
                 name=cohort_name,
                 description=description,
                 criteria=cohort_criteria
