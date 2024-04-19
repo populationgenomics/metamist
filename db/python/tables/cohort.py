@@ -5,7 +5,7 @@ import datetime
 from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectId
 from db.python.utils import GenericFilter, GenericFilterModel, to_db_json
-from models.models.cohort import Cohort, CohortTemplateInternal
+from models.models.cohort import Cohort, CohortCriteria, CohortTemplateInternal
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -121,7 +121,7 @@ class CohortTable(DbBase):
         self,
         name: str,
         description: str,
-        criteria: dict,
+        criteria: CohortCriteria,
         project: ProjectId,
     ):
         """
@@ -136,7 +136,7 @@ class CohortTable(DbBase):
             {
                 'name': name,
                 'description': description,
-                'criteria': to_db_json(criteria),
+                'criteria': to_db_json(dict(criteria)),
                 'project': project,
                 'audit_log_id': await self.audit_log_id(),
             },

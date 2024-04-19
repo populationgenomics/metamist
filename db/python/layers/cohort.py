@@ -164,7 +164,7 @@ class CohortLayer(BaseLayer):
         template_id = await self.ct.create_cohort_template(
             name=cohort_template.name,
             description=cohort_template.description,
-            criteria=dict(cohort_template.criteria),
+            criteria=cohort_template.criteria,
             project=project,
         )
 
