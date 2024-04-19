@@ -1,7 +1,6 @@
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
-from db.python.tables.analysis import AnalysisTable
 from db.python.tables.cohort import CohortFilter, CohortTable, CohortTemplateFilter
 from db.python.tables.project import ProjectId, ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter, SampleTable
@@ -82,7 +81,6 @@ class CohortLayer(BaseLayer):
         super().__init__(connection)
 
         self.sampt = SampleTable(connection)
-        self.at = AnalysisTable(connection)
         self.ct = CohortTable(connection)
         self.pt = ProjectPermissionsTable(connection)
         self.sgt = SequencingGroupTable(connection)

@@ -226,11 +226,24 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 'or project to filter on'
             )
 
-        where_str, values = filter_.to_sql(
+        sg_where_str, sg_values = filter_.to_sql(
             {
                 'id': 'a.id',
                 'sample_id': 'a_sg.sample_id',
                 'sequencing_group_id': 'a_sg.sequencing_group_id',
+                'project': 'a.project',
+                'type': 'a.type',
+                'status': 'a.status',
+                'meta': 'a.meta',
+                'output': 'a.output',
+                'active': 'a.active',
+                'cohort_id': 'a_c.cohort_id',
+            },
+        )
+
+        cohort_where_str, cohort_values = filter_.to_sql(
+            {
+                'id': 'a.id',
                 'project': 'a.project',
                 'type': 'a.type',
                 'status': 'a.status',
@@ -247,16 +260,16 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             raise ValueError('Cannot filter on both cohort_id and sequencing_group_id')
 
         if filter_.cohort_id:
-            _query = f"""
+            _cohort_query = f"""
             SELECT a.id as id, a.type as type, a.status as status,
                     a.output as output, a_c.cohort_id as cohort_id,
                     a.project as project, a.timestamp_completed as timestamp_completed,
                     a.active as active, a.meta as meta, a.author as author
             FROM analysis a
             LEFT JOIN analysis_cohort a_c ON a.id = a_c.analysis_id
-            WHERE {where_str}
+            WHERE {cohort_where_str}
             """
-            rows = await self.connection.fetch_all(_query, values)
+            rows = await self.connection.fetch_all(_cohort_query, cohort_values)
             for row in rows:
                 key = row['id']
                 if key in retvals:
@@ -265,7 +278,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                     retvals[key] = AnalysisInternal.from_db(**dict(row))
 
             if retvals.keys():
-                _query_sg_ids = f"""
+                _query_sg_ids = """
                 SELECT sequencing_group_id, analysis_id
                 FROM analysis_sequencing_group
                 WHERE analysis_id IN :analysis_ids
@@ -287,9 +300,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                     a.active as active, a.meta as meta, a.author as author
             FROM analysis a
             LEFT JOIN analysis_sequencing_group a_sg ON a.id = a_sg.analysis_id
-            WHERE {where_str}
+            WHERE {sg_where_str}
             """
-            rows = await self.connection.fetch_all(_query, values)
+            rows = await self.connection.fetch_all(_query, sg_values)
             for row in rows:
                 key = row['id']
                 if key in retvals:
@@ -297,7 +310,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 else:
                     retvals[key] = AnalysisInternal.from_db(**dict(row))
 
-            _query_cohort_ids = f"""
+            _query_cohort_ids = """
             SELECT analysis_id, cohort_id
             FROM analysis_cohort
             WHERE analysis_id IN :analysis_ids;
