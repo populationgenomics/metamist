@@ -263,7 +263,8 @@ class CohortLayer(BaseLayer):
                 cohort_template=cohort_template, project=project_to_write
             )
 
-        assert template_id, 'Template ID must be set'
+        if not template_id:
+            raise ValueError('Template ID must be set')
 
         # 3. Create Cohort
         cohort_id = await self.ct.create_cohort(
