@@ -7,7 +7,7 @@ from models.models.project import ProjectId
 from models.models.sequencing_group import SequencingGroup, SequencingGroupExternalId
 
 
-class Cohort(SMBase):
+class CohortInternal(SMBase):
     """Model for Cohort"""
 
     id: int
@@ -31,7 +31,7 @@ class Cohort(SMBase):
         template_id = d.pop('template_id', None)
         sequencing_groups = d.pop('sequencing_groups', [])
 
-        return Cohort(
+        return CohortInternal(
             id=_id,
             name=name,
             author=author,
@@ -49,6 +49,7 @@ class CohortTemplateInternal(SMBase):
     name: str
     description: str
     criteria: dict
+    project: ProjectId
 
     @staticmethod
     def from_db(d: dict):
@@ -62,11 +63,14 @@ class CohortTemplateInternal(SMBase):
         if criteria and isinstance(criteria, str):
             criteria = json.loads(criteria)
 
+        project = d.pop('project', None)
+
         return CohortTemplateInternal(
             id=_id,
             name=name,
             description=description,
             criteria=criteria,
+            project=project,
         )
 
 
@@ -97,3 +101,11 @@ class CohortTemplate(BaseModel):
     name: str
     description: str
     criteria: CohortCriteria
+
+
+class NewCohort(BaseModel):
+    """Represents a cohort, which is a collection of sequencing groups."""
+
+    dry_run: bool = False
+    cohort_id: str
+    sequencing_group_ids: list[str]

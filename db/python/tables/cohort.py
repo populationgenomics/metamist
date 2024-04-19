@@ -4,8 +4,15 @@ import datetime
 
 from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectId
-from db.python.utils import GenericFilter, GenericFilterModel, to_db_json
-from models.models.cohort import Cohort, CohortCriteria, CohortTemplateInternal
+from db.python.utils import GenericFilter, GenericFilterModel, NotFoundError, to_db_json
+from models.models.cohort import (
+    CohortCriteria,
+    CohortInternal,
+    CohortTemplateInternal,
+    NewCohort,
+)
+from models.utils.cohort_id_format import cohort_id_format
+from models.utils.sequencing_group_id_format import sequencing_group_id_format_list
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -52,7 +59,9 @@ class CohortTable(DbBase):
 
     template_keys = ['id', 'name', 'description', 'criteria', 'project']
 
-    async def query(self, filter_: CohortFilter) -> tuple[list[Cohort], set[ProjectId]]:
+    async def query(
+        self, filter_: CohortFilter
+    ) -> tuple[list[CohortInternal], set[ProjectId]]:
         """Query Cohorts"""
         wheres, values = filter_.to_sql(field_overrides={})
         if not wheres:
@@ -66,7 +75,7 @@ class CohortTable(DbBase):
         """
 
         rows = await self.connection.fetch_all(_query, values)
-        cohorts = [Cohort.from_db(dict(row)) for row in rows]
+        cohorts = [CohortInternal.from_db(dict(row)) for row in rows]
         projects = {c.project for c in cohorts}
         return cohorts, projects
 
@@ -106,12 +115,12 @@ class CohortTable(DbBase):
         Get a cohort template by ID
         """
         _query = """
-        SELECT id as id, name, description, criteria as criteria FROM cohort_template WHERE id = :template_id
+        SELECT id as id, name, description, criteria, project FROM cohort_template WHERE id = :template_id
         """
         template = await self.connection.fetch_one(_query, {'template_id': template_id})
 
         if not template:
-            return None
+            raise NotFoundError(f'Cohort template with ID {template_id} not found')
 
         cohort_template = CohortTemplateInternal.from_db(dict(template))
 
@@ -151,12 +160,12 @@ class CohortTable(DbBase):
         sequencing_group_ids: list[int],
         description: str,
         template_id: int,
-    ) -> int:
+    ) -> NewCohort:
         """
         Create a new cohort
         """
 
-        # Use an atomic transaction for a mult-part insert query to prevent the database being
+        # Use an atomic transaction for a multi-part insert query to prevent the database being
         # left in an incomplete state if the query fails part way through.
         async with self.connection.transaction():
             audit_log_id = await self.audit_log_id()
@@ -197,9 +206,15 @@ class CohortTable(DbBase):
                 ],
             )
 
-            return cohort_id
+            return NewCohort(
+                dry_run=False,
+                cohort_id=cohort_id_format(cohort_id),
+                sequencing_group_ids=sequencing_group_id_format_list(
+                    sequencing_group_ids
+                ),
+            )
 
-    async def get_cohort_by_id(self, cohort_id: int) -> Cohort:
+    async def get_cohort_by_id(self, cohort_id: int) -> CohortInternal:
         """
         Get the cohort by its ID
         """
@@ -213,4 +228,4 @@ class CohortTable(DbBase):
         if not cohort:
             raise ValueError(f'Cohort with ID {cohort_id} not found')
 
-        return Cohort.from_db(dict(cohort))
+        return CohortInternal.from_db(dict(cohort))

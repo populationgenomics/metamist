@@ -7,7 +7,7 @@ from db.python.layers import CohortLayer, SampleLayer
 from db.python.tables.cohort import CohortFilter
 from db.python.utils import Forbidden, GenericFilter, NotFoundError
 from models.models import SampleUpsertInternal, SequencingGroupUpsertInternal
-from models.models.cohort import CohortCriteria, CohortTemplate
+from models.models.cohort import CohortCriteria, CohortTemplate, NewCohort
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
 
 
@@ -66,9 +66,9 @@ class TestCohortBasic(DbIsolatedTest):
             dry_run=False,
             cohort_criteria=CohortCriteria(projects=['test']),
         )
-        self.assertIsInstance(result, dict)
-        self.assertIsInstance(result['cohort_id'], str)
-        self.assertEqual([], result['sequencing_group_ids'])
+        self.assertIsInstance(result, NewCohort)
+        self.assertIsInstance(result.cohort_id, str)
+        self.assertEqual([], result.sequencing_group_ids)
 
     @run_as_sync
     async def test_create_duplicate_cohort(self):
@@ -236,8 +236,8 @@ class TestCohortData(DbIsolatedTest):
                 sg_ids_internal=[self.sgB],
             ),
         )
-        self.assertIsInstance(result['cohort_id'], str)
-        self.assertEqual([self.sgB], result['sequencing_group_ids'])
+        self.assertIsInstance(result.cohort_id, str)
+        self.assertEqual([self.sgB], result.sequencing_group_ids)
 
     @run_as_sync
     async def test_create_cohort_by_excluded_sgs(self):
@@ -252,10 +252,10 @@ class TestCohortData(DbIsolatedTest):
                 excluded_sgs_internal=[self.sgA],
             ),
         )
-        self.assertIsInstance(result['cohort_id'], str)
-        self.assertEqual(2, len(result['sequencing_group_ids']))
-        self.assertIn(self.sgB, result['sequencing_group_ids'])
-        self.assertIn(self.sgC, result['sequencing_group_ids'])
+        self.assertIsInstance(result.cohort_id, str)
+        self.assertEqual(2, len(result.sequencing_group_ids))
+        self.assertIn(self.sgB, result.sequencing_group_ids)
+        self.assertIn(self.sgC, result.sequencing_group_ids)
 
     @run_as_sync
     async def test_create_cohort_by_technology(self):
@@ -270,10 +270,10 @@ class TestCohortData(DbIsolatedTest):
                 sg_technology=['short-read'],
             ),
         )
-        self.assertIsInstance(result['cohort_id'], str)
-        self.assertEqual(2, len(result['sequencing_group_ids']))
-        self.assertIn(self.sgA, result['sequencing_group_ids'])
-        self.assertIn(self.sgB, result['sequencing_group_ids'])
+        self.assertIsInstance(result.cohort_id, str)
+        self.assertEqual(2, len(result.sequencing_group_ids))
+        self.assertIn(self.sgA, result.sequencing_group_ids)
+        self.assertIn(self.sgB, result.sequencing_group_ids)
 
     @run_as_sync
     async def test_create_cohort_by_platform(self):
@@ -288,8 +288,8 @@ class TestCohortData(DbIsolatedTest):
                 sg_platform=['ONT'],
             ),
         )
-        self.assertIsInstance(result['cohort_id'], str)
-        self.assertEqual([self.sgC], result['sequencing_group_ids'])
+        self.assertIsInstance(result.cohort_id, str)
+        self.assertEqual([self.sgC], result.sequencing_group_ids)
 
     @run_as_sync
     async def test_create_cohort_by_type(self):
@@ -304,10 +304,10 @@ class TestCohortData(DbIsolatedTest):
                 sg_type=['genome'],
             ),
         )
-        self.assertIsInstance(result['cohort_id'], str)
-        self.assertEqual(2, len(result['sequencing_group_ids']))
-        self.assertIn(self.sgA, result['sequencing_group_ids'])
-        self.assertIn(self.sgB, result['sequencing_group_ids'])
+        self.assertIsInstance(result.cohort_id, str)
+        self.assertEqual(2, len(result.sequencing_group_ids))
+        self.assertIn(self.sgA, result.sequencing_group_ids)
+        self.assertIn(self.sgB, result.sequencing_group_ids)
 
     @run_as_sync
     async def test_create_cohort_by_sample_type(self):
@@ -322,8 +322,8 @@ class TestCohortData(DbIsolatedTest):
                 sample_type=['saliva'],
             ),
         )
-        self.assertIsInstance(result['cohort_id'], str)
-        self.assertEqual([self.sgC], result['sequencing_group_ids'])
+        self.assertIsInstance(result.cohort_id, str)
+        self.assertEqual([self.sgC], result.sequencing_group_ids)
 
     @run_as_sync
     async def test_create_cohort_by_everything(self):
@@ -343,8 +343,8 @@ class TestCohortData(DbIsolatedTest):
                 sample_type=['blood'],
             ),
         )
-        self.assertEqual(1, len(result['sequencing_group_ids']))
-        self.assertIn(self.sgB, result['sequencing_group_ids'])
+        self.assertEqual(1, len(result.sequencing_group_ids))
+        self.assertIn(self.sgB, result.sequencing_group_ids)
 
     @run_as_sync
     async def test_reevaluate_cohort(self):
@@ -369,7 +369,7 @@ class TestCohortData(DbIsolatedTest):
             dry_run=False,
             template_id=template,
         )
-        self.assertEqual(2, len(coh1['sequencing_group_ids']))
+        self.assertEqual(2, len(coh1.sequencing_group_ids))
 
         sD = await self.samplel.upsert_sample(get_sample_model('D'))
         sgD = sequencing_group_id_format(sD.sequencing_groups[0].id)
@@ -381,10 +381,10 @@ class TestCohortData(DbIsolatedTest):
             dry_run=False,
             template_id=template,
         )
-        self.assertEqual(3, len(coh2['sequencing_group_ids']))
+        self.assertEqual(3, len(coh2.sequencing_group_ids))
 
-        self.assertNotIn(sgD, coh1['sequencing_group_ids'])
-        self.assertIn(sgD, coh2['sequencing_group_ids'])
+        self.assertNotIn(sgD, coh1.sequencing_group_ids)
+        self.assertIn(sgD, coh2.sequencing_group_ids)
 
     @run_as_sync
     async def test_query_cohort(self):
@@ -399,7 +399,7 @@ class TestCohortData(DbIsolatedTest):
                 sg_ids_internal=[self.sgA, self.sgB],
             ),
         )
-        self.assertEqual(2, len(created['sequencing_group_ids']))
+        self.assertEqual(2, len(created.sequencing_group_ids))
 
         queried = await self.cohortl.query(
             CohortFilter(name=GenericFilter(eq='Duo cohort'))

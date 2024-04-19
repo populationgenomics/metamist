@@ -40,7 +40,7 @@ from models.models import (
     AnalysisInternal,
     AssayInternal,
     AuditLogInternal,
-    Cohort,
+    CohortInternal,
     CohortTemplateInternal,
     FamilyInternal,
     ParticipantInternal,
@@ -93,7 +93,7 @@ class GraphQLCohort:
     author: str
 
     @staticmethod
-    def from_internal(internal: Cohort) -> 'GraphQLCohort':
+    def from_internal(internal: CohortInternal) -> 'GraphQLCohort':
         return GraphQLCohort(
             id=cohort_id_format(internal.id),
             name=internal.name,
