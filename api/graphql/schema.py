@@ -100,10 +100,9 @@ class GraphQLCohort:
             description=internal.description,
             author=internal.author,
         )
+
     @strawberry.field()
-    async def template(
-        self, info: Info, root: 'Cohort'
-    ) -> 'GraphQLCohortTemplate':
+    async def template(self, info: Info, root: 'Cohort') -> 'GraphQLCohortTemplate':
         connection = info.context['connection']
         template = await CohortLayer(connection).get_template_by_cohort_id(
             cohort_id_transform_to_raw(root.id)
@@ -117,14 +116,16 @@ class GraphQLCohort:
     ) -> list['GraphQLSequencingGroup']:
         connection = info.context['connection']
         cohort_layer = CohortLayer(connection)
-        sg_ids = await cohort_layer.get_cohort_sequencing_group_ids(cohort_id_transform_to_raw(root.id))
+        sg_ids = await cohort_layer.get_cohort_sequencing_group_ids(
+            cohort_id_transform_to_raw(root.id)
+        )
 
         sg_layer = SequencingGroupLayer(connection)
         sequencing_groups = await sg_layer.get_sequencing_groups_by_ids(sg_ids)
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sequencing_groups]
 
     @strawberry.field()
-    async def analyses( self, info: Info, root:'Cohort') -> list['GraphQLAnalysis']:
+    async def analyses(self, info: Info, root: 'Cohort') -> list['GraphQLAnalysis']:
         connection = info.context['connection']
         connection.project = root.project
         internal_analysis = await AnalysisLayer(connection).query(
@@ -139,6 +140,7 @@ class GraphQLCohort:
         loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
         project = await loader.load(root.project)
         return GraphQLProject.from_internal(project)
+
 
 # Create cohort template GraphQL model
 @strawberry.type
@@ -159,7 +161,6 @@ class GraphQLCohortTemplate:
             description=internal.description,
             criteria=internal.criteria,
         )
-
 
 
 @strawberry.type
@@ -350,7 +351,11 @@ class GraphQLProject:
             id=id.to_internal_filter(cohort_id_transform_to_raw) if id else None,
             name=name.to_internal_filter() if name else None,
             author=author.to_internal_filter() if author else None,
-            template_id=template_id.to_internal_filter(cohort_template_id_transform_to_raw) if template_id else None,
+            template_id=(
+                template_id.to_internal_filter(cohort_template_id_transform_to_raw)
+                if template_id
+                else None
+            ),
             timestamp=timestamp.to_internal_filter() if timestamp else None,
         )
 
@@ -824,7 +829,7 @@ class Query:  # entry point to graphql.
         return GraphQLEnum()
 
     @strawberry.field()
-    async def cohort_template(
+    async def cohort_templates(
         self,
         info: Info,
         id: GraphQLFilter[str] | None = None,
@@ -847,15 +852,22 @@ class Query:  # entry point to graphql.
             )
 
         filter_ = CohortTemplateFilter(
-            id=id.to_internal_filter(cohort_template_id_transform_to_raw) if id else None,
+            id=(
+                id.to_internal_filter(cohort_template_id_transform_to_raw)
+                if id
+                else None
+            ),
             project=project_filter,
         )
 
         cohort_templates = await cohort_layer.query_cohort_templates(filter_)
-        return [GraphQLCohortTemplate.from_internal(cohort_template) for cohort_template in cohort_templates]
+        return [
+            GraphQLCohortTemplate.from_internal(cohort_template)
+            for cohort_template in cohort_templates
+        ]
 
     @strawberry.field()
-    async def cohort(
+    async def cohorts(
         self,
         info: Info,
         id: GraphQLFilter[str] | None = None,
@@ -885,7 +897,11 @@ class Query:  # entry point to graphql.
             name=name.to_internal_filter() if name else None,
             project=project_filter,
             author=author.to_internal_filter() if author else None,
-            template_id=template_id.to_internal_filter(cohort_template_id_transform_to_raw) if template_id else None,
+            template_id=(
+                template_id.to_internal_filter(cohort_template_id_transform_to_raw)
+                if template_id
+                else None
+            ),
         )
 
         cohorts = await cohort_layer.query(filter_)
