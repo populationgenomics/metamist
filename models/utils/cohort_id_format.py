@@ -49,9 +49,6 @@ def cohort_id_transform_to_raw(cohort_id: int | str, strict=True) -> int:
     if isinstance(cohort_id, int):
         return cohort_id
 
-    if not isinstance(cohort_id, str):
-        raise ValueError('Programming error related to cohort checks')
-
     if not cohort_id.startswith(COHORT_PREFIX):
         raise ValueError(
             f'Invalid prefix found for {COHORT_PREFIX} cohort identifier {cohort_id!r}'
