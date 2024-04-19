@@ -19,9 +19,7 @@ def cohort_id_format(cohort_id: int | str) -> str:
 
     cohort_id = int(cohort_id)
 
-    checksum = luhn_compute(
-        cohort_id, offset=COHORT_CHECKSUM_OFFSET
-    )
+    checksum = luhn_compute(cohort_id, offset=COHORT_CHECKSUM_OFFSET)
 
     return f'{COHORT_PREFIX}{cohort_id}{checksum}'
 
@@ -36,13 +34,13 @@ def cohort_id_format_list(cohort_ids: Iterable[int | str]) -> list[str]:
     return [cohort_id_format(s) for s in cohort_ids]
 
 
-def cohort_id_transform_to_raw(cohort_id: int | str) -> int:
+def cohort_id_transform_to_raw(cohort_id: int | str, strict=True) -> int:
     """
     Transform STRING cohort identifier (COHXXXH) to XXX by:
         - validating prefix
         - validating checksum
     """
-    expected_type = str
+    expected_type = str if strict else (str, int)
     if not isinstance(cohort_id, expected_type):  # type: ignore
         raise TypeError(
             f'Expected identifier type to be {expected_type!r}, received {type(cohort_id)!r}'
@@ -71,11 +69,11 @@ def cohort_id_transform_to_raw(cohort_id: int | str) -> int:
 
 
 def cohort_id_transform_to_raw_list(
-    identifier: Iterable[int | str]
+    identifier: Iterable[int | str], strict=True
 ) -> list[int]:
     """
     Transform LIST of STRING cohort identifier (COHXXXH) to XXX by:
         - validating prefix
         - validating checksum
     """
-    return [cohort_id_transform_to_raw(s) for s in identifier]
+    return [cohort_id_transform_to_raw(s, strict=strict) for s in identifier]
