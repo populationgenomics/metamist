@@ -4,7 +4,7 @@ from fastapi import APIRouter
 
 from api.utils.db import Connection, get_project_write_connection
 from db.python.layers.cohort import CohortLayer
-from models.models.cohort import CohortBody, CohortCriteria, CohortTemplate
+from models.models.cohort import CohortBody, CohortCriteria, CohortTemplate, NewCohort
 
 router = APIRouter(prefix='/cohort', tags=['cohort'])
 
@@ -15,7 +15,7 @@ async def create_cohort_from_criteria(
     connection: Connection = get_project_write_connection,
     cohort_criteria: CohortCriteria = None,
     dry_run: bool = False,
-) -> dict[str, Any]:
+) -> NewCohort:
     """
     Create a cohort with the given name and sample/sequencing group IDs.
     """
@@ -25,7 +25,9 @@ async def create_cohort_from_criteria(
         raise ValueError('A cohort must belong to a project')
 
     if not cohort_criteria and not cohort_spec.template_id:
-        raise ValueError('A cohort must have either criteria or be derived from a template')
+        raise ValueError(
+            'A cohort must have either criteria or be derived from a template'
+        )
 
     cohort_output = await cohort_layer.create_cohort_from_criteria(
         project_to_write=connection.project,
@@ -53,6 +55,5 @@ async def create_cohort_template(
         raise ValueError('A cohort template must belong to a project')
 
     return await cohort_layer.create_cohort_template(
-        cohort_template=template,
-        project=connection.project
+        cohort_template=template, project=connection.project
     )
