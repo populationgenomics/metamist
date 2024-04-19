@@ -149,7 +149,6 @@ class CohortTable(DbBase):
         project: int,
         cohort_name: str,
         sequencing_group_ids: list[int],
-        author: str,
         description: str,
         template_id: int,
     ) -> int:
@@ -172,7 +171,7 @@ class CohortTable(DbBase):
                 _query,
                 {
                     'template_id': template_id,
-                    'author': author,
+                    'author': self.author,
                     'description': description,
                     'project': project,
                     'name': cohort_name,
