@@ -10,7 +10,7 @@ from models.models.sequencing_group import SequencingGroup, SequencingGroupExter
 class Cohort(SMBase):
     """Model for Cohort"""
 
-    id: str
+    id: int
     name: str
     author: str
     project: ProjectId
