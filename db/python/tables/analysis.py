@@ -25,7 +25,7 @@ class AnalysisFilter(GenericFilterModel):
     id: GenericFilter[int] | None = None
     sample_id: GenericFilter[int] | None = None
     sequencing_group_id: GenericFilter[int] | None = None
-    cohort_id: GenericFilter[str] | None = None
+    cohort_id: GenericFilter[int] | None = None
     project: GenericFilter[int] | None = None
     type: GenericFilter[str] | None = None
     status: GenericFilter[AnalysisStatus] | None = None
@@ -128,9 +128,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         )
         await self.connection.execute_many(_query, list(values))
 
-    async def add_cohorts_to_analysis(
-            self, analysis_id: int, cohort_ids: list[int]
-    ):
+    async def add_cohorts_to_analysis(self, analysis_id: int, cohort_ids: list[int]):
         """Add cohorts to an analysis (through the linked table)"""
         _query = """
             INSERT INTO analysis_cohort
@@ -219,7 +217,6 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             filter_.project,
             filter_.sample_id,
             filter_.cohort_id,
-
         ]
 
         if not any(required_fields):
@@ -272,10 +269,14 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 FROM analysis_sequencing_group
                 WHERE analysis_id IN :analysis_ids
                 """
-                sg_ids = await self.connection.fetch_all(_query_sg_ids, {'analysis_ids': list(retvals.keys())})
+                sg_ids = await self.connection.fetch_all(
+                    _query_sg_ids, {'analysis_ids': list(retvals.keys())}
+                )
 
                 for row in sg_ids:
-                    retvals[row['analysis_id']].sequencing_group_ids.append(row['sequencing_group_id'])
+                    retvals[row['analysis_id']].sequencing_group_ids.append(
+                        row['sequencing_group_id']
+                    )
 
         else:
             _query = f"""
@@ -300,7 +301,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             FROM analysis_cohort
             WHERE analysis_id IN :analysis_ids;
             """
-            cohort_ids = await self.connection.fetch_all(_query_cohort_ids, {'analysis_ids': list(retvals.keys())})
+            cohort_ids = await self.connection.fetch_all(
+                _query_cohort_ids, {'analysis_ids': list(retvals.keys())}
+            )
 
             for row in cohort_ids:
                 retvals[row['analysis_id']].cohort_ids.append(row['cohort_id'])
