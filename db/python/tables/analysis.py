@@ -59,12 +59,12 @@ class AnalysisTable(DbBase):
         self,
         analysis_type: str,
         status: AnalysisStatus,
-        sequencing_group_ids: List[int],
+        sequencing_group_ids: List[int] | None = None,
         cohort_ids: List[int] | None = None,
         meta: Optional[Dict[str, Any]] = None,
-        output: str = None,
+        output: str | None = None,
         active: bool = True,
-        project: ProjectId = None,
+        project: ProjectId | None = None,
     ) -> int:
         """
         Create a new sample, and add it to database
@@ -98,9 +98,10 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 dict(kv_pairs),
             )
 
-            await self.add_sequencing_groups_to_analysis(
-                id_of_new_analysis, sequencing_group_ids
-            )
+            if sequencing_group_ids:
+                await self.add_sequencing_groups_to_analysis(
+                    id_of_new_analysis, sequencing_group_ids
+                )
 
             if cohort_ids:
                 await self.add_cohorts_to_analysis(id_of_new_analysis, cohort_ids)

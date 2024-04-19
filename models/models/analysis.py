@@ -83,9 +83,11 @@ class AnalysisInternal(SMBase):
             ),
             cohort_ids=cohort_id_format_list(self.cohort_ids),
             output=self.output,
-            timestamp_completed=self.timestamp_completed.isoformat()
-            if self.timestamp_completed
-            else None,
+            timestamp_completed=(
+                self.timestamp_completed.isoformat()
+                if self.timestamp_completed
+                else None
+            ),
             project=self.project,
             active=self.active,
             meta=self.meta,
@@ -112,14 +114,22 @@ class Analysis(BaseModel):
         """
         Convert to internal model
         """
+        sequencing_group_ids = None
+        if self.sequencing_group_ids:
+            sequencing_group_ids = sequencing_group_id_transform_to_raw_list(
+                self.sequencing_group_ids
+            )
+
+        cohort_ids = None
+        if self.cohort_ids:
+            cohort_ids = cohort_id_transform_to_raw_list(self.cohort_ids)
+
         return AnalysisInternal(
             id=self.id,
             type=self.type,
             status=self.status,
-            sequencing_group_ids=sequencing_group_id_transform_to_raw_list(
-                self.sequencing_group_ids
-            ),
-            cohort_ids=cohort_id_transform_to_raw_list(self.cohort_ids),
+            sequencing_group_ids=sequencing_group_ids,
+            cohort_ids=cohort_ids,
             output=self.output,
             # don't allow this to be set
             timestamp_completed=None,
