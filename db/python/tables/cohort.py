@@ -185,15 +185,17 @@ class CohortTable(DbBase):
             VALUES (:cohort_id, :sequencing_group_id, :audit_log_id)
             """
 
-            for sg in sequencing_group_ids:
-                await self.connection.execute(
-                    _query,
+            await self.connection.execute_many(
+                _query,
+                [
                     {
                         'cohort_id': cohort_id,
                         'sequencing_group_id': sg,
                         'audit_log_id': audit_log_id,
-                    },
-                )
+                    }
+                    for sg in sequencing_group_ids
+                ],
+            )
 
             return cohort_id
 
