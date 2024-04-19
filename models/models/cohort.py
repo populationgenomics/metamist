@@ -3,6 +3,7 @@ import json
 from pydantic import BaseModel
 
 from models.base import SMBase
+from models.models.project import ProjectId
 from models.models.sequencing_group import SequencingGroup, SequencingGroupExternalId
 
 
@@ -12,7 +13,7 @@ class Cohort(SMBase):
     id: str
     name: str
     author: str
-    project: str
+    project: ProjectId
     description: str
     template_id: int
     sequencing_groups: list[SequencingGroup | SequencingGroupExternalId]
@@ -90,7 +91,7 @@ class CohortCriteria(BaseModel):
 
 
 class CohortTemplate(BaseModel):
-    """ Represents a cohort template, to be used to build cohorts. """
+    """Represents a cohort template, to be used to build cohorts."""
 
     id: int | None
     name: str
