@@ -4,7 +4,6 @@ from pydantic import BaseModel
 
 from models.base import SMBase
 from models.models.project import ProjectId
-from models.models.sequencing_group import SequencingGroup, SequencingGroupExternalId
 
 
 class CohortInternal(SMBase):
@@ -16,7 +15,6 @@ class CohortInternal(SMBase):
     project: ProjectId
     description: str
     template_id: int
-    sequencing_groups: list[SequencingGroup | SequencingGroupExternalId]
 
     @staticmethod
     def from_db(d: dict):
@@ -29,7 +27,6 @@ class CohortInternal(SMBase):
         name = d.pop('name', None)
         author = d.pop('author', None)
         template_id = d.pop('template_id', None)
-        sequencing_groups = d.pop('sequencing_groups', [])
 
         return CohortInternal(
             id=_id,
@@ -38,7 +35,6 @@ class CohortInternal(SMBase):
             project=project,
             description=description,
             template_id=template_id,
-            sequencing_groups=sequencing_groups,
         )
 
 
