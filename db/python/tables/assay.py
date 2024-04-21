@@ -520,6 +520,8 @@ class AssayTable(DbBase):
             'a.type',
             'a.meta',
             's.project',
+            'ae.name',
+            'ae.external_id',
         ]
         wheres = [
             'sga.sequencing_group_id IN :sequencing_group_ids',
@@ -530,6 +532,7 @@ class AssayTable(DbBase):
             FROM sequencing_group_assay sga
             INNER JOIN assay a ON sga.assay_id = a.id
             INNER JOIN sample s ON a.sample_id = s.id
+            LEFT JOIN assay_external_id ae ON a.id = ae.assay_id
             WHERE {' AND '.join(wheres)}
         """
 
@@ -541,9 +544,11 @@ class AssayTable(DbBase):
         for row in rows:
             drow = dict(row)
 
-            # Set external_id map to empty dict since we don't fetch them for this query
-            # TODO: Get external_ids map for this query if/when they are needed.
-            drow['external_ids'] = drow.pop('external_ids', {})
+            external_id = drow.pop('external_id', None)
+            if external_id:
+                drow['external_ids'] = {drow.pop('name'): external_id}
+            else:
+                drow['external_ids'] = {}
 
             sequencing_group_id = drow.pop('sequencing_group_id')
             projects.add(drow.pop('project'))
