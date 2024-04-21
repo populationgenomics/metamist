@@ -203,9 +203,10 @@ class GenericFilter(Generic[T]):
             conditionals.append(f'{column} <= :{k}')
             values[k] = self._sql_value_prep(self.lte)
         if self.contains is not None:
+            search_term = escape_like_term(str(self.contains))
             k = self.generate_field_name(column + '_contains')
             conditionals.append(f'{column} LIKE :{k}')
-            values[k] = self._sql_value_prep(f'%{self.contains}%')
+            values[k] = self._sql_value_prep(f'%{search_term}%')
         if self.icontains is not None:
             k = self.generate_field_name(column + '_icontains')
             conditionals.append(f'LOWER({column}) LIKE LOWER(:{k})')
@@ -397,3 +398,11 @@ def split_generic_terms(string: str) -> list[str]:
     filenames = [f for f in filenames if f]
 
     return filenames
+
+
+def escape_like_term(query: str):
+    """
+    Escape meaningful keys when using LIKE with a user supplied input
+    """
+
+    return query.replace('%', '\\%').replace('_', '\\_')

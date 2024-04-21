@@ -2,7 +2,7 @@ from collections import defaultdict
 from typing import Any
 
 from db.python.tables.base import DbBase
-from db.python.utils import NotFoundError, to_db_json
+from db.python.utils import NotFoundError, escape_like_term, to_db_json
 from models.models.participant import ParticipantInternal
 from models.models.project import ProjectId
 
@@ -338,7 +338,7 @@ WHERE {' AND '.join(wheres)}
             _query,
             {
                 'project_ids': project_ids,
-                'search_pattern': self.escape_like_term(query) + '%',
+                'search_pattern': escape_like_term(query) + '%',
                 'limit': limit,
             },
         )

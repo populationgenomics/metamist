@@ -9,6 +9,7 @@ from db.python.utils import (
     GenericFilterModel,
     GenericMetaFilter,
     NotFoundError,
+    escape_like_term,
     to_db_json,
 )
 from models.models.project import ProjectId
@@ -354,7 +355,7 @@ class SampleTable(DbBase):
             _query,
             {
                 'project_ids': project_ids,
-                'search_pattern': self.escape_like_term(query) + '%',
+                'search_pattern': escape_like_term(query) + '%',
                 'limit': limit,
             },
         )

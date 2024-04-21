@@ -1,7 +1,5 @@
 import json
 
-from pydantic import BaseModel
-
 from models.base import SMBase
 from models.models.project import ProjectId
 
@@ -70,7 +68,7 @@ class CohortTemplateInternal(SMBase):
         )
 
 
-class CohortBody(BaseModel):
+class CohortBody(SMBase):
     """Represents the expected JSON body of the create cohort request"""
 
     name: str
@@ -78,7 +76,7 @@ class CohortBody(BaseModel):
     template_id: str | None = None
 
 
-class CohortCriteria(BaseModel):
+class CohortCriteria(SMBase):
     """Represents the expected JSON body of the create cohort request"""
 
     projects: list[str] | None = []
@@ -90,7 +88,7 @@ class CohortCriteria(BaseModel):
     sample_type: list[str] | None = None
 
 
-class CohortTemplate(BaseModel):
+class CohortTemplate(SMBase):
     """Represents a cohort template, to be used to build cohorts."""
 
     id: int | None
@@ -99,7 +97,7 @@ class CohortTemplate(BaseModel):
     criteria: CohortCriteria
 
 
-class NewCohort(BaseModel):
+class NewCohort(SMBase):
     """Represents a cohort, which is a collection of sequencing groups."""
 
     dry_run: bool = False
