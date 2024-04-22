@@ -204,7 +204,8 @@ class TestSequencingGroup(DbIsolatedTest):
         await self.slayer.upsert_sample(sample_to_insert)
 
         print(f'\n{date.today()=}')
-        subprocess.run(['date'], check=True)
+        stdout = subprocess.check_output(['date'], encoding='ascii')
+        print(f'date command: {stdout}')
 
         # Query for sequencing group with creation date before today
         sgs = await self.sglayer.query(
