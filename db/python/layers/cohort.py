@@ -10,47 +10,27 @@ from db.python.tables.sequencing_group import (
 )
 from db.python.utils import GenericFilter, get_logger
 from models.models.cohort import (
-    CohortCriteria,
+    CohortCriteriaInternal,
     CohortInternal,
-    CohortTemplate,
     CohortTemplateInternal,
-    NewCohort,
-)
-from models.utils.cohort_template_id_format import (
-    cohort_template_id_format,
-    cohort_template_id_transform_to_raw,
-)
-from models.utils.sequencing_group_id_format import (
-    sequencing_group_id_format_list,
-    sequencing_group_id_transform_to_raw_list,
+    NewCohortInternal,
 )
 
 logger = get_logger()
 
 
 def get_sg_filter(
-    projects: list[int],
-    sg_ids_internal_rich: list[str],
-    excluded_sgs_internal_rich: list[str],
-    sg_technology: list[str],
-    sg_platform: list[str],
-    sg_type: list[str],
-    sample_ids: list[int],
+    projects: list[ProjectId] | None,
+    sg_ids_internal_raw: list[int] | None,
+    excluded_sgs_internal_raw: list[int] | None,
+    sg_technology: list[str] | None,
+    sg_platform: list[str] | None,
+    sg_type: list[str] | None,
+    sample_ids: list[int] | None,
 ) -> SequencingGroupFilter:
     """Get the sequencing group filter for cohort attributes"""
 
     # Format inputs for filter
-    sg_ids_internal_raw = []
-    excluded_sgs_internal_raw = []
-    if sg_ids_internal_rich:
-        sg_ids_internal_raw = sequencing_group_id_transform_to_raw_list(
-            sg_ids_internal_rich
-        )
-    if excluded_sgs_internal_rich:
-        excluded_sgs_internal_raw = sequencing_group_id_transform_to_raw_list(
-            excluded_sgs_internal_rich
-        )
-
     if sg_ids_internal_raw and excluded_sgs_internal_raw:
         sg_id_filter = GenericFilter(
             in_=sg_ids_internal_raw, nin=excluded_sgs_internal_raw
@@ -143,20 +123,14 @@ class CohortLayer(BaseLayer):
 
     async def create_cohort_template(
         self,
-        cohort_template: CohortTemplate,
+        cohort_template: CohortTemplateInternal,
         project: ProjectId,
-    ):
+    ) -> int:
         """
         Create new cohort template
         """
 
-        # Validate projects specified in criteria are valid
-        _ = await self.pt.get_and_check_access_to_projects_for_names(
-            user=self.connection.author,
-            project_names=cohort_template.criteria.projects,
-            readonly=False,
-        )
-
+        assert cohort_template.criteria.projects, 'Projects must be set in criteria'
         assert cohort_template.id is None, 'Cohort template ID must be None'
 
         template_id = await self.ct.create_cohort_template(
@@ -166,7 +140,7 @@ class CohortLayer(BaseLayer):
             project=project,
         )
 
-        return cohort_template_id_format(template_id)
+        return template_id
 
     async def create_cohort_from_criteria(
         self,
@@ -174,9 +148,9 @@ class CohortLayer(BaseLayer):
         description: str,
         cohort_name: str,
         dry_run: bool,
-        cohort_criteria: CohortCriteria = None,
-        template_id: str = None,
-    ) -> NewCohort:
+        cohort_criteria: CohortCriteriaInternal | None = None,
+        template_id: int | None = None,
+    ) -> NewCohortInternal:
         """
         Create a new cohort from the given parameters. Returns the newly created cohort_id.
         """
@@ -189,11 +163,10 @@ class CohortLayer(BaseLayer):
                 'A cohort must have either criteria or be derived from a template'
             )
 
-        template: CohortTemplateInternal = None
+        template: CohortTemplateInternal | None = None
         # Get template from ID
         if template_id:
-            template_id_raw = cohort_template_id_transform_to_raw(template_id)
-            template = await self.ct.get_cohort_template(template_id_raw)
+            template = await self.ct.get_cohort_template(template_id)
             if not template:
                 raise ValueError(f'Cohort template with ID {template_id} not found')
 
@@ -206,51 +179,49 @@ class CohortLayer(BaseLayer):
         # Only provide a template id
         if template and not cohort_criteria:
             create_cohort_template = False
-            criteria_dict = template.criteria
-            cohort_criteria = CohortCriteria(**criteria_dict)
+            cohort_criteria = template.criteria
 
-        projects_to_pull = await self.pt.get_and_check_access_to_projects_for_names(
-            user=self.connection.author,
-            project_names=cohort_criteria.projects,
-            readonly=True,
-        )
-        projects_to_pull = [p.id for p in projects_to_pull]
+        if not cohort_criteria:
+            raise ValueError('Cohort criteria must be set')
 
-        # Get sample IDs with sample type
-        sample_filter = SampleFilter(
-            project=GenericFilter(in_=projects_to_pull),
-            type=(
-                GenericFilter(in_=cohort_criteria.sample_type)
-                if cohort_criteria.sample_type
-                else None
-            ),
-        )
+        sample_ids: list[int] = []
+        if cohort_criteria.sample_type:
+            # Get sample IDs with sample type
+            sample_filter = SampleFilter(
+                project=GenericFilter(in_=cohort_criteria.projects),
+                type=(
+                    GenericFilter(in_=cohort_criteria.sample_type)
+                    if cohort_criteria.sample_type
+                    else None
+                ),
+            )
 
-        _, samples = await self.sampt.query(sample_filter)
+            _, samples = await self.sampt.query(sample_filter)
+            sample_ids = [s.id for s in samples]
 
         sg_filter = get_sg_filter(
-            projects=projects_to_pull,
-            sg_ids_internal_rich=cohort_criteria.sg_ids_internal,
-            excluded_sgs_internal_rich=cohort_criteria.excluded_sgs_internal,
+            projects=cohort_criteria.projects,
+            sg_ids_internal_raw=cohort_criteria.sg_ids_internal_raw,
+            excluded_sgs_internal_raw=cohort_criteria.excluded_sgs_internal_raw,
             sg_technology=cohort_criteria.sg_technology,
             sg_platform=cohort_criteria.sg_platform,
             sg_type=cohort_criteria.sg_type,
-            sample_ids=[s.id for s in samples],
+            sample_ids=sample_ids,
         )
 
         sgs = await self.sglayer.query(sg_filter)
 
-        rich_ids = sequencing_group_id_format_list([sg.id for sg in sgs])
-
         if dry_run:
-            return NewCohort(
+            sg_ids = [sg.id for sg in sgs if sg.id] if sgs else []
+
+            return NewCohortInternal(
                 dry_run=True,
-                cohort_id=template_id or 'CREATE NEW',
-                sequencing_group_ids=rich_ids,
+                cohort_id=template_id,
+                sequencing_group_ids=sg_ids,
             )
         # 2. Create cohort template, if required.
         if create_cohort_template:
-            cohort_template = CohortTemplate(
+            cohort_template = CohortTemplateInternal(
                 id=None,
                 name=cohort_name,
                 description=description,
@@ -267,7 +238,7 @@ class CohortLayer(BaseLayer):
         return await self.ct.create_cohort(
             project=project_to_write,
             cohort_name=cohort_name,
-            sequencing_group_ids=[sg.id for sg in sgs],
+            sequencing_group_ids=[sg.id for sg in sgs if sg.id],
             description=description,
-            template_id=cohort_template_id_transform_to_raw(template_id),
+            template_id=template_id,
         )

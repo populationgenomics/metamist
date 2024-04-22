@@ -5,9 +5,15 @@ from pymysql.err import IntegrityError
 
 from db.python.layers import CohortLayer, SampleLayer
 from db.python.tables.cohort import CohortFilter
-from db.python.utils import Forbidden, GenericFilter, NotFoundError
+from db.python.utils import GenericFilter
 from models.models import SampleUpsertInternal, SequencingGroupUpsertInternal
-from models.models.cohort import CohortCriteria, CohortTemplate, NewCohort
+from models.models.cohort import (
+    CohortCriteria,
+    CohortCriteriaInternal,
+    CohortTemplate,
+    CohortTemplateInternal,
+    NewCohortInternal,
+)
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
 
 
@@ -30,31 +36,32 @@ class TestCohortBasic(DbIsolatedTest):
                 dry_run=False,
             )
 
-    @run_as_sync
-    async def test_create_cohort_bad_project(self):
-        """Can't create cohort in invalid project"""
-        with self.assertRaises((Forbidden, NotFoundError)):
-            _ = await self.cohortl.create_cohort_from_criteria(
-                project_to_write=self.project_id,
-                description='Cohort based on a missing project',
-                cohort_name='Bad-project cohort',
-                dry_run=False,
-                cohort_criteria=CohortCriteria(projects=['nonexistent']),
-            )
+    # These tests are disabled because the move to an Internal Model means that verification happens in the route not the layer
+    # @run_as_sync
+    # async def test_create_cohort_bad_project(self):
+    #     """Can't create cohort in invalid project"""
+    #     with self.assertRaises((Forbidden, NotFoundError)):
+    #         _ = await self.cohortl.create_cohort_from_criteria(
+    #             project_to_write=self.project_id,
+    #             description='Cohort based on a missing project',
+    #             cohort_name='Bad-project cohort',
+    #             dry_run=False,
+    #             cohort_criteria=CohortCriteriaInternal(projects=[5]),
+    #         )
 
-    @run_as_sync
-    async def test_create_template_bad_project(self):
-        """Can't create template in invalid project"""
-        with self.assertRaises((Forbidden, NotFoundError)):
-            _ = await self.cohortl.create_cohort_template(
-                project=self.project_id,
-                cohort_template=CohortTemplate(
-                    id=None,
-                    name='Bad-project template',
-                    description='Template based on a missing project',
-                    criteria=CohortCriteria(projects=['nonexistent']),
-                ),
-            )
+    # @run_as_sync
+    # async def test_create_template_bad_project(self):
+    #     """Can't create template in invalid project"""
+    #     with self.assertRaises((Forbidden, NotFoundError)):
+    #         _ = await self.cohortl.create_cohort_template(
+    #             project=self.project_id,
+    #             cohort_template=CohortTemplate(
+    #                 id=None,
+    #                 name='Bad-project template',
+    #                 description='Template based on a missing project',
+    #                 criteria=CohortCriteria(projects=['nonexistent']),
+    #             ),
+    #         )
 
     @run_as_sync
     async def test_create_empty_cohort(self):
@@ -64,10 +71,10 @@ class TestCohortBasic(DbIsolatedTest):
             description='Cohort with no entries',
             cohort_name='Empty cohort',
             dry_run=False,
-            cohort_criteria=CohortCriteria(projects=['test']),
+            cohort_criteria=CohortCriteriaInternal(projects=[self.project_id]),
         )
-        self.assertIsInstance(result, NewCohort)
-        self.assertIsInstance(result.cohort_id, str)
+        self.assertIsInstance(result, NewCohortInternal)
+        self.assertIsInstance(result.cohort_id, int)
         self.assertEqual([], result.sequencing_group_ids)
 
     @run_as_sync
@@ -78,7 +85,7 @@ class TestCohortBasic(DbIsolatedTest):
             description='Cohort with no entries',
             cohort_name='Trial duplicate cohort',
             dry_run=False,
-            cohort_criteria=CohortCriteria(projects=['test']),
+            cohort_criteria=CohortCriteriaInternal(projects=[self.project_id]),
         )
 
         _ = await self.cohortl.create_cohort_from_criteria(
@@ -86,7 +93,7 @@ class TestCohortBasic(DbIsolatedTest):
             description='Cohort with no entries',
             cohort_name='Trial duplicate cohort',
             dry_run=True,
-            cohort_criteria=CohortCriteria(projects=['test']),
+            cohort_criteria=CohortCriteriaInternal(projects=[self.project_id]),
         )
 
         with self.assertRaises(IntegrityError):
@@ -95,7 +102,7 @@ class TestCohortBasic(DbIsolatedTest):
                 description='Cohort with no entries',
                 cohort_name='Trial duplicate cohort',
                 dry_run=False,
-                cohort_criteria=CohortCriteria(projects=['test']),
+                cohort_criteria=CohortCriteriaInternal(projects=[self.project_id]),
             )
 
     @run_as_sync
@@ -103,11 +110,11 @@ class TestCohortBasic(DbIsolatedTest):
         """Test with template and cohort IDs out of sync, and creating from template"""
         tid = await self.cohortl.create_cohort_template(
             project=self.project_id,
-            cohort_template=CohortTemplate(
+            cohort_template=CohortTemplateInternal(
                 id=None,
                 name='Empty template',
                 description='Template with no entries',
-                criteria=CohortCriteria(projects=['test']),
+                criteria=CohortCriteriaInternal(projects=[self.project_id]),
             ),
         )
 
@@ -116,7 +123,7 @@ class TestCohortBasic(DbIsolatedTest):
             description='Cohort with no entries',
             cohort_name='Another empty cohort',
             dry_run=False,
-            cohort_criteria=CohortCriteria(projects=['test']),
+            cohort_criteria=CohortCriteriaInternal(projects=[self.project_id]),
         )
 
         _ = await self.cohortl.create_cohort_from_criteria(
@@ -220,8 +227,11 @@ class TestCohortData(DbIsolatedTest):
         )
 
         self.sgA = sequencing_group_id_format(self.sA.sequencing_groups[0].id)
+        self.sgA_raw = self.sA.sequencing_groups[0].id
         self.sgB = sequencing_group_id_format(self.sB.sequencing_groups[0].id)
+        self.sgB_raw = self.sB.sequencing_groups[0].id
         self.sgC = sequencing_group_id_format(self.sC.sequencing_groups[0].id)
+        self.sgC_raw = self.sC.sequencing_groups[0].id
 
     @run_as_sync
     async def test_create_cohort_by_sgs(self):
@@ -234,10 +244,10 @@ class TestCohortData(DbIsolatedTest):
             cohort_criteria=CohortCriteria(
                 projects=['test'],
                 sg_ids_internal=[self.sgB],
-            ),
+            ).to_internal(projects_internal=[self.project_id]),
         )
-        self.assertIsInstance(result.cohort_id, str)
-        self.assertEqual([self.sgB], result.sequencing_group_ids)
+        self.assertIsInstance(result.cohort_id, int)
+        self.assertEqual([self.sgB_raw], result.sequencing_group_ids)
 
     @run_as_sync
     async def test_create_cohort_by_excluded_sgs(self):
@@ -250,12 +260,12 @@ class TestCohortData(DbIsolatedTest):
             cohort_criteria=CohortCriteria(
                 projects=['test'],
                 excluded_sgs_internal=[self.sgA],
-            ),
+            ).to_internal(projects_internal=[self.project_id]),
         )
-        self.assertIsInstance(result.cohort_id, str)
+        self.assertIsInstance(result.cohort_id, int)
         self.assertEqual(2, len(result.sequencing_group_ids))
-        self.assertIn(self.sgB, result.sequencing_group_ids)
-        self.assertIn(self.sgC, result.sequencing_group_ids)
+        self.assertIn(self.sgB_raw, result.sequencing_group_ids)
+        self.assertIn(self.sgC_raw, result.sequencing_group_ids)
 
     @run_as_sync
     async def test_create_cohort_by_technology(self):
@@ -268,12 +278,12 @@ class TestCohortData(DbIsolatedTest):
             cohort_criteria=CohortCriteria(
                 projects=['test'],
                 sg_technology=['short-read'],
-            ),
+            ).to_internal(projects_internal=[self.project_id]),
         )
-        self.assertIsInstance(result.cohort_id, str)
+        self.assertIsInstance(result.cohort_id, int)
         self.assertEqual(2, len(result.sequencing_group_ids))
-        self.assertIn(self.sgA, result.sequencing_group_ids)
-        self.assertIn(self.sgB, result.sequencing_group_ids)
+        self.assertIn(self.sgA_raw, result.sequencing_group_ids)
+        self.assertIn(self.sgB_raw, result.sequencing_group_ids)
 
     @run_as_sync
     async def test_create_cohort_by_platform(self):
@@ -286,10 +296,10 @@ class TestCohortData(DbIsolatedTest):
             cohort_criteria=CohortCriteria(
                 projects=['test'],
                 sg_platform=['ONT'],
-            ),
+            ).to_internal(projects_internal=[self.project_id]),
         )
-        self.assertIsInstance(result.cohort_id, str)
-        self.assertEqual([self.sgC], result.sequencing_group_ids)
+        self.assertIsInstance(result.cohort_id, int)
+        self.assertEqual([self.sgC_raw], result.sequencing_group_ids)
 
     @run_as_sync
     async def test_create_cohort_by_type(self):
@@ -302,12 +312,12 @@ class TestCohortData(DbIsolatedTest):
             cohort_criteria=CohortCriteria(
                 projects=['test'],
                 sg_type=['genome'],
-            ),
+            ).to_internal(projects_internal=[self.project_id]),
         )
-        self.assertIsInstance(result.cohort_id, str)
+        self.assertIsInstance(result.cohort_id, int)
         self.assertEqual(2, len(result.sequencing_group_ids))
-        self.assertIn(self.sgA, result.sequencing_group_ids)
-        self.assertIn(self.sgB, result.sequencing_group_ids)
+        self.assertIn(self.sgA_raw, result.sequencing_group_ids)
+        self.assertIn(self.sgB_raw, result.sequencing_group_ids)
 
     @run_as_sync
     async def test_create_cohort_by_sample_type(self):
@@ -320,10 +330,10 @@ class TestCohortData(DbIsolatedTest):
             cohort_criteria=CohortCriteria(
                 projects=['test'],
                 sample_type=['saliva'],
-            ),
+            ).to_internal(projects_internal=[self.project_id]),
         )
-        self.assertIsInstance(result.cohort_id, str)
-        self.assertEqual([self.sgC], result.sequencing_group_ids)
+        self.assertIsInstance(result.cohort_id, int)
+        self.assertEqual([self.sgC_raw], result.sequencing_group_ids)
 
     @run_as_sync
     async def test_create_cohort_by_everything(self):
@@ -341,10 +351,10 @@ class TestCohortData(DbIsolatedTest):
                 sg_platform=['illumina'],
                 sg_type=['genome'],
                 sample_type=['blood'],
-            ),
+            ).to_internal(projects_internal=[self.project_id]),
         )
         self.assertEqual(1, len(result.sequencing_group_ids))
-        self.assertIn(self.sgB, result.sequencing_group_ids)
+        self.assertIn(self.sgB_raw, result.sequencing_group_ids)
 
     @run_as_sync
     async def test_reevaluate_cohort(self):
@@ -359,7 +369,7 @@ class TestCohortData(DbIsolatedTest):
                     projects=['test'],
                     sample_type=['blood'],
                 ),
-            ),
+            ).to_internal(criteria_projects=[self.project_id]),
         )
 
         coh1 = await self.cohortl.create_cohort_from_criteria(
@@ -372,7 +382,7 @@ class TestCohortData(DbIsolatedTest):
         self.assertEqual(2, len(coh1.sequencing_group_ids))
 
         sD = await self.samplel.upsert_sample(get_sample_model('D'))
-        sgD = sequencing_group_id_format(sD.sequencing_groups[0].id)
+        sgD_raw = sD.sequencing_groups[0].id
 
         coh2 = await self.cohortl.create_cohort_from_criteria(
             project_to_write=self.project_id,
@@ -383,8 +393,8 @@ class TestCohortData(DbIsolatedTest):
         )
         self.assertEqual(3, len(coh2.sequencing_group_ids))
 
-        self.assertNotIn(sgD, coh1.sequencing_group_ids)
-        self.assertIn(sgD, coh2.sequencing_group_ids)
+        self.assertNotIn(sgD_raw, coh1.sequencing_group_ids)
+        self.assertIn(sgD_raw, coh2.sequencing_group_ids)
 
     @run_as_sync
     async def test_query_cohort(self):
@@ -397,7 +407,7 @@ class TestCohortData(DbIsolatedTest):
             cohort_criteria=CohortCriteria(
                 projects=['test'],
                 sg_ids_internal=[self.sgA, self.sgB],
-            ),
+            ).to_internal(projects_internal=[self.project_id]),
         )
         self.assertEqual(2, len(created.sequencing_group_ids))
 

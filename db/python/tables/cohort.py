@@ -6,13 +6,11 @@ from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectId
 from db.python.utils import GenericFilter, GenericFilterModel, NotFoundError, to_db_json
 from models.models.cohort import (
-    CohortCriteria,
+    CohortCriteriaInternal,
     CohortInternal,
     CohortTemplateInternal,
-    NewCohort,
+    NewCohortInternal,
 )
-from models.utils.cohort_id_format import cohort_id_format
-from models.utils.sequencing_group_id_format import sequencing_group_id_format_list
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -130,7 +128,7 @@ class CohortTable(DbBase):
         self,
         name: str,
         description: str,
-        criteria: CohortCriteria,
+        criteria: CohortCriteriaInternal,
         project: ProjectId,
     ):
         """
@@ -160,7 +158,7 @@ class CohortTable(DbBase):
         sequencing_group_ids: list[int],
         description: str,
         template_id: int,
-    ) -> NewCohort:
+    ) -> NewCohortInternal:
         """
         Create a new cohort
         """
@@ -206,12 +204,10 @@ class CohortTable(DbBase):
                 ],
             )
 
-            return NewCohort(
+            return NewCohortInternal(
                 dry_run=False,
-                cohort_id=cohort_id_format(cohort_id),
-                sequencing_group_ids=sequencing_group_id_format_list(
-                    sequencing_group_ids
-                ),
+                cohort_id=cohort_id,
+                sequencing_group_ids=sequencing_group_ids,
             )
 
     async def get_cohort_by_id(self, cohort_id: int) -> CohortInternal:
