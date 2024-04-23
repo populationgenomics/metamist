@@ -7,11 +7,19 @@ from typing import Any, Dict, List, Optional, Tuple
 from db.python.layers.base import BaseLayer
 from db.python.layers.sample import SampleLayer
 from db.python.tables.family import FamilyTable
-from db.python.tables.family_participant import FamilyParticipantTable
+from db.python.tables.family_participant import (
+    FamilyParticipantFilter,
+    FamilyParticipantTable,
+)
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.participant_phenotype import ParticipantPhenotypeTable
 from db.python.tables.sample import SampleTable
-from db.python.utils import NoOpAenter, NotFoundError, split_generic_terms
+from db.python.utils import (
+    GenericFilter,
+    NoOpAenter,
+    NotFoundError,
+    split_generic_terms,
+)
 from models.models.family import PedRowInternal
 from models.models.participant import ParticipantInternal, ParticipantUpsertInternal
 from models.models.project import ProjectId
@@ -489,11 +497,12 @@ class ParticipantLayer(BaseLayer):
                 formed_rows = [
                     PedRowInternal(
                         family_id=fmap_by_external[external_family_id],
-                        participant_id=pid,
+                        individual_id=pid,
                         affected=0,
                         maternal_id=None,
                         paternal_id=None,
                         notes=None,
+                        sex=None,
                     )
                     for external_family_id, pid in family_persons_to_insert
                 ]
@@ -766,11 +775,29 @@ class ParticipantLayer(BaseLayer):
             'header_map': json_header_map,
         }
 
-    async def get_family_participant_data(self, family_id: int, participant_id: int):
+    async def get_family_participant_data(
+        self, family_id: int, participant_id: int, check_project_ids: bool = True
+    ) -> PedRowInternal:
         """Gets the family_participant row for a specific participant"""
         fptable = FamilyParticipantTable(self.connection)
 
-        return await fptable.get_row(family_id=family_id, participant_id=participant_id)
+        projects, rows = await fptable.query(
+            FamilyParticipantFilter(
+                family_id=GenericFilter(eq=family_id),
+                participant_id=GenericFilter(eq=participant_id),
+            )
+        )
+        if not rows:
+            raise NotFoundError(
+                f'Family participant row (family_id: {family_id}, '
+                f'participant_id: {participant_id}) not found'
+            )
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.author, projects, readonly=True
+            )
+
+        return rows[0]
 
     async def remove_participant_from_family(self, family_id: int, participant_id: int):
         """Deletes a participant from a family"""
@@ -948,7 +975,7 @@ class ParticipantLayer(BaseLayer):
             return await self.add_participant_to_family(
                 family_id=new_family_id,
                 participant_id=participant_id,
-                paternal_id=fp_row['paternal_id'],
-                maternal_id=fp_row['maternal_id'],
-                affected=fp_row['affected'],
+                paternal_id=fp_row.paternal_id,
+                maternal_id=fp_row.maternal_id,
+                affected=fp_row.affected,
             )

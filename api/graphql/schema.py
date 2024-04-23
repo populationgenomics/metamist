@@ -31,6 +31,7 @@ from db.python.layers import (
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.analysis_runner import AnalysisRunnerFilter
 from db.python.tables.assay import AssayFilter
+from db.python.tables.family import FamilyFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
@@ -157,9 +158,17 @@ class GraphQLProject:
         self,
         info: Info,
         root: 'GraphQLProject',
+        id: GraphQLFilter[int] | None = None,
+        external_id: GraphQLFilter[str] | None = None,
     ) -> list['GraphQLFamily']:
         connection = info.context['connection']
-        families = await FamilyLayer(connection).get_families(project=root.id)
+        families = await FamilyLayer(connection).query(
+            FamilyFilter(
+                project=GenericFilter(eq=root.id),
+                id=id.to_internal_filter() if id else None,
+                external_id=external_id.to_internal_filter() if external_id else None,
+            )
+        )
         return [GraphQLFamily.from_internal(f) for f in families]
 
     @strawberry.field()
@@ -184,7 +193,7 @@ class GraphQLProject:
         filter_ = SampleFilter(
             type=type.to_internal_filter() if type else None,
             external_id=external_id.to_internal_filter() if external_id else None,
-            id=id.to_internal_filter(sample_id_transform_to_raw) if id else None,
+            id=id.to_internal_filter_mapped(sample_id_transform_to_raw) if id else None,
             meta=graphql_meta_filter_to_internal_filter(meta),
         )
         samples = await loader.load({'id': root.id, 'filter': filter_})
@@ -205,7 +214,7 @@ class GraphQLProject:
         loader = info.context[LoaderKeys.SEQUENCING_GROUPS_FOR_PROJECTS]
         filter_ = SequencingGroupFilter(
             id=(
-                id.to_internal_filter(sequencing_group_id_transform_to_raw)
+                id.to_internal_filter_mapped(sequencing_group_id_transform_to_raw)
                 if id
                 else None
             ),
@@ -285,7 +294,7 @@ class GraphQLAnalysis:
 
     id: int
     type: str
-    status: strawberry.enum(AnalysisStatus)
+    status: strawberry.enum(AnalysisStatus)  # type: ignore
     output: str | None
     timestamp_completed: datetime.datetime | None = None
     active: bool
@@ -380,6 +389,10 @@ class GraphQLFamily:
 
 @strawberry.type
 class GraphQLFamilyParticipant:
+    """
+    A FamilyParticipant, an individual in a family, noting that a Family is bounded
+      by some 'affected' attribute
+    """
 
     affected: int | None
     notes: str | None
@@ -408,7 +421,7 @@ class GraphQLFamilyParticipant:
         return GraphQLFamilyParticipant(
             affected=internal.affected,
             notes=internal.notes,
-            participant_id=internal.participant_id,
+            participant_id=internal.individual_id,
             family_id=internal.family_id,
         )
 
@@ -473,18 +486,17 @@ class GraphQLParticipant:
     ) -> list[GraphQLFamily]:
         fams = await info.context[LoaderKeys.FAMILIES_FOR_PARTICIPANTS].load(root.id)
         return [GraphQLFamily.from_internal(f) for f in fams]
-    
+
     @strawberry.field
     async def family_participants(
         self, info: Info, root: 'GraphQLParticipant'
     ) -> list[GraphQLFamilyParticipant]:
-        return []
-        # family_participants = await info.context[
-        #     LoaderKeys.FAMILY_PARTICIPANTS_FOR_PARTICIPANTS
-        # ].load(root.id)
-        # return [
-        #     GraphQLFamilyParticipant.from_internal(fp) for fp in family_participants
-        # ]
+        family_participants = await info.context[
+            LoaderKeys.FAMILY_PARTICIPANTS_FOR_PARTICIPANTS
+        ].load(root.id)
+        return [
+            GraphQLFamilyParticipant.from_internal(fp) for fp in family_participants
+        ]
 
     @strawberry.field
     async def project(self, info: Info, root: 'GraphQLParticipant') -> GraphQLProject:
@@ -576,7 +588,7 @@ class GraphQLSample:
 
         _filter = SequencingGroupFilter(
             id=(
-                id.to_internal_filter(sequencing_group_id_transform_to_raw)
+                id.to_internal_filter_mapped(sequencing_group_id_transform_to_raw)
                 if id
                 else None
             ),
@@ -657,7 +669,9 @@ class GraphQLSequencingGroup:
             project_id_map: dict[str, int] = {
                 p.name: p.id for p in projects if p.name and p.id
             }
-            _project_filter = project.to_internal_filter(lambda p: project_id_map[p])
+            _project_filter = project.to_internal_filter_mapped(
+                lambda p: project_id_map[p]
+            )
 
         analyses = await loader.load(
             {
@@ -778,7 +792,7 @@ class Query:
     """GraphQL Queries"""
 
     @strawberry.field()
-    def enum(self, info: Info) -> GraphQLEnum:
+    def enum(self, info: Info) -> GraphQLEnum:  # type: ignore
         return GraphQLEnum()
 
     @strawberry.field()
@@ -821,7 +835,7 @@ class Query:
             project_name_map = {p.name: p.id for p in projects if p.name and p.id}
 
         filter_ = SampleFilter(
-            id=id.to_internal_filter(sample_id_transform_to_raw) if id else None,
+            id=id.to_internal_filter_mapped(sample_id_transform_to_raw) if id else None,
             type=type.to_internal_filter() if type else None,
             meta=graphql_meta_filter_to_internal_filter(meta),
             external_id=external_id.to_internal_filter() if external_id else None,
@@ -829,7 +843,7 @@ class Query:
                 participant_id.to_internal_filter() if participant_id else None
             ),
             project=(
-                project.to_internal_filter(lambda pname: project_name_map[pname])
+                project.to_internal_filter_mapped(lambda pname: project_name_map[pname])
                 if project
                 else None
             ),
@@ -866,17 +880,19 @@ class Query:
                 user=connection.author, project_names=project_names, readonly=True
             )
             project_id_map = {p.name: p.id for p in projects if p.name and p.id}
-            _project_filter = project.to_internal_filter(lambda p: project_id_map[p])
+            _project_filter = project.to_internal_filter_mapped(
+                lambda p: project_id_map[p]
+            )
 
         filter_ = SequencingGroupFilter(
             project=_project_filter,
             sample_id=(
-                sample_id.to_internal_filter(sample_id_transform_to_raw)
+                sample_id.to_internal_filter_mapped(sample_id_transform_to_raw)
                 if sample_id
                 else None
             ),
             id=(
-                id.to_internal_filter(sequencing_group_id_transform_to_raw)
+                id.to_internal_filter_mapped(sequencing_group_id_transform_to_raw)
                 if id
                 else None
             ),
@@ -941,4 +957,6 @@ class Query:
 schema = strawberry.Schema(
     query=Query, mutation=None, extensions=[QueryDepthLimiter(max_depth=10)]
 )
-MetamistGraphQLRouter = GraphQLRouter(schema, graphiql=True, context_getter=get_context)
+MetamistGraphQLRouter: GraphQLRouter = GraphQLRouter(
+    schema, graphiql=True, context_getter=get_context
+)
