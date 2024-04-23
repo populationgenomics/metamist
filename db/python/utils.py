@@ -85,8 +85,8 @@ class GenericFilter(Generic[T]):
     """
 
     eq: T | None = None
-    in_: list[T] | None = None
-    nin: list[T] | None = None
+    in_: Sequence[T] | None = None
+    nin: Sequence[T] | None = None
     gt: T | None = None
     gte: T | None = None
     lt: T | None = None
@@ -96,8 +96,8 @@ class GenericFilter(Generic[T]):
         self,
         *,
         eq: T | None = None,
-        in_: list[T] | None = None,
-        nin: list[T] | None = None,
+        in_: Sequence[T] | None = None,
+        nin: Sequence[T] | None = None,
         gt: T | None = None,
         gte: T | None = None,
         lt: T | None = None,
@@ -147,9 +147,19 @@ class GenericFilter(Generic[T]):
         return NONFIELD_CHARS_REGEX.sub('_', name)
 
     def to_sql(
-        self, column: str, column_name: str = None
+        self, column: str, column_name: str | None = None
     ) -> tuple[str, dict[str, T | list[T]]]:
-        """Convert to SQL, and avoid SQL injection"""
+        """Convert to SQL, and avoid SQL injection
+
+        Args:
+            column (str): The expression, or column name that derives the values
+            column_name (str, optional): A column name to use in the field_override.
+                We'll replace any non-alphanumeric characters with an _.
+                (Defaults to None)
+
+        Returns:
+            tuple[str, dict[str, T | list[T]]]: (condition, prepared_values)
+        """
         conditionals = []
         values: dict[str, T | list[T]] = {}
         _column_name = column_name or column

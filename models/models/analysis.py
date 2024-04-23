@@ -19,7 +19,7 @@ class AnalysisInternal(SMBase):
     id: int | None = None
     type: str
     status: AnalysisStatus
-    active: bool
+    active: bool | None = None
     output: str | None = None
     sequencing_group_ids: list[int] = []
     timestamp_completed: datetime | None = None

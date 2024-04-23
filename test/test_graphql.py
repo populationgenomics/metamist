@@ -261,12 +261,15 @@ query MyQuery($pid: Int!) {
 
     @run_as_sync
     async def test_family_participants(self):
+        """Test inserting + querying family participants from different directions"""
         family_layer = FamilyLayer(self.connection)
 
+        family_eid = 'family1'
+
         rows = [
-            ["family1", "individual1", "paternal1", "maternal1", "m", "1", "note1"],
-            ["family1", "paternal1", None, None, "m", "0", "note2"],
-            ["family1", "maternal1", None, None, "f", "1", "note3"],
+            [family_eid, 'individual1', 'paternal1', 'maternal1', 'm', '1', 'note1'],
+            [family_eid, 'paternal1', None, None, 'm', '0', 'note2'],
+            [family_eid, 'maternal1', None, None, 'f', '1', 'note3'],
         ]
 
         await family_layer.import_pedigree(None, rows, create_missing_participants=True)
@@ -285,7 +288,7 @@ query MyQuery($project: String!) {
             }
         }
         families {
-            id
+            externalId
             familyParticipants {
                 affected
                 notes
@@ -299,25 +302,50 @@ query MyQuery($project: String!) {
 """
 
         resp = await self.run_graphql_query_async(q, {'project': self.project_name})
+        assert resp is not None
 
-        {
-            "project": {
-                "participants": [
-                    {"externalId": "individual1", "familyParticipants": []},
-                    {"externalId": "maternal1", "familyParticipants": []},
-                    {"externalId": "paternal1", "familyParticipants": []},
-                ],
-                "families": [
-                    {
-                        "id": 1,
-                        "familyParticipants": [
-                            {"affected": 0, "notes": "note2", "participant": {"id": 1}},
-                            {"affected": 1, "notes": "note3", "participant": {"id": 2}},
-                            {"affected": 1, "notes": "note1", "participant": {"id": 3}},
-                        ],
-                    }
-                ],
-            }
-        }
+        family_simple_obj = {'family': {'externalId': family_eid}}
 
-        print(resp)
+        participants = resp['project']['participants']
+        families = resp['project']['families']
+
+        participants_by_eid = {p['externalId']: p for p in participants}
+        self.assertEqual(3, len(participants))
+
+        self.assertDictEqual(
+            {
+                'externalId': 'individual1',
+                'familyParticipants': [
+                    {'affected': 1, 'notes': 'note1', **family_simple_obj}
+                ],
+            },
+            participants_by_eid['individual1'],
+        )
+
+        self.assertEqual(1, len(families))
+        self.assertEqual(family_eid, families[0]['externalId'])
+
+        sorted_fps = sorted(
+            families[0]['familyParticipants'],
+            key=lambda x: x['participant']['externalId'],
+        )
+        self.assertListEqual(
+            sorted_fps,
+            [
+                {
+                    'affected': 1,
+                    'notes': 'note1',
+                    'participant': {'externalId': 'individual1'},
+                },
+                {
+                    'affected': 1,
+                    'notes': 'note3',
+                    'participant': {'externalId': 'maternal1'},
+                },
+                {
+                    'affected': 0,
+                    'notes': 'note2',
+                    'participant': {'externalId': 'paternal1'},
+                },
+            ],
+        )

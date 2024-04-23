@@ -42,19 +42,10 @@ class GraphQLFilter(Generic[T]):
 
         return v
 
-    def to_internal_filter(self, f: Callable[[T], Y] | None = None) -> GenericFilter[Y]:
+    def to_internal_filter(
+        self,
+    ) -> GenericFilter[T]:
         """Convert from GraphQL to internal filter model"""
-
-        if f:
-            return GenericFilter(
-                eq=f(self.eq) if self.eq else None,
-                in_=list(map(f, self.in_)) if self.in_ else None,
-                nin=list(map(f, self.nin)) if self.nin else None,
-                gt=f(self.gt) if self.gt else None,
-                gte=f(self.gte) if self.gte else None,
-                lt=f(self.lt) if self.lt else None,
-                lte=f(self.lte) if self.lte else None,
-            )
 
         return GenericFilter(
             eq=self.eq,
@@ -66,6 +57,21 @@ class GraphQLFilter(Generic[T]):
             lte=self.lte,
         )
 
+    def to_internal_filter_mapped(self, f: Callable[[T], Y]) -> GenericFilter[Y]:
+        """
+        To internal filter, but apply a function to all values.
+        Separate this into a separate function to please linters and type checkers
+        """
+        return GenericFilter(
+            eq=f(self.eq) if self.eq else None,
+            in_=list(map(f, self.in_)) if self.in_ else None,
+            nin=list(map(f, self.nin)) if self.nin else None,
+            gt=f(self.gt) if self.gt else None,
+            gte=f(self.gte) if self.gte else None,
+            lt=f(self.lt) if self.lt else None,
+            lte=f(self.lte) if self.lte else None,
+        )
+
 
 GraphQLMetaFilter = strawberry.scalars.JSON
 
@@ -73,6 +79,14 @@ GraphQLMetaFilter = strawberry.scalars.JSON
 def graphql_meta_filter_to_internal_filter(
     f: GraphQLMetaFilter | None,
 ) -> GenericMetaFilter | None:
+    """Convert from GraphQL to internal filter model
+
+    Args:
+        f (GraphQLMetaFilter | None): GraphQL filter
+
+    Returns:
+        GenericMetaFilter | None: internal filter
+    """
     if not f:
         return None
 
