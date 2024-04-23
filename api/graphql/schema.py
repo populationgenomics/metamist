@@ -161,6 +161,8 @@ class GraphQLProject:
         id: GraphQLFilter[int] | None = None,
         external_id: GraphQLFilter[str] | None = None,
     ) -> list['GraphQLFamily']:
+        # don't need a data loader here as we're presuming we're not often running 
+        # the "families" method for many projects at once. If so, we might need to fix that
         connection = info.context['connection']
         families = await FamilyLayer(connection).query(
             FamilyFilter(

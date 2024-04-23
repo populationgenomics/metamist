@@ -199,7 +199,7 @@ WHERE fp.participant_id in :participant_ids
 
         _update_before_delete = """
         UPDATE family_participant
-        set audit_log_id = :audit_log_id
+        SET audit_log_id = :audit_log_id
         WHERE family_id = :family_id AND participant_id = :participant_id
         """
 
