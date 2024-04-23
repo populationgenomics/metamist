@@ -42,9 +42,7 @@ class GraphQLFilter(Generic[T]):
 
         return v
 
-    def to_internal_filter(
-        self,
-    ) -> GenericFilter[T]:
+    def to_internal_filter(self) -> GenericFilter[T]:
         """Convert from GraphQL to internal filter model"""
 
         return GenericFilter(
