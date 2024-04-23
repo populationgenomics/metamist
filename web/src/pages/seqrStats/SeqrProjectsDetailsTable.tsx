@@ -9,24 +9,43 @@ interface DetailsTableProps {
     filteredData: SeqrProjectsDetails[]
 }
 
+// placeholder
+const getRowClassName = (sequencingType: string) => {
+    switch (sequencingType) {
+        case 'exome':
+            return 'exome-row'
+        case 'genome':
+            return 'genome-row'
+        default:
+            return 'rna-row'
+    }
+}
+
 const HtmlTooltip = (props: TooltipProps) => (
     <Tooltip {...props} classes={{ popper: 'html-tooltip' }} />
 )
 
-const DetailsTableRow: React.FC<{ details: SeqrProjectsDetails }> = ({ stats }) => {
+const DetailsTableRow: React.FC<{ details: SeqrProjectsDetails }> = ({ details }) => {
     const theme = React.useContext(ThemeContext)
     const isDarkMode = theme.theme === 'dark-mode'
-    const 
+    const rowClassName = getRowClassName(details.sequencing_type)
 
     return (
         <Table.Row key={`${details.sequencing_group_id}`} className={rowClassName}>
-            <Table.Cell className="dataset-cell">{stats.dataset}</Table.Cell>
-            <Table.Cell className="table-cell">{stats.sequencing_type}</Table.Cell>
-            <Table.Cell className="table-cell">{stats.total_families}</Table.Cell>
-            <Table.Cell className="table-cell">{stats.total_participants}</Table.Cell>
-            <Table.Cell className="table-cell">{stats.total_samples}</Table.Cell>
-            <Table.Cell className="table-cell">{stats.total_sequencing_groups}</Table.Cell>
-            <Table.Cell className="table-cell">{stats.total_crams}</Table.Cell>
+            <Table.Cell className="dataset-cell">{details.dataset}</Table.Cell>
+            <Table.Cell className="table-cell">{details.sequencing_type}</Table.Cell>
+            <Table.Cell className="table-cell">{details.sample_type}</Table.Cell>
+            <Table.Cell className="table-cell">{details.family_id}</Table.Cell>
+            <Table.Cell className="table-cell">{details.family_ext_id}</Table.Cell>
+            <Table.Cell className="table-cell">{details.participant_id}</Table.Cell>
+            <Table.Cell className="table-cell">{details.participant_ext_id}</Table.Cell>
+            <Table.Cell className="table-cell">{details.sample_id}</Table.Cell>
+            <Table.Cell className="table-cell">{details.sample_ext_ids}</Table.Cell>
+            <Table.Cell className="table-cell">{details.completed_cram}</Table.Cell>
+            <Table.Cell className="table-cell">{details.in_latest_annotate_dataset}</Table.Cell>
+            <Table.Cell className="table-cell">{details.in_latest_snv_es_index}</Table.Cell>
+            <Table.Cell className="table-cell">{details.in_latest_sv_es_index}</Table.Cell>
+            <Table.Cell className="table-cell">{details.sequencing_group_report_links}</Table.Cell>
         </Table.Row>
     )
 }

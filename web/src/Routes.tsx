@@ -123,6 +123,15 @@ const Routes: React.FunctionComponent = () => (
                 </ErrorBoundary>
             }
         />
+
+        <Route
+            path="seqr/deets"
+            element={
+                <ErrorBoundary>
+                    <SeqrStats />
+                </ErrorBoundary>
+            }
+        />
     </Switch>
 )
 
