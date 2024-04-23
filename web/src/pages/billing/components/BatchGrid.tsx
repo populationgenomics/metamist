@@ -260,7 +260,7 @@ const BatchCard: React.FC<{ item: AnalysisCostRecordBatch }> = ({ item }) => {
 
                     <DisplayRow label="Cost">
                         {formatMoney(item.cost, 4)}{' '}
-                        {item.jobs?.length > 0 && <em>- across {item.jobs.length} job(s)</em>}
+                        {(item?.jobs_cnt || 0) > 0 && <em>- across {item.jobs_cnt} job(s)</em>}
                     </DisplayRow>
 
                     <DisplayRow label="Start" isVisible={isOpen}>
