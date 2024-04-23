@@ -44,11 +44,11 @@ def main(
 
 
 def get_cohort_spec(
-    cohort_name: str, cohort_description: str, cohort_template_id: int
+    cohort_name: str, cohort_description: str, cohort_template_id: str
 ) -> CohortBody:
     """Get the cohort spec"""
 
-    cohort_body_spec: dict[str, int | str] = {}
+    cohort_body_spec: dict[str, str] = {}
 
     if cohort_name:
         cohort_body_spec['name'] = cohort_name
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     parser.add_argument('--name', type=str, help='The name of the cohort')
     parser.add_argument('--description', type=str, help='The description of the cohort')
     parser.add_argument(
-        '--template_id', required=False, type=int, help='The template id of the cohort'
+        '--template_id', required=False, type=str, help='The template id of the cohort'
     )
     parser.add_argument(
         '--projects',
