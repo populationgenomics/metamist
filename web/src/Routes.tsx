@@ -19,6 +19,7 @@ import ProjectsAdmin from './pages/admin/ProjectsAdmin'
 import ErrorBoundary from './shared/utilities/errorBoundary'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
 import SeqrStats from './pages/seqrStats/SeqrStats'
+import SeqrDeets from './pages/seqrStats/SeqrDeets'
 
 const Routes: React.FunctionComponent = () => (
     <Switch>
@@ -128,7 +129,7 @@ const Routes: React.FunctionComponent = () => (
             path="seqr/deets"
             element={
                 <ErrorBoundary>
-                    <SeqrStats />
+                    <SeqrDeets />
                 </ErrorBoundary>
             }
         />
