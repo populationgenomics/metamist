@@ -200,9 +200,12 @@ class FamilyLayer(BaseLayer):
             mapped_rows.append(
                 {
                     'family_id': fmap.get(r.family_id, str(r.family_id)),
-                    'individual_id': pmap.get(r.individual_id, r.individual_id) or empty_participant_value,
-                    'paternal_id': pmap.get(r.paternal_id, r.paternal_id) or empty_participant_value),
-                    'maternal_id': pmap.get(r.maternal_id, r.maternal_id) or empty_participant_value),
+                    'individual_id': pmap.get(r.individual_id, r.individual_id)
+                    or empty_participant_value,
+                    'paternal_id': pmap.get(r.paternal_id, r.paternal_id)
+                    or empty_participant_value,
+                    'maternal_id': pmap.get(r.maternal_id, r.maternal_id)
+                    or empty_participant_value,
                     'sex': r.sex,
                     'affected': r.affected,
                     'notes': r.notes,
