@@ -25,7 +25,7 @@ from db.python.tables.family import FamilyFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
-from db.python.utils import GenericFilter, NotFoundError
+from db.python.utils import GenericFilter, NotFoundError, get_hashable_value
 from models.models import (
     AnalysisInternal,
     AssayInternal,
@@ -96,31 +96,8 @@ def connected_data_loader(id_: LoaderKeys, cache=True):
     return connected_data_loader_caller
 
 
-def _prepare_partial_value_for_hashing(value):
-    if value is None:
-        return None
-    if isinstance(value, (int, str, float, bool)):
-        return value
-    if isinstance(value, enum.Enum):
-        return value.value
-    if isinstance(value, list):
-        # let's see if later we need to prepare the values in the list
-        return tuple(value)
-    if isinstance(value, dict):
-        return tuple(
-            sorted(
-                ((k, _prepare_partial_value_for_hashing(v)) for k, v in value.items()),
-                key=lambda x: x[0],
-            )
-        )
-
-    return hash(value)
-
-
-def _get_connected_data_loader_partial_key(kwargs):
-    return _prepare_partial_value_for_hashing(
-        {k: v for k, v in kwargs.items() if k != 'id'}
-    )
+def _get_connected_data_loader_partial_key(kwargs) -> tuple:
+    return get_hashable_value({k: v for k, v in kwargs.items() if k != 'id'})  # type: ignore
 
 
 def connected_data_loader_with_params(
