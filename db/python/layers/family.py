@@ -57,7 +57,6 @@ class FamilyLayer(BaseLayer):
         self, external_id: str, project: ProjectId | None = None
     ):
         """Get family by external ID, requires project scope"""
-        # return await self.ftable.get_family_by_external_id(external_id, project=project)
         families = await self.ftable.query(
             FamilyFilter(
                 external_id=GenericFilter(eq=external_id),
@@ -304,9 +303,8 @@ class FamilyLayer(BaseLayer):
                             reported_sex=row.sex,
                         )
                     )
-                    external_participant_ids_map[row.individual_id] = (
-                        upserted_participant.id
-                    )
+                    pid = upserted_participant.id
+                    external_participant_ids_map[row.individual_id] = pid
 
             for external_family_id in missing_external_family_ids:
                 internal_family_id = await self.ftable.create_family(
