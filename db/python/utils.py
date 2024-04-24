@@ -147,6 +147,9 @@ class GenericFilter(Generic[T]):
         return NONFIELD_CHARS_REGEX.sub('_', name)
 
     def is_false(self) -> bool:
+        """
+        The filter will resolve to False (usually because the in_ is an empty list)
+        """
         return self.in_ is not None and len(self.in_) == 0
 
     def to_sql(
