@@ -96,6 +96,14 @@ class TestAnalysis(DbIsolatedTest):
         self.assertEqual(AnalysisStatus.COMPLETED, analysis.status)
 
     @run_as_sync
+    async def test_empty_query(self):
+        """
+        Test empty IDs to see the query construction
+        """
+        analyses = await self.al.query(AnalysisFilter(id=GenericFilter(in_=[])))
+        self.assertEqual(len(analyses), 0)
+
+    @run_as_sync
     async def test_add_cram(self):
         """
         Test adding an analysis of type CRAM
