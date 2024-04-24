@@ -53,6 +53,14 @@ class TestSequencingGroup(DbIsolatedTest):
         self.slayer = SampleLayer(self.connection)
 
     @run_as_sync
+    async def test_empty_query(self):
+        """
+        Test empty IDs to see the query construction
+        """
+        sgs = await self.sglayer.query(SequencingGroupFilter(id=GenericFilter(in_=[])))
+        self.assertEqual(len(sgs), 0)
+
+    @run_as_sync
     async def test_insert_sequencing_group(self):
         """Test inserting and fetching a sequencing group"""
         sample_to_insert = get_sample_model()
