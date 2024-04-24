@@ -146,7 +146,6 @@ def validate(doc: DocumentNode, client=None, use_local_schema=False):
     backoff.expo,
     exception=(HTTPError, JSONDecodeError, TransportServerError),
     max_time=10,
-    max_tries=3,
 )
 def query(
     _query: str | DocumentNode,
@@ -177,7 +176,6 @@ def query(
     backoff.expo,
     exception=(HTTPError, JSONDecodeError, TransportServerError),
     max_time=10,
-    max_tries=3,
 )
 async def query_async(
     _query: str | DocumentNode,

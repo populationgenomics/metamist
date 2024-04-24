@@ -212,7 +212,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
                     sum(d.cost) AS cost,
                     MIN(d.usage_start_time) AS usage_start_time,
                     max(d.usage_end_time) AS usage_end_time,
-                    COUNT(DISTINCT d.job_id) as jobs_cnt
+                    MAX(d.job_id) as jobs_cnt
                 FROM d
                 WHERE d.batch_id IS NOT NULL
                 GROUP BY batch_id, batch_name
@@ -253,7 +253,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
                     sum(d.cost) AS cost,
                     MIN(d.usage_start_time) AS usage_start_time,
                     max(d.usage_end_time) AS usage_end_time,
-                    COUNT(DISTINCT d.job_id) as jobs_cnt
+                    MAX(d.job_id) as jobs_cnt
                 FROM d
                 WHERE d.wdl_task_name IS NOT NULL
                 GROUP BY wdl_task_name
@@ -283,7 +283,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
                     sum(d.cost) AS cost,
                     MIN(d.usage_start_time) AS usage_start_time,
                     max(d.usage_end_time) AS usage_end_time,
-                    COUNT(DISTINCT d.job_id) as jobs_cnt
+                    MAX(d.job_id) as jobs_cnt
                 FROM d
                 WHERE d.cromwell_workflow_id IS NOT NULL
                 GROUP BY cromwell_workflow_id
@@ -313,7 +313,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
                     sum(d.cost) AS cost,
                     MIN(d.usage_start_time) AS usage_start_time,
                     max(d.usage_end_time) AS usage_end_time,
-                    COUNT(DISTINCT d.job_id) as jobs_cnt
+                    MAX(d.job_id) as jobs_cnt
                 FROM d
                 WHERE d.cromwell_sub_workflow_name IS NOT NULL
                 GROUP BY cromwell_sub_workflow_name
