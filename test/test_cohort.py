@@ -234,6 +234,50 @@ class TestCohortData(DbIsolatedTest):
         self.sgC_raw = self.sC.sequencing_groups[0].id
 
     @run_as_sync
+    async def test_internal_external(self):
+        """Test to_internal() methods"""
+        cc_external_dict = {
+            'projects': ['test'],
+            'sg_ids_internal': [self.sgB, self.sgC],
+            'excluded_sgs_internal': [self.sgA],
+            'sg_technology': ['short-read'],
+            'sg_platform': ['illumina'],
+            'sg_type': ['genome'],
+            'sample_type': ['blood'],
+        }
+
+        cc_internal_dict = {
+            'projects': [self.project_id],
+            'sg_ids_internal_raw': [self.sgB_raw, self.sgC_raw],
+            'excluded_sgs_internal_raw': [self.sgA_raw],
+            'sg_technology': ['short-read'],
+            'sg_platform': ['illumina'],
+            'sg_type': ['genome'],
+            'sample_type': ['blood'],
+        }
+
+        cc_external = CohortCriteria(**cc_external_dict)
+        cc_internal = cc_external.to_internal(projects_internal=[self.project_id])
+        self.assertIsInstance(cc_internal, CohortCriteriaInternal)
+        self.assertDictEqual(cc_internal.dict(), cc_internal_dict)
+
+        ctpl_internal_dict = {
+            'id': 496,
+            'name': 'My template',
+            'description': 'Testing template',
+            'criteria': cc_internal_dict,
+        }
+
+        ctpl_internal = CohortTemplate(
+            id=496,
+            name='My template',
+            description='Testing template',
+            criteria=cc_external,
+        ).to_internal(criteria_projects=[self.project_id])
+        self.assertIsInstance(ctpl_internal, CohortTemplateInternal)
+        self.assertDictEqual(ctpl_internal.dict(), ctpl_internal_dict)
+
+    @run_as_sync
     async def test_create_cohort_by_sgs(self):
         """Create cohort by selecting sequencing groups"""
         result = await self.cohortl.create_cohort_from_criteria(
@@ -241,10 +285,10 @@ class TestCohortData(DbIsolatedTest):
             description='Cohort with 1 SG',
             cohort_name='SG cohort 1',
             dry_run=False,
-            cohort_criteria=CohortCriteria(
-                projects=['test'],
-                sg_ids_internal=[self.sgB],
-            ).to_internal(projects_internal=[self.project_id]),
+            cohort_criteria=CohortCriteriaInternal(
+                projects=[self.project_id],
+                sg_ids_internal_raw=[self.sgB_raw],
+            ),
         )
         self.assertIsInstance(result.cohort_id, int)
         self.assertEqual([self.sgB_raw], result.sequencing_group_ids)
@@ -257,10 +301,10 @@ class TestCohortData(DbIsolatedTest):
             description='Cohort without 1 SG',
             cohort_name='SG cohort 2',
             dry_run=False,
-            cohort_criteria=CohortCriteria(
-                projects=['test'],
-                excluded_sgs_internal=[self.sgA],
-            ).to_internal(projects_internal=[self.project_id]),
+            cohort_criteria=CohortCriteriaInternal(
+                projects=[self.project_id],
+                excluded_sgs_internal_raw=[self.sgA_raw],
+            ),
         )
         self.assertIsInstance(result.cohort_id, int)
         self.assertEqual(2, len(result.sequencing_group_ids))
@@ -275,10 +319,10 @@ class TestCohortData(DbIsolatedTest):
             description='Short-read cohort',
             cohort_name='Tech cohort 1',
             dry_run=False,
-            cohort_criteria=CohortCriteria(
-                projects=['test'],
+            cohort_criteria=CohortCriteriaInternal(
+                projects=[self.project_id],
                 sg_technology=['short-read'],
-            ).to_internal(projects_internal=[self.project_id]),
+            ),
         )
         self.assertIsInstance(result.cohort_id, int)
         self.assertEqual(2, len(result.sequencing_group_ids))
@@ -293,10 +337,10 @@ class TestCohortData(DbIsolatedTest):
             description='ONT cohort',
             cohort_name='Platform cohort 1',
             dry_run=False,
-            cohort_criteria=CohortCriteria(
-                projects=['test'],
+            cohort_criteria=CohortCriteriaInternal(
+                projects=[self.project_id],
                 sg_platform=['ONT'],
-            ).to_internal(projects_internal=[self.project_id]),
+            ),
         )
         self.assertIsInstance(result.cohort_id, int)
         self.assertEqual([self.sgC_raw], result.sequencing_group_ids)
@@ -309,10 +353,10 @@ class TestCohortData(DbIsolatedTest):
             description='Genome cohort',
             cohort_name='Type cohort 1',
             dry_run=False,
-            cohort_criteria=CohortCriteria(
-                projects=['test'],
+            cohort_criteria=CohortCriteriaInternal(
+                projects=[self.project_id],
                 sg_type=['genome'],
-            ).to_internal(projects_internal=[self.project_id]),
+            ),
         )
         self.assertIsInstance(result.cohort_id, int)
         self.assertEqual(2, len(result.sequencing_group_ids))
@@ -327,10 +371,10 @@ class TestCohortData(DbIsolatedTest):
             description='Sample cohort',
             cohort_name='Sample cohort 1',
             dry_run=False,
-            cohort_criteria=CohortCriteria(
-                projects=['test'],
+            cohort_criteria=CohortCriteriaInternal(
+                projects=[self.project_id],
                 sample_type=['saliva'],
-            ).to_internal(projects_internal=[self.project_id]),
+            ),
         )
         self.assertIsInstance(result.cohort_id, int)
         self.assertEqual([self.sgC_raw], result.sequencing_group_ids)
@@ -343,15 +387,15 @@ class TestCohortData(DbIsolatedTest):
             description='Everything cohort',
             cohort_name='Everything cohort 1',
             dry_run=False,
-            cohort_criteria=CohortCriteria(
-                projects=['test'],
-                sg_ids_internal=[self.sgB, self.sgC],
-                excluded_sgs_internal=[self.sgA],
+            cohort_criteria=CohortCriteriaInternal(
+                projects=[self.project_id],
+                sg_ids_internal_raw=[self.sgB_raw, self.sgC_raw],
+                excluded_sgs_internal_raw=[self.sgA_raw],
                 sg_technology=['short-read'],
                 sg_platform=['illumina'],
                 sg_type=['genome'],
                 sample_type=['blood'],
-            ).to_internal(projects_internal=[self.project_id]),
+            ),
         )
         self.assertEqual(1, len(result.sequencing_group_ids))
         self.assertIn(self.sgB_raw, result.sequencing_group_ids)
@@ -361,15 +405,15 @@ class TestCohortData(DbIsolatedTest):
         """Add another sample, then reevaluate a cohort template"""
         template = await self.cohortl.create_cohort_template(
             project=self.project_id,
-            cohort_template=CohortTemplate(
+            cohort_template=CohortTemplateInternal(
                 id=None,
                 name='Blood template',
                 description='Template selecting blood',
-                criteria=CohortCriteria(
-                    projects=['test'],
+                criteria=CohortCriteriaInternal(
+                    projects=[self.project_id],
                     sample_type=['blood'],
                 ),
-            ).to_internal(criteria_projects=[self.project_id]),
+            ),
         )
 
         coh1 = await self.cohortl.create_cohort_from_criteria(
@@ -404,10 +448,10 @@ class TestCohortData(DbIsolatedTest):
             description='Cohort with two samples',
             cohort_name='Duo cohort',
             dry_run=False,
-            cohort_criteria=CohortCriteria(
-                projects=['test'],
-                sg_ids_internal=[self.sgA, self.sgB],
-            ).to_internal(projects_internal=[self.project_id]),
+            cohort_criteria=CohortCriteriaInternal(
+                projects=[self.project_id],
+                sg_ids_internal_raw=[self.sgA_raw, self.sgB_raw],
+            ),
         )
         self.assertEqual(2, len(created.sequencing_group_ids))
 
