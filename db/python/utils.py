@@ -237,18 +237,16 @@ class GenericFilterModel:
         """
         Returns False if any of the internal filters is FALSE
         """
-        return any(
-            (
-                getattr(self, field.name).is_false()
-                if isinstance(getattr(self, field.name), GenericFilter)
-                else any(
-                    getattr(self, field.name).is_false()
-                    for field in dataclasses.fields(getattr(self, field.name))
-                )
-            )
-            for field in dataclasses.fields(self)
-            if getattr(self, field.name) is not None
-        )
+        for field in dataclasses.fields(self):
+            value = getattr(self, field.name)
+            if isinstance(value, GenericFilter) and value.is_false():
+                return True
+
+            if isinstance(value, dict):
+                if any(f.is_false() for f in value.values()):
+                    return True
+
+        return False
 
     def __post_init__(self):
         for field in dataclasses.fields(self):
