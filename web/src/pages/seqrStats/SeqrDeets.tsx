@@ -1,7 +1,10 @@
+// SeqrDeets.tsx
 import React, { useState, useEffect } from 'react'
 import { SeqrProjectsDetails, ProjectApi, SeqrProjectsStatsApi, EnumsApi } from '../../sm-api'
 import ProjectAndSeqTypeSelector from './ProjectAndSeqTypeSelector'
 import SeqrProjectsDetailsTable from './SeqrProjectsDetailsTable'
+import RowIdFilterModal from './SearchAndFilterModals'
+import { Button } from 'semantic-ui-react'
 
 interface SelectedProject {
     id: number
@@ -17,6 +20,18 @@ const SeqrDeets: React.FC = () => {
     // New state for sequencing types
     const [seqTypes, setSeqTypes] = React.useState<string[]>([])
     const [selectedSeqTypes, setSelectedSeqTypes] = React.useState<string[]>([])
+    // All the filters users can apply to the data
+    const [selectedFamilyIds, setSelectedFamilyIds] = React.useState<string[]>([])
+    const [selectedFamilyExtIds, setSelectedFamilyExtIds] = React.useState<string[]>([])
+    const [selectedParticipantIds, setSelectedParticipantIds] = React.useState<string[]>([])
+    const [selectedParticipantExtIds, setSelectedParticipantExtIds] = React.useState<string[]>([])
+    const [selectedSampleIds, setSelectedSampleIds] = React.useState<string[]>([])
+    const [selectedSampleExtIds, setSelectedSampleExtIds] = React.useState<string[]>([])
+    const [selectedSequencingGroupIds, setSelectedSequencingGroupIds] = React.useState<string[]>([])
+    const [selectedCompletedCram, setSelectedCompletedCram] = React.useState<string[]>([])
+    const [selectedInLatestAnnotateDataset, setSelectedInLatestAnnotateDataset] = React.useState<string[]>([])
+    const [selectedInLatestSnvEsIndex, setSelectedInLatestSnvEsIndex] = React.useState<string[]>([])
+    const [selectedInLatestSvEsIndex, setSelectedInLatestSvEsIndex] = React.useState<string[]>([])
 
     useEffect(() => {
         Promise.all([
@@ -86,7 +101,8 @@ const SeqrDeets: React.FC = () => {
     const filteredData = allData.filter(
         (item) =>
             selectedProjects.some((p) => p.name === item.dataset) &&
-            selectedSeqTypes.includes(item.sequencing_type) 
+            selectedSeqTypes.includes(item.sequencing_type) &&
+            (selectedFamilyExtIds.length === 0 || selectedFamilyExtIds.includes(item.family_ext_id))
             // && (item.family_id === null || item.family_id === '')
     )
 
@@ -103,6 +119,11 @@ const SeqrDeets: React.FC = () => {
                 onProjectChange={handleProjectChange}
                 onSeqTypeChange={handleSeqTypeChange}
             />
+            <Button onClick={() => RowIdFilterModal }>
+                Filter by Family Ext ID
+            </Button> 
+
+            {/* <RowIdFilterModal rowIds={filteredData.map((item) => item.family_ext_id)} selectedRowIds={selectedFamilyExtIds} onSelectionChange={setSelectedFamilyExtIds} onClose={() => {}} /> */}
             <SeqrProjectsDetailsTable filteredData={filteredData}> </SeqrProjectsDetailsTable>
         </div>
     )

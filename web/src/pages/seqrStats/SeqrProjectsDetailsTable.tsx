@@ -35,17 +35,27 @@ const DetailsTableRow: React.FC<{ details: SeqrProjectsDetails }> = ({ details }
             <Table.Cell className="dataset-cell">{details.dataset}</Table.Cell>
             <Table.Cell className="table-cell">{details.sequencing_type}</Table.Cell>
             <Table.Cell className="table-cell">{details.sample_type}</Table.Cell>
+            <Table.Cell className="table-cell">{details.sequencing_group_id}</Table.Cell>
             <Table.Cell className="table-cell">{details.family_id}</Table.Cell>
             <Table.Cell className="table-cell">{details.family_ext_id}</Table.Cell>
             <Table.Cell className="table-cell">{details.participant_id}</Table.Cell>
             <Table.Cell className="table-cell">{details.participant_ext_id}</Table.Cell>
             <Table.Cell className="table-cell">{details.sample_id}</Table.Cell>
             <Table.Cell className="table-cell">{details.sample_ext_ids}</Table.Cell>
-            <Table.Cell className="table-cell">{details.completed_cram}</Table.Cell>
-            <Table.Cell className="table-cell">{details.in_latest_annotate_dataset}</Table.Cell>
-            <Table.Cell className="table-cell">{details.in_latest_snv_es_index}</Table.Cell>
-            <Table.Cell className="table-cell">{details.in_latest_sv_es_index}</Table.Cell>
-            <Table.Cell className="table-cell">{details.sequencing_group_report_links}</Table.Cell>
+            <Table.Cell className="table-cell">{
+                details.completed_cram ? 'Yes' : 'No'
+            }</Table.Cell>
+            <Table.Cell className="table-cell">{
+                details.in_latest_annotate_dataset ? 'Yes' : 'No'
+            }</Table.Cell>
+            <Table.Cell className="table-cell">{
+                details.in_latest_snv_es_index ? 'Yes' : 'No'
+            }</Table.Cell>
+            <Table.Cell className="table-cell">{
+                details.in_latest_sv_es_index ? 'Yes' : 'No'
+            }</Table.Cell>
+            <Table.Cell className="table-cell">{details.sequencing_group_report_links?.stripy}</Table.Cell>
+            <Table.Cell className="table-cell">{details.sequencing_group_report_links?.mito}</Table.Cell>
         </Table.Row>
     )
 }
@@ -181,10 +191,7 @@ const DetailsTable: React.FC<DetailsTableProps> = ({ filteredData }) => {
                     >
                         In latest SV ES-Index
                     </Table.HeaderCell>
-                    <Table.HeaderCell className="header-cell"
-                        sorted={sortColumn === 'sequencing_group_report_links' ? sortDirection : undefined}
-                        onClick={() => handleSort('sequencing_group_report_links')}
-                    >
+                    <Table.HeaderCell className="header-cell">
                         Sequencing Group Report Links
                     </Table.HeaderCell>
                 </Table.Row>
