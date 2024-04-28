@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import datetime
 from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.layers import AnalysisLayer, SampleLayer, SequencingGroupLayer
@@ -202,31 +202,34 @@ class TestSequencingGroup(DbIsolatedTest):
         sample_to_insert = get_sample_model()
         await self.slayer.upsert_sample(sample_to_insert)
 
+        # There's a race condition here -- don't run this near UTC midnight!
+        today = datetime.utcnow().date()
+
         # Query for sequencing group with creation date before today
         sgs = await self.sglayer.query(
-            SequencingGroupFilter(created_on=GenericFilter(lt=date.today()))
+            SequencingGroupFilter(created_on=GenericFilter(lt=today))
         )
         self.assertEqual(len(sgs), 0)
 
         # Query for sequencing group with creation date today
         sgs = await self.sglayer.query(
-            SequencingGroupFilter(created_on=GenericFilter(eq=date.today()))
+            SequencingGroupFilter(created_on=GenericFilter(eq=today))
         )
         self.assertEqual(len(sgs), 1)
 
         sgs = await self.sglayer.query(
-            SequencingGroupFilter(created_on=GenericFilter(lte=date.today()))
+            SequencingGroupFilter(created_on=GenericFilter(lte=today))
         )
         self.assertEqual(len(sgs), 1)
 
         sgs = await self.sglayer.query(
-            SequencingGroupFilter(created_on=GenericFilter(gte=date.today()))
+            SequencingGroupFilter(created_on=GenericFilter(gte=today))
         )
         self.assertEqual(len(sgs), 1)
 
         # Query for sequencing group with creation date today
         sgs = await self.sglayer.query(
-            SequencingGroupFilter(created_on=GenericFilter(gt=date.today()))
+            SequencingGroupFilter(created_on=GenericFilter(gt=today))
         )
         self.assertEqual(len(sgs), 0)
 
