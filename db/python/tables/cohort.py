@@ -90,7 +90,7 @@ class CohortTable(DbBase):
 
     async def query_cohort_templates(
         self, filter_: CohortTemplateFilter
-    ) -> tuple[list[CohortTemplateInternal], set[ProjectId]]:
+    ) -> tuple[set[ProjectId], list[CohortTemplateInternal]]:
         """Query CohortTemplates"""
         wheres, values = filter_.to_sql(field_overrides={})
         if not wheres:
@@ -106,7 +106,7 @@ class CohortTable(DbBase):
         rows = await self.connection.fetch_all(_query, values)
         cohort_templates = [CohortTemplateInternal.from_db(dict(row)) for row in rows]
         projects = {c.project for c in cohort_templates}
-        return cohort_templates, projects
+        return projects, cohort_templates
 
     async def get_cohort_template(self, template_id: int) -> CohortTemplateInternal:
         """

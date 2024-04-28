@@ -87,7 +87,10 @@ class CohortLayer(BaseLayer):
         self, filter_: CohortTemplateFilter, check_project_ids: bool = True
     ) -> list[CohortTemplateInternal]:
         """Query CohortTemplates"""
-        cohort_templates, project_ids = await self.ct.query_cohort_templates(filter_)
+        project_ids, cohort_templates = await self.ct.query_cohort_templates(filter_)
+
+        if not cohort_templates:
+            return []
 
         if check_project_ids:
             await self.pt.get_and_check_access_to_projects_for_ids(
