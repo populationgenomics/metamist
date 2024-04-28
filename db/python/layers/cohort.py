@@ -219,7 +219,7 @@ class CohortLayer(BaseLayer):
 
             return NewCohortInternal(
                 dry_run=True,
-                cohort_id=template_id,
+                cohort_id=None,
                 sequencing_group_ids=sg_ids,
             )
         # 2. Create cohort template, if required.
