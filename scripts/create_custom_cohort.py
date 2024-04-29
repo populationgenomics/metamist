@@ -28,7 +28,7 @@ def main(
         sg_technology=sg_technologies or [],
         sg_platform=sg_platforms or [],
         sg_type=sg_types or [],
-        sample_types=sample_types or [],
+        sample_type=sample_types or [],
     )
 
     cohort = capi.create_cohort_from_criteria(

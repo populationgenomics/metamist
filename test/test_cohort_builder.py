@@ -29,7 +29,10 @@ class TestCohortBuilder(DbIsolatedTest):
     @patch('metamist.apis.CohortApi.create_cohort_from_criteria')
     async def test_empty_main(self, mock):
         """Test main with no criteria"""
-        mock.return_value = {'cohort_id': 'COH1', 'sequencing_group_ids': ['SG1', 'SG2']}
+        mock.return_value = {
+            'cohort_id': 'COH1',
+            'sequencing_group_ids': ['SG1', 'SG2'],
+        }
         main(
             project='greek-myth',
             cohort_body_spec=CohortBody(name='Empty cohort', description='No criteria'),
@@ -51,7 +54,9 @@ class TestCohortBuilder(DbIsolatedTest):
         mock.return_value = {'cohort_id': 'COH2', 'sequencing_group_ids': ['SG3']}
         main(
             project='greek-myth',
-            cohort_body_spec=CohortBody(name='Epic cohort', description='Every criterion'),
+            cohort_body_spec=CohortBody(
+                name='Epic cohort', description='Every criterion'
+            ),
             projects=['alpha', 'beta'],
             sg_ids_internal=['SG3'],
             excluded_sg_ids=['SG1', 'SG2'],
@@ -77,6 +82,6 @@ class TestCohortBuilder(DbIsolatedTest):
         self.assertListEqual(criteria.sg_technology, ['short-read'])
         self.assertListEqual(criteria.sg_platform, ['illumina'])
         self.assertListEqual(criteria.sg_type, ['genome'])
-        self.assertListEqual(criteria.sample_types, ['blood'])
+        self.assertListEqual(criteria.sample_type, ['blood'])
 
         self.assertFalse(body['dry_run'])
