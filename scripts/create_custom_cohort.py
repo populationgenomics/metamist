@@ -41,10 +41,11 @@ def main(
     )
 
     print(f'Awesome! You have created a custom cohort {cohort}')
+    return cohort
 
 
 def get_cohort_spec(
-    cohort_name: str, cohort_description: str, cohort_template_id: str
+    cohort_name: str | None, cohort_description: str | None, cohort_template_id: str | None
 ) -> CohortBody:
     """Get the cohort spec"""
 
