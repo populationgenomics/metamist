@@ -607,7 +607,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         f_name: str,
         docker_image_url: str,
         sa: gcp.serviceaccount.Account,
-        custom_audiences: list[str] | None
+        custom_audiences: list[str] | None,
     ):
         """
         Create External Function with custom audiences
@@ -629,13 +629,14 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                             limits={
                                 'cpu': '1',
                                 'memory': '2Gi',
-                            }
+                            },
                         ),
                         envs=[
                             gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
                                 name=k,
                                 value=v,
-                            ) for k, v in self._etl_get_env().items()
+                            )
+                            for k, v in self._etl_get_env().items()
                         ],
                     )
                 ],
@@ -731,7 +732,9 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             self.config.metamist.etl.custom_audience_list
             and self.config.metamist.etl.custom_audience_list.get(f_name)
         ):
-            custom_audience_list = self.config.metamist.etl.custom_audience_list.get(f_name)
+            custom_audience_list = self.config.metamist.etl.custom_audience_list.get(
+                f_name
+            )
 
         fxn = gcp.cloudfunctionsv2.Function(
             f'metamist-etl-{f_name}',
