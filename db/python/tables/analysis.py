@@ -277,7 +277,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 else:
                     retvals[key] = AnalysisInternal.from_db(**dict(row))
 
-            if retvals.keys():
+            if retvals:
                 _query_sg_ids = """
                 SELECT sequencing_group_id, analysis_id
                 FROM analysis_sequencing_group
@@ -310,17 +310,18 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 else:
                     retvals[key] = AnalysisInternal.from_db(**dict(row))
 
-            _query_cohort_ids = """
-            SELECT analysis_id, cohort_id
-            FROM analysis_cohort
-            WHERE analysis_id IN :analysis_ids;
-            """
-            cohort_ids = await self.connection.fetch_all(
-                _query_cohort_ids, {'analysis_ids': list(retvals.keys())}
-            )
+            if retvals:
+                _query_cohort_ids = """
+                SELECT analysis_id, cohort_id
+                FROM analysis_cohort
+                WHERE analysis_id IN :analysis_ids
+                """
+                cohort_ids = await self.connection.fetch_all(
+                    _query_cohort_ids, {'analysis_ids': list(retvals.keys())}
+                )
 
-            for row in cohort_ids:
-                retvals[row['analysis_id']].cohort_ids.append(row['cohort_id'])
+                for row in cohort_ids:
+                    retvals[row['analysis_id']].cohort_ids.append(row['cohort_id'])
 
         return list(retvals.values())
 

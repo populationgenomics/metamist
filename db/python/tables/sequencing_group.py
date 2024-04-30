@@ -68,6 +68,9 @@ class SequencingGroupTable(DbBase):
         self, filter_: SequencingGroupFilter
     ) -> tuple[set[ProjectId], list[SequencingGroupInternal]]:
         """Query samples"""
+        if filter_.is_false():
+            return set(), []
+
         sql_overrides = {
             'project': 's.project',
             'sample_id': 'sg.sample_id',
@@ -264,9 +267,9 @@ class SequencingGroupTable(DbBase):
         WHERE project = :project
         """
         rows = await self.connection.fetch_all(_query, {'project': self.project})
-        sequencing_group_ids_by_sample_ids_by_type: dict[
-            int, dict[str, list[int]]
-        ] = defaultdict(lambda: defaultdict(list))
+        sequencing_group_ids_by_sample_ids_by_type: dict[int, dict[str, list[int]]] = (
+            defaultdict(lambda: defaultdict(list))
+        )
         for row in rows:
             sample_id = row['sid']
             sg_id = row['sgid']

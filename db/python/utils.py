@@ -155,6 +155,12 @@ class GenericFilter(Generic[T]):
         """
         return NONFIELD_CHARS_REGEX.sub('_', name)
 
+    def is_false(self) -> bool:
+        """
+        The filter will resolve to False (usually because the in_ is an empty list)
+        """
+        return self.in_ is not None and len(self.in_) == 0
+
     def to_sql(
         self, column: str, column_name: str = None
     ) -> tuple[str, dict[str, T | list[T]]]:
@@ -170,6 +176,9 @@ class GenericFilter(Generic[T]):
             conditionals.append(f'{column} = :{k}')
             values[k] = self._sql_value_prep(self.eq)
         if self.in_ is not None:
+            if len(self.in_) == 0:
+                # in an empty list is always false
+                return 'FALSE', {}
             if not isinstance(self.in_, list):
                 raise ValueError('IN filter must be a list')
             if len(self.in_) == 1:
@@ -180,7 +189,8 @@ class GenericFilter(Generic[T]):
                 k = self.generate_field_name(_column_name + '_in')
                 conditionals.append(f'{column} IN :{k}')
                 values[k] = self._sql_value_prep(self.in_)
-        if self.nin is not None:
+        if self.nin is not None and len(self.nin) > 0:
+            # not in an empty list is always true
             if not isinstance(self.nin, list):
                 raise ValueError('NIN filter must be a list')
             k = self.generate_field_name(column + '_nin')
@@ -208,9 +218,10 @@ class GenericFilter(Generic[T]):
             conditionals.append(f'{column} LIKE :{k}')
             values[k] = self._sql_value_prep(f'%{search_term}%')
         if self.icontains is not None:
+            search_term = escape_like_term(str(self.icontains))
             k = self.generate_field_name(column + '_icontains')
             conditionals.append(f'LOWER({column}) LIKE LOWER(:{k})')
-            values[k] = self._sql_value_prep(f'%{self.icontains}%')
+            values[k] = self._sql_value_prep(f'%{search_term}%')
 
         return ' AND '.join(conditionals), values
 
@@ -240,6 +251,21 @@ class GenericFilterModel:
     def __hash__(self):
         """Hash the GenericFilterModel, this doesn't override well"""
         return hash(dataclasses.astuple(self))
+
+    def is_false(self) -> bool:
+        """
+        Returns False if any of the internal filters is FALSE
+        """
+        for field in dataclasses.fields(self):
+            value = getattr(self, field.name)
+            if isinstance(value, GenericFilter) and value.is_false():
+                return True
+
+            if isinstance(value, dict):
+                if any(f.is_false() for f in value.values()):
+                    return True
+
+        return False
 
     def __post_init__(self):
         for field in dataclasses.fields(self):
@@ -280,6 +306,9 @@ class GenericFilterModel:
         exclude: list[str] | None = None,
     ) -> tuple[str, dict[str, Any]]:
         """Convert the model to SQL, and avoid SQL injection"""
+        if self.is_false():
+            return 'FALSE', {}
+
         _foverrides = field_overrides or {}
 
         # check for bad field_overrides
