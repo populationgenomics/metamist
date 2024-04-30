@@ -218,9 +218,10 @@ class GenericFilter(Generic[T]):
             conditionals.append(f'{column} LIKE :{k}')
             values[k] = self._sql_value_prep(f'%{search_term}%')
         if self.icontains is not None:
+            search_term = escape_like_term(str(self.icontains))
             k = self.generate_field_name(column + '_icontains')
             conditionals.append(f'LOWER({column}) LIKE LOWER(:{k})')
-            values[k] = self._sql_value_prep(f'%{self.icontains}%')
+            values[k] = self._sql_value_prep(f'%{search_term}%')
 
         return ' AND '.join(conditionals), values
 
