@@ -112,7 +112,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--sample_type', required=False, type=list[str], help='sample type'
     )
-    parser.add_argument('--dry_run', required=False, type=bool, help='Dry run mode')
+    parser.add_argument('--dry-run', '--dry_run', action='store_true', help='Dry run mode')
 
     args = parser.parse_args()
 
