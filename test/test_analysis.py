@@ -155,6 +155,7 @@ class TestAnalysis(DbIsolatedTest):
                 type='analysis-runner',
                 status=AnalysisStatus.UNKNOWN,
                 sequencing_group_ids=[],
+                cohort_ids=[],
                 output=None,
                 timestamp_completed=None,
                 project=1,

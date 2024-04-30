@@ -79,6 +79,7 @@ class NoProjectAccess(Forbidden):
         )
 
 
+# pylint: disable=too-many-instance-attributes
 class GenericFilter(Generic[T]):
     """
     Generic filter for eq, in_ (in) and nin (not in)
@@ -91,6 +92,8 @@ class GenericFilter(Generic[T]):
     gte: T | None = None
     lt: T | None = None
     lte: T | None = None
+    contains: T | None = None
+    icontains: T | None = None
 
     def __init__(
         self,
@@ -102,6 +105,8 @@ class GenericFilter(Generic[T]):
         gte: T | None = None,
         lt: T | None = None,
         lte: T | None = None,
+        contains: T | None = None,
+        icontains: T | None = None,
     ):
         self.eq = eq
         self.in_ = in_
@@ -110,9 +115,11 @@ class GenericFilter(Generic[T]):
         self.gte = gte
         self.lt = lt
         self.lte = lte
+        self.contains = contains
+        self.icontains = icontains
 
     def __repr__(self):
-        keys = ['eq', 'in_', 'nin', 'gt', 'gte', 'lt', 'lte']
+        keys = ['eq', 'in_', 'nin', 'gt', 'gte', 'lt', 'lte', 'contains', 'icontains']
         inner_values = ', '.join(
             f'{k}={getattr(self, k)!r}' for k in keys if getattr(self, k) is not None
         )
@@ -129,6 +136,8 @@ class GenericFilter(Generic[T]):
                 self.gte,
                 self.lt,
                 self.lte,
+                self.contains,
+                self.icontains,
             )
         )
 
@@ -203,6 +212,16 @@ class GenericFilter(Generic[T]):
             k = self.generate_field_name(column + '_lte')
             conditionals.append(f'{column} <= :{k}')
             values[k] = self._sql_value_prep(self.lte)
+        if self.contains is not None:
+            search_term = escape_like_term(str(self.contains))
+            k = self.generate_field_name(column + '_contains')
+            conditionals.append(f'{column} LIKE :{k}')
+            values[k] = self._sql_value_prep(f'%{search_term}%')
+        if self.icontains is not None:
+            search_term = escape_like_term(str(self.icontains))
+            k = self.generate_field_name(column + '_icontains')
+            conditionals.append(f'LOWER({column}) LIKE LOWER(:{k})')
+            values[k] = self._sql_value_prep(f'%{search_term}%')
 
         return ' AND '.join(conditionals), values
 
@@ -281,7 +300,10 @@ class GenericFilterModel:
                 setattr(self, field.name, GenericFilter(eq=value))
 
     def to_sql(
-        self, field_overrides: dict[str, str] = None
+        self,
+        field_overrides: dict[str, str] = None,
+        only: list[str] | None = None,
+        exclude: list[str] | None = None,
     ) -> tuple[str, dict[str, Any]]:
         """Convert the model to SQL, and avoid SQL injection"""
         if self.is_false():
@@ -301,6 +323,11 @@ class GenericFilterModel:
         fields = dataclasses.fields(self)
         conditionals, values = [], {}
         for field in fields:
+            if only and field.name not in only:
+                continue
+            if exclude and field.name in exclude:
+                continue
+
             fcolumn = _foverrides.get(field.name, field.name)
             if filter_ := getattr(self, field.name):
                 if isinstance(filter_, dict):
@@ -400,3 +427,11 @@ def split_generic_terms(string: str) -> list[str]:
     filenames = [f for f in filenames if f]
 
     return filenames
+
+
+def escape_like_term(query: str):
+    """
+    Escape meaningful keys when using LIKE with a user supplied input
+    """
+
+    return query.replace('%', '\\%').replace('_', '\\_')
