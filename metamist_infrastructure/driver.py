@@ -605,19 +605,13 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
     def _etl_external_function(
         self,
         f_name: str,
-        fxn: gcp.cloudfunctionsv2.Function,
+        docker_image_url: str,
         sa: gcp.serviceaccount.Account,
         custom_audiences: list[str] | None
     ):
-        docker_image_url = pulumi.Output.all(
-            self.config.gcp.region,
-            self.config.metamist.gcp.project,
-            fxn.name,
-        ).apply(
-            lambda args: f"{args[0]}-docker.pkg.dev/{args[1]}/gcf-artifacts/{args[2].replace('-','--')}:latest"
-        )
-
-        # Define the Cloud Run Service (v2)
+        """
+        Create External Function with custom audiences
+        """
         return gcp.cloudrunv2.Service(
             f'metamist-etl-{f_name}-external',
             name=f'metamist-etl-{f_name}-external',
@@ -656,6 +650,9 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         )
 
     def _etl_get_env(self) -> dict:
+        """
+        Commnon environment to all the etl functions and services
+        """
         return {
             'BIGQUERY_TABLE': pulumi.Output.concat(
                 self.etl_bigquery_table.project,
@@ -776,10 +773,18 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         )
 
         if custom_audience_list:
+            # prepare docker image url
+            docker_image_url = pulumi.Output.all(
+                self.config.gcp.region,
+                self.config.metamist.gcp.project,
+                fxn.name,
+            ).apply(
+                lambda args: f"{args[0]}-docker.pkg.dev/{args[1]}/gcf-artifacts/{args[2].replace('-','--')}:latest"
+            )
             # create external cloud run with custom domain
             self._etl_external_function(
                 f_name,
-                fxn,
+                docker_image_url,
                 sa,
                 custom_audience_list,
             )
