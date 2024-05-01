@@ -15,6 +15,7 @@ from db.python.tables.assay import AssayTable
 from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sequencing_group import SequencingGroupTable
+from db.python.utils import escape_like_term
 from models.models import (
     AssayInternal,
     FamilySimpleInternal,
@@ -75,7 +76,7 @@ class WebDb(DbBase):
                 # double double quote field to allow white space
                 q = f'JSON_VALUE({prefix}.meta, "$.""{field}""") LIKE :{key}'  # noqa: B028
             wheres.append(q)
-            values[key] = self.escape_like_term(value) + '%'
+            values[key] = escape_like_term(value) + '%'
         if wheres:
             where_str = 'WHERE ' + ' AND '.join(wheres)
 

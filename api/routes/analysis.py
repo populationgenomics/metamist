@@ -114,6 +114,9 @@ async def create_analysis(
         # special tracking here, if we can't catch it through the header
         connection.on_behalf_of = analysis.author
 
+    if not analysis.sequencing_group_ids and not analysis.cohort_ids:
+        raise ValueError('Must specify "sequencing_group_ids" or "cohort_ids"')
+
     analysis_id = await atable.create_analysis(
         analysis.to_internal(),
     )

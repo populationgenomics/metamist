@@ -602,6 +602,83 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             lambda args: f'https://{args[0]}-python.pkg.dev/{args[1]}/{args[2]}/simple/'
         )
 
+    def _etl_external_function(
+        self,
+        f_name: str,
+        docker_image_url: str,
+        sa: gcp.serviceaccount.Account,
+        custom_audiences: list[str] | None,
+    ):
+        """
+        Create External Function with custom audiences
+        """
+        return gcp.cloudrunv2.Service(
+            f'metamist-etl-{f_name}-external',
+            name=f'metamist-etl-{f_name}-external',
+            project=self.config.metamist.gcp.project,
+            location=self.config.gcp.region,
+            custom_audiences=custom_audiences,
+            ingress='INGRESS_TRAFFIC_ALL',
+            template=gcp.cloudrunv2.ServiceTemplateArgs(
+                containers=[
+                    gcp.cloudrunv2.ServiceTemplateContainerArgs(
+                        image=docker_image_url,
+                        resources=gcp.cloudrunv2.ServiceTemplateContainerResourcesArgs(
+                            cpu_idle=True,
+                            startup_cpu_boost=True,
+                            limits={
+                                'cpu': '1',
+                                'memory': '2Gi',
+                            },
+                        ),
+                        envs=[
+                            gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
+                                name=k,
+                                value=v,
+                            )
+                            for k, v in self._etl_get_env().items()
+                        ],
+                    )
+                ],
+                scaling=gcp.cloudrunv2.ServiceTemplateScalingArgs(
+                    max_instance_count=1,
+                    min_instance_count=0,
+                ),
+                timeout='540s',
+                service_account=sa.email,
+                max_instance_request_concurrency=1,
+            ),
+        )
+
+    def _etl_get_env(self) -> dict:
+        """
+        Commnon environment to all the etl functions and services
+        """
+        return {
+            'BIGQUERY_TABLE': pulumi.Output.concat(
+                self.etl_bigquery_table.project,
+                '.',
+                self.etl_bigquery_table.dataset_id,
+                '.',
+                self.etl_bigquery_table.table_id,
+            ),
+            'BIGQUERY_LOG_TABLE': pulumi.Output.concat(
+                self.etl_bigquery_log_table.project,
+                '.',
+                self.etl_bigquery_log_table.dataset_id,
+                '.',
+                self.etl_bigquery_log_table.table_id,
+            ),
+            'PUBSUB_TOPIC': self.etl_pubsub_topic.id,
+            'NOTIFICATION_PUBSUB_TOPIC': (
+                self.etl_slack_notification_topic.id
+                if self.etl_slack_notification_topic
+                else ''
+            ),
+            'SM_ENVIRONMENT': self.config.metamist.etl.environment,
+            'CONFIGURATION_SECRET': self.etl_configuration_secret_version.id,
+        }
+
     def _etl_function(
         self,
         f_name: str,
@@ -655,8 +732,8 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             self.config.metamist.etl.custom_audience_list
             and self.config.metamist.etl.custom_audience_list.get(f_name)
         ):
-            custom_audience_list = json.dumps(
-                self.config.metamist.etl.custom_audience_list.get(f_name)
+            custom_audience_list = self.config.metamist.etl.custom_audience_list.get(
+                f_name
             )
 
         fxn = gcp.cloudfunctionsv2.Function(
@@ -682,36 +759,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                 available_memory='2Gi',
                 available_cpu='1',
                 timeout_seconds=540,
-                environment_variables={
-                    # format: 'project.dataset.table_id
-                    'BIGQUERY_TABLE': pulumi.Output.concat(
-                        self.etl_bigquery_table.project,
-                        '.',
-                        self.etl_bigquery_table.dataset_id,
-                        '.',
-                        self.etl_bigquery_table.table_id,
-                    ),
-                    'BIGQUERY_LOG_TABLE': pulumi.Output.concat(
-                        self.etl_bigquery_log_table.project,
-                        '.',
-                        self.etl_bigquery_log_table.dataset_id,
-                        '.',
-                        self.etl_bigquery_log_table.table_id,
-                    ),
-                    'PUBSUB_TOPIC': self.etl_pubsub_topic.id,
-                    'NOTIFICATION_PUBSUB_TOPIC': (
-                        self.etl_slack_notification_topic.id
-                        if self.etl_slack_notification_topic
-                        else ''
-                    ),
-                    'SM_ENVIRONMENT': self.config.metamist.etl.environment,
-                    'CONFIGURATION_SECRET': self.etl_configuration_secret_version.id,
-                },  # type: ignore
-                annotations=(
-                    {'run.googleapis.com/custom-audiences': custom_audience_list}
-                    if custom_audience_list
-                    else None
-                ),
+                environment_variables=self._etl_get_env(),
                 ingress_settings='ALLOW_ALL',
                 all_traffic_on_latest_revision=True,
                 service_account_email=sa.email,
@@ -726,6 +774,23 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                 ]
             ),
         )
+
+        if custom_audience_list:
+            # prepare docker image url
+            docker_image_url = pulumi.Output.all(
+                self.config.gcp.region,
+                self.config.metamist.gcp.project,
+                fxn.name,
+            ).apply(
+                lambda args: f"{args[0]}-docker.pkg.dev/{args[1]}/gcf-artifacts/{args[2].replace('-','--')}:latest"
+            )
+            # create external cloud run with custom domain
+            self._etl_external_function(
+                f_name,
+                docker_image_url,
+                sa,
+                custom_audience_list,
+            )
 
         return fxn
 

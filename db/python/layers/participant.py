@@ -2,16 +2,24 @@
 import re
 from collections import defaultdict
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from db.python.layers.base import BaseLayer
 from db.python.layers.sample import SampleLayer
 from db.python.tables.family import FamilyTable
-from db.python.tables.family_participant import FamilyParticipantTable
+from db.python.tables.family_participant import (
+    FamilyParticipantFilter,
+    FamilyParticipantTable,
+)
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.participant_phenotype import ParticipantPhenotypeTable
 from db.python.tables.sample import SampleTable
-from db.python.utils import NoOpAenter, NotFoundError, split_generic_terms
+from db.python.utils import (
+    GenericFilter,
+    NoOpAenter,
+    NotFoundError,
+    split_generic_terms,
+)
 from models.models.family import PedRowInternal
 from models.models.participant import ParticipantInternal, ParticipantUpsertInternal
 from models.models.project import ProjectId
@@ -180,7 +188,7 @@ class SeqrMetadataKeys(Enum):
         )
 
     @staticmethod
-    def parse_hpo_terms(hpo_terms: str) -> List[str]:
+    def parse_hpo_terms(hpo_terms: str) -> list[str]:
         """
         Validate that comma-separated HPO terms must start with 'HP:'
 
@@ -264,8 +272,8 @@ class ParticipantLayer(BaseLayer):
     async def get_participants(
         self,
         project: int,
-        external_participant_ids: List[str] = None,
-        internal_participant_ids: List[int] = None,
+        external_participant_ids: list[str] | None = None,
+        internal_participant_ids: list[int] | None = None,
     ) -> list[ParticipantInternal]:
         """
         Get participants for a project
@@ -352,8 +360,8 @@ class ParticipantLayer(BaseLayer):
 
     async def generic_individual_metadata_importer(
         self,
-        headers: List[str],
-        rows: List[List[str]],
+        headers: list[str],
+        rows: list[list[str]],
         extra_participants_method: ExtraParticipantImporterHandler = ExtraParticipantImporterHandler.FAIL,
     ):
         """
@@ -449,8 +457,8 @@ class ParticipantLayer(BaseLayer):
             }
             missing_family_ids = external_family_ids - set(fmap_by_external.keys())
 
-            family_persons_to_insert: List[Tuple[str, int]] = []
-            incompatible_familes: List[str] = []
+            family_persons_to_insert: list[tuple[str, int]] = []
+            incompatible_familes: list[str] = []
             for pid, external_family_id in provided_pid_to_external_family.items():
                 if pid in pid_to_internal_family:
                     # we know the family
@@ -489,11 +497,12 @@ class ParticipantLayer(BaseLayer):
                 formed_rows = [
                     PedRowInternal(
                         family_id=fmap_by_external[external_family_id],
-                        participant_id=pid,
+                        individual_id=pid,
                         affected=0,
                         maternal_id=None,
                         paternal_id=None,
                         notes=None,
+                        sex=None,
                     )
                     for external_family_id, pid in family_persons_to_insert
                 ]
@@ -530,10 +539,10 @@ class ParticipantLayer(BaseLayer):
 
     async def get_id_map_by_external_ids(
         self,
-        external_ids: List[str],
-        project: Optional[ProjectId],
+        external_ids: list[str],
+        project: ProjectId | None,
         allow_missing=False,
-    ) -> Dict[str, int]:
+    ) -> dict[str, int]:
         """Get participant ID map by external_ids"""
         id_map = await self.pttable.get_id_map_by_external_ids(
             external_ids, project=project
@@ -554,7 +563,7 @@ class ParticipantLayer(BaseLayer):
 
     async def get_external_participant_id_to_internal_sequencing_group_id_map(
         self, project: int, sequencing_type: str = None
-    ) -> List[Tuple[str, int]]:
+    ) -> list[tuple[str, int]]:
         """
         Get a map of {external_participant_id} -> {internal_sequencing_group_id}
         useful to matching joint-called samples in the matrix table to the participant
@@ -647,7 +656,7 @@ class ParticipantLayer(BaseLayer):
         return participants
 
     async def update_many_participant_external_ids(
-        self, internal_to_external_id: Dict[int, str], check_project_ids=True
+        self, internal_to_external_id: dict[int, str], check_project_ids=True
     ):
         """Update many participant external ids"""
         if check_project_ids:
@@ -679,13 +688,13 @@ class ParticipantLayer(BaseLayer):
         self,
         project: int,
         *,
-        internal_participant_ids: Optional[list[int]] = None,
-        external_participant_ids: Optional[List[str]] = None,
+        internal_participant_ids: list[int] | None = None,
+        external_participant_ids: list[str] | None = None,
         # pylint: disable=invalid-name
         replace_with_participant_external_ids=True,
         replace_with_family_external_ids=True,
     ) -> dict[str, Any]:
-        """Get seqr individual level metadata template as List[List[str]]"""
+        """Get seqr individual level metadata template as list[list[str]]"""
 
         # avoid circular imports
         # pylint: disable=import-outside-toplevel,cyclic-import,too-many-locals
@@ -738,7 +747,7 @@ class ParticipantLayer(BaseLayer):
         ]
         json_header_map = dict(zip(json_headers, headers))
         lheader_to_json = dict(zip(lheaders, json_headers))
-        rows: List[Dict[str, str]] = []
+        rows: list[dict[str, str]] = []
         for pid, d in pid_to_features.items():
             d[SeqrMetadataKeys.INDIVIDUAL_ID.value] = internal_to_external_pid_map.get(
                 pid, str(pid)
@@ -766,11 +775,29 @@ class ParticipantLayer(BaseLayer):
             'header_map': json_header_map,
         }
 
-    async def get_family_participant_data(self, family_id: int, participant_id: int):
+    async def get_family_participant_data(
+        self, family_id: int, participant_id: int, check_project_ids: bool = True
+    ) -> PedRowInternal:
         """Gets the family_participant row for a specific participant"""
         fptable = FamilyParticipantTable(self.connection)
 
-        return await fptable.get_row(family_id=family_id, participant_id=participant_id)
+        projects, rows = await fptable.query(
+            FamilyParticipantFilter(
+                family_id=GenericFilter(eq=family_id),
+                participant_id=GenericFilter(eq=participant_id),
+            )
+        )
+        if not rows:
+            raise NotFoundError(
+                f'Family participant row (family_id: {family_id}, '
+                f'participant_id: {participant_id}) not found'
+            )
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.author, projects, readonly=True
+            )
+
+        return rows[0]
 
     async def remove_participant_from_family(self, family_id: int, participant_id: int):
         """Deletes a participant from a family"""
@@ -851,22 +878,22 @@ class ParticipantLayer(BaseLayer):
 
     @staticmethod
     def _prepare_individual_metadata_insertable_rows(
-        storeable_keys: List[str],
-        lheaders_to_idx_map: Dict[str, int],
+        storeable_keys: list[str],
+        lheaders_to_idx_map: dict[str, int],
         participant_id_field_idx: int,
-        pid_map: Dict[str, int],
-        rows: List[List[str]],
+        pid_map: dict[str, int],
+        rows: list[list[str]],
     ):
         # do all the matching in lowercase space, but store in regular case space
         # pylint: disable=invalid-name
-        storeable_header_col_number_tuples: List[Tuple[str, int]] = [
+        storeable_header_col_number_tuples: list[tuple[str, int]] = [
             (k, lheaders_to_idx_map[k.lower()])
             for k in storeable_keys
             if k.lower() in lheaders_to_idx_map
         ]
 
-        # List of (PersonId, Key, value) to insert into the participant_phenotype table
-        insertable_rows: List[Tuple[int, str, Any]] = []
+        # list of (PersonId, Key, value) to insert into the participant_phenotype table
+        insertable_rows: list[tuple[int, str, Any]] = []
         parsers = {k.value: v for k, v in SeqrMetadataKeys.get_key_parsers().items()}
 
         hpo_col_indices = [
@@ -910,7 +937,7 @@ class ParticipantLayer(BaseLayer):
     # endregion PHENOTYPES / SEQR
 
     async def check_project_access_for_participants_families(
-        self, participant_ids: List[int], family_ids: List[int]
+        self, participant_ids: list[int], family_ids: list[int]
     ):
         """Checks user access for the projects associated with participant IDs and family IDs"""
         pprojects = await self.pttable.get_project_ids_for_participant_ids(
@@ -948,7 +975,7 @@ class ParticipantLayer(BaseLayer):
             return await self.add_participant_to_family(
                 family_id=new_family_id,
                 participant_id=participant_id,
-                paternal_id=fp_row['paternal_id'],
-                maternal_id=fp_row['maternal_id'],
-                affected=fp_row['affected'],
+                paternal_id=fp_row.paternal_id,
+                maternal_id=fp_row.maternal_id,
+                affected=fp_row.affected,
             )

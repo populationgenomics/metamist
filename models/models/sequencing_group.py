@@ -52,7 +52,15 @@ class SequencingGroupInternal(SMBase):
 
         _archived = kwargs.pop('archived', None)
         if _archived is not None:
-            _archived = _archived != b'\x00'
+            if isinstance(_archived, int):
+                _archived = _archived != 0
+            elif isinstance(_archived, bytes):
+                _archived = _archived != b'\x00'
+            else:
+                raise TypeError(
+                    f"Received type '{type(_archived)}' for SequencingGroup column 'archived'. "
+                    + "Allowed types are either 'int' or 'bytes'."
+                )
 
         return SequencingGroupInternal(**kwargs, archived=_archived, meta=meta)
 
