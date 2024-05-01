@@ -1,10 +1,32 @@
+import dataclasses
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set
 
 from db.python.tables.base import DbBase
-from db.python.utils import NotFoundError
+from db.python.utils import (
+    GenericFilter,
+    GenericFilterModel,
+    NotFoundError,
+    escape_like_term,
+)
 from models.models.family import FamilyInternal
 from models.models.project import ProjectId
+
+
+@dataclasses.dataclass
+class FamilyFilter(GenericFilterModel):
+    """Filter mode for querying Families
+
+    Args:
+        GenericFilterModel (_type_): _description_
+    """
+
+    id: GenericFilter[int] | None = None
+    external_id: GenericFilter[str] | None = None
+
+    project: GenericFilter[ProjectId] | None = None
+    participant_id: GenericFilter[int] | None = None
+    sample_id: GenericFilter[int] | None = None
 
 
 class FamilyTable(DbBase):
@@ -31,41 +53,53 @@ class FamilyTable(DbBase):
             )
         return projects
 
-    async def get_families(
-        self, project: int = None, participant_ids: List[int] = None
-    ) -> List[FamilyInternal]:
+    async def query(
+        self, filter_: FamilyFilter
+    ) -> tuple[set[ProjectId], list[FamilyInternal]]:
         """Get all families for some project"""
         _query = """
-            SELECT id, external_id, description, coded_phenotype, project
-            FROM family
+            SELECT f.id, f.external_id, f.description, f.coded_phenotype, f.project
+            FROM family f
         """
 
-        values: Dict[str, Any] = {'project': project or self.project}
-        where: List[str] = []
+        if not filter_.project and not filter_.id:
+            raise ValueError('Project or ID filter is required for family queries')
 
-        if participant_ids:
+        field_overrides = {'id': 'f.id', 'external_id': 'f.external_id'}
+
+        if filter_.participant_id:
+            field_overrides['participant_id'] = 'fp.participant_id'
+            has_participant_join = True
             _query += """
-                JOIN family_participant
-                ON family.id = family_participant.family_id
+                JOIN family_participant fp ON family.id = fp.family_id
             """
-            where.append('participant_id IN :pids')
-            values['pids'] = participant_ids
 
-        if project or self.project:
-            where.append('project = :project')
+        if filter_.sample_id:
+            field_overrides['sample_id'] = 's.id'
+            if not has_participant_join:
+                _query += """
+                    JOIN family_participant fp ON family.id = fp.family_id
+                """
 
-        if where:
-            _query += 'WHERE ' + ' AND '.join(where)
+            _query += """
+                INNER JOIN sample s ON fp.participant_id = s.participant_id
+            """
+
+        wheres, values = filter_.to_sql(field_overrides)
+        if wheres:
+            _query += f'WHERE {wheres}'
 
         rows = await self.connection.fetch_all(_query, values)
         seen = set()
         families = []
+        projects: set[ProjectId] = set()
         for r in rows:
             if r['id'] not in seen:
+                projects.add(r['project'])
                 families.append(FamilyInternal.from_db(dict(r)))
                 seen.add(r['id'])
 
-        return families
+        return projects, families
 
     async def get_families_by_participants(
         self, participant_ids: list[int]
@@ -90,47 +124,6 @@ class FamilyTable(DbBase):
 
         return projects, ret_map
 
-    async def get_family_by_external_id(
-        self, external_id: str, project: ProjectId = None
-    ):
-        """Get single family by external ID (requires project)"""
-        _query = """
-        SELECT id, external_id, description, coded_phenotype, project
-        FROM family
-        WHERE project = :project AND external_id = :external_id
-        """
-        row = await self.connection.fetch_one(
-            _query, {'project': project or self.project, 'external_id': external_id}
-        )
-        return FamilyInternal.from_db(row)
-
-    async def get_family_by_internal_id(
-        self, family_id: int
-    ) -> tuple[ProjectId, FamilyInternal]:
-        """Get family (+ project) by internal ID"""
-        _query = """
-        SELECT id, external_id, description, coded_phenotype, project
-        FROM family WHERE id = :fid
-        """
-        row = await self.connection.fetch_one(_query, {'fid': family_id})
-        if not row:
-            raise NotFoundError
-        project = row['project']
-        return project, FamilyInternal.from_db(row)
-
-    async def get_families_by_ids(
-        self, family_ids: list[int]
-    ) -> tuple[set[ProjectId], list[FamilyInternal]]:
-        """Get family (+ project) by internal ID"""
-        _query = """
-        SELECT id, external_id, description, coded_phenotype, project
-        FROM family WHERE id IN :fids
-        """
-        rows = list(await self.connection.fetch_all(_query, {'fids': family_ids}))
-        fams = [FamilyInternal.from_db(row) for row in rows]
-        project = set(f.project for f in fams)
-        return project, fams
-
     async def search(
         self, query, project_ids: list[ProjectId], limit: int = 5
     ) -> list[tuple[ProjectId, int, str]]:
@@ -147,7 +140,7 @@ class FamilyTable(DbBase):
             _query,
             {
                 'project_ids': project_ids,
-                'search_pattern': self.escape_like_term(query) + '%',
+                'search_pattern': escape_like_term(query) + '%',
                 'limit': limit,
             },
         )
@@ -203,7 +196,7 @@ WHERE id = :id
         external_id: str,
         description: Optional[str],
         coded_phenotype: Optional[str],
-        project: ProjectId = None,
+        project: ProjectId | None = None,
     ) -> int:
         """
         Create a new sample, and add it to database
@@ -233,7 +226,7 @@ RETURNING id
         external_ids: List[str],
         descriptions: List[str],
         coded_phenotypes: List[Optional[str]],
-        project: int = None,
+        project: ProjectId | None = None,
     ):
         """Upsert"""
         updater = [

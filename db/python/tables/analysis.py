@@ -25,6 +25,7 @@ class AnalysisFilter(GenericFilterModel):
     id: GenericFilter[int] | None = None
     sample_id: GenericFilter[int] | None = None
     sequencing_group_id: GenericFilter[int] | None = None
+    cohort_id: GenericFilter[int] | None = None
     project: GenericFilter[int] | None = None
     type: GenericFilter[str] | None = None
     status: GenericFilter[AnalysisStatus] | None = None
@@ -58,11 +59,12 @@ class AnalysisTable(DbBase):
         self,
         analysis_type: str,
         status: AnalysisStatus,
-        sequencing_group_ids: List[int],
+        sequencing_group_ids: List[int] | None = None,
+        cohort_ids: List[int] | None = None,
         meta: Optional[Dict[str, Any]] = None,
-        output: str = None,
+        output: str | None = None,
         active: bool = True,
-        project: ProjectId = None,
+        project: ProjectId | None = None,
     ) -> int:
         """
         Create a new sample, and add it to database
@@ -96,9 +98,13 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 dict(kv_pairs),
             )
 
-            await self.add_sequencing_groups_to_analysis(
-                id_of_new_analysis, sequencing_group_ids
-            )
+            if sequencing_group_ids:
+                await self.add_sequencing_groups_to_analysis(
+                    id_of_new_analysis, sequencing_group_ids
+                )
+
+            if cohort_ids:
+                await self.add_cohorts_to_analysis(id_of_new_analysis, cohort_ids)
 
         return id_of_new_analysis
 
@@ -120,6 +126,25 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 'audit_log_id': audit_log_id,
             },
             sequencing_group_ids,
+        )
+        await self.connection.execute_many(_query, list(values))
+
+    async def add_cohorts_to_analysis(self, analysis_id: int, cohort_ids: list[int]):
+        """Add cohorts to an analysis (through the linked table)"""
+        _query = """
+            INSERT INTO analysis_cohort
+                (analysis_id, cohort_id, audit_log_id)
+            VALUES (:aid, :cid, :audit_log_id)
+        """
+
+        audit_log_id = await self.audit_log_id()
+        values = map(
+            lambda cid: {
+                'aid': analysis_id,
+                'cid': cid,
+                'audit_log_id': audit_log_id,
+            },
+            cohort_ids,
         )
         await self.connection.execute_many(_query, list(values))
 
@@ -192,15 +217,16 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             filter_.sequencing_group_id,
             filter_.project,
             filter_.sample_id,
+            filter_.cohort_id,
         ]
 
         if not any(required_fields):
             raise ValueError(
-                'Must provide at least one of id, sample_id, sequencing_group_id, '
+                'Must provide at least one of id, sample_id, sequencing_group_id, cohort_id '
                 'or project to filter on'
             )
 
-        where_str, values = filter_.to_sql(
+        sg_where_str, sg_values = filter_.to_sql(
             {
                 'id': 'a.id',
                 'sample_id': 'a_sg.sample_id',
@@ -211,27 +237,91 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 'meta': 'a.meta',
                 'output': 'a.output',
                 'active': 'a.active',
+                'cohort_id': 'a_c.cohort_id',
             },
         )
 
-        _query = f"""
-        SELECT a.id as id, a.type as type, a.status as status,
-                a.output as output, a_sg.sequencing_group_id as sequencing_group_id,
-                a.project as project, a.timestamp_completed as timestamp_completed,
-                a.active as active, a.meta as meta, a.author as author
-        FROM analysis a
-        LEFT JOIN analysis_sequencing_group a_sg ON a.id = a_sg.analysis_id
-        WHERE {where_str}
-        """
+        cohort_where_str, cohort_values = filter_.to_sql(
+            {
+                'id': 'a.id',
+                'project': 'a.project',
+                'type': 'a.type',
+                'status': 'a.status',
+                'meta': 'a.meta',
+                'output': 'a.output',
+                'active': 'a.active',
+                'cohort_id': 'a_c.cohort_id',
+            },
+        )
 
-        rows = await self.connection.fetch_all(_query, values)
         retvals: Dict[int, AnalysisInternal] = {}
-        for row in rows:
-            key = row['id']
-            if key in retvals:
-                retvals[key].sequencing_group_ids.append(row['sequencing_group_id'])
-            else:
-                retvals[key] = AnalysisInternal.from_db(**dict(row))
+
+        if filter_.cohort_id and filter_.sequencing_group_id:
+            raise ValueError('Cannot filter on both cohort_id and sequencing_group_id')
+
+        if filter_.cohort_id:
+            _cohort_query = f"""
+            SELECT a.id as id, a.type as type, a.status as status,
+                    a.output as output, a_c.cohort_id as cohort_id,
+                    a.project as project, a.timestamp_completed as timestamp_completed,
+                    a.active as active, a.meta as meta, a.author as author
+            FROM analysis a
+            LEFT JOIN analysis_cohort a_c ON a.id = a_c.analysis_id
+            WHERE {cohort_where_str}
+            """
+            rows = await self.connection.fetch_all(_cohort_query, cohort_values)
+            for row in rows:
+                key = row['id']
+                if key in retvals:
+                    retvals[key].cohort_ids.append(row['cohort_id'])
+                else:
+                    retvals[key] = AnalysisInternal.from_db(**dict(row))
+
+            if retvals:
+                _query_sg_ids = """
+                SELECT sequencing_group_id, analysis_id
+                FROM analysis_sequencing_group
+                WHERE analysis_id IN :analysis_ids
+                """
+                sg_ids = await self.connection.fetch_all(
+                    _query_sg_ids, {'analysis_ids': list(retvals.keys())}
+                )
+
+                for row in sg_ids:
+                    retvals[row['analysis_id']].sequencing_group_ids.append(
+                        row['sequencing_group_id']
+                    )
+
+        else:
+            _query = f"""
+            SELECT a.id as id, a.type as type, a.status as status,
+                    a.output as output, a_sg.sequencing_group_id as sequencing_group_id,
+                    a.project as project, a.timestamp_completed as timestamp_completed,
+                    a.active as active, a.meta as meta, a.author as author
+            FROM analysis a
+            LEFT JOIN analysis_sequencing_group a_sg ON a.id = a_sg.analysis_id
+            WHERE {sg_where_str}
+            """
+            rows = await self.connection.fetch_all(_query, sg_values)
+            for row in rows:
+                key = row['id']
+                if key in retvals:
+                    retvals[key].sequencing_group_ids.append(row['sequencing_group_id'])
+                else:
+                    retvals[key] = AnalysisInternal.from_db(**dict(row))
+
+            if retvals:
+                _query_cohort_ids = """
+                SELECT analysis_id, cohort_id
+                FROM analysis_cohort
+                WHERE analysis_id IN :analysis_ids
+                """
+                cohort_ids = await self.connection.fetch_all(
+                    _query_cohort_ids, {'analysis_ids': list(retvals.keys())}
+                )
+
+                for row in cohort_ids:
+                    retvals[row['analysis_id']].cohort_ids.append(row['cohort_id'])
 
         return list(retvals.values())
 

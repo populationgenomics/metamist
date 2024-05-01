@@ -37,13 +37,6 @@ class DbBase:
 
     # piped from the connection
 
-    @staticmethod
-    def escape_like_term(query: str):
-        """
-        Escape meaningful keys when using LIKE with a user supplied input
-        """
-        return query.replace('%', '\\%').replace('_', '\\_')
-
     async def get_all_audit_logs_for_table(
         self, table: str, ids: list[int], id_field='id'
     ) -> dict[int, list[AuditLogInternal]]:
