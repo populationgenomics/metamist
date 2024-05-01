@@ -1098,7 +1098,7 @@ class Query:  # entry point to graphql.
                 else None
             ),
         )
-        return await OurDnaDashboardLayer(connection).query(filter_)
+        return [await OurDnaDashboardLayer(connection).query(filter_)]
 
 
 schema = strawberry.Schema(
