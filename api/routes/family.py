@@ -18,6 +18,8 @@ from api.utils.db import (
 from api.utils.export import ExportType
 from api.utils.extensions import guess_delimiter_by_upload_file_obj
 from db.python.layers.family import FamilyLayer, PedRow
+from db.python.tables.family import FamilyFilter
+from db.python.utils import GenericFilter
 from models.models.family import Family
 from models.utils.sample_id_format import sample_id_transform_to_raw_list
 
@@ -146,8 +148,13 @@ async def get_families(
     family_layer = FamilyLayer(connection)
     sample_ids_raw = sample_id_transform_to_raw_list(sample_ids) if sample_ids else None
 
-    families = await family_layer.get_families(
-        participant_ids=participant_ids, sample_ids=sample_ids_raw
+    families = await family_layer.query(
+        FamilyFilter(
+            participant_id=(
+                GenericFilter(in_=participant_ids) if participant_ids else None
+            ),
+            sample_id=GenericFilter(in_=sample_ids_raw) if sample_ids_raw else None,
+        )
     )
 
     return [f.to_external() for f in families]
@@ -174,7 +181,7 @@ async def update_family(
 async def import_families(
     file: UploadFile = File(...),
     has_header: bool = True,
-    delimiter: str = None,
+    delimiter: str | None = None,
     connection: Connection = get_project_write_connection,
 ):
     """Import a family csv"""

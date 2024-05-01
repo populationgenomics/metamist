@@ -1,296 +1,20 @@
 # pylint: disable=used-before-assignment
-import logging
-from typing import Dict, List, Optional, Union
 
+from api.utils import group_by
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.layers.participant import ParticipantLayer
-from db.python.tables.family import FamilyTable
-from db.python.tables.family_participant import FamilyParticipantTable
+from db.python.tables.family import FamilyFilter, FamilyTable
+from db.python.tables.family_participant import (
+    FamilyParticipantFilter,
+    FamilyParticipantTable,
+)
 from db.python.tables.participant import ParticipantTable
-from db.python.tables.sample import SampleFilter, SampleTable
-from db.python.utils import GenericFilter
-from models.models.family import FamilyInternal, PedRowInternal
+from db.python.tables.sample import SampleTable
+from db.python.utils import GenericFilter, NotFoundError
+from models.models.family import FamilyInternal, PedRow, PedRowInternal
 from models.models.participant import ParticipantUpsertInternal
 from models.models.project import ProjectId
-
-
-class PedRow:
-    """Class for capturing a row in a pedigree"""
-
-    ALLOWED_SEX_VALUES = [0, 1, 2]
-    ALLOWED_AFFECTED_VALUES = [-9, 0, 1, 2]
-
-    PedRowKeys = {
-        # seqr individual template:
-        # Family ID, Individual ID, Paternal ID, Maternal ID, Sex, Affected, Status, Notes
-        'family_id': {'familyid', 'family id', 'family', 'family_id'},
-        'individual_id': {'individualid', 'id', 'individual_id', 'individual id'},
-        'paternal_id': {'paternal_id', 'paternal id', 'paternalid', 'father'},
-        'maternal_id': {'maternal_id', 'maternal id', 'maternalid', 'mother'},
-        'sex': {'sex', 'gender'},
-        'affected': {
-            'phenotype',
-            'affected',
-            'phenotypes',
-            'affected status',
-            'affection',
-            'affection status',
-        },
-        'notes': {'notes'},
-    }
-
-    @staticmethod
-    def default_header():
-        """Default header (corresponds to the __init__ keys)"""
-        return [
-            'family_id',
-            'individual_id',
-            'paternal_id',
-            'maternal_id',
-            'sex',
-            'affected',
-            'notes',
-        ]
-
-    @staticmethod
-    def row_header():
-        """Default RowHeader for output"""
-        return [
-            '#Family ID',
-            'Individual ID',
-            'Paternal ID',
-            'Maternal ID',
-            'Sex',
-            'Affected',
-        ]
-
-    def __init__(
-        self,
-        family_id,
-        individual_id,
-        paternal_id,
-        maternal_id,
-        sex,
-        affected,
-        notes=None,
-    ):
-        self.family_id = family_id.strip()
-        self.individual_id = individual_id.strip()
-        self.paternal_id = None
-        self.maternal_id = None
-        self.paternal_id = self.check_linking_id(paternal_id, 'paternal_id')
-        self.maternal_id = self.check_linking_id(maternal_id, 'maternal_id')
-        self.sex = self.parse_sex(sex)
-        self.affected = self.parse_affected_status(affected)
-        self.notes = notes
-
-    @staticmethod
-    def check_linking_id(linking_id, description: str, blank_values=('0', '')):
-        """Check that the ID is a valid value, or return None if it's a blank value"""
-        if linking_id is None:
-            return None
-        if isinstance(linking_id, int):
-            linking_id = str(linking_id).strip()
-
-        if isinstance(linking_id, str):
-            if linking_id.strip().lower() in blank_values:
-                return None
-            return linking_id.strip()
-
-        raise TypeError(
-            f'Unexpected type {type(linking_id)} ({linking_id}) '
-            f'for {description}, expected "str"'
-        )
-
-    @staticmethod
-    def parse_sex(sex: Union[str, int]) -> int:
-        """
-        Parse the pedigree SEX value:
-            0: unknown
-            1: male (also accepts 'm')
-            2: female (also accepts 'f')
-        """
-        if isinstance(sex, str) and sex.isdigit():
-            sex = int(sex)
-        if isinstance(sex, int):
-            if sex in PedRow.ALLOWED_SEX_VALUES:
-                return sex
-            raise ValueError(
-                f'Sex value ({sex}) was not an expected value {PedRow.ALLOWED_SEX_VALUES}.'
-            )
-
-        sl = sex.lower()
-        if sl in ('m', 'male'):
-            return 1
-        if sl in ('f', 'female'):
-            return 2
-        if sl in ('u', 'unknown'):
-            return 0
-
-        if sl == 'sex':
-            raise ValueError(
-                f'Unknown sex {sex!r}, did you mean to call import_pedigree with has_headers=True?'
-            )
-        raise ValueError(
-            f'Unknown sex {sex!r}, please ensure sex is in {PedRow.ALLOWED_SEX_VALUES}'
-        )
-
-    @staticmethod
-    def parse_affected_status(affected):
-        """
-        Parse the pedigree "AFFECTED" value:
-            -9 / 0: unknown
-            1: unaffected
-            2: affected
-        """
-        if isinstance(affected, str) and not affected.isdigit():
-            affected = affected.lower().strip()
-            if affected in ['unknown']:
-                return 0
-            if affected in ['n', 'no']:
-                return 1
-            if affected in ['y', 'yes', 'affected']:
-                return 2
-
-        affected = int(affected)
-        if affected not in PedRow.ALLOWED_AFFECTED_VALUES:
-            raise ValueError(
-                f'Affected value {affected} was not in expected value: {PedRow.ALLOWED_AFFECTED_VALUES}'
-            )
-
-        return affected
-
-    def __str__(self):
-        return f'PedRow: {self.individual_id} ({self.sex})'
-
-    @staticmethod
-    def order(rows: List['PedRow']) -> List['PedRow']:
-        """
-        Order a list of PedRows, but also validates:
-        - There are no circular dependencies
-        - All maternal / paternal IDs are found in the pedigree
-        """
-        rows_to_order: List['PedRow'] = [*rows]
-        ordered = []
-        seen_individuals = set()
-        remaining_iterations_in_round = len(rows_to_order)
-
-        while len(rows_to_order) > 0:
-            row = rows_to_order.pop(0)
-            reqs = [row.paternal_id, row.maternal_id]
-            if all(r is None or r in seen_individuals for r in reqs):
-                remaining_iterations_in_round = len(rows_to_order)
-                ordered.append(row)
-                seen_individuals.add(row.individual_id)
-            else:
-                remaining_iterations_in_round -= 1
-                rows_to_order.append(row)
-
-            # makes more sense to keep this comparison separate:
-            #   - If remaining iterations is or AND we still have rows
-            #   - Then raise an Exception
-            # pylint: disable=chained-comparison
-            if remaining_iterations_in_round <= 0 and len(rows_to_order) > 0:
-                participant_ids = ', '.join(
-                    f'{r.individual_id} ({r.paternal_id} | {r.maternal_id})'
-                    for r in rows_to_order
-                )
-                raise ValueError(
-                    "There was an issue in the pedigree, either a parent wasn't "
-                    'found in the pedigree, or a circular dependency detected '
-                    "(eg: someone's child is an ancestor's parent). "
-                    f"Can't resolve participants with parental IDs: {participant_ids}"
-                )
-
-        return ordered
-
-    @staticmethod
-    def validate_sexes(rows: List['PedRow'], throws=True) -> bool:
-        """
-        Validate that individuals listed as mothers and fathers
-        have either unknown sex, male if paternal, and female if maternal.
-
-        Future note: The pedigree has a simplified view of sex, especially
-        how it relates families together. This function might not handle
-        more complex cases around intersex disorders within families. The
-        best advice is either to skip this check, or provide sex as 0 (unknown)
-
-        :param throws: If True is provided (default), raise a ValueError, else just return False
-        """
-        keyed: Dict[str, PedRow] = {r.individual_id: r for r in rows}
-        paternal_ids = [r.paternal_id for r in rows if r.paternal_id]
-        mismatched_pat_sex = [
-            pid for pid in paternal_ids if keyed[pid].sex not in (0, 1)
-        ]
-        maternal_ids = [r.maternal_id for r in rows if r.maternal_id]
-        mismatched_mat_sex = [
-            mid for mid in maternal_ids if keyed[mid].sex not in (0, 2)
-        ]
-
-        messages = []
-        if mismatched_pat_sex:
-            actual_values = ', '.join(
-                f'{pid} ({keyed[pid].sex})' for pid in mismatched_pat_sex
-            )
-            messages.append('(0, 1) as they are listed as fathers: ' + actual_values)
-        if mismatched_mat_sex:
-            actual_values = ', '.join(
-                f'{pid} ({keyed[pid].sex})' for pid in mismatched_mat_sex
-            )
-            messages.append('(0, 2) as they are listed as mothers: ' + actual_values)
-
-        if messages:
-            message = 'Expected individuals have sex values:' + ''.join(
-                '\n\t' + m for m in messages
-            )
-            if throws:
-                raise ValueError(message)
-            logging.warning(message)
-            return False
-
-        return True
-
-    @staticmethod
-    def parse_header_order(header: List[str]):
-        """
-        Takes a list of unformatted headers, and returns a list of ordered init_keys
-
-        >>> PedRow.parse_header_order(['family', 'mother', 'paternal id', 'phenotypes', 'gender'])
-        ['family_id', 'maternal_id', 'paternal_id', 'affected', 'sex']
-
-        >>> PedRow.parse_header_order(['#family id'])
-        ['family_id']
-
-        >>> PedRow.parse_header_order(['unexpected header'])
-        Traceback (most recent call last):
-        ValueError: Unable to identity header elements: "unexpected header"
-        """
-        ordered_init_keys = []
-        unmatched = []
-        for item in header:
-            litem = item.lower().strip().strip('#')
-            found = False
-            for h, options in PedRow.PedRowKeys.items():
-                for potential_key in options:
-                    if potential_key == litem:
-                        ordered_init_keys.append(h)
-                        found = True
-                        break
-                if found:
-                    break
-
-            if not found:
-                unmatched.append(item)
-
-        if unmatched:
-            # repr casts to string and quotes if applicable
-            unmatched_headers_str = ', '.join(map(repr, unmatched))
-            raise ValueError(
-                'Unable to identity header elements: ' + unmatched_headers_str
-            )
-
-        return ordered_init_keys
 
 
 class FamilyLayer(BaseLayer):
@@ -316,48 +40,51 @@ class FamilyLayer(BaseLayer):
         self, family_id: int, check_project_id: bool = True
     ) -> FamilyInternal:
         """Get family by internal ID"""
-        project, family = await self.ftable.get_family_by_internal_id(family_id)
+        projects, families = await self.ftable.query(
+            FamilyFilter(id=GenericFilter(eq=family_id))
+        )
+        if not families:
+            raise NotFoundError(f'Family with ID {family_id} not found')
+        family = families[0]
         if check_project_id:
             await self.ptable.check_access_to_project_ids(
-                self.author, [project], readonly=True
+                self.author, projects, readonly=True
             )
 
         return family
 
     async def get_family_by_external_id(
-        self, external_id: str, project: ProjectId = None
+        self, external_id: str, project: ProjectId | None = None
     ):
         """Get family by external ID, requires project scope"""
-        return await self.ftable.get_family_by_external_id(external_id, project=project)
+        families = await self.ftable.query(
+            FamilyFilter(
+                external_id=GenericFilter(eq=external_id),
+                project=GenericFilter(eq=project or self.connection.project),
+            )
+        )
+        if not families:
+            raise NotFoundError(f'Family with external ID {external_id} not found')
 
-    async def get_families(
+        return families[0]
+
+    async def query(
         self,
-        project: int = None,
-        participant_ids: List[int] = None,
-        sample_ids: List[int] = None,
-    ):
+        filter_: FamilyFilter,
+        check_project_ids: bool = True,
+    ) -> list[FamilyInternal]:
         """Get all families for a project"""
-        project = project or self.connection.project
 
-        # Merge sample_id and participant_ids into a single list
-        all_participants = participant_ids if participant_ids else []
+        # don't need a project check, as we're being provided an explicit filter
 
-        # Find the participants from the given samples
-        if sample_ids is not None and len(sample_ids) > 0:
-            _, samples = await self.stable.query(
-                SampleFilter(
-                    project=GenericFilter(eq=project), id=GenericFilter(in_=sample_ids)
-                )
+        projects, families = await self.ftable.query(filter_)
+
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.connection.author, projects, readonly=True
             )
 
-            all_participants += [
-                int(s.participant_id) for s in samples if s.participant_id
-            ]
-            all_participants = list(set(all_participants))
-
-        return await self.ftable.get_families(
-            project=project, participant_ids=all_participants
-        )
+        return families
 
     async def get_families_by_ids(
         self,
@@ -366,8 +93,8 @@ class FamilyLayer(BaseLayer):
         check_project_ids: bool = True,
     ) -> list[FamilyInternal]:
         """Get families by internal IDs"""
-        projects, families = await self.ftable.get_families_by_ids(
-            family_ids=family_ids
+        projects, families = await self.ftable.query(
+            FamilyFilter(id=GenericFilter(in_=family_ids))
         )
         if not families:
             return []
@@ -427,14 +154,14 @@ class FamilyLayer(BaseLayer):
     async def get_pedigree(
         self,
         project: ProjectId,
-        family_ids: List[int] = None,
+        family_ids: list[int] | None = None,
         # pylint: disable=invalid-name
-        replace_with_participant_external_ids=False,
+        replace_with_participant_external_ids: bool = False,
         # pylint: disable=invalid-name
-        replace_with_family_external_ids=False,
-        empty_participant_value=None,
-        include_participants_not_in_families=False,
-    ) -> List[Dict[str, str]]:
+        replace_with_family_external_ids: bool = False,
+        empty_participant_value: str | None = None,
+        include_participants_not_in_families: bool = False,
+    ) -> list[dict[str, str | int | None]]:
         """
         Generate pedigree file for ALL families in project
         (unless internal_family_ids is specified).
@@ -442,46 +169,52 @@ class FamilyLayer(BaseLayer):
         Use internal IDs unless specific options are specified.
         """
 
-        # this is important because a PED file MUST be ordered like this
-
-        pid_fields = {
-            'individual_id',
-            'paternal_id',
-            'maternal_id',
-        }
-
-        rows = await self.fptable.get_rows(
-            project=project,
-            family_ids=family_ids,
+        _, rows = await self.fptable.query(
+            FamilyParticipantFilter(
+                project=GenericFilter(eq=project),
+                family_id=GenericFilter(in_=family_ids) if family_ids else None,
+            ),
             include_participants_not_in_families=include_participants_not_in_families,
         )
-        pmap = {}
+        # participant_id to external_id
+        pmap: dict[int, str] = {}
+        # family_id to external_id
+        fmap: dict[int, str] = {}
         if replace_with_participant_external_ids:
             participant_ids = set(
                 s
                 for r in rows
-                for s in [r[pfield] for pfield in pid_fields]
+                for s in (r.individual_id, r.maternal_id, r.paternal_id)
                 if s is not None
             )
             ptable = ParticipantTable(connection=self.connection)
             pmap = await ptable.get_id_map_by_internal_ids(list(participant_ids))
 
-        for r in rows:
-            for pfield in pid_fields:
-                r[pfield] = pmap.get(r[pfield], r[pfield]) or empty_participant_value
-
         if replace_with_family_external_ids:
-            family_ids = list(
-                set(r['family_id'] for r in rows if r['family_id'] is not None)
-            )
+            family_ids = list(set(r.family_id for r in rows if r.family_id is not None))
             fmap = await self.ftable.get_id_map_by_internal_ids(list(family_ids))
-            for r in rows:
-                r['family_id'] = fmap.get(r['family_id'], r['family_id'])
 
-        return rows
+        mapped_rows: list[dict[str, str | int | None]] = []
+        for r in rows:
+            mapped_rows.append(
+                {
+                    'family_id': fmap.get(r.family_id, str(r.family_id)),
+                    'individual_id': pmap.get(r.individual_id, r.individual_id)
+                    or empty_participant_value,
+                    'paternal_id': pmap.get(r.paternal_id, r.paternal_id)
+                    or empty_participant_value,
+                    'maternal_id': pmap.get(r.maternal_id, r.maternal_id)
+                    or empty_participant_value,
+                    'sex': r.sex,
+                    'affected': r.affected,
+                    'notes': r.notes,
+                }
+            )
+
+        return mapped_rows
 
     async def get_participant_family_map(
-        self, participant_ids: List[int], check_project_ids=False
+        self, participant_ids: list[int], check_project_ids=False
     ):
         """Get participant family map"""
 
@@ -497,8 +230,8 @@ class FamilyLayer(BaseLayer):
 
     async def import_pedigree(
         self,
-        header: Optional[List[str]],
-        rows: List[List[str]],
+        header: list[str] | None,
+        rows: list[list[str]],
         create_missing_participants=False,
         perform_sex_check=True,
     ):
@@ -522,7 +255,7 @@ class FamilyLayer(BaseLayer):
         if len(_header) > max_row_length:
             _header = _header[:max_row_length]
 
-        pedrows: List[PedRow] = [
+        pedrows: list[PedRow] = [
             PedRow(**{_header[i]: r[i] for i in range(len(_header))}) for r in rows
         ]
         # this validates a lot of the pedigree too
@@ -570,9 +303,8 @@ class FamilyLayer(BaseLayer):
                             reported_sex=row.sex,
                         )
                     )
-                    external_participant_ids_map[
-                        row.individual_id
-                    ] = upserted_participant.id
+                    pid = upserted_participant.id
+                    external_participant_ids_map[row.individual_id] = pid
 
             for external_family_id in missing_external_family_ids:
                 internal_family_id = await self.ftable.create_family(
@@ -587,11 +319,12 @@ class FamilyLayer(BaseLayer):
             insertable_rows = [
                 PedRowInternal(
                     family_id=external_family_id_map[row.family_id],
-                    participant_id=external_participant_ids_map[row.individual_id],
+                    individual_id=external_participant_ids_map[row.individual_id],
                     paternal_id=external_participant_ids_map.get(row.paternal_id),
                     maternal_id=external_participant_ids_map.get(row.maternal_id),
                     affected=row.affected,
                     notes=row.notes,
+                    sex=row.sex,
                 )
                 for row in pedrows
             ]
@@ -613,9 +346,7 @@ class FamilyLayer(BaseLayer):
         """Update family members"""
         await self.fptable.create_rows(rows)
 
-    async def import_families(
-        self, headers: Optional[List[str]], rows: List[List[str]]
-    ):
+    async def import_families(self, headers: list[str] | None, rows: list[list[str]]):
         """Import a family table"""
         ordered_headers = [
             'Family ID',
@@ -637,7 +368,7 @@ class FamilyLayer(BaseLayer):
             },
         }
 
-        def get_idx_for_header(header) -> Optional[int]:
+        def get_idx_for_header(header) -> int | None:
             return next(
                 iter(idx for idx, key in enumerate(lheaders) if key in key_map[header]),
                 None,
@@ -653,11 +384,13 @@ class FamilyLayer(BaseLayer):
             """Don't set as empty string, prefer to set as null"""
             return None if val == '' else val
 
-        rows = [[replace_empty_string_with_none(el) for el in r] for r in rows]
+        _fixed_rows = [[replace_empty_string_with_none(el) for el in r] for r in rows]
 
-        empty = [None] * len(rows)
+        empty: list[str | None] = [None] * len(_fixed_rows)
 
-        def select_columns(col1: Optional[int], col2: Optional[int] = None):
+        def select_columns(
+            col1: int | None, col2: int | None = None
+        ) -> list[str | None]:
             """
             - If col1 and col2 is None, return [None] * len(rows)
             - if either col1 or col2 is not None, return that column
@@ -668,13 +401,13 @@ class FamilyLayer(BaseLayer):
                 return empty
             if col1 is not None and col2 is None:
                 # if only col1 is set
-                return [r[col1] for r in rows]
+                return [r[col1] for r in _fixed_rows]
             if col2 is not None and col1 is None:
                 # if only col2 is set
-                return [r[col2] for r in rows]
+                return [r[col2] for r in _fixed_rows]
             # if col1 AND col2 are not None
             assert col1 is not None and col2 is not None
-            return [r[col1] if r[col1] is not None else r[col2] for r in rows]
+            return [r[col1] if r[col1] is not None else r[col2] for r in _fixed_rows]
 
         await self.ftable.insert_or_update_multiple_families(
             external_ids=select_columns(external_identifier_idx, display_name_idx),
@@ -682,3 +415,39 @@ class FamilyLayer(BaseLayer):
             coded_phenotypes=select_columns(phenotype_idx),
         )
         return True
+
+    async def get_family_participants_by_family_ids(
+        self, family_ids: list[int], check_project_ids: bool = True
+    ) -> dict[int, list[PedRowInternal]]:
+        """Get family participants for family IDs"""
+        projects, fps = await self.fptable.query(
+            FamilyParticipantFilter(family_id=GenericFilter(in_=family_ids))
+        )
+
+        if not fps:
+            return {}
+
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.connection.author, projects, readonly=True
+            )
+
+        return group_by(fps, lambda r: r.family_id)
+
+    async def get_family_participants_for_participants(
+        self, participant_ids: list[int], check_project_ids: bool = True
+    ) -> list[PedRowInternal]:
+        """Get family participants for participant IDs"""
+        projects, fps = await self.fptable.query(
+            FamilyParticipantFilter(participant_id=GenericFilter(in_=participant_ids))
+        )
+
+        if not fps:
+            return []
+
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.connection.author, projects, readonly=True
+            )
+
+        return fps

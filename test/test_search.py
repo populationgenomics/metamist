@@ -204,10 +204,11 @@ class TestSample(DbIsolatedTest):
             [
                 PedRowInternal(
                     family_id=f_id,
-                    participant_id=p.id,
+                    individual_id=p.id,
                     paternal_id=None,
                     maternal_id=None,
                     affected=0,
+                    sex=0,
                     notes=None,
                 )
             ]
