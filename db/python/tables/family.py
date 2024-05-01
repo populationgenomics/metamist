@@ -3,7 +3,12 @@ from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set
 
 from db.python.tables.base import DbBase
-from db.python.utils import GenericFilter, GenericFilterModel, NotFoundError
+from db.python.utils import (
+    GenericFilter,
+    GenericFilterModel,
+    NotFoundError,
+    escape_like_term,
+)
 from models.models.family import FamilyInternal
 from models.models.project import ProjectId
 
@@ -135,7 +140,7 @@ class FamilyTable(DbBase):
             _query,
             {
                 'project_ids': project_ids,
-                'search_pattern': self.escape_like_term(query) + '%',
+                'search_pattern': escape_like_term(query) + '%',
                 'limit': limit,
             },
         )
