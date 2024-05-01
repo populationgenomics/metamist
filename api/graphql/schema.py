@@ -88,8 +88,6 @@ GraphQLEnum = strawberry.type(type('GraphQLEnum', (object,), enum_methods))
 
 GraphQLAnalysisStatus = strawberry.enum(AnalysisStatus)
 
-GraphQLAnalysisStatus = strawberry.enum(AnalysisStatus)
-
 
 # Create cohort GraphQL model
 @strawberry.type
@@ -377,11 +375,13 @@ class GraphQLProject:
         connection.project = root.id
 
         c_filter = CohortFilter(
-            id=id.to_internal_filter(cohort_id_transform_to_raw) if id else None,
+            id=id.to_internal_filter_mapped(cohort_id_transform_to_raw) if id else None,
             name=name.to_internal_filter() if name else None,
             author=author.to_internal_filter() if author else None,
             template_id=(
-                template_id.to_internal_filter(cohort_template_id_transform_to_raw)
+                template_id.to_internal_filter_mapped(
+                    cohort_template_id_transform_to_raw
+                )
                 if template_id
                 else None
             ),
@@ -947,13 +947,13 @@ class Query:  # entry point to graphql.
                 user=connection.author, project_names=project_names, readonly=True
             )
             project_name_map = {p.name: p.id for p in projects}
-            project_filter = project.to_internal_filter(
+            project_filter = project.to_internal_filter_mapped(
                 lambda pname: project_name_map[pname]
             )
 
         filter_ = CohortTemplateFilter(
             id=(
-                id.to_internal_filter(cohort_template_id_transform_to_raw)
+                id.to_internal_filter_mapped(cohort_template_id_transform_to_raw)
                 if id
                 else None
             ),
@@ -988,17 +988,19 @@ class Query:  # entry point to graphql.
                 user=connection.author, project_names=project_names, readonly=True
             )
             project_name_map = {p.name: p.id for p in projects}
-            project_filter = project.to_internal_filter(
+            project_filter = project.to_internal_filter_mapped(
                 lambda pname: project_name_map[pname]
             )
 
         filter_ = CohortFilter(
-            id=id.to_internal_filter(cohort_id_transform_to_raw) if id else None,
+            id=id.to_internal_filter_mapped(cohort_id_transform_to_raw) if id else None,
             name=name.to_internal_filter() if name else None,
             project=project_filter,
             author=author.to_internal_filter() if author else None,
             template_id=(
-                template_id.to_internal_filter(cohort_template_id_transform_to_raw)
+                template_id.to_internal_filter_mapped(
+                    cohort_template_id_transform_to_raw
+                )
                 if template_id
                 else None
             ),
