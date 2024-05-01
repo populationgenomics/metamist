@@ -20,13 +20,21 @@ class TestParticipantFamily(DbIsolatedTest):
         self.fid_2 = await fl.create_family(external_id='FAM02')
 
         pl = ParticipantLayer(self.connection)
-        self.pid = (await pl.upsert_participant(ParticipantUpsertInternal(external_id='EX01', reported_sex=2))).id
-        self.pat_pid = (await pl.upsert_participant(
-            ParticipantUpsertInternal(external_id='EX01_pat', reported_sex=1)
-        )).id
-        self.mat_pid = (await pl.upsert_participant(
-            ParticipantUpsertInternal(external_id='EX01_mat', reported_sex=2)
-        )).id
+        self.pid = (
+            await pl.upsert_participant(
+                ParticipantUpsertInternal(external_id='EX01', reported_sex=2)
+            )
+        ).id
+        self.pat_pid = (
+            await pl.upsert_participant(
+                ParticipantUpsertInternal(external_id='EX01_pat', reported_sex=1)
+            )
+        ).id
+        self.mat_pid = (
+            await pl.upsert_participant(
+                ParticipantUpsertInternal(external_id='EX01_mat', reported_sex=2)
+            )
+        ).id
 
         await pl.add_participant_to_family(
             family_id=self.fid_1,
@@ -54,8 +62,9 @@ class TestParticipantFamily(DbIsolatedTest):
             'maternal_id': self.mat_pid,
             'sex': 2,
             'affected': 2,
+            'notes': None,
         }
-        self.assertDictEqual(fp_row, expected_fp_row)
+        self.assertDictEqual(expected_fp_row, fp_row.to_dict())
 
         await pl.remove_participant_from_family(
             family_id=self.fid_1, participant_id=self.pid
@@ -64,9 +73,9 @@ class TestParticipantFamily(DbIsolatedTest):
         await pl.add_participant_to_family(
             family_id=self.fid_2,
             participant_id=self.pid,
-            paternal_id=fp_row['paternal_id'],
-            maternal_id=fp_row['maternal_id'],
-            affected=fp_row['affected'],
+            paternal_id=fp_row.paternal_id,
+            maternal_id=fp_row.maternal_id,
+            affected=fp_row.affected,
         )
 
         updated_fp_row = await pl.get_family_participant_data(
@@ -80,8 +89,9 @@ class TestParticipantFamily(DbIsolatedTest):
             'maternal_id': self.mat_pid,
             'sex': 2,
             'affected': 2,
+            'notes': None,
         }
-        self.assertDictEqual(updated_fp_row, expected_updated_fp_row)
+        self.assertDictEqual(expected_updated_fp_row, updated_fp_row.to_dict())
 
         await pl.remove_participant_from_family(
             family_id=self.fid_2, participant_id=self.pid
@@ -106,8 +116,9 @@ class TestParticipantFamily(DbIsolatedTest):
             'maternal_id': self.mat_pid,
             'sex': 2,
             'affected': 2,
+            'notes': None,
         }
-        self.assertDictEqual(updated_fp_row, expected_updated_fp_row)
+        self.assertDictEqual(expected_updated_fp_row, updated_fp_row.to_dict())
 
         await pl.remove_participant_from_family(
             family_id=self.fid_2, participant_id=self.pid
@@ -128,8 +139,9 @@ class TestParticipantFamily(DbIsolatedTest):
             'maternal_id': self.mat_pid,
             'sex': 2,
             'affected': 2,
+            'notes': None,
         }
-        self.assertDictEqual(fp_row, expected_fp_row)
+        self.assertDictEqual(expected_fp_row, fp_row.to_dict())
 
         with self.assertRaises(IntegrityError):
             await pl.update_participant_family(
@@ -141,4 +153,4 @@ class TestParticipantFamily(DbIsolatedTest):
         )
 
         # Update transaction should rollback, so no change expected
-        self.assertDictEqual(rollback_fp_row, expected_fp_row)
+        self.assertDictEqual(expected_fp_row, rollback_fp_row.to_dict())
