@@ -1,10 +1,13 @@
+# pylint: disable=too-many-locals
 from collections import defaultdict
 from datetime import datetime
 from typing import Any
 
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
+from db.python.tables.participant import ParticipantTable
 from db.python.tables.sample import SampleFilter, SampleTable
+from models.models.participant import ParticipantInternal
 from models.models.sample import Sample, SampleInternal
 
 
@@ -18,8 +21,9 @@ class OurDnaDashboardLayer(BaseLayer):
         # self.at = AnalysisRunnerTable(connection)
 
         self.sample_table = SampleTable(connection)
+        self.participant_table = ParticipantTable(connection)
 
-    async def get_collection_to_process_end_time(self, sample: Sample) -> int | None:
+    def get_collection_to_process_end_time(self, sample: Sample) -> int | None:
         """
         I want to know how long it took between blood collection and sample processing - SAMPLE TABLE
         @fields: collection-time, process-end-time
@@ -31,9 +35,9 @@ class OurDnaDashboardLayer(BaseLayer):
 
         return int(time_taken.total_seconds())
 
-    async def get_processing_times_by_site(self, sample: Sample) -> tuple[str | None, int | None]:
+    def get_processing_times_by_site(self, sample: Sample) -> tuple[str | None, int | None]:
         """
-        I want to know what the sample processing times were for samples at each designated site (BBV, Garvan, Westmead, etc) - SAMPLE TABLE (per site, per sample)
+        I want to know what the sample processing times were for samples at each designated site (BBV, Garvan, Westmead, etc)
         @fields: process-start-time, process-end-time, processing-site where the time fields are of the format '2022-07-03 13:28:00'
         """
         if sample.meta.get('process_start_time') is None or sample.meta.get('process_end_time') is None or sample.meta.get('processing_site') is None:
@@ -43,7 +47,7 @@ class OurDnaDashboardLayer(BaseLayer):
 
         return sample.meta.get('processing_site'), int(processing_time.total_seconds())
 
-    async def get_collection_to_process_start_time(self, sample: Sample) -> int | None:
+    def get_collection_to_process_start_time(self, sample: Sample) -> int | None:
         """
         I want to know how long it has been since the sample was collected - SAMPLE TABLE
         @fields: collection-time, process-start-time
@@ -56,15 +60,47 @@ class OurDnaDashboardLayer(BaseLayer):
         return int(time_taken.total_seconds())
 
     async def query(
-        self, filter_: SampleFilter, check_project_ids: bool = True
+        self, filter_: SampleFilter, check_project_ids: bool = True, project_ids: list = None
     ) -> dict:
         """Get dashboard data"""
         projects: set[int]
-        samples_internal: list[SampleInternal]
-        samples: list[Sample]
+        samples_internal: list[SampleInternal] = []
+        samples: list[Sample] = []
+        participants: list[ParticipantInternal] = []
+        sample_participants: list[ParticipantInternal] = []
+
+        # Data to be returned
+        collection_to_process_end_time: dict[str, int] = {}
+        collection_to_process_end_time_24h: dict[str, int] = {}
+        processing_times_by_site: dict[str, list[dict[str, int]]] = defaultdict(list)
+        total_samples_by_collection_event_name: dict[str, int] = defaultdict(int)
+        samples_lost_after_collection: dict[str, dict[Any, Any]] = {}
+        samples_concentration_gt_1ug: dict[str, float] = {}
+        participants_consented_not_collected: list[int] = []
+        participants_signed_not_consented: list[int] = []
+
+        # TODO We should figure out if we need to handle more than a single project_id
+        for project_id in project_ids:
+            participants.extend(await self.participant_table.get_participants(project=project_id))
 
         projects, samples_internal = await self.sample_table.query(filter_=filter_)
         samples = [s.to_external() for s in samples_internal]
+
+        for participant in participants:
+            samples_for_participant = [sample for sample in samples if sample.participant_id == participant.id]
+
+            # Create a new participant object with the samples for this participant
+            sample_participants.append(participant.copy(update={'samples': samples_for_participant}))
+
+            # Get the samples that have been collected and consented
+            collected_samples = [sample for sample in samples_for_participant if participant.meta.get('consent') is not None and sample.meta.get('collection_time') is not None]
+
+            if len(collected_samples) == 0:
+                participants_consented_not_collected.append(participant.id)
+
+            # Get the participants that have signed but not consented
+            if participant.meta.get('consent') is None:
+                participants_signed_not_consented.append(participant.id)
 
         if check_project_ids:
             await self.ptable.check_access_to_project_ids(
@@ -74,17 +110,11 @@ class OurDnaDashboardLayer(BaseLayer):
         # TODO Add logic here to query and aggregate the data
 
         # go through all samples and get the meta and do something with it
-
-        collection_to_process_end_time: dict[str, int] = {}
-        collection_to_process_end_time_24h: dict[str, int] = {}
-        processing_times_by_site: dict[str, list[dict[str, int]]] = defaultdict(list)
-        total_samples_by_collection_event_name: dict[str, int] = defaultdict(int)
-        samples_lost_after_collection: dict[str, dict[Any, Any]] = {}
-        samples_concentration_gt_1ug: dict[str, float] = {}
-
+        # if we want stats for samples by participant, move this logic up before participant and make use of
+        # the filtered samples to map to each participant
         for sample in samples:
             # Get the time between blood collection and sample processing
-            time_to_process_end = await self.get_collection_to_process_end_time(sample)
+            time_to_process_end = self.get_collection_to_process_end_time(sample)
             if time_to_process_end is not None:
                 collection_to_process_end_time[sample.id] = time_to_process_end
 
@@ -93,7 +123,7 @@ class OurDnaDashboardLayer(BaseLayer):
                 collection_to_process_end_time_24h[sample.id] = time_to_process_end
 
             # Get the sample processing times for each sample at each designated site"""
-            processing_site, processing_time = await self.get_processing_times_by_site(sample)
+            processing_site, processing_time = self.get_processing_times_by_site(sample)
             if processing_site is not None:
                 processing_times_by_site[processing_site].append({sample.id: processing_time})
 
@@ -104,7 +134,7 @@ class OurDnaDashboardLayer(BaseLayer):
                 total_samples_by_collection_event_name['unknown'] += 1
 
             # Get total number of many samples have been lost, EG: participants have been consented, blood collected, not processed (etc), Alert here (highlight after 72 hours)
-            time_to_process_start = await self.get_collection_to_process_start_time(sample)
+            time_to_process_start = self.get_collection_to_process_start_time(sample)
 
             # If we decide to handle None, we can separate into separate checks and handle explicitly
             # can show time to now if process_start_time is None and have an alert field for this to
@@ -137,4 +167,5 @@ class OurDnaDashboardLayer(BaseLayer):
             'total_samples_by_collection_event_name': total_samples_by_collection_event_name,
             'samples_lost_after_collection': samples_lost_after_collection,
             'samples_concentration_gt_1ug': samples_concentration_gt_1ug,
+            'participants_consented_not_collected': participants_consented_not_collected,
         }

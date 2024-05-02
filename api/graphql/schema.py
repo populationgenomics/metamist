@@ -1090,6 +1090,7 @@ class Query:  # entry point to graphql.
                 user=connection.author, project_names=project_names, readonly=True
             )
             project_name_map = {p.name: p.id for p in projects}
+            project_ids = list(project_name_map.values())
 
         filter_ = SampleFilter(
             project=(
@@ -1098,7 +1099,7 @@ class Query:  # entry point to graphql.
                 else None
             ),
         )
-        return [await OurDnaDashboardLayer(connection).query(filter_)]
+        return [await OurDnaDashboardLayer(connection).query(filter_, project_ids)]
 
 
 schema = strawberry.Schema(
