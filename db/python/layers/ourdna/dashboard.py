@@ -168,4 +168,5 @@ class OurDnaDashboardLayer(BaseLayer):
             'samples_lost_after_collection': samples_lost_after_collection,
             'samples_concentration_gt_1ug': samples_concentration_gt_1ug,
             'participants_consented_not_collected': participants_consented_not_collected,
+            'participants_signed_not_consented': participants_signed_not_consented,
         }
