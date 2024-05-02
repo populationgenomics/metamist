@@ -38,7 +38,6 @@ class SequencingGroupInternal(SMBase):
     sample_id: int | None = None
     external_ids: dict[str, str] | None = {}
     archived: bool | None = None
-    author: str | None = None
 
     project: int | None = None
 
