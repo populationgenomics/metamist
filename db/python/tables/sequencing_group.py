@@ -59,7 +59,6 @@ class SequencingGroupTable(DbBase):
         'sg.technology',
         'sg.platform',
         'sg.meta',
-        'sg.author',
         'sg.archived',
     ]
     common_get_keys_str = ', '.join(common_get_keys)
