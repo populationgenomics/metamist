@@ -34,6 +34,7 @@ from db.python.tables.analysis_runner import AnalysisRunnerFilter
 from db.python.tables.assay import AssayFilter
 from db.python.tables.cohort import CohortFilter, CohortTemplateFilter
 from db.python.tables.family import FamilyFilter
+from db.python.tables.participant import ParticipantFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
@@ -269,10 +270,38 @@ class GraphQLProject:
 
     @strawberry.field()
     async def participants(
-        self, info: Info, root: 'Project'
+        self,
+        info: Info,
+        root: 'Project',
+        id: GraphQLFilter[int] | None = None,
+        external_id: GraphQLFilter[str] | None = None,
+        meta: GraphQLMetaFilter | None = None,
+        reported_sex: GraphQLFilter[int] | None = None,
+        reported_gender: GraphQLFilter[str] | None = None,
+        karyotype: GraphQLFilter[str] | None = None,
     ) -> list['GraphQLParticipant']:
         loader = info.context[LoaderKeys.PARTICIPANTS_FOR_PROJECTS]
-        participants = await loader.load(root.id)
+        participants = await loader.load(
+            {
+                'id': root.id,
+                'filter_': ParticipantFilter(
+                    id=id.to_internal_filter() if id else None,
+                    external_id=(
+                        external_id.to_internal_filter() if external_id else None
+                    ),
+                    meta=graphql_meta_filter_to_internal_filter(meta),
+                    reported_gender=(
+                        reported_gender.to_internal_filter()
+                        if reported_gender
+                        else None
+                    ),
+                    reported_sex=(
+                        reported_sex.to_internal_filter() if reported_sex else None
+                    ),
+                    karyotype=karyotype.to_internal_filter() if karyotype else None,
+                ),
+            }
+        )
         return [GraphQLParticipant.from_internal(p) for p in participants]
 
     @strawberry.field()

@@ -11,7 +11,7 @@ from db.python.tables.family_participant import (
     FamilyParticipantFilter,
     FamilyParticipantTable,
 )
-from db.python.tables.participant import ParticipantTable
+from db.python.tables.participant import ParticipantFilter, ParticipantTable
 from db.python.tables.participant_phenotype import ParticipantPhenotypeTable
 from db.python.tables.sample import SampleTable
 from db.python.utils import (
@@ -241,6 +241,24 @@ class ParticipantLayer(BaseLayer):
     def __init__(self, connection):
         super().__init__(connection)
         self.pttable = ParticipantTable(connection=connection)
+
+    async def query(
+        self, filter_: ParticipantFilter, check_project_ids: bool = True
+    ) -> list[ParticipantInternal]:
+        """
+        Query participants from the database, heavy lifting done by the filter
+        """
+        projects, participants = await self.pttable.query(filter_)
+
+        if not participants:
+            return []
+
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.author, projects, readonly=True
+            )
+
+        return participants
 
     async def get_participants_by_ids(
         self,

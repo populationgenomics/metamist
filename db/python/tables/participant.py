@@ -1,10 +1,74 @@
+import dataclasses
 from collections import defaultdict
 from typing import Any
 
 from db.python.tables.base import DbBase
-from db.python.utils import NotFoundError, escape_like_term, to_db_json
+from db.python.utils import (
+    GenericFilter,
+    GenericFilterModel,
+    GenericMetaFilter,
+    NotFoundError,
+    escape_like_term,
+    to_db_json,
+)
 from models.models.participant import ParticipantInternal
 from models.models.project import ProjectId
+
+
+@dataclasses.dataclass(kw_only=True)
+class ParticipantFilter(GenericFilterModel):
+    """
+    Participant filter model
+    """
+
+    @dataclasses.dataclass(kw_only=True)
+    class ParticipantSampleFilter(GenericFilterModel):
+        """
+        Participant sample filter model
+        """
+
+        id: GenericFilter[int] | None = None
+        type: GenericFilter[str] | None = None
+        external_id: GenericFilter[str] | None = None
+        meta: GenericMetaFilter | None = None
+
+    @dataclasses.dataclass(kw_only=True)
+    class ParticipantSequencingGroupFilter(GenericFilterModel):
+        """
+        Participant sequencing group filter model
+        """
+
+        id: GenericFilter[int] | None = None
+        external_id: GenericFilter[str] | None = None
+        meta: GenericMetaFilter | None = None
+        type: GenericFilter[str] | None = None
+        technology: GenericFilter[str] | None = None
+        platform: GenericFilter[str] | None = None
+
+    @dataclasses.dataclass(kw_only=True)
+    class ParticipantAssayFilter(GenericFilterModel):
+        """
+        Participant assay filter model
+        """
+
+        id: GenericFilter[int] | None = None
+        external_id: GenericFilter[str] | None = None
+        meta: GenericMetaFilter | None = None
+        type: GenericFilter[str] | None = None
+        technology: GenericFilter[str] | None = None
+        platform: GenericFilter[str] | None = None
+
+    id: GenericFilter[int] | None = None
+    meta: GenericMetaFilter | None = None
+    external_id: GenericFilter[str] | None = None
+    reported_sex: GenericFilter[int] | None = None
+    reported_gender: GenericFilter[str] | None = None
+    karyotype: GenericFilter[str] | None = None
+    project: GenericFilter[ProjectId] | None = None
+
+    sample: ParticipantSampleFilter | None = None
+    sequencing_group: ParticipantSequencingGroupFilter | None = None
+    assay: ParticipantAssayFilter | None = None
 
 
 class ParticipantTable(DbBase):
@@ -39,36 +103,124 @@ class ParticipantTable(DbBase):
         )
         return set(r['project'] for r in rows)
 
+    async def query(
+        self, filter_: ParticipantFilter
+    ) -> tuple[set[ProjectId], list[ParticipantInternal]]:
+        """Query for participants
+
+        Args:
+            filter_ (ParticipantFilter): _description_
+
+        Returns:
+            list[ParticipantInternal]: _description_
+        """
+        needs_sample = False
+        needs_sequencing_group = False
+        needs_assay = False
+
+        wheres, values = filter_.to_sql(
+            {
+                'project': 'p.project',
+                'id': 'p.id',
+                'external_id': 'p.external_id',
+                'meta': 'p.meta',
+            },
+            exclude=['sample', 'sequencing_group', 'assay'],
+        )
+
+        if filter_.sample:
+            needs_sample = True
+            swheres, svalues = filter_.sample.to_sql(
+                {
+                    'id': 's.id',
+                    'type': 's.type',
+                    'external_id': 's.external_id',
+                    'meta': 's.meta',
+                }
+            )
+            values.update(svalues)
+            if swheres:
+                wheres += ' AND ' + swheres
+
+        if filter_.sequencing_group:
+            needs_sample = True
+            needs_sequencing_group = True
+            swheres, svalues = filter_.sequencing_group.to_sql(
+                {
+                    'id': 'sg.id',
+                    'external_id': 'sg.external_id',
+                    'meta': 'sg.meta',
+                    'type': 'sg.type',
+                    'technology': 'sg.technology',
+                    'platform': 'sg.platform',
+                }
+            )
+            values.update(svalues)
+            if swheres:
+                wheres += ' AND ' + swheres
+
+        if filter_.assay:
+            needs_sample = True
+            needs_sequencing_group = True
+            needs_assay = True
+            swheres, svalues = filter_.assay.to_sql(
+                {
+                    'id': 'a.id',
+                    'external_id': 'a.external_id',
+                    'meta': 'a.meta',
+                    'type': 'a.type',
+                    'technology': 'a.technology',
+                    'platform': 'a.platform',
+                }
+            )
+            values.update(svalues)
+            if swheres:
+                wheres += ' AND ' + swheres
+
+        query = """
+        SELECT
+            p.id, p.external_id, p.reported_sex, p.reported_gender,
+            p.karyotype, p.meta, p.project
+        FROM participant p
+        """
+
+        if needs_sample:
+            query += 'INNER JOIN sample s ON s.participant_id = p.id\n'
+        if needs_sequencing_group:
+            query += 'INNER JOIN sequencing_group sg ON sg.sample_id = s.id\n'
+        if needs_assay:
+            query += 'INNER JOIN assay a ON a.sequencing_group_id = sg.id\n'
+
+        if wheres:
+            query += 'WHERE \n' + wheres
+
+        rows = await self.connection.fetch_all(query, values)
+        projects = set(r['project'] for r in rows)
+        return projects, [ParticipantInternal.from_db(dict(r)) for r in rows]
+
     async def get_participants_by_ids(
         self, ids: list[int]
     ) -> tuple[set[ProjectId], list[ParticipantInternal]]:
         """Get participants by IDs"""
-        _query = f"""
-        SELECT {self.keys_str}
-        FROM participant
-        WHERE id in :ids"""
-        rows = await self.connection.fetch_all(_query, {'ids': ids})
-        ds = [dict(r) for r in rows]
-        projects = set(d.get('project') for d in ds)
-        return projects, [ParticipantInternal.from_db(dict(d)) for d in ds]
+        return await self.query(ParticipantFilter(id=GenericFilter(in_=ids)))
 
     async def get_participants(
-        self, project: int, internal_participant_ids: list[int] = None
+        self, project: int, internal_participant_ids: list[int] | None = None
     ) -> list[ParticipantInternal]:
         """
         Get participants for a project
         """
-        values: dict[str, Any] = {'project': project}
-        if internal_participant_ids:
-            _query = f"""
-                SELECT {self.keys_str}
-                FROM participant
-                WHERE project = :project AND id in :ids"""
-            values['ids'] = internal_participant_ids
-        else:
-            _query = f'SELECT {self.keys_str} FROM participant WHERE project = :project'
-        rows = await self.connection.fetch_all(_query, values)
-        return [ParticipantInternal.from_db(dict(r)) for r in rows]
+        _, particicpants = await self.query(
+            ParticipantFilter(
+                project=GenericFilter(in_=[project]),
+                id=(
+                    GenericFilter(in_=internal_participant_ids)
+                    if internal_participant_ids
+                    else None
+                ),
+            )
+        )
+        return particicpants
 
     async def create_participant(
         self,

@@ -326,6 +326,10 @@ class GenericFilterModel:
             if isinstance(value, GenericFilter):
                 continue
 
+            if isinstance(value, GenericFilterModel):
+                # allow nested GenericFilterModels
+                continue
+
             if isinstance(value, dict):
                 # make sure each field is a GenericFilter, or set it to be one,
                 # in this case it's always 'eq', never automatically in_
