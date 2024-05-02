@@ -99,8 +99,16 @@ def process_rows(
     source_type = bq_row.type
     # source_type should be in the format /ParserName/Version e.g.: /bbv/v1
 
-    # body field is already a JSON type
-    row_json = bq_row.body
+    if isinstance(bq_row.body, str):
+        # body field is a string, convert to JSON
+        try:
+            row_json = json.loads(bq_row.body)
+        except json.JSONDecodeError as e:
+            return ParsingStatus.FAILED, f'Failed to decode JSON: {e}', bq_row
+    else:
+        # body field is already a JSON type
+        row_json = bq_row.body
+
     submitting_user = bq_row.submitting_user
 
     # get config from payload and merge with the default
