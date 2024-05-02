@@ -549,6 +549,7 @@ class AssayTable(DbBase):
                 drow['external_ids'] = {drow.pop('name'): external_id}
             else:
                 drow['external_ids'] = {}
+                del drow['name']
 
             sequencing_group_id = drow.pop('sequencing_group_id')
             projects.add(drow.pop('project'))
