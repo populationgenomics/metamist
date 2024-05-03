@@ -320,14 +320,27 @@ html[data-theme='dark-mode'] .ui.table {
     border: 1px solid #dadde9;
 }
 
+.ui.table {
+    table-layout: fixed;
+}
+
 .ui.table .table-cell {
     text-align: center;
     color: var(--color-text-primary) !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    white-space: normal !important; /* Add this line */
 }
 
 .ui.table .header-cell {
     text-align: center;
     font-size: 1.1em;
+    padding: 10px !important;
+    min-width: 100px !important;
+    max-width: 300px !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    white-space: normal !important; /* Add this line */
     color: var(--color-text-primary) !important;
     background-color: var(--color-header-row) !important;
     border-color: var(--color-border-default) !important;
