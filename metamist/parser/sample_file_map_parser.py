@@ -15,6 +15,7 @@ SEQ_FACILITY_COL_NAME = 'sequencing_facility'
 SEQ_LIBRARY_COL_NAME = 'sequencing_library'
 READ_END_TYPE_COL_NAME = 'read_end_type'
 READ_LENGTH_COL_NAME = 'read_length'
+ASSAY_META_COL_NAME = 'assay_meta'
 
 KeyMap = {
     PARTICIPANT_COL_NAME: [
@@ -35,6 +36,7 @@ KeyMap = {
     READ_END_TYPE_COL_NAME: ['read_end_type', 'read end type', 'read_end_types', 'read end types', 'end type', 'end_type', 'end_types', 'end types'],
     READ_LENGTH_COL_NAME: ['length', 'read length', 'read_length', 'read lengths', 'read_lengths'],
     CHECKSUM_COL_NAME: ['md5', 'checksum'],
+    ASSAY_META_COL_NAME: ['assay_meta', 'assay meta'],
 }
 
 required_keys = [SAMPLE_ID_COL_NAME, READS_COL_NAME]

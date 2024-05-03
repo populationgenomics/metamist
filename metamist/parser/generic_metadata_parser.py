@@ -1,5 +1,6 @@
 # pylint: disable=R0904,too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument,too-many-arguments,unused-import
 import asyncio
+import json
 import logging
 import re
 import shlex
@@ -100,7 +101,7 @@ class GenericMetadataParser(GenericParser):
         read_length_column: str | None = None,
         gvcf_column: str | None = None,
         meta_column: str | None = None,
-        seq_meta_column: str | None = None,
+        assay_meta_column: str | None = None,
         batch_number: str | None = None,
         reference_assembly_location_column: str | None = None,
         default_reference_assembly_location: str | None = None,
@@ -153,7 +154,7 @@ class GenericMetadataParser(GenericParser):
         self.checksum_column = checksum_column
         self.gvcf_column = gvcf_column
         self.meta_column = meta_column
-        self.seq_meta_column = seq_meta_column
+        self.assay_meta_column = assay_meta_column
         self.allow_extra_files_in_search_path = allow_extra_files_in_search_path
         self.batch_number = batch_number
 
@@ -261,6 +262,11 @@ class GenericMetadataParser(GenericParser):
         """Get external assay ID from row. Needs to be implemented per parser.
         NOTE: To be re-thought after assay group changes are applied"""
         return None
+
+    def get_assay_meta(self, row: GroupedRow) -> dict[str, Any] | None:
+        """Get assay metadata from row"""
+        value = json.loads(row.get(self.assay_meta_column, '{}')) or {}
+        return value
 
     def get_participant_id(self, row: SingleRow) -> str | None:
         """Get external participant ID from row"""
@@ -702,6 +708,9 @@ class GenericMetadataParser(GenericParser):
 
         if self.batch_number is not None:
             collapsed_assay_meta['batch'] = self.batch_number
+
+        if self.assay_meta_column:
+            collapsed_assay_meta.update(self.get_assay_meta(sequencing_group.rows[0]))
 
         if sequencing_group.sequencing_type in ['exome', 'polyarna', 'totalrna', 'singlecellrna']:
             rows = sequencing_group.rows
