@@ -483,12 +483,17 @@ class TestParseGenericMetadata(DbIsolatedTest):
             )
         return
 
+    @run_as_sync
+    @patch('metamist.parser.generic_parser.query_async')
     async def test_lrs_rows_with_arbitrary_assay_meta_columns(
         self,
+        mock_graphql_query
     ):
         """
         Test importing a single row of long read sequencing data with arbitrary assay metadata columns
         """
+        mock_graphql_query.side_effect = self.run_graphql_query_async
+
         rows = [
             'Sample ID\tFilename\tassay_meta1\tassay_meta2',
             'sample_id003\t"sample_id003.filename-R1.fastq.gz,sample_id003.filename-R2.fastq.gz"\tTrue\tsome_value',
@@ -562,6 +567,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
         self.assertDictEqual(expected_assay_dict, assay.meta)
         self.assertDictEqual(expected_sg_dict, sg.meta)
+        return
 
     @run_as_sync
     @patch('metamist.parser.generic_parser.query_async')
