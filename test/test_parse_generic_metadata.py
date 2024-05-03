@@ -7,7 +7,10 @@ from unittest.mock import patch
 import api.graphql.schema
 from db.python.layers import ParticipantLayer
 from metamist.graphql import configure_sync_client, validate
-from metamist.parser.generic_metadata_parser import GenericMetadataParser
+from metamist.parser.generic_metadata_parser import (
+    DefaultSequencing,
+    GenericMetadataParser,
+)
 from metamist.parser.generic_parser import (
     QUERY_MATCH_ASSAYS,
     QUERY_MATCH_PARTICIPANTS,
@@ -479,6 +482,86 @@ class TestParseGenericMetadata(DbIsolatedTest):
                 StringIO(file_contents), delimiter='\t', dry_run=True
             )
         return
+
+    async def test_lrs_rows_with_arbitrary_assay_meta_columns(
+        self,
+    ):
+        """
+        Test importing a single row of long read sequencing data with arbitrary assay metadata columns
+        """
+        rows = [
+            'Sample ID\tFilename\tassay_meta1\tassay_meta2',
+            'sample_id003\t"sample_id003.filename-R1.fastq.gz,sample_id003.filename-R2.fastq.gz"\tTrue\tsome_value',
+        ]
+        parser = GenericMetadataParser(
+            search_locations=[],
+            sample_name_column='Sample ID',
+            reads_column='Filename',
+            assay_meta_columns=['assay_meta1', 'assay_meta2'],
+            default_sequencing=DefaultSequencing(
+                seq_type='genome',
+                technology='long-read',
+                platform='pacbio',
+            ),
+            # doesn't matter, we're going to mock the call anyway
+            project=self.project_name,
+            skip_checking_gcs_objects=True,
+        )
+
+        parser.filename_map = {
+            'sample_id003.filename-R1.fastq.gz': '/path/to/sample_id003.filename-R1.fastq.gz',
+            'sample_id003.filename-R2.fastq.gz': '/path/to/sample_id003.filename-R2.fastq.gz',
+        }
+
+        # Call generic parser
+        file_contents = '\n'.join(rows)
+
+        _, prows = await parser.parse_manifest(
+            StringIO(file_contents), delimiter='\t', dry_run=True
+        )
+
+        participants: list[ParsedParticipant] = prows
+
+        expected_assay_dict = {
+            'reads': [
+                {
+                    'basename': 'sample_id003.filename-R1.fastq.gz',
+                    'checksum': None,
+                    'class': 'File',
+                    'location': '/path/to/sample_id003.filename-R1.fastq.gz',
+                    'size': None,
+                    'datetime_added': None,
+                },
+                {
+                    'basename': 'sample_id003.filename-R2.fastq.gz',
+                    'checksum': None,
+                    'class': 'File',
+                    'location': '/path/to/sample_id003.filename-R2.fastq.gz',
+                    'size': None,
+                    'datetime_added': None,
+                },
+            ],
+            'reads_type': 'fastq',
+            'sequencing_platform': 'pacbio',
+            'sequencing_technology': 'long-read',
+            'sequencing_type': 'genome',
+            'assay_meta1': True,
+            'assa_meta2': 'some_value',
+        }
+
+        expected_sg_dict = {
+            'sequencing_platform': 'pacbio',
+            'sequencing_technology': 'long-read',
+            'sequencing_type': 'genome',
+            'assay_meta1': True,
+            'assa_meta2': 'some_value',
+        }
+
+        assay = participants[0].samples[0].sequencing_groups[0].assays[0]
+        sg = participants[0].samples[0].sequencing_groups[0]
+
+        self.assertDictEqual(expected_assay_dict, assay.meta)
+        self.assertDictEqual(expected_sg_dict, sg.meta)
 
     @run_as_sync
     @patch('metamist.parser.generic_parser.query_async')
