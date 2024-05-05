@@ -495,11 +495,12 @@ class TestParseGenericMetadata(DbIsolatedTest):
         mock_graphql_query.side_effect = self.run_graphql_query_async
 
         rows = [
-            'Sample ID\tFilename\tassay_meta1\tassay_meta2',
-            'sample_id003\t"sample_id003.filename-R1.fastq.gz,sample_id003.filename-R2.fastq.gz"\tTrue\tsome_value',
+            'Individual ID\tSample ID\tFilename\tassay_meta1\tassay_meta2',
+            'Athena\tsample_id003\t"sample_id003.filename-R1.fastq.gz,sample_id003.filename-R2.fastq.gz"\tTrue\tsome_value',
         ]
         parser = GenericMetadataParser(
             search_locations=[],
+            participant_column='Individual ID',
             sample_name_column='Sample ID',
             reads_column='Filename',
             assay_meta_columns=['assay_meta1', 'assay_meta2'],
@@ -521,11 +522,11 @@ class TestParseGenericMetadata(DbIsolatedTest):
         # Call generic parser
         file_contents = '\n'.join(rows)
 
-        _, prows = await parser.parse_manifest(
+        _, srows = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        participants: list[ParsedParticipant] = prows
+        participants: list[ParsedParticipant] = srows
 
         expected_assay_dict = {
             'reads': [
@@ -551,7 +552,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
             'sequencing_technology': 'long-read',
             'sequencing_type': 'genome',
             'assay_meta1': True,
-            'assa_meta2': 'some_value',
+            'assay_meta2': 'some_value',
         }
 
         expected_sg_dict = {
@@ -559,7 +560,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
             'sequencing_technology': 'long-read',
             'sequencing_type': 'genome',
             'assay_meta1': True,
-            'assa_meta2': 'some_value',
+            'assay_meta2': 'some_value',
         }
 
         assay = participants[0].samples[0].sequencing_groups[0].assays[0]
