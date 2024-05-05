@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pulumi
 import pulumi_gcp as gcp
+
 from cpg_infra.plugin import CpgInfrastructurePlugin
 from cpg_infra.utils import archive_folder
 
