@@ -326,7 +326,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             ack_deadline_seconds=30,
             dead_letter_policy=gcp.pubsub.SubscriptionDeadLetterPolicyArgs(
                 dead_letter_topic=self.etl_pubsub_dead_letters_topic.id,
-                max_delivery_attempts=3,
+                max_delivery_attempts=5,
             ),
             push_config=gcp.pubsub.SubscriptionPushConfigArgs(
                 push_endpoint=self.etl_load_function.service_config.uri,
