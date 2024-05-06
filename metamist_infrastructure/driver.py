@@ -323,7 +323,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         subscription = gcp.pubsub.Subscription(
             'metamist-etl-subscription',
             topic=self.etl_pubsub_topic.name,
-            ack_deadline_seconds=20,
+            ack_deadline_seconds=30,
             dead_letter_policy=gcp.pubsub.SubscriptionDeadLetterPolicyArgs(
                 dead_letter_topic=self.etl_pubsub_dead_letters_topic.id,
                 max_delivery_attempts=5,
@@ -500,6 +500,16 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             'metamist-etl-load-editor-role',
             project=self.config.metamist.gcp.project,
             role='roles/editor',
+            member=pulumi.Output.concat(
+                'serviceAccount:', self.etl_load_service_account.email
+            ),
+        )
+        # give the etl_load_service_account ability
+        # to access accessor-configuration in secretmanager
+        gcp.projects.IAMMember(
+            'metamist-etl-load-secret-accessor-role',
+            project=self.config.metamist.gcp.project,
+            role='roles/secretmanager.secretAccessor',
             member=pulumi.Output.concat(
                 'serviceAccount:', self.etl_load_service_account.email
             ),
