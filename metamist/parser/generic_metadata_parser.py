@@ -263,11 +263,18 @@ class GenericMetadataParser(GenericParser):
         return None
 
     def get_assay_meta(self, row: GroupedRow) -> dict[str, Any] | None:
-        """Get assay metadata from row"""
+        """Get assay metadata from row, parse true/false strings to boolean"""
         assay_meta = {}
         for column in self.assay_meta_columns:
             if column in row:
-                assay_meta[column] = True if row[column] == 'True' else row[column]
+                value = row[column]
+                if isinstance(value, str):
+                    if value.lower() == 'true':
+                        assay_meta[column] = True
+                    elif value.lower() == 'false':
+                        assay_meta[column] = False
+                    else:
+                        assay_meta[column] = value
         return assay_meta
 
     def get_participant_id(self, row: SingleRow) -> str | None:
