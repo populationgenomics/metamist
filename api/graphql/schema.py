@@ -206,6 +206,16 @@ class GraphQLProject:
         analysis_runners = await alayer.query(filter_)
         return [GraphQLAnalysisRunner.from_internal(ar) for ar in analysis_runners]
 
+    @strawberry.field
+    async def ourdna_dashboard(
+        self,
+        info: Info,
+        root: 'Project'
+    ) -> list[strawberry.scalars.JSON]:
+        connection = info.context['connection']
+        ourdna_layer = OurDnaDashboardLayer(connection)
+        return [await ourdna_layer.query(SampleFilter(project=root.id), project_id=root.id)]
+
     @strawberry.field()
     async def pedigree(
         self,
@@ -1074,32 +1084,6 @@ class Query:  # entry point to graphql.
                 f'Expected exactly one analysis runner expected, found {len(analysis_runners)}'
             )
         return GraphQLAnalysisRunner.from_internal(analysis_runners[0])
-
-    @strawberry.field
-    async def ourdna_dashboard(self, info: Info, project: GraphQLFilter[str] | None = None) -> list[strawberry.scalars.JSON]:
-        connection = info.context['connection']
-        ptable = ProjectPermissionsTable(connection)
-
-        if not project:
-            raise ValueError('Must provide project')
-
-        project_name_map: dict[str, int] = {}
-        if project:
-            project_names = project.all_values()
-            projects = await ptable.get_and_check_access_to_projects_for_names(
-                user=connection.author, project_names=project_names, readonly=True
-            )
-            project_name_map = {p.name: p.id for p in projects}
-            project_ids = list(project_name_map.values())
-
-        filter_ = SampleFilter(
-            project=(
-                project.to_internal_filter(lambda pname: project_name_map[pname])
-                if project
-                else None
-            ),
-        )
-        return [await OurDnaDashboardLayer(connection).query(filter_, project_ids)]
 
 
 schema = strawberry.Schema(

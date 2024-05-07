@@ -60,7 +60,7 @@ class OurDnaDashboardLayer(BaseLayer):
         return int(time_taken.total_seconds())
 
     async def query(
-        self, filter_: SampleFilter, check_project_ids: bool = True, project_ids: list = None
+        self, filter_: SampleFilter, check_project_ids: bool = True, project_id: int = None
     ) -> dict:
         """Get dashboard data"""
         projects: set[int]
@@ -74,17 +74,22 @@ class OurDnaDashboardLayer(BaseLayer):
         collection_to_process_end_time_24h: dict[str, int] = {}
         processing_times_by_site: dict[str, list[dict[str, int]]] = defaultdict(list)
         total_samples_by_collection_event_name: dict[str, int] = defaultdict(int)
-        samples_lost_after_collection: dict[str, dict[Any, Any]] = {}
+        samples_lost_after_collection: dict[str, dict[str, Any]] = {}
         samples_concentration_gt_1ug: dict[str, float] = {}
         participants_consented_not_collected: list[int] = []
         participants_signed_not_consented: list[int] = []
 
         # TODO We should figure out if we need to handle more than a single project_id
-        for project_id in project_ids:
-            participants.extend(await self.participant_table.get_participants(project=project_id))
+        # for project_id in project_ids:
+        participants.extend(await self.participant_table.get_participants(project=project_id))
 
         projects, samples_internal = await self.sample_table.query(filter_=filter_)
         samples = [s.to_external() for s in samples_internal]
+
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.author, projects, readonly=True
+            )
 
         for participant in participants:
             samples_for_participant = [sample for sample in samples if sample.participant_id == participant.id]
@@ -101,11 +106,6 @@ class OurDnaDashboardLayer(BaseLayer):
             # Get the participants that have signed but not consented
             if participant.meta.get('consent') is None:
                 participants_signed_not_consented.append(participant.id)
-
-        if check_project_ids:
-            await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
-            )
 
         # TODO Add logic here to query and aggregate the data
 
