@@ -324,6 +324,12 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             'metamist-etl-subscription',
             topic=self.etl_pubsub_topic.name,
             ack_deadline_seconds=30,
+            expiration_policy=gcp.pubsub.SubscriptionExpirationPolicyArgs(
+                ttl='',  # never expire
+            ),
+            retry_policy=gcp.pubsub.SubscriptionRetryPolicyArgs(
+                minimum_backoff='10s',  # 10 seconds backoff
+            ),
             dead_letter_policy=gcp.pubsub.SubscriptionDeadLetterPolicyArgs(
                 dead_letter_topic=self.etl_pubsub_dead_letters_topic.id,
                 max_delivery_attempts=5,
