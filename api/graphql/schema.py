@@ -233,9 +233,6 @@ class GraphQLProject:
         if not root.id:
             raise ValueError('Project must have an id')
 
-        if not internal_family_ids:
-            return []
-
         pedigree_dicts = await family_layer.get_pedigree(
             project=root.id,
             family_ids=internal_family_ids,
