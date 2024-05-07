@@ -1,7 +1,7 @@
 from test.testbase import DbIsolatedTest, run_as_sync
 
-from models.models.sample import sample_id_format
-from db.python.layers.sample import SampleLayer, SampleType
+from db.python.layers.sample import SampleLayer
+from models.models.sample import SampleUpsertInternal
 
 
 class TestSample(DbIsolatedTest):
@@ -17,52 +17,58 @@ class TestSample(DbIsolatedTest):
     @run_as_sync
     async def test_add_sample(self):
         """Test inserting a sample"""
-        s = await self.slayer.insert_sample(
-            'Test01',
-            SampleType.BLOOD,
-            active=True,
-            meta={'meta': 'meta ;)'},
+        sample = await self.slayer.upsert_sample(
+            SampleUpsertInternal(
+                external_id='Test01',
+                type='blood',
+                active=True,
+                meta={'meta': 'meta ;)'},
+            )
         )
 
         samples = await self.connection.connection.fetch_all(
             'SELECT id, type, meta, project FROM sample'
         )
         self.assertEqual(1, len(samples))
-        s = samples[0]
-        self.assertEqual(1, s['id'])
+        self.assertEqual(sample.id, samples[0]['id'])
 
     @run_as_sync
     async def test_get_sample(self):
         """Test getting formed sample"""
         meta_dict = {'meta': 'meta ;)'}
-        s = await self.slayer.insert_sample(
-            'Test01',
-            SampleType.BLOOD,
-            active=True,
-            meta=meta_dict,
+        s = await self.slayer.upsert_sample(
+            SampleUpsertInternal(
+                external_id='Test01',
+                type='blood',
+                active=True,
+                meta=meta_dict,
+            )
         )
 
-        sample = await self.slayer.get_by_id(s, check_project_id=False)
+        sample = await self.slayer.get_by_id(s.id, check_project_id=False)
 
-        self.assertEqual(sample_id_format(s), sample.id)
-        self.assertEqual(SampleType.BLOOD, sample.type)
+        self.assertEqual('blood', sample.type)
         self.assertDictEqual(meta_dict, sample.meta)
 
     @run_as_sync
     async def test_update_sample(self):
         """Test updating a sample"""
         meta_dict = {'meta': 'meta ;)'}
-        s = await self.slayer.insert_sample(
-            'Test01',
-            SampleType.BLOOD,
-            active=True,
-            meta=meta_dict,
+        s = await self.slayer.upsert_sample(
+            SampleUpsertInternal(
+                external_id='Test01',
+                type='blood',
+                active=True,
+                meta=meta_dict,
+            )
         )
 
         new_external_id = 'Test02'
-        s = await self.slayer.update_sample(s, external_id=new_external_id)
+        await self.slayer.upsert_sample(
+            SampleUpsertInternal(id=s.id, external_id=new_external_id)
+        )
 
-        sample = await self.slayer.get_by_id(s, check_project_id=False)
+        sample = await self.slayer.get_by_id(s.id, check_project_id=False)
 
         self.assertEqual(new_external_id, sample.external_id)
 

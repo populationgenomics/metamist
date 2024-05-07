@@ -1,18 +1,24 @@
 # requirements are for running the server
-cpg-utils
+# fix boto3/core version to prevent pip downloading all the versions caused by cloudpathlib
+boto3==1.28.56
+botocore==1.31.56
+cpg-utils>=5.0.5
 aiohttp
+async_lru
 cloudpathlib
 requests
-google-auth==1.35.0
+google-auth>=2.19.0
 google-cloud-secret-manager==2.8.0
+google-cloud-bigquery==3.11.4
 google-cloud-logging==2.7.0
+google-cloud-pubsub==2.18.3
 google-cloud-storage==1.43.0
 uvicorn==0.18.3
 fastapi[all]==0.85.1
-strawberry-graphql[fastapi]==0.138.1
+strawberry-graphql[fastapi]==0.206.0
 python-multipart==0.0.5
-databases[mysql]==0.6.1
-SQLAlchemy==1.4.41
-cryptography==36.0.1
+databases[mysql]==0.9.0
+SQLAlchemy==2.0.28
+cryptography>=41.0.0
 python-dateutil==2.8.2
 slack-sdk==3.20.2

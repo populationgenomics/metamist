@@ -1,22 +1,25 @@
 import asyncio
 from typing import List, Optional
 
-from db.python.connect import NotFoundError
 from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.family import FamilyTable
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleTable
+from db.python.tables.sequencing_group import SequencingGroupTable
+from db.python.utils import NotFoundError
 from models.enums.search import SearchResponseType
-from models.models.sample import (
-    sample_id_format,
-    sample_id_transform_to_raw,
-)
+from models.models.sample import sample_id_format, sample_id_transform_to_raw
 from models.models.search import (
-    SearchResponse,
-    SampleSearchResponseData,
-    ParticipantSearchResponseData,
     FamilySearchResponseData,
+    ParticipantSearchResponseData,
+    SampleSearchResponseData,
+    SearchResponse,
+    SequencingGroupSearchResponseData,
+)
+from models.models.sequencing_group import (
+    sequencing_group_id_format,
+    sequencing_group_id_transform_to_raw,
 )
 
 
@@ -25,7 +28,7 @@ class SearchLayer(BaseLayer):
 
     def __init__(self, connection: Connection):
         super().__init__(connection)
-        self.pt = ProjectPermissionsTable(connection.connection)
+        self.pt = ProjectPermissionsTable(connection)
         self.connection = connection
 
     @staticmethod
@@ -35,6 +38,17 @@ class SearchLayer(BaseLayer):
         otherwise return None (helper to catch exception)"""
         try:
             return sample_id_transform_to_raw(query, strict=False)
+        except ValueError:
+            return None
+
+    @staticmethod
+    def try_get_sg_id_from_query(query: str) -> Optional[int]:
+        """
+        Try to get internal CPG SG Identifier from string,
+        otherwise return None (helper to catch exception)"""
+        try:
+            print(sequencing_group_id_transform_to_raw(query, strict=False))
+            return sequencing_group_id_transform_to_raw(query, strict=False)
         except ValueError:
             return None
 
@@ -48,14 +62,14 @@ class SearchLayer(BaseLayer):
         cpg_id = sample_id_format(sample_id)
 
         try:
-            project, sample = await stable.get_single_by_id(sample_id)
+            project, sample = await stable.get_sample_by_id(sample_id)
         except NotFoundError:
             return None
 
         sample_eids = [sample.external_id]
         participant_id = int(sample.participant_id) if sample.participant_id else None
-        participant_eids = []
-        family_eids = []
+        participant_eids: list[str] = []
+        family_eids: list[str] = []
 
         title = cpg_id
         id_field = cpg_id
@@ -86,6 +100,41 @@ class SearchLayer(BaseLayer):
             ),
         )
 
+    async def _get_search_result_for_sequencing_group(
+        self, sg_id: int, project_ids: list[int]
+    ) -> SearchResponse | None:
+        sgtable = SequencingGroupTable(self.connection)
+
+        cpg_sg_id = sequencing_group_id_format(sg_id)
+
+        try:
+            _, rows = await sgtable.get_sequencing_groups_by_ids(ids=[sg_id])
+        except NotFoundError:
+            return None
+        result = rows[0]
+
+        sample_id = result.sample_id
+        sg_id = result.id
+        project = result.project
+
+        title = cpg_sg_id
+        id_field = cpg_sg_id
+        if project not in project_ids:
+            # or should it maybe say "no-access" or something
+            title = f'{cpg_sg_id} (no access to project)'
+            id_field = None
+
+        return SearchResponse(
+            title=title,
+            type=SearchResponseType.SEQGROUP,
+            data=SequencingGroupSearchResponseData(
+                project=project,
+                id=id_field,
+                sample_external_id=sample_id_format(sample_id),
+                sg_external_id=sequencing_group_id_format(sg_id),
+            ),
+        )
+
     async def search(self, query: str, project_ids: list[int]) -> List[SearchResponse]:
         """
         Search metamist for some string, get some set of SearchResponses
@@ -100,6 +149,14 @@ class SearchLayer(BaseLayer):
             # just get the sample
             response = await self._get_search_result_for_sample(
                 cpg_sample_id, project_ids=project_ids
+            )
+
+            return [response] if response else []
+
+        if cpg_sg_id := self.try_get_sg_id_from_query(query):
+            # just get the sg
+            response = await self._get_search_result_for_sequencing_group(
+                cpg_sg_id, project_ids=project_ids
             )
 
             return [response] if response else []
@@ -123,6 +180,8 @@ class SearchLayer(BaseLayer):
             ptable.get_external_ids_by_participant(sample_participant_ids),
             ftable.get_family_external_ids_by_participant_ids(all_participant_ids),
         )
+
+        # TODO: add SG external ID searching
 
         samples = [
             SearchResponse(

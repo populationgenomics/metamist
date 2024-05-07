@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 # pylint: disable=logging-not-lazy,subprocess-popen-preexec-fn,consider-using-with
 import logging
-import re
-from typing import Optional, List
-
 import os
-import signal
-import tempfile
+import re
 import shutil
-import time
+import signal
 import subprocess
+import tempfile
+import time
+from typing import List, Optional
 
 import requests
 
@@ -17,13 +16,14 @@ DOCKER_IMAGE = os.getenv('SM_DOCKER')
 PORT = os.getenv('PORT', '8000')
 SCHEMA_URL = os.getenv('SM_SCHEMAURL', f'http://localhost:{PORT}/openapi.json')
 OPENAPI_COMMAND = os.getenv('OPENAPI_COMMAND', 'openapi-generator').split(' ')
-MODULE_NAME = 'sample_metadata'
+MODULE_NAME = 'metamist'
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = 'web/src/static'
 OUTPUT_DOCS_DIR = os.path.join(STATIC_DIR, 'sm_docs')
+MODULE_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), MODULE_NAME)
 
 
 def check_if_server_is_accessible() -> bool:
@@ -32,6 +32,15 @@ def check_if_server_is_accessible() -> bool:
         return requests.get(SCHEMA_URL, timeout=30).ok
     except requests.ConnectionError:
         return False
+
+
+def assert_server_is_accessible():
+    """Assert that the server is accessible"""
+    if not check_if_server_is_accessible():
+        raise requests.ConnectionError(
+            f'Could not connect to server at {SCHEMA_URL}. '
+            'Please make sure the server is running and accessible.'
+        )
 
 
 def start_server() -> Optional[subprocess.Popen]:
@@ -93,12 +102,27 @@ def _get_openapi_version():
     # require two different ways to get the version
     version_cmds = ['--version', 'version']
 
+    has_timeout = False
     for version_cmd in version_cmds:
         command = [*OPENAPI_COMMAND, version_cmd]
         try:
-            return subprocess.check_output(command, stderr=subprocess.PIPE)
+            return subprocess.check_output(command, stderr=subprocess.PIPE, timeout=10)
+
+        except subprocess.TimeoutExpired:
+            has_timeout = True
+            # sometimes a timeout means that it's waiting for stdin because openapi
+            # is misconfigured, so try the next command and then tell the user
+            continue
+
         except subprocess.CalledProcessError:
             continue
+
+    if has_timeout:
+        _command = ' '.join([*OPENAPI_COMMAND, version_cmds[-1]])
+        raise ValueError(
+            'Could not get version of openapi as the command timed out, this might '
+            f'mean openapi is misconfigured. Try running "{_command}" in your terminal.'
+        )
 
     raise ValueError('Could not get version of openapi')
 
@@ -123,7 +147,9 @@ def check_openapi_version():
     logger.info(f'Got openapi version: {version}')
 
 
-def generate_api_and_copy(output_type, output_copyer, extra_commands: List[str] = None):
+def generate_api_and_copy(
+    output_type, output_copyer, extra_commands: List[str] | None = None
+):
     """
     Use OpenApiGenerator to generate the installable API
     """
@@ -160,10 +186,23 @@ def generate_api_and_copy(output_type, output_copyer, extra_commands: List[str] 
             time.sleep(2)
 
     if not succeeded:
-        return
+        raise RuntimeError(
+            f'openapi generation failed after trying {n_attempts} time(s)'
+        )
 
     output_copyer(tmpdir)
     shutil.rmtree(tmpdir)
+
+
+def generate_schema_file():
+    """
+    Generate schema file and place in the metamist/graphql/ directory
+    """
+    command = ['strawberry', 'export-schema', 'api.graphql.schema:schema']
+    schema = subprocess.check_output(command).decode()
+
+    with open(os.path.join(MODULE_DIR, 'graphql/schema.graphql'), 'w+') as f:
+        f.write(schema)
 
 
 def copy_typescript_files_from(tmpdir):
@@ -216,17 +255,16 @@ def copy_python_files_from(tmpdir):
     """
     Copy a selection of API files generated from openapi-generator:
 
-        FROM:   $tmpdir/sample_metadata
-        TO:     ./sample_metadata
+        FROM:   $tmpdir/metamist
+        TO:     ./metamist
 
-    This clears the ./sample_metadata folder except for 'files_to_ignore'.
+    This clears the ./metamist folder except for 'files_to_ignore'.
     """
 
     files_to_ignore = {'README.md', 'parser', 'graphql', 'audit'}
 
-    module_dir = MODULE_NAME.replace('.', '/')
-    dir_to_copy_to = module_dir  # should be relative to this script
-    dir_to_copy_from = os.path.join(tmpdir, module_dir)
+    dir_to_copy_to = MODULE_DIR  # should be relative to this script
+    dir_to_copy_from = os.path.join(tmpdir, MODULE_NAME)
 
     if not os.path.exists(dir_to_copy_to):
         raise FileNotFoundError(
@@ -277,31 +315,60 @@ def main():
     Generates installable python API using:
         - Start API server (if applicable);
         - Call openapi-generator to generate python API to temp folder;
-        - Empty the 'sample_metadata' folder (except for some files);
-        - Copy relevant files to 'sample_metadata' in CWD;
+        - Empty the 'metamist' folder (except for some files);
+        - Copy relevant files to 'metamist' in CWD;
         - Stop the server (if applicable)
 
     """
+    # check openapi version first, because it seems to be fairly sketchy
+    check_openapi_version()
+
     if check_if_server_is_accessible():
         logger.info(f'Using already existing server {SCHEMA_URL}')
         process = None
     else:
         process = start_server()
 
+        # Loop until Docker has initialised server and is ready to accept connections
+        startup_tries = 5
+        wait_time_in_seconds = 2
+        while (not check_if_server_is_accessible()) and startup_tries > 0:
+            startup_tries -= 1
+            logger.info(
+                'Dockerised API server is not ready yet. '
+                + f'Retrying in {wait_time_in_seconds} seconds. '
+                + f'Remaining tries: {startup_tries}'
+            )
+            time.sleep(wait_time_in_seconds)
+
     try:
-        check_openapi_version()
+        assert_server_is_accessible()
+
+        # Generate the installable Python API
         generate_api_and_copy(
             'python',
             copy_python_files_from,
             ['--template-dir', 'openapi-templates'],
         )
-        generate_api_and_copy('typescript-axios', copy_typescript_files_from)
 
+        # Generate the Typescript API for React application
+        generate_api_and_copy(
+            'typescript-axios',
+            copy_typescript_files_from,
+        )
+
+        # Generate the GraphQL schema
+        generate_schema_file()
+
+        # Copy resources and README
         shutil.copy(
             './resources/muck-the-duck.svg',
             os.path.join('web/src', 'muck-the-duck.svg'),
         )
-        shutil.copy('README.md', os.path.join(OUTPUT_DOCS_DIR, 'index.md'))
+        shutil.copy(
+            'README.md',
+            os.path.join(OUTPUT_DOCS_DIR, 'index.md'),
+        )
 
     # pylint: disable=broad-except
     except BaseException as e:

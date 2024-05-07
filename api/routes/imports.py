@@ -1,32 +1,17 @@
-import csv
 import codecs
+import csv
 from typing import Optional
 
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, File, UploadFile
 
-from models.models.sample import sample_id_format_list
-from db.python.layers.imports import ImportLayer
-from db.python.layers.participant import (
-    ParticipantLayer,
-    ExtraParticipantImporterHandler,
-)
+from api.utils.db import Connection, get_project_write_connection
 from api.utils.extensions import guess_delimiter_by_upload_file_obj
-from api.utils.db import get_project_write_connection, Connection
+from db.python.layers.participant import (
+    ExtraParticipantImporterHandler,
+    ParticipantLayer,
+)
 
 router = APIRouter(prefix='/import', tags=['import'])
-
-
-@router.post('/{project}/airtable-manifest', operation_id='importAirtableManifest')
-async def import_airtable_manifest(
-    file: UploadFile = File(...), connection: Connection = get_project_write_connection
-):
-    """Import CSV from airtable"""
-    import_layer = ImportLayer(connection)
-    csvreader = csv.reader(codecs.iterdecode(file.file, 'utf-8-sig'))
-    headers = next(csvreader)
-
-    sample_ids = await import_layer.import_airtable_manifest_csv(headers, csvreader)
-    return {'success': True, 'sample_ids': sample_id_format_list(sample_ids)}
 
 
 @router.post(

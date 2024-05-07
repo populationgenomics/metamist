@@ -1,27 +1,118 @@
 import unittest
 from datetime import datetime
 from io import StringIO
+from test.testbase import DbIsolatedTest, run_as_sync
 from unittest.mock import patch
-from test.testbase import run_as_sync
 
-from sample_metadata.parser.generic_metadata_parser import GenericMetadataParser
+import api.graphql.schema
+from db.python.layers import ParticipantLayer
+from metamist.graphql import configure_sync_client, validate
+from metamist.parser.generic_metadata_parser import GenericMetadataParser
+from metamist.parser.generic_parser import (
+    QUERY_MATCH_ASSAYS,
+    QUERY_MATCH_PARTICIPANTS,
+    QUERY_MATCH_SAMPLES,
+    QUERY_MATCH_SEQUENCING_GROUPS,
+    ParsedParticipant,
+    ParsedSample,
+    ParsedSequencingGroup,
+)
+from models.models import (
+    AssayUpsertInternal,
+    ParticipantUpsertInternal,
+    SampleUpsertInternal,
+    SequencingGroupUpsertInternal,
+)
+from models.utils.sample_id_format import sample_id_format
+from models.utils.sequencing_group_id_format import sequencing_group_id_format
 
 
-class TestParseGenericMetadata(unittest.TestCase):
+def _get_basic_participant_to_upsert():
+    default_assay_meta = {
+        'sequencing_type': 'genome',
+        'sequencing_technology': 'short-read',
+        'sequencing_platform': 'illumina',
+    }
+
+    return ParticipantUpsertInternal(
+        external_id='Demeter',
+        meta={},
+        samples=[
+            SampleUpsertInternal(
+                external_id='sample_id001',
+                meta={},
+                type='blood',
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                meta={
+                                    'reads': [
+                                        {
+                                            'basename': 'sample_id001.filename-R1.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id001.filename-R1.fastq.gz',
+                                            'size': 111,
+                                        },
+                                        {
+                                            'basename': 'sample_id001.filename-R2.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id001.filename-R2.fastq.gz',
+                                            'size': 111,
+                                        },
+                                    ],
+                                    'reads_type': 'fastq',
+                                    'batch': 'M001',
+                                    **default_assay_meta,
+                                },
+                            ),
+                        ],
+                    )
+                ],
+            )
+        ],
+    )
+
+
+class TestValidateParserQueries(unittest.TestCase):
+    """
+    Validate queries used by the GenericParser
+    """
+
+    def test_queries(self):
+        """
+        We have the luxury of getting the schema directly, so we can validate
+        the current development version! Oustide metamist, you'd just leave the
+        schema option blank, and it would fetch the schema from the server.
+        """
+
+        # only need to apply schema to the first client to create, then it gets cached
+        client = configure_sync_client(
+            schema=api.graphql.schema.schema.as_str(), auth_token='FAKE'  # type: ignore
+        )
+        validate(QUERY_MATCH_PARTICIPANTS)
+        validate(QUERY_MATCH_SAMPLES, client=client)
+        validate(QUERY_MATCH_SEQUENCING_GROUPS, client=client)
+        validate(QUERY_MATCH_ASSAYS, client=client)
+
+
+class TestParseGenericMetadata(DbIsolatedTest):
     """Test the GenericMetadataParser"""
 
     @run_as_sync
-    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
+    @patch('metamist.parser.generic_parser.query_async')
     @patch('os.path.getsize')
-    async def test_key_map(
-        self, mock_stat_size, mock_get_sequence_ids, mock_get_sample_id
-    ):
+    async def test_key_map(self, mock_stat_size, mock_graphql_query):
         """
         Test the flexible key map + other options
         """
-        mock_get_sample_id.return_value = {}
-        mock_get_sequence_ids.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
         mock_stat_size.return_value = 111
 
         rows = [
@@ -41,25 +132,25 @@ class TestParseGenericMetadata(unittest.TestCase):
             sample_name_column='sample',
             participant_meta_map={},
             sample_meta_map={},
-            sequence_meta_map={},
+            assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            project='devdev',
+            project=self.project_name,
         )
         parser.skip_checking_gcs_objects = True
         parser.filename_map = {
             '<sample-id>-R1.fastq.gz': 'gs://<sample-id>-R1.fastq.gz',
             '<sample-id>-R2.fastq.gz': 'gs://<sample-id>-R2.fastq.gz',
         }
-
-        resp = await parser.parse_manifest(
+        # samples: list[ParsedSample]
+        summary, _ = await parser.parse_manifest(
             StringIO('\n'.join(rows)), delimiter=',', dry_run=True
         )
 
-        self.assertEqual(1, len(resp['samples']['insert']))
-        self.assertEqual(1, len(resp['sequences']['insert']))
-        self.assertEqual(0, len(resp['samples']['update']))
-        self.assertEqual(0, len(resp['sequences']['update']))
+        self.assertEqual(1, summary['samples']['insert'])
+        self.assertEqual(1, summary['assays']['insert'])
+        self.assertEqual(0, summary['samples']['update'])
+        self.assertEqual(0, summary['assays']['update'])
 
         parser.ignore_extra_keys = False
         rows = [
@@ -78,25 +169,18 @@ class TestParseGenericMetadata(unittest.TestCase):
             )
 
     @run_as_sync
-    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
-    @patch('sample_metadata.parser.cloudhelper.CloudHelper.datetime_added')
-    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_exists')
-    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_size')
+    @patch('metamist.parser.generic_parser.query_async')
+    @patch('metamist.parser.cloudhelper.CloudHelper.datetime_added')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
     async def test_single_row(
-        self,
-        mock_filesize,
-        mock_fileexists,
-        mock_datetime_added,
-        mock_get_sequence_ids,
-        mock_get_sample_id,
+        self, mock_filesize, mock_fileexists, mock_datetime_added, mock_graphql_query
     ):
         """
         Test importing a single row, forms objects and checks response
-        - MOCKS: get_sample_id_map_by_external, get_sequence_ids_for_sample_ids_by_type
+        - MOCKS: get_sample_id_map_by_external, get_assay_ids_for_sample_ids_by_type
         """
-        mock_get_sample_id.return_value = {}
-        mock_get_sequence_ids.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
 
         mock_filesize.return_value = 111
         mock_fileexists.return_value = False
@@ -111,7 +195,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             sample_name_column='SampleId',
             participant_meta_map={},
             sample_meta_map={'sample.centre': 'centre'},
-            sequence_meta_map={
+            assay_meta_map={
                 'raw_data.FREEMIX': 'qc.freemix',
                 'raw_data.PCT_CHIMERAS': 'qc.pct_chimeras',
                 'raw_data.MEDIAN_INSERT_SIZE': 'qc.median_insert_size',
@@ -124,7 +208,7 @@ class TestParseGenericMetadata(unittest.TestCase):
                 'raw_data.MEDIAN_COVERAGE': 'median_coverage',
             },
             # doesn't matter, we're going to mock the call anyway
-            project='devdev',
+            project=self.project_name,
             reads_column='CRAM',
             gvcf_column='GVCF',
         )
@@ -135,39 +219,40 @@ class TestParseGenericMetadata(unittest.TestCase):
         }
 
         file_contents = '\n'.join(rows)
-        resp = await parser.parse_manifest(
+        summary, samples = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(1, len(resp['samples']['insert']))
-        self.assertEqual(1, len(resp['sequences']['insert']))
-        self.assertEqual(0, len(resp['samples']['update']))
-        self.assertEqual(0, len(resp['sequences']['update']))
-        self.assertEqual(1, len(sum(resp['analyses'].values(), [])))
+        self.assertEqual(1, summary['samples']['insert'])
+        self.assertEqual(1, summary['assays']['insert'])
+        self.assertEqual(0, summary['samples']['update'])
+        self.assertEqual(0, summary['assays']['update'])
+        self.assertEqual(1, summary['analyses']['insert'])
 
-        samples_to_add = resp['samples']['insert']
-        sequences_to_add = resp['sequences']['insert']
-        analyses_to_add = resp['analyses']
-
-        self.assertDictEqual({'centre': 'KCCG'}, samples_to_add[0].meta)
-        expected_sequence_dict = {
+        self.assertDictEqual({'centre': 'KCCG'}, samples[0].meta)
+        expected_assay_dict = {
             'qc': {
                 'median_insert_size': '400',
                 'median_coverage': '30',
                 'freemix': '0.01',
                 'pct_chimeras': '0.01',
             },
-            'reads': [
-                {
-                    'location': '/path/to/<sample-id>.bam',
-                    'basename': '<sample-id>.bam',
-                    'class': 'File',
-                    'checksum': None,
-                    'size': 111,
-                    'datetime_added': '2022-02-02T22:22:22',
-                }
-            ],
             'reads_type': 'bam',
+            'reads': {
+                'location': '/path/to/<sample-id>.bam',
+                'basename': '<sample-id>.bam',
+                'class': 'File',
+                'checksum': None,
+                'size': 111,
+                'datetime_added': '2022-02-02T22:22:22',
+            },
+            'sequencing_platform': 'illumina',
+            'sequencing_technology': 'short-read',
+            'sequencing_type': 'genome',
+        }
+
+        assay_group_dict = {
+            'gvcf_types': 'gvcf',
             'gvcfs': [
                 {
                     'location': '/path/to/<sample-id>.g.vcf.gz',
@@ -178,10 +263,12 @@ class TestParseGenericMetadata(unittest.TestCase):
                     'datetime_added': '2022-02-02T22:22:22',
                 }
             ],
-            'gvcf_types': 'gvcf',
         }
-        self.assertDictEqual(expected_sequence_dict, sequences_to_add[0].meta)
-        analysis = analyses_to_add['<sample-id>'][0]
+        self.assertDictEqual(assay_group_dict, samples[0].sequencing_groups[0].meta)
+        self.assertDictEqual(
+            expected_assay_dict, samples[0].sequencing_groups[0].assays[0].meta
+        )
+        analysis = samples[0].sequencing_groups[0].analyses[0]
         self.assertDictEqual(
             {
                 'median_insert_size': '400',
@@ -193,22 +280,13 @@ class TestParseGenericMetadata(unittest.TestCase):
         )
 
     @run_as_sync
-    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
-    @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
-    async def test_rows_with_participants(
-        self,
-        mock_get_sequence_ids,
-        mock_get_sample_id,
-        mock_get_participant_id_map_by_external_ids,
-    ):
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_rows_with_participants(self, mock_graphql_query):
         """
         Test importing a single row with a participant id, forms objects and checks response
-        - MOCKS: get_sample_id_map_by_external, get_sequence_ids_for_sample_ids_by_type
+        - MOCKS: query_async
         """
-        mock_get_sample_id.return_value = {}
-        mock_get_sequence_ids.return_value = {}
-        mock_get_participant_id_map_by_external_ids.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
 
         rows = [
             'Individual ID\tSample ID\tFilenames\tType',
@@ -230,10 +308,10 @@ class TestParseGenericMetadata(unittest.TestCase):
             seq_type_column='Type',
             participant_meta_map={},
             sample_meta_map={},
-            sequence_meta_map={},
+            assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            project='devdev',
+            project=self.project_name,
         )
 
         parser.skip_checking_gcs_objects = True
@@ -252,73 +330,66 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         # Call generic parser
         file_contents = '\n'.join(rows)
-        resp = await parser.parse_manifest(
+        summary, prows = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(3, len(resp['participants']['insert']))
-        self.assertEqual(0, len(resp['participants']['update']))
-        self.assertEqual(4, len(resp['samples']['insert']))
-        self.assertEqual(0, len(resp['samples']['update']))
-        self.assertEqual(5, len(resp['sequences']['insert']))
-        self.assertEqual(0, len(resp['sequences']['update']))
-        self.assertEqual(0, len(sum(resp['analyses'].values(), [])))
+        participants: list[ParsedParticipant] = prows
 
-        participants_to_add = resp['participants']['insert']
-        sequences_to_add = resp['sequences']['insert']
+        self.assertEqual(3, summary['participants']['insert'])
+        self.assertEqual(0, summary['participants']['update'])
+        self.assertEqual(4, summary['samples']['insert'])
+        self.assertEqual(0, summary['samples']['update'])
+        self.assertEqual(5, summary['assays']['insert'])
+        self.assertEqual(0, summary['assays']['update'])
+        self.assertEqual(0, summary['analyses']['insert'])
 
-        expected_sequence_dict = {
+        expected_assay_dict = {
             'reads': [
-                [
-                    {
-                        'basename': 'sample_id001.filename-R1.fastq.gz',
-                        'checksum': None,
-                        'class': 'File',
-                        'location': '/path/to/sample_id001.filename-R1.fastq.gz',
-                        'size': None,
-                        'datetime_added': None,
-                    },
-                    {
-                        'basename': 'sample_id001.filename-R2.fastq.gz',
-                        'checksum': None,
-                        'class': 'File',
-                        'location': '/path/to/sample_id001.filename-R2.fastq.gz',
-                        'size': None,
-                        'datetime_added': None,
-                    },
-                ]
+                {
+                    'basename': 'sample_id001.filename-R1.fastq.gz',
+                    'checksum': None,
+                    'class': 'File',
+                    'location': '/path/to/sample_id001.filename-R1.fastq.gz',
+                    'size': None,
+                    'datetime_added': None,
+                },
+                {
+                    'basename': 'sample_id001.filename-R2.fastq.gz',
+                    'checksum': None,
+                    'class': 'File',
+                    'location': '/path/to/sample_id001.filename-R2.fastq.gz',
+                    'size': None,
+                    'datetime_added': None,
+                },
             ],
             'reads_type': 'fastq',
+            'sequencing_platform': 'illumina',
+            'sequencing_technology': 'short-read',
+            'sequencing_type': 'genome',
         }
-        self.assertDictEqual(expected_sequence_dict, sequences_to_add[0].meta)
+        assay = participants[0].samples[0].sequencing_groups[0].assays[0]
+        self.maxDiff = None
+        self.assertDictEqual(expected_assay_dict, assay.meta)
 
-        # Check that both of Demeter's sequences are there
-        self.assertEqual(participants_to_add[0].external_id, 'Demeter')
-        self.assertEqual(len(participants_to_add[0].samples), 1)
-        self.assertEqual(len(participants_to_add[0].samples[0].sequences), 2)
+        # Check that both of Demeter's assays are there
+        self.assertEqual(participants[0].external_pid, 'Demeter')
+        self.assertEqual(len(participants[0].samples), 1)
+        self.assertEqual(len(participants[0].samples[0].sequencing_groups), 2)
 
         return
 
     @run_as_sync
-    @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
-    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
-    async def test_rows_with_valid_participant_meta(
-        self,
-        mock_get_sequence_ids,
-        mock_get_sample_id,
-        mock_get_participant_id_map_by_external_ids,
-    ):
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_rows_with_valid_participant_meta(self, mock_graphql_query):
         """
         Test importing a several rows with a participant metadata (reported gender, sex and karyotype),
         forms objects and checks response
         - MOCKS: get_sample_id_map_by_external,  get_participant_id_map_by_external_ids,
-        get_sequence_ids_for_sample_ids_by_type
+        get_assay_ids_for_sample_ids_by_type
         """
 
-        mock_get_sample_id.return_value = {}
-        mock_get_sequence_ids.return_value = {}
-        mock_get_participant_id_map_by_external_ids.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
 
         rows = [
             'Individual ID\tSample ID\tSex\tGender\tKaryotype',
@@ -335,55 +406,52 @@ class TestParseGenericMetadata(unittest.TestCase):
             sample_name_column='Sample ID',
             participant_meta_map={},
             sample_meta_map={},
-            sequence_meta_map={},
+            assay_meta_map={},
             qc_meta_map={},
             reported_sex_column='Sex',
             reported_gender_column='Gender',
             karyotype_column='Karyotype',
             # doesn't matter, we're going to mock the call anyway
-            project='devdev',
+            project=self.project_name,
         )
 
         # Call generic parser
         file_contents = '\n'.join(rows)
-        resp = await parser.parse_manifest(
+        participants: list[ParsedParticipant]
+        _, participants = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
-        participants_to_add = resp['participants']['insert']
+        p_by_name = {p.external_pid: p for p in participants}
+        demeter = p_by_name['Demeter']
+        apollo = p_by_name['Apollo']
+        athena = p_by_name['Athena']
+        dionysus = p_by_name['Dionysus']
+        # pluto = p_by_name['Pluto']
 
         # Assert that the participant meta is there.
-        self.assertEqual(participants_to_add[0].reported_gender, 'Non-binary')
-        self.assertEqual(participants_to_add[0].reported_sex, 1)
-        self.assertEqual(participants_to_add[0].karyotype, 'XY')
-        self.assertEqual(participants_to_add[1].reported_gender, 'Female')
-        self.assertEqual(participants_to_add[1].reported_sex, 2)
-        self.assertEqual(participants_to_add[1].karyotype, 'XX')
-        self.assertEqual(participants_to_add[2].reported_sex, 2)
-        self.assertEqual(participants_to_add[2].get('reported_gender'), None)
-        self.assertEqual(participants_to_add[2].get('karyotype'), None)
-        self.assertEqual(participants_to_add[3].reported_gender, 'Male')
-        self.assertEqual(participants_to_add[3].karyotype, 'XX')
+        self.assertEqual(demeter.reported_gender, 'Non-binary')
+        self.assertEqual(demeter.reported_sex, 1)
+        self.assertEqual(demeter.karyotype, 'XY')
+        self.assertEqual(apollo.reported_gender, 'Female')
+        self.assertEqual(apollo.reported_sex, 2)
+        self.assertEqual(apollo.karyotype, 'XX')
+        self.assertEqual(athena.reported_sex, 2)
+        self.assertIsNone(athena.reported_gender)
+        self.assertIsNone(athena.karyotype)
+        self.assertEqual(dionysus.reported_gender, 'Male')
+        self.assertEqual(dionysus.karyotype, 'XX')
         return
 
     @run_as_sync
-    @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
-    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
-    async def test_rows_with_invalid_participant_meta(
-        self,
-        mock_get_sequence_ids,
-        mock_get_sample_id,
-        mock_get_participant_id_map_by_external_ids,
-    ):
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_rows_with_invalid_participant_meta(self, mock_graphql_query):
         """
         Test importing a single rows with invalid participant metadata,
         forms objects and checks response
         - MOCKS: get_sample_id_map_by_external, get_participant_id_map_by_external_ids
         """
 
-        mock_get_sequence_ids.return_value = {}
-        mock_get_sample_id.return_value = {}
-        mock_get_participant_id_map_by_external_ids.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
 
         rows = [
             'Individual ID\tSample ID\tSex\tKaryotype',
@@ -396,12 +464,12 @@ class TestParseGenericMetadata(unittest.TestCase):
             sample_name_column='Sample ID',
             participant_meta_map={},
             sample_meta_map={},
-            sequence_meta_map={},
+            assay_meta_map={},
             qc_meta_map={},
             reported_sex_column='Sex',
             karyotype_column='Karyotype',
             # doesn't matter, we're going to mock the call anyway
-            project='devdev',
+            project=self.project_name,
         )
 
         # Call generic parser
@@ -413,26 +481,23 @@ class TestParseGenericMetadata(unittest.TestCase):
         return
 
     @run_as_sync
-    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
-    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_exists')
-    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_size')
-    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_contents')
+    @patch('metamist.parser.generic_parser.query_async')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_contents')
     async def test_cram_with_no_reference(
         self,
         mock_filecontents,
         mock_filesize,
         mock_fileexists,
-        mock_get_sequence_ids,
-        mock_get_sample_id,
+        mock_graphql_query,
     ):
         """
         Test importing a single row with a cram with no reference
         This should throw an exception
         """
 
-        mock_get_sequence_ids.return_value = {}
-        mock_get_sample_id.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
 
         mock_filecontents.return_value = 'testmd5'
         mock_filesize.return_value = 111
@@ -449,10 +514,10 @@ class TestParseGenericMetadata(unittest.TestCase):
             reads_column='Filename',
             participant_meta_map={},
             sample_meta_map={},
-            sequence_meta_map={},
+            assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            project='devdev',
+            project=self.project_name,
             skip_checking_gcs_objects=True,
         )
 
@@ -470,24 +535,18 @@ class TestParseGenericMetadata(unittest.TestCase):
         )
 
     @run_as_sync
-    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
-    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_exists')
-    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_size')
+    @patch('metamist.parser.generic_parser.query_async')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
     async def test_cram_with_default_reference(
-        self,
-        mock_filesize,
-        mock_fileexists,
-        mock_get_sequence_ids,
-        mock_get_sample_id,
+        self, mock_filesize, mock_fileexists, mock_graphql_query
     ):
         """
         Test importing a single row with a cram with no reference
         This should throw an exception
         """
 
-        mock_get_sequence_ids.return_value = {}
-        mock_get_sample_id.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
 
         mock_filesize.return_value = 111
         mock_fileexists.return_value = True
@@ -503,10 +562,10 @@ class TestParseGenericMetadata(unittest.TestCase):
             reads_column='Filename',
             participant_meta_map={},
             sample_meta_map={},
-            sequence_meta_map={},
+            assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            project='devdev',
+            project=self.project_name,
             default_reference_assembly_location='gs://path/file.fasta',
         )
         parser.skip_checking_gcs_objects = True
@@ -518,7 +577,8 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         # Call generic parser
         file_contents = '\n'.join(rows)
-        resp = await parser.parse_manifest(
+        samples: list[ParsedSample]
+        _, samples = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
@@ -543,26 +603,21 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         self.assertDictEqual(
             expected,
-            resp['sequences']['insert'][0]['meta']['reference_assembly'],
+            samples[0].sequencing_groups[0].assays[0].meta['reference_assembly'],
         )
 
     @run_as_sync
-    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
-    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_exists')
+    @patch('metamist.parser.generic_parser.query_async')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
     async def test_cram_with_row_level_reference(
-        self,
-        mock_fileexists,
-        mock_get_sequence_ids,
-        mock_get_sample_id,
+        self, mock_fileexists, mock_graphql_query
     ):
         """
         Test importing a single row with a cram with no reference
         This should throw an exception
         """
 
-        mock_get_sequence_ids.return_value = {}
-        mock_get_sample_id.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
 
         mock_fileexists.return_value = True
 
@@ -578,10 +633,10 @@ class TestParseGenericMetadata(unittest.TestCase):
             reads_column='Filename',
             participant_meta_map={},
             sample_meta_map={},
-            sequence_meta_map={},
+            assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            project='devdev',
+            project=self.project_name,
             reference_assembly_location_column='Ref'
             # default_reference_assembly_location='gs://path/file.fasta',
         )
@@ -594,7 +649,8 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         # Call generic parser
         file_contents = '\n'.join(rows)
-        resp = await parser.parse_manifest(
+        samples: list[ParsedSample]
+        _, samples = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
@@ -619,26 +675,21 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         self.assertDictEqual(
             expected,
-            resp['sequences']['insert'][0]['meta']['reference_assembly'],
+            samples[0].sequencing_groups[0].assays[0].meta['reference_assembly'],
         )
 
     @run_as_sync
-    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
-    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_exists')
+    @patch('metamist.parser.generic_parser.query_async')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
     async def test_cram_with_multiple_row_level_references(
-        self,
-        mock_fileexists,
-        mock_get_sequence_ids,
-        mock_get_sample_id,
+        self, mock_fileexists, mock_graphql_query
     ):
         """
         Test importing a single row with a cram with no reference
         This should throw an exception
         """
 
-        mock_get_sequence_ids.return_value = {}
-        mock_get_sample_id.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
 
         mock_fileexists.return_value = True
 
@@ -654,10 +705,10 @@ class TestParseGenericMetadata(unittest.TestCase):
             reads_column='Filename',
             participant_meta_map={},
             sample_meta_map={},
-            sequence_meta_map={},
+            assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            project='devdev',
+            project=self.project_name,
             reference_assembly_location_column='Ref'
             # default_reference_assembly_location='gs://path/file.fasta',
         )
@@ -680,6 +731,82 @@ class TestParseGenericMetadata(unittest.TestCase):
             'Multiple reference assemblies were defined for sample_id003: ref.fa, ref2.fa',
             str(ctx.exception),
         )
+
+    @run_as_sync
+    @patch('metamist.parser.generic_parser.query_async')
+    @patch('metamist.parser.cloudhelper.CloudHelper.datetime_added')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
+    async def test_matching_sequencing_groups_and_assays(
+        self, mock_filesize, mock_fileexists, mock_datetime_added, mock_graphql_query
+    ):
+        """Test basic import with data that exists in the database"""
+        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_filesize.return_value = 111
+        mock_fileexists.return_value = False
+        mock_datetime_added.return_value = datetime.fromisoformat('2022-02-02T22:22:22')
+
+        player = ParticipantLayer(self.connection)
+        participant = await player.upsert_participant(
+            _get_basic_participant_to_upsert()
+        )
+
+        filenames = [
+            'sample_id001.filename-R1.fastq.gz',
+            'sample_id001.filename-R2.fastq.gz',
+        ]
+
+        rows = [
+            'Participant ID\tSample ID\tFilename',
+            f'Demeter\tsample_id001\t{filenames[0]}',
+            f'Demeter\tsample_id001\t{filenames[1]}',
+        ]
+
+        parser = GenericMetadataParser(
+            search_locations=[],
+            participant_column='Participant ID',
+            sample_name_column='Sample ID',
+            reads_column='Filename',
+            participant_meta_map={},
+            sample_meta_map={},
+            assay_meta_map={},
+            qc_meta_map={},
+            # doesn't matter, we're going to mock the call anyway
+            project=self.project_name,
+        )
+
+        parser.filename_map = {f: '/path/to/' + f for f in filenames}
+
+        summary, parsed_files = await parser.parse_manifest(
+            StringIO('\n'.join(rows)), delimiter='\t', dry_run=True
+        )
+
+        self.assertEqual(1, summary['participants']['update'])
+        self.assertEqual(1, summary['samples']['update'])
+        self.assertEqual(1, summary['sequencing_groups']['update'])
+        self.assertEqual(1, summary['assays']['update'])
+        self.assertEqual(0, summary['participants']['insert'])
+        self.assertEqual(0, summary['samples']['insert'])
+        self.assertEqual(0, summary['sequencing_groups']['insert'])
+        self.assertEqual(0, summary['assays']['insert'])
+
+        parsed_p: ParsedParticipant = parsed_files[0]
+        self.assertEqual(participant.id, parsed_p.internal_pid)
+        self.assertEqual(
+            sample_id_format(participant.samples[0].id),
+            parsed_p.samples[0].internal_sid,
+        )
+
+        sg: SequencingGroupUpsertInternal = participant.samples[0].sequencing_groups[0]
+        sg_parsed: ParsedSequencingGroup = (
+            parsed_files[0].samples[0].sequencing_groups[0]
+        )
+
+        self.assertEqual(
+            sequencing_group_id_format(sg.id), sg_parsed.internal_seqgroup_id
+        )
+        self.assertEqual(len(sg.assays), len(sg_parsed.assays))
+        self.assertEqual(sg.assays[0].id, sg_parsed.assays[0].internal_id)
 
 
 class FastqPairMatcher(unittest.TestCase):

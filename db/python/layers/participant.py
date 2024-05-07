@@ -1,52 +1,30 @@
 # pylint: disable=invalid-name
-from typing import Dict, List, Tuple, Optional, Any
-
 import re
 from collections import defaultdict
 from enum import Enum
+from typing import Any
 
-from pydantic import BaseModel
-
-from db.python.connect import NotFoundError
 from db.python.layers.base import BaseLayer
-from db.python.layers.sample import (
-    SampleBatchUpsert,
-    SampleBatchUpsertBody,
-    SampleLayer,
-)
+from db.python.layers.sample import SampleLayer
 from db.python.tables.family import FamilyTable
-from db.python.tables.family_participant import FamilyParticipantTable
+from db.python.tables.family_participant import (
+    FamilyParticipantFilter,
+    FamilyParticipantTable,
+)
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.participant_phenotype import ParticipantPhenotypeTable
 from db.python.tables.sample import SampleTable
-from db.python.utils import ProjectId, split_generic_terms
+from db.python.utils import (
+    GenericFilter,
+    NoOpAenter,
+    NotFoundError,
+    split_generic_terms,
+)
 from models.models.family import PedRowInternal
-from models.models.participant import Participant
+from models.models.participant import ParticipantInternal, ParticipantUpsertInternal
+from models.models.project import ProjectId
 
 HPO_REGEX_MATCHER = re.compile(r'HP\:\d+$')
-
-
-class ParticipantUpdateModel(BaseModel):
-    """Update participant model"""
-
-    external_id: Optional[str] = None
-    reported_sex: Optional[int] = None
-    reported_gender: Optional[str] = None
-    karyotype: Optional[str] = None
-    meta: Optional[Dict] = None
-
-
-class ParticipantUpsert(ParticipantUpdateModel):
-    """Update model for sample with sequences list"""
-
-    id: Optional[int]
-    samples: List[SampleBatchUpsert]
-
-
-class ParticipantUpsertBody(BaseModel):
-    """Upsert model for batch Participants"""
-
-    participants: List[ParticipantUpsert]
 
 
 class ExtraParticipantImporterHandler(Enum):
@@ -210,7 +188,7 @@ class SeqrMetadataKeys(Enum):
         )
 
     @staticmethod
-    def parse_hpo_terms(hpo_terms: str) -> List[str]:
+    def parse_hpo_terms(hpo_terms: str) -> list[str]:
         """
         Validate that comma-separated HPO terms must start with 'HP:'
 
@@ -241,7 +219,7 @@ class SeqrMetadataKeys(Enum):
         def process_hpo_term(term):
             if '|' in term:
                 return term.split('|', maxsplit=1)[0].strip()
-            return term
+            return term.strip()
 
         # mfranklin (2021-09-06): There were no IDs that didn't start with HP
         # https://raw.githubusercontent.com/obophenotype/human-phenotype-ontology/master/hp.obo
@@ -254,7 +232,6 @@ class SeqrMetadataKeys(Enum):
                 + ', '.join(failing_terms)
             )
 
-        # do this, because sometimes collaborators use ', ' instead of ','
         return terms
 
 
@@ -270,7 +247,7 @@ class ParticipantLayer(BaseLayer):
         pids: list[int],
         check_project_ids: bool = True,
         allow_missing: bool = False,
-    ) -> list[Participant]:
+    ) -> list[ParticipantInternal]:
         """
         Get participants by IDs
         """
@@ -295,9 +272,9 @@ class ParticipantLayer(BaseLayer):
     async def get_participants(
         self,
         project: int,
-        external_participant_ids: List[str] = None,
-        internal_participant_ids: List[int] = None,
-    ):
+        external_participant_ids: list[str] | None = None,
+        internal_participant_ids: list[int] | None = None,
+    ) -> list[ParticipantInternal]:
         """
         Get participants for a project
         """
@@ -311,20 +288,20 @@ class ParticipantLayer(BaseLayer):
         ps = await self.pttable.get_participants(
             project=project, internal_participant_ids=list(internal_ids)
         )
-        return [Participant(**p) for p in ps]
+        return ps
 
     async def fill_in_missing_participants(self):
         """Update the sequencing status from the internal sample id"""
         sample_table = SampleTable(connection=self.connection)
 
         # { external_id: internal_id }
-        internal_sample_map_with_no_pid = dict(
-            await sample_table.get_sample_with_missing_participants_by_internal_id(
+        samples_with_no_pid = (
+            await sample_table.get_samples_with_missing_participants_by_internal_id(
                 project=self.connection.project
             )
         )
         external_sample_map_with_no_pid = {
-            v: k for k, v in internal_sample_map_with_no_pid.items()
+            sample.external_id: sample.id for sample in samples_with_no_pid
         }
         ext_sample_id_to_pid = {}
 
@@ -351,7 +328,11 @@ class ParticipantLayer(BaseLayer):
             for external_id in external_participant_ids_to_add:
                 sample_id = external_sample_map_with_no_pid[external_id]
                 participant_id = await self.pttable.create_participant(
-                    external_id=external_id
+                    external_id=external_id,
+                    reported_sex=None,
+                    reported_gender=None,
+                    karyotype=None,
+                    meta=None,
                 )
                 ext_sample_id_to_pid[external_id] = participant_id
                 sample_ids_to_update[sample_id] = participant_id
@@ -362,10 +343,25 @@ class ParticipantLayer(BaseLayer):
 
         return f'Updated {len(sample_ids_to_update)} records'
 
+    async def insert_participant_phenotypes(
+        self, participant_phenotypes: dict[int, dict]
+    ):
+        """
+        Insert participant phenotypes, with format: {pid: {key: value}}
+        """
+        ppttable = ParticipantPhenotypeTable(self.connection)
+        return await ppttable.add_key_value_rows(
+            [
+                (pid, pk, pv)
+                for pid, phenotypes in participant_phenotypes.items()
+                for pk, pv in phenotypes.items()
+            ]
+        )
+
     async def generic_individual_metadata_importer(
         self,
-        headers: List[str],
-        rows: List[List[str]],
+        headers: list[str],
+        rows: list[list[str]],
         extra_participants_method: ExtraParticipantImporterHandler = ExtraParticipantImporterHandler.FAIL,
     ):
         """
@@ -414,7 +410,12 @@ class ParticipantLayer(BaseLayer):
                 )
                 for ex_pid in missing_participant_eids:
                     external_pid_map[ex_pid] = await self.pttable.create_participant(
-                        external_id=ex_pid, project=self.connection.project
+                        external_id=ex_pid,
+                        reported_sex=None,
+                        reported_gender=None,
+                        karyotype=None,
+                        meta=None,
+                        project=self.connection.project,
                     )
             elif extra_participants_method == ExtraParticipantImporterHandler.IGNORE:
                 rows = [
@@ -456,8 +457,8 @@ class ParticipantLayer(BaseLayer):
             }
             missing_family_ids = external_family_ids - set(fmap_by_external.keys())
 
-            family_persons_to_insert: List[Tuple[str, int]] = []
-            incompatible_familes: List[str] = []
+            family_persons_to_insert: list[tuple[str, int]] = []
+            incompatible_familes: list[str] = []
             for pid, external_family_id in provided_pid_to_external_family.items():
                 if pid in pid_to_internal_family:
                     # we know the family
@@ -476,8 +477,9 @@ class ParticipantLayer(BaseLayer):
 
             if len(incompatible_familes) > 0:
                 raise ValueError(
-                    f'Specified family IDs for participants did not match what SM already knows, '
-                    f'please update these in the SM database before proceeding: {", ".join(incompatible_familes)}'
+                    'Specified family IDs for participants did not match what SM '
+                    'already knows,please update these in the SM database before '
+                    f'proceeding: {", ".join(incompatible_familes)}'
                 )
 
             if len(missing_family_ids) > 0:
@@ -495,11 +497,12 @@ class ParticipantLayer(BaseLayer):
                 formed_rows = [
                     PedRowInternal(
                         family_id=fmap_by_external[external_family_id],
-                        participant_id=pid,
+                        individual_id=pid,
                         affected=0,
                         maternal_id=None,
                         paternal_id=None,
                         notes=None,
+                        sex=None,
                     )
                     for external_family_id, pid in family_persons_to_insert
                 ]
@@ -519,7 +522,7 @@ class ParticipantLayer(BaseLayer):
 
     async def get_participants_by_families(
         self, family_ids: list[int], check_project_ids: bool = True
-    ) -> dict[int, list[Participant]]:
+    ) -> dict[int, list[ParticipantInternal]]:
         """Get participants, keyed by family ID"""
         projects, family_map = await self.pttable.get_participants_by_families(
             family_ids=family_ids
@@ -534,17 +537,164 @@ class ParticipantLayer(BaseLayer):
 
         return family_map
 
+    async def get_id_map_by_external_ids(
+        self,
+        external_ids: list[str],
+        project: ProjectId | None,
+        allow_missing=False,
+    ) -> dict[str, int]:
+        """Get participant ID map by external_ids"""
+        id_map = await self.pttable.get_id_map_by_external_ids(
+            external_ids, project=project
+        )
+        if not allow_missing and len(id_map) != len(external_ids):
+            provided_external_ids = set(external_ids)
+            # do the check again, but use the set this time
+            # (in case we're provided a list with duplicates)
+            if len(id_map) != len(provided_external_ids):
+                # we have families missing from the map, so we'll 404 the whole thing
+                missing_participant_ids = provided_external_ids - set(id_map.keys())
+
+                raise NotFoundError(
+                    f"Couldn't find participants with IDS: {', '.join(missing_participant_ids)}"
+                )
+
+        return id_map
+
+    async def get_external_participant_id_to_internal_sequencing_group_id_map(
+        self, project: int, sequencing_type: str = None
+    ) -> list[tuple[str, int]]:
+        """
+        Get a map of {external_participant_id} -> {internal_sequencing_group_id}
+        useful to matching joint-called samples in the matrix table to the participant
+
+        Return a list not dictionary, because dict could lose
+        participants with multiple sequencing-groups.
+        """
+        return await self.pttable.get_external_participant_id_to_internal_sequencing_group_id_map(
+            project=project, sequencing_type=sequencing_type
+        )
+
+    # region UPSERTS / UPDATES
+
+    async def upsert_participant(
+        self,
+        participant: ParticipantUpsertInternal,
+        project: ProjectId = None,
+        check_project_id: bool = True,
+        open_transaction=True,
+    ) -> ParticipantUpsertInternal:
+        """Create a single participant"""
+        # pylint: disable=unused-argument
+
+        with_function = (
+            self.connection.connection.transaction if open_transaction else NoOpAenter
+        )
+
+        async with with_function():
+            if participant.id:
+                if check_project_id:
+                    project_ids = (
+                        await self.pttable.get_project_ids_for_participant_ids(
+                            [participant.id]
+                        )
+                    )
+
+                    await self.ptable.check_access_to_project_ids(
+                        self.connection.author, project_ids, readonly=False
+                    )
+                await self.pttable.update_participant(
+                    participant_id=participant.id,
+                    external_id=participant.external_id,
+                    reported_sex=participant.reported_sex,
+                    reported_gender=participant.reported_gender,
+                    meta=participant.meta,
+                    karyotype=participant.karyotype,
+                )
+
+            else:
+                participant.id = await self.pttable.create_participant(
+                    external_id=participant.external_id,
+                    reported_sex=participant.reported_sex,
+                    reported_gender=participant.reported_gender,
+                    karyotype=participant.karyotype,
+                    meta=participant.meta,
+                    project=project,
+                )
+
+            if participant.samples:
+                slayer = SampleLayer(self.connection)
+                for s in participant.samples:
+                    s.participant_id = participant.id
+
+                await slayer.upsert_samples(
+                    participant.samples,
+                    project=project,
+                    check_project_id=False,
+                    open_transaction=False,
+                )
+
+            return participant
+
+    async def upsert_participants(
+        self,
+        participants: list[ParticipantUpsertInternal],
+        open_transaction=True,
+    ):
+        """Batch upsert a list of participants with sequences"""
+
+        with_function = (
+            self.connection.connection.transaction if open_transaction else NoOpAenter
+        )
+
+        async with with_function():
+            # Create or update participants
+            for p in participants:
+                await self.upsert_participant(p, open_transaction=False)
+
+        # Format and return response
+        return participants
+
+    async def update_many_participant_external_ids(
+        self, internal_to_external_id: dict[int, str], check_project_ids=True
+    ):
+        """Update many participant external ids"""
+        if check_project_ids:
+            projects = await self.pttable.get_project_ids_for_participant_ids(
+                list(internal_to_external_id.keys())
+            )
+            await self.ptable.check_access_to_project_ids(
+                user=self.author, project_ids=projects, readonly=False
+            )
+
+        return await self.pttable.update_many_participant_external_ids(
+            internal_to_external_id
+        )
+
+    # region PHENOTYPES / SEQR
+
+    async def get_phenotypes_for_participants(
+        self, participant_ids: list[int]
+    ) -> dict[int, dict[str, Any]]:
+        """
+        Get phenotypes for participants keyed by by pid
+        """
+        ppttable = ParticipantPhenotypeTable(self.connection)
+        return await ppttable.get_key_value_rows_for_participant_ids(
+            participant_ids=participant_ids
+        )
+
     async def get_seqr_individual_template(
         self,
         project: int,
         *,
-        internal_participant_ids: Optional[list[int]] = None,
-        external_participant_ids: Optional[List[str]] = None,
+        internal_participant_ids: list[int] | None = None,
+        external_participant_ids: list[str] | None = None,
         # pylint: disable=invalid-name
         replace_with_participant_external_ids=True,
         replace_with_family_external_ids=True,
     ) -> dict[str, Any]:
-        """Get seqr individual level metadata template as List[List[str]]"""
+        """Get seqr individual level metadata template as list[list[str]]"""
 
         # avoid circular imports
         # pylint: disable=import-outside-toplevel,cyclic-import,too-many-locals
@@ -597,7 +747,7 @@ class ParticipantLayer(BaseLayer):
         ]
         json_header_map = dict(zip(json_headers, headers))
         lheader_to_json = dict(zip(lheaders, json_headers))
-        rows: List[Dict[str, str]] = []
+        rows: list[dict[str, str]] = []
         for pid, d in pid_to_features.items():
             d[SeqrMetadataKeys.INDIVIDUAL_ID.value] = internal_to_external_pid_map.get(
                 pid, str(pid)
@@ -625,51 +775,29 @@ class ParticipantLayer(BaseLayer):
             'header_map': json_header_map,
         }
 
-    async def get_id_map_by_external_ids(
-        self,
-        external_ids: List[str],
-        project: Optional[ProjectId],
-        allow_missing=False,
-    ) -> Dict[str, int]:
-        """Get participant ID map by external_ids"""
-        id_map = await self.pttable.get_id_map_by_external_ids(
-            external_ids, project=project
-        )
-        if not allow_missing and len(id_map) != len(external_ids):
-            provided_external_ids = set(external_ids)
-            # do the check again, but use the set this time
-            # (in case we're provided a list with duplicates)
-            if len(id_map) != len(provided_external_ids):
-                # we have families missing from the map, so we'll 404 the whole thing
-                missing_participant_ids = provided_external_ids - set(id_map.keys())
-
-                raise NotFoundError(
-                    f"Couldn't find participants with IDS: {', '.join(missing_participant_ids)}"
-                )
-
-        return id_map
-
-    async def update_many_participant_external_ids(
-        self, internal_to_external_id: Dict[int, str], check_project_ids=True
-    ):
-        """Update many participant external ids"""
-        if check_project_ids:
-            projects = await self.pttable.get_project_ids_for_participant_ids(
-                list(internal_to_external_id.keys())
-            )
-            await self.ptable.check_access_to_project_ids(
-                user=self.author, project_ids=projects, readonly=False
-            )
-
-        return await self.pttable.update_many_participant_external_ids(
-            internal_to_external_id
-        )
-
-    async def get_family_participant_data(self, family_id: int, participant_id: int):
+    async def get_family_participant_data(
+        self, family_id: int, participant_id: int, check_project_ids: bool = True
+    ) -> PedRowInternal:
         """Gets the family_participant row for a specific participant"""
         fptable = FamilyParticipantTable(self.connection)
 
-        return await fptable.get_row(family_id=family_id, participant_id=participant_id)
+        projects, rows = await fptable.query(
+            FamilyParticipantFilter(
+                family_id=GenericFilter(eq=family_id),
+                participant_id=GenericFilter(eq=participant_id),
+            )
+        )
+        if not rows:
+            raise NotFoundError(
+                f'Family participant row (family_id: {family_id}, '
+                f'participant_id: {participant_id}) not found'
+            )
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.author, projects, readonly=True
+            )
+
+        return rows[0]
 
     async def remove_participant_from_family(self, family_id: int, participant_id: int):
         """Deletes a participant from a family"""
@@ -697,7 +825,6 @@ class ParticipantLayer(BaseLayer):
             maternal_id=maternal_id,
             affected=affected,
             notes=None,
-            author=None,
         )
 
     @staticmethod
@@ -751,22 +878,22 @@ class ParticipantLayer(BaseLayer):
 
     @staticmethod
     def _prepare_individual_metadata_insertable_rows(
-        storeable_keys: List[str],
-        lheaders_to_idx_map: Dict[str, int],
+        storeable_keys: list[str],
+        lheaders_to_idx_map: dict[str, int],
         participant_id_field_idx: int,
-        pid_map: Dict[str, int],
-        rows: List[List[str]],
+        pid_map: dict[str, int],
+        rows: list[list[str]],
     ):
         # do all the matching in lowercase space, but store in regular case space
         # pylint: disable=invalid-name
-        storeable_header_col_number_tuples: List[Tuple[str, int]] = [
+        storeable_header_col_number_tuples: list[tuple[str, int]] = [
             (k, lheaders_to_idx_map[k.lower()])
             for k in storeable_keys
             if k.lower() in lheaders_to_idx_map
         ]
 
-        # List of (PersonId, Key, value) to insert into the participant_phenotype table
-        insertable_rows: List[Tuple[int, str, Any]] = []
+        # list of (PersonId, Key, value) to insert into the participant_phenotype table
+        insertable_rows: list[tuple[int, str, Any]] = []
         parsers = {k.value: v for k, v in SeqrMetadataKeys.get_key_parsers().items()}
 
         hpo_col_indices = [
@@ -807,139 +934,10 @@ class ParticipantLayer(BaseLayer):
 
         return insertable_rows
 
-    async def get_external_participant_id_to_internal_sample_id_map(
-        self, project: int
-    ) -> List[Tuple[str, int]]:
-        """
-        Get a map of {external_participant_id} -> {internal_sample_id}
-        useful to matching joint-called samples in the matrix table to the participant
-
-        Return a list not dictionary, because dict could lose
-        participants with multiple samples.
-        """
-        return await self.pttable.get_external_participant_id_to_internal_sample_id_map(
-            project=project
-        )
-
-    async def create_participant(
-        self,
-        external_id: str,
-        reported_sex: int = None,
-        reported_gender: str = None,
-        karyotype: str = None,
-        meta: Dict = None,
-        author: str = None,
-        project: ProjectId = None,
-    ) -> int:
-        """Create a single participant"""
-        # pylint: disable=unused-argument
-        d = {k: v for k, v in locals().items() if k != 'self'}
-        return await self.pttable.create_participant(**d)
-
-    async def update_participants(
-        self,
-        participant_ids: List[int],
-        reported_sexes: List[int] = None,
-        reported_genders: List[str] = None,
-        karyotypes: List[str] = None,
-        metas: List[Dict] = None,
-        author=None,
-    ):
-        """Update many participants"""
-        # pylint: disable=unused-argument
-        d = {k: v for k, v in locals().items() if k != 'self'}
-        return await self.pttable.update_participants(**d)
-
-    async def update_single_participant(
-        self,
-        participant_id: int,
-        external_id: str = None,
-        reported_sex: int = None,
-        reported_gender: str = None,
-        karyotype: str = None,
-        meta: Dict = None,
-        author=None,
-        check_project_ids=True,
-    ):
-        """Update single participants"""
-        # pylint: disable=unused-argument
-        d = {
-            k: v for k, v in locals().items() if k not in ('self', 'check_project_ids')
-        }
-
-        if check_project_ids:
-            projects = await self.pttable.get_project_ids_for_participant_ids(
-                [participant_id]
-            )
-            await self.ptable.check_access_to_project_ids(
-                user=self.author, project_ids=projects, readonly=False
-            )
-
-        _ = await self.pttable.update_participant(**d)
-        return participant_id
-
-    async def upsert_participant(self, participant: ParticipantUpsert):
-        """Upsert a participant"""
-        if not participant.id:
-            internal_id = await self.create_participant(
-                external_id=participant.external_id,
-                reported_sex=participant.reported_sex,
-                reported_gender=participant.reported_gender,
-                karyotype=participant.karyotype,
-                meta=participant.meta,
-                author=self.connection.author,
-                project=self.connection.project,
-            )
-            return int(internal_id)
-
-        # Otherwise update
-        internal_id = await self.update_single_participant(
-            participant_id=participant.id,
-            external_id=participant.external_id,
-            reported_sex=participant.reported_sex,
-            reported_gender=participant.reported_gender,
-            karyotype=participant.karyotype,
-            meta=participant.meta,
-            author=self.connection.author,
-            check_project_ids=False,
-        )
-        return int(internal_id)
-
-    async def batch_upsert_participants(self, participants: ParticipantUpsertBody):
-        """Batch upsert a list of participants with sequences"""
-        all_participants = participants.participants
-
-        sampt: SampleLayer = SampleLayer(self.connection)
-
-        # Create or update participants
-        pids = [await self.upsert_participant(p) for p in all_participants]
-
-        # Pull a list of external pids
-        epids = [str(participant.external_id) for participant in all_participants]
-
-        # Get map of external pids to internal pids
-        epid_ipid_map = await self.get_id_map_by_external_ids(
-            epids,
-            project=self.connection.project,
-            allow_missing=False,
-        )
-
-        for participant in all_participants:
-            epid = participant.external_id
-            ipid = epid_ipid_map[epid]
-
-            for sample in participant.samples:
-                sample.participant_id = ipid
-
-        # Upsert all samples with sequences for each participant
-        samples = [SampleBatchUpsertBody(samples=p.samples) for p in all_participants]
-        results = [await sampt.batch_upsert_samples(s) for s in samples]
-
-        # Format and return response
-        return dict(zip(pids, results))
+    # endregion PHENOTYPES / SEQR
 
     async def check_project_access_for_participants_families(
-        self, participant_ids: List[int], family_ids: List[int]
+        self, participant_ids: list[int], family_ids: list[int]
     ):
         """Checks user access for the projects associated with participant IDs and family IDs"""
         pprojects = await self.pttable.get_project_ids_for_participant_ids(
@@ -977,7 +975,7 @@ class ParticipantLayer(BaseLayer):
             return await self.add_participant_to_family(
                 family_id=new_family_id,
                 participant_id=participant_id,
-                paternal_id=fp_row['paternal_id'],
-                maternal_id=fp_row['maternal_id'],
-                affected=fp_row['affected'],
+                paternal_id=fp_row.paternal_id,
+                maternal_id=fp_row.maternal_id,
+                affected=fp_row.affected,
             )

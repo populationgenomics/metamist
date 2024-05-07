@@ -1,11 +1,19 @@
 black>=22.3.0
+bump2version
 click==8.0.4
+coverage
 flake8
 flake8-bugbear
+nest-asyncio
 pre-commit
 pylint
-bump2version
-testcontainers[mariadb]
-nest-asyncio
-coverage
+testcontainers[mariadb]>=4.0.0
 types-PyMySQL
+# some strawberry dependency
+strawberry-graphql[debug-server]==0.206.0
+# following required to unit test etl functions
+functions_framework
+google-cloud-bigquery
+google-cloud-pubsub
+# following required to unit test some billing functions
+pytz

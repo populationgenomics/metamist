@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument
-from typing import List
 import logging
+from typing import List
 
 import click
 
-from sample_metadata.parser.generic_metadata_parser import run_as_sync
-from sample_metadata.parser.sample_file_map_parser import SampleFileMapParser
+from metamist.parser.generic_metadata_parser import DefaultSequencing, run_as_sync
+from metamist.parser.sample_file_map_parser import SampleFileMapParser
 
 __DOC = """
 The SampleFileMapParser is used for parsing files with format:
@@ -32,11 +32,11 @@ logger.setLevel(logging.INFO)
 @click.command(help=__DOC)
 @click.option(
     '--project',
-    help='The sample-metadata project to import manifest into',
+    help='The metamist project to import manifest into',
 )
 @click.option('--default-sample-type', default='blood')
-@click.option('--default-sequence-type', default='wgs')
-@click.option('--default-sequence-technology', default='short-read')
+@click.option('--default-sequencing-type', default='wgs')
+@click.option('--default-sequencing-technology', default='short-read')
 @click.option(
     '--confirm', is_flag=True, help='Confirm with user input before updating server'
 )
@@ -66,8 +66,8 @@ async def main(
     search_path: List[str],
     project,
     default_sample_type='blood',
-    default_sequence_type='wgs',
-    default_sequence_technology='short-read',
+    default_sequencing_type='wgs',
+    default_sequencing_technology='short-read',
     confirm=False,
     dry_run=False,
     allow_extra_files_in_search_path=False,
@@ -77,15 +77,17 @@ async def main(
     if not manifests:
         raise ValueError('Expected at least 1 manifest')
 
-    extra_seach_paths = [m for m in manifests if m.startswith('gs://')]
-    if extra_seach_paths:
-        search_path = list(set(search_path).union(set(extra_seach_paths)))
+    extra_search_paths = [m for m in manifests if m.startswith('gs://')]
+    if extra_search_paths:
+        search_path = list(set(search_path).union(set(extra_search_paths)))
 
     parser = SampleFileMapParser(
         project=project,
         default_sample_type=default_sample_type,
-        default_sequence_type=default_sequence_type,
-        default_sequence_technology=default_sequence_technology,
+        default_sequencing=DefaultSequencing(
+            seq_type=default_sequencing_type,
+            technology=default_sequencing_technology,
+        ),
         search_locations=search_path,
         allow_extra_files_in_search_path=allow_extra_files_in_search_path,
         default_reference_assembly_location=ref,

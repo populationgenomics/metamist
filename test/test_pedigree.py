@@ -2,6 +2,7 @@ from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
+from models.models.participant import ParticipantUpsertInternal
 
 
 class TestPedigree(DbIsolatedTest):
@@ -12,10 +13,10 @@ class TestPedigree(DbIsolatedTest):
         """Test import + get pedigree"""
         fl = FamilyLayer(self.connection)
 
-        rows = [
-            ['FAM01', 'EX01_father', '', '', 1, 1],
-            ['FAM01', 'EX01_mother', '', '', 2, 1],
-            ['FAM01', 'EX01_subject', 'EX01_father', 'EX01_mother', 1, 2],
+        rows: list[list[str]] = [
+            ['FAM01', 'EX01_father', '', '', '1', '1'],
+            ['FAM01', 'EX01_mother', '', '', '2', '1'],
+            ['FAM01', 'EX01_subject', 'EX01_father', 'EX01_mother', '1', '2'],
         ]
 
         await fl.import_pedigree(
@@ -48,11 +49,15 @@ class TestPedigree(DbIsolatedTest):
         pl = ParticipantLayer(self.connection)
         fl = FamilyLayer(self.connection)
 
-        await pl.create_participant(
-            external_id='EX01',
-            reported_sex=1,
+        await pl.upsert_participant(
+            ParticipantUpsertInternal(
+                external_id='EX01',
+                reported_sex=1,
+            )
         )
-        await pl.create_participant(external_id='EX02', reported_sex=None)
+        await pl.upsert_participant(
+            ParticipantUpsertInternal(external_id='EX02', reported_sex=None)
+        )
 
         rows = await fl.get_pedigree(
             project=self.connection.project,

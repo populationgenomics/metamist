@@ -1,25 +1,27 @@
 # pylint: disable=invalid-name
-import io
-import csv
 import codecs
+import csv
+import io
 from datetime import date
 from typing import List, Optional
 
-from fastapi import APIRouter, UploadFile, File, Query
+from fastapi import APIRouter, File, Query, UploadFile
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
 from api.utils import get_projectless_db_connection
 from api.utils.db import (
+    Connection,
     get_project_readonly_connection,
     get_project_write_connection,
-    Connection,
 )
 from api.utils.export import ExportType
 from api.utils.extensions import guess_delimiter_by_upload_file_obj
 from db.python.layers.family import FamilyLayer, PedRow
+from db.python.tables.family import FamilyFilter
+from db.python.utils import GenericFilter
 from models.models.family import Family
-from models.models.sample import sample_id_transform_to_raw_list
+from models.utils.sample_id_format import sample_id_transform_to_raw_list
 
 router = APIRouter(prefix='/family', tags=['family'])
 
@@ -146,9 +148,16 @@ async def get_families(
     family_layer = FamilyLayer(connection)
     sample_ids_raw = sample_id_transform_to_raw_list(sample_ids) if sample_ids else None
 
-    return await family_layer.get_families(
-        participant_ids=participant_ids, sample_ids=sample_ids_raw
+    families = await family_layer.query(
+        FamilyFilter(
+            participant_id=(
+                GenericFilter(in_=participant_ids) if participant_ids else None
+            ),
+            sample_id=GenericFilter(in_=sample_ids_raw) if sample_ids_raw else None,
+        )
     )
+
+    return [f.to_external() for f in families]
 
 
 @router.post('/', operation_id='updateFamily')
@@ -172,7 +181,7 @@ async def update_family(
 async def import_families(
     file: UploadFile = File(...),
     has_header: bool = True,
-    delimiter: str = None,
+    delimiter: str | None = None,
     connection: Connection = get_project_write_connection,
 ):
     """Import a family csv"""
@@ -187,7 +196,8 @@ async def import_families(
     rows = [r for r in reader if not r[0].startswith('#')]
     if len(rows[0]) == 1:
         raise ValueError(
-            'Only one column was detected in the pedigree, ensure the file is TAB separated (\\t)'
+            'Only one column was detected in the pedigree, ensure the '
+            'file is TAB separated (\\t)'
         )
     success = await family_layer.import_families(headers, rows)
     return {'success': success}

@@ -1,5 +1,7 @@
 from test.testbase import DbIsolatedTest, run_as_sync
+
 from db.python.layers.participant import ParticipantLayer
+from models.models.participant import ParticipantUpsertInternal
 
 
 class TestParticipant(DbIsolatedTest):
@@ -10,11 +12,21 @@ class TestParticipant(DbIsolatedTest):
         super().setUp()
 
         pl = ParticipantLayer(self.connection)
-        await pl.create_participant(
-            external_id='EX01', reported_sex=2, karyotype='XX', meta={'field': 1}
-        )
-        await pl.create_participant(
-            external_id='EX02', reported_sex=1, karyotype='XY', meta={'field': 2}
+        await pl.upsert_participants(
+            [
+                ParticipantUpsertInternal(
+                    external_id='EX01',
+                    reported_sex=2,
+                    karyotype='XX',
+                    meta={'field': 1},
+                ),
+                ParticipantUpsertInternal(
+                    external_id='EX02',
+                    reported_sex=1,
+                    karyotype='XY',
+                    meta={'field': 2},
+                ),
+            ]
         )
 
     @run_as_sync

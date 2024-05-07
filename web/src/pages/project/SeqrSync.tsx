@@ -1,12 +1,12 @@
 import * as React from 'react'
 import _ from 'lodash'
-import { Button, CheckboxProps, Form, Message, Modal } from 'semantic-ui-react'
-import { SequenceType, WebApi } from '../../sm-api'
+import { Button, CheckboxProps, DropdownProps, Form, Message, Modal } from 'semantic-ui-react'
+import { SeqrDatasetType, WebApi } from '../../sm-api'
 import MuckTheDuck from '../../shared/components/MuckTheDuck'
 
 interface SeqrSyncProps {
     project: string
-    syncTypes: SequenceType[]
+    syncTypes: string[]
 }
 
 interface SeqrSyncFormOptions {
@@ -14,6 +14,7 @@ interface SeqrSyncFormOptions {
     syncIndividualMetadata?: boolean
     syncIndividuals?: boolean
     syncEsIndex?: boolean
+    esIndexTypes: SeqrDatasetType[]
     syncSavedVariants?: boolean
     syncCramMap?: boolean
     postSlackNotification?: boolean
@@ -22,7 +23,7 @@ interface SeqrSyncFormOptions {
 const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }) => {
     const [isLoading, setIsLoading] = React.useState<boolean>(false)
     const [messages, setMessages] = React.useState<string[]>([])
-    const [seqTypeInModal, setSeqTypeInModal] = React.useState<SequenceType | null>(null)
+    const [seqTypeInModal, setSeqTypeInModal] = React.useState<string | null>(null)
     const [errors, setErrors] = React.useState<string[] | null>()
 
     const [syncOptions, setSyncOptions] = React.useState<SeqrSyncFormOptions>({
@@ -30,6 +31,7 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
         syncIndividualMetadata: true,
         syncIndividuals: true,
         syncEsIndex: true,
+        esIndexTypes: [SeqrDatasetType.SnvIndel],
         syncSavedVariants: true,
         syncCramMap: true,
         postSlackNotification: true,
@@ -37,7 +39,7 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
 
     if (!syncTypes || syncTypes.length === 0) return <></>
 
-    const syncSeqrProject = (seqType: SequenceType | null) => {
+    const syncSeqrProject = (seqType: string | null) => {
         if (!seqType) return
         setIsLoading(true)
         setErrors(null)
@@ -45,6 +47,7 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
             .syncSeqrProject(
                 seqType,
                 project,
+                syncOptions.esIndexTypes,
                 syncOptions.syncFamilies,
                 syncOptions.syncIndividualMetadata,
                 syncOptions.syncIndividuals,
@@ -73,8 +76,25 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
             })
     }
 
-    const updateStateFromForm = (e: React.FormEvent<HTMLInputElement>, data: CheckboxProps) =>
-        setSyncOptions({ ...syncOptions, [data.id || '']: data.checked })
+    const [dropdownDisabled, setDropdownDisabled] = React.useState(!syncOptions.syncEsIndex)
+
+    const updateStateFromCheckbox = (e: React.FormEvent<HTMLInputElement>, data: CheckboxProps) => {
+        const value = data.checked
+        setSyncOptions({ ...syncOptions, [data.id || '']: value })
+        if (data.id === 'syncEsIndex') {
+            setDropdownDisabled(!value)
+        }
+    }
+
+    const updateStateFromDropdown = (
+        e: React.SyntheticEvent<HTMLElement, Event>,
+        data: DropdownProps
+    ) => {
+        const value = Array.isArray((data as any).value)
+            ? (data as any).value
+            : [(data as any).value]
+        setSyncOptions({ ...syncOptions, [data.id || '']: value })
+    }
 
     return (
         <>
@@ -98,44 +118,78 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
                 <Modal.Content>
                     Select sync options:
                     <Form style={{ paddingTop: '20px', paddingLeft: '20px' }}>
-                        <Form.Checkbox
-                            id="syncIndividuals"
-                            checked={syncOptions.syncIndividuals}
-                            onChange={updateStateFromForm}
-                            label="Sync pedigree"
-                        />
-                        <Form.Checkbox
-                            id="syncFamilies"
-                            checked={syncOptions.syncFamilies}
-                            onChange={updateStateFromForm}
-                            label="Sync families"
-                        />
-                        <Form.Checkbox
-                            id="syncIndividualMetadata"
-                            checked={syncOptions.syncIndividualMetadata}
-                            onChange={updateStateFromForm}
-                            label="Sync individuals metadata"
-                        />
-                        <Form.Checkbox
-                            id="syncEsIndex"
-                            checked={syncOptions.syncEsIndex}
-                            onChange={updateStateFromForm}
-                            label="Sync elastic-search index"
-                        />
-                        <Form.Checkbox
-                            id="syncCramMap"
-                            checked={syncOptions.syncCramMap}
-                            onChange={updateStateFromForm}
-                            label="Sync CRAMs"
-                        />
-                        <br />
-                        <Form.Checkbox
-                            id="postSlackNotification"
-                            checked={syncOptions.postSlackNotification}
-                            onChange={updateStateFromForm}
-                            label="Post slack notification"
-                        />
-
+                        <div
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'flex-start',
+                                justifyContent: 'space-between',
+                                gap: '5px',
+                            }}
+                        >
+                            <Form.Checkbox
+                                id="syncIndividuals"
+                                checked={syncOptions.syncIndividuals}
+                                onChange={updateStateFromCheckbox}
+                                label="Sync pedigree"
+                            />
+                            <Form.Checkbox
+                                id="syncFamilies"
+                                checked={syncOptions.syncFamilies}
+                                onChange={updateStateFromCheckbox}
+                                label="Sync families"
+                            />
+                            <Form.Checkbox
+                                id="syncIndividualMetadata"
+                                checked={syncOptions.syncIndividualMetadata}
+                                onChange={updateStateFromCheckbox}
+                                label="Sync individuals metadata"
+                            />
+                            <Form.Checkbox
+                                id="syncEsIndex"
+                                checked={syncOptions.syncEsIndex}
+                                onChange={updateStateFromCheckbox}
+                                label="Sync elastic-search index"
+                            />
+                            <div style={{ marginLeft: '25px', marginBottom: '30px' }}>
+                                <Form.Dropdown
+                                    id="esIndexTypes"
+                                    options={[
+                                        {
+                                            key: 'SNV_INDEL',
+                                            text: 'SNV_INDEL',
+                                            value: 'SNV_INDEL',
+                                        },
+                                        { key: 'SV', text: 'SV', value: 'SV' },
+                                        { key: 'CNV', text: 'CNV', value: 'CNV' },
+                                        {
+                                            key: 'MITO',
+                                            text: 'MITO',
+                                            value: 'MITO',
+                                        },
+                                    ]}
+                                    value={syncOptions.esIndexTypes}
+                                    onChange={updateStateFromDropdown}
+                                    label="ES index type"
+                                    multiple
+                                    selection
+                                    disabled={dropdownDisabled}
+                                />
+                            </div>
+                            <Form.Checkbox
+                                id="syncCramMap"
+                                checked={syncOptions.syncCramMap}
+                                onChange={updateStateFromCheckbox}
+                                label="Sync CRAMs"
+                            />
+                            <br />
+                            <Form.Checkbox
+                                id="postSlackNotification"
+                                checked={syncOptions.postSlackNotification}
+                                onChange={updateStateFromCheckbox}
+                                label="Post slack notification"
+                            />
+                        </div>
                         {!!errors && (
                             <Message negative onDismiss={() => setErrors(null)}>
                                 <h4>

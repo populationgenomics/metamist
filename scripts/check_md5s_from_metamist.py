@@ -1,14 +1,16 @@
-from collections import namedtuple
 import math
 import os
+from collections import namedtuple
 from shlex import quote
 
 import click
-import hailtop.batch as hb
-from cpg_utils.hail_batch import remote_tmpdir
-from cpg_utils.config import get_config
 
-from sample_metadata.apis import SampleApi, SequenceApi
+import hailtop.batch as hb
+
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import remote_tmpdir
+
+from metamist.apis import AssayApi, SampleApi
 
 LocationTuple = namedtuple(
     'LocationTuple', ['cpg_sample_id', 'location', 'checksum', 'size']
@@ -72,10 +74,8 @@ def get_file_path_md5_pairs_from_samples(
     a list of:
         (cpg_sample_id, file_path, expected_md5)
     """
-    seqapi = SequenceApi()
-    sequences = seqapi.get_sequences_by_sample_ids(
-        request_body=cpg_sample_ids, get_latest_sequence_only=False
-    )
+    seqapi = AssayApi()
+    sequences = seqapi.get_assays_by_criteria(sample_ids=cpg_sample_ids)
 
     pairs = []
     for seq in sequences:

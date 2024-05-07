@@ -1,37 +1,37 @@
-import io
 import csv
+import io
 from datetime import date
-
-from typing import List, Optional, Dict, Any
+from typing import Any
 
 from fastapi import APIRouter
 from fastapi.params import Body, Query
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
-from api.utils.dates import parse_date_only_string
 
+from api.utils.dates import parse_date_only_string
 from api.utils.db import (
-    get_projectless_db_connection,
+    Connection,
     get_project_readonly_connection,
     get_project_write_connection,
-    Connection,
+    get_projectless_db_connection,
 )
 from api.utils.export import ExportType
 from db.python.layers.analysis import AnalysisLayer
+from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.project import ProjectPermissionsTable
-from models.enums import AnalysisType, AnalysisStatus, SequenceType
+from db.python.utils import GenericFilter
+from models.enums import AnalysisStatus
 from models.models.analysis import (
     Analysis,
-    ProjectSizeModel,
-    SampleSizeModel,
-    DateSizeModel,
+    AnalysisInternal,
+    ProportionalDateTemporalMethod,
 )
-from models.models.sample import (
-    sample_id_transform_to_raw_list,
-    sample_id_format_list,
-    sample_id_format,
+from models.utils.sample_id_format import sample_id_transform_to_raw_list
+from models.utils.sequencing_group_id_format import (
+    sequencing_group_id_format,
+    sequencing_group_id_format_list,
+    sequencing_group_id_transform_to_raw_list,
 )
-
 
 router = APIRouter(prefix='/analysis', tags=['analysis'])
 
@@ -41,70 +41,95 @@ class AnalysisModel(BaseModel):
     Model for 'createNewAnalysis'
     """
 
-    sample_ids: List[str]
-    type: AnalysisType
+    sequencing_group_ids: list[str]
+    type: str
     status: AnalysisStatus
-    meta: Optional[Dict[str, Any]] = None
-    output: Optional[str] = None
+    meta: dict[str, Any] | None = None
+    output: str | None = None
     active: bool = True
     # please don't use this, unless you're the analysis-runner,
     # the usage is tracked ... (Ծ_Ծ)
-    author: Optional[str] = None
+    author: str | None = None
 
 
 class AnalysisUpdateModel(BaseModel):
     """Update analysis model"""
 
     status: AnalysisStatus
-    output: Optional[str] = None
-    meta: Optional[Dict[str, Any]] = None
-    active: Optional[bool] = None
+    output: str | None = None
+    meta: dict[str, Any] | None = None
+    active: bool | None = None
 
 
 class AnalysisQueryModel(BaseModel):
     """Used to query for many analysis"""
 
-    # sample_ids means it contains the analysis contains at least one of the sample_ids in the list
-    sample_ids: Optional[List[str]]
+    # sequencing_group_ids means it the analysis contains at least one of in the list
+    sample_ids: list[str] | None = None
+    sequencing_group_ids: list[str] | None
     # # sample_ids_all means the analysis contains ALL of the sample_ids
-    # sample_ids_all: List[str] = None
-    projects: List[str]
-    type: Optional[AnalysisType] = None
-    status: Optional[AnalysisStatus] = None
-    meta: Optional[Dict[str, Any]] = None
-    output: Optional[str] = None
-    active: Optional[bool] = None
+    # sample_ids_all: list[str] = None
+    projects: list[str]
+    type: str | None = None
+    status: AnalysisStatus | None = None
+    meta: dict[str, Any] | None = None
+    output: str | None = None
+    active: bool | None = None
+
+    def to_filter(self, project_id_map: dict[str, int]) -> AnalysisFilter:
+        """Convert to internal analysis filter"""
+        return AnalysisFilter(
+            sample_id=(
+                GenericFilter(in_=sample_id_transform_to_raw_list(self.sample_ids))
+                if self.sample_ids
+                else None
+            ),
+            sequencing_group_id=(
+                GenericFilter(
+                    in_=sequencing_group_id_transform_to_raw_list(
+                        self.sequencing_group_ids
+                    )
+                )
+                if self.sequencing_group_ids
+                else None
+            ),
+            project=(
+                GenericFilter(in_=[project_id_map.get(p) for p in self.projects])
+                if self.projects
+                else None
+            ),
+            type=GenericFilter(eq=self.type) if self.type else None,
+        )
 
 
-@router.put('/{project}/', operation_id='createNewAnalysis', response_model=int)
-async def create_new_analysis(
-    analysis: AnalysisModel, connection: Connection = get_project_write_connection
-):
+@router.put('/{project}/', operation_id='createAnalysis', response_model=int)
+async def create_analysis(
+    analysis: Analysis, connection: Connection = get_project_write_connection
+) -> int:
     """Create a new analysis"""
 
     atable = AnalysisLayer(connection)
 
-    sample_ids = sample_id_transform_to_raw_list(analysis.sample_ids)
+    if analysis.author:
+        # special tracking here, if we can't catch it through the header
+        connection.on_behalf_of = analysis.author
 
-    analysis_id = await atable.insert_analysis(
-        analysis_type=analysis.type,
-        status=analysis.status,
-        sample_ids=sample_ids,
-        meta=analysis.meta,
-        output=analysis.output,
-        # analysis-runner: usage is tracked through `on_behalf_of`
-        author=analysis.author,
+    if not analysis.sequencing_group_ids and not analysis.cohort_ids:
+        raise ValueError('Must specify "sequencing_group_ids" or "cohort_ids"')
+
+    analysis_id = await atable.create_analysis(
+        analysis.to_internal(),
     )
 
     return analysis_id
 
 
-@router.patch('/{analysis_id}/', operation_id='updateAnalysisStatus')
-async def update_analysis_status(
+@router.patch('/{analysis_id}/', operation_id='updateAnalysis')
+async def update_analysis(
     analysis_id: int,
     analysis: AnalysisUpdateModel,
     connection: Connection = get_projectless_db_connection,
-):
+) -> bool:
     """Update status of analysis"""
     atable = AnalysisLayer(connection)
     await atable.update_analysis(
@@ -118,16 +143,20 @@ async def update_analysis_status(
     operation_id='getAllSampleIdsWithoutAnalysisType',
 )
 async def get_all_sample_ids_without_analysis_type(
-    analysis_type: AnalysisType,
+    analysis_type: str,
     connection: Connection = get_project_readonly_connection,
 ):
     """get_all_sample_ids_without_analysis_type"""
     atable = AnalysisLayer(connection)
     assert connection.project
-    result = await atable.get_all_sample_ids_without_analysis_type(
-        connection.project, analysis_type
+    sequencing_group_ids = (
+        await atable.get_all_sequencing_group_ids_without_analysis_type(
+            connection.project, analysis_type
+        )
     )
-    return {'sample_ids': sample_id_format_list(result)}
+    return {
+        'sequencing_group_ids': sequencing_group_id_format_list(sequencing_group_ids)
+    }
 
 
 @router.get(
@@ -141,12 +170,7 @@ async def get_incomplete_analyses(
     atable = AnalysisLayer(connection)
     assert connection.project
     results = await atable.get_incomplete_analyses(project=connection.project)
-    if results:
-        for result in results:
-            if result.sample_ids:
-                result.sample_ids = list(sample_id_format_list(result.sample_ids))
-
-    return results
+    return [r.to_external() for r in results]
 
 
 @router.get(
@@ -154,7 +178,7 @@ async def get_incomplete_analyses(
     operation_id='getLatestCompleteAnalysisForType',
 )
 async def get_latest_complete_analysis_for_type(
-    analysis_type: AnalysisType,
+    analysis_type: str,
     connection: Connection = get_project_readonly_connection,
 ):
     """Get (SINGLE) latest complete analysis for some analysis type"""
@@ -163,10 +187,7 @@ async def get_latest_complete_analysis_for_type(
     analysis = await alayer.get_latest_complete_analysis_for_type(
         project=connection.project, analysis_type=analysis_type
     )
-    if analysis and analysis.sample_ids:
-        analysis.sample_ids = list(sample_id_format_list(analysis.sample_ids))
-
-    return analysis
+    return analysis.to_external()
 
 
 @router.post(
@@ -174,8 +195,8 @@ async def get_latest_complete_analysis_for_type(
     operation_id='getLatestCompleteAnalysisForTypePost',
 )
 async def get_latest_complete_analysis_for_type_post(
-    analysis_type: AnalysisType,
-    meta: Dict[str, Any] = Body(..., embed=True),  # type: ignore[assignment]
+    analysis_type: str,
+    meta: dict[str, Any] = Body(..., embed=True),  # type: ignore[assignment]
     connection: Connection = get_project_readonly_connection,
 ):
     """
@@ -189,38 +210,8 @@ async def get_latest_complete_analysis_for_type_post(
         analysis_type=analysis_type,
         meta=meta,
     )
-    if analysis and analysis.sample_ids:
-        analysis.sample_ids = list(sample_id_format_list(analysis.sample_ids))
 
-    return analysis
-
-
-@router.post(
-    '/{project}/{analysis_type}/latest-complete/for-samples',
-    operation_id='getLatestAnalysisForSamplesAndType',
-)
-async def get_latest_analysis_for_samples_and_type(
-    sample_ids: List[str],
-    analysis_type: AnalysisType,
-    allow_missing: bool = True,
-    connection: Connection = get_project_readonly_connection,
-):
-    """
-    Get latest complete analysis for samples and type.
-    Should return one per sample.
-    """
-    atable = AnalysisLayer(connection)
-    results = await atable.get_latest_complete_analysis_for_samples_and_type(
-        analysis_type=analysis_type,
-        sample_ids=sample_id_transform_to_raw_list(sample_ids),
-        allow_missing=allow_missing,
-    )
-
-    if results:
-        for result in results:
-            result.sample_ids = sample_id_format_list(result.sample_ids)
-
-    return results
+    return analysis.to_external()
 
 
 @router.get(
@@ -235,8 +226,7 @@ async def get_analysis_by_id(
     """Get analysis by ID"""
     atable = AnalysisLayer(connection)
     result = await atable.get_analysis_by_id(analysis_id)
-    result.sample_ids = sample_id_format_list(result.sample_ids)
-    return result
+    return result.to_external()
 
 
 @router.post('/query', operation_id='queryAnalyses')
@@ -247,50 +237,42 @@ async def query_analyses(
     if not query.projects:
         raise ValueError('Must specify "projects"')
 
-    pt = ProjectPermissionsTable(connection=connection.connection)
-    project_ids = await pt.get_project_ids_from_names_and_user(
-        connection.author, query.projects, readonly=True
+    pt = ProjectPermissionsTable(connection)
+    projects = await pt.get_and_check_access_to_projects_for_names(
+        user=connection.author, project_names=query.projects, readonly=True
     )
+    project_name_map = {p.name: p.id for p in projects}
     atable = AnalysisLayer(connection)
-    analyses = await atable.query_analysis(
-        sample_ids=sample_id_transform_to_raw_list(query.sample_ids)
-        if query.sample_ids
-        else None,
-        project_ids=project_ids,
-        analysis_type=query.type,
-        status=query.status,
-        meta=query.meta,
-        output=query.output,
-        active=query.active,
-    )
-    for analysis in analyses:
-        analysis.sample_ids = sample_id_format_list(analysis.sample_ids)
-
-    return analyses
+    analyses = await atable.query(query.to_filter(project_name_map))
+    return [a.to_external() for a in analyses]
 
 
 @router.get('/analysis-runner', operation_id='getAnalysisRunnerLog')
 async def get_analysis_runner_log(
-    project_names: List[str] = Query(None),  # type: ignore
-    author: str = None,
+    project_names: list[str] = Query(None),  # type: ignore
+    # author: str = None, # not implemented yet, uncomment when we do
     output_dir: str = None,
+    ar_guid: str = None,
     connection: Connection = get_projectless_db_connection,
-) -> List[Analysis]:
+) -> list[AnalysisInternal]:
     """
     Get log for the analysis-runner, useful for checking this history of analysis
     """
     atable = AnalysisLayer(connection)
     project_ids = None
     if project_names:
-        pt = ProjectPermissionsTable(connection=connection.connection)
+        pt = ProjectPermissionsTable(connection)
         project_ids = await pt.get_project_ids_from_names_and_user(
             connection.author, project_names, readonly=True
         )
 
     results = await atable.get_analysis_runner_log(
-        project_ids=project_ids, author=author, output_dir=output_dir
+        project_ids=project_ids,
+        # author=author,
+        output_dir=output_dir,
+        ar_guid=ar_guid,
     )
-    return results
+    return [a.to_external() for a in results]
 
 
 @router.get(
@@ -300,32 +282,34 @@ async def get_analysis_runner_log(
 )
 async def get_sample_reads_map(
     export_type: ExportType = ExportType.JSON,
-    sequence_types: List[SequenceType] = Query(None),  # type: ignore
+    sequencing_types: list[str] = Query(None),  # type: ignore
     connection: Connection = get_project_readonly_connection,
 ):
     """
-    Get map of ExternalSampleId  pathToCram  InternalSampleID for seqr
+    Get map of ExternalSampleId  pathToCram  InternalSeqGroupID for seqr
+
+    Note that, in JSON the result is
 
     Description:
         Column 1: Individual ID
         Column 2: gs:// Google bucket path or server filesystem path for this Individual
-        Column 3: Sample ID for this file, if different from the Individual ID.
+        Column 3: SequencingGroup ID for this file, if different from the Individual ID.
                     Used primarily for gCNV files to identify the sample in the batch path
     """
 
     at = AnalysisLayer(connection)
     assert connection.project
     objs = await at.get_sample_cram_path_map_for_seqr(
-        project=connection.project, sequence_types=sequence_types
+        project=connection.project, sequencing_types=sequencing_types
     )
 
     for r in objs:
-        r['sample_id'] = sample_id_format(r['sample_id'])
+        r['sequencing_group_id'] = sequencing_group_id_format(r['sequencing_group_id'])
 
     if export_type == ExportType.JSON:
         return objs
 
-    keys = ['participant_id', 'output', 'sample_id']
+    keys = ['participant_id', 'output', 'sequencing_group_id']
     rows = [[r[k] for k in keys] for r in objs]
 
     output = io.StringIO()
@@ -343,50 +327,44 @@ async def get_sample_reads_map(
     )
 
 
-@router.get('/sample-file-sizes', operation_id='getSampleFileSizes')
-async def get_sample_file_sizes(
-    project_names: List[str] = Query(None),  # type: ignore
-    start_date: str = None,
-    end_date: str = None,
+@router.post(
+    '/cram-proportionate-map',
+    operation_id='getProportionateMap',
+    # response_model=list[ProportionalDateModel] # don't uncomment this, breaks python API
+)
+async def get_proportionate_map(
+    start: str,
+    projects: list[str],
+    temporal_methods: list[ProportionalDateTemporalMethod],
+    sequencing_types: list[str] | None = None,
+    end: str = None,
     connection: Connection = get_projectless_db_connection,
-) -> list[ProjectSizeModel]:
+):
     """
-    Get the per sample file size by type over the given projects and date range
+    Get proportionate map of project sizes over time, specifying the temporal
+    methods to use. These will be given back as:
+    {
+        [temporalMethod]: {
+            date: Date,
+            projects: [{ project: string, percentage: float, size: int }]
+        }
+    }
     """
-    atable = AnalysisLayer(connection)
-
-    # Check access to projects
-    project_ids = None
-    pt = ProjectPermissionsTable(connection=connection.connection)
+    pt = ProjectPermissionsTable(connection)
     project_ids = await pt.get_project_ids_from_names_and_user(
-        connection.author, project_names, readonly=True
+        connection.author, projects, readonly=True
     )
 
-    # Map from internal pids to project name
-    prj_name_map = dict(zip(project_ids, project_names))
+    start_date = parse_date_only_string(start) if start else None
+    end_date = parse_date_only_string(end) if end else None
 
-    # Convert dates
-    start = parse_date_only_string(start_date)
-    end = parse_date_only_string(end_date)
-
-    # Get results with internal ids as keys
-    results = await atable.get_sample_file_sizes(
-        project_ids=project_ids, start_date=start, end_date=end
+    at = AnalysisLayer(connection)
+    results = await at.get_cram_size_proportionate_map(
+        projects=project_ids,
+        sequencing_types=sequencing_types,
+        start_date=start_date,
+        end_date=end_date,
+        temporal_methods=temporal_methods,
     )
 
-    # Convert to the correct output type, converting internal ids to external
-    fixed_pids: List[Any] = [
-        ProjectSizeModel(
-            project=prj_name_map[project_data['project']],
-            samples=[
-                SampleSizeModel(
-                    sample=sample_id_format(s['sample']),
-                    dates=[DateSizeModel(**d) for d in s['dates']],
-                )
-                for s in project_data['samples']
-            ],
-        )
-        for project_data in results
-    ]
-
-    return fixed_pids
+    return {k.value: v for k, v in results.items()}

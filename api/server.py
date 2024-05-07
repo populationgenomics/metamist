@@ -2,24 +2,25 @@ import os
 import time
 import traceback
 
-from fastapi import FastAPI, Request, HTTPException, APIRouter
+from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
+from pydantic import ValidationError
 from starlette.responses import FileResponse
 
+from api import routes
+from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
+from api.settings import PROFILE_REQUESTS, SKIP_DATABASE_CONNECTION
+from api.utils import get_openapi_schema_func
+from api.utils.exceptions import determine_code_from_error
 from db.python.connect import SMConnections
 from db.python.tables.project import is_all_access
 from db.python.utils import get_logger
 
-from api import routes
-from api.utils import get_openapi_schema_func
-from api.utils.exceptions import determine_code_from_error
-from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
-from api.settings import PROFILE_REQUESTS, SKIP_DATABASE_CONNECTION
-
 # This tag is automatically updated by bump2version
-_VERSION = '5.7.2'
+_VERSION = '6.10.1'
+
 
 logger = get_logger()
 
@@ -30,7 +31,7 @@ static_dir_exists = os.path.exists(STATIC_DIR)
 app = FastAPI()
 
 if PROFILE_REQUESTS:
-    from fastapi_profiler.profiler_middleware import PyInstrumentProfilerMiddleware
+    from fastapi_profiler.profiler import PyInstrumentProfilerMiddleware
 
     app.add_middleware(PyInstrumentProfilerMiddleware)
 
@@ -100,16 +101,23 @@ async def not_found(request, exc):
 async def exception_handler(request: Request, e: Exception):
     """Generic exception handler"""
     add_stacktrace = True
+    description: str
 
     if isinstance(e, HTTPException):
         code = e.status_code
         name = e.detail
-
+        description = str(e)
+    elif isinstance(e, ValidationError):
+        # for whatever reason, calling str(e) here fails
+        code = 500
+        name = 'ValidationError'
+        description = str(e.args)
     else:
         code = determine_code_from_error(e)
         name = str(type(e).__name__)
+        description = str(e)
 
-    base_params = {'name': name, 'description': str(e)}
+    base_params = {'name': name, 'description': description}
 
     if add_stacktrace:
         st = traceback.format_exc()
@@ -133,11 +141,11 @@ async def exception_handler(request: Request, e: Exception):
         cors_middleware = middlewares[0]
 
         request_origin = request.headers.get('origin', '')
-        if cors_middleware and '*' in cors_middleware.options['allow_origins']:
+        if cors_middleware and '*' in cors_middleware.options['allow_origins']:  # type: ignore
             response.headers['Access-Control-Allow-Origin'] = '*'
         elif (
             cors_middleware
-            and request_origin in cors_middleware.options['allow_origins']
+            and request_origin in cors_middleware.options['allow_origins']  # type: ignore
         ):
             response.headers['Access-Control-Allow-Origin'] = request_origin
 
@@ -145,7 +153,7 @@ async def exception_handler(request: Request, e: Exception):
 
 
 # graphql
-app.include_router(MetamistGraphQLRouter, prefix='/graphql')
+app.include_router(MetamistGraphQLRouter, prefix='/graphql', include_in_schema=False)
 
 for route in routes.__dict__.values():
     if not isinstance(route, APIRouter):
@@ -161,12 +169,17 @@ app.openapi = get_openapi_schema_func(app, _VERSION)  # type: ignore[assignment]
 
 
 if __name__ == '__main__':
+    import logging
+
     import uvicorn
+
+    logging.getLogger('watchfiles').setLevel(logging.WARNING)
+    logging.getLogger('watchfiles.main').setLevel(logging.WARNING)
 
     uvicorn.run(
         'api.server:app',
         host='0.0.0.0',
         port=int(os.getenv('PORT', '8000')),
-        debug=True,
+        # debug=True,
         reload=True,
     )

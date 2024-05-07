@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # pylint: disable=no-member,consider-using-with
 """
-Run the sample-metadata API through the analysis runner
+Run the metamist API through the analysis runner
 in a very generic, customisable way!
 
 For example:
@@ -11,16 +11,15 @@ For example:
         --json '{"project": "acute-care", "external_id": "<external-id>"}'
 
 """
-from typing import List
-import os.path
-import logging
-import subprocess
-
 import argparse
 import json
+import logging
+import os.path
+import subprocess
+from typing import List
 
-from sample_metadata import apis
-from sample_metadata.model_utils import file_type
+from metamist import apis
+from metamist.model_utils import file_type
 
 
 def run_sm(
@@ -39,7 +38,7 @@ def run_sm(
     api = getattr(apis, api_class_name)
     api_instance = api()
 
-    # the latest sample-metadata API wants an IOBase, so let's
+    # the latest metamist API wants an IOBase, so let's
     # scan through the params, open and substitute the files
     openapi_types = getattr(api_instance, f'{method_name}_endpoint').__dict__[
         'openapi_types'
@@ -90,7 +89,7 @@ def from_args(args):
 def main(args=None):
     """Main function, parses sys.argv"""
 
-    parser = argparse.ArgumentParser('Arbitrary sample-metadata script')
+    parser = argparse.ArgumentParser('Arbitrary metamist script')
     parser.add_argument('api_name')
     parser.add_argument('method_name')
     parser.add_argument(

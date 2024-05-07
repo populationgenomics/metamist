@@ -1,14 +1,15 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order
 import logging
-from typing import Optional, List
+from typing import List, Optional
 
 import click
 
-from sample_metadata.models import AnalysisType, AnalysisStatus, AnalysisModel
-from sample_metadata.parser.generic_metadata_parser import (
+from metamist.models import AnalysisStatus
+from metamist.parser.generic_metadata_parser import (
     GenericMetadataParser,
-    SequenceMetaGroup,
-    SingleRow,
+    ParsedAnalysis,
+    ParsedAssay,
+    ParsedSequencingGroup,
     run_as_sync,
 )
 
@@ -42,18 +43,18 @@ class TobWgsParser(GenericMetadataParser):
         self,
         project: str,
         search_locations: List[str],
-        default_sequence_type='wgs',
+        default_sequencing_type='wgs',
         default_sample_type='blood',
     ):
         super().__init__(
             search_locations=search_locations,
             project=project,
-            default_sequence_type=default_sequence_type,
+            default_sequencing_type=default_sequencing_type,
             default_sample_type=default_sample_type,
             sample_name_column='sample.sample_name',
             participant_meta_map={},
             sample_meta_map={},
-            sequence_meta_map=SEQUENCE_MAP,
+            assay_meta_map=SEQUENCE_MAP,
             qc_meta_map={},
         )
 
@@ -109,14 +110,17 @@ class TobWgsParser(GenericMetadataParser):
 
         return None
 
-    async def get_analyses(
-        self, sample_id: str, row: SingleRow, cpg_id: Optional[str]
-    ) -> List[AnalysisModel]:
+    async def get_analyses_from_sequencing_group(
+        self, sequencing_group: ParsedSequencingGroup
+    ) -> list[ParsedAnalysis]:
         """
         Get Analysis entries from a row.
         cpg_id is known for previously added samples.
         """
-        analyses = await super().get_analyses(sample_id, row, cpg_id)
+        analyses = await super().get_analyses_from_sequencing_group(sequencing_group)
+
+        sample_id = sequencing_group.sample.external_sid
+        cpg_id = sequencing_group.sample.internal_sid
 
         for analysis_type in ['gvcf', 'cram']:
             if analysis_type == 'gvcf':
@@ -129,9 +133,9 @@ class TobWgsParser(GenericMetadataParser):
                 continue
 
             analyses.append(
-                AnalysisModel(
-                    sample_ids=['<none>'],
-                    type=AnalysisType(analysis_type),
+                ParsedAnalysis(
+                    sequencing_group=sequencing_group,
+                    type_=analysis_type,
                     status=AnalysisStatus('completed'),
                     output=file_path,
                     meta={
@@ -143,35 +147,28 @@ class TobWgsParser(GenericMetadataParser):
                         # need to reblock):
                         'staging': True,
                     },
+                    rows=[],
                 )
             )
         return analyses
 
-    async def get_sequence_meta(
-        self, seq_group: SequenceMetaGroup, sample_id: Optional[str] = None
-    ) -> SequenceMetaGroup:
-        """Get sequence-metadata from row"""
-        rows = seq_group.rows
-        if isinstance(rows, list):
-            row = rows[0]
+    async def get_assays_from_group(
+        self, sequencing_group: ParsedSequencingGroup
+    ) -> list[ParsedAssay]:
+        assays = await super().get_assays_from_group(sequencing_group)
 
-        result = await super().get_sequence_meta(seq_group, sample_id=sample_id)
-        collapsed_sequence_meta = result.meta or {}
+        for assay in assays:
+            row = assay.rows[0]
+            assay.meta['batch'] = int(row['batch.batch_name'][-3:])
+            assay.meta['batch_name'] = row['batch.batch_name'][:-5]
 
-        batch_number = int(row['batch.batch_name'][-3:])
-        collapsed_sequence_meta['batch'] = batch_number
-
-        batch_name = row['batch.batch_name'][:-5]
-        collapsed_sequence_meta['batch_name'] = batch_name
-
-        seq_group.meta = collapsed_sequence_meta
-        return seq_group
+        return assays
 
 
 @click.command(help='GCS path to manifest file')
 @click.option(
     '--project',
-    help='The sample-metadata project to import manifest into (probably "seqr")',
+    help='The metamist project to import manifest into (probably "seqr")',
 )
 @click.option('--default-sample-type', default='blood')
 @click.option('--default-sequence-type', default='wgs')
@@ -186,7 +183,7 @@ async def main(
     manifests,
     project,
     default_sample_type='blood',
-    default_sequence_type='wgs',
+    default_sequencing_type='wgs',
     path_prefix=None,
     confirm=False,
     dry_run=False,
@@ -196,7 +193,7 @@ async def main(
 
     parser = TobWgsParser(
         default_sample_type=default_sample_type,
-        default_sequence_type=default_sequence_type,
+        default_sequencing_type=default_sequencing_type,
         project=project,
         search_locations=_search_locations,
     )

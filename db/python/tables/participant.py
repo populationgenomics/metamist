@@ -1,9 +1,10 @@
 from collections import defaultdict
-from typing import List, Dict, Tuple, Any, Optional
+from typing import Any
 
-from db.python.connect import DbBase, NotFoundError
-from db.python.utils import ProjectId, to_db_json
-from models.models.participant import Participant
+from db.python.tables.base import DbBase
+from db.python.utils import NotFoundError, escape_like_term, to_db_json
+from models.models.participant import ParticipantInternal
+from models.models.project import ProjectId
 
 
 class ParticipantTable(DbBase):
@@ -11,11 +12,28 @@ class ParticipantTable(DbBase):
     Capture Analysis table operations and queries
     """
 
+    keys_str = ', '.join(
+        [
+            'id',
+            'external_id',
+            'reported_sex',
+            'reported_gender',
+            'karyotype',
+            'meta',
+            'project',
+            'audit_log_id',
+        ]
+    )
+
     table_name = 'participant'
 
-    async def get_project_ids_for_participant_ids(self, participant_ids: List[int]):
+    async def get_project_ids_for_participant_ids(self, participant_ids: list[int]):
         """Get project IDs for participant_ids (mostly for checking auth)"""
-        _query = 'SELECT project FROM participant WHERE id in :participant_ids GROUP BY project'
+        _query = """
+        SELECT project
+        FROM participant
+        WHERE id in :participant_ids
+        GROUP BY project"""
         rows = await self.connection.fetch_all(
             _query, {'participant_ids': participant_ids}
         )
@@ -23,44 +41,55 @@ class ParticipantTable(DbBase):
 
     async def get_participants_by_ids(
         self, ids: list[int]
-    ) -> tuple[set[ProjectId], list[Participant]]:
+    ) -> tuple[set[ProjectId], list[ParticipantInternal]]:
         """Get participants by IDs"""
-        _query = 'SELECT project, id, external_id, reported_sex, reported_gender, karyotype, meta FROM participant WHERE id in :ids'
+        _query = f"""
+        SELECT {self.keys_str}
+        FROM participant
+        WHERE id in :ids"""
         rows = await self.connection.fetch_all(_query, {'ids': ids})
         ds = [dict(r) for r in rows]
         projects = set(d.get('project') for d in ds)
-        return projects, [Participant(**d) for d in ds]
+        return projects, [ParticipantInternal.from_db(dict(d)) for d in ds]
 
     async def get_participants(
-        self, project: int, internal_participant_ids: List[int] = None
-    ):
+        self, project: int, internal_participant_ids: list[int] = None
+    ) -> list[ParticipantInternal]:
         """
         Get participants for a project
         """
-        values: Dict[str, Any] = {'project': project}
+        values: dict[str, Any] = {'project': project}
         if internal_participant_ids:
-            _query = 'SELECT * FROM participant WHERE project = :project AND id in :ids'
+            _query = f"""
+                SELECT {self.keys_str}
+                FROM participant
+                WHERE project = :project AND id in :ids"""
             values['ids'] = internal_participant_ids
         else:
-            _query = 'SELECT * FROM participant WHERE project = :project'
-        return await self.connection.fetch_all(_query, values)
+            _query = f'SELECT {self.keys_str} FROM participant WHERE project = :project'
+        rows = await self.connection.fetch_all(_query, values)
+        return [ParticipantInternal.from_db(dict(r)) for r in rows]
 
     async def create_participant(
         self,
         external_id: str,
-        reported_sex: int = None,
-        reported_gender: str = None,
-        karyotype: str = None,
-        meta: Dict = None,
-        author: str = None,
+        reported_sex: int | None,
+        reported_gender: str | None,
+        karyotype: str | None,
+        meta: dict | None,
         project: ProjectId = None,
     ) -> int:
         """
         Create a new sample, and add it to database
         """
-        _query = f"""
-INSERT INTO participant (external_id, reported_sex, reported_gender, karyotype, meta, author, project)
-VALUES (:external_id, :reported_sex, :reported_gender, :karyotype, :meta, :author, :project)
+        if not (project or self.project):
+            raise ValueError('Must provide project to create participant')
+
+        _query = """
+INSERT INTO participant
+    (external_id, reported_sex, reported_gender, karyotype, meta, audit_log_id, project)
+VALUES
+    (:external_id, :reported_sex, :reported_gender, :karyotype, :meta, :audit_log_id, :project)
 RETURNING id
         """
 
@@ -72,30 +101,29 @@ RETURNING id
                 'reported_gender': reported_gender,
                 'karyotype': karyotype,
                 'meta': to_db_json(meta or {}),
-                'author': author or self.author,
+                'audit_log_id': await self.audit_log_id(),
                 'project': project or self.project,
             },
         )
 
     async def update_participants(
         self,
-        participant_ids: List[int],
-        reported_sexes: List[int] = None,
-        reported_genders: List[str] = None,
-        karyotypes: List[str] = None,
-        metas: List[Dict] = None,
-        author=None,
+        participant_ids: list[int],
+        reported_sexes: list[int] | None,
+        reported_genders: list[str] | None,
+        karyotypes: list[str] | None,
+        metas: list[dict] | None,
     ):
         """
         Update many participants, expects that all lists contain the same number of values.
         You can't update selective fields on selective samples, if you provide metas, this
         function will update EVERY participant with the provided meta values.
         """
-        _author = author or self.author
-        updaters = ['author = :author']
-        values: Dict[str, List[Any]] = {
+        updaters = ['audit_log_id = :audit_log_id']
+        audit_log_id = await self.audit_log_id()
+        values: dict[str, list[Any]] = {
             'pid': participant_ids,
-            'author': [_author] * len(participant_ids),
+            'audit_log_id': [audit_log_id] * len(participant_ids),
         }
         if reported_sexes:
             updaters.append('reported_sex = :reported_sex')
@@ -123,18 +151,17 @@ RETURNING id
     async def update_participant(
         self,
         participant_id: int,
-        external_id: str = None,
-        reported_sex: int = None,
-        reported_gender: str = None,
-        karyotype: str = None,
-        meta: Dict = None,
-        author=None,
+        external_id: str | None,
+        reported_sex: int | None,
+        reported_gender: str | None,
+        karyotype: str | None,
+        meta: dict | None,
     ):
         """
         Update participant
         """
-        updaters = ['author = :author']
-        fields = {'pid': participant_id, 'author': author or self.author}
+        updaters = ['audit_log_id = :audit_log_id']
+        fields = {'pid': participant_id, 'audit_log_id': await self.audit_log_id()}
 
         if external_id:
             updaters.append('external_id = :external_id')
@@ -163,16 +190,23 @@ RETURNING id
 
     async def get_id_map_by_external_ids(
         self,
-        external_participant_ids: List[str],
-        project: Optional[ProjectId],
-    ) -> Dict[str, int]:
+        external_participant_ids: list[str],
+        project: ProjectId | None,
+    ) -> dict[str, int]:
         """Get map of {external_id: internal_participant_id}"""
-        assert project
+        _project = project or self.project
+        if not _project:
+            raise ValueError(
+                'Must provide project to get participant id map by external'
+            )
 
         if len(external_participant_ids) == 0:
             return {}
 
-        _query = 'SELECT external_id, id FROM participant WHERE external_id in :external_ids AND project = :project'
+        _query = """
+        SELECT external_id, id
+        FROM participant
+        WHERE external_id in :external_ids AND project = :project"""
         results = await self.connection.fetch_all(
             _query,
             {
@@ -185,8 +219,8 @@ RETURNING id
         return id_map
 
     async def get_id_map_by_internal_ids(
-        self, internal_participant_ids: List[int], allow_missing=False
-    ) -> Dict[int, str]:
+        self, internal_participant_ids: list[int], allow_missing=False
+    ) -> dict[int, str]:
         """Get map of {internal_id: external_participant_id}"""
         if len(internal_participant_ids) == 0:
             return {}
@@ -195,7 +229,7 @@ RETURNING id
         results = await self.connection.fetch_all(
             _query, {'ids': internal_participant_ids}
         )
-        id_map: Dict[int, str] = {r['id']: r['external_id'] for r in results}
+        id_map: dict[int, str] = {r['id']: r['external_id'] for r in results}
 
         if not allow_missing and len(id_map) != len(internal_participant_ids):
             provided_internal_ids = set(internal_participant_ids)
@@ -213,9 +247,9 @@ RETURNING id
 
     async def get_participants_by_families(
         self, family_ids: list[int]
-    ) -> tuple[set[ProjectId], dict[int, list[Participant]]]:
+    ) -> tuple[set[ProjectId], dict[int, list[ParticipantInternal]]]:
         """Get list of participants keyed by families, duplicates results"""
-        _query = f"""
+        _query = """
             SELECT project, fp.family_id, p.id, p.external_id, p.reported_sex, p.reported_gender, p.karyotype, p.meta
             FROM participant p
             INNER JOIN family_participant fp ON fp.participant_id = p.id
@@ -228,17 +262,21 @@ RETURNING id
             drow = dict(row)
             projects.add(row['project'])
             fid = drow.pop('family_id')
-            retmap[fid].append(Participant(**drow))
+            retmap[fid].append(ParticipantInternal.from_db(drow))
 
         return projects, retmap
 
     async def update_many_participant_external_ids(
-        self, internal_to_external_id: Dict[int, str]
+        self, internal_to_external_id: dict[int, str]
     ):
         """Update many participant external_ids through the {internal: external} map"""
-        _query = 'UPDATE participant SET external_id = :external_id WHERE id = :participant_id'
+        _query = """
+        UPDATE participant
+        SET external_id = :external_id, audit_log_id = :audit_log_id
+        WHERE id = :participant_id"""
+        audit_log_id = await self.audit_log_id()
         mapped_values = [
-            {'participant_id': k, 'external_id': v}
+            {'participant_id': k, 'external_id': v, 'audit_log_id': audit_log_id}
             for k, v in internal_to_external_id.items()
         ]
         await self.connection.execute_many(_query, mapped_values)
@@ -258,24 +296,31 @@ RETURNING id
         rows = await self.connection.fetch_all(_query, {'pids': participant_ids})
         return {r['id']: [r['external_id']] for r in rows}
 
-    async def get_external_participant_id_to_internal_sample_id_map(
-        self, project: ProjectId
-    ) -> List[Tuple[str, int]]:
+    async def get_external_participant_id_to_internal_sequencing_group_id_map(
+        self, project: ProjectId, sequencing_type: str | None = None
+    ) -> list[tuple[str, int]]:
         """
-        Get a map of {external_participant_id} -> {internal_sample_id}
-        useful to matching joint-called samples in the matrix table to the participant
+        Get a map of {external_participant_id} -> {internal_sequencing_group_id}
+        useful to match joint-called sequencing groups in the matrix table to the participant
 
         Return a list not dictionary, because dict could lose
-        participants with multiple samples.
+        participants with multiple sequencing groups.
         """
-        _query = """
-SELECT p.external_id, s.id
+        wheres = ['p.project = :project']
+        values: dict[str, Any] = {'project': project}
+        if sequencing_type:
+            wheres.append('sg.type = :sequencing_type')
+            values['sequencing_type'] = sequencing_type
+
+        _query = f"""
+SELECT p.external_id, sg.id
 FROM participant p
 INNER JOIN sample s ON p.id = s.participant_id
-WHERE p.project = :project
+INNER JOIN sequencing_group sg ON sg.sample_id = s.id
+WHERE {' AND '.join(wheres)}
 """
-        values = await self.connection.fetch_all(_query, {'project': project})
-        return [(r[0], r[1]) for r in values]
+        rows = await self.connection.fetch_all(_query, values)
+        return [(r[0], int(r[1])) for r in rows]
 
     async def search(
         self, query, project_ids: list[ProjectId], limit: int = 5
@@ -293,7 +338,7 @@ WHERE p.project = :project
             _query,
             {
                 'project_ids': project_ids,
-                'search_pattern': self.escape_like_term(query) + '%',
+                'search_pattern': escape_like_term(query) + '%',
                 'limit': limit,
             },
         )

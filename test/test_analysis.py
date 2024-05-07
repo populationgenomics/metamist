@@ -1,14 +1,19 @@
 # pylint: disable=invalid-overridden-method
-from datetime import date, timedelta
-
 from test.testbase import DbIsolatedTest, run_as_sync
 
-from models.enums.sequencing import SequenceType
-from models.enums import AnalysisType, AnalysisStatus
-from models.models.analysis import Analysis
-
 from db.python.layers.analysis import AnalysisLayer
-from db.python.layers.sample import SampleLayer, SampleType
+from db.python.layers.assay import AssayLayer
+from db.python.layers.sample import SampleLayer
+from db.python.layers.sequencing_group import SequencingGroupLayer
+from db.python.tables.analysis import AnalysisFilter
+from db.python.utils import GenericFilter
+from models.enums import AnalysisStatus
+from models.models import (
+    AnalysisInternal,
+    AssayUpsertInternal,
+    SampleUpsertInternal,
+    SequencingGroupUpsertInternal,
+)
 
 
 class TestAnalysis(DbIsolatedTest):
@@ -19,21 +24,84 @@ class TestAnalysis(DbIsolatedTest):
         # don't need to await because it's tagged @run_as_sync
         super().setUp()
         self.sl = SampleLayer(self.connection)
+        self.sgl = SequencingGroupLayer(self.connection)
+        self.asl = AssayLayer(self.connection)
         self.al = AnalysisLayer(self.connection)
 
-        self.sample_id = await self.sl.insert_sample(
-            'Test01',
-            SampleType.BLOOD,
-            meta={'meta': 'meta ;)'},
-            active=True,
+        sample = await self.sl.upsert_sample(
+            SampleUpsertInternal(
+                external_id='Test01',
+                type='blood',
+                meta={'meta': 'meta ;)'},
+                active=True,
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={},
+                        sample_id=None,
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                meta={
+                                    'sequencing_type': 'genome',
+                                    'sequencing_technology': 'short-read',
+                                    'sequencing_platform': 'illumina',
+                                },
+                            )
+                        ],
+                    ),
+                    SequencingGroupUpsertInternal(
+                        type='exome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={},
+                        sample_id=None,
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                meta={
+                                    'sequencing_type': 'exome',
+                                    'sequencing_technology': 'short-read',
+                                    'sequencing_platform': 'illumina',
+                                },
+                            )
+                        ],
+                    ),
+                ],
+            )
+        )
+        self.sample_id = sample.id
+        self.genome_sequencing_group_id = sample.sequencing_groups[0].id
+        self.exome_sequencing_group_id = sample.sequencing_groups[self.project_id].id
+
+    @run_as_sync
+    async def test_get_analysis_by_id(self):
+        """
+        Test getting an analysis by id
+        """
+        analysis_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[self.genome_sequencing_group_id],
+                meta={'sequencing_type': 'genome', 'size': 1024},
+            )
         )
 
-        await self.al.insert_analysis(
-            analysis_type=AnalysisType.CRAM,
-            status=AnalysisStatus.COMPLETED,
-            sample_ids=[self.sample_id],
-            meta={'sequence_type': 'genome', 'size': 1024},
-        )
+        analysis = await self.al.get_analysis_by_id(analysis_id)
+        self.assertEqual(analysis_id, analysis.id)
+        self.assertEqual('cram', analysis.type)
+        self.assertEqual(AnalysisStatus.COMPLETED, analysis.status)
+
+    @run_as_sync
+    async def test_empty_query(self):
+        """
+        Test empty IDs to see the query construction
+        """
+        analyses = await self.al.query(AnalysisFilter(id=GenericFilter(in_=[])))
+        self.assertEqual(len(analyses), 0)
 
     @run_as_sync
     async def test_add_cram(self):
@@ -41,16 +109,24 @@ class TestAnalysis(DbIsolatedTest):
         Test adding an analysis of type CRAM
         """
 
-        analyses = await self.connection.connection.fetch_all('SELECT * FROM analysis')
-        analysis_samples = await self.connection.connection.fetch_all(
-            'SELECT * FROM analysis_sample'
+        analysis_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[self.genome_sequencing_group_id],
+                meta={'sequencing_type': 'genome', 'size': 1024},
+            )
         )
-        print(analyses, analysis_samples)
+
+        analyses = await self.connection.connection.fetch_all('SELECT * FROM analysis')
+        analysis_sgs = await self.connection.connection.fetch_all(
+            'SELECT * FROM analysis_sequencing_group'
+        )
 
         self.assertEqual(1, len(analyses))
-
-        self.assertEqual(1, analysis_samples[0]['sample_id'])
-        self.assertEqual(analyses[0]['id'], analysis_samples[0]['analysis_id'])
+        self.assertEqual(analysis_id, analyses[0]['id'])
+        self.assertEqual(1, analysis_sgs[0]['sequencing_group_id'])
+        self.assertEqual(analyses[0]['id'], analysis_sgs[0]['analysis_id'])
 
     @run_as_sync
     async def test_get_analysis(self):
@@ -58,123 +134,35 @@ class TestAnalysis(DbIsolatedTest):
         Test adding an analysis of type ANALYSIS_RUNNER
         """
 
-        await self.al.insert_analysis(
-            analysis_type=AnalysisType.ANALYSIS_RUNNER,
-            status=AnalysisStatus.UNKNOWN,
-            # no sample IDs to check join
-            sample_ids=[],
-            meta={},
+        a_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='analysis-runner',
+                status=AnalysisStatus.UNKNOWN,
+                sequencing_group_ids=[],
+                meta={},
+            )
         )
 
-        analyses = await self.al.query_analysis(
-            project_ids=[1], analysis_type=AnalysisType.ANALYSIS_RUNNER
+        analyses = await self.al.query(
+            AnalysisFilter(
+                project=GenericFilter(eq=self.project_id),
+                type=GenericFilter(eq='analysis-runner'),
+            )
         )
         expected = [
-            Analysis(
-                id=3,
-                type=AnalysisType.ANALYSIS_RUNNER,
+            AnalysisInternal(
+                id=a_id,
+                type='analysis-runner',
                 status=AnalysisStatus.UNKNOWN,
-                sample_ids=[],
+                sequencing_group_ids=[],
+                cohort_ids=[],
                 output=None,
                 timestamp_completed=None,
                 project=1,
                 meta={},
                 active=True,
-                author='testuser',
+                author=None,
             )
         ]
 
         self.assertEqual(analyses, expected)
-
-    @run_as_sync
-    async def test_get_sample_file_sizes(self):
-        """
-        Test retrieval of sample file sizes over time
-        """
-
-        result = await self.al.get_sample_file_sizes(project_ids=[1])
-        expected = [
-            {
-                'project': 1,
-                'samples': [
-                    {
-                        'sample': self.sample_id,
-                        'dates': [
-                            {
-                                'start': date.today(),
-                                'end': None,
-                                'size': {SequenceType.GENOME: 1024},
-                            }
-                        ],
-                    }
-                ],
-            }
-        ]
-
-        # Check output is formatted correctly
-        self.assertEqual(1, len(result))
-        self.assertDictEqual(expected[0], result[0])
-
-        # Add exome cram
-        await self.al.insert_analysis(
-            analysis_type=AnalysisType.CRAM,
-            status=AnalysisStatus.COMPLETED,
-            sample_ids=[self.sample_id],
-            meta={'sequence_type': 'exome', 'size': 3141},
-        )
-
-        expected[0]['samples'][0]['dates'][0]['size'][SequenceType.EXOME] = 3141
-
-        # Assert that the exome size was added correctly
-        result = await self.al.get_sample_file_sizes(project_ids=[1])
-        self.assertDictEqual(expected[0], result[0])
-
-        # Assert that if we select a date range outside of sample creation date
-        # that is doesn't show up in the map
-        yesterday = date.today() - timedelta(days=1)
-        result = await self.al.get_sample_file_sizes(
-            project_ids=[1], end_date=yesterday
-        )
-
-        self.assertEqual([], result)
-
-        # Add another genome cram that's newer
-        await self.al.insert_analysis(
-            analysis_type=AnalysisType.CRAM,
-            status=AnalysisStatus.COMPLETED,
-            sample_ids=[self.sample_id],
-            meta={'sequence_type': 'genome', 'size': 11111},
-        )
-
-        expected[0]['samples'][0]['dates'][0]['size'][SequenceType.GENOME] = 11111
-        result = await self.al.get_sample_file_sizes(project_ids=[1])
-        self.assertDictEqual(expected[0], result[0])
-
-        # Add another sample and it's analysis cram as well
-        sample_id_2 = await self.sl.insert_sample(
-            'Test02',
-            SampleType.BLOOD,
-            meta={'meta': 'meta ;)'},
-            active=True,
-        )
-        await self.al.insert_analysis(
-            analysis_type=AnalysisType.CRAM,
-            status=AnalysisStatus.COMPLETED,
-            sample_ids=[sample_id_2],
-            meta={'sequence_type': 'genome', 'size': 987654321},
-        )
-
-        sample_2_data = {
-            'sample': sample_id_2,
-            'dates': [
-                {
-                    'start': date.today(),
-                    'end': None,
-                    'size': {SequenceType.GENOME: 987654321},
-                }
-            ],
-        }
-        expected[0]['samples'].append(sample_2_data)
-
-        result = await self.al.get_sample_file_sizes(project_ids=[1])
-        self.assertDictEqual(expected[0], result[0])

@@ -17,7 +17,7 @@ import iconStyle from '../../shared/iconStyle'
 import SeqPanel from '../../shared/components/SeqPanel'
 import SampleInfo from '../../shared/components/SampleInfo'
 
-const sampleFieldsToDisplay = ['active', 'type', 'participantId']
+const sampleFieldsToDisplay = ['active', 'type']
 
 const GET_FAMILY_INFO = gql(`
 query FamilyInfo($family_id: Int!) {
@@ -28,17 +28,20 @@ query FamilyInfo($family_id: Int!) {
       id
       samples {
         active
-        author
         externalId
         id
         meta
         type
-        participantId
-        sequences {
-          externalIds
-          id
-          meta
-          type
+        sequencingGroups {
+            id
+            platform
+            technology
+            type
+            assays {
+                id
+                meta
+                type
+            }
         }
       }
       externalId
@@ -200,7 +203,11 @@ const FamilyView: React.FunctionComponent<Record<string, unknown>> = () => {
                                                                 )}
                                                             />
 
-                                                            <SeqPanel sequences={s.sequences} />
+                                                            <SeqPanel
+                                                                sequencingGroups={
+                                                                    s.sequencingGroups
+                                                                }
+                                                            />
                                                         </div>
                                                     </>
                                                 ),

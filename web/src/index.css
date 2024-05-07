@@ -11,8 +11,9 @@
     --color-bg: #f5f7f9;
     --color-bg-card: #fff;
     --color-bg-disabled-card: #eeeeee;
+    --color-table-header: #eaeaea;
 
-    --color-border-color: #3a3a3a;
+    --color-border-color: #c8c9ca;
     --color-border-default: #d0d7de;
 
     --color-divider: rgba(0, 0, 0, 0.3);
@@ -25,6 +26,12 @@
 
     --color-check-green: #7ac142;
     --color-table-header: #f9fafb;
+
+    --color-bg-over-budget: rgba(128, 0, 0, 0.2);
+    --color-bg-half-budget: rgba(255, 165, 0, 0.2);
+    --color-bg-under-budget: rgba(0, 128, 0, 0.2);
+
+    --color-text-href: rgb(65, 131, 196);
 }
 
 html[data-theme='dark-mode'] {
@@ -32,6 +39,7 @@ html[data-theme='dark-mode'] {
     --color-bg: #1d1d1d;
     --color-bg-card: #2c2c2c;
     --color-bg-disabled-card: #353535;
+    --color-table-header: #383838;
 
     --color-border-color: #3a3a3a;
     --color-border-default: #292a2b;
@@ -43,7 +51,14 @@ html[data-theme='dark-mode'] {
 
     --color-check-green: #659251;
     --color-table-header: rgba(0, 0, 0, 0.15);
+
+    --color-bg-over-budget: rgba(128, 0, 0, 0.5);
+    --color-bg-half-budget: rgba(255, 165, 0, 0.5);
+    --color-bg-under-budget: rgba(0, 128, 0, 0.5);
+
+    --color-text-href: rgb(188, 188, 251);
 }
+
 /* poor man's dark mode: https://github.com/swagger-api/swagger-ui/issues/5327#issuecomment-742375520 */
 html[data-theme='dark-mode'] .swagger-ui {
     filter: invert(88%) hue-rotate(180deg);
@@ -120,6 +135,7 @@ blockquote {
   max-width: 768px;
   margin: calc(50px + 1vmin) auto 0 auto; */
     padding: 80px;
+    padding-top: 40px;
 }
 
 @media screen and (min-width: 1200px) {
@@ -134,6 +150,16 @@ blockquote {
     width: 100% !important;
 }
 
+/* https://alexandergottlieb.com/2018/02/22/overflow-scroll-and-the-right-padding-problem-a-css-only-solution/ */
+.projectSummaryGrid::after {
+    content: '';
+    display: block;
+    position: absolute;
+    right: -80px;
+    width: 80px;
+    height: 1px;
+}
+
 html[data-theme='dark-mode'] .ui.styled.accordion {
     box-shadow: 0 1px 2px 0 rgba(84, 84, 84, 0.87), 0 0 0 1px rgba(84, 84, 84, 0.87);
 }
@@ -142,6 +168,7 @@ html[data-theme='dark-mode'] .ui.styled.accordion .content {
     background-color: #353535;
     border-color: rgba(255, 255, 255, 0.87);
 }
+
 html[data-theme='dark-mode'] .ui.styled.accordion .title {
     background-color: #242424;
     color: rgba(255, 255, 255, 0.87);
@@ -183,4 +210,84 @@ html[data-theme='dark-mode'] .ui.table {
 /* Turn off weird highlighting code blocks from react SyntaxHighlighter */
 [class^='language-'] {
     border: none;
+}
+
+#group-by-dropdown .menu {
+    background: #ffffff !important;
+}
+
+.field-selector-label {
+    width: 200px !important;
+}
+
+.field-selector-dropdown {
+    width: 80% !important;
+}
+
+.donut-chart {
+    padding-top: 20px;
+}
+
+/* missing styles regarding dark/light theme */
+.ui.fluid.card {
+    color: var(--color-text-primary);
+    background: var(--color-bg);
+    fill: var(--color-text-primary);
+}
+
+.ui.header {
+    color: var(--color-text-primary);
+}
+
+.ui.input > input {
+    color: var(--color-text-primary);
+    background: var(--color-bg-card);
+}
+
+.ui.toggle.checkbox label {
+    color: var(--color-text-primary);
+}
+
+.ui.toggle.checkbox input:checked ~ .box,
+.ui.toggle.checkbox input:checked ~ label {
+    color: var(--color-text-primary) !important;
+}
+
+/* charts */
+.tooltip {
+    background-color: var(--color-bg-card);
+    color: var(--color-text-primary);
+}
+
+.chart-card {
+    background-color: var(--color-bg-card);
+    color: var(--color-text-primary) !important;
+}
+
+.chart-label {
+    color: var(--color-text-primary) !important;
+}
+
+.hb-chart-grid {
+    color: var(--color-divider) !important;
+}
+
+.billing-over-budget {
+    background-color: var(--color-bg-over-budget) !important;
+}
+
+.billing-half-budget {
+    background-color: var(--color-bg-half-budget) !important;
+}
+
+.billing-under-budget {
+    background-color: var(--color-bg-under-budget) !important;
+}
+
+.billing-href a {
+    color: var(--color-text-href) !important;
+}
+
+.bold-text {
+    font-weight: bold;
 }

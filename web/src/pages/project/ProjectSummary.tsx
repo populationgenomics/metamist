@@ -3,12 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { Dropdown } from 'semantic-ui-react'
 import ProjectSelector from './ProjectSelector'
-import {
-    WebApi,
-    ProjectSummaryResponse,
-    SearchItem,
-    MetaSearchEntityPrefix,
-} from '../../sm-api/api'
+import { WebApi, ProjectSummary, SearchItem, MetaSearchEntityPrefix } from '../../sm-api/api'
 
 import PageOptions from './PageOptions'
 import SeqrLinks from './SeqrLinks'
@@ -23,7 +18,7 @@ import SeqrSync from './SeqrSync'
 
 const PAGE_SIZES = [20, 40, 100, 1000]
 
-const ProjectSummary: React.FunctionComponent = () => {
+const ProjectSummaryView: React.FunctionComponent = () => {
     const navigate = useNavigate()
 
     const { projectName, page } = useParams()
@@ -37,7 +32,7 @@ const ProjectSummary: React.FunctionComponent = () => {
 
     const validPages = !!(page && +page && pageSize && +pageSize && PAGE_SIZES.includes(+pageSize))
 
-    const [summary, setSummary] = React.useState<ProjectSummaryResponse | undefined>()
+    const [summary, setSummary] = React.useState<ProjectSummary | undefined>()
     const [pageNumber, setPageNumber] = React.useState<number>(validPages ? +page : 1)
     const [isLoading, setIsLoading] = React.useState<boolean>(false)
     const [error, setError] = React.useState<string | undefined>()
@@ -183,7 +178,7 @@ const ProjectSummary: React.FunctionComponent = () => {
                         <BatchStatistics
                             projectName={projectName}
                             cramSeqrStats={summary?.cram_seqr_stats ?? {}}
-                            batchSequenceStats={summary?.batch_sequence_stats ?? {}}
+                            batchSequenceStats={summary?.batch_sequencing_group_stats ?? {}}
                         />
                         <hr />
                         <MultiQCReports projectName={projectName} />
@@ -211,28 +206,32 @@ const ProjectSummary: React.FunctionComponent = () => {
                             <PageOptions
                                 isLoading={isLoading}
                                 totalPageNumbers={totalPageNumbers}
-                                totalSamples={summary?.total_samples_in_query}
+                                total={summary?.total_samples_in_query}
                                 pageNumber={pageNumber}
                                 handleOnClick={handleOnClick}
+                                title="samples"
                             />
                         </div>
-                        <ProjectGrid
-                            summary={summary}
-                            projectName={projectName}
-                            updateFilters={updateFilters}
-                            filterValues={gridFilterValues}
-                        />
-                        <PageOptions
-                            isLoading={isLoading}
-                            totalPageNumbers={totalPageNumbers}
-                            totalSamples={summary?.total_samples_in_query}
-                            pageNumber={pageNumber}
-                            handleOnClick={handleOnClick}
-                        />
+                        <div style={{ position: 'absolute', paddingBottom: '80px' }}>
+                            <ProjectGrid
+                                summary={summary}
+                                projectName={projectName}
+                                updateFilters={updateFilters}
+                                filterValues={gridFilterValues}
+                            />
+                            <PageOptions
+                                isLoading={isLoading}
+                                totalPageNumbers={totalPageNumbers}
+                                total={summary?.total_samples_in_query}
+                                pageNumber={pageNumber}
+                                handleOnClick={handleOnClick}
+                                title="samples"
+                            />
+                        </div>
                     </>
                 )}
         </>
     )
 }
 
-export default ProjectSummary
+export default ProjectSummaryView

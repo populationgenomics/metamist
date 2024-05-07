@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 # pylint: disable=W0703
-
-import os
+"""
+Find sequencing files that exist in the bucket, but are not ingested.
+This pairs well will the cleanup_fastqs.py script.
+"""
 import asyncio
 import logging
+import os
 from collections import defaultdict
-from typing import Set, Dict, Any, List
+from typing import Any, Dict, List, Set
 
 from google.cloud import storage
-from sample_metadata.apis import WebApi, SampleApi, SequenceApi, ProjectApi
+
+from metamist.apis import AssayApi, ProjectApi, SampleApi, WebApi
 
 # Global vars
 logger = logging.getLogger(__file__)
@@ -19,7 +23,7 @@ client = storage.Client()
 projapi = ProjectApi()
 webapi = WebApi()
 sampapi = SampleApi()
-seqapi = SequenceApi()
+assay_api = AssayApi()
 
 
 def get_bucket_name_from_path(path_input):
@@ -72,13 +76,8 @@ async def get_all_sequence_files(cpg_project):
     Get all sequence files for a project
     """
     try:
-        resp = await sampapi.get_all_sample_id_map_by_internal_async(cpg_project)
-        if len(resp) == 0:
-            return []
-        sequences = await seqapi.get_sequences_by_sample_ids_async(
-            get_latest_sequence_only=False, request_body=list(resp.keys())
-        )
-        return sequences
+        assays = await assay_api.get_assays_by_criteria_async(projects=[cpg_project])
+        return assays
     except Exception as err:
         logging.error(f'{cpg_project} :: Cannot get sequences {err}')
 
@@ -87,7 +86,7 @@ async def get_all_sequence_files(cpg_project):
 
 async def get_sm_sequences():
     """
-    Get all the sequences across all the projects from sample_metadata
+    Get all the sequences across all the projects from metamist
     """
     my_projects_raw, all_projects_raw = await asyncio.gather(
         projapi.get_my_projects_async(), projapi.get_all_projects_async()

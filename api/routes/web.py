@@ -6,66 +6,19 @@ from typing import Optional
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
+from api.utils.db import (
+    Connection,
+    get_project_readonly_connection,
+    get_project_write_connection,
+    get_projectless_db_connection,
+)
 from db.python.layers.search import SearchLayer
 from db.python.layers.seqr import SeqrLayer
+from db.python.layers.web import SearchItem, WebLayer
 from db.python.tables.project import ProjectPermissionsTable
-from db.python.layers.web import WebLayer, NestedParticipant, SearchItem
-from models.enums import SequenceType
-
-from models.models.sample import sample_id_format
+from models.enums.web import SeqrDatasetType
 from models.models.search import SearchResponse
-
-from api.utils.db import (
-    get_project_readonly_connection,
-    get_projectless_db_connection,
-    get_project_write_connection,
-    Connection,
-)
-
-
-class PagingLinks(BaseModel):
-    """Model for PAGING"""
-
-    self: str
-    next: str | None
-    token: str | None
-
-
-class WebProject(BaseModel):
-    """Minimal class to hold web info"""
-
-    id: int
-    name: str
-    dataset: str
-    meta: dict
-
-
-class ProjectSummaryResponse(BaseModel):
-    """Response for the project summary"""
-
-    project: WebProject
-    # high level stats
-    total_participants: int
-    total_samples: int
-    total_samples_in_query: int
-    total_sequences: int
-    cram_seqr_stats: dict[str, dict[str, str]]  # {seqType: {seqr/seq/cram count: }}
-    batch_sequence_stats: dict[str, dict[str, str]]  # {batch: {seqType: }}
-
-    # for display
-    participants: list[NestedParticipant]
-    participant_keys: list[list[str]]
-    sample_keys: list[list[str]]
-    sequence_keys: list[list[str]]
-    seqr_links: dict[str, str]
-    seqr_sync_types: list[SequenceType]
-
-    links: PagingLinks | None
-
-    class Config:
-        """Config for ProjectSummaryResponse"""
-
-        fields = {'links': '_links'}
+from models.models.web import PagingLinks, ProjectSummary
 
 
 class SearchResponseModel(BaseModel):
@@ -79,7 +32,7 @@ router = APIRouter(prefix='/web', tags=['web'])
 
 @router.post(
     '/{project}/summary',
-    response_model=ProjectSummaryResponse,
+    response_model=ProjectSummary,
     operation_id='getProjectSummary',
 )
 async def get_project_summary(
@@ -88,7 +41,7 @@ async def get_project_summary(
     limit: int = 20,
     token: Optional[int] = 0,
     connection: Connection = get_project_readonly_connection,
-) -> ProjectSummaryResponse:
+) -> ProjectSummary:
     """Creates a new sample, and returns the internal sample ID"""
     st = WebLayer(connection)
 
@@ -96,34 +49,12 @@ async def get_project_summary(
         token=token, limit=limit, grid_filter=grid_filter
     )
 
-    if len(summary.participants) == 0:
-        return ProjectSummaryResponse(
-            project=WebProject(**summary.project.__dict__),
-            participants=[],
-            participant_keys=[],
-            sample_keys=[],
-            sequence_keys=[],
-            _links=None,
-            total_samples=0,
-            total_samples_in_query=0,
-            total_participants=0,
-            total_sequences=0,
-            cram_seqr_stats={},
-            batch_sequence_stats={},
-            seqr_links=summary.seqr_links,
-            seqr_sync_types=[],
-        )
-
     participants = summary.participants
 
     collected_samples = sum(len(p.samples) for p in participants)
     new_token = None
     if collected_samples >= limit:
         new_token = max(int(sample.id) for p in participants for sample in p.samples)
-
-    for participant in participants:
-        for sample in participant.samples:
-            sample.id = sample_id_format(sample.id)
 
     links = PagingLinks(
         next=str(request.base_url)
@@ -135,23 +66,7 @@ async def get_project_summary(
         token=str(new_token) if new_token else None,
     )
 
-    return ProjectSummaryResponse(
-        project=WebProject(**summary.project.__dict__),
-        total_samples=summary.total_samples,
-        total_samples_in_query=summary.total_samples_in_query,
-        total_participants=summary.total_participants,
-        total_sequences=summary.total_sequences,
-        cram_seqr_stats=summary.cram_seqr_stats,
-        batch_sequence_stats=summary.batch_sequence_stats,
-        # other stuff
-        participants=participants,
-        participant_keys=summary.participant_keys,
-        sample_keys=summary.sample_keys,
-        sequence_keys=summary.sequence_keys,
-        seqr_links=summary.seqr_links,
-        seqr_sync_types=summary.seqr_sync_types,
-        _links=links,
-    )
+    return summary.to_external(links)
 
 
 @router.get(
@@ -163,22 +78,32 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
     that you are a part of (automatically).
     """
     # raise ValueError("Test")
-    pt = ProjectPermissionsTable(connection.connection)
+    pt = ProjectPermissionsTable(connection)
     projects = await pt.get_projects_accessible_by_user(
         connection.author, readonly=True
     )
-    project_ids = list(projects.keys())
-    responses = await SearchLayer(connection).search(keyword, project_ids=project_ids)
+    pmap = {p.id: p for p in projects}
+    responses = await SearchLayer(connection).search(
+        keyword, project_ids=list(pmap.keys())
+    )
 
     for res in responses:
-        res.data.project = projects.get(res.data.project, res.data.project)  # type: ignore
+        if res.data.project in pmap:
+            # the solution to the type issue is to create internal / external models
+            # and convert between them for transport
+            res.data.project = pmap[res.data.project].name  # type: ignore
+        else:
+            res.data.project = str(res.data.project)
 
     return SearchResponseModel(responses=responses)
 
 
-@router.post('/{project}/{sequence_type}/sync-dataset', operation_id='syncSeqrProject')
+@router.post(
+    '/{project}/{sequencing_type}/sync-dataset', operation_id='syncSeqrProject'
+)
 async def sync_seqr_project(
-    sequence_type: SequenceType,
+    sequencing_type: str,
+    es_index_types: list[SeqrDatasetType],
     sync_families: bool = True,
     sync_individual_metadata: bool = True,
     sync_individuals: bool = True,
@@ -190,15 +115,17 @@ async def sync_seqr_project(
 ):
     """
     Sync a metamist project with its seqr project (for a specific sequence type)
+    es_index_types: list of any of 'Haplotypecaller', 'SV_Caller', 'Mitochondria_Caller'
     """
     seqr = SeqrLayer(connection)
     try:
         data = await seqr.sync_dataset(
-            sequence_type,
+            sequencing_type,
             sync_families=sync_families,
             sync_individual_metadata=sync_individual_metadata,
             sync_individuals=sync_individuals,
             sync_es_index=sync_es_index,
+            es_index_types=es_index_types,
             sync_saved_variants=sync_saved_variants,
             sync_cram_map=sync_cram_map,
             post_slack_notification=post_slack_notification,

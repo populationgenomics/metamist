@@ -202,7 +202,7 @@ const constructTangleLayout = (levels: NodeList[]) => {
                     (a, b) =>
                         a.x - b.x ||
                         oldLevel.findIndex((c) => a.id === c.id) -
-                            oldLevel.findIndex((c) => b.id === c.id)
+                        oldLevel.findIndex((c) => b.id === c.id)
                 )
                 if (movedIndex < level.nodes.length - 1) {
                     // not the last node
@@ -359,12 +359,10 @@ const renderChart = (
 
     return (
         <svg
-            width={`${
-                tangleLayout.layout.width_dimensions[1] - tangleLayout.layout.width_dimensions[0]
-            }`}
-            height={`${
-                tangleLayout.layout.height_dimensions[1] - tangleLayout.layout.height_dimensions[0]
-            }`}
+            width={`${tangleLayout.layout.width_dimensions[1] - tangleLayout.layout.width_dimensions[0]
+                }`}
+            height={`${tangleLayout.layout.height_dimensions[1] - tangleLayout.layout.height_dimensions[0]
+                }`}
             viewBox={`${tangleLayout.layout.width_dimensions[0]} ${tangleLayout.layout.height_dimensions[0]} ${tangleLayout.layout.width_dimensions[1]} ${tangleLayout.layout.height_dimensions[1]}`}
         >
             {tangleLayout.bundles.map((b) => {

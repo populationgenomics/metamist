@@ -1,19 +1,20 @@
 """
 Previously, samples where ingested before we updated our metamist model to include multiple
-sequence IDs. This script is a quick fix that will back-populate sequence IDs for previously ingested projects.
-The sequence ID is pulled from the file path of the fastq's.
+assay IDs. This script is a quick fix that will back-populate assay IDs for previously ingested projects.
+The assay ID is pulled from the file path of the fastq's.
 This simple script assumes output paths are already populated, and follow the convention
 FLOW-CELL-ID_LANE_SAMPLE-NAME_SPECIES_SEQUENCING-INDEX_BATCH_READ
-Where the sequence ID corresponds to FLOW-CELL-ID_LANE_SAMPLE-NAME
+Where the assay ID corresponds to FLOW-CELL-ID_LANE_SAMPLE-NAME
 For example:
 HTJMHDSX3_4_220817_FD123456_Homo-sapiens_AGATCCATTA-TGGTAGAGAT_R_220208_BATCH_M014_R2.fastq.gz.md5
-The sequence ID would be HTJMHDSX3_4_220817_FD123456
+The assay ID would be HTJMHDSX3_4_220817_FD123456
 """
 import logging
+
 import click
 
-from sample_metadata.apis import SequenceApi
-from sample_metadata.models import SequenceUpdateModel
+from metamist.apis import AssayApi
+from metamist.models import AssayUpsert
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -24,53 +25,55 @@ logger.setLevel(logging.INFO)
 @click.option(
     '--project',
     required=True,
-    help='The sample-metadata project ($DATASET)',
+    help='The metamist project ($DATASET)',
 )
 def main(project: str):
-    """Back populate external_ids for existing sequences"""
+    """Back populate external_ids for existing assays"""
 
-    seqapi = SequenceApi()
-    # Pull all the sequences
-    sequences = seqapi.get_sequences_by_criteria(
+    # Pull all the assays
+    assayapi = AssayApi()
+    assays = assayapi.get_assays_by_criteria(
         active=True,
-        body_get_sequences_by_criteria={
+        body_get_assays_by_criteria={
             'projects': [project],
         },
     )
 
     # For logs
-    updated_sequences: list[dict[str, str]] = []
+    updated_assays: list[dict[str, str]] = []
 
-    for sequence in sequences:
-        internal_sequence_id = sequence.get('id')
-        current_external_ids = sequence.get('external_ids')
+    for assay in assays:
+        internal_assay_id = assay.get('id')
+        current_external_ids = assay.get('external_ids')
 
         # Quick validation
         if current_external_ids:
             logging.warning(
-                f'{internal_sequence_id} already has external sequence id/s set: {current_external_ids}. Skipping'
+                f'{internal_assay_id} already has external assay id/s set: {current_external_ids}. Skipping'
             )
             continue
 
         try:
-            fastq_filename = sequence.get('meta').get('reads')[0][0].get('basename')
+            fastq_filename = assay.get('meta').get('reads')[0].get('basename')
         except TypeError:
-            # Can't determine seq_id
-            logging.warning(f'No reads for {internal_sequence_id} skipping {sequence}')
+            # Can't determine fastq filename, hence can't pull ID from it
+            logging.warning(f'No reads for {internal_assay_id} skipping {assay}')
             continue
 
-        # Pull external sequence id
+        # Pull external assay id
         split_filename = fastq_filename.split('_')[0:4]
-        external_sequence_id = '_'.join(split_filename)
+        external_assay_id = '_'.join(split_filename)
 
-        # Add sequence id to existing sequence object
-        seqapi.update_sequence(
-            internal_sequence_id,
-            SequenceUpdateModel(external_ids={'kccg_id': external_sequence_id}),
+        # Add assay id to existing assay object
+        assayapi.update_assay(
+            AssayUpsert(
+                id=internal_assay_id,
+                external_ids={'kccg_id': external_assay_id},
+            )
         )
-        updated_sequences.append({internal_sequence_id: external_sequence_id})
+        updated_assays.append({internal_assay_id: external_assay_id})
 
-    logging.info(f'Updated {len(updated_sequences)} sequences. {updated_sequences}')
+    logging.info(f'Updated {len(updated_assays)} assays. {updated_assays}')
 
 
 if __name__ == '__main__':
