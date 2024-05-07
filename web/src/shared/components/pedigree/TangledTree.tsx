@@ -6,13 +6,14 @@ import _ from 'lodash'
 import { min, max, sum, mean, extent } from 'd3'
 import LoadingDucks from '../LoadingDucks/LoadingDucks'
 import MuckError from '../MuckError'
+import { ThemeContext } from '../ThemeProvider'
 
-interface PedigreeEntry {
+export interface PedigreeEntry {
     affected: number
     family_id: string
     individual_id: string
-    maternal_id: string
-    paternal_id: string
+    maternal_id?: string | null
+    paternal_id?: string | null
     sex: number
 }
 
@@ -20,8 +21,8 @@ interface ModifiedPedEntry {
     affected: number
     family_id: string
     individual_id: string
-    maternal_id: string
-    paternal_id: string
+    maternal_id?: string | null
+    paternal_id?: string | null
     sex: number
     children: string[]
 }
@@ -346,24 +347,35 @@ const constructTangleLayout = (levels: NodeList[]) => {
     return { levels, nodes, nodes_index, links, bundles, layout }
 }
 
-const renderChart = (
-    data: NodeList[],
-    originalData: { [name: string]: PedigreeEntry },
-    click: (e: string) => void
-) => {
+interface ITangleTreeChartProps {
+    data: NodeList[]
+    originalData: { [name: string]: PedigreeEntry }
+    onClick?: (e: string) => void
+}
+
+const TangleTreeChart: React.FC<ITangleTreeChartProps> = ({ data, originalData, onClick }) => {
     const tangleLayout = constructTangleLayout(_.cloneDeep(data))
 
     if ('error' in tangleLayout) {
         return <MuckError message={`Ah Muck, couldn't resolve this pedigree`} />
     }
 
+    const width = tangleLayout.layout.width_dimensions[1] - tangleLayout.layout.width_dimensions[0]
+    const height = tangleLayout.layout.height_dimensions[1] - tangleLayout.layout.height_dimensions[0]
+    const viewBox = `${tangleLayout.layout.width_dimensions[0]} ${tangleLayout.layout.height_dimensions[0]} ${tangleLayout.layout.width_dimensions[1]} ${tangleLayout.layout.height_dimensions[1]}`
+
+    const textColor = "var(--color-text-primary)"
+    const colLines = "var(--color-border-color)"
+
+    const colAffected = "var(--color-pedigree-affected)"
+    const colPersonBorder = "var(--color-pedigree-person-border)"
+    const colUnaffected = "var(--color-pedigree-unaffected)"
+
     return (
         <svg
-            width={`${tangleLayout.layout.width_dimensions[1] - tangleLayout.layout.width_dimensions[0]
-                }`}
-            height={`${tangleLayout.layout.height_dimensions[1] - tangleLayout.layout.height_dimensions[0]
-                }`}
-            viewBox={`${tangleLayout.layout.width_dimensions[0]} ${tangleLayout.layout.height_dimensions[0]} ${tangleLayout.layout.width_dimensions[1]} ${tangleLayout.layout.height_dimensions[1]}`}
+            width={width}
+            height={height}
+            viewBox={viewBox}
         >
             {tangleLayout.bundles.map((b) => {
                 const d = b.links
@@ -378,8 +390,8 @@ const renderChart = (
                     .join('')
                 return (
                     <React.Fragment key={`${b.id}-bundle`}>
-                        <path fill="none" d={`${d}`} stroke={'white'} strokeWidth="5" />
-                        <path d={`${d}`} fill="none" stroke={'black'} strokeWidth="2" />
+                        {/* <path fill="none" d={`${d}`} stroke={'white'} strokeWidth="5" /> */}
+                        <path d={d} fill="none" stroke={colLines} strokeWidth="2" />
                     </React.Fragment>
                 )
             })}
@@ -388,40 +400,32 @@ const renderChart = (
                 <React.Fragment key={`${n.id}-node`}>
                     <path
                         data-id={`${n.id}`}
-                        stroke="black"
+                        stroke={colPersonBorder}
                         strokeWidth="50"
+                        z="-1"
                         d={`M${n.x} ${n.y} L${n.x} ${n.y}`}
                         strokeLinecap={originalData[n.id].sex === 1 ? 'square' : 'round'}
                     />
                     <path
-                        stroke={originalData[n.id].affected === 1 ? 'white' : 'black'}
+                        stroke={originalData[n.id].affected === 1 ? colAffected : colUnaffected}
                         strokeWidth="45"
                         strokeLinecap={originalData[n.id].sex === 1 ? 'square' : 'round'}
                         d={`M${n.x} ${n.y} L${n.x} ${n.y}`}
-                        onClick={() => click(n.id)}
+                        onClick={() => onClick?.(n.id)}
                     />
-
-                    <text
-                        className="selectable"
-                        data-id={`${n.id}`}
-                        x={`${n.x}`}
-                        y={`${n.y + 40}`}
-                        stroke="white"
-                        strokeWidth="2"
-                        fontSize="12px"
-                        textAnchor="middle"
-                    >
-                        {n.id}
-                    </text>
-                    <text
-                        x={`${n.x}`}
-                        y={`${n.y + 40}`}
-                        fontSize="12px"
-                        style={{ pointerEvents: 'none' }}
-                        textAnchor="middle"
-                    >
-                        {n.id}
-                    </text>
+                    {/* wrap text in g to get fill to work correctly */}
+                    <g fill={textColor}>
+                        <text
+                            className="selectable"
+                            data-id={`${n.id}`}
+                            x={`${n.x}`}
+                            y={`${n.y + 40}`}
+                            fontSize="12px"
+                            textAnchor="middle"
+                        >
+                            {n.id}
+                        </text>
+                    </g>
                 </React.Fragment>
             ))}
         </svg>
@@ -638,47 +642,20 @@ const formatData = (data: PedigreeEntry[]) => {
 
 interface RenderPedigreeProps {
     data: PedigreeEntry[]
-    click?(e: string): void
+    onClick?: (e: string) => void
 }
 
-const TangledTree: React.FunctionComponent<RenderPedigreeProps> = ({ data, click }) => {
-    const [tree, setTree] = React.useState<NodeList[]>([])
-    const [keyedData, setKeyedData] = React.useState<{
-        [name: string]: PedigreeEntry
-    }>()
-    const onClick =
-        click ??
-        function defaultClick() {
-            return undefined
-        }
+const TangledTree: React.FunctionComponent<RenderPedigreeProps> = ({ data, onClick }) => {
 
-    React.useEffect(() => {
-        setTree(formatData(data))
-        setKeyedData(
-            data.reduce((obj: { [key: string]: PedigreeEntry }, s: PedigreeEntry) => {
-                obj[s.individual_id] = s
-                return obj
-            }, {})
-        )
-    }, [data])
+    if (data.length === 0) {
+        return <p><em>Empty pedigree</em></p>
+    }
 
-    return (
-        <>
-            {(!data || !data.length) && (
-                <MuckError message={`Ah Muck, there's no data for this pedigree!`} />
-            )}
-            {data && !!data.length && !tree && (
-                <>
-                    <LoadingDucks />
-                    <div style={{ textAlign: 'center' }}>
-                        <h5>Loading pedigrees</h5>
-                    </div>
-                </>
-            )}
-            {!!data.length && tree && keyedData && renderChart(tree, keyedData, onClick)}
-            <br />
-        </>
-    )
+    const tree = formatData(data)
+    const keyedData = _.keyBy(data, s => s.individual_id)
+
+
+    return <TangleTreeChart data={tree} originalData={keyedData} onClick={onClick} />
 }
 
 export default TangledTree

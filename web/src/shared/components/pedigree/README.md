@@ -16,86 +16,87 @@ TRIO
 
 input:
 
-```[
-{
-"family_id": "TRIO",
-"individual_id": "Parent_1",
-"paternal_id": null,
-"maternal_id": null,
-"sex": 1,
-"affected": 2
-},
-{
-"family_id": "TRIO",
-"individual_id": "Parent_2",
-"paternal_id": null,
-"maternal_id": null,
-"sex": 2,
-"affected": 2
-},
-{
-"family_id": "TRIO",
-"individual_id": "Trio_Child",
-"paternal_id": "Parent_1",
-"maternal_id": "Parent_2",
-"sex": 1,
-"affected": 1
-}
+```json
+[
+    {
+        "family_id": "TRIO",
+        "individual_id": "Parent_1",
+        "paternal_id": null,
+        "maternal_id": null,
+        "sex": 1,
+        "affected": 2
+    },
+    {
+        "family_id": "TRIO",
+        "individual_id": "Parent_2",
+        "paternal_id": null,
+        "maternal_id": null,
+        "sex": 2,
+        "affected": 2
+    },
+    {
+        "family_id": "TRIO",
+        "individual_id": "Trio_Child",
+        "paternal_id": "Parent_1",
+        "maternal_id": "Parent_2",
+        "sex": 1,
+        "affected": 1
+    }
 ]
 ```
 
 Output:
 
 ```[
-{
-"nodes": [
-{
-"x": 0,
-"y": 0,
-"parents": [],
-"level": -1,
-"bundles": [],
-"links": [],
-"parentsList": [],
-"id": "Parent_1"
-},
-{
-"x": 0,
-"y": 0,
-"parents": [],
-"level": -1,
-"bundles": [],
-"links": [],
-"parentsList": [],
-"id": "Parent_2"
-}
-],
-"bundles": []
-},
-{
-"nodes": [
-{
-"x": 0,
-"y": 0,
-"parents": [],
-"level": -1,
-"bundles": [],
-"links": [],
-"parentsList": [
-"Parent_1",
-"Parent_2"
-],
-"id": "Trio_Child"
-}
-],
-"bundles": []
-}
+    {
+        "nodes": [
+            {
+                "x": 0,
+                "y": 0,
+                "parents": [],
+                "level": -1,
+                "bundles": [],
+                "links": [],
+                "parentsList": [],
+                "id": "Parent_1"
+            },
+            {
+                "x": 0,
+                "y": 0,
+                "parents": [],
+                "level": -1,
+                "bundles": [],
+                "links": [],
+                "parentsList": [],
+                "id": "Parent_2"
+            }
+        ],
+        "bundles": []
+    },
+    {
+        "nodes": [
+            {
+                "x": 0,
+                "y": 0,
+                "parents": [],
+                "level": -1,
+                "bundles": [],
+                "links": [],
+                "parentsList": [
+                    "Parent_1",
+                    "Parent_2"
+                ],
+                "id": "Trio_Child"
+            }
+        ],
+        "bundles": []
+    }
 ]
 ```
 
 Note that the red is the 2 parent nodes, both in the same object (level 0) and the blue is the child node with a parentList array, this is level 1.
 
-Generating this output correctly can be trivial for easy families (trios, standard nuclear, 3 generations etc) but can be tricky when for more complicated cases. It is likely that some tweaking will be necessary when we come across these cases. I’ve outlined the logic below. The idea is to identify the longest possible spine of consecutive descendants across generations, and then add branches where possible/necessary.
+Generating this output correctly can be trivial for easy families (trios, standard nuclear, 3 generations etc) but can be tricky when for more complicated cases. It is likely that some tweaking will be necessary when we come across these cases. I've outlined the logic below. The idea is to identify the longest possible spine of consecutive descendants across generations, and then add branches where possible/necessary.
 
 ### Logic:
 
@@ -107,7 +108,7 @@ All other individuals other than the root are added to a Set of unseen from whic
 
 Using a queue and starting with the root we chose, we pop the next individual or group of individuals off the list and add them all on the same level. Then we add all their children to the queue, these will go on the next level. Note this step does not include spouses, just simply starting with the root on level 0, all their children on level 1, childrens children on level 2 etc.
 
-After this ‘spine’ is completed, we try to add any remaining individuals to the pedigree in the appropriate level. First we check if the individual is a spouse of someone already added. If so, we add them to the same level.
+After this 'spine' is completed, we try to add any remaining individuals to the pedigree in the appropriate level. First we check if the individual is a spouse of someone already added. If so, we add them to the same level.
 
 Next, we check if the individual is a parents of someone already added. They will be added in one level higher than the individual (-1).
 
@@ -119,7 +120,7 @@ Next, this formatted level data is passed to the constructTangleLayout() functio
 
 ## constructTangleLayout() function
 
-This is likely the function that needs the most refactoring as it relies on deepcloning objects and recursive properties to work, which I don’t think are necessary but haven’t sat down to refactor it. This is inspired by https://observablehq.com/@nitaku/tangled-tree-visualization-ii
+This is likely the function that needs the most refactoring as it relies on deepcloning objects and recursive properties to work, which I don't think are necessary but haven't sat down to refactor it. This is inspired by https://observablehq.com/@nitaku/tangled-tree-visualization-ii
 
 ### Logic:
 
