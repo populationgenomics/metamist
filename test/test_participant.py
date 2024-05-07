@@ -9,21 +9,21 @@ from models.models.sample import SampleUpsertInternal
 from models.models.sequencing_group import SequencingGroupUpsertInternal
 
 
-def get_participant_to_insert():
+def get_participant_to_insert(id_suffix="1"):
     return ParticipantUpsertInternal(
-        external_id="P01",
+        external_id="P0" + id_suffix,
         meta={'pmeta': 'pvalue'},
         reported_sex=2,
         reported_gender='FEMALE',
         karyotype='XX',
         samples=[
             SampleUpsertInternal(
-                external_id="S01",
+                external_id="S0" + id_suffix,
                 type='blood',
                 meta={'smeta': 'svalue'},
                 sequencing_groups=[
                     SequencingGroupUpsertInternal(
-                        external_ids={'default': 'SG01'},
+                        external_ids={'default': 'SG0' + id_suffix},
                         type='genome',
                         technology='short-read',
                         platform='illumina',
@@ -31,7 +31,7 @@ def get_participant_to_insert():
                         assays=[
                             AssayUpsertInternal(
                                 type='sequencing',
-                                external_ids={'default': 'A01'},
+                                external_ids={'default': 'A0' + id_suffix},
                                 meta={
                                     'ameta': 'avalue',
                                     'sequencing_type': 'genome',
@@ -50,7 +50,7 @@ def get_participant_to_insert():
 class TestParticipant(DbIsolatedTest):
     @run_as_sync
     async def setUp(self) -> None:
-        super().setUp()
+        super().setUp()  # type: ignore
 
         self.player = ParticipantLayer(self.connection)
 
@@ -114,3 +114,27 @@ query TestGraphqlQueryById($projectName: String!, $pid: Int!) {
             )
         )
         self.assertEqual(len(ps), 0)
+
+    @run_as_sync
+    async def test_query_with_offset(self):
+        """Test query providing an offset and a limit"""
+
+        p1 = await self.player.upsert_participant(get_participant_to_insert("1"))
+        p2 = await self.player.upsert_participant(get_participant_to_insert("2"))
+
+        participants = await self.player.query(
+            ParticipantFilter(project=GenericFilter(eq=self.project_id)),
+            limit=1,
+        )
+
+        self.assertEqual(len(participants), 1)
+        self.assertEqual(participants[0].id, p1.id)
+
+        participants = await self.player.query(
+            ParticipantFilter(project=GenericFilter(eq=self.project_id)),
+            limit=1,
+            skip=1,
+        )
+
+        self.assertEqual(len(participants), 1)
+        self.assertEqual(participants[0].id, p2.id)

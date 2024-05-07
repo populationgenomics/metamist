@@ -4,11 +4,13 @@ from typing import Any
 from models.base import OpenApiGenNoneType, SMBase
 from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
 
+AssayId = int
+
 
 class AssayInternal(SMBase):
     """Internal model for Assay"""
 
-    id: int | None
+    id: AssayId | None
     sample_id: int
     meta: dict[str, Any] | None
     type: str
@@ -48,7 +50,7 @@ class AssayInternal(SMBase):
 class AssayUpsertInternal(SMBase):
     """Internal upsert model for assay"""
 
-    id: int | None = None
+    id: AssayId | None = None
     type: str | None = None
     external_ids: dict[str, str | None] | None = None
     sample_id: int | None = None

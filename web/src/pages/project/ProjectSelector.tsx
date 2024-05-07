@@ -1,4 +1,5 @@
 import * as React from 'react'
+import * as _ from 'lodash'
 
 import { useParams } from 'react-router-dom'
 
@@ -49,7 +50,7 @@ const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({ onClic
                 value={projectName ?? ''}
                 options={
                     data &&
-                    data.myProjects.map((p) => ({
+                    _.sortBy(data.myProjects, p => p.name).map((p) => ({
                         key: p.name,
                         text: p.name,
                         value: p.name,

@@ -206,17 +206,11 @@ class TestWeb(DbIsolatedTest):
         expected = ProjectSummaryInternal(
             project=WebProject(id=1, name='test', meta={}, dataset='test'),
             total_samples=0,
-            total_samples_in_query=0,
             total_participants=0,
             total_sequencing_groups=0,
             total_assays=0,
             batch_sequencing_group_stats={},
             cram_seqr_stats={},
-            participants=[],
-            participant_keys=[],
-            sample_keys=[],
-            sequencing_group_keys=[],
-            assay_keys=[],
             seqr_links={},
             seqr_sync_types=[],
         )

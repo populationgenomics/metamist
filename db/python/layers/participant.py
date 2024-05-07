@@ -243,12 +243,12 @@ class ParticipantLayer(BaseLayer):
         self.pttable = ParticipantTable(connection=connection)
 
     async def query(
-        self, filter_: ParticipantFilter, check_project_ids: bool = True
+        self, filter_: ParticipantFilter, limit: int | None = None, skip: int | None = None, check_project_ids: bool = True
     ) -> list[ParticipantInternal]:
         """
         Query participants from the database, heavy lifting done by the filter
         """
-        projects, participants = await self.pttable.query(filter_)
+        projects, participants = await self.pttable.query(filter_, skip=skip, limit=limit)
 
         if not participants:
             return []

@@ -2,7 +2,7 @@
 import dataclasses
 import re
 from collections import defaultdict
-from typing import Any
+from typing import Any, NamedTuple
 
 from db.python.tables.base import DbBase
 from db.python.utils import (
@@ -13,8 +13,9 @@ from db.python.utils import (
     NotFoundError,
     to_db_json,
 )
-from models.models.assay import AssayInternal
+from models.models.assay import AssayId, AssayInternal
 from models.models.project import ProjectId
+from models.models.sequencing_group import SequencingGroupInternalId
 
 REPLACEMENT_KEY_INVALID_CHARS = re.compile(r'[^\w\d_]')
 
@@ -35,7 +36,7 @@ class AssayFilter(GenericFilterModel):
     Filter for Assay model
     """
 
-    id: GenericFilter[int] | None = None
+    id: GenericFilter[AssayId] | None = None
     sample_id: GenericFilter[int] | None = None
     external_id: GenericFilter[str] | None = None
     meta: GenericMetaFilter | None = None
@@ -47,6 +48,12 @@ class AssayFilter(GenericFilterModel):
         return hash(
             (self.id, self.sample_id, self.external_id, self.project, self.type)
         )
+
+
+class BatchStatisticsRow(NamedTuple):
+    batch: str | None
+    sequencing_type: str
+    sequencing_group_ids: list[tuple[SequencingGroupInternalId, int]]
 
 
 class AssayTable(DbBase):
@@ -179,7 +186,9 @@ class AssayTable(DbBase):
 
         return {r['type']: r['n'] for r in rows}
 
-    async def get_assay_type_numbers_by_batch_for_project(self, project: ProjectId):
+    async def get_assay_type_numbers_by_batch_for_project(
+        self, project: ProjectId
+    ) -> list[BatchStatisticsRow]:
         """
         Grouped by the meta.batch field on an assay
         """
@@ -188,25 +197,38 @@ class AssayTable(DbBase):
         # treats a SQL NULL and JSON NULL (selected from the meta.batch) differently.
         _query = """
             SELECT
-                IFNULL(JSON_EXTRACT(a.meta, '$.batch'), 'null') as batch,
-                sg.type,
-                COUNT(*) AS n
+                sg.id as sg_id,
+                JSON_VALUE(a.meta, '$.sequencing_type') as sequencing_type,
+                JSON_VALUE(a.meta, '$.batch') as batch,
+                COUNT(*) as n
             FROM assay a
-            INNER JOIN sample s ON s.id = a.sample_id
-            LEFT JOIN sequencing_group sg ON sg.sample_id = s.id
-            WHERE s.project = :project
-            GROUP BY batch, sg.type
+            LEFT JOIN sequencing_group_assay sga ON sga.assay_id = a.id
+            LEFT JOIN sample s ON s.id = a.sample_id
+            LEFT JOIN sequencing_group sg ON sg.id = sga.sequencing_group_id
+            WHERE s.project = :project AND NOT sg.archived
+            GROUP BY sg_id, batch, sequencing_type
         """
         rows = await self.connection.fetch_all(_query, {'project': project})
-        batch_result: dict[str, dict[str, str]] = defaultdict(dict)
+        batch_result: defaultdict[
+            str, defaultdict[str, list[tuple[SequencingGroupInternalId, int]]]
+        ] = defaultdict(lambda: defaultdict(list))
         for row in rows:
-            batch, seqType, count = row['batch'], row['type'], row['n']
-            batch = str(batch).strip('\"') if batch != 'null' else 'no-batch'
-            batch_result[batch][seqType] = str(count)
-        if len(batch_result) == 1 and 'no-batch' in batch_result:
-            # if there are no batches, ignore the no-batch option
-            return {}
-        return batch_result
+            batch = row['batch']
+            sequencing_type = row['sequencing_type']
+            batch_result[batch][sequencing_type].append((row['sg_id'], row['n']))
+
+        retval = []
+        for batch, batch_data in batch_result.items():
+            for sequencing_type, sequencing_group_ids in batch_data.items():
+                retval.append(
+                    BatchStatisticsRow(
+                        batch=batch,
+                        sequencing_type=sequencing_type,
+                        sequencing_group_ids=sequencing_group_ids,
+                    )
+                )
+
+        return retval
 
     # endregion GETS
 

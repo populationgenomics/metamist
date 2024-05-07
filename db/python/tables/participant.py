@@ -104,7 +104,10 @@ class ParticipantTable(DbBase):
         return set(r['project'] for r in rows)
 
     async def query(
-        self, filter_: ParticipantFilter
+        self,
+        filter_: ParticipantFilter,
+        limit: int | None = None,
+        skip: int | None = None,
     ) -> tuple[set[ProjectId], list[ParticipantInternal]]:
         """Query for participants
 
@@ -193,6 +196,14 @@ class ParticipantTable(DbBase):
 
         if wheres:
             query += 'WHERE \n' + wheres
+
+        if skip:
+            query += '\nOFFSET :offset'
+            values['offset'] = skip
+
+        if limit:
+            query += '\nLIMIT :limit'
+            values['limit'] = limit
 
         rows = await self.connection.fetch_all(query, values)
         projects = set(r['project'] for r in rows)

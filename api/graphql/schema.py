@@ -272,7 +272,7 @@ class GraphQLProject:
     async def participants(
         self,
         info: Info,
-        root: 'Project',
+        root: 'GraphQLProject',
         id: GraphQLFilter[int] | None = None,
         external_id: GraphQLFilter[str] | None = None,
         meta: GraphQLMetaFilter | None = None,
@@ -285,6 +285,7 @@ class GraphQLProject:
             {
                 'id': root.id,
                 'filter_': ParticipantFilter(
+                    project=GenericFilter(eq=root.id),
                     id=id.to_internal_filter() if id else None,
                     external_id=(
                         external_id.to_internal_filter() if external_id else None

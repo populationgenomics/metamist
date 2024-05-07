@@ -1,7 +1,6 @@
 """
 Web routes
 """
-from typing import Optional
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
@@ -12,13 +11,20 @@ from api.utils.db import (
     get_project_write_connection,
     get_projectless_db_connection,
 )
+from db.python.layers.participant import ParticipantLayer
 from db.python.layers.search import SearchLayer
 from db.python.layers.seqr import SeqrLayer
-from db.python.layers.web import SearchItem, WebLayer
+from db.python.layers.web import WebLayer
+from db.python.tables.participant import ParticipantFilter
 from db.python.tables.project import ProjectPermissionsTable
+from db.python.utils import GenericFilter, GenericMetaFilter
 from models.enums.web import SeqrDatasetType
+from models.models.participant import NestedParticipantInternal
 from models.models.search import SearchResponse
-from models.models.web import PagingLinks, ProjectSummary
+from models.models.web import (
+    ProjectParticipantGridResponse,
+    ProjectSummary,
+)
 
 
 class SearchResponseModel(BaseModel):
@@ -37,36 +43,69 @@ router = APIRouter(prefix='/web', tags=['web'])
 )
 async def get_project_summary(
     request: Request,
-    grid_filter: list[SearchItem],
-    limit: int = 20,
-    token: Optional[int] = 0,
     connection: Connection = get_project_readonly_connection,
 ) -> ProjectSummary:
     """Creates a new sample, and returns the internal sample ID"""
     st = WebLayer(connection)
 
-    summary = await st.get_project_summary(
-        token=token, limit=limit, grid_filter=grid_filter
+    summary = await st.get_project_summary()
+
+    return summary.to_external()
+
+
+class ProjectParticipantGridFilter(BaseModel):
+    id: GenericFilter[int] | None = None
+    meta: GenericMetaFilter | None = None
+    external_id: GenericFilter[str] | None = None
+    reported_sex: GenericFilter[int] | None = None
+    reported_gender: GenericFilter[str] | None = None
+    karyotype: GenericFilter[str] | None = None
+
+
+@router.post(
+    '/{project}/participants',
+    response_model=ProjectParticipantGridResponse,
+    operation_id='getProjectParticipantsGridWithLimit',
+)
+async def get_project_summary_with_limit(
+    request: Request,
+    limit: int,
+    token: int,
+    query: ProjectParticipantGridFilter,
+    connection=get_project_readonly_connection,
+):
+
+    if not connection.project:
+        raise ValueError("No project was detected through the authentication")
+
+    player = ParticipantLayer(connection)
+    id_query = query.id
+    if token:
+        id_query = id_query or GenericFilter()
+        id_query.gt = token
+
+    participants = await player.query(
+        ParticipantFilter(
+            id=id_query,
+            external_id=query.external_id,
+            reported_sex=query.reported_sex,
+            reported_gender=query.reported_gender,
+            karyotype=query.karyotype,
+            project=GenericFilter(eq=connection.project),
+        ),
+        limit=limit,
     )
 
-    participants = summary.participants
+    # then have to get all nested objects
 
-    collected_samples = sum(len(p.samples) for p in participants)
-    new_token = None
-    if collected_samples >= limit:
-        new_token = max(int(sample.id) for p in participants for sample in p.samples)
+    ps: list[NestedParticipantInternal] = []
 
-    links = PagingLinks(
-        next=str(request.base_url)
-        + request.url.path.lstrip('/')
-        + f'?token={new_token}'
-        if new_token
-        else None,
-        self=str(request.url),
-        token=str(new_token) if new_token else None,
+    return ProjectParticipantGridResponse.construct(
+        participants=ps,
+        token_base_url=str(request.base_url) + request.url.path.lstrip('/'),
+        current_url=str(request.url),
+        request_limit=limit,
     )
-
-    return summary.to_external(links)
 
 
 @router.get(
