@@ -21,7 +21,11 @@ interface TileProps {
 const Tile: React.FC<TileProps> = ({ color, header, stat, units, description }) => {
     return (
         <>
-            <Card className="ourdna-tile" color={color}>
+            <Card
+                className="ourdna-tile"
+                color={color}
+                style={{ width: '100%', height: '180px', margin: '2em' }}
+            >
                 <CardContent>
                     <CardHeader className="ourdna-tile-header">{header}</CardHeader>
                     <Container
