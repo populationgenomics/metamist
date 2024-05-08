@@ -129,7 +129,6 @@ def process_rows(
     else:
         status = ParsingStatus.FAILED
         parsing_result = f'Error: {err_msg} when parsing record with id: {request_id}'
-        # TODO: should we log to error log table as well?
 
     if delivery_attempt == 1:
         # log only at the first attempt,
@@ -167,6 +166,10 @@ def process_rows(
             # publish to notification pubsub
             msg_title = 'Metamist ETL Load Failed'
             try:
+                # limit result to max 100 characters, to avoid spamming slack
+                # sometimes the details can be huge, the whole stacktrace
+                log_details['result'] = str(parsing_result)[:100]
+                log_record['details'] = json.dumps(log_details)
                 pubsub_client = _get_pubsub_client()
                 pubsub_client.publish(
                     NOTIFICATION_PUBSUB_TOPIC,
