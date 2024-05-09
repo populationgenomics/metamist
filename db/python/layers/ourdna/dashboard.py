@@ -95,6 +95,7 @@ class OurDnaDashboardLayer(BaseLayer):
 
         # Data to be returned
         collection_to_process_end_time: dict[str, int] = {}
+        collection_to_process_end_time_statistics: dict[str, float | None] = {}
         collection_to_process_end_time_24h: dict[str, int] = {}
         processing_times_by_site: dict[str, dict[int, int]] = defaultdict(
             lambda: defaultdict(int)
@@ -229,8 +230,29 @@ class OurDnaDashboardLayer(BaseLayer):
                 if i not in processing_times_by_site[site]:
                     processing_times_by_site[site][i] = 0
 
+        # Pull collection_to_process_end_time statistics, including average, median, min, max
+        collection_to_process_end_time_statistics['average'] = (
+            sum(collection_to_process_end_time.values())
+            / len(collection_to_process_end_time)
+            if collection_to_process_end_time
+            else None
+        )
+
+        collection_to_process_end_time_statistics['min'] = (
+            min(collection_to_process_end_time.values())
+            if collection_to_process_end_time
+            else None
+        )
+
+        collection_to_process_end_time_statistics['max'] = (
+            max(collection_to_process_end_time.values())
+            if collection_to_process_end_time
+            else None
+        )
+
         return {
             'collection_to_process_end_time': collection_to_process_end_time,
+            'collection_to_process_end_time_statistics': collection_to_process_end_time_statistics,
             'collection_to_process_end_time_24h': collection_to_process_end_time_24h,
             'processing_times_by_site': processing_times_by_site,
             'total_samples_by_collection_event_name': total_samples_by_collection_event_name,
