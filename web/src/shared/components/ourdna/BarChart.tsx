@@ -40,9 +40,18 @@ interface HistogramProps {
     data: object
 }
 
+const OURDNA_COLOURS = [
+    'rgba(191, 0, 61, 0.5)', // OurDNA Red
+    'rgba(233, 199, 30, 0.5)', // OurDNA Yellow
+    'rgba(161, 202, 56, 0.5)', // Green
+    'rgba(114, 173, 225, 0.5)', // OurDNA Blue
+    'rgba(85, 85, 85, 0.5)', // OurDNA Charchoal
+]
+
 const HistogramChart: React.FC<HistogramProps> = ({ header, data }) => {
     let labels = []
     let datasets = []
+    const numColors = OURDNA_COLOURS.length
 
     Object.keys(data).forEach((key) => {
         labels = labels.concat(Object.keys(data[key]))
@@ -50,12 +59,12 @@ const HistogramChart: React.FC<HistogramProps> = ({ header, data }) => {
 
     labels = [...new Set(labels)]
 
-    datasets = Object.keys(data).map((key) => {
+    datasets = Object.keys(data).map((key, index) => {
         let values = Object.values(data[key])
         return {
             label: key,
             data: values,
-            backgroundColor: 'rgba(255, 99, 132, 0.5)',
+            backgroundColor: OURDNA_COLOURS[index % numColors],
         }
     }, [])
 
