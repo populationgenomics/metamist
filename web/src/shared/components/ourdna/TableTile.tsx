@@ -1,91 +1,55 @@
 // Table is a wrapper around semantic-ui-react's Table component that adds a class
 // to the table if the user has dark mode enabled in their browser.
 import * as React from 'react'
-import {
-    SemanticCOLORS,
-    Container,
-    Card,
-    CardContent,
-    CardHeader,
-    Table,
-    TableHeader,
-    TableHeaderCell,
-    TableCell,
-    TableRow,
-    TableBody,
-} from 'semantic-ui-react'
+
+import { Box, Text, Table, Thead, Tbody, Tfoot, Tr, Th, Td, TableCaption } from '@chakra-ui/react'
 
 interface TableTileProps {
-    color: SemanticCOLORS
     header: string
-    // data: object
+    data: object
+    columns: Array<string>
 }
 
-const Tile: React.FC<TableTileProps> = ({ color, header }) => {
+const Tile: React.FC<TableTileProps> = ({ header, data, columns }) => {
     return (
         <>
-            <Card
-                className="ourdna-tile"
-                color={color}
-                style={{ width: '100%', height: '180px', margin: '2em' }}
-            >
-                <CardContent>
-                    <CardHeader className="ourdna-tile-header">{header}</CardHeader>
-                    <Container
-                        className="ourdna-table-tile"
-                        style={{
-                            display: 'flex',
-                            flexDirection: 'row',
-                            height: '400px',
-                            overflowY: 'auto',
-                        }}
-                    >
-                        {/* Change this to a table element */}
-                        <Table basic="very">
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHeaderCell>Name</TableHeaderCell>
-                                    <TableHeaderCell>Status</TableHeaderCell>
-                                    <TableHeaderCell>Notes</TableHeaderCell>
-                                </TableRow>
-                            </TableHeader>
-
-                            <TableBody>
-                                <TableRow>
-                                    <TableCell>John</TableCell>
-                                    <TableCell>Approved</TableCell>
-                                    <TableCell>None</TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell>Jamie</TableCell>
-                                    <TableCell>Approved</TableCell>
-                                    <TableCell>Requires call</TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell>Jill</TableCell>
-                                    <TableCell>Denied</TableCell>
-                                    <TableCell>None</TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell>John</TableCell>
-                                    <TableCell>Approved</TableCell>
-                                    <TableCell>None</TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell>Jamie</TableCell>
-                                    <TableCell>Approved</TableCell>
-                                    <TableCell>Requires call</TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell>Jill</TableCell>
-                                    <TableCell>Denied</TableCell>
-                                    <TableCell>None</TableCell>
-                                </TableRow>
-                            </TableBody>
-                        </Table>
-                    </Container>
-                </CardContent>
-            </Card>
+            <Box p="6" borderWidth="1px" borderRadius="lg">
+                <Text>{header}</Text>
+                <Box height="150px" width="300px" overflowY="auto">
+                    <Table variant="simple">
+                        <Thead position="sticky" top={0} backgroundColor={'white'}>
+                            <Tr>
+                                {columns &&
+                                    columns.map(
+                                        (column, index) => <Th key={index}>{column}</Th>,
+                                        this
+                                    )}
+                            </Tr>
+                        </Thead>
+                        <Tbody>
+                            {data &&
+                                Object.keys(data).map(
+                                    (key, index) => (
+                                        <Tr key={`${index}-row`}>
+                                            <Td key={`${index}-col1`}>{key}</Td>
+                                            <Td key={`${index}-col2`}>{data[key]}</Td>
+                                        </Tr>
+                                    ),
+                                    this
+                                )}
+                        </Tbody>
+                        <Tfoot position="sticky" bottom={0} backgroundColor={'white'}>
+                            <Tr>
+                                {columns &&
+                                    columns.map(
+                                        (column, index) => <Th key={index}>{column}</Th>,
+                                        this
+                                    )}
+                            </Tr>
+                        </Tfoot>
+                    </Table>
+                </Box>
+            </Box>
         </>
     )
 }

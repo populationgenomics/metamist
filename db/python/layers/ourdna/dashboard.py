@@ -134,12 +134,12 @@ class OurDnaDashboardLayer(BaseLayer):
             collected_samples = [
                 sample
                 for sample in samples_for_participant
-                if participant.meta.get('consent') is not None
-                and sample.meta.get('collection_time') is not None
+                if sample.meta.get('collection_time') is not None
             ]
 
             if len(collected_samples) == 0:
-                participants_consented_not_collected.append(participant.id)
+                if participant.meta.get('consent') is not None:
+                    participants_consented_not_collected.append(participant.id)
 
             # Get the participants that have signed but not consented
             if participant.meta.get('consent') is None:

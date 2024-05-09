@@ -2,6 +2,8 @@ import * as React from 'react'
 
 import SwaggerUI from 'swagger-ui-react'
 import { Routes as Switch, Route } from 'react-router-dom'
+import { ChakraProvider } from '@chakra-ui/react'
+
 import {
     BillingHome,
     BillingSeqrProp,
@@ -93,7 +95,14 @@ const Routes: React.FunctionComponent = () => (
             }
         />
 
-        <Route path="/ourdna" element={<OurDnaDashboard />} />
+        <Route
+            path="/ourdna"
+            element={
+                <ChakraProvider resetCSS>
+                    <OurDnaDashboard />
+                </ChakraProvider>
+            }
+        />
 
         <Route path="/swagger" element={<SwaggerUI url="/openapi.json" tryItOutEnabled={true} />} />
 
