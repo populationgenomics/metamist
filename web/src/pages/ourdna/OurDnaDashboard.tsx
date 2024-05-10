@@ -47,15 +47,7 @@ const Dashboard = () => {
             <Box marginTop={0} padding={5}>
                 <Image htmlWidth="150px" src="/logo.png" />
             </Box>
-            <Grid
-                h="100vh"
-                templateRows="repeat(5, 1fr)"
-                templateColumns="repeat(5, 1fr)"
-                autoFlow={'row dense'}
-                autoRows={'minmax(100px, auto)'}
-                autoColumns={'minmax(100px, auto)'}
-                gap={4}
-            >
+            <Grid h="100vh" templateRows="repeat(5, 1fr)" templateColumns="repeat(5, 1fr)" gap={4}>
                 <GridItem rowSpan={2} colSpan={3} border={'1px solid'}>
                     <Grid
                         templateRows="repeat(2, 1fr)"
