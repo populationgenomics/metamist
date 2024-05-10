@@ -13,10 +13,17 @@ interface TableTileProps {
 const Tile: React.FC<TableTileProps> = ({ header, data, columns }) => {
     return (
         <>
-            <Box p="6" borderWidth="1px" borderRadius="lg">
+            <Box
+                height="100%"
+                px="6"
+                paddingTop="6"
+                paddingBottom="10"
+                borderWidth="1px"
+                borderRadius="lg"
+            >
                 <Text>{header}</Text>
-                <Box height="150px" width="300px" overflowY="auto">
-                    <Table variant="simple">
+                <Box height="100%" overflowY="scroll">
+                    <Table variant="simple" height="100%">
                         <Thead position="sticky" top={0} backgroundColor={'white'}>
                             <Tr>
                                 {columns &&
@@ -38,15 +45,6 @@ const Tile: React.FC<TableTileProps> = ({ header, data, columns }) => {
                                     this
                                 )}
                         </Tbody>
-                        <Tfoot position="sticky" bottom={0} backgroundColor={'white'}>
-                            <Tr>
-                                {columns &&
-                                    columns.map(
-                                        (column, index) => <Th key={index}>{column}</Th>,
-                                        this
-                                    )}
-                            </Tr>
-                        </Tfoot>
                     </Table>
                 </Box>
             </Box>

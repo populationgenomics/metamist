@@ -49,19 +49,20 @@ const Dashboard = () => {
             </Box>
             <Grid
                 h="100vh"
-                templateRows="repeat(4, 1fr)"
-                templateColumns="repeat(4, 1fr)"
+                templateRows="repeat(5, 1fr)"
+                templateColumns="repeat(5, 1fr)"
                 autoFlow={'row dense'}
                 autoRows={'minmax(100px, auto)'}
                 autoColumns={'minmax(100px, auto)'}
-                gap={6}
+                gap={4}
             >
-                <GridItem rowSpan={2} colSpan={2} border={'1px solid'}>
+                <GridItem rowSpan={2} colSpan={3} border={'1px solid'}>
                     <Grid
                         templateRows="repeat(2, 1fr)"
                         templateColumns="repeat(2, 1fr)"
-                        gap={4}
-                        padding={4}
+                        gap={5}
+                        paddingX={6}
+                        paddingY={4}
                     >
                         <GridItem rowSpan={1} colSpan={1}>
                             <Tile
@@ -111,26 +112,27 @@ const Dashboard = () => {
                         }
                     />
                 </GridItem>
-                <GridItem rowSpan={2} colSpan={3} border={'1px solid'}>
+                <GridItem rowSpan={3} colSpan={4} border={'1px solid'}>
                     <BarChart
                         header="Samples by Site"
                         data={data.project.ourdnaDashboard[0].processing_times_by_site}
                     />
                 </GridItem>
-                <GridItem rowSpan={2} colSpan={1} border={'1px solid'}>
+                <GridItem rowSpan={3} colSpan={1} border={'1px solid'}>
                     <Grid
-                        templateRows="repeat(2, 1fr)"
-                        templateColumns="repeat(1, 1fr)"
+                        templateRows="repeat(2, minmax(100px, 50%))"
+                        templateColumns="repeat(1, 100%)"
                         height="100%"
+                        gap={5}
                     >
-                        <GridItem rowSpan={1} colSpan={1} height="50%">
+                        <GridItem rowSpan={1} colSpan={1} border={'1px solid'}>
                             <TableTile
                                 header="Viable Long Read"
                                 data={data.project.ourdnaDashboard[0].samples_concentration_gt_1ug}
                                 columns={['Sample ID', 'Concentration']}
                             />
                         </GridItem>
-                        <GridItem rowSpan={1} colSpan={1} height="50%">
+                        <GridItem rowSpan={1} colSpan={1} border={'1px solid'}>
                             <TableTile
                                 header="Processed > 24h"
                                 data={samplesLostAfterCollections}

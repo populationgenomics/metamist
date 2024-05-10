@@ -1,7 +1,7 @@
 // Table is a wrapper around semantic-ui-react's Table component that adds a class
 // to the table if the user has dark mode enabled in their browser.
 import * as React from 'react'
-import { Box, Heading } from '@chakra-ui/react'
+import { Box, Heading, Flex } from '@chakra-ui/react'
 
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
 import { Doughnut } from 'react-chartjs-2'
@@ -36,7 +36,14 @@ const OurDonutChart: React.FC<PieChartProps> = ({ header, data }) => {
     }
     return (
         <>
-            <Box height="100%" padding={6} borderWidth="1px" borderRadius="lg" overflow="hidden">
+            <Flex
+                height="100%"
+                padding={6}
+                borderWidth="1px"
+                borderRadius="lg"
+                overflow="hidden"
+                justifyContent={'center'}
+            >
                 {/* INSERT PIE CHART HERE */}
                 <Heading size="md">{header}</Heading>
                 <Doughnut
@@ -54,7 +61,7 @@ const OurDonutChart: React.FC<PieChartProps> = ({ header, data }) => {
                         },
                     }}
                 />
-            </Box>
+            </Flex>
         </>
     )
 }

@@ -75,7 +75,7 @@ const HistogramChart: React.FC<HistogramProps> = ({ header, data }) => {
 
     return (
         <>
-            <Box height="100%" p="6" borderWidth="1px" borderRadius="lg" overflow="hidden">
+            <Box p="6" borderWidth="1px" borderRadius="lg" overflow="hidden">
                 {/* INSERT PIE CHART HERE */}
                 <Heading size="md">{header}</Heading>
                 {/* INSERT PIE CHART HERE */}
