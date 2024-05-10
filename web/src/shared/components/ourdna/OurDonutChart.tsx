@@ -36,7 +36,7 @@ const OurDonutChart: React.FC<PieChartProps> = ({ header, data }) => {
     }
     return (
         <>
-            <Box maxW="md" borderWidth="1px" borderRadius="lg" overflow="hidden">
+            <Box height="100%" padding={6} borderWidth="1px" borderRadius="lg" overflow="hidden">
                 {/* INSERT PIE CHART HERE */}
                 <Heading size="md">{header}</Heading>
                 <Doughnut

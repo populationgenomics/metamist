@@ -14,7 +14,7 @@ interface TileProps {
 const Tile: React.FC<TileProps> = ({ header, stat, units, description }) => {
     return (
         <>
-            <Box maxW="sm" p="6" borderWidth="1px" borderRadius="lg" overflow="hidden">
+            <Box p="6" borderWidth="1px" borderRadius="lg" overflow="hidden">
                 <Stat>
                     <StatLabel>{header}</StatLabel>
                     <HStack spacing="24px">

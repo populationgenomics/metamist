@@ -43,7 +43,7 @@ interface HistogramProps {
 const OURDNA_COLOURS = [
     'rgba(191, 0, 61, 0.5)', // OurDNA Red
     'rgba(233, 199, 30, 0.5)', // OurDNA Yellow
-    'rgba(161, 202, 56, 0.5)', // Green
+    'rgba(161, 202, 56, 0.5)', // OurDNA Green
     'rgba(114, 173, 225, 0.5)', // OurDNA Blue
     'rgba(85, 85, 85, 0.5)', // OurDNA Charchoal
 ]
@@ -75,7 +75,7 @@ const HistogramChart: React.FC<HistogramProps> = ({ header, data }) => {
 
     return (
         <>
-            <Box maxW="4xl" p="6" borderWidth="1px" borderRadius="lg" overflow="hidden">
+            <Box height="100%" p="6" borderWidth="1px" borderRadius="lg" overflow="hidden">
                 {/* INSERT PIE CHART HERE */}
                 <Heading size="md">{header}</Heading>
                 {/* INSERT PIE CHART HERE */}

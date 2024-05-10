@@ -1,24 +1,7 @@
 import React from 'react'
 import { CardGroup, Container } from 'semantic-ui-react'
 
-import {
-    Box,
-    Flex,
-    Image,
-    Avatar,
-    Text,
-    Button,
-    Menu,
-    MenuButton,
-    MenuList,
-    MenuItem,
-    MenuDivider,
-    useDisclosure,
-    useColorModeValue,
-    Stack,
-    useColorMode,
-    Center,
-} from '@chakra-ui/react'
+import { Box, Flex, Image, Grid, GridItem } from '@chakra-ui/react'
 
 import { gql, useQuery } from '@apollo/client'
 // import { gql } from '../../__generated__/gql'
@@ -60,50 +43,43 @@ const Dashboard = () => {
     if (error) return <>Error! {error.message}</>
 
     return data ? (
-        <div>
-            <Container
-                fluid
-                style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: '10px',
-                    paddingTop: '1em',
-                    paddingBottom: '1em',
-                }}
+        <>
+            <Box marginTop={0} padding={5}>
+                <Image htmlWidth="150px" src="/logo.png" />
+            </Box>
+            <Grid
+                h="100vh"
+                templateRows="repeat(4, 1fr)"
+                templateColumns="repeat(4, 1fr)"
+                autoFlow={'row dense'}
+                autoRows={'minmax(100px, auto)'}
+                autoColumns={'minmax(100px, auto)'}
+                gap={6}
             >
-                <Box px={4}>
-                    <Flex h={16} alignItems={'center'} justifyContent={'space-between'}>
-                        <Box>
-                            <Image htmlWidth="150px" src="/logo.png" />
-                        </Box>
-                    </Flex>
-                </Box>
-
-                <div
-                    className="ourdna-dashboard-tiles"
-                    style={{
-                        marginTop: '4em',
-                        padding: '2em',
-                        display: 'flex',
-                        flexDirection: 'row',
-                        alignContent: 'center',
-                    }}
-                >
-                    <Container fluid style={{ width: '60%' }}>
-                        <CardGroup itemsPerRow={2}>
+                <GridItem rowSpan={2} colSpan={2} border={'1px solid'}>
+                    <Grid
+                        templateRows="repeat(2, 1fr)"
+                        templateColumns="repeat(2, 1fr)"
+                        gap={4}
+                        padding={4}
+                    >
+                        <GridItem rowSpan={1} colSpan={1}>
                             <Tile
                                 header="Awaiting Consent"
                                 stat={`${data.project.ourdnaDashboard[0].participants_signed_not_consented.length}`}
                                 units="participants"
                                 description="The number of people who have signed up but not consented."
                             />
+                        </GridItem>
+                        <GridItem rowSpan={1} colSpan={1}>
                             <Tile
                                 header="Awaiting Collection"
                                 stat={`${data.project.ourdnaDashboard[0].participants_consented_not_collected.length}`}
                                 units="participants"
                                 description="The number of people who have consented but not given blood."
                             />
+                        </GridItem>
+                        <GridItem rowSpan={1} colSpan={1}>
                             <Tile
                                 header="Samples Lost"
                                 stat={`${
@@ -115,59 +91,56 @@ const Dashboard = () => {
                                 units="samples"
                                 description="Blood has been collected, but was not processed within 72 hours. "
                             />
-                            {/* Add more aggregated tile here */}
+                        </GridItem>
+                        {/* Add more aggregated tile here */}
+                        <GridItem rowSpan={1} colSpan={1}>
                             <Tile
                                 header="Collection to Processing"
                                 stat="90"
                                 units="participants"
                                 description="The number of people who have consented but not given blood."
                             />
-                        </CardGroup>
-                    </Container>
-                    <Container style={{ width: '40%' }}>
-                        <OurDonutChart
-                            header="Sample Status"
-                            data={
-                                data.project.ourdnaDashboard[0]
-                                    .total_samples_by_collection_event_name
-                            }
-                        />
-                    </Container>
-                </div>
-                <div
-                    className="ourdna-dashboard-tiles"
-                    style={{
-                        marginTop: '4em',
-                        padding: '2em',
-                        display: 'flex',
-                        flexDirection: 'row',
-                        alignContent: 'center',
-                    }}
-                >
-                    <Container style={{ width: '60%' }}>
-                        <BarChart
-                            header="Samples by Site"
-                            data={data.project.ourdnaDashboard[0].processing_times_by_site}
-                        />
-                    </Container>
-                    <Container style={{ width: '40%' }}>
-                        <CardGroup itemsPerRow={1} style={{ width: '100%' }}>
+                        </GridItem>
+                    </Grid>
+                </GridItem>
+                <GridItem rowSpan={2} colSpan={2} border={'1px solid'}>
+                    <OurDonutChart
+                        header="Sample Status"
+                        data={
+                            data.project.ourdnaDashboard[0].total_samples_by_collection_event_name
+                        }
+                    />
+                </GridItem>
+                <GridItem rowSpan={2} colSpan={3} border={'1px solid'}>
+                    <BarChart
+                        header="Samples by Site"
+                        data={data.project.ourdnaDashboard[0].processing_times_by_site}
+                    />
+                </GridItem>
+                <GridItem rowSpan={2} colSpan={1} border={'1px solid'}>
+                    <Grid
+                        templateRows="repeat(2, 1fr)"
+                        templateColumns="repeat(1, 1fr)"
+                        height="100%"
+                    >
+                        <GridItem rowSpan={1} colSpan={1} height="50%">
                             <TableTile
                                 header="Viable Long Read"
                                 data={data.project.ourdnaDashboard[0].samples_concentration_gt_1ug}
                                 columns={['Sample ID', 'Concentration']}
                             />
-                            {/* Add more aggregated tile here */}
+                        </GridItem>
+                        <GridItem rowSpan={1} colSpan={1} height="50%">
                             <TableTile
                                 header="Processed > 24h"
                                 data={samplesLostAfterCollections}
                                 columns={['Sample ID', 'Time (h)']}
                             />
-                        </CardGroup>
-                    </Container>
-                </div>
-            </Container>
-        </div>
+                        </GridItem>
+                    </Grid>
+                </GridItem>
+            </Grid>
+        </>
     ) : (
         <MuckError message={`Ah Muck, there's no data here`} />
     )
