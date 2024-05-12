@@ -10,6 +10,7 @@ import './OurDnaDashboard.css'
 
 import Tile from '../../shared/components/ourdna/Tile'
 import TableTile from '../../shared/components/ourdna/TableTile'
+import ThreeStatTile from '../../shared/components/ourdna/ThreeStatTile'
 
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import MuckError from '../../shared/components/MuckError'
@@ -93,12 +94,40 @@ const Dashboard = () => {
                         </GridItem>
                         {/* Add more aggregated tile here */}
                         <GridItem rowSpan={1} colSpan={1}>
-                            <Tile
+                            <ThreeStatTile
                                 header="Collection to Processing"
-                                stat="90"
+                                stats={[
+                                    {
+                                        value: `${(
+                                            data.project.ourdnaDashboard[0]
+                                                .collection_to_process_end_time_statistics.min /
+                                            3600
+                                        ).toFixed(1)}`,
+                                        units: 'shortest (h)',
+                                        unitsColour: '#a1c938',
+                                    },
+                                    {
+                                        value: `${(
+                                            data.project.ourdnaDashboard[0]
+                                                .collection_to_process_end_time_statistics.max /
+                                            3600
+                                        ).toFixed(1)}`,
+                                        units: 'longest (h)',
+                                        unitsColour: '#bf003c',
+                                    },
+                                    {
+                                        value: `${(
+                                            data.project.ourdnaDashboard[0]
+                                                .collection_to_process_end_time_statistics.average /
+                                            3600
+                                        ).toFixed(1)}`,
+                                        units: 'average (h)',
+                                        unitsColour: '#71ace1',
+                                    },
+                                ]}
                                 units="participants"
                                 units_colour="#a1c938"
-                                description="The number of people who have consented but not given blood."
+                                description="The time between collection and processing for each sample."
                                 tile_icon="/dashboard_icons/green_truck.svg"
                             />
                         </GridItem>

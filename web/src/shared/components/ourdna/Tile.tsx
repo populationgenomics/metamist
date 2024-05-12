@@ -35,13 +35,15 @@ const Tile: React.FC<TileProps> = ({
         <>
             <Box p="6" borderWidth="1px" borderRadius="lg" overflow="hidden">
                 <Stat>
-                    <StatLabel style={{ fontSize: '16px', fontWeight: 'bold' }}>
+                    <StatLabel
+                        style={{ fontSize: '16px', fontWeight: 'bold', paddingBottom: '20px' }}
+                    >
                         <Flex alignItems="center">
                             <Image src={tile_icon} alt="Icon" boxSize="24px" mr="2" />
                             {header}
                         </Flex>
                     </StatLabel>
-                    <HStack spacing="24px">
+                    <HStack spacing="24px" style={{ paddingBottom: '10px' }}>
                         <StatNumber>{stat}</StatNumber>
                         <Box>
                             <Badge borderRadius="full" px="2" bg={units_colour} color="white">
