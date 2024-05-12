@@ -37,7 +37,7 @@ const Tile: React.FC<TableTileProps> = ({ header, data, columns, tile_icon }) =>
             >
                 <Flex alignItems="center">
                     <Image src={tile_icon} alt="Icon" boxSize="24px" mr="2" />
-                    <Text>{header}</Text>
+                    <Text style={{ fontSize: '16px', fontWeight: 'bold' }}>{header}</Text>
                 </Flex>
                 <Box height="100%" overflowY="scroll">
                     <Table variant="simple" height="100%">
