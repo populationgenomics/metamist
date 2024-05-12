@@ -18,11 +18,19 @@ interface TileProps {
     header: string
     stat: string
     units: string
+    units_colour: string
     description: string
     tile_icon: string
 }
 
-const Tile: React.FC<TileProps> = ({ header, stat, units, description, tile_icon }) => {
+const Tile: React.FC<TileProps> = ({
+    header,
+    stat,
+    units,
+    units_colour,
+    description,
+    tile_icon,
+}) => {
     return (
         <>
             <Box p="6" borderWidth="1px" borderRadius="lg" overflow="hidden">
@@ -36,7 +44,7 @@ const Tile: React.FC<TileProps> = ({ header, stat, units, description, tile_icon
                     <HStack spacing="24px">
                         <StatNumber>{stat}</StatNumber>
                         <Box>
-                            <Badge borderRadius="full" px="2" colorScheme="teal">
+                            <Badge borderRadius="full" px="2" bg={units_colour} color="white">
                                 {units}
                             </Badge>
                         </Box>

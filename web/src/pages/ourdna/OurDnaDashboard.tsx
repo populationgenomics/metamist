@@ -61,6 +61,7 @@ const Dashboard = () => {
                                 header="Awaiting Consent"
                                 stat={`${data.project.ourdnaDashboard[0].participants_signed_not_consented.length}`}
                                 units="participants"
+                                units_colour="#71ace1"
                                 description="The number of people who have signed up but not consented."
                                 tile_icon="/dashboard_icons/blue_clipboard.svg"
                             />
@@ -70,6 +71,7 @@ const Dashboard = () => {
                                 header="Awaiting Collection"
                                 stat={`${data.project.ourdnaDashboard[0].participants_consented_not_collected.length}`}
                                 units="participants"
+                                units_colour="#e8c71d"
                                 description="The number of people who have consented but not given blood."
                                 tile_icon="/dashboard_icons/yellow_syringe.svg"
                             />
@@ -84,6 +86,7 @@ const Dashboard = () => {
                                     ).length
                                 }`}
                                 units="samples"
+                                units_colour="#bf003c"
                                 description="Blood has been collected, but was not processed within 72 hours. "
                                 tile_icon="/dashboard_icons/red_bloodsample.svg"
                             />
@@ -94,6 +97,7 @@ const Dashboard = () => {
                                 header="Collection to Processing"
                                 stat="90"
                                 units="participants"
+                                units_colour="#a1c938"
                                 description="The number of people who have consented but not given blood."
                                 tile_icon="/dashboard_icons/green_truck.svg"
                             />
