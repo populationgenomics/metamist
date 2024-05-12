@@ -45,7 +45,7 @@ const Dashboard = () => {
     return data ? (
         <>
             <Box marginTop={0} padding={5}>
-                <Image htmlWidth="150px" src="/logo.png" />
+                <Image htmlWidth="150px" src="/logo_option2.png" />
             </Box>
             <Grid h="100vh" templateRows="repeat(5, 1fr)" templateColumns="repeat(5, 1fr)" gap={4}>
                 <GridItem rowSpan={2} colSpan={3} border={'1px solid'}>
@@ -62,6 +62,7 @@ const Dashboard = () => {
                                 stat={`${data.project.ourdnaDashboard[0].participants_signed_not_consented.length}`}
                                 units="participants"
                                 description="The number of people who have signed up but not consented."
+                                tile_icon="/dashboard_icons/blue_clipboard.svg"
                             />
                         </GridItem>
                         <GridItem rowSpan={1} colSpan={1}>
@@ -70,6 +71,7 @@ const Dashboard = () => {
                                 stat={`${data.project.ourdnaDashboard[0].participants_consented_not_collected.length}`}
                                 units="participants"
                                 description="The number of people who have consented but not given blood."
+                                tile_icon="/dashboard_icons/yellow_syringe.svg"
                             />
                         </GridItem>
                         <GridItem rowSpan={1} colSpan={1}>
@@ -83,6 +85,7 @@ const Dashboard = () => {
                                 }`}
                                 units="samples"
                                 description="Blood has been collected, but was not processed within 72 hours. "
+                                tile_icon="/dashboard_icons/red_bloodsample.svg"
                             />
                         </GridItem>
                         {/* Add more aggregated tile here */}
@@ -92,22 +95,25 @@ const Dashboard = () => {
                                 stat="90"
                                 units="participants"
                                 description="The number of people who have consented but not given blood."
+                                tile_icon="/dashboard_icons/green_truck.svg"
                             />
                         </GridItem>
                     </Grid>
                 </GridItem>
                 <GridItem rowSpan={2} colSpan={2} border={'1px solid'}>
                     <OurDonutChart
-                        header="Sample Status"
+                        header="Where we collected our samples"
                         data={
                             data.project.ourdnaDashboard[0].total_samples_by_collection_event_name
                         }
+                        icon="/dashboard_icons/blue_testtube.svg"
                     />
                 </GridItem>
                 <GridItem rowSpan={3} colSpan={4} border={'1px solid'}>
                     <BarChart
-                        header="Samples by Site"
+                        header="Processing time per site"
                         data={data.project.ourdnaDashboard[0].processing_times_by_site}
+                        icon="/dashboard_icons/yellow_clock.svg"
                     />
                 </GridItem>
                 <GridItem rowSpan={3} colSpan={1} border={'1px solid'}>
@@ -122,6 +128,7 @@ const Dashboard = () => {
                                 header="Viable Long Read"
                                 data={data.project.ourdnaDashboard[0].samples_concentration_gt_1ug}
                                 columns={['Sample ID', 'Concentration']}
+                                tile_icon="/dashboard_icons/green_rocket.svg"
                             />
                         </GridItem>
                         <GridItem rowSpan={1} colSpan={1} border={'1px solid'}>
@@ -129,6 +136,7 @@ const Dashboard = () => {
                                 header="Processed > 24h"
                                 data={samplesLostAfterCollections}
                                 columns={['Sample ID', 'Time (h)']}
+                                tile_icon="/dashboard_icons/red_alarm.svg"
                             />
                         </GridItem>
                     </Grid>

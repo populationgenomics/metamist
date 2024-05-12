@@ -2,15 +2,29 @@
 // to the table if the user has dark mode enabled in their browser.
 import * as React from 'react'
 
-import { Box, Text, Table, Thead, Tbody, Tfoot, Tr, Th, Td, TableCaption } from '@chakra-ui/react'
+import {
+    Box,
+    Flex,
+    Image,
+    Text,
+    Table,
+    Thead,
+    Tbody,
+    Tfoot,
+    Tr,
+    Th,
+    Td,
+    TableCaption,
+} from '@chakra-ui/react'
 
 interface TableTileProps {
     header: string
     data: object
     columns: Array<string>
+    tile_icon: string
 }
 
-const Tile: React.FC<TableTileProps> = ({ header, data, columns }) => {
+const Tile: React.FC<TableTileProps> = ({ header, data, columns, tile_icon }) => {
     return (
         <>
             <Box
@@ -21,7 +35,10 @@ const Tile: React.FC<TableTileProps> = ({ header, data, columns }) => {
                 borderWidth="1px"
                 borderRadius="lg"
             >
-                <Text>{header}</Text>
+                <Flex alignItems="center">
+                    <Image src={tile_icon} alt="Icon" boxSize="24px" mr="2" />
+                    <Text>{header}</Text>
+                </Flex>
                 <Box height="100%" overflowY="scroll">
                     <Table variant="simple" height="100%">
                         <Thead position="sticky" top={0} backgroundColor={'white'}>

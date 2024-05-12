@@ -2,21 +2,37 @@
 // to the table if the user has dark mode enabled in their browser.
 import * as React from 'react'
 
-import { Badge, Box, HStack, Stat, StatLabel, StatNumber, StatHelpText } from '@chakra-ui/react'
+import {
+    Badge,
+    Box,
+    Flex,
+    HStack,
+    Image,
+    Stat,
+    StatLabel,
+    StatNumber,
+    StatHelpText,
+} from '@chakra-ui/react'
 
 interface TileProps {
     header: string
     stat: string
     units: string
     description: string
+    tile_icon: string
 }
 
-const Tile: React.FC<TileProps> = ({ header, stat, units, description }) => {
+const Tile: React.FC<TileProps> = ({ header, stat, units, description, tile_icon }) => {
     return (
         <>
             <Box p="6" borderWidth="1px" borderRadius="lg" overflow="hidden">
                 <Stat>
-                    <StatLabel>{header}</StatLabel>
+                    <StatLabel>
+                        <Flex alignItems="center">
+                            <Image src={tile_icon} alt="Icon" boxSize="24px" mr="2" />
+                            {header}
+                        </Flex>
+                    </StatLabel>
                     <HStack spacing="24px">
                         <StatNumber>{stat}</StatNumber>
                         <Box>
