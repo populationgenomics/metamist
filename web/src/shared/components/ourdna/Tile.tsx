@@ -33,27 +33,31 @@ const Tile: React.FC<TileProps> = ({
 }) => {
     return (
         <>
-            <Box p="6" borderWidth="1px" borderRadius="lg" overflow="hidden">
-                <Stat>
+            <Flex height="100%" px="6" borderWidth="1px" borderRadius="lg">
+                <Stat height="100%">
                     <StatLabel
-                        style={{ fontSize: '16px', fontWeight: 'bold', paddingBottom: '20px' }}
+                        fontSize={['xs', 'sm', 'md', 'lg']}
+                        fontWeight="bold"
+                        paddingY={['2', '4']}
                     >
                         <Flex alignItems="center">
                             <Image src={tile_icon} alt="Icon" boxSize="24px" mr="2" />
                             {header}
                         </Flex>
                     </StatLabel>
-                    <HStack spacing="24px" style={{ paddingBottom: '10px' }}>
-                        <StatNumber>{stat}</StatNumber>
-                        <Box>
+                    <Flex flexDirection={['column', 'row']}>
+                        <StatNumber fontSize={['md', 'lg', 'xl']}>{stat}</StatNumber>
+                        <Box paddingX={['0', '3']} paddingY={['3', '0']}>
                             <Badge borderRadius="full" px="2" bg={units_colour} color="white">
                                 {units}
                             </Badge>
                         </Box>
-                    </HStack>
-                    <StatHelpText>{description}</StatHelpText>
+                    </Flex>
+                    <StatHelpText fontSize={['xs', 'sm']} paddingY={['2', '4']}>
+                        {description}
+                    </StatHelpText>
                 </Stat>
-            </Box>
+            </Flex>
         </>
     )
 }
