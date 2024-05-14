@@ -22,9 +22,10 @@ interface TableTileProps {
     data: object
     columns: Array<string>
     tile_icon: string
+    maxRows?: number
 }
 
-const Tile: React.FC<TableTileProps> = ({ header, data, columns, tile_icon }) => {
+const Tile: React.FC<TableTileProps> = ({ header, data, columns, tile_icon, maxRows }) => {
     return (
         <>
             <Box
@@ -39,7 +40,7 @@ const Tile: React.FC<TableTileProps> = ({ header, data, columns, tile_icon }) =>
                     <Image src={tile_icon} alt="Icon" boxSize="24px" mr="2" />
                     <Text style={{ fontSize: 'md', fontWeight: 'bold' }}>{header}</Text>
                 </Flex>
-                <Box height="100%" overflowY="scroll">
+                <Box overflowY="auto" height="calc(100% - 2rem)">
                     <Table variant="simple" height="100%">
                         <Thead position="sticky" top={0} backgroundColor={'white'}>
                             <Tr>

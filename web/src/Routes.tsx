@@ -98,7 +98,7 @@ const Routes: React.FunctionComponent = () => (
         <Route
             path="/ourdna"
             element={
-                <ChakraProvider resetCSS>
+                <ChakraProvider>
                     <OurDnaDashboard />
                 </ChakraProvider>
             }

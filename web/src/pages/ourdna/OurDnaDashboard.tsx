@@ -1,7 +1,7 @@
 import React from 'react'
 import { CardGroup, Container } from 'semantic-ui-react'
 
-import { Box, Flex, Image, Grid, GridItem } from '@chakra-ui/react'
+import { Box, Flex, Image, Grid, GridItem, useBreakpointValue } from '@chakra-ui/react'
 
 import { gql, useQuery } from '@apollo/client'
 // import { gql } from '../../__generated__/gql'
@@ -29,6 +29,31 @@ const Dashboard = () => {
         variables: { project: 'greek-myth' },
     })
 
+    const containerSizesRow = useBreakpointValue({
+        base: 'repeat(2, 1fr)',
+        sm: 'repeat(8, 1fr)',
+        md: 'repeat(2, 1fr)',
+        lg: 'repeat(2, 1fr)',
+    })
+    const containerSizesColumn = useBreakpointValue({
+        base: 'repeat(5, 1fr)',
+        sm: 'repeat(1, 1fr)',
+        md: 'repeat(5, 1fr)',
+        lg: 'repeat(5, 1fr)',
+    })
+    const tileSizesRow = useBreakpointValue({
+        base: 'repeat(2, 1fr)',
+        sm: 'repeat(4, 1fr)',
+        md: 'repeat(4, 1fr)',
+        lg: 'repeat(2, 1fr)',
+    })
+    const tileSizesColumn = useBreakpointValue({
+        base: 'repeat(2, 1fr)',
+        sm: 'repeat(1, 1fr)',
+        md: 'repeat(1, 1fr)',
+        lg: 'repeat(2, 1fr)',
+    })
+
     const samplesLostAfterCollections = {}
     data &&
         Object.keys(data.project.ourdnaDashboard[0].samples_lost_after_collection).forEach(
@@ -45,17 +70,26 @@ const Dashboard = () => {
 
     return data ? (
         <>
-            <Box marginTop={0} padding={5}>
-                <Image htmlWidth="150px" src="/logo_option2.png" />
+            <Box marginTop={0} paddingBottom={5}>
+                <Image maxWidth={['100px', '100px', '150px']} src="/logo_option2.png" />
             </Box>
-            <Grid h="100vh" templateRows="repeat(5, 1fr)" templateColumns="repeat(5, 1fr)" gap={4}>
-                <GridItem rowSpan={2} colSpan={3} border={'1px solid'}>
+            <Grid
+                h="90vh"
+                templateRows={containerSizesRow}
+                templateColumns={containerSizesColumn}
+                gap={6}
+            >
+                <GridItem
+                    rowSpan={1}
+                    colSpan={3}
+                    // border={'1px solid'}
+                >
                     <Grid
-                        templateRows="repeat(2, 1fr)"
-                        templateColumns="repeat(2, 1fr)"
-                        gap={5}
-                        paddingX={6}
-                        paddingY={4}
+                        templateRows="auto"
+                        templateColumns={tileSizesColumn}
+                        gap={[3, 6]}
+                        h="100%"
+                        // border={'1px solid blue'}
                     >
                         <GridItem rowSpan={1} colSpan={1}>
                             <Tile
@@ -125,15 +159,17 @@ const Dashboard = () => {
                                         unitsColour: '#71ace1',
                                     },
                                 ]}
-                                units="participants"
-                                units_colour="#a1c938"
                                 description="The time between collection and processing for each sample."
                                 tile_icon="/dashboard_icons/green_truck.svg"
                             />
                         </GridItem>
                     </Grid>
                 </GridItem>
-                <GridItem rowSpan={2} colSpan={2} border={'1px solid'}>
+                <GridItem
+                    rowSpan={1}
+                    colSpan={2}
+                    // border={'1px solid'}
+                >
                     <OurDonutChart
                         header="Where we collected our samples"
                         data={
@@ -142,34 +178,52 @@ const Dashboard = () => {
                         icon="/dashboard_icons/blue_testtube.svg"
                     />
                 </GridItem>
-                <GridItem rowSpan={3} colSpan={4} border={'1px solid'}>
+                <GridItem
+                    rowSpan={1}
+                    colSpan={4}
+                    // border={'1px solid'}
+                >
                     <BarChart
                         header="Processing time per site"
                         data={data.project.ourdnaDashboard[0].processing_times_by_site}
                         icon="/dashboard_icons/yellow_clock.svg"
                     />
                 </GridItem>
-                <GridItem rowSpan={3} colSpan={1} border={'1px solid'}>
+                <GridItem
+                    rowSpan={1}
+                    colSpan={1}
+                    // border={'1px solid'}
+                >
                     <Grid
-                        templateRows="repeat(2, minmax(100px, 50%))"
+                        templateRows="repeat(2, 1fr)"
                         templateColumns="repeat(1, 100%)"
                         height="100%"
                         gap={5}
                     >
-                        <GridItem rowSpan={1} colSpan={1} border={'1px solid'}>
+                        <GridItem
+                            rowSpan={1}
+                            colSpan={1}
+                            // border={'1px solid'}
+                        >
                             <TableTile
                                 header="Viable Long Read"
                                 data={data.project.ourdnaDashboard[0].samples_concentration_gt_1ug}
                                 columns={['Sample ID', 'Concentration']}
                                 tile_icon="/dashboard_icons/green_rocket.svg"
+                                maxRows={3}
                             />
                         </GridItem>
-                        <GridItem rowSpan={1} colSpan={1} border={'1px solid'}>
+                        <GridItem
+                            rowSpan={1}
+                            colSpan={1}
+                            // border={'1px solid'}
+                        >
                             <TableTile
                                 header="Processed > 24h"
                                 data={samplesLostAfterCollections}
                                 columns={['Sample ID', 'Time (h)']}
                                 tile_icon="/dashboard_icons/red_alarm.svg"
+                                maxRows={3}
                             />
                         </GridItem>
                     </Grid>
