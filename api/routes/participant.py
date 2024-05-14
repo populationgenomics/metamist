@@ -201,6 +201,8 @@ async def upsert_participants(
 
 
 class QueryParticipantCriteria(SMBase):
+    """Query criteria for participants"""
+
     external_participant_ids: list[str] | None = None
     internal_participant_ids: list[int] | None = None
 
