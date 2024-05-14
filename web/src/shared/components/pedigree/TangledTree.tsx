@@ -3,10 +3,9 @@
 /* eslint-disable no-param-reassign */
 import * as React from 'react'
 import _ from 'lodash'
+
 import { min, max, sum, mean, extent } from 'd3'
-import LoadingDucks from '../LoadingDucks/LoadingDucks'
 import MuckError from '../MuckError'
-import { ThemeContext } from '../ThemeProvider'
 
 export interface PedigreeEntry {
     affected: number
@@ -27,10 +26,12 @@ interface ModifiedPedEntry {
     children: string[]
 }
 
-interface Node {
-    id: string
+interface NodePosition {
     x: number
     y: number
+}
+interface Node extends NodePosition {
+    id: string
     parents: Node[]
     parentsList: string[]
     level: number
@@ -65,16 +66,29 @@ interface Link {
 }
 
 // layout
-const yPadding = 50
-const xPadding = 50
-const node_height = 22
-const node_width = 70
-const bundle_width = 14
-const level_y_padding = 100
-const horizontal_spacing = 100
+const defaultNodeDiameter = 40
 
-const constructTangleLayout = (levels: NodeList[]) => {
+
+const textColor = "var(--color-text-primary)"
+const colLines = "var(--color-border-color)"
+
+const colAffected = "var(--color-pedigree-affected)"
+const colPersonBorder = "var(--color-pedigree-person-border)"
+const colUnaffected = "var(--color-pedigree-unaffected)"
+
+interface ITangleLayoutOptions {
+    nodeDiameter: number
+    horizontalSpacing?: number
+    verticalSpacing?: number
+}
+
+const constructTangleLayout = (levels: NodeList[], options: ITangleLayoutOptions) => {
     const nodes_index: Record<string, any> = {}
+
+    const nodeDiameter = options.nodeDiameter ?? defaultNodeDiameter
+    const _horizontalSpacing = options.horizontalSpacing ?? nodeDiameter * 2.5
+    const _verticalSpacing = options.verticalSpacing ?? Math.max(50, nodeDiameter * 1.7)
+
     // precompute level depth
     levels.forEach((l, i) =>
         l.nodes.forEach((n) => {
@@ -129,9 +143,9 @@ const constructTangleLayout = (levels: NodeList[]) => {
                     xb: d.bundle?.x ?? p.x,
                     yb: d.bundle?.y ?? p.y,
                     x1: d.bundle?.x ?? p.x,
-                    y1: d.y - level_y_padding / 2,
+                    y1: d.y - _verticalSpacing / 2,
                     x2: d.x,
-                    y2: d.y - level_y_padding / 2,
+                    y2: d.y - _verticalSpacing / 2,
                     xs: d.x,
                     ys: d.y,
                 })
@@ -179,17 +193,17 @@ const constructTangleLayout = (levels: NodeList[]) => {
         n.height = Math.max(1, n.bundles.length) - 1
     })
 
-    let x_offset = xPadding
-    let y_offset = yPadding
+    let x_offset = 0
+    let y_offset = 0
     levels.forEach((l) => {
-        x_offset = xPadding
+        x_offset = 0
         l.nodes.forEach((n) => {
             n.x = x_offset
             n.y = y_offset
 
-            x_offset += horizontal_spacing
+            x_offset += _horizontalSpacing
         })
-        y_offset += level_y_padding
+        y_offset += _verticalSpacing
     })
 
     const rebalanceNodes = () => {
@@ -208,10 +222,10 @@ const constructTangleLayout = (levels: NodeList[]) => {
                 if (movedIndex < level.nodes.length - 1) {
                     // not the last node
                     const nextNode = level.nodes[movedIndex + 1]
-                    if (Math.abs(currentNode.x - nextNode.x) < horizontal_spacing) {
+                    if (Math.abs(currentNode.x - nextNode.x) < _horizontalSpacing) {
                         moved = true
                         const oldX = nextNode.x
-                        nextNode.x = currentNode.x + horizontal_spacing
+                        nextNode.x = currentNode.x + _horizontalSpacing
                         const movedX = nextNode.x - oldX
                         nextNode.bundles.forEach((bundle) => {
                             bundle
@@ -281,9 +295,9 @@ const constructTangleLayout = (levels: NodeList[]) => {
         l.xb = l.bundle?.x ?? l.target.x
         l.yb = l.bundle?.y ?? l.target.y
         l.x1 = l.bundle?.x ?? l.target.x
-        l.y1 = l.source.y - level_y_padding / 2
+        l.y1 = l.source.y - _verticalSpacing / 2
         l.x2 = l.source.x
-        l.y2 = l.source.y - level_y_padding / 2
+        l.y2 = l.source.y - _verticalSpacing / 2
         l.xs = l.source.x
         l.ys = l.source.y
     })
@@ -328,20 +342,22 @@ const constructTangleLayout = (levels: NodeList[]) => {
         return { error: 'Infinite loop - could not generate pedigree' }
     }
 
-    const minWidth = min(nodes, (n) => n.x) ?? 0
-    const maxWidth = max(nodes, (n) => n.x) ?? 0
-    const minHeight = min(nodes, (n) => n.y) ?? 0
-    const maxHeight = max(nodes, (n) => n.y) ?? 0
+    const nodeHeight = nodeDiameter + 15
+
+    const minNodeCenterX = min(nodes, (n) => n.x) ?? 0
+    const maxNodeCenterX = max(nodes, (n) => n.x) ?? 0
+    const minNodeCenterY = min(nodes, (n) => n.y) ?? 0
+    const maxNodeCenterY = max(nodes, (n) => n.y) ?? 0
+
     const layout = {
-        width_dimensions: [minWidth - node_width, maxWidth + node_width + 2 * xPadding],
+        width_dimensions: [minNodeCenterX - nodeDiameter / 2, maxNodeCenterX + nodeDiameter / 2],
         height_dimensions: [
-            minHeight - node_height / 2 - yPadding,
-            maxHeight + node_height / 2 + 2 * yPadding,
+            minNodeCenterY - nodeDiameter / 2,
+            maxNodeCenterY + nodeHeight - nodeDiameter / 2,
         ],
-        node_height,
-        node_width,
-        bundle_width,
-        level_y_padding,
+        nodeDiameter: nodeDiameter,
+        nodeHeight: nodeHeight,
+        level_y_padding: _verticalSpacing,
     }
 
     return { levels, nodes, nodes_index, links, bundles, layout }
@@ -350,32 +366,48 @@ const constructTangleLayout = (levels: NodeList[]) => {
 interface ITangleTreeChartProps {
     data: NodeList[]
     originalData: { [name: string]: PedigreeEntry }
-    onClick?: (e: string) => void
+    onClick?: (e: PedigreeEntry) => void
+    onHighlight?: (entry?: PedigreeEntry | null) => void
+
+    nodeDiameter?: number
+    nodeHorizontalSpacing?: number
+    nodeVerticalSpacing?: number
+    paddingX?: number
+    paddingY?: number
+
 }
 
-const TangleTreeChart: React.FC<ITangleTreeChartProps> = ({ data, originalData, onClick }) => {
-    const tangleLayout = constructTangleLayout(_.cloneDeep(data))
+const TangleTreeChart: React.FC<ITangleTreeChartProps> = (props) => {
+    const {
+        data, originalData, onClick, onHighlight,
+        nodeHorizontalSpacing,
+        nodeVerticalSpacing,
+        nodeDiameter = defaultNodeDiameter,
+        paddingX = 10,
+        paddingY = 10,
+    } = props
+
+    const tangleLayout = constructTangleLayout(
+        _.cloneDeep(data),
+        { nodeDiameter, horizontalSpacing: nodeHorizontalSpacing, verticalSpacing: nodeVerticalSpacing }
+    )
 
     if ('error' in tangleLayout) {
         return <MuckError message={`Ah Muck, couldn't resolve this pedigree`} />
     }
 
-    const width = tangleLayout.layout.width_dimensions[1] - tangleLayout.layout.width_dimensions[0]
-    const height = tangleLayout.layout.height_dimensions[1] - tangleLayout.layout.height_dimensions[0]
-    const viewBox = `${tangleLayout.layout.width_dimensions[0]} ${tangleLayout.layout.height_dimensions[0]} ${tangleLayout.layout.width_dimensions[1]} ${tangleLayout.layout.height_dimensions[1]}`
-
-    const textColor = "var(--color-text-primary)"
-    const colLines = "var(--color-border-color)"
-
-    const colAffected = "var(--color-pedigree-affected)"
-    const colPersonBorder = "var(--color-pedigree-person-border)"
-    const colUnaffected = "var(--color-pedigree-unaffected)"
+    const minX = tangleLayout.layout.width_dimensions[0] - paddingX
+    const minY = tangleLayout.layout.height_dimensions[0] - paddingY
+    const width = tangleLayout.layout.width_dimensions[1] - minX + 2 * paddingX
+    const height = tangleLayout.layout.height_dimensions[1] - minY + 2 * paddingY
+    const viewBox = `${minX} ${minY} ${width} ${height}`
 
     return (
         <svg
             width={width}
             height={height}
             viewBox={viewBox}
+            style={{ border: "1px solid black" }}
         >
             {tangleLayout.bundles.map((b) => {
                 const d = b.links
@@ -397,40 +429,78 @@ const TangleTreeChart: React.FC<ITangleTreeChartProps> = ({ data, originalData, 
             })}
 
             {tangleLayout.nodes.map((n) => (
-                <React.Fragment key={`${n.id}-node`}>
-                    <path
-                        data-id={`${n.id}`}
-                        stroke={colPersonBorder}
-                        strokeWidth="50"
-                        z="-1"
-                        d={`M${n.x} ${n.y} L${n.x} ${n.y}`}
-                        strokeLinecap={originalData[n.id].sex === 1 ? 'square' : 'round'}
-                    />
-                    <path
-                        stroke={originalData[n.id].affected === 1 ? colAffected : colUnaffected}
-                        strokeWidth="45"
-                        strokeLinecap={originalData[n.id].sex === 1 ? 'square' : 'round'}
-                        d={`M${n.x} ${n.y} L${n.x} ${n.y}`}
-                        onClick={() => onClick?.(n.id)}
-                    />
-                    {/* wrap text in g to get fill to work correctly */}
-                    <g fill={textColor}>
-                        <text
-                            className="selectable"
-                            data-id={`${n.id}`}
-                            x={`${n.x}`}
-                            y={`${n.y + 40}`}
-                            fontSize="12px"
-                            textAnchor="middle"
-                        >
-                            {n.id}
-                        </text>
-                    </g>
-                </React.Fragment>
+                <PersonNode
+                    key={`node-${n.id}`} node={n}
+                    entry={originalData[n.id]}
+                    onClick={onClick}
+                    onHighlight={onHighlight}
+                    nodeSize={nodeDiameter}
+                />
             ))}
         </svg>
     )
 }
+
+interface IPersonNode {
+    node: NodePosition
+    entry: PedigreeEntry
+    onClick?: (entry: PedigreeEntry) => void
+    onHighlight?: (entry?: PedigreeEntry | null) => void
+
+    nodeSize?: number
+    showIndividualId?: boolean
+}
+
+export const PersonNode: React.FC<IPersonNode> = ({ node, entry, onClick, onHighlight, nodeSize = defaultNodeDiameter, showIndividualId = true }) => {
+
+    const [isHighlighted, setIsHighlighted] = React.useState(false)
+
+    return <React.Fragment>
+        <g
+            onMouseOver={() => {
+                if (!!onHighlight) {
+                    setIsHighlighted(true);
+                    onHighlight?.(entry);
+                }
+            }}
+            onMouseLeave={() => {
+                setIsHighlighted(false)
+                onHighlight?.(null)
+            }}
+        >
+            <path
+                data-id={`${entry.individual_id}`}
+                stroke={isHighlighted ? "blue" : colPersonBorder}
+                strokeWidth={isHighlighted ? nodeSize : nodeSize * 0.8}
+                z="-1"
+                d={`M${node.x} ${node.y} L${node.x} ${node.y}`}
+                strokeLinecap={entry.sex === 1 ? 'square' : 'round'}
+            />
+            <path
+                stroke={entry.affected === 1 ? colAffected : colUnaffected}
+                strokeWidth={nodeSize * 0.65}
+                strokeLinecap={entry.sex === 1 ? 'square' : 'round'}
+                d={`M${node.x} ${node.y} L${node.x} ${node.y}`}
+                onClick={() => onClick?.(entry)}
+            />
+            {/* wrap text in g to get fill to work correctly */}
+            {showIndividualId && <g fill={textColor}>
+                <text
+                    className="selectable"
+                    data-id={`${entry.individual_id}`}
+                    x={`${node.x}`}
+                    y={`${node.y + nodeSize / 2 + 10}`}
+                    fontSize="12px"
+                    textAnchor="middle"
+                    textDecoration={isHighlighted ? "underline" : "none"}
+                >
+                    {entry.individual_id}
+                </text>
+            </g>}
+        </g>
+    </React.Fragment>
+}
+
 const calculateDepth = (
     person: ModifiedPedEntry,
     data: { [name: string]: ModifiedPedEntry }
@@ -642,12 +712,16 @@ const formatData = (data: PedigreeEntry[]) => {
 
 interface RenderPedigreeProps {
     data: PedigreeEntry[]
-    onClick?: (e: string) => void
+    onClick?: (e: PedigreeEntry) => void
+
+    nodeDiameter?: number
+    nodeHorizontalSpacing?: number
+    nodeVerticalSpacing?: number
 }
 
-const TangledTree: React.FunctionComponent<RenderPedigreeProps> = ({ data, onClick }) => {
+const TangledTree: React.FunctionComponent<RenderPedigreeProps> = ({ data, onClick, ...props }) => {
 
-    if (data.length === 0) {
+    if (!data?.length) {
         return <p><em>Empty pedigree</em></p>
     }
 
@@ -655,7 +729,12 @@ const TangledTree: React.FunctionComponent<RenderPedigreeProps> = ({ data, onCli
     const keyedData = _.keyBy(data, s => s.individual_id)
 
 
-    return <TangleTreeChart data={tree} originalData={keyedData} onClick={onClick} />
+    return <TangleTreeChart
+        data={tree}
+        originalData={keyedData}
+        onClick={onClick}
+        {...props}
+    />
 }
 
 export default TangledTree

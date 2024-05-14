@@ -15,22 +15,22 @@ query PedigreeInfo($family_id: Int!) {
     }
   }`)
 
-const Pedigree: React.FunctionComponent<{
-    familyID: number
-    onClick?(e: string): void
-}> = ({ familyID, onClick }) => {
-    const { loading, error, data } = useQuery(GET_PEDIGREE_INFO, {
-        variables: { family_id: familyID },
-    })
+interface IPedigreeProps {
+  familyId: number
+  onClick?: (e: string) => void
+}
 
-    if (loading) return <LoadingDucks />
-    if (error) return <>Error! {error.message}</>
+const Pedigree: React.FC<IPedigreeProps> = ({ familyId, onClick }) => {
+  const { loading, error, data } = useQuery(GET_PEDIGREE_INFO, {
+    variables: { family_id: familyId },
+  })
 
-    return data?.family.project.pedigree ? (
-        <TangledTree data={data.family.project.pedigree} click={onClick} />
-    ) : (
-        <></>
-    )
+  if (loading) return <LoadingDucks />
+  if (error) return <>Error! {error.message}</>
+
+  if (!data?.family?.project?.pedigree) return <></>
+
+  return <TangledTree data={data.family.project.pedigree} />
 }
 
 export default Pedigree
