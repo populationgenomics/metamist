@@ -36,7 +36,7 @@ It comprises three key components:
 
 As of Jan 15, 2024 this schema should reflect the data structure on the tables:
 
-![Database Structure](resources/schemav7.7.png.png)
+![Database Structure](resources/schemav7.7.png)
 
 You can also find this at [DbDiagram](https://dbdiagram.io/d/Metamist-Schema-v7-7-6600c875ae072629ced6a1fc).
 
