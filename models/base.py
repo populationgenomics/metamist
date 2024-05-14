@@ -9,7 +9,7 @@ OpenApiGenNoneType = bytes | None
 class SMBase(BaseModel):
     """Base object for all models"""
 
-    model_type = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra='forbid')
 
     @classmethod
     def from_dict(cls, d: dict):

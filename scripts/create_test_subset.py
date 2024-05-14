@@ -696,7 +696,9 @@ def transfer_participants(
     participant_data,
 ) -> dict[str, int]:
     """Transfers relevant participants between projects"""
-    existing_participants = papi.get_participants(target_project)
+    existing_participants = papi.get_participants(
+        project=target_project, query_participant_criteria={}
+    )
 
     target_project_pid_map = {
         participant['external_id']: participant['id']

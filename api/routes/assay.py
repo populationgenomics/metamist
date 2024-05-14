@@ -62,6 +62,8 @@ async def get_assay_by_external_id(
 
 
 class AssayQueryCriteria(SMBase):
+    """Crieria for filtering for assays"""
+
     sample_ids: list[str] | None = None
     assay_ids: list[int] | None = None
     external_assay_ids: list[str] | None = None

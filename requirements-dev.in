@@ -8,10 +8,10 @@ flake8-bugbear
 nest-asyncio
 pre-commit
 pylint
-testcontainers[mariadb]>=4.0.0
+testcontainers[mysql]>=4.4.1
 types-PyMySQL
 # some strawberry dependency
-strawberry-graphql[debug-server]==0.217.0
+strawberry-graphql[debug-server]==0.229.0
 # following required to unit test etl functions
 functions_framework
 google-cloud-bigquery

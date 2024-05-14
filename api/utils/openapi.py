@@ -5,7 +5,7 @@ from fastapi.openapi.utils import get_openapi
 
 from api.settings import SM_ENVIRONMENT
 
-Json = dict[str | Literal["anyOf", "type"], "Json"] | list["Json"] | str | bool
+Json = dict[str | Literal['anyOf', 'type'], 'Json'] | list['Json'] | str | bool
 
 
 URLS = []
@@ -31,9 +31,9 @@ def convert_3_dot_1_to_3_dot_0_inplace(json: dict[str, Json]):
 
         >>> from pprint import pprint
         >>> json = {
-        ...     "some_irrelevant_keys": {...},
-        ...     "nested_dict": {"nested_key": {"anyOf": [{"type": "string"}, {"type": "null"}]}},
-        ...     "examples": [{...}, {...}]
+        ...     'some_irrelevant_keys': {...},
+        ...     'nested_dict': {'nested_key': {'anyOf': [{'type': 'string'}, {'type': 'null'}]}},
+        ...     'examples': [{...}, {...}]
         ... }
         >>> convert_3_dot_1_to_3_dot_0(json)
         >>> pprint(json)
@@ -43,20 +43,20 @@ def convert_3_dot_1_to_3_dot_0_inplace(json: dict[str, Json]):
          'openapi': '3.0.2',
          'some_irrelevant_keys': {Ellipsis}}
     """
-    json["openapi"] = "3.0.2"
+    json['openapi'] = '3.0.2'
 
     def inner(yaml_dict: Json):
         if isinstance(yaml_dict, dict):
-            if "anyOf" in yaml_dict and isinstance((anyOf := yaml_dict["anyOf"]), list):
+            if 'anyOf' in yaml_dict and isinstance((anyOf := yaml_dict['anyOf']), list):
                 for i, item in enumerate(anyOf):
-                    if isinstance(item, dict) and item.get("type") == "null":
+                    if isinstance(item, dict) and item.get('type') == 'null':
                         anyOf.pop(i)
-                        yaml_dict["nullable"] = True
-            if "examples" in yaml_dict:
-                examples = yaml_dict["examples"]
-                del yaml_dict["examples"]
+                        yaml_dict['nullable'] = True
+            if 'examples' in yaml_dict:
+                examples = yaml_dict['examples']
+                del yaml_dict['examples']
                 if isinstance(examples, list) and len(examples):
-                    yaml_dict["example"] = examples[0]
+                    yaml_dict['example'] = examples[0]
             for value in yaml_dict.values():
                 inner(value)
         elif isinstance(yaml_dict, list):

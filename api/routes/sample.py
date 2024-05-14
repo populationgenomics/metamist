@@ -117,6 +117,8 @@ async def get_sample_by_external_id(
 
 
 class GetSamplesCriteria(SMBase):
+    """Get samples filter criteria"""
+
     sample_ids: list[str] | None = None
     meta: dict | None = None
     participant_ids: list[int] | None = None
@@ -141,7 +143,11 @@ async def get_samples(
             connection.author, criteria.project_ids, readonly=True
         )
 
-    sample_ids_raw = sample_id_transform_to_raw_list(criteria.sample_ids) if criteria.sample_ids else None
+    sample_ids_raw = (
+        sample_id_transform_to_raw_list(criteria.sample_ids)
+        if criteria.sample_ids
+        else None
+    )
 
     result = await st.get_samples_by(
         sample_ids=sample_ids_raw,

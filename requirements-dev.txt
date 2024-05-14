@@ -79,6 +79,7 @@ cryptography==42.0.7
     # via
     #   -r requirements.in
     #   azure-storage-blob
+    #   pymysql
 databases[mysql]==0.9.0
     # via
     #   -r requirements.in
@@ -97,7 +98,7 @@ docker==7.0.0
     # via testcontainers
 email-validator==2.1.1
     # via fastapi
-fastapi[all]==0.108.0
+fastapi[all]==0.110.2
     # via
     #   -r requirements.in
     #   fastapi
@@ -326,8 +327,10 @@ pygments==2.18.0
     #   strawberry-graphql
 pylint==3.1.1
     # via -r requirements-dev.in
-pymysql==1.1.0
-    # via aiomysql
+pymysql[rsa]==1.1.0
+    # via
+    #   aiomysql
+    #   testcontainers
 python-dateutil==2.8.2
     # via
     #   -r requirements.in
@@ -338,9 +341,8 @@ python-dotenv==1.0.1
     # via
     #   pydantic-settings
     #   uvicorn
-python-multipart==0.0.5
+python-multipart==0.0.9
     # via
-    #   -r requirements.in
     #   fastapi
     #   strawberry-graphql
 pytz==2024.1
@@ -376,7 +378,6 @@ six==1.16.0
     #   google-cloud-storage
     #   isodate
     #   python-dateutil
-    #   python-multipart
 slack-sdk==3.20.2
     # via -r requirements.in
 sniffio==1.3.1
@@ -384,19 +385,21 @@ sniffio==1.3.1
     #   anyio
     #   httpx
 sqlalchemy==2.0.30
-    # via databases
-starlette==0.32.0.post1
+    # via
+    #   databases
+    #   testcontainers
+starlette==0.37.2
     # via
     #   fastapi
     #   strawberry-graphql
-strawberry-graphql[debug-server,fastapi]==0.217.0
+strawberry-graphql[debug-server,fastapi]==0.229.0
     # via
     #   -r requirements-dev.in
     #   -r requirements.in
     #   strawberry-graphql
 tabulate==0.9.0
     # via cpg-utils
-testcontainers[mariadb]==4.4.0
+testcontainers[mysql]==4.4.1
     # via
     #   -r requirements-dev.in
     #   testcontainers
@@ -427,7 +430,7 @@ urllib3==1.26.18
     #   docker
     #   requests
     #   testcontainers
-uvicorn[standard]==0.25.0
+uvicorn[standard]==0.29.0
     # via
     #   -r requirements.in
     #   fastapi
