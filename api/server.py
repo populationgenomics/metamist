@@ -1,6 +1,7 @@
 import os
 import time
 import traceback
+from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,12 +29,31 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'public')
 
 static_dir_exists = os.path.exists(STATIC_DIR)
 
-app = FastAPI()
+
+@asynccontextmanager
+async def app_lifespan(_: FastAPI):
+    """
+    Context manager for the app lifecycle. This is useful for running
+    code before and after the app is started. This is used by the
+    `run` command.
+    """
+    try:
+        if not SKIP_DATABASE_CONNECTION:
+            await SMConnections.connect()
+        yield
+    finally:
+        if not SKIP_DATABASE_CONNECTION:
+            await SMConnections.disconnect()
+
+
+app = FastAPI(lifespan=app_lifespan)
+
 
 if PROFILE_REQUESTS:
+
     from fastapi_profiler.profiler import PyInstrumentProfilerMiddleware
 
-    app.add_middleware(PyInstrumentProfilerMiddleware)
+    app.add_middleware(PyInstrumentProfilerMiddleware)  # type: ignore
 
 if is_all_access():
     app.add_middleware(
@@ -60,20 +80,6 @@ class SPAStaticFiles(StaticFiles):
             # server index.html if can't find existing resource
             response = await super().get_response('index.html', scope)
         return response
-
-
-@app.on_event('startup')
-async def startup():
-    """Server is starting up, connect dbs"""
-    if not SKIP_DATABASE_CONNECTION:
-        await SMConnections.connect()
-
-
-@app.on_event('shutdown')
-async def shutdown():
-    """Shutdown server, disconnect dbs"""
-    if not SKIP_DATABASE_CONNECTION:
-        await SMConnections.disconnect()
 
 
 @app.middleware('http')

@@ -8,6 +8,7 @@ from db.python.layers.assay import AssayLayer
 from db.python.tables.assay import AssayFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.utils import GenericFilter
+from models.base import SMBase
 from models.models.assay import AssayUpsert
 from models.utils.sample_id_format import sample_id_transform_to_raw_list
 
@@ -60,15 +61,19 @@ async def get_assay_by_external_id(
     return resp.to_external()
 
 
+class AssayQueryCriteria(SMBase):
+    sample_ids: list[str] | None = None
+    assay_ids: list[int] | None = None
+    external_assay_ids: list[str] | None = None
+    assay_meta: dict | None = None
+    sample_meta: dict | None = None
+    projects: list[str] | None = None
+    assay_types: list[str] | None = None
+
+
 @router.post('/criteria', operation_id='getAssaysByCriteria')
 async def get_assays_by_criteria(
-    sample_ids: list[str] = None,
-    assay_ids: list[int] = None,
-    external_assay_ids: list[str] = None,
-    assay_meta: dict = None,
-    sample_meta: dict = None,
-    projects: list[str] = None,
-    assay_types: list[str] = None,
+    criteria: AssayQueryCriteria,
     connection: Connection = get_projectless_db_connection,
 ):
     """Get assays by criteria"""
@@ -76,27 +81,29 @@ async def get_assays_by_criteria(
     pt = ProjectPermissionsTable(connection)
 
     pids: list[int] | None = None
-    if projects:
+    if criteria.projects:
         pids = await pt.get_project_ids_from_names_and_user(
-            connection.author, projects, readonly=True
+            connection.author, criteria.projects, readonly=True
         )
 
     unwrapped_sample_ids: list[int] | None = None
-    if sample_ids:
-        unwrapped_sample_ids = sample_id_transform_to_raw_list(sample_ids)
+    if criteria.sample_ids:
+        unwrapped_sample_ids = sample_id_transform_to_raw_list(criteria.sample_ids)
 
     filter_ = AssayFilter(
-        sample_id=GenericFilter(in_=unwrapped_sample_ids)
-        if unwrapped_sample_ids
-        else None,
-        id=GenericFilter(in_=assay_ids) if assay_ids else None,
-        external_id=GenericFilter(in_=external_assay_ids)
-        if external_assay_ids
-        else None,
-        meta=assay_meta,
-        sample_meta=sample_meta,
+        sample_id=(
+            GenericFilter(in_=unwrapped_sample_ids) if unwrapped_sample_ids else None
+        ),
+        id=GenericFilter(in_=criteria.assay_ids) if criteria.assay_ids else None,
+        external_id=(
+            GenericFilter(in_=criteria.external_assay_ids)
+            if criteria.external_assay_ids
+            else None
+        ),
+        meta=criteria.assay_meta,
+        sample_meta=criteria.sample_meta,
         project=GenericFilter(in_=pids) if pids else None,
-        type=GenericFilter(in_=assay_types) if assay_types else None,
+        type=GenericFilter(in_=criteria.assay_types) if criteria.assay_types else None,
     )
 
     result = await assay_layer.query(filter_)

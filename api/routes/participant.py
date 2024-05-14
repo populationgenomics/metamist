@@ -14,6 +14,7 @@ from api.utils.db import (
 )
 from api.utils.export import ExportType
 from db.python.layers.participant import ParticipantLayer
+from models.base import SMBase
 from models.models.participant import ParticipantUpsert
 from models.models.sequencing_group import sequencing_group_id_format
 
@@ -153,7 +154,9 @@ async def get_external_participant_id_to_sequencing_group_id(
     writer.writerows(rows)
 
     ext = export_type.get_extension()
-    filename = f'{project}-participant-to-sequencing-group-map-{date.today().isoformat()}{ext}'
+    filename = (
+        f'{project}-participant-to-sequencing-group-map-{date.today().isoformat()}{ext}'
+    )
     if sequencing_type:
         filename = f'{project}-{sequencing_type}-participant-to-sequencing-group-map-{date.today().isoformat()}{ext}'
     return StreamingResponse(
@@ -197,22 +200,30 @@ async def upsert_participants(
     return [p.to_external() for p in results]
 
 
+class QueryParticipantCriteria(SMBase):
+    external_participant_ids: list[str] | None = None
+    internal_participant_ids: list[int] | None = None
+
+
 @router.post(
     '/{project}',
     # response_model=list[ParticipantModel],
     operation_id='getParticipants',
 )
 async def get_participants(
-    external_participant_ids: list[str] = None,
-    internal_participant_ids: list[int] = None,
+    criteria: QueryParticipantCriteria,
     connection: Connection = get_project_readonly_connection,
 ):
     """Get participants, default ALL participants in project"""
     player = ParticipantLayer(connection)
     participants = await player.get_participants(
         project=connection.project,
-        external_participant_ids=external_participant_ids,
-        internal_participant_ids=internal_participant_ids,
+        external_participant_ids=(
+            criteria.external_participant_ids if criteria else None
+        ),
+        internal_participant_ids=(
+            criteria.internal_participant_ids if criteria else None
+        ),
     )
     return [p.to_external() for p in participants]
 
