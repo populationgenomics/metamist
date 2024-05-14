@@ -767,7 +767,8 @@ class ParticipantLayer(BaseLayer):
         rows = [{h: r.get(h) for h in set_headers if h in r} for r in rows]
         headers = []  # get ordered headers if we have data for it
         for h in SeqrMetadataKeys.get_ordered_headers():
-            if (header := lheader_to_json.get(h.value.lower())) in set_headers:
+            header = lheader_to_json.get(h.value.lower())
+            if header in set_headers:
                 headers.append(header)
 
         return {
