@@ -114,7 +114,7 @@ async def HACK_dependable_contributor_project_connection(
     if extra_values:
         meta.update(extra_values)
 
-    meta = {'role': 'contributor'}
+    meta['role'] = 'contributor'
 
     # hack by making it appear readonly
     connection = await ProjectPermissionsTable.get_project_connection(
