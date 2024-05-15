@@ -6,6 +6,7 @@ import datetime
 import random
 from pathlib import Path
 from pprint import pprint
+from uuid import uuid4
 
 from metamist.apis import (
     AnalysisApi,
@@ -123,7 +124,6 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
                     ),
                 },
                 participant_id=pid,
-                assays=[],
                 sequencing_groups=[],
             )
             samples.append(sample)
@@ -194,7 +194,7 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
             *[
                 ar_api.create_analysis_runner_log_async(
                     project=project,
-                    ar_guid=f'fake-guid-{s}',
+                    ar_guid=str(uuid4()),
                     output_path=f'FAKE://greek-myth-test/output-dir/{s}',
                     access_level=random.choice(['full', 'standard', 'test']),
                     repository='metamist',
