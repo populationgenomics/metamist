@@ -120,7 +120,7 @@ async def HACK_dependable_contributor_project_connection(
     connection = await ProjectPermissionsTable.get_project_connection(
         project_name=project,
         author=author,
-        readonly=False,
+        readonly=True,
         on_behalf_of=None,
         ar_guid=ar_guid,
         meta=meta,
