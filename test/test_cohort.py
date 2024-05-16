@@ -12,8 +12,10 @@ from models.models.cohort import (
     CohortCriteriaInternal,
     CohortTemplate,
     CohortTemplateInternal,
+    NewCohort,
     NewCohortInternal,
 )
+from models.utils.cohort_id_format import cohort_id_format
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
 
 
@@ -115,6 +117,7 @@ class TestCohortBasic(DbIsolatedTest):
                 name='Empty template',
                 description='Template with no entries',
                 criteria=CohortCriteriaInternal(projects=[self.project_id]),
+                project=self.project_id,
             ),
         )
 
@@ -235,9 +238,9 @@ class TestCohortData(DbIsolatedTest):
 
     @run_as_sync
     async def test_internal_external(self):
-        """Test to_internal() methods"""
+        """Test to_internal() and to_external() methods"""
         cc_external_dict = {
-            'projects': ['test'],
+            'projects': [self.project_name],
             'sg_ids_internal': [self.sgB, self.sgC],
             'excluded_sgs_internal': [self.sgA],
             'sg_technology': ['short-read'],
@@ -261,11 +264,16 @@ class TestCohortData(DbIsolatedTest):
         self.assertIsInstance(cc_internal, CohortCriteriaInternal)
         self.assertDictEqual(cc_internal.dict(), cc_internal_dict)
 
+        cc_ext_trip = cc_internal.to_external(project_names=[self.project_name])
+        self.assertIsInstance(cc_ext_trip, CohortCriteria)
+        self.assertDictEqual(cc_ext_trip.dict(), cc_external_dict)
+
         ctpl_internal_dict = {
             'id': 496,
             'name': 'My template',
             'description': 'Testing template',
             'criteria': cc_internal_dict,
+            'project': self.project_id,
         }
 
         ctpl_internal = CohortTemplate(
@@ -273,7 +281,9 @@ class TestCohortData(DbIsolatedTest):
             name='My template',
             description='Testing template',
             criteria=cc_external,
-        ).to_internal(criteria_projects=[self.project_id])
+        ).to_internal(
+            criteria_projects=[self.project_id], template_project=self.project_id
+        )
         self.assertIsInstance(ctpl_internal, CohortTemplateInternal)
         self.assertDictEqual(ctpl_internal.dict(), ctpl_internal_dict)
 
@@ -290,8 +300,16 @@ class TestCohortData(DbIsolatedTest):
                 sg_ids_internal_raw=[self.sgB_raw],
             ),
         )
+        self.assertIsInstance(result, NewCohortInternal)
         self.assertIsInstance(result.cohort_id, int)
         self.assertEqual([self.sgB_raw], result.sequencing_group_ids)
+
+        external = result.to_external()
+        self.assertIsInstance(external, NewCohort)
+        self.assertIsInstance(external.cohort_id, str)
+        self.assertEqual(external.cohort_id, cohort_id_format(result.cohort_id))
+        self.assertEqual([self.sgB], external.sequencing_group_ids)
+        self.assertEqual(False, external.dry_run)
 
     @run_as_sync
     async def test_create_cohort_by_excluded_sgs(self):
@@ -413,6 +431,7 @@ class TestCohortData(DbIsolatedTest):
                     projects=[self.project_id],
                     sample_type=['blood'],
                 ),
+                project=self.project_id,
             ),
         )
 

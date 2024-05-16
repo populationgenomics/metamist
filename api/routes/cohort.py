@@ -93,7 +93,9 @@ async def create_cohort_template(
             criteria_project_ids = [p.id for p in projects_for_criteria if p.id]
 
     cohort_raw_id = await cohort_layer.create_cohort_template(
-        cohort_template=template.to_internal(criteria_projects=criteria_project_ids),
+        cohort_template=template.to_internal(
+            criteria_projects=criteria_project_ids, template_project=connection.project
+        ),
         project=connection.project,
     )
 
