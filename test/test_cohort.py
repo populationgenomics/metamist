@@ -265,9 +265,8 @@ class TestCohortData(DbIsolatedTest):
         self.assertDictEqual(cc_internal.dict(), cc_internal_dict)
 
         cc_ext_trip = cc_internal.to_external(project_names=[self.project_name])
-        # self.assertIsInstance(cc_ext_trip, CohortCriteria)
-        # self.assertDictEqual(cc_ext_trip.dict(), cc_external_dict)
-        self.assertDictEqual(cc_ext_trip, cc_external_dict)
+        self.assertIsInstance(cc_ext_trip, CohortCriteria)
+        self.assertDictEqual(cc_ext_trip.dict(), cc_external_dict)
 
         ctpl_internal_dict = {
             'id': 496,

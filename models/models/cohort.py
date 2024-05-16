@@ -52,27 +52,27 @@ class CohortCriteriaInternal(SMBase):
     sg_type: list[str] | None = None
     sample_type: list[str] | None = None
 
-    def to_external(self, project_names: list[str]) -> dict:
+    def to_external(self, project_names: list[str]) -> 'CohortCriteria':
         """
         Convert to external model
         """
-        return {
-            'projects': project_names,
-            'sg_ids_internal': (
+        return CohortCriteria(
+            projects=project_names,
+            sg_ids_internal=(
                 sequencing_group_id_format_list(self.sg_ids_internal_raw)
                 if self.sg_ids_internal_raw
                 else []
             ),
-            'excluded_sgs_internal': (
+            excluded_sgs_internal=(
                 sequencing_group_id_format_list(self.excluded_sgs_internal_raw)
                 if self.excluded_sgs_internal_raw
                 else []
             ),
-            'sg_technology': self.sg_technology if self.sg_technology else [],
-            'sg_platform': self.sg_platform if self.sg_platform else [],
-            'sg_type': self.sg_type if self.sg_type else [],
-            'sample_type': self.sample_type if self.sample_type else [],
-        }
+            sg_technology=self.sg_technology if self.sg_technology else [],
+            sg_platform=self.sg_platform if self.sg_platform else [],
+            sg_type=self.sg_type if self.sg_type else [],
+            sample_type=self.sample_type if self.sample_type else [],
+        )
 
 
 class CohortTemplateInternal(SMBase):

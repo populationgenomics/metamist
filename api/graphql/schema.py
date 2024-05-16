@@ -184,7 +184,7 @@ class GraphQLCohortTemplate:
             id=cohort_template_id_format(internal.id),
             name=internal.name,
             description=internal.description,
-            criteria=internal.criteria.to_external(project_names=project_names),
+            criteria=internal.criteria.to_external(project_names=project_names).dict(),
         )
 
 
