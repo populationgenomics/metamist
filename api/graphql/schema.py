@@ -170,7 +170,7 @@ class GraphQLCohortTemplate:
             id=cohort_template_id_format(internal.id),
             name=internal.name,
             description=internal.description,
-            criteria=internal.criteria,
+            criteria=internal.criteria.to_external(),
         )
 
 
@@ -383,6 +383,7 @@ class GraphQLProject:
                 else None
             ),
             timestamp=timestamp.to_internal_filter() if timestamp else None,
+            project=GenericFilter(eq=root.id),
         )
 
         cohorts = await CohortLayer(connection).query(c_filter)

@@ -229,6 +229,7 @@ class CohortLayer(BaseLayer):
                 name=cohort_name,
                 description=description,
                 criteria=cohort_criteria,
+                project=project_to_write,
             )
             template_id = await self.create_cohort_template(
                 cohort_template=cohort_template, project=project_to_write
