@@ -267,6 +267,7 @@ class TestCohortData(DbIsolatedTest):
             'name': 'My template',
             'description': 'Testing template',
             'criteria': cc_internal_dict,
+            'project': self.project_id,
         }
 
         ctpl_internal = CohortTemplate(
