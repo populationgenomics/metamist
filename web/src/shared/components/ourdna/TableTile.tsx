@@ -22,25 +22,28 @@ interface TableTileProps {
     data: object
     columns: Array<string>
     tile_icon: string
-    maxRows?: number
 }
 
-const Tile: React.FC<TableTileProps> = ({ header, data, columns, tile_icon, maxRows }) => {
+const Tile: React.FC<TableTileProps> = ({ header, data, columns, tile_icon }) => {
     return (
         <>
-            <Box
+            <Flex
                 height="100%"
                 px="6"
-                paddingTop="6"
-                paddingBottom="10"
+                paddingTop="4"
+                paddingBottom="4"
                 borderWidth="1px"
                 borderRadius="lg"
+                flexDirection={'column'}
+                maxHeight="24vh"
             >
                 <Flex alignItems="center">
                     <Image src={tile_icon} alt="Icon" boxSize="24px" mr="2" />
-                    <Text style={{ fontSize: 'md', fontWeight: 'bold' }}>{header}</Text>
+                    <Text fontSize={['xs', 'sm', 'md']} fontWeight={'bold'}>
+                        {header}
+                    </Text>
                 </Flex>
-                <Box overflowY="auto" height="calc(100% - 2rem)">
+                <Box overflowY="auto" height="100%">
                     <Table variant="simple" height="100%">
                         <Thead position="sticky" top={0} backgroundColor={'white'}>
                             <Tr>
@@ -51,7 +54,7 @@ const Tile: React.FC<TableTileProps> = ({ header, data, columns, tile_icon, maxR
                                     )}
                             </Tr>
                         </Thead>
-                        <Tbody>
+                        <Tbody fontSize={['xs', 'sm']}>
                             {data &&
                                 Object.keys(data).map(
                                     (key, index) => (
@@ -65,7 +68,7 @@ const Tile: React.FC<TableTileProps> = ({ header, data, columns, tile_icon, maxR
                         </Tbody>
                     </Table>
                 </Box>
-            </Box>
+            </Flex>
         </>
     )
 }

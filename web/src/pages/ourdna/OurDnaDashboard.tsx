@@ -74,7 +74,7 @@ const Dashboard = () => {
                 <Image maxWidth={['100px', '100px', '150px']} src="/logo_option2.png" />
             </Box>
             <Grid
-                h="90vh"
+                h="100vh"
                 templateRows={containerSizesRow}
                 templateColumns={containerSizesColumn}
                 gap={6}
@@ -195,10 +195,11 @@ const Dashboard = () => {
                     // border={'1px solid'}
                 >
                     <Grid
-                        templateRows="repeat(2, 1fr)"
-                        templateColumns="repeat(1, 100%)"
+                        templateRows="auto"
+                        templateColumns="1fr"
                         height="100%"
-                        gap={5}
+                        maxHeight="50vh"
+                        rowGap="2vh"
                     >
                         <GridItem
                             rowSpan={1}
@@ -210,7 +211,6 @@ const Dashboard = () => {
                                 data={data.project.ourdnaDashboard[0].samples_concentration_gt_1ug}
                                 columns={['Sample ID', 'Concentration']}
                                 tile_icon="/dashboard_icons/green_rocket.svg"
-                                maxRows={3}
                             />
                         </GridItem>
                         <GridItem
@@ -223,7 +223,6 @@ const Dashboard = () => {
                                 data={samplesLostAfterCollections}
                                 columns={['Sample ID', 'Time (h)']}
                                 tile_icon="/dashboard_icons/red_alarm.svg"
-                                maxRows={3}
                             />
                         </GridItem>
                     </Grid>

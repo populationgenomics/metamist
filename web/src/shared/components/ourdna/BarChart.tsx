@@ -1,7 +1,7 @@
 // Table is a wrapper around semantic-ui-react's Table component that adds a class
 // to the table if the user has dark mode enabled in their browser.
 import * as React from 'react'
-import { Box, Heading } from '@chakra-ui/react'
+import { Box, Flex, Image, Text } from '@chakra-ui/react'
 
 import {
     Chart as ChartJS,
@@ -29,13 +29,14 @@ export const options = {
             },
         },
         title: {
-            display: true,
+            display: false,
             text: 'Chart.js Bar Chart',
         },
     },
 }
 
 interface HistogramProps {
+    icon: string
     header: string
     data: object
 }
@@ -48,7 +49,7 @@ const OURDNA_COLOURS = [
     'rgba(85, 85, 85, 0.5)', // OurDNA Charchoal
 ]
 
-const HistogramChart: React.FC<HistogramProps> = ({ header, data }) => {
+const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
     let labels = []
     let datasets = []
     const numColors = OURDNA_COLOURS.length
@@ -75,9 +76,21 @@ const HistogramChart: React.FC<HistogramProps> = ({ header, data }) => {
 
     return (
         <>
-            <Box height="100%" p="6" borderWidth="1px" borderRadius="lg" overflow="hidden">
-                <Heading size="md">{header}</Heading>
-                <Box height="100%">
+            <Box
+                height="100%"
+                maxHeight="50vh"
+                p="6"
+                borderWidth="1px"
+                borderRadius="lg"
+                overflow="hidden"
+            >
+                <Flex alignItems="center">
+                    <Image src={icon} alt="Icon" boxSize="24px" mr="2" />
+                    <Text fontSize={['xs', 'sm', 'md']} fontWeight={'bold'}>
+                        {header}
+                    </Text>
+                </Flex>
+                <Box height="100%" paddingY={5}>
                     <Bar data={barData} options={options} style={{ height: '100%' }} />
                 </Box>
             </Box>
