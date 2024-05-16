@@ -115,6 +115,7 @@ class TestCohortBasic(DbIsolatedTest):
                 name='Empty template',
                 description='Template with no entries',
                 criteria=CohortCriteriaInternal(projects=[self.project_id]),
+                project=self.project_id,
             ),
         )
 
@@ -273,7 +274,9 @@ class TestCohortData(DbIsolatedTest):
             name='My template',
             description='Testing template',
             criteria=cc_external,
-        ).to_internal(criteria_projects=[self.project_id])
+        ).to_internal(
+            criteria_projects=[self.project_id], template_project=self.project_id
+        )
         self.assertIsInstance(ctpl_internal, CohortTemplateInternal)
         self.assertDictEqual(ctpl_internal.dict(), ctpl_internal_dict)
 
@@ -413,6 +416,7 @@ class TestCohortData(DbIsolatedTest):
                     projects=[self.project_id],
                     sample_type=['blood'],
                 ),
+                project=self.project_id,
             ),
         )
 
