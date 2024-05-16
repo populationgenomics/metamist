@@ -890,7 +890,7 @@ class GraphQLAnalysisRunner:
     script: str
     description: str
     driver_image: str
-    config_path: str
+    config_path: str | None
     cwd: str | None
     environment: str
     hail_version: str | None
