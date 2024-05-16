@@ -52,12 +52,12 @@ class CohortCriteriaInternal(SMBase):
     sg_type: list[str] | None = None
     sample_type: list[str] | None = None
 
-    def to_external(self) -> dict:
+    def to_external(self, project_names: list[str]) -> dict:
         """
         Convert to external model
         """
         return {
-            'projects': [str(p) for p in self.projects] if self.projects else [],
+            'projects': project_names,
             'sg_ids_internal': (
                 sequencing_group_id_format_list(self.sg_ids_internal_raw)
                 if self.sg_ids_internal_raw
