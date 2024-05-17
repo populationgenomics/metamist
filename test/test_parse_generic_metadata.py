@@ -235,10 +235,10 @@ class TestParseGenericMetadata(DbIsolatedTest):
         self.assertDictEqual({'centre': 'KCCG'}, samples[0].meta)
         expected_assay_dict = {
             'qc': {
-                'median_insert_size': 400,
-                'median_coverage': 30,
-                'freemix': 0.01,
-                'pct_chimeras': 0.01,
+                'median_insert_size': '400',
+                'median_coverage': '30',
+                'freemix': '0.01',
+                'pct_chimeras': '0.01',
             },
             'reads_type': 'bam',
             'reads': {
@@ -274,10 +274,10 @@ class TestParseGenericMetadata(DbIsolatedTest):
         analysis = samples[0].sequencing_groups[0].analyses[0]
         self.assertDictEqual(
             {
-                'median_insert_size': 400,
-                'median_coverage': 30,
-                'freemix': 0.01,
-                'pct_chimeras': 0.01,
+                'median_insert_size': '400',
+                'median_coverage': '30',
+                'freemix': '0.01',
+                'pct_chimeras': '0.01',
             },
             analysis.meta,
         )
@@ -581,7 +581,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
             'sequencing_platform': 'pacbio',
             'sequencing_technology': 'long-read',
             'sequencing_type': 'genome',
-            'assay_meta1': [True, 5],
+            'assay_meta1': [True, '5'],
             'assay_meta2': [False, 'some_value'],
         }
 
@@ -589,7 +589,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
             'sequencing_platform': 'pacbio',
             'sequencing_technology': 'long-read',
             'sequencing_type': 'genome',
-            'assay_meta1': [True, 5],
+            'assay_meta1': [True, '5'],
             'assay_meta2': [False, 'some_value'],
         }
 

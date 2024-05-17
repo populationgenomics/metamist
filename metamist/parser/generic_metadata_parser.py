@@ -468,21 +468,15 @@ class GenericMetadataParser(GenericParser):
         if not key_map or not row:
             return {}
 
-        def unstring_value(value: Any) -> bool:
-            """Convert strings to boolean or number if possible"""
+        def string_to_bool(value: Any) -> bool:
+            """Convert strings to boolean if possible"""
             if not isinstance(value, str):
                 return value
             if value.lower() == 'true':
                 return True
             if value.lower() == 'false':
                 return False
-            try:
-                return int(value)
-            except ValueError:
-                try:
-                    return float(value)
-                except ValueError:
-                    return value
+            return value
 
         def prepare_dict_from_keys(key_parts: list[str], val):
             """Recursive production of dictionary"""
@@ -493,7 +487,7 @@ class GenericMetadataParser(GenericParser):
         dicts = []
         for row_key, dict_key in key_map.items():
             if isinstance(row, list):
-                inner_values = [unstring_value(r[row_key]) for r in row if r.get(row_key) is not None]
+                inner_values = [string_to_bool(r[row_key]) for r in row if r.get(row_key) is not None]
                 if any(isinstance(inner, list) for inner in inner_values):
                     # lists are unhashable
                     value = inner_values
@@ -502,11 +496,11 @@ class GenericMetadataParser(GenericParser):
                     if len(value) == 0:
                         continue
                     if len(value) == 1:
-                        value = unstring_value(value[0])
+                        value = string_to_bool(value[0])
             else:
                 if row_key not in row:
                     continue
-                value = unstring_value(row[row_key])
+                value = string_to_bool(row[row_key])
             dicts.append(prepare_dict_from_keys(dict_key.split('.'), value))
 
         return reduce(GenericMetadataParser.merge_dicts, dicts)
