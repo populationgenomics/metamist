@@ -468,7 +468,7 @@ class GenericMetadataParser(GenericParser):
         if not key_map or not row:
             return {}
 
-        def string_to_bool(value: Any) -> bool:
+        def string_to_bool(value: Any) -> Any:
             """Convert strings to boolean if possible"""
             if not isinstance(value, str):
                 return value
@@ -492,7 +492,7 @@ class GenericMetadataParser(GenericParser):
                     # lists are unhashable
                     value = inner_values
                 else:
-                    value = list(set(inner_values))
+                    value = sorted(list(set(inner_values)), key=lambda x: str(x))
                     if len(value) == 0:
                         continue
                     if len(value) == 1:

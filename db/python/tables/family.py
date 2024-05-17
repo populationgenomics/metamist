@@ -67,6 +67,7 @@ class FamilyTable(DbBase):
 
         field_overrides = {'id': 'f.id', 'external_id': 'f.external_id'}
 
+        has_participant_join = False
         if filter_.participant_id:
             field_overrides['participant_id'] = 'fp.participant_id'
             has_participant_join = True
