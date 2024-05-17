@@ -4,7 +4,7 @@ import logging
 import re
 import shlex
 from functools import reduce
-from typing import Any, Union
+from typing import Any
 
 import click
 
@@ -80,36 +80,46 @@ class GenericMetadataParser(GenericParser):
         project: str,
         search_locations: list[str],
         sample_name_column: str,
-        participant_meta_map: dict[str, str] = None,
-        sample_meta_map: dict[str, str] = None,
-        assay_meta_map: dict[str, str] = None,
-        qc_meta_map: dict[str, str] = None,
+
+        # Participant columns
         participant_column: str | None = None,
-        assay_id_column: str | None = None,
         reported_sex_column: str | None = None,
         reported_gender_column: str | None = None,
         karyotype_column: str | None = None,
-        reads_column: str | None = None,
-        checksum_column: str | None = None,
+
+        # Sequencing metadata columns
         seq_type_column: str | None = None,
         seq_technology_column: str | None = None,
         seq_platform_column: str | None = None,
         seq_facility_column: str | None = None,
         seq_library_column: str | None = None,
+
+        # Assay columns
+        assay_id_column: str | None = None,
+        reads_column: str | None = None,
+        checksum_column: str | None = None,
         read_end_type_column: str | None = None,
         read_length_column: str | None = None,
-        gvcf_column: str | None = None,
-        meta_column: str | None = None,
-        assay_meta_columns: list[str] | None = None,
-        batch_number: str | None = None,
         reference_assembly_location_column: str | None = None,
+
+        # GVCF columns
+        gvcf_column: str | None = None,
+
+        # Meta field key maps
+        participant_meta_map: dict[str, str] | None = None,
+        sample_meta_map: dict[str, str] | None = None,
+        assay_meta_map: dict[str, str] | None = None,
+        qc_meta_map: dict[str, str] | None = None,
+
+        # Default values
         default_reference_assembly_location: str | None = None,
-        default_sample_type=None,
+        default_sample_type: str | None = None,
         default_sequencing=DefaultSequencing(
             seq_type='genome', technology='short-read', platform='illumina'
         ),
         default_read_end_type: str | None = None,
         default_read_length: str | int | None = None,
+        batch_number: str | None = None,
         allow_extra_files_in_search_path=False,
         **kwargs,
     ):
@@ -127,35 +137,43 @@ class GenericMetadataParser(GenericParser):
         if not sample_name_column:
             raise ValueError('A sample name column MUST be provided')
 
-        self.cpg_id_column = 'Internal CPG Sample ID'
-
+        self.cpg_id_column = 'Internal CPG Sequencing Group ID'
         self.sample_name_column = sample_name_column
+
+        # Participant columns
         self.participant_column = participant_column
-        self.assay_id_column = assay_id_column
         self.reported_sex_column = reported_sex_column
         self.reported_gender_column = reported_gender_column
         self.karyotype_column = karyotype_column
+
+        # Sequencing metadata columns
         self.seq_type_column = seq_type_column
         self.seq_technology_column = seq_technology_column
         self.seq_platform_column = seq_platform_column
         self.seq_facility_column = seq_facility_column
         self.seq_library_column = seq_library_column
+
+        # Assay columns
+        self.assay_id_column = assay_id_column
+        self.reads_column = reads_column
+        self.checksum_column = checksum_column
         self.read_end_type_column = read_end_type_column
         self.read_length_column = read_length_column
         self.reference_assembly_location_column = reference_assembly_location_column
-        self.default_reference_assembly_location = default_reference_assembly_location
 
+        # Meta field key maps
         self.participant_meta_map = participant_meta_map or {}
         self.sample_meta_map = sample_meta_map or {}
         self.assay_meta_map = assay_meta_map or {}
         self.qc_meta_map = qc_meta_map or {}
-        self.reads_column = reads_column
-        self.checksum_column = checksum_column
+
+        # GVCF column
         self.gvcf_column = gvcf_column
-        self.meta_column = meta_column
-        self.assay_meta_columns = assay_meta_columns
-        self.allow_extra_files_in_search_path = allow_extra_files_in_search_path
+
+        # Default values
         self.batch_number = batch_number
+        self.default_reference_assembly_location = default_reference_assembly_location
+        self.allow_extra_files_in_search_path = allow_extra_files_in_search_path
 
     def get_sample_id(self, row: SingleRow) -> str:
         """Get external sample ID from row"""
@@ -261,21 +279,6 @@ class GenericMetadataParser(GenericParser):
         """Get external assay ID from row. Needs to be implemented per parser.
         NOTE: To be re-thought after assay group changes are applied"""
         return None
-
-    def get_assay_meta(self, row: GroupedRow) -> dict[str, Any] | None:
-        """Get assay metadata from row, parse true/false strings to boolean"""
-        assay_meta = {}
-        for column in self.assay_meta_columns:
-            if column in row:
-                value = row[column]
-                if isinstance(value, str):
-                    if value.lower() == 'true':
-                        assay_meta[column] = True
-                    elif value.lower() == 'false':
-                        assay_meta[column] = False
-                    else:
-                        assay_meta[column] = value
-        return assay_meta
 
     def get_participant_id(self, row: SingleRow) -> str | None:
         """Get external participant ID from row"""
@@ -465,6 +468,22 @@ class GenericMetadataParser(GenericParser):
         if not key_map or not row:
             return {}
 
+        def unstring_value(value: Any) -> bool:
+            """Convert strings to boolean or number if possible"""
+            if not isinstance(value, str):
+                return value
+            if value.lower() == 'true':
+                return True
+            if value.lower() == 'false':
+                return False
+            try:
+                return int(value)
+            except ValueError:
+                try:
+                    return float(value)
+                except ValueError:
+                    return value
+
         def prepare_dict_from_keys(key_parts: list[str], val):
             """Recursive production of dictionary"""
             if len(key_parts) == 1:
@@ -474,7 +493,7 @@ class GenericMetadataParser(GenericParser):
         dicts = []
         for row_key, dict_key in key_map.items():
             if isinstance(row, list):
-                inner_values = [r[row_key] for r in row if r.get(row_key) is not None]
+                inner_values = [unstring_value(r[row_key]) for r in row if r.get(row_key) is not None]
                 if any(isinstance(inner, list) for inner in inner_values):
                     # lists are unhashable
                     value = inner_values
@@ -483,18 +502,17 @@ class GenericMetadataParser(GenericParser):
                     if len(value) == 0:
                         continue
                     if len(value) == 1:
-                        value = value[0]
+                        value = unstring_value(value[0])
             else:
                 if row_key not in row:
                     continue
-                value = row[row_key]
-
+                value = unstring_value(row[row_key])
             dicts.append(prepare_dict_from_keys(dict_key.split('.'), value))
 
         return reduce(GenericMetadataParser.merge_dicts, dicts)
 
     @staticmethod
-    def process_filename_value(string: Union[str, list[str]]) -> list[str]:
+    def process_filename_value(string: str | list[str]) -> list[str]:
         """
         Split on multiple delimiters, ;,
 
@@ -718,9 +736,6 @@ class GenericMetadataParser(GenericParser):
         if self.batch_number is not None:
             collapsed_assay_meta['batch'] = self.batch_number
 
-        if self.assay_meta_columns:
-            collapsed_assay_meta.update(self.get_assay_meta(sequencing_group.rows[0]))
-
         if sequencing_group.sequencing_type in ['exome', 'polyarna', 'totalrna', 'singlecellrna']:
             rows = sequencing_group.rows
             # Exome / RNA should have facility and library, allow missing for exomes - for now
@@ -802,18 +817,11 @@ class GenericMetadataParser(GenericParser):
     required=True,
     help='The metamist project ($DATASET) to import manifest into',
 )
+@click.option('--search-path', multiple=True, required=True)
 @click.option('--sample-name-column', required=True)
 @click.option(
     '--participant-column',
     help='Column where the external participant id is held',
-)
-@click.option(
-    '--reads-column',
-    help='Column where the reads information is held, comma-separated if multiple',
-)
-@click.option(
-    '--gvcf-column',
-    help='Column where the reads information is held, comma-separated if multiple',
 )
 @click.option(
     '--reported-sex-column',
@@ -828,10 +836,12 @@ class GenericMetadataParser(GenericParser):
     help='Column where the karyotype is held',
 )
 @click.option(
-    '--qc-meta-field-map',
-    nargs=2,
-    multiple=True,
-    help='Two arguments per listing, eg: --qc-meta-field "name-in-manifest" "name-in-analysis.meta"',
+    '--reads-column',
+    help='Column where the reads information is held, comma-separated if multiple',
+)
+@click.option(
+    '--gvcf-column',
+    help='Column where the reads information is held, comma-separated if multiple',
 )
 @click.option(
     '--participant-meta-field',
@@ -866,34 +876,37 @@ class GenericMetadataParser(GenericParser):
     multiple=True,
     help='Two arguments per listing, eg: --assay-meta-field "name-in-manifest" "name-in-assay.meta"',
 )
+@click.option(
+    '--qc-meta-field-map',
+    nargs=2,
+    multiple=True,
+    help='Two arguments per listing, eg: --qc-meta-field "name-in-manifest" "name-in-analysis.meta"',
+)
 @click.option('--default-sample-type', default='blood')
-@click.option('--default-assay-type', default='wgs')
 @click.option(
     '--confirm', is_flag=True, help='Confirm with user input before updating server'
 )
-@click.option('--search-path', multiple=True, required=True)
 @click.argument('manifests', nargs=-1)
 @run_as_sync
 async def main(
     manifests,
-    search_path: list[str],
     project,
+    search_path: list[str],
     sample_name_column: str,
-    participant_meta_field: list[str],
-    participant_meta_field_map: list[tuple[str, str]],
-    sample_meta_field: list[str],
-    sample_meta_field_map: list[tuple[str, str]],
-    assay_meta_field: list[str],
-    assay_meta_field_map: list[tuple[str, str]],
-    qc_meta_field_map: list[tuple[str, str]] = None,
-    reads_column: str | None = None,
-    gvcf_column: str | None = None,
     participant_column: str | None = None,
     reported_sex_column: str | None = None,
     reported_gender_column: str | None = None,
     karyotype_column: str | None = None,
+    participant_meta_field: list[str] | None = None,
+    participant_meta_field_map: list[tuple[str, str]] | None = None,
+    sample_meta_field: list[str] | None = None,
+    sample_meta_field_map: list[tuple[str, str]] | None = None,
+    assay_meta_field: list[str] | None = None,
+    assay_meta_field_map: list[tuple[str, str]] | None = None,
+    qc_meta_field_map: list[tuple[str, str]] = None,
+    reads_column: str | None = None,
+    gvcf_column: str | None = None,
     default_sample_type: str | None = None,
-    default_assay_type='sequencing',
     confirm=False,
 ):
     """Run script from CLI arguments"""
@@ -926,15 +939,15 @@ async def main(
         project=project,
         sample_name_column=sample_name_column,
         participant_column=participant_column,
+        reported_sex_column=reported_sex_column,
+        reported_gender_column=reported_gender_column,
+        karyotype_column=karyotype_column,
         participant_meta_map=participant_meta_map,
         sample_meta_map=sample_meta_map,
         assay_meta_map=assay_meta_map,
         qc_meta_map=qc_meta_map,
         reads_column=reads_column,
         gvcf_column=gvcf_column,
-        reported_sex_column=reported_sex_column,
-        reported_gender_column=reported_gender_column,
-        karyotype_column=karyotype_column,
         default_sample_type=default_sample_type,
         default_sequencing=DefaultSequencing(
             seq_type='genome', technology='short-read', platform='illumina'
