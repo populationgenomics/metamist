@@ -64,8 +64,8 @@ QUERY_PROJECT_SGS = gql(
     query MyQuery($project: String!) {
         project(name: $project) {
             sequencingGroups {
-            id
-            type
+                id
+                type
             }
         }
     }
@@ -326,7 +326,7 @@ async def generate_sample_entries(
     await sapi.upsert_samples_async(project, samples)
 
 
-async def generate_cram_analyses(project: str, analyses_to_insert: list[Analysis]):
+async def generate_cram_analyses(project: str, analyses_to_insert: list[Analysis]) -> list[dict]:
     """
     Queries the list of sequencing groups for a project and randomly selects some
     to generate CRAM analysis entries for.
@@ -361,6 +361,52 @@ async def generate_cram_analyses(project: str, analyses_to_insert: list[Analysis
     )
 
     return aligned_sgs
+
+
+async def generate_web_report_analyses(project: str,
+                                       aligned_sequencing_groups: list[dict],
+                                       analyses_to_insert: list[Analysis]
+                                       ):
+    """
+    Queries the list of sequencing groups for a project and generates web analysis (STRipy
+    and MITO report) entries for those with completed a CRAM analysis.
+    """
+    # Insert completed web analyses for the aligned sequencing groups
+    for sg in aligned_sequencing_groups:
+        analyses_to_insert.extend(
+            [
+                Analysis(
+                    sequencing_group_ids=[sg['id']],
+                    type='web',
+                    status=AnalysisStatus('completed'),
+                    output=f'FAKE://{project}/stripy/{sg["id"]}.stripy.html',
+                    timestamp_completed=(
+                        datetime.datetime.now() - datetime.timedelta(days=random.randint(1, 15))
+                    ).isoformat(),
+                    meta={
+                        'stage': 'Stripy',
+                        'sequencing_type': sg['type'],
+                        # random size between 5, 50 MB
+                        'size': random.randint(5 * 1024, 25 * 1024) * 1024,
+                    },
+                ),
+                Analysis(
+                    sequencing_group_ids=[sg['id']],
+                    type='web',
+                    status=AnalysisStatus('completed'),
+                    output=f'FAKE://{project}/mito/mitoreport-{sg["id"]}/index.html',
+                    timestamp_completed=(
+                        datetime.datetime.now() - datetime.timedelta(days=random.randint(1, 15))
+                    ).isoformat(),
+                    meta={
+                        'stage': 'MitoReport',
+                        'sequencing_type': sg['type'],
+                        # random size between 5, 50 MB
+                        'size': random.randint(5 * 1024, 25 * 1024) * 1024,
+                    },
+                )
+            ]
+        )
 
 
 async def generate_joint_called_analyses(project: str, aligned_sgs: list[dict], analyses_to_insert: list[Analysis]):
@@ -454,6 +500,8 @@ async def main():
         await generate_sample_entries(project, participant_id_map, metamist_enums, sapi)
 
         aligned_sgs = await generate_cram_analyses(project, analyses_to_insert)
+
+        await generate_web_report_analyses(project, aligned_sgs, analyses_to_insert)
 
         await generate_joint_called_analyses(project, aligned_sgs, analyses_to_insert)
 
