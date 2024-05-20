@@ -49,7 +49,6 @@ class SampleTable(DbBase):
         'active',
         'type',
         'project',
-        'audit_log_id',
     ]
 
     # region GETS

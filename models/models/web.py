@@ -117,8 +117,3 @@ class ProjectSummary(SMBase):
     seqr_sync_types: list[str]
 
     links: PagingLinks | None
-
-    class Config:
-        """Config for ProjectSummaryResponse"""
-
-        fields = {'links': '_links'}

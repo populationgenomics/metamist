@@ -51,8 +51,16 @@ def etl_notify(request: flask.Request):
             'message': f'Missing or empty message: {jbody_str}',
         }, 400
 
-    # TODO: format message to slack message
-    message_blocks = format_slack(message)
+    # format message to slack message
+    try:
+        message_blocks = format_slack(message)
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logging.error(f'Failed to format message: {e}, message: {message}')
+        return {
+            'success': False,
+            'message': f'Failed to format message: {e}',
+        }, 500
+
     success = None
     try:
         client = WebClient(token=SLACK_BOT_TOKEN)

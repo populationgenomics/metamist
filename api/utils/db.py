@@ -103,6 +103,35 @@ async def dependable_get_write_project_connection(
     )
 
 
+async def HACK_dependable_contributor_project_connection(
+    project: str,
+    author: str = Depends(authenticate),
+    ar_guid: str = Depends(get_ar_guid),
+    extra_values: dict | None = Depends(get_extra_audit_log_values),
+) -> Connection:
+    """FastAPI handler for getting connection WITH project"""
+    meta = {}
+    if extra_values:
+        meta.update(extra_values)
+
+    meta['role'] = 'contributor'
+
+    # hack by making it appear readonly
+    connection = await ProjectPermissionsTable.get_project_connection(
+        project_name=project,
+        author=author,
+        readonly=True,
+        on_behalf_of=None,
+        ar_guid=ar_guid,
+        meta=meta,
+    )
+
+    # then hack it so
+    connection.readonly = False
+
+    return connection
+
+
 async def dependable_get_readonly_project_connection(
     project: str,
     author: str = Depends(authenticate),
@@ -179,6 +208,9 @@ def validate_iap_jwt_and_get_email(iap_jwt, audience):
 
 get_author = Depends(authenticate)
 get_project_readonly_connection = Depends(dependable_get_readonly_project_connection)
+HACK_get_project_contributor_connection = Depends(
+    HACK_dependable_contributor_project_connection
+)
 get_project_write_connection = Depends(dependable_get_write_project_connection)
 get_projectless_db_connection = Depends(dependable_get_connection)
 get_projectless_bq_connection = Depends(dependable_get_bq_connection)

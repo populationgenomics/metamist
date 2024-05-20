@@ -23,12 +23,12 @@ class AnalysisInternal(SMBase):
     id: int | None = None
     type: str
     status: AnalysisStatus
-    output: str = None
+    active: bool | None = None
+    output: str | None = None
     sequencing_group_ids: list[int] | None = None
     cohort_ids: list[int] | None = None
     timestamp_completed: datetime | None = None
     project: int | None = None
-    active: bool | None = None
     meta: dict[str, Any] = {}
     author: str | None = None
 

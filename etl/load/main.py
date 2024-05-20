@@ -74,7 +74,7 @@ def call_parser(parser_obj, row_json) -> tuple[str, str]:
     async def run_parser_capture_result(parser_obj, row_data, res, status):
         try:
             # TODO better error handling
-            r = await parser_obj.from_json(row_data, confirm=False)
+            r = await parser_obj.from_json(row_data, confirm=False, dry_run=False)
             res.append(r)
             status.append(ParsingStatus.SUCCESS)
         except Exception as e:  # pylint: disable=broad-exception-caught
@@ -99,7 +99,16 @@ def process_rows(
     source_type = bq_row.type
     # source_type should be in the format /ParserName/Version e.g.: /bbv/v1
 
-    row_json = json.loads(bq_row.body)
+    if isinstance(bq_row.body, str):
+        # body field is a string, convert to JSON
+        try:
+            row_json = json.loads(bq_row.body)
+        except json.JSONDecodeError as e:
+            return ParsingStatus.FAILED, f'Failed to decode JSON: {e}', bq_row
+    else:
+        # body field is already a JSON type
+        row_json = bq_row.body
+
     submitting_user = bq_row.submitting_user
 
     # get config from payload and merge with the default
@@ -157,6 +166,10 @@ def process_rows(
             # publish to notification pubsub
             msg_title = 'Metamist ETL Load Failed'
             try:
+                # limit result to max 100 characters, to avoid spamming slack
+                # sometimes the details can be huge, the whole stacktrace
+                log_details['result'] = str(parsing_result)[:100]
+                log_record['details'] = json.dumps(log_details)
                 pubsub_client = _get_pubsub_client()
                 pubsub_client.publish(
                     NOTIFICATION_PUBSUB_TOPIC,
@@ -411,7 +424,6 @@ def prepare_parser_map() -> dict[str, type[GenericParser]]:
 
     for entry_point in importlib.metadata.entry_points().get('metamist_parser'):
         parser_cls = entry_point.load()
-        parser_short_name, parser_version = parser_cls.get_info()
-        parser_map[f'{parser_short_name}/{parser_version}'] = parser_cls
+        parser_map[entry_point.name] = parser_cls
 
     return parser_map
