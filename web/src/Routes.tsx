@@ -95,14 +95,7 @@ const Routes: React.FunctionComponent = () => (
             }
         />
 
-        <Route
-            path="/ourdna"
-            element={
-                <ChakraProvider>
-                    <OurDnaDashboard />
-                </ChakraProvider>
-            }
-        />
+        <Route path="/ourdna" element={<OurDnaDashboard />} />
 
         <Route path="/swagger" element={<SwaggerUI url="/openapi.json" tryItOutEnabled={true} />} />
 
