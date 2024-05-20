@@ -208,13 +208,13 @@ class GraphQLProject:
 
     @strawberry.field
     async def ourdna_dashboard(
-        self,
-        info: Info,
-        root: 'Project'
-    ) -> list[strawberry.scalars.JSON]:
+        self, info: Info, root: 'Project'
+    ) -> strawberry.scalars.JSON:
         connection = info.context['connection']
         ourdna_layer = OurDnaDashboardLayer(connection)
-        return [await ourdna_layer.query(SampleFilter(project=root.id), project_id=root.id)]
+        return await ourdna_layer.query(
+            SampleFilter(project=root.id), project_id=root.id
+        )
 
     @strawberry.field()
     async def pedigree(

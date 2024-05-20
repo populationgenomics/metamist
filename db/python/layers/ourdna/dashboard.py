@@ -30,14 +30,14 @@ class OurDnaDashboardLayer(BaseLayer):
         @fields: collection-time, process-end-time
         """
         if (
-            sample.meta.get('collection_time') is None
-            or sample.meta.get('process_end_time') is None
+            sample.meta.get('collection-time') is None
+            or sample.meta.get('process-end-time') is None
         ):
             return None
 
         time_taken = datetime.strptime(
-            sample.meta.get('process_end_time'), '%Y-%m-%d %H:%M:%S'
-        ) - datetime.strptime(sample.meta.get('collection_time'), '%Y-%m-%d %H:%M:%S')
+            sample.meta.get('process-end-time'), '%Y-%m-%d %H:%M:%S'
+        ) - datetime.strptime(sample.meta.get('collection-time'), '%Y-%m-%d %H:%M:%S')
 
         return int(time_taken.total_seconds())
 
@@ -49,19 +49,19 @@ class OurDnaDashboardLayer(BaseLayer):
         @fields: process-start-time, process-end-time, processing-site where the time fields are of the format '2022-07-03 13:28:00'
         """
         if (
-            sample.meta.get('process_start_time') is None
-            or sample.meta.get('process_end_time') is None
-            or sample.meta.get('processing_site') is None
+            sample.meta.get('process-start-time') is None
+            or sample.meta.get('process-end-time') is None
+            or sample.meta.get('processing-site') is None
         ):
             return None, None
 
         processing_time = datetime.strptime(
-            sample.meta.get('process_end_time'), '%Y-%m-%d %H:%M:%S'
+            sample.meta.get('process-end-time'), '%Y-%m-%d %H:%M:%S'
         ) - datetime.strptime(
-            sample.meta.get('process_start_time'), '%Y-%m-%d %H:%M:%S'
+            sample.meta.get('process-start-time'), '%Y-%m-%d %H:%M:%S'
         )
 
-        return sample.meta.get('processing_site'), int(processing_time.total_seconds())
+        return sample.meta.get('processing-site'), int(processing_time.total_seconds())
 
     def get_collection_to_process_start_time(self, sample: Sample) -> int | None:
         """
@@ -69,14 +69,14 @@ class OurDnaDashboardLayer(BaseLayer):
         @fields: collection-time, process-start-time
         """
         if (
-            sample.meta.get('collection_time') is None
-            or sample.meta.get('process_start_time') is None
+            sample.meta.get('collection-time') is None
+            or sample.meta.get('process-start-time') is None
         ):
             return None
 
         time_taken = datetime.strptime(
-            sample.meta.get('process_start_time'), '%Y-%m-%d %H:%M:%S'
-        ) - datetime.strptime(sample.meta.get('collection_time'), '%Y-%m-%d %H:%M:%S')
+            sample.meta.get('process-start-time'), '%Y-%m-%d %H:%M:%S'
+        ) - datetime.strptime(sample.meta.get('collection-time'), '%Y-%m-%d %H:%M:%S')
 
         return int(time_taken.total_seconds())
 
@@ -134,7 +134,7 @@ class OurDnaDashboardLayer(BaseLayer):
             collected_samples = [
                 sample
                 for sample in samples_for_participant
-                if sample.meta.get('collection_time') is not None
+                if sample.meta.get('collection-time') is not None
             ]
 
             if len(collected_samples) == 0:
@@ -168,9 +168,9 @@ class OurDnaDashboardLayer(BaseLayer):
                 processing_times_by_site[processing_site][current_bucket] += 1
 
             # Get total number of samples collected from each type of collection-event-name"""
-            if sample.meta.get('collection_event_name') is not None:
+            if sample.meta.get('collection-event-name') is not None:
                 total_samples_by_collection_event_name[
-                    sample.meta.get('collection_event_name')
+                    sample.meta.get('collection-event-name')
                 ] += 1
             else:
                 total_samples_by_collection_event_name['unknown'] += 1
@@ -187,27 +187,27 @@ class OurDnaDashboardLayer(BaseLayer):
             ):
                 samples_lost_after_collection[sample.id] = {
                     'time_to_process_start': time_to_process_start,
-                    'collection_time': sample.meta.get('collection_time'),
-                    'process_start_time': sample.meta.get('process_start_time'),
-                    'process_end_time': sample.meta.get('process_end_time'),
-                    'received_time': sample.meta.get('received_time'),
-                    'received_by': sample.meta.get('received_by'),
-                    'collection_lab': sample.meta.get('collection_lab'),
+                    'collection_time': sample.meta.get('collection-time'),
+                    'process_start_time': sample.meta.get('process-start-time'),
+                    'process_end_time': sample.meta.get('process-end-time'),
+                    'received_time': sample.meta.get('received-time'),
+                    'received_by': sample.meta.get('received-by'),
+                    'collection_lab': sample.meta.get('collection-lab'),
                     'courier': sample.meta.get('courier'),
                     'courier_tracking_number': sample.meta.get(
-                        'courier_tracking_number'
+                        'courier-tracking-number'
                     ),
                     'courier_scheduled_pickup_time': sample.meta.get(
-                        'courier_scheduled_pickup_time'
+                        'courier-scheduled-pickup-time'
                     ),
                     'courier_actual_pickup_time': sample.meta.get(
-                        'courier_actual_pickup_time'
+                        'courier-actual-pickup-time'
                     ),
                     'courier_scheduled_dropoff_time': sample.meta.get(
-                        'courier_scheduled_dropoff_time'
+                        'courier-scheduled-dropoff-time'
                     ),
                     'courier_actual_dropoff_time': sample.meta.get(
-                        'courier_actual_dropoff_time'
+                        'courier-actual-dropoff-time'
                     ),
                 }
 
