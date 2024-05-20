@@ -32,35 +32,33 @@ const Tile: React.FC<TileProps> = ({
     tile_icon,
 }) => {
     return (
-        <>
-            <Flex height="100%" px="6" borderWidth="1px" borderRadius="lg">
-                <Stat height="100%">
-                    <Stack direction={'column'} spacing={[2, 5]}>
-                        <StatLabel
-                            fontSize={['xs', 'sm', 'md', 'lg']}
-                            fontWeight="bold"
-                            paddingY={['2', '4']}
-                        >
-                            <Flex alignItems="center">
-                                <Image src={tile_icon} alt="Icon" boxSize="24px" mr="2" />
-                                {header}
-                            </Flex>
-                        </StatLabel>
-                        <Flex flexDirection={['column', 'row']}>
-                            <StatNumber fontSize={['md', 'lg', 'xl']}>{stat}</StatNumber>
-                            <Box paddingX={['0', '3']} paddingY={['3', '0']}>
-                                <Badge borderRadius="full" px="2" bg={units_colour} color="white">
-                                    {units}
-                                </Badge>
-                            </Box>
+        <Flex height="100%" px="6" borderWidth="1px" borderRadius="lg" boxShadow="lg">
+            <Stat height="100%">
+                <Stack direction="column" spacing={[2, 5]}>
+                    <StatLabel
+                        fontSize={['xs', 'sm', 'md', 'lg']}
+                        fontWeight="bold"
+                        paddingY={['2', '4']}
+                    >
+                        <Flex alignItems="center">
+                            <Image src={tile_icon} alt="Icon" boxSize="24px" mr="2" />
+                            {header}
                         </Flex>
-                        <StatHelpText fontSize={['xs', 'sm']} paddingY={['2', '4']}>
-                            {description}
-                        </StatHelpText>
-                    </Stack>
-                </Stat>
-            </Flex>
-        </>
+                    </StatLabel>
+                    <Flex flexDirection={['column', 'row']}>
+                        <StatNumber fontSize={['md', 'lg', 'xl']}>{stat}</StatNumber>
+                        <Box paddingX={['0', '3']} paddingY={['3', '0']}>
+                            <Badge borderRadius="full" px="2" bg={units_colour} color="white">
+                                {units}
+                            </Badge>
+                        </Box>
+                    </Flex>
+                    <StatHelpText fontSize={['xs', 'sm']} paddingY={['2', '4']}>
+                        {description}
+                    </StatHelpText>
+                </Stack>
+            </Stat>
+        </Flex>
     )
 }
 

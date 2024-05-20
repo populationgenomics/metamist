@@ -6,11 +6,11 @@ import { Box, Flex, Image, Grid, GridItem, useBreakpointValue } from '@chakra-ui
 import { gql, useQuery } from '@apollo/client'
 // import { gql } from '../../__generated__/gql'
 
-import './OurDnaDashboard.css'
+// import './OurDnaDashboard.css'
 
 import Tile from '../../shared/components/ourdna/Tile'
 import TableTile from '../../shared/components/ourdna/TableTile'
-import ThreeStatTile from '../../shared/components/ourdna/ThreeStatTile'
+import StatTile from '../../shared/components/ourdna/StatTile'
 
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import MuckError from '../../shared/components/MuckError'
@@ -23,6 +23,17 @@ const GET_OURDNA_DASHBOARD = gql(`
       ourdnaDashboard
     }
   }`)
+
+const icons = {
+    clipboard: '/dashboard_icons/blue_clipboard.svg',
+    syringe: '/dashboard_icons/yellow_syringe.svg',
+    red_bloodsample: '/dashboard_icons/red_bloodsample.svg',
+    green_truck: '/dashboard_icons/green_truck.svg',
+    yellow_clock: '/dashboard_icons/yellow_clock.svg',
+    blue_testtube: '/dashboard_icons/blue_testtube.svg',
+    green_rocket: '/dashboard_icons/green_rocket.svg',
+    red_alarm: '/dashboard_icons/red_alarm.svg',
+} as const
 
 const Dashboard = () => {
     const { loading, error, data } = useQuery(GET_OURDNA_DASHBOARD, {
@@ -54,21 +65,18 @@ const Dashboard = () => {
         lg: 'repeat(2, 1fr)',
     })
 
-    const samplesLostAfterCollections = {}
-    data &&
-        Object.keys(data.project.ourdnaDashboard[0].samples_lost_after_collection).forEach(
-            (key) => {
-                samplesLostAfterCollections[key] =
-                    data.project.ourdnaDashboard[0].samples_lost_after_collection[key]
-                        .time_to_process_start / 3600
-            },
-            []
-        )
-
+    if (!data) return <MuckError message={`Ah Muck, there's no data here`} />
     if (loading) return <LoadingDucks />
     if (error) return <>Error! {error.message}</>
 
-    return data ? (
+    const samplesLostAfterCollections = Object.entries(
+        data.project.ourdnaDashboard[0].samples_lost_after_collection
+    ).reduce((rr: Record<string, number>, [key, sample]) => {
+        rr[key] = sample.time_to_process_start / 3600
+        return rr
+    }, {})
+
+    return (
         <>
             <Box marginTop={0} paddingBottom={5}>
                 <Image maxWidth={['100px', '100px', '150px']} src="/logo_option2.png" />
@@ -98,7 +106,7 @@ const Dashboard = () => {
                                 units="participants"
                                 units_colour="#71ace1"
                                 description="The number of people who have signed up but not consented."
-                                tile_icon="/dashboard_icons/blue_clipboard.svg"
+                                tile_icon={icons['clipboard']}
                             />
                         </GridItem>
                         <GridItem rowSpan={1} colSpan={1}>
@@ -108,7 +116,7 @@ const Dashboard = () => {
                                 units="participants"
                                 units_colour="#e8c71d"
                                 description="The number of people who have consented but not given blood."
-                                tile_icon="/dashboard_icons/yellow_syringe.svg"
+                                tile_icon={icons['syringe']}
                             />
                         </GridItem>
                         <GridItem rowSpan={1} colSpan={1}>
@@ -123,12 +131,12 @@ const Dashboard = () => {
                                 units="samples"
                                 units_colour="#bf003c"
                                 description="Blood has been collected, but was not processed within 72 hours. "
-                                tile_icon="/dashboard_icons/red_bloodsample.svg"
+                                tile_icon={icons['red_bloodsample']}
                             />
                         </GridItem>
                         {/* Add more aggregated tile here */}
                         <GridItem rowSpan={1} colSpan={1}>
-                            <ThreeStatTile
+                            <StatTile
                                 header="Collection to Processing"
                                 stats={[
                                     {
@@ -160,7 +168,7 @@ const Dashboard = () => {
                                     },
                                 ]}
                                 description="The time between collection and processing for each sample."
-                                tile_icon="/dashboard_icons/green_truck.svg"
+                                tile_icon={icons['green_truck']}
                             />
                         </GridItem>
                     </Grid>
@@ -175,7 +183,7 @@ const Dashboard = () => {
                         data={
                             data.project.ourdnaDashboard[0].total_samples_by_collection_event_name
                         }
-                        icon="/dashboard_icons/blue_testtube.svg"
+                        icon={icons['blue_testtube']}
                     />
                 </GridItem>
                 <GridItem
@@ -186,7 +194,7 @@ const Dashboard = () => {
                     <BarChart
                         header="Processing time per site"
                         data={data.project.ourdnaDashboard[0].processing_times_by_site}
-                        icon="/dashboard_icons/yellow_clock.svg"
+                        icon={icons['yellow_clock']}
                     />
                 </GridItem>
                 <GridItem
@@ -210,7 +218,7 @@ const Dashboard = () => {
                                 header="Viable Long Read"
                                 data={data.project.ourdnaDashboard[0].samples_concentration_gt_1ug}
                                 columns={['Sample ID', 'Concentration']}
-                                tile_icon="/dashboard_icons/green_rocket.svg"
+                                tile_icon={icons['green_rocket']}
                             />
                         </GridItem>
                         <GridItem
@@ -222,15 +230,13 @@ const Dashboard = () => {
                                 header="Processed > 24h"
                                 data={samplesLostAfterCollections}
                                 columns={['Sample ID', 'Time (h)']}
-                                tile_icon="/dashboard_icons/red_alarm.svg"
+                                tile_icon={icons['red_alarm']}
                             />
                         </GridItem>
                     </Grid>
                 </GridItem>
             </Grid>
         </>
-    ) : (
-        <MuckError message={`Ah Muck, there's no data here`} />
     )
 }
 

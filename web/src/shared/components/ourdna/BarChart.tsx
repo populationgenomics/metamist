@@ -16,16 +16,13 @@ import { Bar } from 'react-chartjs-2'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
-export const options = {
+export const chartOptions = {
     responsive: true,
     plugins: {
         legend: {
             position: 'bottom' as const,
             labels: {
                 padding: 20,
-                font: {
-                    family: 'Plus Jakarta Sans',
-                },
             },
         },
         title: {
@@ -49,16 +46,18 @@ const OURDNA_COLOURS = [
     'rgba(85, 85, 85, 0.5)', // OurDNA Charchoal
 ]
 
-const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
-    let labels = []
+const HistogramChart = ({ icon, header, data }: HistogramProps) => {
     let datasets = []
     const numColors = OURDNA_COLOURS.length
 
-    Object.keys(data).forEach((key) => {
-        labels = labels.concat(Object.keys(data[key]))
-    })
-
-    labels = [...new Set(labels)]
+    const labels = [
+        ...new Set(
+            Object.entries(data).reduce(
+                (ll: string[], [key, val]) => ll.concat(Object.keys(val)),
+                []
+            )
+        ),
+    ]
 
     datasets = Object.keys(data).map((key, index) => {
         let values = Object.values(data[key])
@@ -83,15 +82,16 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
                 borderWidth="1px"
                 borderRadius="lg"
                 overflow="hidden"
+                boxShadow="lg"
             >
                 <Flex alignItems="center">
                     <Image src={icon} alt="Icon" boxSize="24px" mr="2" />
-                    <Text fontSize={['xs', 'sm', 'md']} fontWeight={'bold'}>
+                    <Text fontSize={['xs', 'sm', 'md']} fontWeight="bold">
                         {header}
                     </Text>
                 </Flex>
                 <Box height="100%" paddingY={5}>
-                    <Bar data={barData} options={options} style={{ height: '100%' }} />
+                    <Bar data={barData} options={chartOptions} style={{ height: '100%' }} />
                 </Box>
             </Box>
         </>

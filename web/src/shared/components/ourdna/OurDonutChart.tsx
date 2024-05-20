@@ -43,9 +43,10 @@ const OurDonutChart: React.FC<PieChartProps> = ({ header, data, icon }) => {
                 borderWidth="1px"
                 borderRadius="lg"
                 overflow="hidden"
-                flexDirection={'column'}
+                flexDirection="column"
                 width="100%"
                 height="100%"
+                boxShadow="lg"
             >
                 <Flex alignItems="center" fontSize={['xs', 'sm', 'md', 'lg']} fontWeight="bold">
                     <Image src={icon} alt="Icon" boxSize={['12px', '24px']} mr="2" />

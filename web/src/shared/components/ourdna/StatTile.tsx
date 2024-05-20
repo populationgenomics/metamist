@@ -11,18 +11,18 @@ import {
     StatHelpText,
 } from '@chakra-ui/react'
 
-interface ThreeStatTileProps {
+interface StatTileProps {
     header: string
     stats: { value: string; units: string; unitsColour: string }[]
     tile_icon: string
     description: string
 }
 
-const ThreeStatTile: React.FC<ThreeStatTileProps> = ({ header, stats, tile_icon, description }) => {
+const StatTile: React.FC<ThreeStatTileProps> = ({ header, stats, tile_icon, description }) => {
     return (
-        <Flex height="100%" px="6" borderWidth="1px" borderRadius="lg">
+        <Flex height="100%" px="6" borderWidth="1px" borderRadius="lg" boxShadow="lg">
             <Stat height="100%">
-                <Stack direction={'column'} spacing={[2, 5]}>
+                <Stack direction="column" spacing={[2, 5]}>
                     <StatLabel
                         fontSize={['xs', 'sm', 'md', 'lg']}
                         fontWeight="bold"
@@ -57,4 +57,4 @@ const ThreeStatTile: React.FC<ThreeStatTileProps> = ({ header, stats, tile_icon,
     )
 }
 
-export default ThreeStatTile
+export default StatTile

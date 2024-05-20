@@ -26,10 +26,7 @@ ReactDOM.render(
     <React.StrictMode>
         <ApolloProvider client={client}>
             <ThemeProvider>
-                {/* <ChakraProvider resetCSS> */}
                 <App />
-                {/* </ChakraProvider> */}
-                {/* <App /> */}
             </ThemeProvider>
         </ApolloProvider>
     </React.StrictMode>,
