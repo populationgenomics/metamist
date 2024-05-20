@@ -1,7 +1,5 @@
-// Table is a wrapper around semantic-ui-react's Table component that adds a class
-// to the table if the user has dark mode enabled in their browser.
 import * as React from 'react'
-import { Box, Flex, Image, Text } from '@chakra-ui/react'
+import { Card, Image, Container } from 'semantic-ui-react'
 
 import {
     Chart as ChartJS,
@@ -43,12 +41,15 @@ const OURDNA_COLOURS = [
     'rgba(233, 199, 30, 0.5)', // OurDNA Yellow
     'rgba(161, 202, 56, 0.5)', // OurDNA Green
     'rgba(114, 173, 225, 0.5)', // OurDNA Blue
-    'rgba(85, 85, 85, 0.5)', // OurDNA Charchoal
+    'rgba(85, 85, 85, 0.5)', // OurDNA Charcoal
 ]
 
-const HistogramChart = ({ icon, header, data }: HistogramProps) => {
-    let datasets = []
-    const numColors = OURDNA_COLOURS.length
+const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
+    const datasets = Object.keys(data).map((key, index) => ({
+        label: key,
+        data: Object.values(data[key]),
+        backgroundColor: OURDNA_COLOURS[index % OURDNA_COLOURS.length],
+    }))
 
     const labels = [
         ...new Set(
@@ -59,42 +60,25 @@ const HistogramChart = ({ icon, header, data }: HistogramProps) => {
         ),
     ]
 
-    datasets = Object.keys(data).map((key, index) => {
-        let values = Object.values(data[key])
-        return {
-            label: key,
-            data: values,
-            backgroundColor: OURDNA_COLOURS[index % numColors],
-        }
-    }, [])
-
     const barData = {
         labels,
         datasets,
     }
 
     return (
-        <>
-            <Box
-                height="100%"
-                maxHeight="50vh"
-                p="6"
-                borderWidth="1px"
-                borderRadius="lg"
-                overflow="hidden"
-                boxShadow="lg"
-            >
-                <Flex alignItems="center">
-                    <Image src={icon} alt="Icon" boxSize="24px" mr="2" />
-                    <Text fontSize={['xs', 'sm', 'md']} fontWeight="bold">
-                        {header}
-                    </Text>
-                </Flex>
-                <Box height="100%" paddingY={5}>
-                    <Bar data={barData} options={chartOptions} style={{ height: '100%' }} />
-                </Box>
-            </Box>
-        </>
+        <Card fluid style={{ backgroundColor: 'white' }}>
+            <Card.Content>
+                <Card.Header>
+                    <Image src={icon} alt="Icon" size="mini" spaced="right" />
+                    {header}
+                </Card.Header>
+                <Card.Description>
+                    <Container style={{ position: 'relative' }}>
+                        <Bar data={barData} options={chartOptions} />
+                    </Container>
+                </Card.Description>
+            </Card.Content>
+        </Card>
     )
 }
 
