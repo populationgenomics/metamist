@@ -79,7 +79,7 @@ const Dashboard = () => {
                                     header="Awaiting Consent"
                                     stat={`${data.project.ourdnaDashboard.participants_signed_not_consented.length}`}
                                     units="participants"
-                                    units_colour="rgba(113, 172, 225, 0.5)"
+                                    units_colour="ourdna-blue-transparent"
                                     description="The number of people who have signed up but not consented."
                                     tile_icon={icons.clipboard}
                                 />
@@ -89,7 +89,7 @@ const Dashboard = () => {
                                     header="Awaiting Collection"
                                     stat={`${data.project.ourdnaDashboard.participants_consented_not_collected.length}`}
                                     units="participants"
-                                    units_colour="rgba(232, 199, 29, 0.5)"
+                                    units_colour="ourdna-yellow-transparent"
                                     description="The number of people who have consented but not given blood."
                                     tile_icon={icons.syringe}
                                 />
@@ -104,7 +104,7 @@ const Dashboard = () => {
                                         ).length
                                     }`}
                                     units="samples"
-                                    units_colour="rgba(191, 0, 59, 0.5)"
+                                    units_colour="ourdna-red-transparent"
                                     description="Blood has been collected, but was not processed within 72 hours."
                                     tile_icon={icons.red_bloodsample}
                                 />
@@ -120,7 +120,7 @@ const Dashboard = () => {
                                                 3600
                                             ).toFixed(1)}`,
                                             units: 'shortest (h)',
-                                            unitsColour: 'rgba(159, 201, 54, 0.5)',
+                                            unitsColour: 'ourdna-green-transparent',
                                         },
                                         {
                                             value: `${(
@@ -129,7 +129,7 @@ const Dashboard = () => {
                                                 3600
                                             ).toFixed(1)}`,
                                             units: 'longest (h)',
-                                            unitsColour: 'rgba(191, 0, 59, 0.5)',
+                                            unitsColour: 'ourdna-red-transparent',
                                         },
                                         {
                                             value: `${(
@@ -138,7 +138,7 @@ const Dashboard = () => {
                                                     .average / 3600
                                             ).toFixed(1)}`,
                                             units: 'average (h)',
-                                            unitsColour: 'rgba(113, 172, 225, 0.5)',
+                                            unitsColour: 'ourdna-blue-transparent',
                                         },
                                     ]}
                                     description="The time between collection and processing for each sample."

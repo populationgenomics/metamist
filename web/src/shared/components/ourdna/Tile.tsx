@@ -35,7 +35,10 @@ const Tile: React.FC<TileProps> = ({
                     <Statistic size="small">
                         <Statistic.Value>{stat}</Statistic.Value>
                         <Statistic.Label style={{ margin: 5 }}>
-                            <Label color="white" style={{ backgroundColor: units_colour }}>
+                            <Label
+                                color="white"
+                                style={{ backgroundColor: `var(--${units_colour})` }}
+                            >
                                 {units}
                             </Label>
                         </Statistic.Label>

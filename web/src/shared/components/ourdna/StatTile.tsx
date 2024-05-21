@@ -31,7 +31,9 @@ const StatTile: React.FC<StatTileProps> = ({ header, stats, tile_icon, descripti
                                     <Statistic.Label style={{ margin: 5 }}>
                                         <Label
                                             color="white"
-                                            style={{ backgroundColor: stat.unitsColour }}
+                                            style={{
+                                                backgroundColor: `var(--${stat.unitsColour})`,
+                                            }}
                                         >
                                             {stat.units}
                                         </Label>
