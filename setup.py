@@ -39,7 +39,7 @@ setup(
         # for get id-token
         'cpg-utils >= 5.0.5',
         'gql[aiohttp,requests]',
-        'tabulate >= 0.9.0'
+        'tabulate >= 0.9.0',
     ],
     entry_points={
         'metamist_parser': [
