@@ -66,9 +66,15 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
     }
 
     return (
-        <Card fluid style={{ backgroundColor: 'white' }}>
+        <Card
+            fluid
+            style={{
+                backgroundColor: 'var(--color-bg-card)',
+                boxShadow: 'rgba(0, 0, 0, 0.24) 0px 3px 8px',
+            }}
+        >
             <Card.Content>
-                <Card.Header>
+                <Card.Header style={{ fontSize: '1.25rem' }}>
                     <Image src={icon} alt="Icon" size="mini" spaced="right" />
                     {header}
                 </Card.Header>

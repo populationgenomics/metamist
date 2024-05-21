@@ -19,16 +19,22 @@ const Tile: React.FC<TileProps> = ({
     tile_icon,
 }) => {
     return (
-        <Card fluid style={{ backgroundColor: 'white' }}>
+        <Card
+            fluid
+            style={{
+                backgroundColor: 'var(--color-bg-card)',
+                boxShadow: 'rgba(0, 0, 0, 0.24) 0px 3px 8px',
+            }}
+        >
             <Card.Content>
-                <Card.Header>
+                <Card.Header style={{ fontSize: '1.25rem' }}>
                     <Image src={tile_icon} alt="Icon" size="mini" spaced="right" />
                     {header}
                 </Card.Header>
                 <Card.Description>
-                    <Statistic>
+                    <Statistic size="small">
                         <Statistic.Value>{stat}</Statistic.Value>
-                        <Statistic.Label>
+                        <Statistic.Label style={{ margin: 5 }}>
                             <Label color="white" style={{ backgroundColor: units_colour }}>
                                 {units}
                             </Label>

@@ -55,81 +55,77 @@ const Dashboard = () => {
                 <GridRow centered>
                     <GridColumn width={10}>
                         <Grid stackable columns={2}>
-                            <GridRow centered>
-                                <GridColumn width={5}>
-                                    <Tile
-                                        header="Awaiting Consent"
-                                        stat={`${data.project.ourdnaDashboard.participants_signed_not_consented.length}`}
-                                        units="participants"
-                                        units_colour="#71ace1"
-                                        description="The number of people who have signed up but not consented."
-                                        tile_icon={icons.clipboard}
-                                    />
-                                </GridColumn>
-                                <GridColumn width={5}>
-                                    <Tile
-                                        header="Awaiting Collection"
-                                        stat={`${data.project.ourdnaDashboard.participants_consented_not_collected.length}`}
-                                        units="participants"
-                                        units_colour="#e8c71d"
-                                        description="The number of people who have consented but not given blood."
-                                        tile_icon={icons.syringe}
-                                    />
-                                </GridColumn>
-                            </GridRow>
-                            <GridRow centered>
-                                <GridColumn width={5}>
-                                    <Tile
-                                        header="Samples Lost"
-                                        stat={`${
-                                            Object.keys(
+                            <GridColumn>
+                                <Tile
+                                    header="Awaiting Consent"
+                                    stat={`${data.project.ourdnaDashboard.participants_signed_not_consented.length}`}
+                                    units="participants"
+                                    units_colour="rgba(113, 172, 225, 0.5)"
+                                    description="The number of people who have signed up but not consented."
+                                    tile_icon={icons.clipboard}
+                                />
+                            </GridColumn>
+                            <GridColumn>
+                                <Tile
+                                    header="Awaiting Collection"
+                                    stat={`${data.project.ourdnaDashboard.participants_consented_not_collected.length}`}
+                                    units="participants"
+                                    units_colour="rgba(232, 199, 29, 0.5)"
+                                    description="The number of people who have consented but not given blood."
+                                    tile_icon={icons.syringe}
+                                />
+                            </GridColumn>
+                            <GridColumn>
+                                <Tile
+                                    header="Samples Lost"
+                                    stat={`${
+                                        Object.keys(
+                                            data.project.ourdnaDashboard
+                                                .samples_lost_after_collection
+                                        ).length
+                                    }`}
+                                    units="samples"
+                                    units_colour="rgba(191, 0, 59, 0.5)"
+                                    description="Blood has been collected, but was not processed within 72 hours."
+                                    tile_icon={icons.red_bloodsample}
+                                />
+                            </GridColumn>
+                            <GridColumn>
+                                <StatTile
+                                    header="Collection to Processing"
+                                    stats={[
+                                        {
+                                            value: `${(
                                                 data.project.ourdnaDashboard
-                                                    .samples_lost_after_collection
-                                            ).length
-                                        }`}
-                                        units="samples"
-                                        units_colour="#bf003c"
-                                        description="Blood has been collected, but was not processed within 72 hours."
-                                        tile_icon={icons.red_bloodsample}
-                                    />
-                                </GridColumn>
-                                <GridColumn width={5}>
-                                    <StatTile
-                                        header="Collection to Processing"
-                                        stats={[
-                                            {
-                                                value: `${(
-                                                    data.project.ourdnaDashboard
-                                                        .collection_to_process_end_time_statistics
-                                                        .min / 3600
-                                                ).toFixed(1)}`,
-                                                units: 'shortest (h)',
-                                                unitsColour: '#a1c938',
-                                            },
-                                            {
-                                                value: `${(
-                                                    data.project.ourdnaDashboard
-                                                        .collection_to_process_end_time_statistics
-                                                        .max / 3600
-                                                ).toFixed(1)}`,
-                                                units: 'longest (h)',
-                                                unitsColour: '#bf003c',
-                                            },
-                                            {
-                                                value: `${(
-                                                    data.project.ourdnaDashboard
-                                                        .collection_to_process_end_time_statistics
-                                                        .average / 3600
-                                                ).toFixed(1)}`,
-                                                units: 'average (h)',
-                                                unitsColour: '#71ace1',
-                                            },
-                                        ]}
-                                        description="The time between collection and processing for each sample."
-                                        tile_icon={icons.green_truck}
-                                    />
-                                </GridColumn>
-                            </GridRow>
+                                                    .collection_to_process_end_time_statistics.min /
+                                                3600
+                                            ).toFixed(1)}`,
+                                            units: 'shortest (h)',
+                                            unitsColour: 'rgba(159, 201, 54, 0.5)',
+                                        },
+                                        {
+                                            value: `${(
+                                                data.project.ourdnaDashboard
+                                                    .collection_to_process_end_time_statistics.max /
+                                                3600
+                                            ).toFixed(1)}`,
+                                            units: 'longest (h)',
+                                            unitsColour: 'rgba(191, 0, 59, 0.5)',
+                                        },
+                                        {
+                                            value: `${(
+                                                data.project.ourdnaDashboard
+                                                    .collection_to_process_end_time_statistics
+                                                    .average / 3600
+                                            ).toFixed(1)}`,
+                                            units: 'average (h)',
+                                            unitsColour: 'rgba(113, 172, 225, 0.5)',
+                                        },
+                                    ]}
+                                    description="The time between collection and processing for each sample."
+                                    tile_icon={icons.green_truck}
+                                />
+                            </GridColumn>
                         </Grid>
                     </GridColumn>
                     <GridColumn width={6}>
@@ -150,7 +146,7 @@ const Dashboard = () => {
                             icon={icons.yellow_clock}
                         />
                     </GridColumn>
-                    <GridColumn width={6} stretched>
+                    <GridColumn width={6} stackable>
                         <GridColumn>
                             <TableTile
                                 header="Viable Long Read"

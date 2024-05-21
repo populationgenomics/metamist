@@ -35,13 +35,20 @@ const OurDonutChart: React.FC<PieChartProps> = ({ header, data, icon }) => {
     }
 
     return (
-        <Card fluid style={{ height: '100%', backgroundColor: 'white' }}>
+        <Card
+            fluid
+            style={{
+                height: '100%',
+                backgroundColor: 'var(--color-bg-card)',
+                boxShadow: 'rgba(0, 0, 0, 0.24) 0px 3px 8px',
+            }}
+        >
             <Card.Content style={{ height: '100%' }}>
-                <Card.Header>
+                <Card.Header style={{ fontSize: '1.25rem' }}>
                     <Image src={icon} alt="Icon" size="mini" spaced="right" />
                     {header}
                 </Card.Header>
-                <Card.Description>
+                <Card.Description style={{ height: '100%' }}>
                     <Container style={{ position: 'relative' }}>
                         <Doughnut
                             data={donutData}
