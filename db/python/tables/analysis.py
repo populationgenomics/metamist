@@ -295,20 +295,19 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         else:
             _query = f"""
             SELECT a.id as id, a.type as type, a.status as status,
-                    a.output as output, a_sg.sequencing_group_id as sequencing_group_id,
+                    a.output as output, JSON_ARRAYAGG(a_sg.sequencing_group_id) as _sequencing_group_ids,
                     a.project as project, a.timestamp_completed as timestamp_completed,
                     a.active as active, a.meta as meta, a.author as author
             FROM analysis a
             LEFT JOIN analysis_sequencing_group a_sg ON a.id = a_sg.analysis_id
             WHERE {sg_where_str}
+            GROUP BY a.id
             """
             rows = await self.connection.fetch_all(_query, sg_values)
             for row in rows:
                 key = row['id']
-                if key in retvals:
-                    retvals[key].sequencing_group_ids.append(row['sequencing_group_id'])
-                else:
-                    retvals[key] = AnalysisInternal.from_db(**dict(row))
+                retvals[key] = AnalysisInternal.from_db(**dict(row))
+                retvals[key].sequencing_group_ids = row['_sequencing_group_ids']
 
             if retvals:
                 _query_cohort_ids = """
@@ -397,13 +396,15 @@ WHERE s.project = :project AND
         """
         Gets details of analysis with status queued or in-progress
         """
+
         _query = """
 SELECT a.id as id, a.type as type, a.status as status,
-        a.output as output, a_sg.sequencing_group_id as sequencing_group_id,
+        a.output as output, JSON_ARRAYAGG(a_sg.sequencing_group_id) as _sequencing_group_ids,
         a.project as project, a.meta as meta
 FROM analysis_sequencing_group a_sg
 INNER JOIN analysis a ON a_sg.analysis_id = a.id
 WHERE a.project = :project AND a.active AND (a.status='queued' OR a.status='in-progress')
+GROUP BY a.id
 """
         rows = await self.connection.fetch_all(
             _query, {'project': project or self.project}
@@ -411,10 +412,8 @@ WHERE a.project = :project AND a.active AND (a.status='queued' OR a.status='in-p
         analysis_by_id = {}
         for row in rows:
             aid = row['id']
-            if aid not in analysis_by_id:
-                analysis_by_id[aid] = AnalysisInternal.from_db(**dict(row))
-            else:
-                analysis_by_id[aid].sample_ids.append(row['sequencing_group_id'])
+            analysis_by_id[aid] = AnalysisInternal.from_db(**dict(row))
+            analysis_by_id[aid].sequencing_group_ids = row['_sequencing_group_ids']
 
         return list(analysis_by_id.values())
 
