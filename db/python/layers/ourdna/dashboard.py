@@ -24,20 +24,30 @@ class OurDnaDashboardLayer(BaseLayer):
         self.sample_table = SampleTable(connection)
         self.participant_table = ParticipantTable(connection)
 
+    @staticmethod
+    def get_meta_property(sample: Sample, property_name: str) -> Any:
+        """
+        Get a property from the meta field of a sample, accounting for hyphenated property names
+        or underscores in the property name
+        """
+        return sample.meta.get(property_name) or sample.meta.get(property_name.replace('-', '_'))
+
     def get_collection_to_process_end_time(self, sample: Sample) -> int | None:
         """
         I want to know how long it took between blood collection and sample processing - SAMPLE TABLE
         @fields: collection-time, process-end-time
         """
+        _collection_time = self.get_meta_property(sample=sample, property_name='collection-time')
+        _process_end_time = self.get_meta_property(sample=sample, property_name='process-end-time')
         if (
-            sample.meta.get('collection-time') is None
-            or sample.meta.get('process-end-time') is None
+            _collection_time is None
+            or _process_end_time is None
         ):
             return None
 
         time_taken = datetime.strptime(
-            sample.meta.get('process-end-time'), '%Y-%m-%d %H:%M:%S'
-        ) - datetime.strptime(sample.meta.get('collection-time'), '%Y-%m-%d %H:%M:%S')
+            _process_end_time, '%Y-%m-%d %H:%M:%S'
+        ) - datetime.strptime(_collection_time, '%Y-%m-%d %H:%M:%S')
 
         return int(time_taken.total_seconds())
 
@@ -48,35 +58,40 @@ class OurDnaDashboardLayer(BaseLayer):
         I want to know what the sample processing times were for samples at each designated site (BBV, Garvan, Westmead, etc)
         @fields: process-start-time, process-end-time, processing-site where the time fields are of the format '2022-07-03 13:28:00'
         """
+        _process_start_time = self.get_meta_property(sample=sample, property_name='process-start-time')
+        _process_end_time = self.get_meta_property(sample=sample, property_name='process-end-time')
+        _processing_site = self.get_meta_property(sample=sample, property_name='processing-site')
         if (
-            sample.meta.get('process-start-time') is None
-            or sample.meta.get('process-end-time') is None
-            or sample.meta.get('processing-site') is None
+            _process_start_time is None
+            or _process_end_time is None
+            or _processing_site is None
         ):
             return None, None
 
         processing_time = datetime.strptime(
-            sample.meta.get('process-end-time'), '%Y-%m-%d %H:%M:%S'
+            _process_end_time, '%Y-%m-%d %H:%M:%S'
         ) - datetime.strptime(
-            sample.meta.get('process-start-time'), '%Y-%m-%d %H:%M:%S'
+            _process_start_time, '%Y-%m-%d %H:%M:%S'
         )
 
-        return sample.meta.get('processing-site'), int(processing_time.total_seconds())
+        return _processing_site, int(processing_time.total_seconds())
 
     def get_collection_to_process_start_time(self, sample: Sample) -> int | None:
         """
         I want to know how long it has been since the sample was collected - SAMPLE TABLE
         @fields: collection-time, process-start-time
         """
+        _collection_time = self.get_meta_property(sample=sample, property_name='collection-time')
+        _process_start_time = self.get_meta_property(sample=sample, property_name='process-start-time')
         if (
-            sample.meta.get('collection-time') is None
-            or sample.meta.get('process-start-time') is None
+            _collection_time is None
+            or _process_start_time is None
         ):
             return None
 
         time_taken = datetime.strptime(
-            sample.meta.get('process-start-time'), '%Y-%m-%d %H:%M:%S'
-        ) - datetime.strptime(sample.meta.get('collection-time'), '%Y-%m-%d %H:%M:%S')
+            _process_start_time, '%Y-%m-%d %H:%M:%S'
+        ) - datetime.strptime(_collection_time, '%Y-%m-%d %H:%M:%S')
 
         return int(time_taken.total_seconds())
 
@@ -168,9 +183,10 @@ class OurDnaDashboardLayer(BaseLayer):
                 processing_times_by_site[processing_site][current_bucket] += 1
 
             # Get total number of samples collected from each type of collection-event-name"""
-            if sample.meta.get('collection-event-name') is not None:
+            _collection_event_name = self.get_meta_property(sample=sample, property_name='collection-event-name')
+            if _collection_event_name is not None:
                 total_samples_by_collection_event_name[
-                    sample.meta.get('collection-event-name')
+                    _collection_event_name
                 ] += 1
             else:
                 total_samples_by_collection_event_name['unknown'] += 1
@@ -187,28 +203,18 @@ class OurDnaDashboardLayer(BaseLayer):
             ):
                 samples_lost_after_collection[sample.id] = {
                     'time_to_process_start': time_to_process_start,
-                    'collection_time': sample.meta.get('collection-time'),
-                    'process_start_time': sample.meta.get('process-start-time'),
-                    'process_end_time': sample.meta.get('process-end-time'),
-                    'received_time': sample.meta.get('received-time'),
-                    'received_by': sample.meta.get('received-by'),
-                    'collection_lab': sample.meta.get('collection-lab'),
-                    'courier': sample.meta.get('courier'),
-                    'courier_tracking_number': sample.meta.get(
-                        'courier-tracking-number'
-                    ),
-                    'courier_scheduled_pickup_time': sample.meta.get(
-                        'courier-scheduled-pickup-time'
-                    ),
-                    'courier_actual_pickup_time': sample.meta.get(
-                        'courier-actual-pickup-time'
-                    ),
-                    'courier_scheduled_dropoff_time': sample.meta.get(
-                        'courier-scheduled-dropoff-time'
-                    ),
-                    'courier_actual_dropoff_time': sample.meta.get(
-                        'courier-actual-dropoff-time'
-                    ),
+                    'collection_time': self.get_meta_property(sample=sample, property_name='collection-time'),
+                    'process_start_time': self.get_meta_property(sample=sample, property_name='process-start-time'),
+                    'process_end_time': self.get_meta_property(sample=sample, property_name='process-end-time'),
+                    'received_time': self.get_meta_property(sample=sample, property_name='received-time'),
+                    'received_by': self.get_meta_property(sample=sample, property_name='received-by'),
+                    'collection_lab': self.get_meta_property(sample=sample, property_name='collection-lab'),
+                    'courier': self.get_meta_property(sample=sample, property_name='courier'),
+                    'courier_tracking_number': self.get_meta_property(sample=sample, property_name='courier-tracking-number'),
+                    'courier_scheduled_pickup_time': self.get_meta_property(sample=sample, property_name='courier-scheduled-pickup-time'),
+                    'courier_actual_pickup_time': self.get_meta_property(sample=sample, property_name='courier-actual-pickup-time'),
+                    'courier_scheduled_dropoff_time': self.get_meta_property(sample=sample, property_name='courier-scheduled-dropoff-time'),
+                    'courier_actual_dropoff_time': self.get_meta_property(sample=sample, property_name='courier-actual-dropoff-time'),
                 }
 
             # Get the concentration of the sample where the concentration is more than 1 ug of DNA
