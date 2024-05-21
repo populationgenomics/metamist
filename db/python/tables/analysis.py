@@ -346,7 +346,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
         _query = f"""
 SELECT a.id as id, a.type as type, a.status as status,
-        a.output as output, a_sg.sample_id as sample_id,
+        a.output as output, a_sg.sequencing_group_id as sequencing_group_id,
         a.project as project, a.timestamp_completed as timestamp_completed,
         a.meta as meta
 FROM analysis_sequencing_group a_sg
@@ -362,9 +362,9 @@ WHERE a.id = (
         if len(rows) == 0:
             raise NotFoundError(f"Couldn't find any analysis with type {analysis_type}")
         a = AnalysisInternal.from_db(**dict(rows[0]))
-        # .from_db maps 'sample_id' -> sample_ids
+        # .from_db maps 'sequencing_group_id' -> sequencing_group_ids
         for row in rows[1:]:
-            a.sample_ids.append(row['sample_id'])
+            a.sequencing_group_ids.append(row['sequencing_group_id'])
 
         return a
 
@@ -424,7 +424,7 @@ GROUP BY a.id
         _query = """
 SELECT
     a.id AS id, a.type as type, a.status as status, a.output as output,
-    a.project as project, a_sg.sequencing_group_id as sample_id,
+    a.project as project, a_sg.sequencing_group_id,
     a.timestamp_completed as timestamp_completed, a.meta as meta
 FROM analysis a
 LEFT JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
@@ -477,7 +477,7 @@ WHERE a.id = :analysis_id
 
         a = AnalysisInternal.from_db(**dict(rows[0]))
         for row in rows[1:]:
-            a.sample_ids.append(row['sequencing_group_id'])
+            a.sequencing_group_ids.append(row['sequencing_group_id'])
 
         return project, a
 
