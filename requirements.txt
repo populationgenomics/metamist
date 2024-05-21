@@ -7,7 +7,7 @@ cpg-utils>=5.0.5
 aiohttp
 async_lru
 cloudpathlib
-requests
+requests==2.31.0
 google-auth>=2.19.0
 google-cloud-secret-manager==2.8.0
 google-cloud-bigquery==3.11.4
