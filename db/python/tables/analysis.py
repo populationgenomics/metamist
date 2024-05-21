@@ -482,52 +482,6 @@ WHERE a.id = :analysis_id
 
         return project, a
 
-    async def get_analyses_for_samples(
-        self,
-        sample_ids: list[int],
-        analysis_type: str | None,
-        status: AnalysisStatus | None,
-    ) -> tuple[set[ProjectId], list[AnalysisInternal]]:
-        """
-        Get relevant analyses for a sample, optional type / status filters
-        map_sample_ids will map the Analysis.sample_ids component,
-        not required for GraphQL sources.
-        """
-        values: dict[str, Any] = {'sample_ids': sample_ids}
-        wheres = ['a_sg.sequencing_group_id IN :sequencing_group_ids']
-
-        if analysis_type:
-            wheres.append('a.type = :atype')
-            values['atype'] = analysis_type
-
-        if status:
-            wheres.append('a.status = :status')
-            values['status'] = status.value
-
-        _query = f"""
-    SELECT
-        a.id as id, a.type as type, a.status as status,
-        a.output as output, a.project as project,
-        a_sg.sequencing_group_id as sequencing_group_id,
-        a.timestamp_completed as timestamp_completed, a.meta as meta
-    FROM analysis a
-    INNER JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
-    WHERE {' AND '.join(wheres)}
-        """
-
-        rows = await self.connection.fetch_all(_query, values)
-        analyses = {}
-        projects: set[ProjectId] = set()
-        for a in rows:
-            a_id = a['id']
-            if a_id not in analyses:
-                analyses[a_id] = AnalysisInternal.from_db(**dict(a))
-                projects.add(a['project'])
-
-            analyses[a_id].sample_ids.append(a['sample_id'])
-
-        return projects, list(analyses.values())
-
     async def get_sample_cram_path_map_for_seqr(
         self,
         project: ProjectId,
