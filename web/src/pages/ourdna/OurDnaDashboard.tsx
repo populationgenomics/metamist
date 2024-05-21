@@ -30,9 +30,28 @@ const icons = {
     red_alarm: '/dashboard_icons/red_alarm.svg',
 }
 
+type OurDNADashboardData = {
+    project: {
+        ourdnaDashboard: {
+            participants_signed_not_consented: number[]
+            participants_consented_not_collected: number[]
+            samples_lost_after_collection: Record<string, Record<string, any>>
+            collection_to_process_end_time: Record<string, number>
+            collection_to_process_end_time_statistics: {
+                min: number
+                max: number
+                average: number
+            }
+            collection_to_process_end_time_24h: Record<string, number>
+            total_samples_by_collection_event_name: Record<string, number>
+            processing_times_by_site: Record<string, Record<number, number>>
+            samples_concentration_gt_1ug: Record<string, number>
+        }
+    }
+}
 const Dashboard = () => {
-    const { loading, error, data } = useQuery(GET_OURDNA_DASHBOARD, {
-        variables: { project: 'greek-myth' },
+    const { loading, error, data } = useQuery<OurDNADashboardData>(GET_OURDNA_DASHBOARD, {
+        variables: { project: import.meta.env.VITE_OURDNA_PROJECT_NAME || 'ourdna' },
     })
 
     if (!data) return <MuckError message={`Ah Muck, there's no data here`} />
