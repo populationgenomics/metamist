@@ -1,18 +1,5 @@
-// Table is a wrapper around semantic-ui-react's Table component that adds a class
-// to the table if the user has dark mode enabled in their browser.
 import * as React from 'react'
-
-import {
-    Badge,
-    Box,
-    Flex,
-    Stack,
-    Image,
-    Stat,
-    StatLabel,
-    StatNumber,
-    StatHelpText,
-} from '@chakra-ui/react'
+import { Card, Image, Label, Statistic } from 'semantic-ui-react'
 
 interface TileProps {
     header: string
@@ -32,33 +19,31 @@ const Tile: React.FC<TileProps> = ({
     tile_icon,
 }) => {
     return (
-        <Flex height="100%" px="6" borderWidth="1px" borderRadius="lg" boxShadow="lg">
-            <Stat height="100%">
-                <Stack direction="column" spacing={[2, 5]}>
-                    <StatLabel
-                        fontSize={['xs', 'sm', 'md', 'lg']}
-                        fontWeight="bold"
-                        paddingY={['2', '4']}
-                    >
-                        <Flex alignItems="center">
-                            <Image src={tile_icon} alt="Icon" boxSize="24px" mr="2" />
-                            {header}
-                        </Flex>
-                    </StatLabel>
-                    <Flex flexDirection={['column', 'row']}>
-                        <StatNumber fontSize={['md', 'lg', 'xl']}>{stat}</StatNumber>
-                        <Box paddingX={['0', '3']} paddingY={['3', '0']}>
-                            <Badge borderRadius="full" px="2" bg={units_colour} color="white">
+        <Card
+            fluid
+            style={{
+                backgroundColor: 'var(--color-bg-card)',
+                boxShadow: 'rgba(0, 0, 0, 0.24) 0px 3px 8px',
+            }}
+        >
+            <Card.Content>
+                <Card.Header style={{ fontSize: '1.25rem' }}>
+                    <Image src={tile_icon} alt="Icon" size="mini" spaced="right" />
+                    {header}
+                </Card.Header>
+                <Card.Description>
+                    <Statistic size="small">
+                        <Statistic.Value>{stat}</Statistic.Value>
+                        <Statistic.Label style={{ margin: 5 }}>
+                            <Label color="white" style={{ backgroundColor: units_colour }}>
                                 {units}
-                            </Badge>
-                        </Box>
-                    </Flex>
-                    <StatHelpText fontSize={['xs', 'sm']} paddingY={['2', '4']}>
-                        {description}
-                    </StatHelpText>
-                </Stack>
-            </Stat>
-        </Flex>
+                            </Label>
+                        </Statistic.Label>
+                    </Statistic>
+                </Card.Description>
+            </Card.Content>
+            <Card.Content extra>{description}</Card.Content>
+        </Card>
     )
 }
 
