@@ -2,6 +2,7 @@
 import asyncio
 from collections import defaultdict
 from typing import Any
+
 from db.python.layers.base import BaseLayer
 from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectPermissionsTable
@@ -46,9 +47,9 @@ class SeqrProjectsStatsLayer(BaseLayer):
 class SeqrProjectsStatsDb(DbBase):
     """
     Db layer for seqr projects stats summary and details routes
-    
+
     The following queries are used to get the summary and details for the seqr projects stats dashboard
-    For the summary stats, the queries return a dictionary with the project and sequencing type as the key 
+    For the summary stats, the queries return a dictionary with the project and sequencing type as the key
     and the number of families, participants, samples, sequencing groups, CRAMs, etc. as the values.
     """
     # Summary queries
@@ -72,7 +73,7 @@ GROUP BY
     f.project,
     sg.type;
         """
-        
+
         _query_results = await self.connection.fetch_all(
             _query,
             {
@@ -200,7 +201,7 @@ WHERE
         crams_by_project_id_and_seq_type = defaultdict(list)
         for row in _query_results:
             crams_by_project_id_and_seq_type[(row['project'], row['sequencing_type'])].append(row['sequencing_group_id'])
-            
+
         return crams_by_project_id_and_seq_type
 
     async def _latest_annotate_dataset_by_project_id_and_seq_type(
@@ -285,7 +286,7 @@ AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) in :sequencing_types
         )
         latest_es_indices_by_project_id_and_seq_type_and_stage = { (row['project'], row['sequencing_type'], row['stage']): {'id': row['id'], 'output': row['output'], 'timestamp_completed': row['timestamp_completed']} for row in _query_results}
         return defaultdict(dict, latest_es_indices_by_project_id_and_seq_type_and_stage)
-    
+
     # Details queries
     async def _families_by_project_and_sequencing_type(
         self, project_ids: list[ProjectId], sequencing_types: list[str]
@@ -332,8 +333,8 @@ ORDER BY
             families_by_project_id_and_seq_type[(row['project'], row['sequencing_type'])].append(row)
 
         return families_by_project_id_and_seq_type
-    
-    
+
+
     async def _details_sequencing_groups_report_links(
         self, project_ids: list[ProjectId], sequencing_types: list[str]
     ) -> dict[tuple[ProjectId, str, int], dict[str, bool]]:
@@ -345,7 +346,7 @@ WITH mito AS (
     LEFT JOIN analysis_sequencing_group asg on asg.analysis_id=a.id
     WHERE status = 'COMPLETED'
     AND type = 'WEB'
-    AND meta LIKE '%mitoreport%'
+    AND JSON_EXTRACT(meta, '$.stage') = 'MitoReport'
 ),
 stripy AS (
     SELECT DISTINCT asg.sequencing_group_id
@@ -353,7 +354,7 @@ stripy AS (
     LEFT JOIN analysis_sequencing_group asg on asg.analysis_id=a.id
     WHERE status = 'COMPLETED'
     AND type = 'WEB'
-    AND meta LIKE '%stripy%'
+    AND JSON_EXTRACT(meta, '$.stage') = 'Stripy'
 )
 
 SELECT DISTINCT
@@ -384,16 +385,16 @@ WHERE
         )
         return { (row['project'], row['sequencing_type'], row['sequencing_group_id']): {'stripy': row['stripy'], 'mito': row['mito']} for row in _query_results}
 
-    # Helper functions    
+    # Helper functions
     async def _get_sequencing_groups_by_analysis_ids(self, analysis_ids: list[int]) -> defaultdict[int, list[int]]:
         """Get sequencing groups for a list of analysis ids"""
         _query = """
 SELECT
     analysis_id,
     sequencing_group_id
-FROM 
+FROM
     analysis_sequencing_group
-WHERE 
+WHERE
     analysis_id IN :analysis_ids;
         """
         _query_results = await self.connection.fetch_all(
@@ -417,9 +418,9 @@ WHERE
         for group_analysis_rows in all_group_analysis_rows:
             for row in group_analysis_rows.values():
                 analyses_to_query_sequencing_groups.append(row['id'])
-        
+
         return await self._get_sequencing_groups_by_analysis_ids(analyses_to_query_sequencing_groups)
-    
+
     def get_sg_web_report_links(self, sequencing_group_web_reports, project, sequencing_type: str, sequencing_group_id: int):
         """
         Get the web report links for a sequencing group
@@ -428,7 +429,7 @@ WHERE
         sg_reports = sequencing_group_web_reports.get((project.id, sequencing_type, sequencing_group_id))
         if not sg_reports:
             return report_links
-        
+
         stripy = sequencing_group_web_reports[(project.id, sequencing_type, sequencing_group_id)]['stripy']
         if stripy:
             report_links['stripy'] = (
@@ -444,9 +445,9 @@ WHERE
                 f'{project.name}/mito/'
                 f'mitoreport-{sequencing_group_id}/index.html'
             )
-        
+
         return report_links
-    
+
     # Main functions
     async def get_seqr_projects_stats_summary(
         self, project_ids: list[ProjectId], sequencing_types: list[str]
@@ -479,9 +480,9 @@ WHERE
             ),
             self._latest_es_indices_by_project_id_and_seq_type_and_stage(project_ids, sequencing_types,),
         )
-        
-        # Get the sequencing groups for each of the analyses in the grouped analyses rows 
-        # (latest_annotate_dataset and latest_es_indices) 
+
+        # Get the sequencing groups for each of the analyses in the grouped analyses rows
+        # (latest_annotate_dataset and latest_es_indices)
         # TODO: Add multiQC and other grouped analyses to this
         analysis_sequencing_groups = await self.get_analysis_sequencing_groups([latest_annotate_dataset_by_project_id_and_seq_type, latest_es_indices_by_project_id_and_seq_type_and_stage])
 
@@ -554,8 +555,8 @@ WHERE
                 project_ids, sequencing_types
             ),
         )
-        # Get the sequencing groups for each of the analyses in the grouped analyses rows 
-        # (latest_annotate_dataset and latest_es_indices) 
+        # Get the sequencing groups for each of the analyses in the grouped analyses rows
+        # (latest_annotate_dataset and latest_es_indices)
         # TODO: Add multiQC and other grouped analyses to this
         analysis_sequencing_groups = await self.get_analysis_sequencing_groups([latest_annotate_dataset_by_project_id_and_seq_type, latest_es_indices_by_project_id_and_seq_type_and_stage])
 

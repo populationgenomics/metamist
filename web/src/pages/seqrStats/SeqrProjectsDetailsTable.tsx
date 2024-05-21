@@ -51,9 +51,9 @@ const DetailsTableRow: React.FC<{ details: SeqrProjectsDetails }> = ({ details }
 
     return (
         <Table.Row key={`${details.sequencing_group_id}`} className={rowClassName}>
-            <Table.Cell className="dataset-cell">{details.dataset}</Table.Cell>
-            <Table.Cell className="table-cell">{details.sequencing_type}</Table.Cell>
-            <Table.Cell className="table-cell">{details.sample_type}</Table.Cell>
+            <Table.Cell className="category-cell">{details.dataset}</Table.Cell>
+            <Table.Cell className="category-cell">{details.sequencing_type}</Table.Cell>
+            <Table.Cell className="category-cell">{details.sample_type}</Table.Cell>
             <Table.Cell className="table-cell">{details.sequencing_group_id}</Table.Cell>
             <Table.Cell className="table-cell">{details.family_id}</Table.Cell>
             <Table.Cell className="table-cell">{details.family_ext_id}</Table.Cell>
@@ -61,15 +61,26 @@ const DetailsTableRow: React.FC<{ details: SeqrProjectsDetails }> = ({ details }
             <Table.Cell className="table-cell">{details.participant_ext_id}</Table.Cell>
             <Table.Cell className="table-cell">{details.sample_id}</Table.Cell>
             <Table.Cell className="table-cell">{details.sample_ext_ids}</Table.Cell>
-            <Table.Cell className="table-cell">{details.completed_cram ? 'Yes' : 'No'}</Table.Cell>
             <Table.Cell className="table-cell">
-                {details.in_latest_annotate_dataset ? 'Yes' : 'No'}
+                
+                <HtmlTooltip
+                        title={
+                            <p>
+                                {details.in_latest_annotate_dataset}
+                            </p>
+                        }
+                    >
+                        <div>{details.completed_cram ? '✅' : '❌'}%</div>
+                    </HtmlTooltip>
             </Table.Cell>
             <Table.Cell className="table-cell">
-                {details.in_latest_snv_es_index ? 'Yes' : 'No'}
+                {details.in_latest_annotate_dataset ? '✅' : '❌'}
             </Table.Cell>
             <Table.Cell className="table-cell">
-                {details.in_latest_sv_es_index ? 'Yes' : 'No'}
+                {details.in_latest_snv_es_index ? '✅' : '❌'}
+            </Table.Cell>
+            <Table.Cell className="table-cell">
+                {details.in_latest_sv_es_index ? '✅' : '❌'}
             </Table.Cell>
             <Table.Cell className="table-cell">
                 {details.sequencing_group_report_links?.stripy ? (
@@ -114,47 +125,37 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
     selectedMito,
     handleSelectionChange,
 }) => {
-    // const [sortColumn, setSortColumn] = useState<keyof SeqrProjectsDetails| null>(null)
-    // const [sortDirection, setSortDirection] = useState<'ascending' | 'descending'>('ascending')
-    // const handleSort = (column: keyof SeqrProjectsDetails) => {
-    //     if (sortColumn === column) {
-    //         setSortDirection(sortDirection === 'ascending' ? 'descending' : 'ascending')
-    //     } else {
-    //         setSortColumn(column)
-    //         setSortDirection('ascending')
-    //     }
-    // }
+    const [sortColumns, setSortColumns] = useState<
+        Array<{ column: keyof SeqrProjectsDetails; direction: 'ascending' | 'descending' }>
+    >([])
+    const handleSort = (column: keyof SeqrProjectsDetails, isMultiSort: boolean) => {
+        if (isMultiSort) {
+            const existingColumnIndex = sortColumns.findIndex(
+                (sortColumn) => sortColumn.column === column
+            )
 
-    // const sortedData = React.useMemo(() => {
-    //     const data = [...filteredData]
-    //     if (sortColumn) {
-    //         data.sort((a, b) => {
-    //             const valueA = a[sortColumn]
-    //             const valueB = b[sortColumn]
-    //             if (valueA === valueB) return 0
-    //             if (typeof valueA === 'number' && typeof valueB === 'number') {
-    //                 return sortDirection === 'ascending' ? valueA - valueB : valueB - valueA
-    //             } else {
-    //                 return sortDirection === 'ascending'
-    //                     ? String(valueA).localeCompare(String(valueB))
-    //                     : String(valueB).localeCompare(String(valueA))
-    //             }
-    //         })
-    //     }
-    //     return data
-    // }, [filteredData, sortColumn, sortDirection])
-    const [sortColumns, setSortColumns] = useState<Array<{ column: keyof SeqrProjectsDetails; direction: 'ascending' | 'descending' }>>([])
-
-    const handleSort = (column: keyof SeqrProjectsDetails) => {
-        const existingColumnIndex = sortColumns.findIndex((sortColumn) => sortColumn.column === column)
-
-        if (existingColumnIndex !== -1) {
-            const updatedSortColumns = [...sortColumns]
-            updatedSortColumns[existingColumnIndex].direction =
-                updatedSortColumns[existingColumnIndex].direction === 'ascending' ? 'descending' : 'ascending'
-            setSortColumns(updatedSortColumns)
+            if (existingColumnIndex !== -1) {
+                const updatedSortColumns = [...sortColumns]
+                updatedSortColumns[existingColumnIndex].direction =
+                    updatedSortColumns[existingColumnIndex].direction === 'ascending'
+                        ? 'descending'
+                        : 'ascending'
+                setSortColumns(updatedSortColumns)
+            } else {
+                setSortColumns([...sortColumns, { column, direction: 'ascending' }])
+            }
         } else {
-            setSortColumns([...sortColumns, { column, direction: 'ascending' }])
+            if (sortColumns.length === 1 && sortColumns[0].column === column) {
+                setSortColumns([
+                    {
+                        column,
+                        direction:
+                            sortColumns[0].direction === 'ascending' ? 'descending' : 'ascending',
+                    },
+                ])
+            } else {
+                setSortColumns([{ column, direction: 'ascending' }])
+            }
         }
     }
 
@@ -178,7 +179,9 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
         return data
     }, [filteredData, sortColumns])
 
-    const getUniqueOptionsForColumn = (columnName: keyof SeqrProjectsDetails | 'stripy' | 'mito' ) => {
+    const getUniqueOptionsForColumn = (
+        columnName: keyof SeqrProjectsDetails | 'stripy' | 'mito'
+    ) => {
         const filteredDataExcludingCurrentColumn = allData.filter((item) => {
             return (
                 selectedProjects.some((p) => p.name === item.dataset) &&
@@ -221,15 +224,16 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                     selectedInLatestSvEsIndex.length === 0 ||
                     item.in_latest_sv_es_index === (selectedInLatestSvEsIndex[0] === 'true')) &&
                 (columnName === 'stripy' ||
-                    (selectedStripy.length === 0 || item.sequencing_group_report_links?.stripy)) &&
+                    selectedStripy.length === 0 ||
+                    item.sequencing_group_report_links?.stripy) &&
                 (columnName === 'mito' ||
-                    (selectedMito.length === 0 || item.sequencing_group_report_links?.mito)
-                )
+                    selectedMito.length === 0 ||
+                    item.sequencing_group_report_links?.mito)
             )
         })
 
         let uniqueOptions: string[] = []
-        switch(columnName) {
+        switch (columnName) {
             case 'stripy':
             case 'mito':
                 uniqueOptions = Array.from(
@@ -238,8 +242,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                             item.sequencing_group_report_links?.[columnName] ? 'Yes' : 'No'
                         )
                     )
-                );
-                break;
+                )
+                break
             case 'completed_cram':
             case 'in_latest_annotate_dataset':
             case 'in_latest_snv_es_index':
@@ -250,12 +254,12 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                             item[columnName] ? 'Yes' : 'No'
                         )
                     )
-                );
-                break;
+                )
+                break
             default:
                 uniqueOptions = Array.from(
                     new Set(filteredDataExcludingCurrentColumn.map((item) => item[columnName]))
-                ).map((option) => option?.toString() || '');
+                ).map((option) => option?.toString() || '')
         }
 
         return uniqueOptions
@@ -267,21 +271,32 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                 <Table.Row>
                     <Table.HeaderCell
                         className="header-cell"
-                        sorted={sortColumns === 'dataset' ? sortDirection : undefined}
-                        onClick={() => handleSort('dataset')}
+                        sorted={
+                            sortColumns.find((column) => column.column === 'dataset')?.direction
+                        }
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('dataset', event.shiftKey)
+                        }
                     >
                         Dataset
                     </Table.HeaderCell>
                     <Table.HeaderCell
                         className="header-cell"
-                        sorted={sortColumn === 'sequencing_type' ? sortDirection : undefined}
-                        onClick={() => handleSort('sequencing_type')}
+                        sorted={
+                            sortColumns.find((column) => column.column === 'sequencing_type')
+                                ?.direction
+                        }
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('sequencing_type', event.shiftKey)
+                        }
                     >
                         Seq Type
                     </Table.HeaderCell>
                     <Table.HeaderCell
                         className="header-cell"
-                        onClick={() => handleSort('sample_type')}
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('sample_type', event.shiftKey)
+                        }
                     >
                         <div className="filter-button">
                             <FilterButton
@@ -293,20 +308,24 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 }
                             />
                         </div>
-                        {sortColumns.find(column => column.column === 'sample_type') && (
-                                <Icon
-                                    name={sortColumns.find(column => column.column === 'sample_type')?.direction === 'ascending' ? 'caret up' : 'caret down'}
-                                    className="sort-icon"
-                                />
-                            )}
-                        <div className="header-text">
-                            Sample Type
-                            
-                        </div>
+                        {sortColumns.find((column) => column.column === 'sample_type') && (
+                            <Icon
+                                name={
+                                    sortColumns.find((column) => column.column === 'sample_type')
+                                        ?.direction === 'ascending'
+                                        ? 'caret up'
+                                        : 'caret down'
+                                }
+                                className="sort-icon"
+                            />
+                        )}
+                        <div className="header-text">Sample Type</div>
                     </Table.HeaderCell>
                     <Table.HeaderCell
                         className="header-cell"
-                        onClick={() => handleSort('sequencing_group_id')}
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('sequencing_group_id', event.shiftKey)
+                        }
                     >
                         <div className="filter-button">
                             <FilterButton
@@ -318,20 +337,25 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 }
                             />
                         </div>
-                        {sortColumn === 'sequencing_group_id' && (
-                                <Icon
-                                    name={sortDirection === 'ascending' ? 'caret up' : 'caret down'}
-                                    className="sort-icon"
-                                />
-                            )}
-                        <div className="header-text">
-                            SG ID
-                            
-                        </div>
+                        {sortColumns.find((column) => column.column === 'sequencing_group_id') && (
+                            <Icon
+                                name={
+                                    sortColumns.find(
+                                        (column) => column.column === 'sequencing_group_id'
+                                    )?.direction === 'ascending'
+                                        ? 'caret up'
+                                        : 'caret down'
+                                }
+                                className="sort-icon"
+                            />
+                        )}
+                        <div className="header-text">SG ID</div>
                     </Table.HeaderCell>
                     <Table.HeaderCell
                         className="header-cell"
-                        onClick={() => handleSort('family_id')}
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('family_id', event.shiftKey)
+                        }
                     >
                         <div className="filter-button">
                             <FilterButton
@@ -343,20 +367,24 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 }
                             />
                         </div>
-                        {sortColumn === 'family_id' && (
-                                <Icon
-                                    name={sortDirection === 'ascending' ? 'caret up' : 'caret down'}
-                                    className="sort-icon"
-                                />
-                            )}
-                        <div className="header-text">
-                            Family ID
-                            
-                        </div>
+                        {sortColumns.find((column) => column.column === 'family_id') && (
+                            <Icon
+                                name={
+                                    sortColumns.find((column) => column.column === 'family_id')
+                                        ?.direction === 'ascending'
+                                        ? 'caret up'
+                                        : 'caret down'
+                                }
+                                className="sort-icon"
+                            />
+                        )}
+                        <div className="header-text">Family ID</div>
                     </Table.HeaderCell>
                     <Table.HeaderCell
                         className="header-cell"
-                        onClick={() => handleSort('family_ext_id')}
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('family_ext_id', event.shiftKey)
+                        }
                     >
                         <div className="filter-button">
                             <FilterButton
@@ -368,20 +396,24 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 }
                             />
                         </div>
-                        {sortColumn === 'family_ext_id' && (
-                                <Icon
-                                    name={sortDirection === 'ascending' ? 'caret up' : 'caret down'}
-                                    className="sort-icon"
-                                />
-                            )}
-                        <div className="header-text">
-                            Family Ext. ID
-                            
-                        </div>
+                        {sortColumns.find((column) => column.column === 'family_ext_id') && (
+                            <Icon
+                                name={
+                                    sortColumns.find((column) => column.column === 'family_ext_id')
+                                        ?.direction === 'ascending'
+                                        ? 'caret up'
+                                        : 'caret down'
+                                }
+                                className="sort-icon"
+                            />
+                        )}
+                        <div className="header-text">Family Ext. ID</div>
                     </Table.HeaderCell>
                     <Table.HeaderCell
                         className="header-cell"
-                        onClick={() => handleSort('participant_id')}
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('participant_id', event.shiftKey)
+                        }
                     >
                         <div className="filter-button">
                             <FilterButton
@@ -393,20 +425,24 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 }
                             />
                         </div>
-                        {sortColumn === 'participant_id' && (
-                                <Icon
-                                    name={sortDirection === 'ascending' ? 'caret up' : 'caret down'}
-                                    className="sort-icon"
-                                />
-                            )}
-                        <div className="header-text">
-                            Participant ID
-                            
-                        </div>
+                        {sortColumns.find((column) => column.column === 'participant_id') && (
+                            <Icon
+                                name={
+                                    sortColumns.find((column) => column.column === 'participant_id')
+                                        ?.direction === 'ascending'
+                                        ? 'caret up'
+                                        : 'caret down'
+                                }
+                                className="sort-icon"
+                            />
+                        )}
+                        <div className="header-text">Participant ID</div>
                     </Table.HeaderCell>
                     <Table.HeaderCell
                         className="header-cell"
-                        onClick={() => handleSort('participant_ext_id')}
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('participant_ext_id', event.shiftKey)
+                        }
                     >
                         <div className="filter-button">
                             <FilterButton
@@ -418,20 +454,25 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 }
                             />
                         </div>
-                        {sortColumn === 'participant_ext_id' && (
-                                <Icon
-                                    name={sortDirection === 'ascending' ? 'caret up' : 'caret down'}
-                                    className="sort-icon"
-                                />
-                            )}
-                        <div className="header-text">
-                            Participant Ext. ID
-                            
-                        </div>
+                        {sortColumns.find((column) => column.column === 'participant_ext_id') && (
+                            <Icon
+                                name={
+                                    sortColumns.find(
+                                        (column) => column.column === 'participant_ext_id'
+                                    )?.direction === 'ascending'
+                                        ? 'caret up'
+                                        : 'caret down'
+                                }
+                                className="sort-icon"
+                            />
+                        )}
+                        <div className="header-text">Participant Ext. ID</div>
                     </Table.HeaderCell>
                     <Table.HeaderCell
                         className="header-cell"
-                        onClick={() => handleSort('sample_id')}
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('sample_id', event.shiftKey)
+                        }
                     >
                         <div className="filter-button">
                             <FilterButton
@@ -443,19 +484,24 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 }
                             />
                         </div>
-                        {sortColumn === 'sample_id' && (
-                                <Icon
-                                    name={sortDirection === 'ascending' ? 'caret up' : 'caret down'}
-                                    className="sort-icon"
-                                />
-                            )}
-                        <div className="header-text">
-                            Sample ID
-                        </div>
+                        {sortColumns.find((column) => column.column === 'sample_id') && (
+                            <Icon
+                                name={
+                                    sortColumns.find((column) => column.column === 'sample_id')
+                                        ?.direction === 'ascending'
+                                        ? 'caret up'
+                                        : 'caret down'
+                                }
+                                className="sort-icon"
+                            />
+                        )}
+                        <div className="header-text">Sample ID</div>
                     </Table.HeaderCell>
                     <Table.HeaderCell
                         className="header-cell"
-                        onClick={() => handleSort('sample_ext_ids')}
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('sample_ext_ids', event.shiftKey)
+                        }
                     >
                         <div className="filter-button">
                             <FilterButton
@@ -467,20 +513,32 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 }
                             />
                         </div>
-                        {sortColumn === 'sample_ext_ids' && (
-                                <Icon
-                                    name={sortDirection === 'ascending' ? 'caret up' : 'caret down'}
-                                    className="sort-icon"
-                                />
-                            )}
-                        <div className="header-text">
-                            Sample Ext. ID(s)
-                            
-                        </div>
+                        {sortColumns.find((column) => column.column === 'sample_ext_ids') && (
+                            <Icon
+                                name={
+                                    sortColumns.find((column) => column.column === 'sample_ext_ids')
+                                        ?.direction === 'ascending'
+                                        ? 'caret up'
+                                        : 'caret down'
+                                }
+                                className="sort-icon"
+                            />
+                        )}
+                        <div className="header-text">Sample Ext. ID(s)</div>
                     </Table.HeaderCell>
                     <Table.HeaderCell
                         className="header-cell"
-                        onClick={() => handleSort('completed_cram')}
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('completed_cram', event.shiftKey)
+                        }
+                        // On mouse over, reveal the column name and expand column width to show the full name
+                        onMouseEnter={(event: React.MouseEvent<HTMLElement>) => 
+                            event.currentTarget.style.width = '200px' 
+                        }
+                        // On mouse leave, hide the column name and shrink column width
+                        onMouseLeave={(event: React.MouseEvent<HTMLElement>) => 
+                            event.currentTarget.style.width = '50px'
+                        }
                     >
                         <div className="filter-button">
                             <FilterButton
@@ -492,19 +550,24 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 }
                             />
                         </div>
-                        {sortColumn === 'completed_cram' && (
-                                <Icon
-                                    name={sortDirection === 'ascending' ? 'caret up' : 'caret down'}
-                                    className="sort-icon"
-                                />
-                            )}
-                        <div className="header-text">
-                            CRAM
-                        </div>
+                        {sortColumns.find((column) => column.column === 'completed_cram') && (
+                            <Icon
+                                name={
+                                    sortColumns.find((column) => column.column === 'completed_cram')
+                                        ?.direction === 'ascending'
+                                        ? 'caret up'
+                                        : 'caret down'
+                                }
+                                className="sort-icon"
+                            />
+                        )}
+                        <div className="header-text">CRAM</div>
                     </Table.HeaderCell>
                     <Table.HeaderCell
                         className="header-cell"
-                        onClick={() => handleSort('in_latest_annotate_dataset')}
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('in_latest_annotate_dataset', event.shiftKey)
+                        }
                     >
                         <div className="filter-button">
                             <FilterButton
@@ -519,19 +582,27 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 }
                             />
                         </div>
-                        {sortColumn === 'in_latest_annotate_dataset' && (
-                                <Icon
-                                    name={sortDirection === 'ascending' ? 'caret up' : 'caret down'}
-                                    className="sort-icon"
-                                />
-                            )}
-                        <div className="header-text">
-                            Joint Callset
-                        </div>
+                        {sortColumns.find(
+                            (column) => column.column === 'in_latest_annotate_dataset'
+                        ) && (
+                            <Icon
+                                name={
+                                    sortColumns.find(
+                                        (column) => column.column === 'in_latest_annotate_dataset'
+                                    )?.direction === 'ascending'
+                                        ? 'caret up'
+                                        : 'caret down'
+                                }
+                                className="sort-icon"
+                            />
+                        )}
+                        <div className="header-text">Joint Callset</div>
                     </Table.HeaderCell>
                     <Table.HeaderCell
                         className="header-cell"
-                        onClick={() => handleSort('in_latest_snv_es_index')}
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('in_latest_snv_es_index', event.shiftKey)
+                        }
                     >
                         <div className="filter-button">
                             <FilterButton
@@ -543,19 +614,27 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 }
                             />
                         </div>
-                        {sortColumn === 'in_latest_snv_es_index' && (
-                                <Icon
-                                    name={sortDirection === 'ascending' ? 'caret up' : 'caret down'}
-                                    className="sort-icon"
-                                />
-                            )}
-                        <div className="header-text">
-                            SNV ES-Index
-                        </div>
+                        {sortColumns.find(
+                            (column) => column.column === 'in_latest_snv_es_index'
+                        ) && (
+                            <Icon
+                                name={
+                                    sortColumns.find(
+                                        (column) => column.column === 'in_latest_snv_es_index'
+                                    )?.direction === 'ascending'
+                                        ? 'caret up'
+                                        : 'caret down'
+                                }
+                                className="sort-icon"
+                            />
+                        )}
+                        <div className="header-text">SNV ES-Index</div>
                     </Table.HeaderCell>
                     <Table.HeaderCell
                         className="header-cell"
-                        onClick={() => handleSort('in_latest_sv_es_index')}
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('in_latest_sv_es_index', event.shiftKey)
+                        }
                     >
                         <div className="filter-button">
                             <FilterButton
@@ -567,15 +646,21 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 }
                             />
                         </div>
-                        {sortColumn === 'in_latest_sv_es_index' && (
-                                <Icon
-                                    name={sortDirection === 'ascending' ? 'caret up' : 'caret down'}
-                                    className="sort-icon"
-                                />
-                            )}
-                        <div className="header-text">
-                            SV ES-Index
-                        </div>
+                        {sortColumns.find(
+                            (column) => column.column === 'in_latest_sv_es_index'
+                        ) && (
+                            <Icon
+                                name={
+                                    sortColumns.find(
+                                        (column) => column.column === 'in_latest_sv_es_index'
+                                    )?.direction === 'ascending'
+                                        ? 'caret up'
+                                        : 'caret down'
+                                }
+                                className="sort-icon"
+                            />
+                        )}
+                        <div className="header-text">SV ES-Index</div>
                     </Table.HeaderCell>
                     <Table.HeaderCell className="header-cell">
                         <div className="filter-button">

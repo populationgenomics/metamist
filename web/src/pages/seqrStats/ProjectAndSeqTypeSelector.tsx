@@ -59,7 +59,8 @@ const ProjectAndSeqTypeSelector: React.FC<ProjectAndSeqTypeSelectorProps> = ({
             <div style={{ flex: '1', marginRight: '20px' }}>
                 <h2 style={{ fontSize: '18px', marginBottom: '10px' }}>Select Projects</h2>
                 <div style={{ marginBottom: '10px' }}>
-                    <Checkbox className='seq-type-project-checkbox'
+                    <Checkbox
+                        className="seq-type-project-checkbox"
                         label="Select All"
                         checked={selectedProjects.length === projects.length}
                         onChange={(_, data) =>
@@ -74,7 +75,8 @@ const ProjectAndSeqTypeSelector: React.FC<ProjectAndSeqTypeSelectorProps> = ({
                 <div style={{ maxHeight: '200px', overflowY: 'auto', columns: 2 }}>
                     {projects.map((project) => (
                         <div key={project.id}>
-                            <Checkbox className='seq-type-project-checkbox'
+                            <Checkbox
+                                className="seq-type-project-checkbox"
                                 label={project.name}
                                 checked={selectedProjects.includes(project.name)}
                                 onChange={(_, data) =>
@@ -88,7 +90,8 @@ const ProjectAndSeqTypeSelector: React.FC<ProjectAndSeqTypeSelectorProps> = ({
             <div style={{ flex: '1' }}>
                 <h2 style={{ fontSize: '18px', marginBottom: '10px' }}>Select Sequencing Types</h2>
                 <div style={{ marginBottom: '10px' }}>
-                    <Checkbox className='seq-type-project-checkbox'
+                    <Checkbox
+                        className="seq-type-project-checkbox"
                         style={{ marginRight: '50px' }}
                         label="Select All"
                         checked={selectedSeqTypes.length === seqTypes.length}
@@ -100,11 +103,11 @@ const ProjectAndSeqTypeSelector: React.FC<ProjectAndSeqTypeSelectorProps> = ({
                             )
                         }
                     />
-                    <Checkbox className='seq-type-project-checkbox'
+                    <Checkbox
+                        className="seq-type-project-checkbox"
                         style={{ marginLeft: '50px' }}
                         label="WGS & WES Only"
-                        labelColor='blue'
-                        
+                        labelColor="blue"
                         // When this button is clicked, the 'genome' and 'exome' checkboxes should be checked and the rest should be unchecked
                         checked={
                             selectedSeqTypes.includes('genome') &&
@@ -124,7 +127,8 @@ const ProjectAndSeqTypeSelector: React.FC<ProjectAndSeqTypeSelectorProps> = ({
                 <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
                     {seqTypes.map((seqType) => (
                         <div key={seqType}>
-                            <Checkbox className='seq-type-project-checkbox'
+                            <Checkbox
+                                className="seq-type-project-checkbox"
                                 label={seqType}
                                 checked={selectedSeqTypes.includes(seqType)}
                                 onChange={(_, data) =>

@@ -19,18 +19,15 @@ const InsightsStats: React.FC = () => {
     const [selectedSeqTypes, setSelectedSeqTypes] = React.useState<string[]>([])
 
     useEffect(() => {
-        Promise.all([
-            new EnumsApi().getSequencingTypes(),
-            new ProjectApi().getSeqrProjects({}),
-        ])
+        Promise.all([new EnumsApi().getSequencingTypes(), new ProjectApi().getSeqrProjects({})])
             .then(([seqTypesResp, projectsResp]) => {
                 const sequencingTypes: string[] = seqTypesResp.data
                 setSeqTypes(sequencingTypes)
-    
+
                 const projects: { id: number; name: string }[] = projectsResp.data
                 setSeqrProjectNames(projects.map((project) => project.name))
                 setSeqrProjectIds(projects.map((project) => project.id))
-    
+
                 // Call getProjectsInsightsStats with the project IDs and sequencing types
                 return new SeqrProjectsStatsApi().getSeqrProjectsStats({
                     project_ids: projects.map((project) => project.id),

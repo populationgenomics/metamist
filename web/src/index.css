@@ -326,29 +326,57 @@ html[data-theme='dark-mode'] .ui.table {
 
 .ui.table .table-cell {
     text-align: center;
+    vertical-align: middle;
+    /* font-size: 0.8em; */
     color: var(--color-text-primary) !important;
     word-wrap: break-word !important;
     overflow-wrap: break-word !important;
-    white-space: normal !important; /* Add this line */
+    /* white-space: normal !important; */
 }
 
 .ui.table .header-cell {
     text-align: center;
     font-size: 1.1em;
-    padding: 10px !important;
+    padding: 30px 5px 10px !important;
     min-width: 100px !important;
-    max-width: 300px !important;
+    max-width: 350px !important;
     word-wrap: break-word !important;
     overflow-wrap: break-word !important;
-    white-space: normal !important; /* Add this line */
+    white-space: normal !important;
     color: var(--color-text-primary) !important;
     background-color: var(--color-header-row) !important;
     border-color: var(--color-border-default) !important;
+    position: relative;
+    min-height: 80px;
+    justify-content: center;
 }
 
-.ui.table .dataset-cell {
+.header-cell .header-text {
+    margin-top: 20px;
+}
+
+.header-cell .filter-button {
+    position: absolute;
+    top: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+}
+
+.header-cell .sort-icon {
+    position: absolute;
+    top: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+}
+
+.ui.table .category-cell {
     text-align: center;
+    vertical-align: middle;
     color: var(--color-text-primary);
+    font-size: 1.25em;
+    font-weight: bold;
 }
 
 .exome-row {
@@ -380,5 +408,5 @@ html[data-theme='dark-mode'] .ui.table {
 .seq-type-project-checkbox {
     label {
         color: var(--color-text-primary) !important;
-    };
+    }
 }

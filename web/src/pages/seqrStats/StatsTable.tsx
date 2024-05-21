@@ -10,11 +10,11 @@ interface StatsTableProps {
 }
 
 function getPercentageColor(percentage: number, isDarkMode: boolean) {
-    const hue = (percentage / 100) * 120; // Convert percentage to hue value (0-120)
-    const saturation = isDarkMode ? '100%' : '90%'; // Set saturation based on mode
-    const lightness = isDarkMode ? '25%' : '75%'; // Set lightness based on mode
-  
-    return `hsl(${hue}, ${saturation}, ${lightness})`;
+    const hue = (percentage / 100) * 120 // Convert percentage to hue value (0-120)
+    const saturation = isDarkMode ? '100%' : '90%' // Set saturation based on mode
+    const lightness = isDarkMode ? '25%' : '75%' // Set lightness based on mode
+
+    return `hsl(${hue}, ${saturation}, ${lightness})`
 }
 
 const HtmlTooltip = (props: TooltipProps) => (
@@ -64,18 +64,19 @@ const StatsTableRow: React.FC<{ stats: SeqrProjectsSummary }> = ({ stats }) => {
             <Table.Cell className="table-cell">{stats.total_samples}</Table.Cell>
             <Table.Cell className="table-cell">{stats.total_sequencing_groups}</Table.Cell>
             <Table.Cell className="table-cell">{stats.total_crams}</Table.Cell>
-            <Table.Cell className="table-cell"
+            <Table.Cell
+                className="table-cell"
                 style={{
                     textAlign: 'center',
                     backgroundColor: getPercentageColor(percentageAligned, isDarkMode),
                 }}
             >
                 <div style={{ display: 'flex', justifyContent: 'center' }}>
-                    <HtmlTooltip 
+                    <HtmlTooltip
                         title={
                             <p>
                                 {stats.total_crams} / {stats.total_sequencing_groups} Total
-                                 Sequencing Groups with a Completed CRAM Analysis
+                                Sequencing Groups with a Completed CRAM Analysis
                             </p>
                         }
                     >
@@ -83,7 +84,8 @@ const StatsTableRow: React.FC<{ stats: SeqrProjectsSummary }> = ({ stats }) => {
                     </HtmlTooltip>
                 </div>
             </Table.Cell>
-            <Table.Cell className="table-cell"
+            <Table.Cell
+                className="table-cell"
                 style={{
                     textAlign: 'center',
                     backgroundColor: getPercentageColor(percentageInJointCall, isDarkMode),
@@ -95,8 +97,8 @@ const StatsTableRow: React.FC<{ stats: SeqrProjectsSummary }> = ({ stats }) => {
                             <p>
                                 {stats.latest_annotate_dataset?.sg_count} /{' '}
                                 {stats.total_sequencing_groups} Total Sequencing Groups in the
-                                latest {stats.sequencing_type} AnnotateDataset analysis
-                                Analysis ID: {stats.latest_annotate_dataset?.id}
+                                latest {stats.sequencing_type} AnnotateDataset analysis Analysis ID:{' '}
+                                {stats.latest_annotate_dataset?.id}
                             </p>
                         }
                     >
@@ -104,7 +106,8 @@ const StatsTableRow: React.FC<{ stats: SeqrProjectsSummary }> = ({ stats }) => {
                     </HtmlTooltip>
                 </div>
             </Table.Cell>
-            <Table.Cell className="table-cell"
+            <Table.Cell
+                className="table-cell"
                 style={{
                     textAlign: 'center',
                     backgroundColor: getPercentageColor(percentageInSnvIndex, isDarkMode),
@@ -113,19 +116,20 @@ const StatsTableRow: React.FC<{ stats: SeqrProjectsSummary }> = ({ stats }) => {
                 <div style={{ display: 'flex', justifyContent: 'center' }}>
                     <HtmlTooltip
                         title={
-                                <p>
-                                    {stats.latest_snv_es_index?.sg_count} /{' '}
-                                    {stats.total_sequencing_groups} Total Sequencing Groups in the
-                                    latest {stats.sequencing_type} SNV Elasticsearch Index
-                                    Analysis ID: {stats.latest_snv_es_index?.id}
-                                </p>
+                            <p>
+                                {stats.latest_snv_es_index?.sg_count} /{' '}
+                                {stats.total_sequencing_groups} Total Sequencing Groups in the
+                                latest {stats.sequencing_type} SNV Elasticsearch Index Analysis ID:{' '}
+                                {stats.latest_snv_es_index?.id}
+                            </p>
                         }
                     >
                         <div>{percentageInSnvIndex.toFixed(2)}%</div>
                     </HtmlTooltip>
                 </div>
             </Table.Cell>
-            <Table.Cell className="table-cell"
+            <Table.Cell
+                className="table-cell"
                 style={{
                     textAlign: 'center',
                     backgroundColor: getPercentageColor(percentageInSvIndex, isDarkMode),
@@ -134,12 +138,12 @@ const StatsTableRow: React.FC<{ stats: SeqrProjectsSummary }> = ({ stats }) => {
                 <div style={{ display: 'flex', justifyContent: 'center' }}>
                     <HtmlTooltip
                         title={
-                                <p>
-                                    {stats.latest_sv_es_index?.sg_count} /{' '}
-                                    {stats.total_sequencing_groups} Total Sequencing Groups in the
-                                    latest {stats.sequencing_type} SV Elasticsearch Index
-                                    Analysis ID: {stats.latest_sv_es_index?.id}
-                                </p>
+                            <p>
+                                {stats.latest_sv_es_index?.sg_count} /{' '}
+                                {stats.total_sequencing_groups} Total Sequencing Groups in the
+                                latest {stats.sequencing_type} SV Elasticsearch Index Analysis ID:{' '}
+                                {stats.latest_sv_es_index?.id}
+                            </p>
                         }
                     >
                         <div>{percentageInSvIndex.toFixed(2)}%</div>
@@ -238,53 +242,57 @@ const StatsTable: React.FC<StatsTableProps> = ({ filteredData }) => {
                     </Table.HeaderCell>
                     <Table.HeaderCell className="header-cell">
                         <div style={{ display: 'flex', justifyContent: 'center' }}>
-                            <HtmlTooltip 
+                            <HtmlTooltip
                                 title={
                                     <p>
-                                        Percentage of Sequencing Groups with a Completed CRAM Analysis
+                                        Percentage of Sequencing Groups with a Completed CRAM
+                                        Analysis
                                     </p>
                                 }
                             >
-                            <div>% Aligned</div>
+                                <div>% Aligned</div>
                             </HtmlTooltip>
                         </div>
                     </Table.HeaderCell>
                     <Table.HeaderCell className="header-cell">
-                    <div style={{ display: 'flex', justifyContent: 'center' }}>
-                            <HtmlTooltip 
+                        <div style={{ display: 'flex', justifyContent: 'center' }}>
+                            <HtmlTooltip
                                 title={
                                     <p>
-                                        Percentage of Sequencing Groups in the latest AnnotateDataset Analysis
+                                        Percentage of Sequencing Groups in the latest
+                                        AnnotateDataset Analysis
                                     </p>
                                 }
                             >
-                            <div>% in Annotated Dataset</div>
+                                <div>% in Annotated Dataset</div>
                             </HtmlTooltip>
                         </div>
                     </Table.HeaderCell>
                     <Table.HeaderCell className="header-cell">
-                    <div style={{ display: 'flex', justifyContent: 'center' }}>
-                            <HtmlTooltip 
+                        <div style={{ display: 'flex', justifyContent: 'center' }}>
+                            <HtmlTooltip
                                 title={
                                     <p>
-                                        Percentage of Sequencing Groups in the latest SNV ES-Index Analysis
+                                        Percentage of Sequencing Groups in the latest SNV ES-Index
+                                        Analysis
                                     </p>
                                 }
                             >
-                            <div>% in SNV ES-Index</div>
+                                <div>% in SNV ES-Index</div>
                             </HtmlTooltip>
                         </div>
                     </Table.HeaderCell>
                     <Table.HeaderCell className="header-cell">
-                    <div style={{ display: 'flex', justifyContent: 'center' }}>
-                            <HtmlTooltip 
+                        <div style={{ display: 'flex', justifyContent: 'center' }}>
+                            <HtmlTooltip
                                 title={
                                     <p>
-                                        Percentage of Sequencing Groups in the latest SV (genome) or gCNV (exome) ES-Index Analysis
+                                        Percentage of Sequencing Groups in the latest SV (genome) or
+                                        gCNV (exome) ES-Index Analysis
                                     </p>
                                 }
                             >
-                            <div>% in SV ES-Index</div>
+                                <div>% in SV ES-Index</div>
                             </HtmlTooltip>
                         </div>
                     </Table.HeaderCell>
@@ -299,7 +307,7 @@ const StatsTable: React.FC<StatsTableProps> = ({ filteredData }) => {
                 ))}
             </Table.Body>
             <Table.Footer>
-                <Table.Row className="grand-total-row" key="grandTotals" >
+                <Table.Row className="grand-total-row" key="grandTotals">
                     <Table.Cell className="table-cell">Grand Total</Table.Cell>
                     <Table.Cell className="table-cell">{sortedData.length} entries</Table.Cell>
                     <Table.Cell className="table-cell">
@@ -321,60 +329,59 @@ const StatsTable: React.FC<StatsTableProps> = ({ filteredData }) => {
                         <div style={{ display: 'flex', justifyContent: 'center' }}>
                             <HtmlTooltip
                                 title={
-                                        <p>
-                                            {filteredData.reduce(
-                                                (acc, curr) => acc + curr.total_crams,
-                                                0
-                                            )}{' '}
-                                            /{' '}
-                                            {filteredData.reduce(
-                                                (acc, curr) => acc + curr.total_sequencing_groups,
-                                                0
-                                            )}{' '}
-                                            Total Sequencing Groups with a Completed CRAM Analysis
-                                        </p>
+                                    <p>
+                                        {filteredData.reduce(
+                                            (acc, curr) => acc + curr.total_crams,
+                                            0
+                                        )}{' '}
+                                        /{' '}
+                                        {filteredData.reduce(
+                                            (acc, curr) => acc + curr.total_sequencing_groups,
+                                            0
+                                        )}{' '}
+                                        Total Sequencing Groups with a Completed CRAM Analysis
+                                    </p>
                                 }
                             >
                                 <div>
                                     {(
-                                        (filteredData.reduce(
+                                        filteredData.reduce(
                                             (acc, curr) => acc + curr.total_crams,
                                             0
                                         ) /
                                             filteredData.reduce(
                                                 (acc, curr) => acc + curr.total_sequencing_groups,
                                                 0
-                                            )) || 0 *
-                                        100
+                                            ) || 0 * 100
                                     ).toFixed(2)}
                                     %
                                 </div>
                             </HtmlTooltip>
                         </div>
                     </Table.Cell>
-                    <Table.Cell  className="table-cell">
+                    <Table.Cell className="table-cell">
                         <div style={{ display: 'flex', justifyContent: 'center' }}>
                             <HtmlTooltip
                                 title={
-                                        <p>
-                                            {filteredData.reduce(
-                                                (acc, curr) =>
-                                                    acc + curr.latest_annotate_dataset?.sg_count,
-                                                0
-                                            )}{' '}
-                                            /{' '}
-                                            {filteredData.reduce(
-                                                (acc, curr) => acc + curr.total_sequencing_groups,
-                                                0
-                                            )}{' '}
-                                            Total Sequencing Groups in the latest AnnotateDataset
-                                            analysis
-                                        </p>
+                                    <p>
+                                        {filteredData.reduce(
+                                            (acc, curr) =>
+                                                acc + curr.latest_annotate_dataset?.sg_count,
+                                            0
+                                        )}{' '}
+                                        /{' '}
+                                        {filteredData.reduce(
+                                            (acc, curr) => acc + curr.total_sequencing_groups,
+                                            0
+                                        )}{' '}
+                                        Total Sequencing Groups in the latest AnnotateDataset
+                                        analysis
+                                    </p>
                                 }
                             >
                                 <div>
                                     {(
-                                        (filteredData.reduce(
+                                        filteredData.reduce(
                                             (acc, curr) =>
                                                 acc + curr.latest_annotate_dataset?.sg_count,
                                             0
@@ -382,82 +389,76 @@ const StatsTable: React.FC<StatsTableProps> = ({ filteredData }) => {
                                             filteredData.reduce(
                                                 (acc, curr) => acc + curr.total_sequencing_groups,
                                                 0
-                                            )) || 0 *
-                                        100
+                                            ) || 0 * 100
                                     ).toFixed(2)}
                                     %
                                 </div>
                             </HtmlTooltip>
                         </div>
                     </Table.Cell>
-                    <Table.Cell  className="table-cell">
+                    <Table.Cell className="table-cell">
                         <div style={{ display: 'flex', justifyContent: 'center' }}>
                             <HtmlTooltip
                                 title={
-                                        <p>
-                                            {filteredData.reduce(
-                                                (acc, curr) =>
-                                                    acc + curr.latest_snv_es_index?.sg_count,
-                                                0
-                                            )}{' '}
-                                            /{' '}
-                                            {filteredData.reduce(
-                                                (acc, curr) => acc + curr.total_sequencing_groups,
-                                                0
-                                            )}{' '}
-                                            Total Sequencing Groups in the latest SNV Elasticsearch
-                                            Index
-                                        </p>
+                                    <p>
+                                        {filteredData.reduce(
+                                            (acc, curr) => acc + curr.latest_snv_es_index?.sg_count,
+                                            0
+                                        )}{' '}
+                                        /{' '}
+                                        {filteredData.reduce(
+                                            (acc, curr) => acc + curr.total_sequencing_groups,
+                                            0
+                                        )}{' '}
+                                        Total Sequencing Groups in the latest SNV Elasticsearch
+                                        Index
+                                    </p>
                                 }
                             >
                                 <div>
                                     {(
-                                        (filteredData.reduce(
+                                        filteredData.reduce(
                                             (acc, curr) => acc + curr.latest_snv_es_index?.sg_count,
                                             0
                                         ) /
                                             filteredData.reduce(
                                                 (acc, curr) => acc + curr.total_sequencing_groups,
                                                 0
-                                            )) || 0 *
-                                        100
+                                            ) || 0 * 100
                                     ).toFixed(2)}
                                     %
                                 </div>
                             </HtmlTooltip>
                         </div>
                     </Table.Cell>
-                    <Table.Cell  className="table-cell">
+                    <Table.Cell className="table-cell">
                         <div style={{ display: 'flex', justifyContent: 'center' }}>
                             <HtmlTooltip
                                 title={
-                                        <p>
-                                            {filteredData.reduce(
-                                                (acc, curr) =>
-                                                    acc + curr.latest_sv_es_index?.sg_count,
-                                                0
-                                            )}{' '}
-                                            /{' '}
-                                            {filteredData.reduce(
-                                                (acc, curr) => acc + curr.total_sequencing_groups,
-                                                0
-                                            )}{' '}
-                                            Total Sequencing Groups in the latest SV Elasticsearch
-                                            Index
-                                        </p>
+                                    <p>
+                                        {filteredData.reduce(
+                                            (acc, curr) => acc + curr.latest_sv_es_index?.sg_count,
+                                            0
+                                        )}{' '}
+                                        /{' '}
+                                        {filteredData.reduce(
+                                            (acc, curr) => acc + curr.total_sequencing_groups,
+                                            0
+                                        )}{' '}
+                                        Total Sequencing Groups in the latest SV Elasticsearch Index
+                                    </p>
                                 }
                             >
                                 <div>
                                     {(
-                                        (filteredData.reduce(
+                                        filteredData.reduce(
                                             (acc, curr) => acc + curr.latest_sv_es_index?.sg_count,
                                             0
                                         ) /
                                             filteredData.reduce(
                                                 (acc, curr) => acc + curr.total_sequencing_groups,
                                                 0
-                                            )) || 0 *
-                                        100
+                                            ) || 0 * 100
                                     ).toFixed(2)}
                                     %
                                 </div>

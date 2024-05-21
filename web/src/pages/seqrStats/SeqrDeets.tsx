@@ -3,9 +3,6 @@ import React, { useState, useEffect } from 'react'
 import { SeqrProjectsDetails, ProjectApi, SeqrProjectsStatsApi, EnumsApi } from '../../sm-api'
 import ProjectAndSeqTypeSelector from './ProjectAndSeqTypeSelector'
 import SeqrProjectsDetailsTable from './SeqrProjectsDetailsTable'
-import FilterModal from './FilterModal'
-import { Button } from 'semantic-ui-react'
-import { number } from 'prop-types'
 
 interface SelectedProject {
     id: number
@@ -31,78 +28,24 @@ const SeqrDeets: React.FC = () => {
     const [selectedSampleExtIds, setSelectedSampleExtIds] = React.useState<string[]>([])
     const [selectedSequencingGroupIds, setSelectedSequencingGroupIds] = React.useState<string[]>([])
     const [selectedCompletedCram, setSelectedCompletedCram] = React.useState<string[]>([])
-    const [selectedInLatestAnnotateDataset, setSelectedInLatestAnnotateDataset] = React.useState<string[]>([])
+    const [selectedInLatestAnnotateDataset, setSelectedInLatestAnnotateDataset] = React.useState<
+        string[]
+    >([])
     const [selectedInLatestSnvEsIndex, setSelectedInLatestSnvEsIndex] = React.useState<string[]>([])
     const [selectedInLatestSvEsIndex, setSelectedInLatestSvEsIndex] = React.useState<string[]>([])
-
-    const getUniqueOptionsForColumn = (columnName: keyof SeqrProjectsDetails) => {
-        const filteredDataExcludingCurrentColumn = allData.filter((item) => {
-          return (
-            selectedProjects.some((p) => p.name === item.dataset) &&
-            selectedSeqTypes.includes(item.sequencing_type) &&
-            (columnName === 'sample_type' || selectedSampleTypes.length === 0 || selectedSampleTypes.includes(item.sample_type)) &&
-            (columnName === 'family_id' || selectedFamilyIds.length === 0 || selectedFamilyIds.includes(item.family_id?.toString() || '')) &&
-            (columnName === 'family_ext_id' || selectedFamilyExtIds.length === 0 || selectedFamilyExtIds.includes(item.family_ext_id)) &&
-            (columnName === 'participant_id' || selectedParticipantIds.length === 0 || selectedParticipantIds.includes(item.participant_id?.toString() || '')) &&
-            (columnName === 'participant_ext_id' || selectedParticipantExtIds.length === 0 || selectedParticipantExtIds.includes(item.participant_ext_id)) &&
-            (columnName === 'sample_id' || selectedSampleIds.length === 0 || selectedSampleIds.includes(item.sample_id)) &&
-            (columnName === 'sample_ext_ids' || selectedSampleExtIds.length === 0 || selectedSampleExtIds.includes(item.sample_ext_ids[0])) &&
-            (columnName === 'sequencing_group_id' || selectedSequencingGroupIds.length === 0 || selectedSequencingGroupIds.includes(item.sequencing_group_id)) &&
-            (columnName === 'completed_cram' || selectedCompletedCram.length === 0 || item.completed_cram === (selectedCompletedCram[0] === 'true')) &&
-            (columnName === 'in_latest_annotate_dataset' || selectedInLatestAnnotateDataset.length === 0 || item.in_latest_annotate_dataset === (selectedInLatestAnnotateDataset[0] === 'true')) &&
-            (columnName === 'in_latest_snv_es_index' || selectedInLatestSnvEsIndex.length === 0 || item.in_latest_snv_es_index === (selectedInLatestSnvEsIndex[0] === 'true')) &&
-            (columnName === 'in_latest_sv_es_index' || selectedInLatestSvEsIndex.length === 0 || item.in_latest_sv_es_index === (selectedInLatestSvEsIndex[0] === 'true'))
-          );
-        });
-      
-        const uniqueOptions = Array.from(new Set(filteredDataExcludingCurrentColumn.map((item) => item[columnName])));
-        return uniqueOptions.map((option) => option?.toString() || '');
-    };
-    
-    const getSelectedOptionsForColumn = (columnName: string) => {
-        switch (columnName) {
-          case 'sample_type':
-            return selectedSampleTypes;
-          case 'family_id':
-            return selectedFamilyIds;
-          case 'family_ext_id':
-            return selectedFamilyExtIds;
-          case 'participant_id':
-            return selectedParticipantIds;
-          case 'participant_ext_id':
-            return selectedParticipantExtIds;
-          case 'sample_id':
-            return selectedSampleIds;
-          case 'sample_ext_ids':
-            return selectedSampleExtIds;
-          case 'sequencing_group_id':
-            return selectedSequencingGroupIds;
-          case 'completed_cram':
-            return selectedCompletedCram;
-          case 'in_latest_annotate_dataset':
-            return selectedInLatestAnnotateDataset;
-          case 'in_latest_snv_es_index':
-            return selectedInLatestSnvEsIndex;
-          case 'in_latest_sv_es_index':
-            return selectedInLatestSvEsIndex;
-          default:
-            return [];
-        }
-    };
+    const [selectedStripy, setSelectedStripy] = React.useState<string[]>([])
+    const [selectedMito, setSelectedMito] = React.useState<string[]>([])
 
     useEffect(() => {
-        Promise.all([
-            new EnumsApi().getSequencingTypes(),
-            new ProjectApi().getSeqrProjects({}),
-        ])
+        Promise.all([new EnumsApi().getSequencingTypes(), new ProjectApi().getSeqrProjects({})])
             .then(([seqTypesResp, projectsResp]) => {
                 const sequencingTypes: string[] = seqTypesResp.data
                 setSeqTypes(sequencingTypes)
-    
+
                 const projects: { id: number; name: string }[] = projectsResp.data
                 setSeqrProjectNames(projects.map((project) => project.name))
                 setSeqrProjectIds(projects.map((project) => project.id))
-    
+
                 // Call getProjectsInsightsStats with the project IDs and sequencing types
                 return new SeqrProjectsStatsApi().getSeqrProjectsDetails({
                     project_ids: projects.map((project) => project.id),
@@ -161,61 +104,89 @@ const SeqrDeets: React.FC = () => {
             selectedProjects.some((p) => p.name === item.dataset) &&
             selectedSeqTypes.includes(item.sequencing_type) &&
             (selectedSampleTypes.length === 0 || selectedSampleTypes.includes(item.sample_type)) &&
-            (selectedFamilyIds.length === 0 || selectedFamilyIds.includes(item.family_id?.toString() || '')) &&
-            (selectedFamilyExtIds.length === 0 || selectedFamilyExtIds.includes(item.family_ext_id)) &&
-            (selectedParticipantIds.length === 0 || selectedParticipantIds.includes(item.participant_id?.toString() || '')) &&
-            (selectedParticipantExtIds.length === 0 || selectedParticipantExtIds.includes(item.participant_ext_id)) &&
+            (selectedFamilyIds.length === 0 ||
+                selectedFamilyIds.includes(item.family_id?.toString() || '')) &&
+            (selectedFamilyExtIds.length === 0 ||
+                selectedFamilyExtIds.includes(item.family_ext_id)) &&
+            (selectedParticipantIds.length === 0 ||
+                selectedParticipantIds.includes(item.participant_id?.toString() || '')) &&
+            (selectedParticipantExtIds.length === 0 ||
+                selectedParticipantExtIds.includes(item.participant_ext_id)) &&
             (selectedSampleIds.length === 0 || selectedSampleIds.includes(item.sample_id)) &&
-            (selectedSampleExtIds.length === 0 || selectedSampleExtIds.includes(item.sample_ext_ids[0])) &&
-            (selectedSequencingGroupIds.length === 0 || selectedSequencingGroupIds.includes(item.sequencing_group_id)) &&
-            (selectedCompletedCram.length === 0 || item.completed_cram === (selectedCompletedCram[0] === 'true')) &&
-            (selectedInLatestAnnotateDataset.length === 0 || item.in_latest_annotate_dataset === (selectedInLatestAnnotateDataset[0] === 'true')) &&
-            (selectedInLatestSnvEsIndex.length === 0 || item.in_latest_snv_es_index === (selectedInLatestSnvEsIndex[0] === 'true')) &&
-            (selectedInLatestSvEsIndex.length === 0 || item.in_latest_sv_es_index === (selectedInLatestSvEsIndex[0] === 'true'))
-    );
+            (selectedSampleExtIds.length === 0 ||
+                selectedSampleExtIds.includes(item.sample_ext_ids[0])) &&
+            (selectedSequencingGroupIds.length === 0 ||
+                selectedSequencingGroupIds.includes(item.sequencing_group_id)) &&
+            (selectedCompletedCram.length === 0 ||
+                (selectedCompletedCram.includes('Yes') && item.completed_cram) ||
+                (selectedCompletedCram.includes('No') && !item.completed_cram)) &&
+            (selectedInLatestAnnotateDataset.length === 0 ||
+                (selectedInLatestAnnotateDataset.includes('Yes') &&
+                    item.in_latest_annotate_dataset) ||
+                (selectedInLatestAnnotateDataset.includes('No') &&
+                    !item.in_latest_annotate_dataset)) &&
+            (selectedInLatestSnvEsIndex.length === 0 ||
+                (selectedInLatestSnvEsIndex.includes('Yes') && item.in_latest_snv_es_index) ||
+                (selectedInLatestSnvEsIndex.includes('No') && !item.in_latest_snv_es_index)) &&
+            (selectedInLatestSvEsIndex.length === 0 ||
+                (selectedInLatestSvEsIndex.includes('Yes') && item.in_latest_sv_es_index) ||
+                (selectedInLatestSvEsIndex.includes('No') && !item.in_latest_sv_es_index)) &&
+            (selectedStripy.length === 0 ||
+                (selectedStripy.includes('Yes') && item.sequencing_group_report_links?.stripy) ||
+                (selectedStripy.includes('No') && !item.sequencing_group_report_links?.stripy)) &&
+            (selectedMito.length === 0 ||
+                (selectedMito.includes('Yes') && item.sequencing_group_report_links?.mito) ||
+                (selectedMito.includes('No') && !item.sequencing_group_report_links?.mito))
+    )
     const handleSelectionChange = (columnName: string, selectedOptions: string[]) => {
         // Update the selected options for the given column based on the state variable
         switch (columnName) {
             case 'sample_type':
-                setSelectedSampleTypes(selectedOptions);
-                break;
+                setSelectedSampleTypes(selectedOptions)
+                break
             case 'family_id':
-                setSelectedFamilyIds(selectedOptions);
-                break;
+                setSelectedFamilyIds(selectedOptions)
+                break
             case 'family_ext_id':
-                setSelectedFamilyExtIds(selectedOptions);
-                break;
+                setSelectedFamilyExtIds(selectedOptions)
+                break
             case 'participant_id':
-                setSelectedParticipantIds(selectedOptions);
-                break;
+                setSelectedParticipantIds(selectedOptions)
+                break
             case 'participant_ext_id':
-                setSelectedParticipantExtIds(selectedOptions);
-                break;
+                setSelectedParticipantExtIds(selectedOptions)
+                break
             case 'sample_id':
-                setSelectedSampleIds(selectedOptions);
-                break;
+                setSelectedSampleIds(selectedOptions)
+                break
             case 'sample_ext_id':
-                setSelectedSampleExtIds(selectedOptions);
-                break;
+                setSelectedSampleExtIds(selectedOptions)
+                break
             case 'sequencing_group_id':
-                setSelectedSequencingGroupIds(selectedOptions);
-                break;
+                setSelectedSequencingGroupIds(selectedOptions)
+                break
             case 'completed_cram':
-                setSelectedCompletedCram(selectedOptions);
-                break;
+                setSelectedCompletedCram(selectedOptions)
+                break
             case 'in_latest_annotate_dataset':
-                setSelectedInLatestAnnotateDataset(selectedOptions);
-                break;
+                setSelectedInLatestAnnotateDataset(selectedOptions)
+                break
             case 'in_latest_snv_es_index':
-                setSelectedInLatestSnvEsIndex(selectedOptions);
-                break;
+                setSelectedInLatestSnvEsIndex(selectedOptions)
+                break
             case 'in_latest_sv_es_index':
-                setSelectedInLatestSvEsIndex(selectedOptions);
-                break;
-          default:
-            break;
+                setSelectedInLatestSvEsIndex(selectedOptions)
+                break
+            case 'stripy':
+                setSelectedStripy(selectedOptions)
+                break
+            case 'mito':
+                setSelectedMito(selectedOptions)
+                break
+            default:
+                break
         }
-    };
+    }
 
     return (
         <div>
@@ -247,18 +218,10 @@ const SeqrDeets: React.FC = () => {
                 selectedInLatestAnnotateDataset={selectedInLatestAnnotateDataset}
                 selectedInLatestSnvEsIndex={selectedInLatestSnvEsIndex}
                 selectedInLatestSvEsIndex={selectedInLatestSvEsIndex}
+                selectedStripy={selectedStripy}
+                selectedMito={selectedMito}
                 handleSelectionChange={handleSelectionChange}
-            >
-            </SeqrProjectsDetailsTable> 
-            {/* {filterModalOpen && (
-                <FilterModal
-                    columnName={filterColumn as keyof SeqrProjectsDetails} // Cast filterColumn to keyof SeqrProjectsDetails
-                    options={getUniqueOptionsForColumn(filterColumn as keyof SeqrProjectsDetails)} // Cast filterColumn to keyof SeqrProjectsDetails
-                    selectedOptions={getSelectedOptionsForColumn(filterColumn as keyof SeqrProjectsDetails)} 
-                    onSelectionChange={(selectedOptions) => handleSelectionChange(filterColumn, selectedOptions)}
-                    onClose={() => setFilterModalOpen(false)}
-                />
-            )} */}
+            ></SeqrProjectsDetailsTable>
         </div>
     )
 }
