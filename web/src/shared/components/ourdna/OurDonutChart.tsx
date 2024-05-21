@@ -49,7 +49,7 @@ const OurDonutChart: React.FC<PieChartProps> = ({ header, data, icon }) => {
                     {header}
                 </Card.Header>
                 <Card.Description style={{ height: '100%' }}>
-                    <Container style={{ position: 'relative' }}>
+                    <Container style={{ position: 'relative', height: '90%' }}>
                         <Doughnut
                             data={donutData}
                             options={{
