@@ -99,6 +99,8 @@ class GraphQLCohort:
     description: str
     author: str
 
+    project_id: strawberry.Private[int]
+
     @staticmethod
     def from_internal(internal: CohortInternal) -> 'GraphQLCohort':
         return GraphQLCohort(
@@ -106,6 +108,7 @@ class GraphQLCohort:
             name=internal.name,
             description=internal.description,
             author=internal.author,
+            project_id=internal.project,
         )
 
     @strawberry.field()
@@ -161,7 +164,7 @@ class GraphQLCohort:
     @strawberry.field()
     async def project(self, info: Info, root: 'GraphQLCohort') -> 'GraphQLProject':
         loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
-        project = await loader.load(root.project)
+        project = await loader.load(root.project_id)
         return GraphQLProject.from_internal(project)
 
 
