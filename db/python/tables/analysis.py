@@ -338,33 +338,6 @@ WHERE s.project = :project AND
         )
         return [row[0] for row in rows]
 
-    async def get_incomplete_analyses(
-        self, project: ProjectId
-    ) -> List[AnalysisInternal]:
-        """
-        Gets details of analysis with status queued or in-progress
-        """
-
-        _query = """
-SELECT a.id as id, a.type as type, a.status as status,
-        a.output as output, JSON_ARRAYAGG(a_sg.sequencing_group_id) as _sequencing_group_ids,
-        a.project as project, a.meta as meta
-FROM analysis_sequencing_group a_sg
-INNER JOIN analysis a ON a_sg.analysis_id = a.id
-WHERE a.project = :project AND a.active AND (a.status='queued' OR a.status='in-progress')
-GROUP BY a.id
-"""
-        rows = await self.connection.fetch_all(
-            _query, {'project': project or self.project}
-        )
-        analysis_by_id = {}
-        for row in rows:
-            aid = row['id']
-            analysis_by_id[aid] = AnalysisInternal.from_db(**dict(row))
-            analysis_by_id[aid].sequencing_group_ids = row['_sequencing_group_ids']
-
-        return list(analysis_by_id.values())
-
     async def get_latest_complete_analysis_for_sequencing_group_ids_by_type(
         self, analysis_type: str, sequencing_group_ids: List[int]
     ) -> List[AnalysisInternal]:

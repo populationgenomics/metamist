@@ -90,7 +90,16 @@ class AnalysisLayer(BaseLayer):
         """
         Gets details of analysis with status queued or in-progress
         """
-        return await self.at.get_incomplete_analyses(project=project)
+
+        return await self.at.query(
+            filter_=AnalysisFilter(
+                project=GenericFilter(eq=project),
+                active=GenericFilter(eq=True),
+                status=GenericFilter(
+                    in_=[AnalysisStatus.IN_PROGRESS, AnalysisStatus.QUEUED]
+                ),
+            )
+        )
 
     async def get_sample_cram_path_map_for_seqr(
         self,
