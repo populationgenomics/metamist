@@ -1,14 +1,14 @@
 import * as React from 'react'
-import { Card, Image, Label, Statistic, Grid } from 'semantic-ui-react'
+import { Card, Label, Statistic, Grid } from 'semantic-ui-react'
 
 interface StatTileProps {
     header: string
     stats: { value: string; units: string; unitsColour: string }[]
-    tile_icon: string
+    icon: React.ReactNode
     description: string
 }
 
-const StatTile: React.FC<StatTileProps> = ({ header, stats, tile_icon, description }) => (
+const StatTile: React.FC<StatTileProps> = ({ header, stats, icon, description }) => (
     <Card
         fluid
         style={{
@@ -18,7 +18,7 @@ const StatTile: React.FC<StatTileProps> = ({ header, stats, tile_icon, descripti
     >
         <Card.Content>
             <Card.Header className="dashboard-tile" style={{ fontSize: '1.25rem' }}>
-                <Image src={tile_icon} alt="Icon" size="mini" spaced="right" />
+                {icon}
                 {header}
             </Card.Header>
             <Card.Description>

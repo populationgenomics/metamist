@@ -1,6 +1,8 @@
 import * as React from 'react'
-import { Card, Image, Container } from 'semantic-ui-react'
+import { Card, Container } from 'semantic-ui-react'
 import * as d3 from 'd3'
+
+import { ourdnaColours } from './Colours'
 
 import {
     Chart as ChartJS,
@@ -11,7 +13,6 @@ import {
     Tooltip,
     Legend,
 } from 'chart.js'
-import { Bar } from 'react-chartjs-2'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
@@ -32,18 +33,10 @@ export const chartOptions = {
 }
 
 interface HistogramProps {
-    icon: string
+    icon: React.ReactNode
     header: string
     data: object
 }
-
-const OURDNA_COLOURS = [
-    'var(--ourdna-red)', // OurDNA Red
-    'var(--ourdna-yellow)', // OurDNA Yellow
-    'var(--ourdna-green)', // OurDNA Green
-    'var(--ourdna-blue)', // OurDNA Blue
-    'var(--ourdna-charcoal)', // OurDNA Charcoal
-]
 
 const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
     const svgRef = React.useRef<SVGSVGElement | null>(null)
@@ -114,7 +107,7 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
         const color = d3
             .scaleOrdinal<string>()
             .domain(transformedData.map((d) => d.site))
-            .range(OURDNA_COLOURS)
+            .range(Object.values(ourdnaColours))
 
         groupedData.forEach(([hour, values]) => {
             if (x0(hour) === undefined) {
@@ -257,7 +250,7 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
         >
             <Card.Content>
                 <Card.Header className="dashboard-tile" style={{ fontSize: '1.25rem' }}>
-                    <Image src={icon} alt="Icon" size="mini" spaced="right" />
+                    {icon}
                     {header}
                 </Card.Header>
                 <Card.Description>

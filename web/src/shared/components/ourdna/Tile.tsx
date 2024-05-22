@@ -1,23 +1,16 @@
 import * as React from 'react'
-import { Card, Image, Label, Statistic } from 'semantic-ui-react'
+import { Card, Label, Statistic } from 'semantic-ui-react'
 
 interface TileProps {
     header: string
     stat: string
     units: string
-    units_colour: string
+    unitsColour: string
     description: string
-    tile_icon: string
+    icon: React.ReactNode
 }
 
-const Tile: React.FC<TileProps> = ({
-    header,
-    stat,
-    units,
-    units_colour,
-    description,
-    tile_icon,
-}) => (
+const Tile: React.FC<TileProps> = ({ header, stat, units, unitsColour, description, icon }) => (
     <Card
         fluid
         style={{
@@ -27,7 +20,7 @@ const Tile: React.FC<TileProps> = ({
     >
         <Card.Content>
             <Card.Header className="dashboard-tile" style={{ fontSize: '1.25rem' }}>
-                <Image src={tile_icon} alt="Icon" size="mini" spaced="right" />
+                {icon}
                 {header}
             </Card.Header>
             <Card.Description>
@@ -36,7 +29,7 @@ const Tile: React.FC<TileProps> = ({
                     <Statistic.Label style={{ margin: 5 }}>
                         <Label
                             className="dashboard-tile"
-                            style={{ backgroundColor: `var(--${units_colour})` }}
+                            style={{ backgroundColor: `var(--${unitsColour})` }}
                         >
                             {units}
                         </Label>
