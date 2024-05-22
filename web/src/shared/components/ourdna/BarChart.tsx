@@ -38,11 +38,11 @@ interface HistogramProps {
 }
 
 const OURDNA_COLOURS = [
-    'rgba(191, 0, 61)', // OurDNA Red
-    'rgba(233, 199, 30)', // OurDNA Yellow
-    'rgba(161, 202, 56)', // OurDNA Green
-    'rgba(114, 173, 225)', // OurDNA Blue
-    'rgba(85, 85, 85)', // OurDNA Charcoal
+    'var(--ourdna-red)', // OurDNA Red
+    'var(--ourdna-yellow)', // OurDNA Yellow
+    'var(--ourdna-green)', // OurDNA Green
+    'var(--ourdna-blue)', // OurDNA Blue
+    'var(--ourdna-charcoal)', // OurDNA Charcoal
 ]
 
 const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
@@ -168,7 +168,7 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
             .attr('text-anchor', 'end')
             .attr('x', width / 2)
             .attr('y', height + margin.bottom - 15)
-            .text('Hour Buckets')
+            .text('Hours Taken')
 
         g.append('text')
             .attr('class', 'axis-label')
