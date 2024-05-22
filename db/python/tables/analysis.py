@@ -257,10 +257,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             WHERE {where_str}
             GROUP BY a.id
         """
-        retvals: Dict[int, AnalysisInternal] = {}
         rows = await self.connection.fetch_all(_query, values)
+        result: list[AnalysisInternal] = []
         for row in rows:
-            key = row['id']
             analysis = AnalysisInternal.from_db(**dict(row))
 
             if row['_sequencing_group_ids']:
@@ -269,9 +268,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             if row['_cohort_ids']:
                 analysis.cohort_ids = row['_cohort_ids'].split(',')
 
-            retvals[key] = analysis
+            result.append(analysis)
 
-        return list(retvals.values())
+        return result
 
     async def get_latest_complete_analysis_for_type(
         self,
