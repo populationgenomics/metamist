@@ -90,10 +90,10 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
     React.useEffect(() => {
         if (dimensions.width === 0 || dimensions.height === 0) return
 
-        const svg = d3.select(svgRef.current),
-            margin = { top: 20, right: 20, bottom: 60, left: 60 },
-            width = dimensions.width - margin.left - margin.right,
-            height = dimensions.height - margin.top - margin.bottom
+        const svg = d3.select(svgRef.current)
+        const margin = { top: 20, right: 20, bottom: 60, left: 60 }
+        const width = dimensions.width - margin.left - margin.right
+        const height = dimensions.height - margin.top - margin.bottom
 
         svg.selectAll('*').remove() // Clear previous content
 
@@ -118,7 +118,6 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
 
         groupedData.forEach(([hour, values]) => {
             if (x0(hour) === undefined) {
-                console.error(`x0(${hour}) is undefined`)
                 return
             }
 
@@ -129,7 +128,6 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
                 .padding(0.05)
 
             if (Number.isNaN(x0(hour))) {
-                console.error(`x0(${hour}) is NaN`)
                 return
             }
 
@@ -142,7 +140,6 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
                 .attr('x', (d) => {
                     const x = x1(d.site)
                     if (Number.isNaN(x)) {
-                        console.error(`x1(${d.site}) is NaN`)
                         return 0
                     }
                     return x

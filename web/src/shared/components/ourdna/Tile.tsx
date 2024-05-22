@@ -17,37 +17,30 @@ const Tile: React.FC<TileProps> = ({
     units_colour,
     description,
     tile_icon,
-}) => {
-    return (
-        <Card
-            fluid
-            style={{
-                backgroundColor: 'var(--color-bg-card)',
-                boxShadow: 'rgba(0, 0, 0, 0.24) 0px 3px 8px',
-            }}
-        >
-            <Card.Content>
-                <Card.Header style={{ fontSize: '1.25rem' }}>
-                    <Image src={tile_icon} alt="Icon" size="mini" spaced="right" />
-                    {header}
-                </Card.Header>
-                <Card.Description>
-                    <Statistic size="small">
-                        <Statistic.Value>{stat}</Statistic.Value>
-                        <Statistic.Label style={{ margin: 5 }}>
-                            <Label
-                                color="white"
-                                style={{ backgroundColor: `var(--${units_colour})` }}
-                            >
-                                {units}
-                            </Label>
-                        </Statistic.Label>
-                    </Statistic>
-                </Card.Description>
-            </Card.Content>
-            <Card.Content extra>{description}</Card.Content>
-        </Card>
-    )
-}
+}) => (
+    <Card
+        fluid
+        style={{
+            backgroundColor: 'var(--color-bg-card)',
+            boxShadow: 'rgba(0, 0, 0, 0.24) 0px 3px 8px',
+        }}
+    >
+        <Card.Content>
+            <Card.Header style={{ fontSize: '1.25rem' }}>
+                <Image src={tile_icon} alt="Icon" size="mini" spaced="right" />
+                {header}
+            </Card.Header>
+            <Card.Description>
+                <Statistic size="small">
+                    <Statistic.Value>{stat}</Statistic.Value>
+                    <Statistic.Label style={{ margin: 5 }}>
+                        <Label style={{ backgroundColor: `var(--${units_colour})` }}>{units}</Label>
+                    </Statistic.Label>
+                </Statistic>
+            </Card.Description>
+        </Card.Content>
+        <Card.Content extra>{description}</Card.Content>
+    </Card>
+)
 
 export default Tile
