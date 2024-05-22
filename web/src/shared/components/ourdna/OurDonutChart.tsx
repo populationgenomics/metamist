@@ -44,7 +44,7 @@ const OurDonutChart: React.FC<PieChartProps> = ({ header, data, icon }) => {
             }}
         >
             <Card.Content style={{ height: '100%' }}>
-                <Card.Header style={{ fontSize: '1.25rem' }}>
+                <Card.Header className="dashboard-tile" style={{ fontSize: '1.25rem' }}>
                     {icon}
                     {header}
                 </Card.Header>

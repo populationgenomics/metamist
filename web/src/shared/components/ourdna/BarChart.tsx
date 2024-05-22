@@ -183,6 +183,45 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
             .append('g')
             .attr('transform', (d, i) => `translate(0,${i * 20})`)
 
+        // Append X axis
+        g.append('g')
+            .attr('class', 'axis-label')
+            .attr('transform', `translate(0,${height})`)
+            .call(d3.axisBottom(x0))
+            .selectAll('text')
+            .attr('dy', '1em') // Adjust the position of the x-axis labels
+            .style('fill', 'var(--color-text-primary)') // Change the color of the axis labels
+
+        // Change the color of the tick marks
+        g.selectAll('.tick line').style('stroke', 'var(--color-text-primary)') // Change the color of the tick marks
+        // Append Y axis
+        g.append('g')
+            .attr('class', 'axis-label')
+            .call(d3.axisLeft(y).ticks(y.domain()[1]).tickFormat(d3.format('d')))
+            .selectAll('text')
+            .attr('dx', '-1em') // Adjust the position of the y-axis labels
+            .style('fill', 'var(--color-text-primary)') // Change the color of the axis labels
+
+        // Append X axis line
+        g.append('g')
+            .attr('class', 'axis-line')
+            .append('line')
+            .attr('x1', 0)
+            .attr('x2', width)
+            .attr('y1', height)
+            .attr('y2', height)
+            .style('stroke', 'var(--color-text-primary)') // Change the color of the axis line
+
+        // Append Y axis line
+        g.append('g')
+            .attr('class', 'axis-line')
+            .append('line')
+            .attr('x1', 0)
+            .attr('x2', 0)
+            .attr('y1', 0)
+            .attr('y2', height)
+            .style('stroke', 'var(--color-text-primary)') // Change the color of the axis line
+
         legend
             .append('rect')
             .attr('x', 0)
@@ -211,7 +250,7 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
             }}
         >
             <Card.Content>
-                <Card.Header style={{ fontSize: '1.25rem' }}>
+                <Card.Header className="dashboard-tile" style={{ fontSize: '1.25rem' }}>
                     {icon}
                     {header}
                 </Card.Header>

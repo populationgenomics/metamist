@@ -17,7 +17,7 @@ const TableTile: React.FC<TableTileProps> = ({ header, data, columns, icon }) =>
         }}
     >
         <Card.Content>
-            <Card.Header>
+            <Card.Header className="dashboard-tile">
                 {icon}
                 {header}
             </Card.Header>
@@ -28,6 +28,7 @@ const TableTile: React.FC<TableTileProps> = ({ header, data, columns, icon }) =>
                             {columns &&
                                 columns.map((column, index) => (
                                     <Table.HeaderCell
+                                        className="dashboard-tile"
                                         key={index}
                                         style={{ backgroundColor: 'var(--color-bg-card)' }}
                                     >
@@ -36,7 +37,7 @@ const TableTile: React.FC<TableTileProps> = ({ header, data, columns, icon }) =>
                                 ))}
                         </Table.Row>
                     </Table.Header>
-                    <Table.Body>
+                    <Table.Body className="dashboard-tile">
                         {data &&
                             Object.keys(data).map((key, index) => (
                                 <Table.Row key={index}>

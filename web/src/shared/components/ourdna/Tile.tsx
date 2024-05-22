@@ -19,20 +19,27 @@ const Tile: React.FC<TileProps> = ({ header, stat, units, unitsColour, descripti
         }}
     >
         <Card.Content>
-            <Card.Header style={{ fontSize: '1.25rem' }}>
+            <Card.Header className="dashboard-tile" style={{ fontSize: '1.25rem' }}>
                 {icon}
                 {header}
             </Card.Header>
             <Card.Description>
                 <Statistic size="small">
-                    <Statistic.Value>{stat}</Statistic.Value>
+                    <Statistic.Value className="dashboard-tile">{stat}</Statistic.Value>
                     <Statistic.Label style={{ margin: 5 }}>
-                        <Label style={{ backgroundColor: `var(--${unitsColour})` }}>{units}</Label>
+                        <Label
+                            className="dashboard-tile"
+                            style={{ backgroundColor: `var(--${unitsColour})` }}
+                        >
+                            {units}
+                        </Label>
                     </Statistic.Label>
                 </Statistic>
             </Card.Description>
         </Card.Content>
-        <Card.Content extra>{description}</Card.Content>
+        <Card.Content className="dashboard-tile" extra>
+            {description}
+        </Card.Content>
     </Card>
 )
 
