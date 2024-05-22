@@ -84,7 +84,7 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
         if (dimensions.width === 0 || dimensions.height === 0) return
 
         const svg = d3.select(svgRef.current)
-        const margin = { top: 20, right: 20, bottom: 60, left: 60 }
+        const margin = { top: 20, right: 100, bottom: 60, left: 60 }
         const width = dimensions.width - margin.left - margin.right
         const height = dimensions.height - margin.top - margin.bottom
 
@@ -100,7 +100,7 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
 
         const y = d3
             .scaleLinear()
-            .domain([0, d3.max(transformedData, (d) => d.count) || 0])
+            .domain([0, d3.max(transformedData, (d) => d.count) || 1])
             .nice()
             .rangeRound([height, 0])
 
@@ -139,7 +139,7 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
                 })
                 .attr('y', (d) => y(d.count))
                 .attr('width', x1.bandwidth())
-                .attr('height', (d) => height - y(d.count))
+                .attr('height', (d) => Math.max(0, height - y(d.count)))
                 .attr('fill', (d) => color(d.site))
         })
 
@@ -171,11 +171,12 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
             .attr('y', -margin.left + 15)
             .text('Sample Count')
 
-        const legend = g
+        const legend = svg
             .append('g')
             .attr('font-family', 'sans-serif')
             .attr('font-size', 10)
-            .attr('text-anchor', 'end')
+            .attr('text-anchor', 'start')
+            .attr('transform', `translate(${dimensions.width - margin.right + 10},${margin.top})`)
             .selectAll('g')
             .data(transformedData.map((d) => d.site).filter((v, i, a) => a.indexOf(v) === i))
             .enter()
@@ -223,18 +224,18 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
 
         legend
             .append('rect')
-            .attr('x', width - 19)
+            .attr('x', 0)
             .attr('width', 19)
             .attr('height', 19)
             .attr('fill', (d) => color(d))
 
         legend
             .append('text')
-            .attr('x', width - 24)
+            .attr('x', 24)
             .attr('y', 9.5)
             .attr('dy', '0.32em')
             .text((d) => d)
-    }, [transformedData])
+    }, [data, dimensions])
 
     //   return (
     //     <svg ref={svgRef} width="800" height="400"></svg>
