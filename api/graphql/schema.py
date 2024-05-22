@@ -153,7 +153,7 @@ class GraphQLCohort:
         self, info: Info, root: 'GraphQLCohort'
     ) -> list['GraphQLAnalysis']:
         connection = info.context['connection']
-        connection.project = root.project
+        connection.project = root.project_id
         internal_analysis = await AnalysisLayer(connection).query(
             AnalysisFilter(
                 cohort_id=GenericFilter(in_=[cohort_id_transform_to_raw(root.id)]),
@@ -178,6 +178,8 @@ class GraphQLCohortTemplate:
     description: str
     criteria: strawberry.scalars.JSON
 
+    project_id: strawberry.Private[int]
+
     @staticmethod
     def from_internal(
         internal: CohortTemplateInternal, project_names: list[str]
@@ -188,7 +190,16 @@ class GraphQLCohortTemplate:
             name=internal.name,
             description=internal.description,
             criteria=internal.criteria.to_external(project_names=project_names).dict(),
+            project_id=internal.project,
         )
+
+    @strawberry.field()
+    async def project(
+        self, info: Info, root: 'GraphQLCohortTemplate'
+    ) -> 'GraphQLProject':
+        loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
+        project = await loader.load(root.project_id)
+        return GraphQLProject.from_internal(project)
 
 
 @strawberry.type
@@ -382,7 +393,7 @@ class GraphQLProject:
         id: GraphQLFilter[int] | None = None,
         name: GraphQLFilter[str] | None = None,
         author: GraphQLFilter[str] | None = None,
-        template_id: GraphQLFilter[int] | None = None,
+        template_id: GraphQLFilter[str] | None = None,
         timestamp: GraphQLFilter[datetime.datetime] | None = None,
     ) -> list['GraphQLCohort']:
         connection = info.context['connection']
@@ -1000,7 +1011,7 @@ class Query:  # entry point to graphql.
         project: GraphQLFilter[str] | None = None,
         name: GraphQLFilter[str] | None = None,
         author: GraphQLFilter[str] | None = None,
-        template_id: GraphQLFilter[int] | None = None,
+        template_id: GraphQLFilter[str] | None = None,
     ) -> list[GraphQLCohort]:
         connection = info.context['connection']
         cohort_layer = CohortLayer(connection)
