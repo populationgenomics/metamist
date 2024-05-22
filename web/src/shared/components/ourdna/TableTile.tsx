@@ -1,14 +1,14 @@
 import * as React from 'react'
-import { Card, Image, Table, Icon } from 'semantic-ui-react'
+import { Card, Table } from 'semantic-ui-react'
 
 interface TableTileProps {
     header: string
     data: Record<string, string | number>
     columns: Array<string>
-    tile_icon: string
+    icon: React.ReactNode
 }
 
-const TableTile: React.FC<TableTileProps> = ({ header, data, columns, tile_icon }) => (
+const TableTile: React.FC<TableTileProps> = ({ header, data, columns, icon }) => (
     <Card
         fluid
         style={{
@@ -18,7 +18,7 @@ const TableTile: React.FC<TableTileProps> = ({ header, data, columns, tile_icon 
     >
         <Card.Content>
             <Card.Header>
-                <Image src={tile_icon} alt="Icon" size="mini" spaced="right" />
+                {icon}
                 {header}
             </Card.Header>
             <Card.Description>

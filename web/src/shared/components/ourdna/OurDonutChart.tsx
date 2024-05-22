@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Card, Image, Container } from 'semantic-ui-react'
+import { Card, Container } from 'semantic-ui-react'
 
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
 import { Doughnut } from 'react-chartjs-2'
@@ -9,7 +9,7 @@ ChartJS.register(ArcElement, Tooltip, Legend)
 interface PieChartProps {
     header: string
     data: object
-    icon: string
+    icon: React.ReactNode
 }
 
 const OurDonutChart: React.FC<PieChartProps> = ({ header, data, icon }) => {
@@ -45,7 +45,7 @@ const OurDonutChart: React.FC<PieChartProps> = ({ header, data, icon }) => {
         >
             <Card.Content style={{ height: '100%' }}>
                 <Card.Header style={{ fontSize: '1.25rem' }}>
-                    <Image src={icon} alt="Icon" size="mini" spaced="right" />
+                    {icon}
                     {header}
                 </Card.Header>
                 <Card.Description style={{ height: '100%' }}>

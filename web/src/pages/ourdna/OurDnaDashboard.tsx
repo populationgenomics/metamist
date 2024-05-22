@@ -10,6 +10,16 @@ import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import MuckError from '../../shared/components/MuckError'
 import OurDonutChart from '../../shared/components/ourdna/OurDonutChart'
 import BarChart from '../../shared/components/ourdna/BarChart'
+import { ourdnaColours } from '../../shared/components/ourdna/Colours'
+
+import ClipboardIcon from '../../shared/components/ourdna/dashboardIcons/ClipboardIcon'
+import SyringeIcon from '../../shared/components/ourdna/dashboardIcons/SyringeIcon'
+import TestTubeIcon from '../../shared/components/ourdna/dashboardIcons/TestTubeIcon'
+import BloodSampleIcon from '../../shared/components/ourdna/dashboardIcons/BloodSampleIcon'
+import TruckIcon from '../../shared/components/ourdna/dashboardIcons/TruckIcon'
+import ClockIcon from '../../shared/components/ourdna/dashboardIcons/ClockIcon'
+import RocketIcon from '../../shared/components/ourdna/dashboardIcons/RocketIcon'
+import AlarmIcon from '../../shared/components/ourdna/dashboardIcons/AlarmIcon'
 
 const GET_OURDNA_DASHBOARD = gql`
     query DashboardQuery($project: String!) {
@@ -19,15 +29,10 @@ const GET_OURDNA_DASHBOARD = gql`
     }
 `
 
-const icons = {
-    clipboard: '/dashboard_icons/blue_clipboard.svg',
-    syringe: '/dashboard_icons/yellow_syringe.svg',
-    red_bloodsample: '/dashboard_icons/red_bloodsample.svg',
-    green_truck: '/dashboard_icons/green_truck.svg',
-    yellow_clock: '/dashboard_icons/yellow_clock.svg',
-    blue_testtube: '/dashboard_icons/blue_testtube.svg',
-    green_rocket: '/dashboard_icons/green_rocket.svg',
-    red_alarm: '/dashboard_icons/red_alarm.svg',
+const iconStyle = {
+    marginRight: '10px',
+    width: '24px',
+    height: '24px',
 }
 
 type OurDNADashboardData = {
@@ -79,9 +84,14 @@ const Dashboard = () => {
                                     header="Awaiting Consent"
                                     stat={`${data.project.ourdnaDashboard.participants_signed_not_consented.length}`}
                                     units="participants"
-                                    units_colour="ourdna-blue-transparent"
+                                    unitsColour="ourdna-blue-transparent"
                                     description="The number of people who have signed up but not consented."
-                                    tile_icon={icons.clipboard}
+                                    icon={
+                                        <ClipboardIcon
+                                            fill={ourdnaColours.blue}
+                                            style={{ ...iconStyle }}
+                                        />
+                                    }
                                 />
                             </GridColumn>
                             <GridColumn>
@@ -89,9 +99,14 @@ const Dashboard = () => {
                                     header="Awaiting Collection"
                                     stat={`${data.project.ourdnaDashboard.participants_consented_not_collected.length}`}
                                     units="participants"
-                                    units_colour="ourdna-yellow-transparent"
+                                    unitsColour="ourdna-yellow-transparent"
                                     description="The number of people who have consented but not given blood."
-                                    tile_icon={icons.syringe}
+                                    icon={
+                                        <SyringeIcon
+                                            fill={ourdnaColours.yellow}
+                                            style={{ ...iconStyle }}
+                                        />
+                                    }
                                 />
                             </GridColumn>
                             <GridColumn>
@@ -104,9 +119,14 @@ const Dashboard = () => {
                                         ).length
                                     }`}
                                     units="samples"
-                                    units_colour="ourdna-red-transparent"
+                                    unitsColour="ourdna-red-transparent"
                                     description="Blood has been collected, but was not processed within 72 hours."
-                                    tile_icon={icons.red_bloodsample}
+                                    icon={
+                                        <BloodSampleIcon
+                                            fill={ourdnaColours.red}
+                                            style={{ ...iconStyle }}
+                                        />
+                                    }
                                 />
                             </GridColumn>
                             <GridColumn>
@@ -142,7 +162,12 @@ const Dashboard = () => {
                                         },
                                     ]}
                                     description="The time between collection and processing for each sample."
-                                    tile_icon={icons.green_truck}
+                                    icon={
+                                        <TruckIcon
+                                            fill={ourdnaColours.green}
+                                            style={{ ...iconStyle }}
+                                        />
+                                    }
                                 />
                             </GridColumn>
                         </Grid>
@@ -153,7 +178,9 @@ const Dashboard = () => {
                             data={
                                 data.project.ourdnaDashboard.total_samples_by_collection_event_name
                             }
-                            icon={icons.blue_testtube}
+                            icon={
+                                <TestTubeIcon fill={ourdnaColours.blue} style={{ ...iconStyle }} />
+                            }
                         />
                     </GridColumn>
                 </GridRow>
@@ -162,7 +189,9 @@ const Dashboard = () => {
                         <BarChart
                             header="Processing time per site"
                             data={data.project.ourdnaDashboard.processing_times_by_site}
-                            icon={icons.yellow_clock}
+                            icon={
+                                <ClockIcon fill={ourdnaColours.yellow} style={{ ...iconStyle }} />
+                            }
                         />
                     </GridColumn>
                     <GridColumn width={6} stackable>
@@ -171,7 +200,12 @@ const Dashboard = () => {
                                 header="Viable Long Read"
                                 data={data.project.ourdnaDashboard.samples_concentration_gt_1ug}
                                 columns={['Sample ID', 'Concentration']}
-                                tile_icon={icons.green_rocket}
+                                icon={
+                                    <RocketIcon
+                                        fill={ourdnaColours.green}
+                                        style={{ ...iconStyle }}
+                                    />
+                                }
                             />
                         </GridColumn>
                         <GridColumn>
@@ -179,7 +213,9 @@ const Dashboard = () => {
                                 header="Processed > 24h"
                                 data={samplesLostAfterCollections}
                                 columns={['Sample ID', 'Time (h)']}
-                                tile_icon={icons.red_alarm}
+                                icon={
+                                    <AlarmIcon fill={ourdnaColours.red} style={{ ...iconStyle }} />
+                                }
                             />
                         </GridColumn>
                     </GridColumn>
