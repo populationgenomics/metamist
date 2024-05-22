@@ -305,3 +305,7 @@ html[data-theme='dark-mode'] .ui.table {
 .bold-text {
     font-weight: bold;
 }
+
+.dashboard-tile {
+    color: var(--color-text-primary) !important;
+}

@@ -17,7 +17,7 @@ const StatTile: React.FC<StatTileProps> = ({ header, stats, tile_icon, descripti
         }}
     >
         <Card.Content>
-            <Card.Header style={{ fontSize: '1.25rem' }}>
+            <Card.Header className="dashboard-tile" style={{ fontSize: '1.25rem' }}>
                 <Image src={tile_icon} alt="Icon" size="mini" spaced="right" />
                 {header}
             </Card.Header>
@@ -26,9 +26,12 @@ const StatTile: React.FC<StatTileProps> = ({ header, stats, tile_icon, descripti
                     {stats.map((stat, index) => (
                         <Grid.Column key={index}>
                             <Statistic size="small">
-                                <Statistic.Value>{stat.value}</Statistic.Value>
+                                <Statistic.Value className="dashboard-tile">
+                                    {stat.value}
+                                </Statistic.Value>
                                 <Statistic.Label style={{ margin: 5 }}>
                                     <Label
+                                        className="dashboard-tile"
                                         style={{
                                             backgroundColor: `var(--${stat.unitsColour})`,
                                         }}
@@ -42,7 +45,9 @@ const StatTile: React.FC<StatTileProps> = ({ header, stats, tile_icon, descripti
                 </Grid>
             </Card.Description>
         </Card.Content>
-        <Card.Content extra>{description}</Card.Content>
+        <Card.Content extra className="dashboard-tile">
+            {description}
+        </Card.Content>
     </Card>
 )
 
