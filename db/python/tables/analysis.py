@@ -263,10 +263,12 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             analysis = AnalysisInternal.from_db(**dict(row))
 
             if row['_sequencing_group_ids']:
-                analysis.sequencing_group_ids = row['_sequencing_group_ids'].split(',')
+                analysis.sequencing_group_ids = [
+                    int(sg) for sg in row['_sequencing_group_ids'].split(',')
+                ]
 
             if row['_cohort_ids']:
-                analysis.cohort_ids = row['_cohort_ids'].split(',')
+                analysis.cohort_ids = [int(co) for co in row['_cohort_ids'].split(',')]
 
             result.append(analysis)
 
