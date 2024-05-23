@@ -6,6 +6,8 @@ import re
 from enum import Enum
 from typing import Any, Generic, Sequence, TypeVar
 
+from models.base import SMBase
+
 T = TypeVar('T')
 
 levels_map = {'DEBUG': logging.DEBUG, 'INFO': logging.INFO, 'WARNING': logging.WARNING}
@@ -65,9 +67,11 @@ class NoProjectAccess(Forbidden):
         project_names: Sequence[str] | None,
         author: str,
         *args,
-        readonly: bool = None,
+        readonly: bool | None = None,
     ):
-        project_names_str = ', '.join(repr(p) for p in project_names)
+        project_names_str = (
+            ', '.join(repr(p) for p in project_names) if project_names else ''
+        )
         access_type = ''
         if readonly is False:
             access_type = 'write '
@@ -80,7 +84,7 @@ class NoProjectAccess(Forbidden):
 
 
 # pylint: disable=too-many-instance-attributes
-class GenericFilter(Generic[T]):
+class GenericFilter(SMBase, Generic[T]):
     """
     Generic filter for eq, in_ (in) and nin (not in)
     """
@@ -94,29 +98,6 @@ class GenericFilter(Generic[T]):
     lte: T | None = None
     contains: T | None = None
     icontains: T | None = None
-
-    def __init__(
-        self,
-        *,
-        eq: T | None = None,
-        in_: Sequence[T] | None = None,
-        nin: Sequence[T] | None = None,
-        gt: T | None = None,
-        gte: T | None = None,
-        lt: T | None = None,
-        lte: T | None = None,
-        contains: T | None = None,
-        icontains: T | None = None,
-    ):
-        self.eq = eq
-        self.in_ = in_
-        self.nin = nin
-        self.gt = gt
-        self.gte = gte
-        self.lt = lt
-        self.lte = lte
-        self.contains = contains
-        self.icontains = icontains
 
     def __repr__(self):
         keys = ['eq', 'in_', 'nin', 'gt', 'gte', 'lt', 'lte', 'contains', 'icontains']

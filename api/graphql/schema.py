@@ -118,7 +118,19 @@ class GraphQLCohort:
             cohort_id_transform_to_raw(root.id)
         )
 
-        return GraphQLCohortTemplate.from_internal(template)
+        ptable = ProjectPermissionsTable(connection)
+        projects = await ptable.get_and_check_access_to_projects_for_ids(
+            user=connection.author,
+            project_ids=(
+                template.criteria.projects if template.criteria.projects else []
+            ),
+            readonly=True,
+        )
+        project_names = [p.name for p in projects if p.name]
+
+        return GraphQLCohortTemplate.from_internal(
+            template, project_names=project_names
+        )
 
     @strawberry.field()
     async def sequencing_groups(
@@ -165,13 +177,15 @@ class GraphQLCohortTemplate:
     criteria: strawberry.scalars.JSON
 
     @staticmethod
-    def from_internal(internal: CohortTemplateInternal) -> 'GraphQLCohortTemplate':
+    def from_internal(
+        internal: CohortTemplateInternal, project_names: list[str]
+    ) -> 'GraphQLCohortTemplate':
         # At this point, the object that comes in doesn't have an ID field.
         return GraphQLCohortTemplate(
             id=cohort_template_id_format(internal.id),
             name=internal.name,
             description=internal.description,
-            criteria=internal.criteria,
+            criteria=internal.criteria.to_external(project_names=project_names).dict(),
         )
 
 
@@ -413,6 +427,7 @@ class GraphQLProject:
                 else None
             ),
             timestamp=timestamp.to_internal_filter() if timestamp else None,
+            project=GenericFilter(eq=root.id),
         )
 
         cohorts = await CohortLayer(connection).query(c_filter)
@@ -905,7 +920,7 @@ class GraphQLAnalysisRunner:
     script: str
     description: str
     driver_image: str
-    config_path: str
+    config_path: str | None
     cwd: str | None
     environment: str
     hail_version: str | None
@@ -988,10 +1003,21 @@ class Query:  # entry point to graphql.
         )
 
         cohort_templates = await cohort_layer.query_cohort_templates(filter_)
-        return [
-            GraphQLCohortTemplate.from_internal(cohort_template)
-            for cohort_template in cohort_templates
-        ]
+
+        external_templates = []
+
+        for template in cohort_templates:
+            template_projects = await ptable.get_and_check_access_to_projects_for_ids(
+                user=connection.author,
+                project_ids=template.criteria.projects or [],
+                readonly=True,
+            )
+            template_project_names = [p.name for p in template_projects if p.name]
+            external_templates.append(
+                GraphQLCohortTemplate.from_internal(template, template_project_names)
+            )
+
+        return external_templates
 
     @strawberry.field()
     async def cohorts(

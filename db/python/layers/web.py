@@ -53,9 +53,9 @@ class WebDb(DbBase):
         for query in grid_filter:
             value = query.query
             field = query.field
-            prefix = query.model_type.value
+            prefix = query.type.value
             key = (
-                f'{query.model_type}_{field}_{value}'.replace('-', '_')
+                f'{query.type}_{field}_{value}'.replace('-', '_')
                 .replace('.', '_')
                 .replace(':', '_')
                 .replace(' ', '_')

@@ -1,3 +1,4 @@
+# pylint: disable=kwarg-superseded-by-positional-arg
 """
 Web routes
 """
