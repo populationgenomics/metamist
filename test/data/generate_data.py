@@ -124,6 +124,7 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
                     ),
                 },
                 participant_id=pid,
+                non_sequencing_assays=[],
                 sequencing_groups=[],
             )
             samples.append(sample)
