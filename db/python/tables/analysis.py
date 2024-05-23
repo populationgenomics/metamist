@@ -299,6 +299,7 @@ SELECT a.id as id, a.type as type, a.status as status,
         a.meta as meta
 FROM analysis_sequencing_group a_sg
 INNER JOIN analysis a ON a_sg.analysis_id = a.id
+INNER JOIN sequencing_group sg ON a_sg.sequencing_group_id = sg.id
 WHERE a.id = (
     SELECT id FROM analysis
     WHERE active AND type = :type AND project = :project AND status = 'completed' AND timestamp_completed IS NOT NULL{meta_str}
