@@ -4,20 +4,12 @@ from dataclasses import dataclass
 from models.base import SMBase
 from models.utils import sample_id_format, sequencing_group_id_format
 
-
-class PagingLinks(SMBase):
-    """Model for PAGING"""
-
-    self: str
-    next: str | None
-    token: str | None
-
-
 @dataclass
 class AnalysisStats:
     """Model for Analysis Sequencing Group Stats"""
-    id: int = None
-    sg_count: int = None
+    id: int | None = None
+    name: str | None = None
+    sg_count: int | None = None
 
     def to_external(self):
         """Convert to transport model"""
@@ -27,12 +19,14 @@ class AnalysisStats:
 
 
 @dataclass
-class SeqrProjectsDetailsInternal:
+class SeqrProjectsSummaryDetailsInternal:
     """Return class for the seqr projects stats details endpoint"""
 
     project: int
     dataset: str
     sequencing_type: str
+    sequencing_platform: str
+    sequencing_technology: str
     sample_type: str
     family_id: int
     family_ext_id: str
@@ -47,12 +41,14 @@ class SeqrProjectsDetailsInternal:
     in_latest_sv_es_index: bool
     sequencing_group_report_links: dict[str, str]
 
-    def to_external(self, links):
+    def to_external(self):
         """Convert to transport model"""
-        return SeqrProjectsDetails(
+        return SeqrProjectsSummaryDetails(
             project=self.project,
             dataset=self.dataset,
             sequencing_type=self.sequencing_type,
+            sequencing_platform=self.sequencing_platform,
+            sequencing_technology=self.sequencing_technology,
             sample_type=self.sample_type,
             family_id=self.family_id,
             family_ext_id=self.family_ext_id,
@@ -66,16 +62,17 @@ class SeqrProjectsDetailsInternal:
             in_latest_snv_es_index=self.in_latest_snv_es_index,
             in_latest_sv_es_index=self.in_latest_sv_es_index,
             sequencing_group_report_links=self.sequencing_group_report_links,
-            links=links,
         )
 
 
-class SeqrProjectsDetails(SMBase):
+class SeqrProjectsSummaryDetails(SMBase):
     """External return class for the seqr projects stats details endpoint"""
 
     project: int
     dataset: str
     sequencing_type: str
+    sequencing_platform: str
+    sequencing_technology: str
     sample_type: str
     family_id: int
     family_ext_id: str
@@ -90,21 +87,16 @@ class SeqrProjectsDetails(SMBase):
     in_latest_sv_es_index: bool
     sequencing_group_report_links: dict[str, str]
 
-    links: PagingLinks | None
-
-    class Config:
-        """Config for SeqrProjectsDetailsResponse"""
-
-        fields = {'links': '_links'}
-
 
 @dataclass
-class SeqrProjectsSummaryInternal:
+class SeqrProjectsSummaryStatsInternal:
     """Return class for the seqr projects summary endpoint"""
 
     project: int
     dataset: str
     sequencing_type: str
+    sequencing_platform: str
+    sequencing_technology: str
     total_families: int = 0
     total_participants: int = 0
     total_samples: int = 0
@@ -114,12 +106,14 @@ class SeqrProjectsSummaryInternal:
     latest_snv_es_index: AnalysisStats = None
     latest_sv_es_index: AnalysisStats = None
 
-    def to_external(self, links):
+    def to_external(self):
         """Convert to transport model"""
-        return SeqrProjectsSummary(
+        return SeqrProjectsSummaryStats(
             project=self.project,
             dataset=self.dataset,
             sequencing_type=self.sequencing_type,
+            sequencing_platform=self.sequencing_platform,
+            sequencing_technology=self.sequencing_technology,
             total_families=self.total_families,
             total_participants=self.total_participants,
             total_samples=self.total_samples,
@@ -128,16 +122,17 @@ class SeqrProjectsSummaryInternal:
             latest_annotate_dataset=self.latest_annotate_dataset.to_external() if self.latest_annotate_dataset else None,
             latest_snv_es_index=self.latest_snv_es_index.to_external() if self.latest_snv_es_index else None,
             latest_sv_es_index=self.latest_sv_es_index.to_external() if self.latest_sv_es_index else None,
-            links=links,
         )
 
 
-class SeqrProjectsSummary(SMBase):
+class SeqrProjectsSummaryStats(SMBase):
     """Return class for the project insights stats endpoint"""
 
     project: int
     dataset: str
     sequencing_type: str
+    sequencing_platform: str
+    sequencing_technology: str
     total_families: int
     total_participants: int
     total_samples: int
@@ -146,10 +141,3 @@ class SeqrProjectsSummary(SMBase):
     latest_annotate_dataset: dict[str, int] | None
     latest_snv_es_index: dict[str, int] | None
     latest_sv_es_index: dict[str, int] | None
-
-    links: PagingLinks | None
-
-    class Config:
-        """Config for ProjectInsightsStatsResponse"""
-
-        fields = {'links': '_links'}
