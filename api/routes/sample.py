@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body
+from fastapi import APIRouter
 
 from api.utils.db import (
     Connection,
@@ -8,6 +8,7 @@ from api.utils.db import (
 )
 from db.python.layers.sample import SampleLayer
 from db.python.tables.project import ProjectPermissionsTable
+from models.base import SMBase
 from models.models.sample import SampleUpsert
 from models.utils.sample_id_format import (  # Sample,
     sample_id_format,
@@ -115,13 +116,19 @@ async def get_sample_by_external_id(
     return result.to_external()
 
 
+class GetSamplesCriteria(SMBase):
+    """Get samples filter criteria"""
+
+    sample_ids: list[str] | None = None
+    meta: dict | None = None
+    participant_ids: list[int] | None = None
+    project_ids: list[str] | None = None
+    active: bool = True
+
+
 @router.post('/', operation_id='getSamples')
 async def get_samples(
-    sample_ids: list[str] = None,
-    meta: dict = None,
-    participant_ids: list[int] = None,
-    project_ids: list[str] = None,
-    active: bool = Body(default=True),
+    criteria: GetSamplesCriteria,
     connection: Connection = get_projectless_db_connection,
 ):
     """
@@ -131,19 +138,23 @@ async def get_samples(
 
     pt = ProjectPermissionsTable(connection)
     pids: list[int] | None = None
-    if project_ids:
+    if criteria.project_ids:
         pids = await pt.get_project_ids_from_names_and_user(
-            connection.author, project_ids, readonly=True
+            connection.author, criteria.project_ids, readonly=True
         )
 
-    sample_ids_raw = sample_id_transform_to_raw_list(sample_ids) if sample_ids else None
+    sample_ids_raw = (
+        sample_id_transform_to_raw_list(criteria.sample_ids)
+        if criteria.sample_ids
+        else None
+    )
 
     result = await st.get_samples_by(
         sample_ids=sample_ids_raw,
-        meta=meta,
-        participant_ids=participant_ids,
+        meta=criteria.meta,
+        participant_ids=criteria.participant_ids,
         project_ids=pids,
-        active=active,
+        active=criteria.active,
         check_project_ids=True,
     )
 
