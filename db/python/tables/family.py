@@ -65,6 +65,7 @@ class FamilyTable(DbBase):
         if not filter_.project and not filter_.id:
             raise ValueError('Project or ID filter is required for family queries')
 
+        has_participant_join = False
         field_overrides = {'id': 'f.id', 'external_id': 'f.external_id'}
 
         has_participant_join = False
