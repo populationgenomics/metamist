@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument
 import logging
-from typing import List
 
 import click
 
@@ -95,7 +93,7 @@ class SampleFileMapParser(GenericMetadataParser):
 
     def __init__(
         self,
-        search_locations: List[str],
+        search_locations: list[str],
         project: str,
         default_sample_type='blood',
         default_sequencing=DefaultSequencing(
@@ -106,6 +104,7 @@ class SampleFileMapParser(GenericMetadataParser):
         allow_extra_files_in_search_path=False,
         default_reference_assembly_location: str | None = None,
         verbose=True,
+        **kwargs,
     ):
         super().__init__(
             search_locations=search_locations,
@@ -124,13 +123,10 @@ class SampleFileMapParser(GenericMetadataParser):
             default_read_end_type=default_read_end_type,
             default_read_length=default_read_length,
             default_reference_assembly_location=default_reference_assembly_location,
-            participant_meta_map={},
-            sample_meta_map={},
-            assay_meta_map={},
-            qc_meta_map={},
             allow_extra_files_in_search_path=allow_extra_files_in_search_path,
             key_map=KeyMap,
             verbose=verbose,
+            **kwargs,
         )
 
     def get_sample_id(self, row: SingleRow) -> str:
@@ -192,7 +188,7 @@ class SampleFileMapParser(GenericMetadataParser):
 @run_as_sync
 async def main(  # pylint: disable=too-many-arguments
     manifests,
-    search_path: List[str],
+    search_path: list[str],
     project,
     default_sample_type='blood',
     default_sequencing_type='genome',
