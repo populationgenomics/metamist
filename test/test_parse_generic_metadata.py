@@ -490,7 +490,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
         mock_graphql_query
     ):
         """
-        Test importing a single row of long read sequencing data with arbitrary assay metadata columns
+        Test importing rows of long read sequencing data with arbitrary assay metadata columns
         """
         mock_graphql_query.side_effect = self.run_graphql_query_async
         self.maxDiff = None
