@@ -586,9 +586,6 @@ class TestParseGenericMetadata(DbIsolatedTest):
         }
 
         expected_sg_dict = {
-            'sequencing_platform': 'pacbio',
-            'sequencing_technology': 'long-read',
-            'sequencing_type': 'genome',
             'assay_meta1': [5, True],
             'assay_meta2': [False, 'some_value'],
         }
