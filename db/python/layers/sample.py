@@ -161,9 +161,9 @@ class SampleLayer(BaseLayer):
 
     async def get_samples_by(
         self,
-        sample_ids: list[int] = None,
-        meta: dict[str, Any] = None,
-        participant_ids: list[int] = None,
+        sample_ids: list[int] | None = None,
+        meta: dict[str, Any] | None = None,
+        participant_ids: list[int] | None = None,
         project_ids=None,
         active=True,
         check_project_ids=True,
