@@ -4,18 +4,6 @@ import * as d3 from 'd3'
 
 import { ourdnaColours } from './Colours'
 
-import {
-    Chart as ChartJS,
-    CategoryScale,
-    LinearScale,
-    BarElement,
-    Title,
-    Tooltip,
-    Legend,
-} from 'chart.js'
-
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
-
 export const chartOptions = {
     responsive: true,
     plugins: {
@@ -236,10 +224,6 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
             .attr('dy', '0.32em')
             .text((d) => d)
     }, [data, dimensions])
-
-    //   return (
-    //     <svg ref={svgRef} width="800" height="400"></svg>
-    //   );
 
     return (
         <Card
