@@ -6,6 +6,8 @@ import re
 from enum import Enum
 from typing import Any, Generic, Sequence, TypeVar
 
+from models.base import SMBase
+
 T = TypeVar('T')
 
 levels_map = {'DEBUG': logging.DEBUG, 'INFO': logging.INFO, 'WARNING': logging.WARNING}
@@ -65,9 +67,11 @@ class NoProjectAccess(Forbidden):
         project_names: Sequence[str] | None,
         author: str,
         *args,
-        readonly: bool = None,
+        readonly: bool | None = None,
     ):
-        project_names_str = ', '.join(repr(p) for p in project_names)
+        project_names_str = (
+            ', '.join(repr(p) for p in project_names) if project_names else ''
+        )
         access_type = ''
         if readonly is False:
             access_type = 'write '
@@ -80,43 +84,20 @@ class NoProjectAccess(Forbidden):
 
 
 # pylint: disable=too-many-instance-attributes
-class GenericFilter(Generic[T]):
+class GenericFilter(SMBase, Generic[T]):
     """
     Generic filter for eq, in_ (in) and nin (not in)
     """
 
     eq: T | None = None
-    in_: list[T] | None = None
-    nin: list[T] | None = None
+    in_: Sequence[T] | None = None
+    nin: Sequence[T] | None = None
     gt: T | None = None
     gte: T | None = None
     lt: T | None = None
     lte: T | None = None
     contains: T | None = None
     icontains: T | None = None
-
-    def __init__(
-        self,
-        *,
-        eq: T | None = None,
-        in_: list[T] | None = None,
-        nin: list[T] | None = None,
-        gt: T | None = None,
-        gte: T | None = None,
-        lt: T | None = None,
-        lte: T | None = None,
-        contains: T | None = None,
-        icontains: T | None = None,
-    ):
-        self.eq = eq
-        self.in_ = in_
-        self.nin = nin
-        self.gt = gt
-        self.gte = gte
-        self.lt = lt
-        self.lte = lte
-        self.contains = contains
-        self.icontains = icontains
 
     def __repr__(self):
         keys = ['eq', 'in_', 'nin', 'gt', 'gte', 'lt', 'lte', 'contains', 'icontains']
@@ -125,10 +106,11 @@ class GenericFilter(Generic[T]):
         )
         return f'{self.__class__.__name__}({inner_values})'
 
-    def __hash__(self):
-        """Override to ensure we can hash this object"""
-        return hash(
+    def get_hashable_value(self):
+        """Get value that we could run hash on"""
+        return get_hashable_value(
             (
+                self.__class__.__name__,
                 self.eq,
                 tuple(self.in_) if self.in_ is not None else None,
                 tuple(self.nin) if self.nin is not None else None,
@@ -140,6 +122,10 @@ class GenericFilter(Generic[T]):
                 self.icontains,
             )
         )
+
+    def __hash__(self):
+        """Override to ensure we can hash this object"""
+        return hash(self.get_hashable_value())
 
     @staticmethod
     def generate_field_name(name):
@@ -162,9 +148,19 @@ class GenericFilter(Generic[T]):
         return self.in_ is not None and len(self.in_) == 0
 
     def to_sql(
-        self, column: str, column_name: str = None
+        self, column: str, column_name: str | None = None
     ) -> tuple[str, dict[str, T | list[T]]]:
-        """Convert to SQL, and avoid SQL injection"""
+        """Convert to SQL, and avoid SQL injection
+
+        Args:
+            column (str): The expression, or column name that derives the values
+            column_name (str, optional): A column name to use in the field_override.
+                We'll replace any non-alphanumeric characters with an _.
+                (Defaults to None)
+
+        Returns:
+            tuple[str, dict[str, T | list[T]]]: (condition, prepared_values)
+        """
         conditionals = []
         values: dict[str, T | list[T]] = {}
         _column_name = column_name or column
@@ -238,6 +234,30 @@ class GenericFilter(Generic[T]):
         return value
 
 
+def get_hashable_value(value):
+    """Prepare a value that can be hashed, for use in a dict or set"""
+    if value is None:
+        return None
+    if isinstance(value, (int, str, float, bool)):
+        return value
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, (tuple, list)):
+        # let's see if later we need to prepare the values in the list
+        return tuple(get_hashable_value(v) for v in value)
+    if isinstance(value, dict):
+        return tuple(
+            sorted(
+                ((k, get_hashable_value(v)) for k, v in value.items()),
+                key=lambda x: x[0],
+            )
+        )
+    if hasattr(value, 'get_hashable_value'):
+        return value.get_hashable_value()
+
+    return hash(value)
+
+
 # pylint: disable=missing-class-docstring
 GenericMetaFilter = dict[str, GenericFilter[Any]]
 
@@ -250,7 +270,11 @@ class GenericFilterModel:
 
     def __hash__(self):
         """Hash the GenericFilterModel, this doesn't override well"""
-        return hash(dataclasses.astuple(self))
+        return hash(self.get_hashable_value())
+
+    def get_hashable_value(self):
+        """Get value that we could run hash on"""
+        return get_hashable_value((self.__class__.__name__, *dataclasses.astuple(self)))
 
     def is_false(self) -> bool:
         """
@@ -301,7 +325,7 @@ class GenericFilterModel:
 
     def to_sql(
         self,
-        field_overrides: dict[str, str] = None,
+        field_overrides: dict[str, str] | None = None,
         only: list[str] | None = None,
         exclude: list[str] | None = None,
     ) -> tuple[str, dict[str, Any]]:

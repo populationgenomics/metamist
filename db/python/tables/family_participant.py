@@ -1,9 +1,20 @@
+import dataclasses
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 from db.python.tables.base import DbBase
+from db.python.utils import GenericFilter, GenericFilterModel
 from models.models.family import PedRowInternal
 from models.models.project import ProjectId
+
+
+@dataclasses.dataclass
+class FamilyParticipantFilter(GenericFilterModel):
+    """Filter for family_participant table"""
+
+    project: GenericFilter[ProjectId] | None = None
+    participant_id: GenericFilter[int] | None = None
+    family_id: GenericFilter[int] | None = None
 
 
 class FamilyParticipantTable(DbBase):
@@ -21,7 +32,7 @@ class FamilyParticipantTable(DbBase):
         maternal_id: int,
         affected: int,
         notes: str | None = None,
-    ) -> Tuple[int, int]:
+    ) -> tuple[int, int]:
         """
         Create a new sample, and add it to database
         """
@@ -64,16 +75,17 @@ VALUES
         """
         ignore_keys_during_update = {'participant_id'}
 
-        remapped_ds_by_keys: Dict[Tuple, List[Dict]] = defaultdict(list)
+        remapped_ds_by_keys: dict[tuple, list[dict]] = defaultdict(list)
         # this now works when only a portion of the keys are specified
         for row in rows:
             d: dict[str, Any] = {
                 'family_id': row.family_id,
-                'participant_id': row.participant_id,
+                'participant_id': row.individual_id,
                 'paternal_participant_id': row.paternal_id,
                 'maternal_participant_id': row.maternal_id,
                 'affected': row.affected,
                 'notes': row.notes,
+                # sex is NOT inserted here
                 'audit_log_id': await self.audit_log_id(),
             }
 
@@ -97,113 +109,51 @@ ON DUPLICATE KEY UPDATE
 
         return True
 
-    async def get_rows(
+    async def query(
         self,
-        project: ProjectId,
-        family_ids: Optional[List[int]] = None,
-        include_participants_not_in_families=False,
-    ):
+        filter_: FamilyParticipantFilter,
+        include_participants_not_in_families: bool = False,
+    ) -> tuple[set[ProjectId], list[PedRowInternal]]:
         """
-        Get rows from database, return ALL rows unless family_ids is specified.
-        If family_ids is not specified, and `include_participants_not_in_families` is True,
-            Get all participants from project and include them in pedigree
+        Query the family_participant table
         """
-        keys = [
-            'fp.family_id',
-            'p.id as individual_id',
-            'fp.paternal_participant_id as paternal_id',
-            'fp.maternal_participant_id as maternal_id',
-            'p.reported_sex as sex',
-            'fp.affected',
-        ]
-        keys_str = ', '.join(keys)
 
-        values: Dict[str, Any] = {'project': project or self.project}
-        wheres = ['p.project = :project']
-        if family_ids:
-            wheres.append('family_id in :family_ids')
-            values['family_ids'] = family_ids
+        wheres, values = filter_.to_sql()
+        if not wheres:
+            raise ValueError('No filter provided')
 
-        if not include_participants_not_in_families:
-            wheres.append('f.project = :project')
+        join_type = 'LEFT' if include_participants_not_in_families else 'INNER'
+        query = f"""
+        SELECT
+            fp.family_id,
+            p.id as individual_id,
+            fp.paternal_participant_id as paternal_id,
+            fp.maternal_participant_id as maternal_id,
+            p.reported_sex as sex,
+            fp.affected,
+            fp.notes as notes,
+            p.project
+        FROM participant p
+        {join_type} JOIN family_participant fp on fp.participant_id = p.id
+        WHERE {wheres}
+        """
 
-        conditions = ' AND '.join(wheres)
+        rows = await self.connection.fetch_all(query, values)
+        projects: set[ProjectId] = set()
+        pedrows: list[PedRowInternal] = []
+        for row in rows:
+            r = dict(row)
+            projects.add(r.pop('project'))
+            pedrows.append(PedRowInternal(**r))
 
-        _query = f"""
-            SELECT {keys_str} FROM family_participant fp
-            INNER JOIN family f ON f.id = fp.family_id
-            INNER JOIN participant p on fp.participant_id = p.id
-            WHERE {conditions}"""
-        if not family_ids and include_participants_not_in_families:
-            # rewrite the query to LEFT join from participants
-            # to include all participants
-            _query = f"""
-                SELECT {keys_str} FROM participant p
-                LEFT JOIN family_participant fp ON fp.participant_id = p.id
-                LEFT JOIN family f ON f.id = fp.family_id
-                WHERE {conditions}"""
-
-        rows = await self.connection.fetch_all(_query, values)
-
-        ordered_keys = [
-            'family_id',
-            'individual_id',
-            'paternal_id',
-            'maternal_id',
-            'sex',
-            'affected',
-        ]
-        ds = [{k: row[k] for k in ordered_keys} for row in rows]
-
-        return ds
-
-    async def get_row(
-        self,
-        family_id: int,
-        participant_id: int,
-    ) -> dict | None:
-        """Get a single row from the family_participant table"""
-        values: Dict[str, Any] = {
-            'family_id': family_id,
-            'participant_id': participant_id,
-        }
-
-        _query = """
-SELECT
-    fp.family_id as family_id,
-    p.id as individual_id,
-    fp.paternal_participant_id as paternal_id,
-    fp.maternal_participant_id as maternal_id,
-    p.reported_sex as sex,
-    fp.affected
-FROM family_participant fp
-INNER JOIN family f ON f.id = fp.family_id
-INNER JOIN participant p on fp.participant_id = p.id
-WHERE f.id = :family_id AND p.id = :participant_id
-"""
-
-        row = await self.connection.fetch_one(_query, values)
-        if not row:
-            return None
-
-        ordered_keys = [
-            'family_id',
-            'individual_id',
-            'paternal_id',
-            'maternal_id',
-            'sex',
-            'affected',
-        ]
-        ds = {k: row[k] for k in ordered_keys}
-
-        return ds
+        return projects, pedrows
 
     async def get_participant_family_map(
-        self, participant_ids: List[int]
-    ) -> Tuple[Set[int], Dict[int, int]]:
+        self,
+        participant_ids: list[int],
+    ) -> tuple[set[int], dict[int, int]]:
         """
         Get {participant_id: family_id} map
-        w/ projects
         """
 
         if len(participant_ids) == 0:
@@ -218,10 +168,26 @@ WHERE fp.participant_id in :participant_ids
         rows = await self.connection.fetch_all(
             _query, {'participant_ids': participant_ids}
         )
-        projects = set(r['project'] for r in rows)
-        m = {r['id']: r['family_id'] for r in rows}
 
-        return projects, m
+        projects = set(r['project'] for r in rows)
+        conflicts: dict[int, list[int]] = {}
+        pid_to_fid_map: dict[int, int] = {}
+        for r in rows:
+            r_id = r['id']
+
+            if r_id in pid_to_fid_map:
+                if r_id not in conflicts:
+                    conflicts[r_id] = [pid_to_fid_map[r_id]]
+                conflicts[r_id].append(r['family_id'])
+
+            pid_to_fid_map[r_id] = r['family_id']
+
+        if conflicts:
+            raise ValueError(
+                f'Participants were found in more than one family ({{pid: [fids]}}): {conflicts}'
+            )
+
+        return projects, pid_to_fid_map
 
     async def delete_family_participant_row(self, family_id: int, participant_id: int):
         """

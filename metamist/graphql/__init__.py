@@ -143,9 +143,10 @@ def validate(doc: DocumentNode, client=None, use_local_schema=False):
 
 # use older style typing to broaden supported Python versions
 @backoff.on_exception(
-    backoff.expo,
+    backoff.fibo,
     exception=(HTTPError, JSONDecodeError, TransportServerError),
-    max_time=10,
+    max_time=55,
+    max_value=55
 )
 def query(
     _query: str | DocumentNode,

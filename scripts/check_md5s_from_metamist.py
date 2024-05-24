@@ -11,6 +11,7 @@ from cpg_utils.config import get_config
 from cpg_utils.hail_batch import remote_tmpdir
 
 from metamist.apis import AssayApi, SampleApi
+from metamist.model.assay_query_criteria import AssayQueryCriteria
 
 LocationTuple = namedtuple(
     'LocationTuple', ['cpg_sample_id', 'location', 'checksum', 'size']
@@ -75,7 +76,9 @@ def get_file_path_md5_pairs_from_samples(
         (cpg_sample_id, file_path, expected_md5)
     """
     seqapi = AssayApi()
-    sequences = seqapi.get_assays_by_criteria(sample_ids=cpg_sample_ids)
+    sequences = seqapi.get_assays_by_criteria(
+        assay_query_criteria=AssayQueryCriteria(sample_ids=cpg_sample_ids)
+    )
 
     pairs = []
     for seq in sequences:

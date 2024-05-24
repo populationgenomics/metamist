@@ -5,7 +5,10 @@ We want to package it up in a way that cpg-infrastructure deployment can consume
 using [entry points](https://amir.rachum.com/python-entry-points/). Hence, this python package
 contains all files required to deploy:
 
-- Metamist ETL framework (cloud function, bigquery, pubsub), with currently no consumer
+- Metamist ETL framework (cloud function, bigquery, pubsub), with currently no consumer:
+
+![Database Structure](../resources/metamist-etl.drawio.png)
+
 
 ## Installation
 
