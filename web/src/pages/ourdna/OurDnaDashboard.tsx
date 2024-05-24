@@ -6,6 +6,7 @@ import Tile from '../../shared/components/ourdna/Tile'
 import TableTile from '../../shared/components/ourdna/TableTile'
 import StatTile from '../../shared/components/ourdna/StatTile'
 
+import OurDNALogo from '../../shared/components/OurDNALogo'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import MuckError from '../../shared/components/MuckError'
 import OurDonutChart from '../../shared/components/ourdna/OurDonutChart'
@@ -72,8 +73,16 @@ const Dashboard = () => {
 
     return (
         <>
-            <Container style={{ marginTop: 0, paddingBottom: '20px' }}>
-                <Image src="/logo_option2.png" size="small" centered />
+            <Container
+                style={{
+                    marginTop: 0,
+                    paddingBottom: '20px',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                }}
+            >
+                <OurDNALogo className="ourdna-logo-responsive" />
             </Container>
             <Grid stackable>
                 <GridRow centered>
