@@ -243,12 +243,18 @@ class ParticipantLayer(BaseLayer):
         self.pttable = ParticipantTable(connection=connection)
 
     async def query(
-        self, filter_: ParticipantFilter, limit: int | None = None, skip: int | None = None, check_project_ids: bool = True
+        self,
+        filter_: ParticipantFilter,
+        limit: int | None = None,
+        skip: int | None = None,
+        check_project_ids: bool = True,
     ) -> list[ParticipantInternal]:
         """
         Query participants from the database, heavy lifting done by the filter
         """
-        projects, participants = await self.pttable.query(filter_, skip=skip, limit=limit)
+        projects, participants = await self.pttable.query(
+            filter_, skip=skip, limit=limit
+        )
 
         if not participants:
             return []
@@ -259,6 +265,24 @@ class ParticipantLayer(BaseLayer):
             )
 
         return participants
+
+    async def query_count(
+        self,
+        filter_: ParticipantFilter,
+    ) -> int:
+        """
+        Count the number of rows returned by the filter, the speed
+            (compared to SQL_CALC_FOUND_ROWS + FOUND_ROWS())
+        depends on whether the filter is able to use indexes (and hence just perform
+        an index scan), but we don't want it on every query participants, so keep
+        it separate.
+
+        - https://mariadb.com/kb/en/found_rows/
+        - source: https://www.percona.com/blog/to-sql_calc_found_rows-or-not-to-sql_calc_found_rows/
+        """
+        count = await self.pttable.query_count(filter_)
+
+        return count
 
     async def get_participants_by_ids(
         self,

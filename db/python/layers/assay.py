@@ -59,11 +59,18 @@ class AssayLayer(BaseLayer):
         return assay
 
     async def get_assays_for_sequencing_group_ids(
-        self, sequencing_group_ids: list[int], check_project_ids=True
+        self,
+        sequencing_group_ids: list[int],
+        filter_: AssayFilter | None = None,
+        check_project_ids=True,
     ) -> dict[int, list[AssayInternal]]:
         """Get assays for a list of sequencing group IDs"""
+        if not sequencing_group_ids:
+            return {}
+
         projects, assays = await self.seqt.get_assays_for_sequencing_group_ids(
             sequencing_group_ids=sequencing_group_ids,
+            filter_=filter_,
         )
 
         if not assays:

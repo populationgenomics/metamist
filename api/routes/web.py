@@ -12,7 +12,6 @@ from api.utils.db import (
     get_project_write_connection,
     get_projectless_db_connection,
 )
-from db.python.layers.participant import ParticipantLayer
 from db.python.layers.search import SearchLayer
 from db.python.layers.seqr import SeqrLayer
 from db.python.layers.web import WebLayer
@@ -20,12 +19,8 @@ from db.python.tables.participant import ParticipantFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.utils import GenericFilter, GenericMetaFilter
 from models.enums.web import SeqrDatasetType
-from models.models.participant import NestedParticipantInternal
 from models.models.search import SearchResponse
-from models.models.web import (
-    ProjectParticipantGridResponse,
-    ProjectSummary,
-)
+from models.models.web import ProjectParticipantGridResponse, ProjectSummary
 
 
 class SearchResponseModel(BaseModel):
@@ -79,19 +74,20 @@ async def get_project_summary_with_limit(
     if not connection.project:
         raise ValueError("No project was detected through the authentication")
 
-    player = ParticipantLayer(connection)
+    wlayer = WebLayer(connection)
     id_query = query.id
     if token:
         id_query = id_query or GenericFilter()
         id_query.gt = token
 
-    participants = await player.query(
+    participants = await wlayer.query(
         ParticipantFilter(
             id=id_query,
             external_id=query.external_id,
             reported_sex=query.reported_sex,
             reported_gender=query.reported_gender,
             karyotype=query.karyotype,
+            meta=query.meta,
             project=GenericFilter(eq=connection.project),
         ),
         limit=limit,
@@ -99,10 +95,8 @@ async def get_project_summary_with_limit(
 
     # then have to get all nested objects
 
-    ps: list[NestedParticipantInternal] = []
-
     return ProjectParticipantGridResponse.construct(
-        participants=ps,
+        participants=participants,
         token_base_url=str(request.base_url) + request.url.path.lstrip('/'),
         current_url=str(request.url),
         request_limit=limit,

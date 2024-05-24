@@ -80,18 +80,18 @@ class ProjectParticipantGridResponseInternal(SMBase):
 
     @staticmethod
     def to_external(
-        participants: NestedParticipantInternal,
+        participants: list[NestedParticipantInternal],
         token_base_url: str,
         current_url: str,
         request_limit: int,
     ):
         """Convert to transport model"""
         collected_samples = sum(
-            len(p.samples) if p.samples else 0 for p in self.participants
+            len(p.samples) if p.samples else 0 for p in participants
         )
         new_token = None
         if collected_samples >= request_limit:
-            new_token = max(int(p.id) for p in self.participants)
+            new_token = max(int(p.id) for p in participants)
 
         links = PagingLinks(
             next=token_base_url + f'?token={new_token}' if new_token else None,

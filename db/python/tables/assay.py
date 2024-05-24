@@ -89,29 +89,29 @@ class AssayTable(DbBase):
         if filter_.external_id is not None and filter_.project is None:
             raise ValueError('Must provide a project if filtering by external_id')
 
-        conditions, values = filter_.to_sql(sql_overides)
-        keys = ', '.join(self.COMMON_GET_KEYS)
+        conditions, values = filter_.to_sql(
+            sql_overides, exclude=['sequencing_group_id']
+        )
+
         _query = f"""
-            SELECT {keys}
+            SELECT
+                a.id, a.meta, a.project, a.type
+                JSON_OBJECTAGG(aeid.name, aeid.external_id) as external_ids
             FROM assay a
             LEFT JOIN sample s ON s.id = a.sample_id
             LEFT JOIN assay_external_id aeid ON aeid.assay_id = a.id
             WHERE {conditions}
+            GROUP BY a.id, a.meta, s.project, a.type
         """
 
         assay_rows = await self.connection.fetch_all(_query, values)
-
-        # this will unique on the id, which we want due to joining on 1:many eid table
-        assay_ids = [a['id'] for a in assay_rows]
-        seq_eids = await self._get_assays_eids(assay_ids)
-        assays = []
-
+        assays: list[AssayInternal] = []
         project_ids: set[ProjectId] = set()
         for row in assay_rows:
             drow = dict(row)
             project_ids.add(drow.pop('project'))
             assay = AssayInternal.from_db(drow)
-            assay.external_ids = seq_eids.get(assay.id, {}) if assay.id else {}
+
             assays.append(assay)
 
         return project_ids, assays
@@ -229,6 +229,58 @@ class AssayTable(DbBase):
                 )
 
         return retval
+
+    async def get_assays_for_sequencing_group_ids(
+        self,
+        sequencing_group_ids: list[int],
+        filter_: AssayFilter | None = None,
+    ) -> tuple[set[ProjectId], dict[int, list[AssayInternal]]]:
+        """Get all assays for sequencing group ids"""
+
+        values = {'sequencing_group_ids': sequencing_group_ids}
+        wheres = [
+            'sga.sequencing_group_id IN :sequencing_group_ids',
+        ]
+        if filter_:
+            _filter, _values = filter_.to_sql(
+                {
+                    'id': 'a.id',
+                    'sample_id': 'a.sample_id',
+                    'external_id': 'ae.external_id',
+                    'meta': 'a.meta',
+                    'project': 's.project',
+                    'type': 'a.type',
+                }
+            )
+            wheres.append(_filter)
+            values.update(_values)
+
+        _query = f"""
+            SELECT
+                a.id, a.sample_id, a.type, a.meta, s.project,
+                JSON_OBJECTAGG(ae.name, ae.external_id) as external_ids,
+                sga.sequencing_group_id
+            FROM sequencing_group_assay sga
+            INNER JOIN assay a ON sga.assay_id = a.id
+            LEFT JOIN sample s ON a.sample_id = s.id
+            LEFT JOIN assay_external_id ae ON a.id = ae.assay_id
+            WHERE {' AND '.join(wheres)}
+            GROUP BY
+                a.id, a.sample_id, a.type, a.meta,
+                s.project, sga.sequencing_group_id
+        """
+
+        rows = await self.connection.fetch_all(_query, values)
+        by_sequencing_group_id: dict[int, list[AssayInternal]] = defaultdict(list)
+        projects: set[ProjectId] = set()
+        for row in rows:
+            drow = dict(row)
+            sequencing_group_id = drow.pop('sequencing_group_id')
+            projects.add(drow.pop('project'))
+            assay = AssayInternal.from_db(drow)
+            by_sequencing_group_id[sequencing_group_id].append(assay)
+
+        return projects, by_sequencing_group_id
 
     # endregion GETS
 
@@ -531,54 +583,6 @@ class AssayTable(DbBase):
         projs = list(set([s['project'] for s in assay_rows]))
 
         return projs, list(assays.values())
-
-    async def get_assays_for_sequencing_group_ids(
-        self, sequencing_group_ids: list[int]
-    ) -> tuple[set[ProjectId], dict[int, list[AssayInternal]]]:
-        """Get all assays for sequencing group ids"""
-        keys = [
-            'a.id',
-            'a.sample_id',
-            'a.type',
-            'a.meta',
-            's.project',
-            'ae.name',
-            'ae.external_id',
-        ]
-        wheres = [
-            'sga.sequencing_group_id IN :sequencing_group_ids',
-        ]
-
-        _query = f"""
-            SELECT {', '.join(keys)}, sga.sequencing_group_id
-            FROM sequencing_group_assay sga
-            INNER JOIN assay a ON sga.assay_id = a.id
-            INNER JOIN sample s ON a.sample_id = s.id
-            LEFT JOIN assay_external_id ae ON a.id = ae.assay_id
-            WHERE {' AND '.join(wheres)}
-        """
-
-        rows = await self.connection.fetch_all(
-            _query, {'sequencing_group_ids': sequencing_group_ids}
-        )
-        by_sequencing_group_id: dict[int, list[AssayInternal]] = defaultdict(list)
-        projects: set[ProjectId] = set()
-        for row in rows:
-            drow = dict(row)
-
-            external_id = drow.pop('external_id', None)
-            if external_id:
-                drow['external_ids'] = {drow.pop('name'): external_id}
-            else:
-                drow['external_ids'] = {}
-                del drow['name']
-
-            sequencing_group_id = drow.pop('sequencing_group_id')
-            projects.add(drow.pop('project'))
-            assay = AssayInternal.from_db(drow)
-            by_sequencing_group_id[sequencing_group_id].append(assay)
-
-        return projects, by_sequencing_group_id
 
     # region EIDs
 

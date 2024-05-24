@@ -1,28 +1,35 @@
 # pylint: disable=too-many-locals, too-many-instance-attributes
 import asyncio
-import itertools
-import json
-import re
 from collections import defaultdict
 from datetime import date
 
 from api.utils import group_by
+from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer
+from db.python.layers.participant import ParticipantLayer
+from db.python.layers.sample import SampleLayer
 from db.python.layers.seqr import SeqrLayer
+from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisTable
-from db.python.tables.assay import AssayTable
+from db.python.tables.assay import AssayFilter, AssayTable
 from db.python.tables.base import DbBase
+from db.python.tables.participant import ParticipantFilter
 from db.python.tables.project import ProjectPermissionsTable
-from db.python.tables.sequencing_group import SequencingGroupTable
-from db.python.utils import escape_like_term
+from db.python.tables.sample import SampleFilter
+from db.python.tables.sequencing_group import (
+    SequencingGroupFilter,
+    SequencingGroupTable,
+)
+from db.python.utils import GenericFilter
 from models.models import (
     AssayInternal,
     FamilySimpleInternal,
     NestedSampleInternal,
     NestedSequencingGroupInternal,
-    SearchItem,
-    parse_sql_bool,
 )
+from models.models.participant import NestedParticipant, ParticipantInternal
+from models.models.sample import SampleInternal
+from models.models.sequencing_group import SequencingGroupInternal
 from models.models.web import ProjectSummaryInternal, WebProject
 
 
@@ -42,153 +49,6 @@ class WebLayer(BaseLayer):
 
 class WebDb(DbBase):
     """Db layer for web related routes,"""
-
-    def _project_summary_sample_query(self, grid_filter: list[SearchItem]):
-        """
-        Get query for getting list of samples
-        """
-        wheres = ['s.project = :project', 's.active']
-        values = {'project': self.project}
-        where_str = ''
-        for query in grid_filter:
-            value = query.query
-            field = query.field
-            prefix = query.type.value
-            key = (
-                f'{query.type}_{field}_{value}'.replace('-', '_')
-                .replace('.', '_')
-                .replace(':', '_')
-                .replace(' ', '_')
-            )
-            if bool(re.search(r'\W', field)) and not query.is_meta:
-                # protect against SQL injection attacks
-                raise ValueError('Invalid characters in field')
-            if not query.is_meta:
-                q = f'{prefix}.{field} LIKE :{key}'
-            else:
-                # double double quote field to allow white space
-                q = f'JSON_VALUE({prefix}.meta, "$.""{field}""") LIKE :{key}'  # noqa: B028
-            wheres.append(q)
-            values[key] = escape_like_term(value) + '%'
-        if wheres:
-            where_str = 'WHERE ' + ' AND '.join(wheres)
-
-        # Skip 'limit' and 'after' SQL commands so we can get all samples that match
-        # the query to determine the total count, then take the selection of samples
-        # for the current page. This is more efficient than doing 2 queries separately.
-        sample_query = f"""
-        SELECT s.id, s.external_id, s.type, s.meta, s.participant_id, s.active
-        FROM sample s
-        LEFT JOIN assay a ON s.id = a.sample_id
-        LEFT JOIN participant p ON p.id = s.participant_id
-        LEFT JOIN family_participant fp on s.participant_id = fp.participant_id
-        LEFT JOIN family f ON f.id = fp.family_id
-        LEFT JOIN sequencing_group sg ON s.id = sg.sample_id
-        {where_str}
-        GROUP BY id
-        ORDER BY id
-        """
-        return sample_query, values
-
-    @staticmethod
-    def _project_summary_process_assay_rows_by_sample_id(
-        assay_rows,
-    ) -> dict[int, list[AssayInternal]]:
-        """
-        Get sequences for samples for project summary
-        """
-
-        seq_id_to_sample_id_map = {seq['id']: seq['sample_id'] for seq in assay_rows}
-        seq_models = [
-            AssayInternal(
-                id=seq['id'],
-                type=seq['type'],
-                meta=json.loads(seq['meta']),
-                sample_id=seq['sample_id'],
-            )
-            for seq in assay_rows
-        ]
-        seq_models_by_sample_id = group_by(
-            seq_models, lambda s: seq_id_to_sample_id_map[s.id]
-        )
-
-        return seq_models_by_sample_id
-
-    @staticmethod
-    def _project_summary_process_sequencing_group_rows_by_sample_id(
-        sequencing_group_rows,
-        sequencing_eid_rows: list,
-        seq_models_by_sample_id: dict[int, list[AssayInternal]],
-    ) -> dict[int, list[NestedSequencingGroupInternal]]:
-        assay_models_by_id = {
-            assay.id: assay
-            for assay in itertools.chain(*seq_models_by_sample_id.values())
-        }
-
-        sequencing_group_eid_map: dict[int, dict[str, str]] = defaultdict(dict)
-        for row in sequencing_eid_rows:
-            sgid = row['sequencing_group_id']
-            sequencing_group_eid_map[sgid][row['name']] = row['name']
-
-        sg_by_id: dict[int, NestedSequencingGroupInternal] = {}
-        sg_id_to_sample_id: dict[int, int] = {}
-        for row in sequencing_group_rows:
-            sg_id = row['id']
-            assay = assay_models_by_id.get(row['assay_id'])
-            if sg_id in sg_by_id:
-                if assay:
-                    sg_by_id[sg_id].assays.append(assay)
-                continue
-            sg_id_to_sample_id[sg_id] = row['sample_id']
-            sg_by_id[sg_id] = NestedSequencingGroupInternal(
-                id=sg_id,
-                meta=json.loads(row['meta']),
-                type=row['type'],
-                technology=row['technology'],
-                platform=row['platform'],
-                assays=[assay] if assay else [],
-                external_ids=sequencing_group_eid_map.get(sg_id, {}),
-            )
-
-        return group_by(sg_by_id.values(), lambda sg: sg_id_to_sample_id[sg.id])
-
-    @staticmethod
-    def _project_summary_process_sample_rows(
-        sample_rows,
-        assay_models_by_sample_id: dict[int, list[AssayInternal]],
-        sg_models_by_sample_id: dict[int, list[NestedSequencingGroupInternal]],
-        sample_id_start_times: dict[int, date],
-    ) -> list[NestedSampleInternal]:
-        """
-        Process the returned sample rows into nested samples + sequences
-        """
-        assays_in_sgs = set(
-            assay.id
-            for sgs in sg_models_by_sample_id.values()
-            for sg in sgs
-            for assay in sg.assays
-        )
-        # filter assays to only those not in sequencing groups
-        filtered_assay_models_by_sid = {}
-        for sample_id, assays in assay_models_by_sample_id.items():
-            filtered_assays = [a for a in assays if a.id not in assays_in_sgs]
-            if len(filtered_assays) > 0:
-                filtered_assay_models_by_sid[sample_id] = filtered_assays
-
-        smodels = [
-            NestedSampleInternal(
-                id=s['id'],
-                external_id=s['external_id'],
-                type=s['type'],
-                meta=json.loads(s['meta']) or {},
-                created_date=str(sample_id_start_times.get(s['id'], '')),
-                sequencing_groups=sg_models_by_sample_id.get(s['id'], []),
-                non_sequencing_assays=filtered_assay_models_by_sid.get(s['id'], []),
-                active=parse_sql_bool(s['active']),
-            )
-            for s in sample_rows
-        ]
-        return smodels
 
     async def get_total_number_of_samples(self):
         """Get total number of active samples within a project"""
@@ -343,3 +203,125 @@ class WebDb(DbBase):
             seqr_links=seqr_links,
             seqr_sync_types=seqr_sync_types,
         )
+
+    async def query_participants(
+        self, query: ParticipantFilter, limit: int | None
+    ) -> list[NestedParticipant]:
+        player = ParticipantLayer(self._connection)
+        slayer = SampleLayer(self._connection)
+        sglayer = SequencingGroupLayer(self._connection)
+        alayer = AssayLayer(self._connection)
+
+        participants = await player.query(query, limit=limit)
+        if not participants:
+            return []
+
+        sfilter = SampleFilter(
+            participant_id=GenericFilter(in_=[p.id for p in participants]),
+        )
+        if query.sample:
+            sfilter.id = query.sample.id
+            sfilter.type = query.sample.type
+            sfilter.meta = query.sample.meta
+            sfilter.external_id = query.sample.external_id
+            # sfilter.active = query.sample.active
+
+        samples = await slayer.query(sfilter)
+
+        sgfilter = SequencingGroupFilter(
+            sample_id=GenericFilter(in_=[s.id for s in samples])
+        )
+        if query.sequencing_group:
+            sgfilter.id = query.sequencing_group.id
+            sgfilter.type = query.sequencing_group.type
+            sgfilter.technology = query.sequencing_group.technology
+            sgfilter.platform = query.sequencing_group.platform
+            sgfilter.meta = query.sequencing_group.meta
+
+        sequencing_groups = await sglayer.query(sgfilter)
+
+        sg_ids = [sg.id for sg in sequencing_groups if sg.id]
+        assayfilter: AssayFilter | None = None
+        if query.assay:
+            assayfilter = AssayFilter(
+                id=query.assay.id,
+                type=query.assay.type,
+                meta=query.assay.meta,
+                external_id=query.assay.external_id,
+            )
+
+        samples_created_date = await slayer.get_samples_create_date(
+            [s.id for s in samples]
+        )
+
+        assays_by_sgids = await alayer.get_assays_for_sequencing_group_ids(
+            sg_ids, filter_=assayfilter
+        )
+
+        return self.assemble_nested_participants_from(
+            participants=participants,
+            samples=samples,
+            sequencing_groups=sequencing_groups,
+            assays_by_sg=assays_by_sgids,
+            sample_created_dates=samples_created_date,
+        )
+
+    @staticmethod
+    def assemble_nested_participants_from(
+        *,
+        participants: list[ParticipantInternal],
+        samples: list[SampleInternal],
+        sequencing_groups: list[SequencingGroupInternal],
+        assays_by_sg: dict[int, list[AssayInternal]],
+        sample_created_dates: dict[int, date],
+    ) -> list[NestedParticipant]:
+        """
+        Assemble nested participants from the various components
+        """
+        samples_by_participant_id = group_by(samples, lambda s: s.participant_id)
+        sequencing_groups_by_sample_id = group_by(
+            sequencing_groups, lambda sg: sg.sample_id
+        )
+
+        nested_participants = []
+        for participant in participants:
+            nested_samples = []
+
+            for sample in samples_by_participant_id.get(participant.id, []):
+                nested_sgs = []
+                for sg in sequencing_groups_by_sample_id.get(sample.id, []):
+                    nested_sgs.append(
+                        NestedSequencingGroupInternal(
+                            id=sg.id,
+                            meta=sg.meta,
+                            type=sg.type,
+                            technology=sg.technology,
+                            platform=sg.platform,
+                            assays=assays_by_sg.get(sg.id, []),
+                        )
+                    )
+
+                nested_samples.append(
+                    NestedSampleInternal(
+                        id=sample.id,
+                        external_id=sample.external_id,
+                        type=sample.type,
+                        meta=sample.meta,
+                        created_date=sample_created_dates.get(sample.id),
+                        sequencing_groups=nested_sgs,
+                        non_sequencing_assays=[],
+                        active=sample.active,
+                    )
+                )
+
+            nested_participant = NestedParticipant(
+                id=participant.id,
+                external_id=participant.external_id,
+                samples=nested_samples,
+                meta=participant.meta,
+                families=[],
+            )
+
+            nested_participants.append(nested_participant)
+
+        return nested_participants

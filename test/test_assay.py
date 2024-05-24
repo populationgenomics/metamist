@@ -352,6 +352,96 @@ class TestAssay(DbIsolatedTest):
         # )
 
     @run_as_sync
+    async def test_query_by_sg_ids(self):
+        """Test query_assays in different combinations"""
+        sample = await self.slayer.upsert_sample(
+            SampleUpsertInternal(
+                external_id='SAM_TEST_QUERY',
+                type='blood',
+                active=True,
+                meta={'collection-year': '2022'},
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={'sgmeta': 'sgvalue'},
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                external_ids={'default': 'A1_1'},
+                                meta={
+                                    'batch': 'batch-1a',
+                                    'sequencing_type': 'genome',
+                                    'sequencing_platform': 'illumina',
+                                    'sequencing_technology': 'short-read',
+                                },
+                            ),
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                external_ids={'default': 'A1_2'},
+                                meta={
+                                    'batch': 'batch-1b',
+                                    'sequencing_type': 'genome',
+                                    'sequencing_platform': 'illumina',
+                                    'sequencing_technology': 'short-read',
+                                },
+                            ),
+                        ],
+                    ),
+                    SequencingGroupUpsertInternal(
+                        type='exome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={'sgmeta': 'sgvalue'},
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                external_ids={'default': 'sg2_1'},
+                                meta={
+                                    'batch': 'batch-2',
+                                    'sequencing_type': 'genome',
+                                    'sequencing_platform': 'illumina',
+                                    'sequencing_technology': 'short-read',
+                                },
+                            ),
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                external_ids={'default': 'sg2_2'},
+                                meta={
+                                    'batch': 'batch-2',
+                                    'sequencing_type': 'genome',
+                                    'sequencing_platform': 'illumina',
+                                    'sequencing_technology': 'short-read',
+                                },
+                            ),
+                        ],
+                    ),
+                ],
+            )
+        )
+
+        sg_id = sample.sequencing_groups[0].id
+        assay_ids_sg1 = {a.id for a in sample.sequencing_groups[0].assays}
+
+        assays = await self.assaylayer.get_assays_for_sequencing_group_ids([sg_id])
+
+        self.assertSetEqual(
+            assay_ids_sg1, {a.id for sgs_as in assays.values() for a in sgs_as}
+        )
+
+        # subfilter
+        assays_batch_1a = await self.assaylayer.get_assays_for_sequencing_group_ids(
+            [sg_id],
+            filter_=AssayFilter(
+                meta={'batch': GenericFilter(eq='batch-1a')},
+            ),
+        )
+        self.assertEqual(1, len(assays_batch_1a))
+        batch_1a_assay = next(iter(assays_batch_1a.values()))[0]
+        self.assertEqual('batch-1a', batch_1a_assay.meta['batch'])
+
+    @run_as_sync
     async def test_update(self):
         """Test updating an assay, and all fields are updated correctly"""
         # insert

@@ -50,7 +50,7 @@ const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({ onClic
                 value={projectName ?? ''}
                 options={
                     data &&
-                    _.sortBy(data.myProjects, p => p.name).map((p) => ({
+                    _.sortBy(data.myProjects, (p) => p.name).map((p) => ({
                         key: p.name,
                         text: p.name,
                         value: p.name,

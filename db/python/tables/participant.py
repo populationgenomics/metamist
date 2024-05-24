@@ -103,20 +103,11 @@ class ParticipantTable(DbBase):
         )
         return set(r['project'] for r in rows)
 
-    async def query(
-        self,
-        filter_: ParticipantFilter,
-        limit: int | None = None,
-        skip: int | None = None,
-    ) -> tuple[set[ProjectId], list[ParticipantInternal]]:
-        """Query for participants
-
-        Args:
-            filter_ (ParticipantFilter): _description_
-
-        Returns:
-            list[ParticipantInternal]: _description_
-        """
+    @staticmethod
+    async def _construct_participant_query(
+        filter_: ParticipantFilter, keys: list[str]
+    ) -> tuple[str, dict[str, Any]]:
+        """Construct a participant query"""
         needs_sample = False
         needs_sequencing_group = False
         needs_assay = False
@@ -165,25 +156,10 @@ class ParticipantTable(DbBase):
         if filter_.assay:
             needs_sample = True
             needs_sequencing_group = True
-            needs_assay = True
-            swheres, svalues = filter_.assay.to_sql(
-                {
-                    'id': 'a.id',
-                    'external_id': 'a.external_id',
-                    'meta': 'a.meta',
-                    'type': 'a.type',
-                    'technology': 'a.technology',
-                    'platform': 'a.platform',
-                }
-            )
-            values.update(svalues)
-            if swheres:
-                wheres += ' AND ' + swheres
 
-        query = """
+        query = f"""
         SELECT
-            p.id, p.external_id, p.reported_sex, p.reported_gender,
-            p.karyotype, p.meta, p.project
+            {', '.join(str(k) for k in keys)}
         FROM participant p
         """
 
@@ -197,6 +173,33 @@ class ParticipantTable(DbBase):
         if wheres:
             query += 'WHERE \n' + wheres
 
+        return query, values
+
+    async def query(
+        self,
+        filter_: ParticipantFilter,
+        limit: int | None = None,
+        skip: int | None = None,
+    ) -> tuple[set[ProjectId], list[ParticipantInternal]]:
+        """Query for participants
+
+        Args:
+            filter_ (ParticipantFilter): _description_
+
+        Returns:
+            list[ParticipantInternal]: _description_
+        """
+        keys = [
+            'p.id',
+            'p.external_id',
+            'p.reported_sex',
+            'p.reported_gender',
+            'p.karyotype',
+            'p.meta',
+            'p.project',
+        ]
+        query, values = await self._construct_participant_query(filter_, keys=keys)
+
         if skip:
             query += '\nOFFSET :offset'
             values['offset'] = skip
@@ -208,6 +211,16 @@ class ParticipantTable(DbBase):
         rows = await self.connection.fetch_all(query, values)
         projects = set(r['project'] for r in rows)
         return projects, [ParticipantInternal.from_db(dict(r)) for r in rows]
+
+    async def query_count(self, filter_: ParticipantFilter) -> int:
+        """Query for participants count"""
+        query, values = await self._construct_participant_query(
+            filter_, keys=['COUNT(*) as cnt']
+        )
+        row = await self.connection.fetch_one(query, values)
+        if not row:
+            return 0
+        return row['cnt']
 
     async def get_participants_by_ids(
         self, ids: list[int]
