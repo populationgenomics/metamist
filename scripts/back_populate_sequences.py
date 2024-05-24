@@ -9,11 +9,13 @@ For example:
 HTJMHDSX3_4_220817_FD123456_Homo-sapiens_AGATCCATTA-TGGTAGAGAT_R_220208_BATCH_M014_R2.fastq.gz.md5
 The assay ID would be HTJMHDSX3_4_220817_FD123456
 """
+
 import logging
 
 import click
 
 from metamist.apis import AssayApi
+from metamist.model.assay_query_criteria import AssayQueryCriteria
 from metamist.models import AssayUpsert
 
 logger = logging.getLogger(__file__)
@@ -33,10 +35,10 @@ def main(project: str):
     # Pull all the assays
     assayapi = AssayApi()
     assays = assayapi.get_assays_by_criteria(
-        active=True,
-        body_get_assays_by_criteria={
-            'projects': [project],
-        },
+        assay_query_criteria=AssayQueryCriteria(
+            active=True,
+            projects=[project],
+        )
     )
 
     # For logs

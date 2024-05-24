@@ -53,14 +53,19 @@ class SearchResponse(SMBase):
 
     type: SearchResponseType
     title: str
-    data: SampleSearchResponseData | ParticipantSearchResponseData | FamilySearchResponseData | SequencingGroupSearchResponseData
+    data: (
+        SampleSearchResponseData
+        | ParticipantSearchResponseData
+        | FamilySearchResponseData
+        | SequencingGroupSearchResponseData
+    )
     error: ErrorResponse | None = None
 
 
 class SearchItem(SMBase):
     """Summary Grid Filter Model"""
 
-    model_type: MetaSearchEntityPrefix
+    type: MetaSearchEntityPrefix
     query: str
     field: str
     is_meta: bool

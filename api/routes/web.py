@@ -1,6 +1,8 @@
+# pylint: disable=kwarg-superseded-by-positional-arg
 """
 Web routes
 """
+
 from typing import Optional
 
 from fastapi import APIRouter, Request
@@ -57,12 +59,12 @@ async def get_project_summary(
         new_token = max(int(sample.id) for p in participants for sample in p.samples)
 
     links = PagingLinks(
-        next=str(request.base_url)
-        + request.url.path.lstrip('/')
-        + f'?token={new_token}'
-        if new_token
-        else None,
         self=str(request.url),
+        next=(
+            str(request.base_url) + request.url.path.lstrip('/') + f'?token={new_token}'
+            if new_token
+            else None
+        ),
         token=str(new_token) if new_token else None,
     )
 
