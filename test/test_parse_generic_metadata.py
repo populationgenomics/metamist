@@ -7,7 +7,10 @@ from unittest.mock import patch
 import api.graphql.schema
 from db.python.layers import ParticipantLayer
 from metamist.graphql import configure_sync_client, validate
-from metamist.parser.generic_metadata_parser import GenericMetadataParser
+from metamist.parser.generic_metadata_parser import (
+    DefaultSequencing,
+    GenericMetadataParser,
+)
 from metamist.parser.generic_parser import (
     QUERY_MATCH_ASSAYS,
     QUERY_MATCH_PARTICIPANTS,
@@ -232,10 +235,10 @@ class TestParseGenericMetadata(DbIsolatedTest):
         self.assertDictEqual({'centre': 'KCCG'}, samples[0].meta)
         expected_assay_dict = {
             'qc': {
-                'median_insert_size': '400',
-                'median_coverage': '30',
-                'freemix': '0.01',
-                'pct_chimeras': '0.01',
+                'median_insert_size': 400,
+                'median_coverage': 30,
+                'freemix': 0.01,
+                'pct_chimeras': 0.01,
             },
             'reads_type': 'bam',
             'reads': {
@@ -271,10 +274,10 @@ class TestParseGenericMetadata(DbIsolatedTest):
         analysis = samples[0].sequencing_groups[0].analyses[0]
         self.assertDictEqual(
             {
-                'median_insert_size': '400',
-                'median_coverage': '30',
-                'freemix': '0.01',
-                'pct_chimeras': '0.01',
+                'median_insert_size': 400,
+                'median_coverage': 30,
+                'freemix': 0.01,
+                'pct_chimeras': 0.01,
             },
             analysis.meta,
         )
@@ -478,6 +481,125 @@ class TestParseGenericMetadata(DbIsolatedTest):
             await parser.parse_manifest(
                 StringIO(file_contents), delimiter='\t', dry_run=True
             )
+        return
+
+    @run_as_sync
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_lrs_rows_with_arbitrary_assay_meta_columns(
+        self,
+        mock_graphql_query
+    ):
+        """
+        Test importing a single row of long read sequencing data with arbitrary assay metadata columns
+        """
+        mock_graphql_query.side_effect = self.run_graphql_query_async
+        self.maxDiff = None
+        rows = [
+            'Individual ID\tSample ID\tFilename\tAssay Meta 1\tAssay Meta 2',
+            'Athena\tsample_id003\t"sample_id003.filename-01-R1.fastq.gz,sample_id003.filename-01-R2.fastq.gz"\tTrue\tsome_value',
+            'Athena\tsample_id003\t"sample_id003.filename-02-R1.fastq.gz,sample_id003.filename-02-R2.fastq.gz"\t5\tFalse',
+        ]
+        parser = GenericMetadataParser(
+            search_locations=[],
+            participant_column='Individual ID',
+            sample_name_column='Sample ID',
+            reads_column='Filename',
+            assay_meta_map={'Assay Meta 1': 'assay_meta1', 'Assay Meta 2': 'assay_meta2'},
+            default_sequencing=DefaultSequencing(
+                seq_type='genome',
+                technology='long-read',
+                platform='pacbio',
+            ),
+            # doesn't matter, we're going to mock the call anyway
+            project=self.project_name,
+            skip_checking_gcs_objects=True,
+        )
+
+        parser.filename_map = {
+            'sample_id003.filename-01-R1.fastq.gz': '/path/to/sample_id003.filename-01-R1.fastq.gz',
+            'sample_id003.filename-01-R2.fastq.gz': '/path/to/sample_id003.filename-01-R2.fastq.gz',
+            'sample_id003.filename-02-R1.fastq.gz': '/path/to/sample_id003.filename-02-R1.fastq.gz',
+            'sample_id003.filename-02-R2.fastq.gz': '/path/to/sample_id003.filename-02-R2.fastq.gz',
+        }
+
+        # Call generic parser
+        file_contents = '\n'.join(rows)
+
+        _, prows = await parser.parse_manifest(
+            StringIO(file_contents), delimiter='\t', dry_run=True
+        )
+
+        participants: list[ParsedParticipant] = prows
+
+        expected_assay_1_dict = {
+            'reads': [
+                {
+                    'basename': 'sample_id003.filename-01-R1.fastq.gz',
+                    'checksum': None,
+                    'class': 'File',
+                    'location': '/path/to/sample_id003.filename-01-R1.fastq.gz',
+                    'size': None,
+                    'datetime_added': None,
+                },
+                {
+                    'basename': 'sample_id003.filename-01-R2.fastq.gz',
+                    'checksum': None,
+                    'class': 'File',
+                    'location': '/path/to/sample_id003.filename-01-R2.fastq.gz',
+                    'size': None,
+                    'datetime_added': None,
+                },
+            ],
+            'reads_type': 'fastq',
+            'sequencing_platform': 'pacbio',
+            'sequencing_technology': 'long-read',
+            'sequencing_type': 'genome',
+            'assay_meta1': [5, True],
+            'assay_meta2': [False, 'some_value'],
+        }
+
+        expected_assay_2_dict = {
+            'reads': [
+                {
+                    'basename': 'sample_id003.filename-02-R1.fastq.gz',
+                    'checksum': None,
+                    'class': 'File',
+                    'location': '/path/to/sample_id003.filename-02-R1.fastq.gz',
+                    'size': None,
+                    'datetime_added': None,
+                },
+                {
+                    'basename': 'sample_id003.filename-02-R2.fastq.gz',
+                    'checksum': None,
+                    'class': 'File',
+                    'location': '/path/to/sample_id003.filename-02-R2.fastq.gz',
+                    'size': None,
+                    'datetime_added': None,
+                },
+            ],
+            'reads_type': 'fastq',
+            'sequencing_platform': 'pacbio',
+            'sequencing_technology': 'long-read',
+            'sequencing_type': 'genome',
+            'assay_meta1': [5, True],
+            'assay_meta2': [False, 'some_value'],
+        }
+
+        expected_sg_dict = {
+            'sequencing_platform': 'pacbio',
+            'sequencing_technology': 'long-read',
+            'sequencing_type': 'genome',
+            'assay_meta1': [5, True],
+            'assay_meta2': [False, 'some_value'],
+        }
+
+        assay_1 = participants[0].samples[0].sequencing_groups[0].assays[0]
+        assay_2 = participants[0].samples[0].sequencing_groups[0].assays[1]
+        sg = participants[0].samples[0].sequencing_groups[0]
+
+        self.assertDictEqual(expected_assay_1_dict, assay_1.meta)
+        self.assertDictEqual(expected_assay_2_dict, assay_2.meta)
+        self.assertDictEqual(expected_sg_dict, sg.meta)
         return
 
     @run_as_sync

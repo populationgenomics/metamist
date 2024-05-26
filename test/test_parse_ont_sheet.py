@@ -86,7 +86,7 @@ class TestOntSampleSheetParser(DbIsolatedTest):
             'experiment_name': 'PBXP_Awesome',
             'flow_cell': 'PRO002',
             'flowcell_id': 'XYZ1',
-            'mux_total': '7107',
+            'mux_total': 7107,
             'protocol': 'LSK1',
             'reads': [
                 {
