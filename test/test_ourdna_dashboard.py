@@ -1,10 +1,16 @@
+from datetime import datetime
 from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.layers.ourdna.dashboard import OurDnaDashboardLayer
 from db.python.layers.sample import SampleLayer
 from db.python.tables.sample import SampleFilter
 from db.python.utils import GenericFilter
-from models.models import SampleUpsertInternal
+from models.models import SampleUpsert, SampleUpsertInternal
+
+
+def str_to_datetime(timestamp_str):
+    """Convert string timestamp to datetime"""
+    return datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
 
 
 class OurDNADashboardTest(DbIsolatedTest):
@@ -15,16 +21,12 @@ class OurDNADashboardTest(DbIsolatedTest):
         # don't need to await because it's tagged @run_as_sync
         super().setUp()
         self.odd = OurDnaDashboardLayer(self.connection)
-
         self.sl = SampleLayer(self.connection)
 
-        # TODO: Add additional samples to test
-
-        self.test_sample_one = await self.sl.upsert_sample(
-            SampleUpsertInternal(
-                external_id='Test01',
-                type='blood',
-                meta={
+        samples_data = [
+            {
+                'external_id': 'Test01',
+                'meta': {
                     'collection-time': '2022-07-03 13:28:00',
                     'processing-site': 'Garvan',
                     'process-start-time': '2022-07-06 16:28:00',
@@ -41,15 +43,12 @@ class OurDNADashboardTest(DbIsolatedTest):
                     'courier-actual-dropoff-time': '2022-07-03 13:28:00',
                     'concentration': 1.45,
                 },
-                active=True,
-            )
-        )
-
-        self.test_sample_two = await self.sl.upsert_sample(
-            SampleUpsertInternal(
-                external_id='Test02',
-                type='blood',
-                meta={
+                'type': 'blood',
+                'active': True,
+            },
+            {
+                'external_id': 'Test02',
+                'meta': {
                     'collection-time': '2022-07-03 13:28:00',
                     'processing-site': 'BBV',
                     'process-start-time': '2022-07-06 16:28:00',
@@ -66,15 +65,12 @@ class OurDNADashboardTest(DbIsolatedTest):
                     'courier-actual-dropoff-time': '2022-07-03 13:28:00',
                     'concentration': 0.98,
                 },
-                active=True,
-            )
-        )
-
-        self.test_sample_three = await self.sl.upsert_sample(
-            SampleUpsertInternal(
-                external_id='Test03',
-                type='blood',
-                meta={
+                'type': 'blood',
+                'active': True,
+            },
+            {
+                'external_id': 'Test03',
+                'meta': {
                     'collection-time': '2022-07-03 13:28:00',
                     'processing-site': 'Garvan',
                     'process-start-time': '2022-07-03 16:28:00',
@@ -90,9 +86,33 @@ class OurDNADashboardTest(DbIsolatedTest):
                     'courier-actual-dropoff-time': '2022-07-03 13:28:00',
                     'concentration': 1.66,
                 },
-                active=True,
+                'type': 'blood',
+                'active': True,
+            },
+        ]
+
+        sample_names = ['sample_one', 'sample_two', 'sample_three']
+
+        self.sample_external_objects: list[SampleUpsert] = []
+
+        for sample_name, sample_data in zip(sample_names, samples_data):
+            assert isinstance(sample_data['meta'], dict)
+            assert isinstance(sample_data['active'], bool)
+            sample = await self.sl.upsert_sample(
+                SampleUpsertInternal(
+                    external_id=str(sample_data['external_id']),
+                    meta=sample_data['meta'],
+                    type=str(sample_data['type']),
+                    active=sample_data['active'],
+                )
             )
-        )
+            sample_external = sample.to_external()
+            self.sample_external_objects.append(sample_external)
+            setattr(self, f'test_{sample_name}', sample_external)
+            # NOTE: We probably don't need to set the sample_external_objects as attributes of the test class
+            assert sample.id
+
+        self.number_of_samples = len(samples_data)
 
     @run_as_sync
     async def test_get_dashboard(self):
@@ -106,9 +126,36 @@ class OurDNADashboardTest(DbIsolatedTest):
         """I want to know how long it took between blood collection and sample processing"""
         sample_filter = SampleFilter(project=GenericFilter(eq=self.project_id))
         dashboard = await self.odd.query(sample_filter)
-        print(dashboard)
+        collection_to_process_end_time = dashboard['collection_to_process_end_time']
 
-        # TODO: Add assertions VB
+        # Check that collection_to_process_end_time is not empty and is a dict
+        assert collection_to_process_end_time
+        assert isinstance(collection_to_process_end_time, dict)
+
+        # Check the number of samples in the cohort
+        assert len(collection_to_process_end_time.keys()) == self.number_of_samples
+
+        # Check that the ids of the samples are the keys of the dict
+        sample_ids = [sample.id for sample in self.sample_external_objects]
+        assert set(collection_to_process_end_time.keys()) == set(sample_ids)
+
+        # Check that the values are the difference between the process end time and the collection time
+        for sample in self.sample_external_objects:
+            assert isinstance(sample.meta, dict)
+
+            collection_time = str_to_datetime(sample.meta['collection-time'])
+            process_end_time = str_to_datetime(sample.meta['process-end-time'])
+            time_difference = (
+                process_end_time - collection_time
+            ).total_seconds()  # Difference in seconds
+
+            assert collection_to_process_end_time[sample.id] == time_difference
+
+        for _sample_id, time_diff in collection_to_process_end_time.items():
+            assert (
+                time_diff > 0
+            )  # NOTE: Should we actually check this explicitly in the code instead?
+            assert isinstance(time_diff, int)
 
     @run_as_sync
     async def test_collection_to_process_end_time_24h(self):
