@@ -1,11 +1,13 @@
+from collections import OrderedDict
 from datetime import datetime
 from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.layers.ourdna.dashboard import OurDnaDashboardLayer
+from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from db.python.tables.sample import SampleFilter
 from db.python.utils import GenericFilter
-from models.models import SampleUpsert, SampleUpsertInternal
+from models.models import ParticipantUpsertInternal, SampleUpsert, SampleUpsertInternal
 
 
 def str_to_datetime(timestamp_str):
@@ -22,6 +24,26 @@ class OurDNADashboardTest(DbIsolatedTest):
         super().setUp()
         self.odd = OurDnaDashboardLayer(self.connection)
         self.sl = SampleLayer(self.connection)
+        self.pl = ParticipantLayer(self.connection)
+
+        participants = await self.pl.upsert_participants(
+            [
+                ParticipantUpsertInternal(
+                    external_id='EX01',
+                    reported_sex=2,
+                    karyotype='XX',
+                    meta={'consent': True, 'field': 1},
+                ),
+                ParticipantUpsertInternal(
+                    external_id='EX02',
+                    reported_sex=1,
+                    karyotype='XY',
+                    meta={'field': 2},
+                ),
+            ]
+        )
+
+        self.participants_external_objects = [participant.to_external() for participant in participants]
 
         samples_data = [
             {
@@ -74,7 +96,7 @@ class OurDNADashboardTest(DbIsolatedTest):
                     'collection-time': '2022-07-03 13:28:00',
                     'processing-site': 'Garvan',
                     'process-start-time': '2022-07-03 16:28:00',
-                    'process-end-time': '2022-07-03 19:28:00',
+                    # 'process-end-time': '2022-07-03 19:28:00',
                     'received-time': '2022-07-03 14:28:00',
                     'received-by': 'YP',
                     'collection-lab': 'XYZ LAB',
@@ -94,6 +116,7 @@ class OurDNADashboardTest(DbIsolatedTest):
         sample_names = ['sample_one', 'sample_two', 'sample_three']
 
         self.sample_external_objects: list[SampleUpsert] = []
+        self.sample_internal_objects: list[SampleUpsertInternal] = []
 
         for sample_name, sample_data in zip(sample_names, samples_data):
             assert isinstance(sample_data['meta'], dict)
@@ -106,6 +129,7 @@ class OurDNADashboardTest(DbIsolatedTest):
                     active=sample_data['active'],
                 )
             )
+            self.sample_internal_objects.append(sample)
             sample_external = sample.to_external()
             self.sample_external_objects.append(sample_external)
             setattr(self, f'test_{sample_name}', sample_external)
@@ -140,7 +164,7 @@ class OurDNADashboardTest(DbIsolatedTest):
         assert set(collection_to_process_end_time.keys()) == set(sample_ids)
 
         # Check that the values are the difference between the process end time and the collection time
-        for sample in self.sample_external_objects:
+        for sample in self.sample_internal_objects:
             assert isinstance(sample.meta, dict)
 
             collection_time = str_to_datetime(sample.meta['collection-time'])
@@ -162,9 +186,31 @@ class OurDNADashboardTest(DbIsolatedTest):
         """I want to know which samples took more than 24 hours between blood collection and sample processing completion"""
         sample_filter = SampleFilter(project=GenericFilter(eq=self.project_id))
         dashboard = await self.odd.query(sample_filter)
-        print(dashboard)
+        collection_to_process_end_time_24h = dashboard.get('collection_to_process_end_time_24h')
 
-        # TODO: Add assertions YP
+        # Check that collection_to_process_end_time is not empty and is a dict
+        assert collection_to_process_end_time_24h
+        assert isinstance(collection_to_process_end_time_24h, dict)
+
+        samples_filtered: list[SampleUpsertInternal] = []
+        for sample in self.sample_internal_objects:
+            collection_time = sample.meta.get('collection-time')
+            process_end_time = sample.meta.get('process-end-time')
+            # Skip samples that don't have collection_time or process_end_time
+            if not collection_time or not process_end_time:
+                continue
+            time_difference = str_to_datetime(process_end_time) - str_to_datetime(collection_time)
+            if time_difference.total_seconds() > 24 * 3600:
+                samples_filtered.append(sample)
+
+                # Check that the id of the samples is a keys of the dict
+                assert sample.id in collection_to_process_end_time_24h
+
+                # Check that the time difference matches the expected value
+                assert collection_to_process_end_time_24h[sample.id] == time_difference.total_seconds()
+
+        # check that there are a correct number of matching results
+        assert len(collection_to_process_end_time_24h.keys()) == len(samples_filtered)
 
     @run_as_sync
     async def test_processing_times_per_site(self):
@@ -180,9 +226,25 @@ class OurDNADashboardTest(DbIsolatedTest):
         """I want to know how many samples were collected from walk-ins vs during events or scheduled activities"""
         sample_filter = SampleFilter(project=GenericFilter(eq=self.project_id))
         dashboard = await self.odd.query(sample_filter)
-        print(dashboard)
+        total_samples_by_collection_event_name = dashboard.get('total_samples_by_collection_event_name')
 
-        # TODO: Add assertions YP
+        # Check that total_samples_by_collection_event_name is not empty and is a dict
+        assert total_samples_by_collection_event_name
+        assert isinstance(total_samples_by_collection_event_name, dict)
+
+        sample_tally: dict[str, int] = OrderedDict()
+        for sample in self.sample_internal_objects:
+            event_name = sample.meta.get('collection-event-name', 'Unknown')
+            if event_name in sample_tally:
+                sample_tally[event_name] += 1
+            else:
+                sample_tally[event_name] = 1
+
+        # Check that the keys of the dict are the event names
+        assert set(total_samples_by_collection_event_name.keys()) == set(sample_tally.keys())
+
+        # Check that the tally and the total_samples_by_collection_event_name are the same
+        assert OrderedDict(total_samples_by_collection_event_name) == sample_tally
 
     @run_as_sync
     async def test_samples_lost_after_collection(self):
@@ -198,9 +260,18 @@ class OurDNADashboardTest(DbIsolatedTest):
         """I want to generate a list of samples containing more than 1 ug of DNA to prioritise them for long-read sequencing applications"""
         sample_filter = SampleFilter(project=GenericFilter(eq=self.project_id))
         dashboard = await self.odd.query(sample_filter)
-        print(dashboard)
+        samples_more_than_1ug_dna = dashboard.get('samples_concentration_gt_1ug')
 
-        # TODO: Add assertions YP
+        # Check that samples_concentratiom_gt_1ug is not empty and is a dict
+        assert samples_more_than_1ug_dna
+        assert isinstance(samples_more_than_1ug_dna, dict)
+
+        # Check that the number of samples in the list is correct
+        samples_filtered = [sample for sample in self.sample_internal_objects if (sample.meta.get('concentration') and sample.meta.get('concentration') > 1)]
+        assert len(samples_more_than_1ug_dna) == len(samples_filtered)
+
+        # Check that the ids of the samples are the keys of the dict
+        assert set(samples_more_than_1ug_dna.keys()) == set([sample.id for sample in samples_filtered])
 
     @run_as_sync
     async def participants_consented_not_collected(self):
@@ -217,5 +288,14 @@ class OurDNADashboardTest(DbIsolatedTest):
         sample_filter = SampleFilter(project=GenericFilter(eq=self.project_id))
         dashboard = await self.odd.query(sample_filter)
         print(dashboard)
+        # participants_signed_not_consented = dashboard.get('participants_signed_not_consented')
+
+        # # Check that participants_signed_not_consented is not empty and is a dict
+        # assert participants_signed_not_consented
+        # assert isinstance(participants_signed_not_consented, list)
+
+        # # Check that the number of participants in the list is correct
+        # participants_filtered = [participant for participant in self.participants_external_objects if not participant.meta.get('consent')]
+        # assert len(participants_signed_not_consented) == len(participants_filtered)
 
         # TODO: Add assertions YP

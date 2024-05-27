@@ -189,7 +189,7 @@ class OurDnaDashboardLayer(BaseLayer):
                     _collection_event_name
                 ] += 1
             else:
-                total_samples_by_collection_event_name['unknown'] += 1
+                total_samples_by_collection_event_name['Unknown'] += 1
 
             # Get total number of many samples have been lost, EG: participants have been consented, blood collected, not processed (etc), Alert here (highlight after 72 hours)
             time_to_process_start = self.get_collection_to_process_start_time(sample)
