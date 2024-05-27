@@ -70,7 +70,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
     }
 
     const convertCostCategory = (costCategory: string) => {
-        if (costCategory === 'Cloud Storage') {
+        if (costCategory.startsWith('Cloud Storage')) {
             return 'Storage Cost'
         }
         return 'Compute Cost'

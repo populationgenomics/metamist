@@ -11,6 +11,7 @@ from typing import Iterable, Iterator, TypeVar
 import aiohttp
 import slack_sdk
 import slack_sdk.errors
+from backoff import expo, on_exception
 from cloudpathlib import AnyPath
 
 from cpg_utils.cloud import get_google_identity_token
@@ -387,7 +388,7 @@ class SeqrLayer(BaseLayer):
                 )
                 if sequencing_groups_diff:
                     messages.append(
-                        'Sequencing groups added to index: ' + ', '.join(sequencing_groups_diff),
+                        f'Sequencing groups added to {es_index_analyses[-1].output}: ' + ', '.join(sequencing_groups_diff),
                     )
 
             sg_ids_missing_from_index = sequencing_group_id_format_list(
@@ -408,7 +409,7 @@ class SeqrLayer(BaseLayer):
             headers=headers,
         )
         resp.raise_for_status()
-        return await resp.text()
+        return f'Updated ES index {post_json.get("elasticsearchIndex")}: {resp.status} - {resp.reason}'
 
     async def update_es_index(
         self,
@@ -494,11 +495,11 @@ class SeqrLayer(BaseLayer):
                 'ignoreExtraSamplesInCallset': True,
             }
             requests.append(self.post_es_index_update(session, req1_url, post_json, headers))
-            messages.append(f'Updated ES index {es_index}')
 
         messages.extend(await asyncio.gather(*requests))
         return messages
 
+    @on_exception(expo, aiohttp.ClientResponseError, max_tries=3)
     async def update_saved_variants(
         self,
         session: aiohttp.ClientSession,

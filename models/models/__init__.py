@@ -12,7 +12,7 @@ from models.models.analysis import (
 from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
 from models.models.audit_log import AuditLogId, AuditLogInternal
 from models.models.billing import (
-    BillingBatchCostRecord,
+    AnalysisCostRecord,
     BillingColumn,
     BillingCostBudgetRecord,
     BillingCostDetailsRecord,
@@ -20,6 +20,7 @@ from models.models.billing import (
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 )
+from models.models.cohort import CohortInternal, CohortTemplateInternal
 from models.models.family import (
     Family,
     FamilyInternal,

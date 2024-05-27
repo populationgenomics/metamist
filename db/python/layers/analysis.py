@@ -7,6 +7,7 @@ from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter, AnalysisTable
+from db.python.tables.cohort import CohortTable
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import SequencingGroupFilter
 from db.python.utils import GenericFilter, get_logger
@@ -48,35 +49,9 @@ class AnalysisLayer(BaseLayer):
 
         self.sampt = SampleTable(connection)
         self.at = AnalysisTable(connection)
+        self.ct = CohortTable(connection)
 
     # GETS
-
-    async def get_analyses_for_samples(
-        self,
-        sample_ids: list[int],
-        analysis_type: str | None,
-        status: AnalysisStatus | None,
-        check_project_id=True,
-    ) -> list[AnalysisInternal]:
-        """
-        Get a list of all analysis that relevant for samples
-
-        """
-        projects, analysis = await self.at.get_analyses_for_samples(
-            sample_ids,
-            analysis_type=analysis_type,
-            status=status,
-        )
-
-        if len(analysis) == 0:
-            return []
-
-        if check_project_id:
-            await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
-            )
-
-        return analysis
 
     async def get_analysis_by_id(self, analysis_id: int, check_project_id=True):
         """Get analysis by ID"""
@@ -115,7 +90,16 @@ class AnalysisLayer(BaseLayer):
         """
         Gets details of analysis with status queued or in-progress
         """
-        return await self.at.get_incomplete_analyses(project=project)
+
+        return await self.at.query(
+            filter_=AnalysisFilter(
+                project=GenericFilter(eq=project),
+                active=GenericFilter(eq=True),
+                status=GenericFilter(
+                    in_=[AnalysisStatus.IN_PROGRESS, AnalysisStatus.QUEUED]
+                ),
+            )
+        )
 
     async def get_sample_cram_path_map_for_seqr(
         self,
@@ -545,10 +529,23 @@ class AnalysisLayer(BaseLayer):
         project: ProjectId = None,
     ) -> int:
         """Create a new analysis"""
+
+        # Validate cohort sgs equal sgs
+        if analysis.cohort_ids and analysis.sequencing_group_ids:
+            all_cohort_sgs: list[int] = []
+            for cohort_id in analysis.cohort_ids:
+                cohort_sgs = await self.ct.get_cohort_sequencing_group_ids(cohort_id)
+                all_cohort_sgs.extend(cohort_sgs)
+            if set(all_cohort_sgs) != set(analysis.sequencing_group_ids):
+                raise ValueError(
+                    'Cohort sequencing groups do not match analysis sequencing groups'
+                )
+
         return await self.at.create_analysis(
             analysis_type=analysis.type,
             status=analysis.status,
             sequencing_group_ids=analysis.sequencing_group_ids,
+            cohort_ids=analysis.cohort_ids,
             meta=analysis.meta,
             output=analysis.output,
             active=analysis.active,

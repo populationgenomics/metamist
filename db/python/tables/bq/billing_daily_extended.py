@@ -7,7 +7,7 @@ from db.python.tables.bq.billing_base import (
     BillingBaseTable,
     time_optimisation_parameter,
 )
-from models.models import BillingBatchCostRecord, BillingColumn
+from models.models import AnalysisCostRecord, BillingColumn
 
 
 class BillingDailyExtendedTable(BillingBaseTable):
@@ -60,7 +60,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
         end_time: datetime,
         batch_ids: list[str] | None,
         ar_guid: str | None,
-    ) -> list[BillingBatchCostRecord]:
+    ) -> list[AnalysisCostRecord]:
         """
         Get summary of AR run
         """
@@ -212,7 +212,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
                     sum(d.cost) AS cost,
                     MIN(d.usage_start_time) AS usage_start_time,
                     max(d.usage_end_time) AS usage_end_time,
-                    COUNT(DISTINCT d.job_id) as jobs_cnt
+                    MAX(d.job_id) as jobs_cnt
                 FROM d
                 WHERE d.batch_id IS NOT NULL
                 GROUP BY batch_id, batch_name
@@ -253,7 +253,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
                     sum(d.cost) AS cost,
                     MIN(d.usage_start_time) AS usage_start_time,
                     max(d.usage_end_time) AS usage_end_time,
-                    COUNT(DISTINCT d.job_id) as jobs_cnt
+                    MAX(d.job_id) as jobs_cnt
                 FROM d
                 WHERE d.wdl_task_name IS NOT NULL
                 GROUP BY wdl_task_name
@@ -283,7 +283,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
                     sum(d.cost) AS cost,
                     MIN(d.usage_start_time) AS usage_start_time,
                     max(d.usage_end_time) AS usage_end_time,
-                    COUNT(DISTINCT d.job_id) as jobs_cnt
+                    MAX(d.job_id) as jobs_cnt
                 FROM d
                 WHERE d.cromwell_workflow_id IS NOT NULL
                 GROUP BY cromwell_workflow_id
@@ -313,7 +313,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
                     sum(d.cost) AS cost,
                     MIN(d.usage_start_time) AS usage_start_time,
                     max(d.usage_end_time) AS usage_end_time,
-                    COUNT(DISTINCT d.job_id) as jobs_cnt
+                    MAX(d.job_id) as jobs_cnt
                 FROM d
                 WHERE d.cromwell_sub_workflow_name IS NOT NULL
                 GROUP BY cromwell_sub_workflow_name
@@ -361,9 +361,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
         query_job_result = self._execute_query(_query, query_parameters, False)
 
         if query_job_result:
-            return [
-                BillingBatchCostRecord.from_json(dict(row)) for row in query_job_result
-            ]
+            return [AnalysisCostRecord.from_dict(dict(row)) for row in query_job_result]
 
         # return empty list if no record found
         return []

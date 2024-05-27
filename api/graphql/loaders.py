@@ -21,10 +21,11 @@ from db.python.layers import (
 )
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.assay import AssayFilter
+from db.python.tables.family import FamilyFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
-from db.python.utils import GenericFilter, NotFoundError
+from db.python.utils import GenericFilter, NotFoundError, get_hashable_value
 from models.models import (
     AnalysisInternal,
     AssayInternal,
@@ -36,6 +37,7 @@ from models.models import (
     SequencingGroupInternal,
 )
 from models.models.audit_log import AuditLogInternal
+from models.models.family import PedRowInternal
 
 
 class LoaderKeys(enum.Enum):
@@ -65,6 +67,9 @@ class LoaderKeys(enum.Enum):
     PARTICIPANTS_FOR_PROJECTS = 'participants_for_projects'
 
     FAMILIES_FOR_PARTICIPANTS = 'families_for_participants'
+    FAMILY_PARTICIPANTS_FOR_FAMILIES = 'family_participants_for_families'
+    FAMILY_PARTICIPANTS_FOR_PARTICIPANTS = 'family_participants_for_participants'
+    FAMILIES_FOR_IDS = 'families_for_ids'
 
     SEQUENCING_GROUPS_FOR_IDS = 'sequencing_groups_for_ids'
     SEQUENCING_GROUPS_FOR_SAMPLES = 'sequencing_groups_for_samples'
@@ -91,31 +96,8 @@ def connected_data_loader(id_: LoaderKeys, cache=True):
     return connected_data_loader_caller
 
 
-def _prepare_partial_value_for_hashing(value):
-    if value is None:
-        return None
-    if isinstance(value, (int, str, float, bool)):
-        return value
-    if isinstance(value, enum.Enum):
-        return value.value
-    if isinstance(value, list):
-        # let's see if later we need to prepare the values in the list
-        return tuple(value)
-    if isinstance(value, dict):
-        return tuple(
-            sorted(
-                ((k, _prepare_partial_value_for_hashing(v)) for k, v in value.items()),
-                key=lambda x: x[0],
-            )
-        )
-
-    return hash(value)
-
-
-def _get_connected_data_loader_partial_key(kwargs):
-    return _prepare_partial_value_for_hashing(
-        {k: v for k, v in kwargs.items() if k != 'id'}
-    )
+def _get_connected_data_loader_partial_key(kwargs) -> tuple:
+    return get_hashable_value({k: v for k, v in kwargs.items() if k != 'id'})  # type: ignore
 
 
 def connected_data_loader_with_params(
@@ -364,10 +346,13 @@ async def load_projects_for_ids(project_ids: list[int], connection) -> list[Proj
     """
     pttable = ProjectPermissionsTable(connection)
     projects = await pttable.get_and_check_access_to_projects_for_ids(
-        user=connection.user, project_ids=project_ids, readonly=True
+        user=connection.author, project_ids=project_ids, readonly=True
     )
+
     p_by_id = {p.id: p for p in projects}
-    return [p_by_id.get(p) for p in project_ids]
+    projects = [p_by_id.get(p) for p in project_ids]
+
+    return [p for p in projects if p is not None]
 
 
 @connected_data_loader(LoaderKeys.FAMILIES_FOR_PARTICIPANTS)
@@ -378,7 +363,10 @@ async def load_families_for_participants(
     Get families of participants, noting a participant can be in multiple families
     """
     flayer = FamilyLayer(connection)
-    fam_map = await flayer.get_families_by_participants(participant_ids=participant_ids)
+
+    fam_map = await flayer.get_families_by_participants(
+        participant_ids=participant_ids, check_project_ids=False
+    )
     return [fam_map.get(p, []) for p in participant_ids]
 
 
@@ -444,6 +432,55 @@ async def load_phenotypes_for_participants(
         participant_ids=participant_ids
     )
     return [participant_phenotypes.get(pid, {}) for pid in participant_ids]
+
+
+@connected_data_loader(LoaderKeys.FAMILIES_FOR_IDS)
+async def load_families_for_ids(
+    family_ids: list[int], connection
+) -> list[FamilyInternal]:
+    """
+    DataLoader: get_families_for_ids
+    """
+    flayer = FamilyLayer(connection)
+    families = await flayer.query(FamilyFilter(id=GenericFilter(in_=family_ids)))
+    f_by_id = {f.id: f for f in families}
+    return [f_by_id[f] for f in family_ids]
+
+
+@connected_data_loader(LoaderKeys.FAMILY_PARTICIPANTS_FOR_FAMILIES)
+async def load_family_participants_for_families(
+    family_ids: list[int], connection
+) -> list[list[PedRowInternal]]:
+    """
+    DataLoader: get_family_participants_for_families
+    """
+    flayer = FamilyLayer(connection)
+    fp_map = await flayer.get_family_participants_by_family_ids(family_ids)
+
+    return [fp_map.get(fid, []) for fid in family_ids]
+
+
+@connected_data_loader(LoaderKeys.FAMILY_PARTICIPANTS_FOR_PARTICIPANTS)
+async def load_family_participants_for_participants(
+    participant_ids: list[int], connection
+) -> list[list[PedRowInternal]]:
+    """data loader for family participants for participants
+
+    Args:
+        participant_ids (list[int]): list of internal participant ids
+        connection (_type_): (this is automatically filled in by the loader decorator)
+
+    Returns:
+        list[list[PedRowInternal]]: list of family participants for each participant
+            (in order)
+    """
+    flayer = FamilyLayer(connection)
+    family_participants = await flayer.get_family_participants_for_participants(
+        participant_ids
+    )
+    fp_map = group_by(family_participants, lambda fp: fp.individual_id)
+
+    return [fp_map.get(pid, []) for pid in participant_ids]
 
 
 async def get_context(

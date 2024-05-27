@@ -19,7 +19,7 @@ with open('README.md', encoding='utf-8') as f:
 setup(
     name=PKG,
     # This tag is automatically updated by bump2version
-    version='6.8.0',
+    version='7.0.3',
     description='Python API for interacting with the Sample API system',
     long_description=readme,
     long_description_content_type='text/markdown',
@@ -27,6 +27,7 @@ setup(
     license='MIT',
     packages=all_packages,
     install_requires=[
+        'backoff>=2.2.1',
         'click',
         'google-auth',
         'google-api-core',  # dependency to google-auth that however is not
@@ -36,9 +37,9 @@ setup(
         'requests',
         'typing-extensions',
         # for get id-token
-        'cpg-utils >= 4.9.4',
+        'cpg-utils >= 5.0.5',
         'gql[aiohttp,requests]',
-        'tabulate >= 0.9.0'
+        'tabulate >= 0.9.0',
     ],
     entry_points={
         'metamist_parser': [
