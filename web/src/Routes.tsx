@@ -14,7 +14,7 @@ import {
 import DocumentationArticle from './pages/docs/Documentation'
 import SampleView from './pages/sample/SampleView'
 import FamilyView from './pages/family/FamilyView'
-import ProjectSummaryView from './pages/project/ProjectSummary'
+import ProjectOverview from './pages/project/ProjectOverview'
 import ProjectsAdmin from './pages/admin/ProjectsAdmin'
 import ErrorBoundary from './shared/utilities/errorBoundary'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
@@ -28,7 +28,7 @@ const Routes: React.FunctionComponent = () => (
             path="/project/:projectName?/:page?"
             element={
                 <ErrorBoundary>
-                    <ProjectSummaryView />
+                    <ProjectOverview />
                 </ErrorBoundary>
             }
         />
