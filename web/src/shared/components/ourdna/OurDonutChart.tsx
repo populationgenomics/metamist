@@ -122,7 +122,7 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
             .attr('dy', '0.35em')
             .text((d) => d.data[0])
             .style('font-size', '12px')
-            .style('fill', '#000')
+            .style('fill', 'var(--color-text-primary)')
     }, [data, dimensions])
 
     return (

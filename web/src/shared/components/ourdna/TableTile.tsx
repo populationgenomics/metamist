@@ -22,31 +22,40 @@ const TableTile: React.FC<TableTileProps> = ({ header, data, columns, icon }) =>
                 {header}
             </Card.Header>
             <Card.Description>
-                <Table celled style={{ backgroundColor: 'var(--color-bg-card)' }}>
-                    <Table.Header>
-                        <Table.Row>
-                            {columns &&
-                                columns.map((column, index) => (
-                                    <Table.HeaderCell
-                                        className="dashboard-tile"
-                                        key={index}
-                                        style={{ backgroundColor: 'var(--color-bg-card)' }}
-                                    >
-                                        {column}
-                                    </Table.HeaderCell>
+                <div style={{ maxHeight: '20vh', overflowY: 'auto' }}>
+                    <Table celled style={{ backgroundColor: 'var(--color-bg-card)' }}>
+                        <Table.Header
+                            style={{
+                                position: 'sticky',
+                                top: 0,
+                                zIndex: 1,
+                                backgroundColor: 'var(--color-bg-card)',
+                            }}
+                        >
+                            <Table.Row>
+                                {columns &&
+                                    columns.map((column, index) => (
+                                        <Table.HeaderCell
+                                            className="dashboard-tile"
+                                            key={index}
+                                            style={{ backgroundColor: 'var(--color-bg-card)' }}
+                                        >
+                                            {column}
+                                        </Table.HeaderCell>
+                                    ))}
+                            </Table.Row>
+                        </Table.Header>
+                        <Table.Body className="dashboard-tile">
+                            {data &&
+                                Object.keys(data).map((key, index) => (
+                                    <Table.Row key={index}>
+                                        <Table.Cell>{key}</Table.Cell>
+                                        <Table.Cell>{data[key]}</Table.Cell>
+                                    </Table.Row>
                                 ))}
-                        </Table.Row>
-                    </Table.Header>
-                    <Table.Body className="dashboard-tile">
-                        {data &&
-                            Object.keys(data).map((key, index) => (
-                                <Table.Row key={index}>
-                                    <Table.Cell>{key}</Table.Cell>
-                                    <Table.Cell>{data[key]}</Table.Cell>
-                                </Table.Row>
-                            ))}
-                    </Table.Body>
-                </Table>
+                        </Table.Body>
+                    </Table>
+                </div>
             </Card.Description>
         </Card.Content>
     </Card>

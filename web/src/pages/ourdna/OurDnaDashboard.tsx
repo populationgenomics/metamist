@@ -203,30 +203,35 @@ const Dashboard = () => {
                             }
                         />
                     </GridColumn>
-                    <GridColumn width={6} stackable>
-                        <GridColumn>
-                            <TableTile
-                                header="Viable Long Read"
-                                data={data.project.ourdnaDashboard.samples_concentration_gt_1ug}
-                                columns={['Sample ID', 'Concentration']}
-                                icon={
-                                    <RocketIcon
-                                        fill={ourdnaColours.green}
-                                        style={{ ...iconStyle }}
-                                    />
-                                }
-                            />
-                        </GridColumn>
-                        <GridColumn>
-                            <TableTile
-                                header="Processed > 24h"
-                                data={samplesLostAfterCollections}
-                                columns={['Sample ID', 'Time (h)']}
-                                icon={
-                                    <AlarmIcon fill={ourdnaColours.red} style={{ ...iconStyle }} />
-                                }
-                            />
-                        </GridColumn>
+                    <GridColumn width={6}>
+                        <Grid stackable columns={1}>
+                            <GridColumn>
+                                <TableTile
+                                    header="Viable Long Read"
+                                    data={data.project.ourdnaDashboard.samples_concentration_gt_1ug}
+                                    columns={['Sample ID', 'Concentration']}
+                                    icon={
+                                        <RocketIcon
+                                            fill={ourdnaColours.green}
+                                            style={{ ...iconStyle }}
+                                        />
+                                    }
+                                />
+                            </GridColumn>
+                            <GridColumn>
+                                <TableTile
+                                    header="Processed > 24h"
+                                    data={samplesLostAfterCollections}
+                                    columns={['Sample ID', 'Time (h)']}
+                                    icon={
+                                        <AlarmIcon
+                                            fill={ourdnaColours.red}
+                                            style={{ ...iconStyle }}
+                                        />
+                                    }
+                                />
+                            </GridColumn>
+                        </Grid>
                     </GridColumn>
                 </GridRow>
             </Grid>
