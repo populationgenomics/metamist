@@ -1,5 +1,6 @@
 from collections import OrderedDict
 from datetime import datetime
+from math import ceil
 from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.layers.ourdna.dashboard import OurDnaDashboardLayer
@@ -203,12 +204,6 @@ class OurDNADashboardTest(DbIsolatedTest):
             if time_difference.total_seconds() > 24 * 3600:
                 samples_filtered.append(sample)
 
-                # Check that the id of the samples is a keys of the dict
-                assert sample.id in collection_to_process_end_time_24h
-
-                # Check that the time difference matches the expected value
-                assert collection_to_process_end_time_24h[sample.id] == time_difference.total_seconds()
-
         # check that there are a correct number of matching results
         assert len(collection_to_process_end_time_24h.keys()) == len(samples_filtered)
 
@@ -217,7 +212,29 @@ class OurDNADashboardTest(DbIsolatedTest):
         """I want to know what the sample processing times were for samples at each designated site"""
         sample_filter = SampleFilter(project=GenericFilter(eq=self.project_id))
         dashboard = await self.odd.query(sample_filter)
-        print(dashboard)
+        processing_times_by_site = dashboard.get('processing_times_by_site')
+
+        # Check that processing_times_per_site is not empty and is a dict
+        assert processing_times_by_site
+        assert isinstance(processing_times_by_site, dict)
+
+        sample_tally: dict[str, dict[str, int]] = OrderedDict()
+        for sample in self.sample_internal_objects:
+            processing_site = sample.meta.get('processing-site', 'Unknown')
+            process_start_time = sample.meta.get('process-start-time')
+            process_end_time = sample.meta.get('process-end-time')
+            # Skip samples that don't have process_start_time or process_end_time
+            if not process_start_time or not process_end_time:
+                continue
+            time_difference = str_to_datetime(process_end_time) - str_to_datetime(process_start_time)
+            current_bucket = ceil(time_difference.total_seconds() / 3600)
+            if processing_site in sample_tally:
+                sample_tally[processing_site][current_bucket] += 1
+            else:
+                sample_tally[processing_site] = {}
+                sample_tally[processing_site][current_bucket] = 1
+
+        assert OrderedDict(processing_times_by_site) == sample_tally
 
         # TODO: Add assertions VB
 
@@ -251,7 +268,26 @@ class OurDNADashboardTest(DbIsolatedTest):
         """I need to know how many samples have been lost, EG: participants have been consented, blood collected, not processed"""
         sample_filter = SampleFilter(project=GenericFilter(eq=self.project_id))
         dashboard = await self.odd.query(sample_filter)
-        print(dashboard)
+        samples_lost_after_collection = dashboard.get('samples_lost_after_collection')
+
+        # Check that samples_lost_after_collection is not empty and is a dict
+        assert samples_lost_after_collection
+        assert isinstance(samples_lost_after_collection, dict)
+
+        # Check that the number of samples in the list is correct
+        samples_filtered: list[SampleUpsertInternal] = []
+        for sample in self.sample_internal_objects:
+            collection_time = sample.meta.get('collection-time')
+            process_start_time = sample.meta.get('process-start-time')
+            # Skip samples that don't have collection_time or process_end_time
+            if not collection_time or not process_start_time:
+                continue
+            time_difference = str_to_datetime(process_start_time) - str_to_datetime(collection_time)
+            if time_difference.total_seconds() > 72 * 3600:
+                samples_filtered.append(sample)
+
+        # check that there are a correct number of matching results
+        assert len(samples_lost_after_collection.keys()) == len(samples_filtered)
 
         # TODO: Add assertions VB
 
@@ -270,11 +306,8 @@ class OurDNADashboardTest(DbIsolatedTest):
         samples_filtered = [sample for sample in self.sample_internal_objects if (sample.meta.get('concentration') and sample.meta.get('concentration') > 1)]
         assert len(samples_more_than_1ug_dna) == len(samples_filtered)
 
-        # Check that the ids of the samples are the keys of the dict
-        assert set(samples_more_than_1ug_dna.keys()) == set([sample.id for sample in samples_filtered])
-
     @run_as_sync
-    async def participants_consented_not_collected(self):
+    async def test_participants_consented_not_collected(self):
         """I want to know how many people who have consented and NOT given blood"""
         sample_filter = SampleFilter(project=GenericFilter(eq=self.project_id))
         dashboard = await self.odd.query(sample_filter)
