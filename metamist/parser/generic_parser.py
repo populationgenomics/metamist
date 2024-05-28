@@ -1086,7 +1086,9 @@ class GenericParser(
                 )
             elif assay.meta.get('sequencing_technology') == 'long-read':
                 # lift all assay meta into the sequencing group meta for long-read
-                keys = [k for k in assay.meta.keys() if k not in ('reads', 'reads_type')]
+                # except for assay reads, and keys that are already top-level sequencing group fields
+                keys_to_avoid = ('reads', 'reads_type', 'sequencing_type', 'sequencing_technology', 'sequencing_platform')
+                keys = [k for k in assay.meta.keys() if k not in keys_to_avoid]
             else:
                 continue
             for key in keys:

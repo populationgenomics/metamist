@@ -490,7 +490,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
         mock_graphql_query
     ):
         """
-        Test importing a single row of long read sequencing data with arbitrary assay metadata columns
+        Test importing rows of long read sequencing data with arbitrary assay metadata columns
         """
         mock_graphql_query.side_effect = self.run_graphql_query_async
         self.maxDiff = None
@@ -586,9 +586,6 @@ class TestParseGenericMetadata(DbIsolatedTest):
         }
 
         expected_sg_dict = {
-            'sequencing_platform': 'pacbio',
-            'sequencing_technology': 'long-read',
-            'sequencing_type': 'genome',
             'assay_meta1': [5, True],
             'assay_meta2': [False, 'some_value'],
         }

@@ -53,33 +53,6 @@ class AnalysisLayer(BaseLayer):
 
     # GETS
 
-    async def get_analyses_for_samples(
-        self,
-        sample_ids: list[int],
-        analysis_type: str | None,
-        status: AnalysisStatus | None,
-        check_project_id=True,
-    ) -> list[AnalysisInternal]:
-        """
-        Get a list of all analysis that relevant for samples
-
-        """
-        projects, analysis = await self.at.get_analyses_for_samples(
-            sample_ids,
-            analysis_type=analysis_type,
-            status=status,
-        )
-
-        if len(analysis) == 0:
-            return []
-
-        if check_project_id:
-            await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
-            )
-
-        return analysis
-
     async def get_analysis_by_id(self, analysis_id: int, check_project_id=True):
         """Get analysis by ID"""
         project, analysis = await self.at.get_analysis_by_id(analysis_id)
@@ -117,7 +90,16 @@ class AnalysisLayer(BaseLayer):
         """
         Gets details of analysis with status queued or in-progress
         """
-        return await self.at.get_incomplete_analyses(project=project)
+
+        return await self.at.query(
+            filter_=AnalysisFilter(
+                project=GenericFilter(eq=project),
+                active=GenericFilter(eq=True),
+                status=GenericFilter(
+                    in_=[AnalysisStatus.IN_PROGRESS, AnalysisStatus.QUEUED]
+                ),
+            )
+        )
 
     async def get_sample_cram_path_map_for_seqr(
         self,

@@ -26,7 +26,6 @@ from models.models.analysis import (
     AnalysisInternal,
     ProportionalDateTemporalMethod,
 )
-from models.utils.sample_id_format import sample_id_transform_to_raw_list
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
     sequencing_group_id_format_list,
@@ -65,10 +64,7 @@ class AnalysisQueryModel(BaseModel):
     """Used to query for many analysis"""
 
     # sequencing_group_ids means it the analysis contains at least one of in the list
-    sample_ids: list[str] | None = None
     sequencing_group_ids: list[str] | None
-    # # sample_ids_all means the analysis contains ALL of the sample_ids
-    # sample_ids_all: list[str] = None
     projects: list[str]
     type: str | None = None
     status: AnalysisStatus | None = None
@@ -79,11 +75,6 @@ class AnalysisQueryModel(BaseModel):
     def to_filter(self, project_id_map: dict[str, int]) -> AnalysisFilter:
         """Convert to internal analysis filter"""
         return AnalysisFilter(
-            sample_id=(
-                GenericFilter(in_=sample_id_transform_to_raw_list(self.sample_ids))
-                if self.sample_ids
-                else None
-            ),
             sequencing_group_id=(
                 GenericFilter(
                     in_=sequencing_group_id_transform_to_raw_list(
