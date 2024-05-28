@@ -1,41 +1,118 @@
-import * as React from 'react'
 import _, { capitalize } from 'lodash'
-import { Table as SUITable, Form, Popup } from 'semantic-ui-react'
+import * as React from 'react'
+import { Form, Popup, Table as SUITable } from 'semantic-ui-react'
 
+import CloseIcon from '@mui/icons-material/Close'
 import FilterAltIcon from '@mui/icons-material/FilterAlt'
 import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined'
-import CloseIcon from '@mui/icons-material/Close'
 import { IconButton } from '@mui/material'
 import Table from '../../shared/components/Table'
-import SampleLink from '../../shared/components/links/SampleLink'
 import FamilyLink from '../../shared/components/links/FamilyLink'
-import sanitiseValue from '../../shared/utilities/sanitiseValue'
-import { ProjectSummary, MetaSearchEntityPrefix } from '../../sm-api/api'
+import SampleLink from '../../shared/components/links/SampleLink'
 import SequencingGroupLink from '../../shared/components/links/SequencingGroupLink'
+import sanitiseValue from '../../shared/utilities/sanitiseValue'
+import { ProjectParticipantGridFilter, ProjectParticipantGridResponse } from '../../sm-api/api'
 
 interface ProjectGridProps {
-    summary: ProjectSummary
+    participantResponse?: ProjectParticipantGridResponse
     projectName: string
-    filterValues: Record<
-        string,
-        { value: string; category: MetaSearchEntityPrefix; title: string; field: string }
-    >
-    updateFilters: (e: {
-        [k: string]: {
-            value: string
-            category: MetaSearchEntityPrefix
-            title: string
-            field: string
-        }
-    }) => void
+    filterValues: ProjectParticipantGridFilter
+    updateFilters: (e: Partial<ProjectParticipantGridFilter>) => void
+}
+
+enum MetaSearchEntityPrefix {
+    F = 'family',
+    P = 'participant',
+    S = 'sample',
+    Sg = 'sequencing_group',
+    A = 'assay',
+}
+
+interface IValueFilter {
+    filterValues: ProjectParticipantGridFilter
+    updateFilterValues: (e: Partial<ProjectParticipantGridFilter>) => void
+
+    category: MetaSearchEntityPrefix
+    key: string
+    isMeta?: boolean
+    position?: 'top right' | 'top center'
+
+}
+const ValueFilter: React.FC<IValueFilter> = ({ filterValues, category, key, position, updateFilterValues, isMeta = false, ...props }) => {
+    // TODO: remove this type ignore
+    // @ts-ignore
+    const optionsToCheck = category == MetaSearchEntityPrefix.P ? filterValues : filterValues[category]
+    const isHighlighted = key in optionsToCheck
+
+    const [tempValue, setTempValue] = React.useState<string | undefined>(optionsToCheck[key] ?? '')
+
+    const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault()
+        const updateFilterValue =
+
+            updateFilterValues()
+        // updateFilterValues({
+        //     ...filterValues,
+        //     [category]: {
+        //         ...optionsToCheck,
+        //         [key]: tempValue,
+        //     },
+        // })
+    }
+
+    return <div style={{ position: 'relative' }}>
+        <div style={{ position: 'absolute', top: 0, right: 0 }}>
+            <Popup
+                position={position || 'top right'}
+                trigger={isHighlighted ? <FilterAltIcon /> : <FilterAltOutlinedIcon />}
+                hoverable
+            >
+                <Form onSubmit={onSubmit}>
+                    <Form.Group
+                        inline
+                        style={{ padding: 0, margin: 0 }}
+                    >
+                        <Form.Field style={{ padding: 0, margin: 0 }}>
+                            <Form.Input
+                                action={{ icon: 'search' }}
+                                placeholder="Filter..."
+                                name={name}
+                                value={tempValue}
+                                onChange={(e) =>
+                                    onFilterValueChange(
+                                        e,
+                                        category,
+                                        title
+                                    )
+                                }
+                            />
+                        </Form.Field>
+                        {`${category}.${name}` in filterValues && (
+                            <Form.Field style={{ padding: 0 }}>
+                                <IconButton
+                                    onClick={() =>
+                                        onClear(name, category)
+                                    }
+                                    style={{ padding: 0 }}
+                                >
+                                    <CloseIcon />
+                                </IconButton>
+                            </Form.Field>
+                        )}
+                    </Form.Group>
+                </Form>
+            </Popup>
+        </div>
+    </div>
 }
 
 const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
-    summary,
+    participantResponse: summary,
     projectName,
     filterValues,
     updateFilters,
 }) => {
+    if (!summary) return <p><em>No data</em></p>
     let headers = [
         {
             name: 'external_id',
@@ -77,13 +154,7 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
         { title: 'Assay', width: summary.assay_keys.length },
     ]
 
-    const [tempFilterValues, setTempFilterValues] =
-        React.useState<
-            Record<
-                string,
-                { value: string; category: MetaSearchEntityPrefix; title: string; field: string }
-            >
-        >(filterValues)
+    const [tempFilterValues, setTempFilterValues] = React.useState<ProjectParticipantGridFilter>(filterValues)
 
     const onFilterValueChange = (
         e: React.ChangeEvent<HTMLInputElement>,
@@ -92,20 +163,20 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
     ) => {
         const { name } = e.target
         const { value } = e.target
-        setTempFilterValues({
-            ...Object.keys(tempFilterValues)
-                .filter((key) => `${category}.${name}` !== key)
-                .reduce((res, key) => Object.assign(res, { [key]: tempFilterValues[key] }), {}),
-            ...(value && { [`${category}.${name}`]: { value, category, title, field: name } }),
-        })
+        // setTempFilterValues({
+        //     ...Object.keys(tempFilterValues)
+        //         .filter((key) => `${category}.${name}` !== key)
+        //         .reduce((res, key) => Object.assign(res, { [key]: tempFilterValues[key] }), {}),
+        //     ...(value && { [`${category}.${name}`]: { value, category, title, field: name } }),
+        // })
     }
 
     const onClear = (column: string, category: MetaSearchEntityPrefix) => {
-        updateFilters({
-            ...Object.keys(tempFilterValues)
-                .filter((key) => `${category}.${column}` !== key)
-                .reduce((res, key) => Object.assign(res, { [key]: tempFilterValues[key] }), {}),
-        })
+        // updateFilters({
+        //     ...Object.keys(tempFilterValues)
+        //         .filter((key) => `${category}.${column}` !== key)
+        //         .reduce((res, key) => Object.assign(res, { [key]: tempFilterValues[key] }), {}),
+        // })
     }
 
     const onSubmit = () => {
@@ -113,6 +184,7 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
     }
 
     if (summary.participants.length === 0 && Object.keys(filterValues).length) {
+        // if we have filters but no data, we need to show the headers without any data
         headers = Object.entries(filterValues).map(([, { field, category, title }]) => ({
             name: field,
             category,
@@ -181,64 +253,7 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                         : '1px solid var(--color-border-default)',
                                 }}
                             >
-                                <div style={{ position: 'relative' }}>
-                                    <div style={{ position: 'absolute', top: 0, right: 0 }}>
-                                        <Popup
-                                            position={
-                                                summary.participants.length === 0
-                                                    ? 'top right'
-                                                    : 'top center'
-                                            }
-                                            trigger={
-                                                `${category}.${name}` in filterValues ? (
-                                                    <FilterAltIcon />
-                                                ) : (
-                                                    <FilterAltOutlinedIcon />
-                                                )
-                                            }
-                                            hoverable
-                                        >
-                                            <Form onSubmit={onSubmit}>
-                                                <Form.Group
-                                                    inline
-                                                    style={{ padding: 0, margin: 0 }}
-                                                >
-                                                    <Form.Field style={{ padding: 0, margin: 0 }}>
-                                                        <Form.Input
-                                                            action={{ icon: 'search' }}
-                                                            placeholder="Filter..."
-                                                            name={name}
-                                                            value={
-                                                                tempFilterValues[
-                                                                    `${category}.${name}`
-                                                                ]?.value || ''
-                                                            }
-                                                            onChange={(e) =>
-                                                                onFilterValueChange(
-                                                                    e,
-                                                                    category,
-                                                                    title
-                                                                )
-                                                            }
-                                                        />
-                                                    </Form.Field>
-                                                    {`${category}.${name}` in filterValues && (
-                                                        <Form.Field style={{ padding: 0 }}>
-                                                            <IconButton
-                                                                onClick={() =>
-                                                                    onClear(name, category)
-                                                                }
-                                                                style={{ padding: 0 }}
-                                                            >
-                                                                <CloseIcon />
-                                                            </IconButton>
-                                                        </Form.Field>
-                                                    )}
-                                                </Form.Group>
-                                            </Form>
-                                        </Popup>
-                                    </div>
-                                </div>
+                                <ValueFilter />
                             </SUITable.HeaderCell>
                         )
                     })}
@@ -294,7 +309,7 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                             sgs = [{}]
                         }
                         return sgs.map((sg, sgidx) =>
-                            (sg.assays?.length > 0 ? sg.assays : [{}]).map((assay, assayidx) => {
+                            ((!!sg?.assays) ? sg.assays : [{ id: 0 }]).map((assay, assayidx) => {
                                 const isFirstOfGroup = sidx === 0 && sgidx === 0 && assayidx === 0
                                 const border = '1px solid #dee2e6'
                                 // const border = '1px solid'

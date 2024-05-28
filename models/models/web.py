@@ -130,6 +130,7 @@ class ProjectSummary(SMBase):
 class ProjectParticipantGridResponse(SMBase):
     # grid
     participants: list[NestedParticipant]
+    total_results: int
     participant_keys: list[tuple[str, str]]
     sample_keys: list[tuple[str, str]]
     sequencing_group_keys: list[tuple[str, str]]
@@ -140,6 +141,7 @@ class ProjectParticipantGridResponse(SMBase):
     @staticmethod
     def construct(
         participants: list[NestedParticipantInternal],
+        total_results: int,
         token_base_url: str,
         current_url: str,
         request_limit: int,
@@ -159,6 +161,7 @@ class ProjectParticipantGridResponse(SMBase):
 
         return ProjectParticipantGridResponse(
             participants=[p.to_external() for p in participants],
+            total_results=total_results,
             participant_keys=entity_keys.participant_keys,
             sample_keys=entity_keys.sample_keys,
             sequencing_group_keys=entity_keys.sequencing_group_keys,

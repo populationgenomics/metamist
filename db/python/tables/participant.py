@@ -22,6 +22,16 @@ class ParticipantFilter(GenericFilterModel):
     """
 
     @dataclasses.dataclass(kw_only=True)
+    class ParticipantFamilyFilter(GenericFilterModel):
+        """
+        Participant sample filter model
+        """
+
+        id: GenericFilter[int] | None = None
+        external_id: GenericFilter[str] | None = None
+        meta: GenericMetaFilter | None = None
+
+    @dataclasses.dataclass(kw_only=True)
     class ParticipantSampleFilter(GenericFilterModel):
         """
         Participant sample filter model
@@ -66,6 +76,7 @@ class ParticipantFilter(GenericFilterModel):
     karyotype: GenericFilter[str] | None = None
     project: GenericFilter[ProjectId] | None = None
 
+    family: ParticipantFamilyFilter | None = None
     sample: ParticipantSampleFilter | None = None
     sequencing_group: ParticipantSequencingGroupFilter | None = None
     assay: ParticipantAssayFilter | None = None
@@ -108,6 +119,7 @@ class ParticipantTable(DbBase):
         filter_: ParticipantFilter, keys: list[str]
     ) -> tuple[str, dict[str, Any]]:
         """Construct a participant query"""
+        needs_family = False
         needs_sample = False
         needs_sequencing_group = False
         needs_assay = False
@@ -119,8 +131,21 @@ class ParticipantTable(DbBase):
                 'external_id': 'p.external_id',
                 'meta': 'p.meta',
             },
-            exclude=['sample', 'sequencing_group', 'assay'],
+            exclude=['family', 'sample', 'sequencing_group', 'assay'],
         )
+
+        if filter_.family:
+            needs_family = True
+            fwheres, fvalues = filter_.family.to_sql(
+                {
+                    'id': 'f.id',
+                    'external_id': 'f.external_id',
+                    'meta': 'f.meta',
+                }
+            )
+            values.update(fvalues)
+            if fwheres:
+                wheres += ' AND ' + fwheres
 
         if filter_.sample:
             needs_sample = True
@@ -169,6 +194,9 @@ class ParticipantTable(DbBase):
             query += 'INNER JOIN sequencing_group sg ON sg.sample_id = s.id\n'
         if needs_assay:
             query += 'INNER JOIN assay a ON a.sequencing_group_id = sg.id\n'
+        if needs_family:
+            query += 'INNER JOIN family_participant fp ON fp.participant_id = p.id\n'
+            query += 'INNER JOIN family f ON f.id = fp.family_id\n'
 
         if wheres:
             query += 'WHERE \n' + wheres

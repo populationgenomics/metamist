@@ -93,9 +93,11 @@ class SequencingGroupTable(DbBase):
 
         # Base query
         _query.append(
-            f"""
+            """
             SELECT
-                {self.common_get_keys_str}
+                sg.id, s.project, sg.sample_id, sg.type,
+                sg.technology, sg.platform, sg.meta, sg.archived,
+                JSON_OBJECTAGG(sgexid.name, sgexid.external_id) AS external_ids
             FROM sequencing_group AS sg
             LEFT JOIN sample s ON s.id = sg.sample_id
             LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id"""
@@ -181,9 +183,14 @@ class SequencingGroupTable(DbBase):
         )
         query_values.update(values)
 
+        _query.append(
+            'GROUP BY sg.id, s.project, sg.sample_id, sg.type, '
+            'sg.technology, sg.platform, sg.meta, sg.archived'
+        )
+
         rows = await self.connection.fetch_all('\n'.join(_query), query_values)
         sgs = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
-        projects = set(sg.project for sg in sgs)
+        projects = set(sg.project for sg in sgs if sg.project)
         return projects, sgs
 
     async def get_projects_by_sequencing_group_ids(

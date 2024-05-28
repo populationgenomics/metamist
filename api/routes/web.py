@@ -3,6 +3,8 @@
 Web routes
 """
 
+import asyncio
+
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
@@ -50,12 +52,60 @@ async def get_project_summary(
 
 
 class ProjectParticipantGridFilter(BaseModel):
+    class ParticipantGridFamilyFilter(BaseModel):
+        """
+        Participant sample filter model
+        """
+
+        id: GenericFilter[int] | None = None
+        external_id: GenericFilter[str] | None = None
+        meta: GenericMetaFilter | None = None
+
+    class ParticipantGridSampleFilter(BaseModel):
+        """
+        Participant sample filter model
+        """
+
+        id: GenericFilter[int] | None = None
+        type: GenericFilter[str] | None = None
+        external_id: GenericFilter[str] | None = None
+        meta: GenericMetaFilter | None = None
+
+    class ParticipantGridSequencingGroupFilter(BaseModel):
+        """
+        Participant sequencing group filter model
+        """
+
+        id: GenericFilter[int] | None = None
+        external_id: GenericFilter[str] | None = None
+        meta: GenericMetaFilter | None = None
+        type: GenericFilter[str] | None = None
+        technology: GenericFilter[str] | None = None
+        platform: GenericFilter[str] | None = None
+
+    class ParticipantGridAssayFilter(BaseModel):
+        """
+        Participant assay filter model
+        """
+
+        id: GenericFilter[int] | None = None
+        external_id: GenericFilter[str] | None = None
+        meta: GenericMetaFilter | None = None
+        type: GenericFilter[str] | None = None
+        technology: GenericFilter[str] | None = None
+        platform: GenericFilter[str] | None = None
+
     id: GenericFilter[int] | None = None
     meta: GenericMetaFilter | None = None
     external_id: GenericFilter[str] | None = None
     reported_sex: GenericFilter[int] | None = None
     reported_gender: GenericFilter[str] | None = None
     karyotype: GenericFilter[str] | None = None
+
+    family: ParticipantGridFamilyFilter | None = None
+    sample: ParticipantGridSampleFilter | None = None
+    sequencing_group: ParticipantGridSequencingGroupFilter | None = None
+    assay: ParticipantGridAssayFilter | None = None
 
 
 @router.post(
@@ -66,8 +116,8 @@ class ProjectParticipantGridFilter(BaseModel):
 async def get_project_summary_with_limit(
     request: Request,
     limit: int,
-    token: int,
     query: ProjectParticipantGridFilter,
+    token: int | None = None,
     connection=get_project_readonly_connection,
 ):
 
@@ -78,25 +128,69 @@ async def get_project_summary_with_limit(
     id_query = query.id
     if token:
         id_query = id_query or GenericFilter()
-        id_query.gt = token
-
-    participants = await wlayer.query(
-        ParticipantFilter(
-            id=id_query,
-            external_id=query.external_id,
-            reported_sex=query.reported_sex,
-            reported_gender=query.reported_gender,
-            karyotype=query.karyotype,
-            meta=query.meta,
-            project=GenericFilter(eq=connection.project),
+        id_query.gt = int(token)
+    pfilter = ParticipantFilter(
+        id=id_query,
+        external_id=query.external_id,
+        reported_sex=query.reported_sex,
+        reported_gender=query.reported_gender,
+        karyotype=query.karyotype,
+        meta=query.meta,
+        project=GenericFilter(eq=connection.project),
+        # nested models
+        family=(
+            ParticipantFilter.ParticipantFamilyFilter(
+                id=query.family.id,
+                external_id=query.family.external_id,
+                meta=query.family.meta,
+            )
+            if query.family
+            else None
         ),
-        limit=limit,
+        sample=(
+            ParticipantFilter.ParticipantSampleFilter(
+                id=query.sample.id,
+                type=query.sample.type,
+                external_id=query.sample.external_id,
+                meta=query.sample.meta,
+            )
+            if query.sample
+            else None
+        ),
+        sequencing_group=(
+            ParticipantFilter.ParticipantSequencingGroupFilter(
+                id=query.sequencing_group.id,
+                type=query.sequencing_group.type,
+                external_id=query.sequencing_group.external_id,
+                meta=query.sequencing_group.meta,
+                technology=query.sequencing_group.technology,
+                platform=query.sequencing_group.platform,
+            )
+            if query.sequencing_group
+            else None
+        ),
+        assay=(
+            ParticipantFilter.ParticipantAssayFilter(
+                id=query.assay.id,
+                type=query.assay.type,
+                external_id=query.assay.external_id,
+                meta=query.assay.meta,
+            )
+            if query.assay
+            else None
+        ),
+    )
+
+    participants, pcount = await asyncio.gather(
+        wlayer.query_participants(pfilter, limit=limit),
+        wlayer.count_participants(pfilter),
     )
 
     # then have to get all nested objects
 
     return ProjectParticipantGridResponse.construct(
         participants=participants,
+        total_results=pcount,
         token_base_url=str(request.base_url) + request.url.path.lstrip('/'),
         current_url=str(request.url),
         request_limit=limit,
