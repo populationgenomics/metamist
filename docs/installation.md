@@ -209,7 +209,7 @@ pushd db/
 wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.0.3/mariadb-java-client-3.0.3.jar
 liquibase \
     --changeLogFile project.xml \
-    --url jdbc:mariadb://localhost/sm_dev \
+    --url jdbc:mariadb://${SM_DEV_DB_HOST}:${SM_DEV_DB_PORT}/${SM_DEV_DB_NAME} \
     --driver org.mariadb.jdbc.Driver \
     --classpath mariadb-java-client-3.0.3.jar \
     --username ${SM_DEV_DB_USER:-root} \
