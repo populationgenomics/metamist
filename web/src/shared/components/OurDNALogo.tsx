@@ -1,6 +1,6 @@
 import * as React from 'react'
-import ourDNA from '../../cpg-logo-rgb.svg'
-import ourDNADark from '../../cpg-white.svg'
+import ourDNA from '../../ourdna-logo-rgb.svg'
+import ourDNADark from '../../ourdna-white.svg'
 import { ThemeContext } from './ThemeProvider'
 
 const OurDNALogo: React.FunctionComponent<

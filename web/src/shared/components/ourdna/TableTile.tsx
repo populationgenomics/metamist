@@ -13,7 +13,7 @@ const TableTile: React.FC<TableTileProps> = ({ header, data, columns, icon }) =>
         fluid
         style={{
             backgroundColor: 'var(--color-bg-card)',
-            boxShadow: 'rgba(0, 0, 0, 0.24) 0px 3px 8px',
+            boxShadow: 'var(--color-bg-card-shadow)',
         }}
     >
         <Card.Content>

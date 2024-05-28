@@ -131,7 +131,7 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
             style={{
                 height: '100%',
                 backgroundColor: 'var(--color-bg-card)',
-                boxShadow: 'rgba(0, 0, 0, 0.24) 0px 3px 8px',
+                boxShadow: 'var(--color-bg-card-shadow)',
             }}
         >
             <Card.Content style={{ height: '100%' }}>

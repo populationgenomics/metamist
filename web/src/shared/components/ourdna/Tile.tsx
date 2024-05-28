@@ -15,7 +15,7 @@ const Tile: React.FC<TileProps> = ({ header, stat, units, unitsColour, descripti
         fluid
         style={{
             backgroundColor: 'var(--color-bg-card)',
-            boxShadow: 'rgba(0, 0, 0, 0.24) 0px 3px 8px',
+            boxShadow: 'var(--color-bg-card-shadow)',
         }}
     >
         <Card.Content>

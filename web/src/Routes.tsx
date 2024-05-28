@@ -2,7 +2,6 @@ import * as React from 'react'
 
 import SwaggerUI from 'swagger-ui-react'
 import { Routes as Switch, Route } from 'react-router-dom'
-import { ChakraProvider } from '@chakra-ui/react'
 
 import {
     BillingHome,

@@ -1,5 +1,5 @@
 import React from 'react'
-import { CardGroup, Container, Grid, GridRow, GridColumn, Image } from 'semantic-ui-react'
+import { Container, Grid, GridRow, GridColumn } from 'semantic-ui-react'
 import { gql, useQuery } from '@apollo/client'
 
 import Tile from '../../shared/components/ourdna/Tile'
