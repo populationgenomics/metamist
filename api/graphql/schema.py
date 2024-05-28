@@ -237,8 +237,10 @@ class GraphQLProject:
     ) -> strawberry.scalars.JSON:
         connection = info.context['connection']
         ourdna_layer = OurDnaDashboardLayer(connection)
+        if not root.id:
+            raise ValueError('Project must have an id')
         return await ourdna_layer.query(
-            SampleFilter(project=root.id), project_id=root.id
+            SampleFilter(project=GenericFilter(eq=root.id)), project_id=root.id
         )
 
     @strawberry.field()

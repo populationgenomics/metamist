@@ -146,15 +146,15 @@ class OurDnaDashboardLayer(BaseLayer):
             )
 
             # Get the samples that have been collected and consented
-            collected_samples = [
+            samples_consented_not_collected = [
                 sample
                 for sample in samples_for_participant
-                if sample.meta.get('collection-time') is not None
+                if participant.meta.get('consent')
+                and self.get_meta_property(sample=sample, property_name='collection-time') is None
             ]
 
-            if len(collected_samples) == 0:
-                if participant.meta.get('consent') is not None:
-                    participants_consented_not_collected.append(participant.id)
+            if len(samples_consented_not_collected) > 0:
+                participants_consented_not_collected.append(participant.id)
 
             # Get the participants that have signed but not consented
             if participant.meta.get('consent') is None:
@@ -189,7 +189,7 @@ class OurDnaDashboardLayer(BaseLayer):
                     _collection_event_name
                 ] += 1
             else:
-                total_samples_by_collection_event_name['unknown'] += 1
+                total_samples_by_collection_event_name['Unknown'] += 1
 
             # Get total number of many samples have been lost, EG: participants have been consented, blood collected, not processed (etc), Alert here (highlight after 72 hours)
             time_to_process_start = self.get_collection_to_process_start_time(sample)
