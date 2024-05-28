@@ -83,9 +83,7 @@ cryptography==42.0.7
     #   azure-storage-blob
     #   pymysql
 databases[mysql]==0.9.0
-    # via
-    #   -r requirements.in
-    #   databases
+    # via -r requirements.in
 deprecated==1.2.14
     # via cpg-utils
 deprecation==2.1.0
@@ -96,14 +94,13 @@ distlib==0.3.8
     # via virtualenv
 dnspython==2.6.1
     # via email-validator
-docker==7.0.0
+docker==7.1.0
     # via testcontainers
 email-validator==2.1.1
     # via fastapi
 fastapi[all]==0.110.2
     # via
     #   -r requirements.in
-    #   fastapi
     #   strawberry-graphql
 filelock==3.14.0
     # via virtualenv
@@ -125,7 +122,6 @@ functions-framework==3.5.0
     # via -r requirements-dev.in
 google-api-core[grpc]==2.19.0
     # via
-    #   google-api-core
     #   google-cloud-appengine-logging
     #   google-cloud-bigquery
     #   google-cloud-core
@@ -181,8 +177,6 @@ googleapis-common-protos[grpc]==1.63.0
     #   grpcio-status
 graphql-core==3.2.3
     # via strawberry-graphql
-greenlet==3.0.3
-    # via sqlalchemy
 grpc-google-iam-v1==0.12.7
     # via
     #   google-cloud-logging
@@ -267,7 +261,6 @@ packaging==24.0
     # via
     #   black
     #   deprecation
-    #   docker
     #   google-cloud-bigquery
     #   gunicorn
 pathspec==0.12.1
@@ -355,7 +348,7 @@ pyyaml==6.0.1
     #   libcst
     #   pre-commit
     #   uvicorn
-requests==2.31.0
+requests==2.32.2
     # via
     #   -r requirements.in
     #   azure-core
@@ -398,13 +391,10 @@ strawberry-graphql[debug-server,fastapi]==0.229.0
     # via
     #   -r requirements-dev.in
     #   -r requirements.in
-    #   strawberry-graphql
 tabulate==0.9.0
     # via cpg-utils
-testcontainers[mysql]==4.4.1
-    # via
-    #   -r requirements-dev.in
-    #   testcontainers
+testcontainers[mysql]==4.5.0
+    # via -r requirements-dev.in
 toml==0.10.2
     # via cpg-utils
 tomlkit==0.12.5
