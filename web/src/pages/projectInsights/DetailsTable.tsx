@@ -1,16 +1,18 @@
-// SeqrProjectsDetailsRable.tsx
+// DetailsRable.tsx
 import React, { useState } from 'react'
-import { SeqrProjectsDetails } from '../../sm-api'
-import { Table, Icon } from 'semantic-ui-react'
+import { ProjectInsightsDetails } from '../../sm-api'
+import { Button, Table, Icon } from 'semantic-ui-react'
 import Tooltip, { TooltipProps } from '@mui/material/Tooltip'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
 import FilterButton from './FilterButton'
 
 interface DetailsTableProps {
-    allData: SeqrProjectsDetails[]
-    filteredData: SeqrProjectsDetails[]
+    allData: ProjectInsightsDetails[]
+    filteredData: ProjectInsightsDetails[]
     selectedProjects: { name: string }[]
     selectedSeqTypes: string[]
+    selectedSeqPlatforms: string[]
+    selectedSeqTechnologies: string[]
     selectedSampleTypes: string[]
     selectedFamilyIds: string[]
     selectedFamilyExtIds: string[]
@@ -44,25 +46,26 @@ const HtmlTooltip = (props: TooltipProps) => (
     <Tooltip {...props} classes={{ popper: 'html-tooltip' }} />
 )
 
-const DetailsTableRow: React.FC<{ details: SeqrProjectsDetails }> = ({ details }) => {
+const DetailsTableRow: React.FC<{ details: ProjectInsightsDetails }> = ({ details }) => {
     const theme = React.useContext(ThemeContext)
     const isDarkMode = theme.theme === 'dark-mode'
     const rowClassName = getRowClassName(details.sequencing_type)
 
     return (
         <Table.Row key={`${details.sequencing_group_id}`} className={rowClassName}>
-            <Table.Cell className="category-cell">{details.dataset}</Table.Cell>
-            <Table.Cell className="category-cell">{details.sequencing_type}</Table.Cell>
-            <Table.Cell className="category-cell">{details.sample_type}</Table.Cell>
-            <Table.Cell className="table-cell">{details.sequencing_group_id}</Table.Cell>
-            <Table.Cell className="table-cell">{details.family_id}</Table.Cell>
-            <Table.Cell className="table-cell">{details.family_ext_id}</Table.Cell>
-            <Table.Cell className="table-cell">{details.participant_id}</Table.Cell>
-            <Table.Cell className="table-cell">{details.participant_ext_id}</Table.Cell>
-            <Table.Cell className="table-cell">{details.sample_id}</Table.Cell>
-            <Table.Cell className="table-cell">{details.sample_ext_ids}</Table.Cell>
-            <Table.Cell className="table-cell">
-                
+            <Table.Cell data-cell className="category-cell">{details.dataset}</Table.Cell>
+            <Table.Cell data-cell className="category-cell">{details.sequencing_type}</Table.Cell>
+            <Table.Cell data-cell className="category-cell">{details.sequencing_platform}</Table.Cell>
+            <Table.Cell data-cell className="category-cell">{details.sequencing_technology}</Table.Cell>
+            <Table.Cell data-cell className="category-cell">{details.sample_type}</Table.Cell>
+            <Table.Cell data-cell className="table-cell">{details.sequencing_group_id}</Table.Cell>
+            <Table.Cell data-cell className="table-cell">{details.family_id}</Table.Cell>
+            <Table.Cell data-cell className="table-cell">{details.family_ext_id}</Table.Cell>
+            <Table.Cell data-cell className="table-cell">{details.participant_id}</Table.Cell>
+            <Table.Cell data-cell className="table-cell">{details.participant_ext_id}</Table.Cell>
+            <Table.Cell data-cell className="table-cell">{details.sample_id}</Table.Cell>
+            <Table.Cell data-cell className="table-cell">{details.sample_ext_ids}</Table.Cell>
+            <Table.Cell data-cell className="table-cell">
                 <HtmlTooltip
                         title={
                             <p>
@@ -70,7 +73,7 @@ const DetailsTableRow: React.FC<{ details: SeqrProjectsDetails }> = ({ details }
                             </p>
                         }
                     >
-                        <div>{details.completed_cram ? '✅' : '❌'}%</div>
+                        <div>{details.completed_cram ? '✅' : '❌'}</div>
                     </HtmlTooltip>
             </Table.Cell>
             <Table.Cell className="table-cell">
@@ -82,7 +85,7 @@ const DetailsTableRow: React.FC<{ details: SeqrProjectsDetails }> = ({ details }
             <Table.Cell className="table-cell">
                 {details.in_latest_sv_es_index ? '✅' : '❌'}
             </Table.Cell>
-            <Table.Cell className="table-cell">
+            <Table.Cell data-cell className="table-cell">
                 {details.sequencing_group_report_links?.stripy ? (
                     <a
                         href={`https://main-web.populationgenomics.org.au/${details.dataset}/stripy/${details.sequencing_group_id}.html`}
@@ -91,7 +94,7 @@ const DetailsTableRow: React.FC<{ details: SeqrProjectsDetails }> = ({ details }
                     </a>
                 ) : null}
             </Table.Cell>
-            <Table.Cell className="table-cell">
+            <Table.Cell data-cell className="table-cell">
                 {details.sequencing_group_report_links?.mito ? (
                     <a
                         href={`https://main-web.populationgenomics.org.au/${details.dataset}/mito/mitoreport-${details.sequencing_group_id}/index.html`}
@@ -109,6 +112,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
     filteredData,
     selectedProjects,
     selectedSeqTypes,
+    selectedSeqPlatforms,
+    selectedSeqTechnologies,
     selectedSampleTypes,
     selectedFamilyIds,
     selectedFamilyExtIds,
@@ -126,9 +131,9 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
     handleSelectionChange,
 }) => {
     const [sortColumns, setSortColumns] = useState<
-        Array<{ column: keyof SeqrProjectsDetails; direction: 'ascending' | 'descending' }>
+        Array<{ column: keyof ProjectInsightsDetails; direction: 'ascending' | 'descending' }>
     >([])
-    const handleSort = (column: keyof SeqrProjectsDetails, isMultiSort: boolean) => {
+    const handleSort = (column: keyof ProjectInsightsDetails, isMultiSort: boolean) => {
         if (isMultiSort) {
             const existingColumnIndex = sortColumns.findIndex(
                 (sortColumn) => sortColumn.column === column
@@ -180,7 +185,7 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
     }, [filteredData, sortColumns])
 
     const getUniqueOptionsForColumn = (
-        columnName: keyof SeqrProjectsDetails | 'stripy' | 'mito'
+        columnName: keyof ProjectInsightsDetails | 'stripy' | 'mito'
     ) => {
         const filteredDataExcludingCurrentColumn = allData.filter((item) => {
             return (
@@ -189,6 +194,12 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                 (columnName === 'sample_type' ||
                     selectedSampleTypes.length === 0 ||
                     selectedSampleTypes.includes(item.sample_type)) &&
+                (columnName === 'sequencing_platform' ||
+                    selectedSeqPlatforms.length === 0 ||
+                    selectedSeqPlatforms.includes(item.sequencing_platform)) &&
+                (columnName === 'sequencing_technology' ||
+                    selectedSeqTechnologies.length === 0 ||
+                    selectedSeqTechnologies.includes(item.sequencing_technology)) &&
                 (columnName === 'family_id' ||
                     selectedFamilyIds.length === 0 ||
                     selectedFamilyIds.includes(item.family_id?.toString() || '')) &&
@@ -264,8 +275,42 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
 
         return uniqueOptions
     }
+    const exportToCSV = () => {
+        const headerCells = document.querySelectorAll('.ui.table thead tr th');
+        const headerData = Array.from(headerCells).map(cell => cell.textContent);
+      
+        const rows = document.querySelectorAll('.ui.table tbody tr');
+        const rowData = Array.from(rows).map(row => {
+            const cells = row.querySelectorAll('td');
+            return Array.from(cells).map(cell => {
+                if (cell.textContent === '✅') {
+                    return 'TRUE';
+                } else if (cell.textContent === '❌') {
+                    return 'FALSE';
+                } else if (cell.querySelector('a')) {
+                    const anchor = cell.querySelector('a');
+                    return anchor ? anchor.href : null;
+                } else {
+                    return cell.textContent;
+                }
+            });
+        });
+      
+        const csvData = [headerData, ...rowData].map(row => row.join(',')).join('\n');
+      
+        const blob = new Blob([csvData], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'table_data.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
 
     return (
+        <div>
+        <Button onClick={exportToCSV}>Export to CSV</Button>
         <Table sortable>
             <Table.Header>
                 <Table.Row>
@@ -291,6 +336,64 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                         }
                     >
                         Seq Type
+                    </Table.HeaderCell>
+                    <Table.HeaderCell
+                        className="header-cell"
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('sequencing_platform', event.shiftKey)
+                        }
+                    >
+                        <div className="filter-button">
+                            <FilterButton
+                                columnName="Platform"
+                                options={getUniqueOptionsForColumn('sequencing_platform')}
+                                selectedOptions={selectedSampleTypes}
+                                onSelectionChange={(selectedOptions) =>
+                                    handleSelectionChange('sequencing_platform', selectedOptions)
+                                }
+                            />
+                        </div>
+                        {sortColumns.find((column) => column.column === 'sequencing_platform') && (
+                            <Icon
+                                name={
+                                    sortColumns.find((column) => column.column === 'sequencing_platform')
+                                        ?.direction === 'ascending'
+                                        ? 'caret up'
+                                        : 'caret down'
+                                }
+                                className="sort-icon"
+                            />
+                        )}
+                        <div className="header-text">Platform</div>
+                    </Table.HeaderCell>
+                    <Table.HeaderCell
+                        className="header-cell"
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('sequencing_technology', event.shiftKey)
+                        }
+                    >
+                        <div className="filter-button">
+                            <FilterButton
+                                columnName="Technology"
+                                options={getUniqueOptionsForColumn('sequencing_technology')}
+                                selectedOptions={selectedSampleTypes}
+                                onSelectionChange={(selectedOptions) =>
+                                    handleSelectionChange('sequencing_technology', selectedOptions)
+                                }
+                            />
+                        </div>
+                        {sortColumns.find((column) => column.column === 'sequencing_technology') && (
+                            <Icon
+                                name={
+                                    sortColumns.find((column) => column.column === 'sequencing_technology')
+                                        ?.direction === 'ascending'
+                                        ? 'caret up'
+                                        : 'caret down'
+                                }
+                                className="sort-icon"
+                            />
+                        )}
+                        <div className="header-text">Technology</div>
                     </Table.HeaderCell>
                     <Table.HeaderCell
                         className="header-cell"
@@ -527,47 +630,51 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                         <div className="header-text">Sample Ext. ID(s)</div>
                     </Table.HeaderCell>
                     <Table.HeaderCell
-                        className="header-cell"
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('completed_cram', event.shiftKey)
-                        }
-                        // On mouse over, reveal the column name and expand column width to show the full name
-                        onMouseEnter={(event: React.MouseEvent<HTMLElement>) => 
-                            event.currentTarget.style.width = '200px' 
-                        }
-                        // On mouse leave, hide the column name and shrink column width
-                        onMouseLeave={(event: React.MouseEvent<HTMLElement>) => 
-                            event.currentTarget.style.width = '50px'
-                        }
+                      className="header-cell collapsible-header"
+                      onClick={(event: React.MouseEvent<HTMLElement>) =>
+                        handleSort('completed_cram', event.shiftKey)
+                      }
+                      onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
+                        event.currentTarget.classList.add('expanded');
+                      }}
+                      onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
+                        event.currentTarget.classList.remove('expanded');
+                      }}
                     >
-                        <div className="filter-button">
-                            <FilterButton
-                                columnName="Completed CRAM"
-                                options={getUniqueOptionsForColumn('completed_cram')}
-                                selectedOptions={selectedCompletedCram}
-                                onSelectionChange={(selectedOptions) =>
-                                    handleSelectionChange('completed_cram', selectedOptions)
-                                }
-                            />
-                        </div>
-                        {sortColumns.find((column) => column.column === 'completed_cram') && (
-                            <Icon
-                                name={
-                                    sortColumns.find((column) => column.column === 'completed_cram')
-                                        ?.direction === 'ascending'
-                                        ? 'caret up'
-                                        : 'caret down'
-                                }
-                                className="sort-icon"
-                            />
-                        )}
-                        <div className="header-text">CRAM</div>
+                      <div className="filter-button">
+                        <FilterButton
+                          columnName="Completed CRAM"
+                          options={getUniqueOptionsForColumn('completed_cram')}
+                          selectedOptions={selectedCompletedCram}
+                          onSelectionChange={(selectedOptions) =>
+                            handleSelectionChange('completed_cram', selectedOptions)
+                          }
+                        />
+                      </div>
+                      {sortColumns.find((column) => column.column === 'completed_cram') && (
+                        <Icon
+                          name={
+                            sortColumns.find((column) => column.column === 'completed_cram')
+                              ?.direction === 'ascending'
+                              ? 'caret up'
+                              : 'caret down'
+                          }
+                          className="sort-icon"
+                        />
+                      )}
+                      <div className="header-text">CRAM</div>
                     </Table.HeaderCell>
                     <Table.HeaderCell
-                        className="header-cell"
+                        className="header-cell collapsible-header"
                         onClick={(event: React.MouseEvent<HTMLElement>) =>
                             handleSort('in_latest_annotate_dataset', event.shiftKey)
                         }
+                        onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
+                            event.currentTarget.classList.add('expanded');
+                          }}
+                          onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
+                            event.currentTarget.classList.remove('expanded');
+                          }}
                     >
                         <div className="filter-button">
                             <FilterButton
@@ -599,10 +706,16 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                         <div className="header-text">Joint Callset</div>
                     </Table.HeaderCell>
                     <Table.HeaderCell
-                        className="header-cell"
+                        className="header-cell collapsible-header"
                         onClick={(event: React.MouseEvent<HTMLElement>) =>
                             handleSort('in_latest_snv_es_index', event.shiftKey)
                         }
+                        onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
+                            event.currentTarget.classList.add('expanded');
+                          }}
+                          onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
+                            event.currentTarget.classList.remove('expanded');
+                          }}
                     >
                         <div className="filter-button">
                             <FilterButton
@@ -631,10 +744,16 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                         <div className="header-text">SNV ES-Index</div>
                     </Table.HeaderCell>
                     <Table.HeaderCell
-                        className="header-cell"
+                        className="header-cell collapsible-header"
                         onClick={(event: React.MouseEvent<HTMLElement>) =>
                             handleSort('in_latest_sv_es_index', event.shiftKey)
                         }
+                        onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
+                            event.currentTarget.classList.add('expanded');
+                          }}
+                          onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
+                            event.currentTarget.classList.remove('expanded');
+                          }}
                     >
                         <div className="filter-button">
                             <FilterButton
@@ -662,7 +781,13 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                         )}
                         <div className="header-text">SV ES-Index</div>
                     </Table.HeaderCell>
-                    <Table.HeaderCell className="header-cell">
+                    <Table.HeaderCell className="header-cell collapsible-header"
+                    onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
+                        event.currentTarget.classList.add('expanded');
+                      }}
+                      onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
+                        event.currentTarget.classList.remove('expanded');
+                      }}>
                         <div className="filter-button">
                             <FilterButton
                                 columnName="STRipy Report"
@@ -675,7 +800,13 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                         </div>
                         <div className="header-text">STRipy Report</div>
                     </Table.HeaderCell>
-                    <Table.HeaderCell className="header-cell">
+                    <Table.HeaderCell className="header-cell collapsible-header"
+                    onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
+                        event.currentTarget.classList.add('expanded');
+                      }}
+                      onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
+                        event.currentTarget.classList.remove('expanded');
+                      }}>
                         <div className="filter-button">
                             <FilterButton
                                 columnName="Mito Report"
@@ -692,10 +823,11 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
             </Table.Header>
             <Table.Body>
                 {sortedData.map((details) => (
-                    <DetailsTableRow key={`${details.sequencing_group_id}`} details={details} />
+                    <DetailsTableRow data-row key={`${details.sequencing_group_id}`} details={details} />
                 ))}
             </Table.Body>
         </Table>
+        </div>
     )
 }
 

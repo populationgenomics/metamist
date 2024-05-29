@@ -18,8 +18,8 @@ import ProjectSummaryView from './pages/project/ProjectSummary'
 import ProjectsAdmin from './pages/admin/ProjectsAdmin'
 import ErrorBoundary from './shared/utilities/errorBoundary'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
-import InsightsSummary from './pages/projectInsights/InsightsSummary'
-import InsightsDetails from './pages/projectInsights/InsightsDetails'
+import Summary from './pages/projectInsights/Summary'
+import Details from './pages/projectInsights/Details'
 
 const Routes: React.FunctionComponent = () => (
     <Switch>
@@ -120,7 +120,7 @@ const Routes: React.FunctionComponent = () => (
             path="projectInsights/summary"
             element={
                 <ErrorBoundary>
-                    <InsightsSummary />
+                    <Summary />
                 </ErrorBoundary>
             }
         />
@@ -129,7 +129,7 @@ const Routes: React.FunctionComponent = () => (
             path="projectInsights/details"
             element={
                 <ErrorBoundary>
-                    <InsightsDetails />
+                    <Details />
                 </ErrorBoundary>
             }
         />

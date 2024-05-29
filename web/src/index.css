@@ -371,6 +371,37 @@ html[data-theme='dark-mode'] .ui.table {
     z-index: 1;
 }
 
+
+.ui.table .header-cell.collapsible-header {
+    white-space: nowrap;
+    overflow: clip;
+    text-overflow: ellipsis;
+  }
+  
+  .ui.table .header-cell.collapsible-header.expanded {
+    width: 100px !important;
+  }
+  .ui.table .header-cell.collapsible-header:not(.expanded) {
+    width: 50px !important;
+  }
+
+  .ui.table .header-cell.collapsible-header:not(.expanded) .header-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+  
+  .ui.table .header-cell.collapsible-header.expanded .header-text {
+    visibility: visible;
+  }
+
+  /* .ui.table .header-cell.collapsible-header .header-text {
+    display: inline-block;
+    vertical-align: middle;
+  } */
+  
+
 .ui.table .category-cell {
     text-align: center;
     vertical-align: middle;

@@ -1,15 +1,16 @@
-// InsightsDetails.tsx
+// Details.tsx
 import React, { useState, useEffect } from 'react'
 import { ProjectInsightsDetails, ProjectApi, ProjectInsightsApi, EnumsApi } from '../../sm-api'
 import ProjectAndSeqTypeSelector from './ProjectAndSeqTypeSelector'
-import InsightsDetailsTable from './InsightsDetailsTable'
+import DetailsTable from './DetailsTable'
 
 interface SelectedProject {
     id: number
     name: string
 }
 
-const InsightsDetails: React.FC = () => {
+
+const Details: React.FC = () => {
     // Get the list of  projects from the project API
     const [allData, setAllData] = useState<ProjectInsightsDetails[]>([])
     const [projectNames, setProjectNames] = React.useState<string[]>([])
@@ -19,6 +20,8 @@ const InsightsDetails: React.FC = () => {
     const [seqTypes, setSeqTypes] = React.useState<string[]>([])
     const [selectedSeqTypes, setSelectedSeqTypes] = React.useState<string[]>([])
     // All the filters users can apply to the data
+    const [selectedSeqPlatforms, setSelectedSeqPlatforms] = React.useState<string[]>([])
+    const [selectedSeqTechnologies, setSelectedSeqTechnologies] = React.useState<string[]>([])
     const [selectedSampleTypes, setSelectedSampleTypes] = React.useState<string[]>([])
     const [selectedFamilyIds, setSelectedFamilyIds] = React.useState<string[]>([])
     const [selectedFamilyExtIds, setSelectedFamilyExtIds] = React.useState<string[]>([])
@@ -46,7 +49,7 @@ const InsightsDetails: React.FC = () => {
                 setProjectNames(projects.map((project) => project.name))
                 setProjectIds(projects.map((project) => project.id))
 
-                // Call getProjectsInsightsDetails with the project IDs and sequencing types
+                // Call getProjectsDetails with the project IDs and sequencing types
                 return new ProjectInsightsApi().getProjectInsightsDetails({
                     project_ids: projects.map((project) => project.id),
                     sequencing_types: sequencingTypes,
@@ -103,6 +106,10 @@ const InsightsDetails: React.FC = () => {
         (item) =>
             selectedProjects.some((p) => p.name === item.dataset) &&
             selectedSeqTypes.includes(item.sequencing_type) &&
+            (selectedSeqPlatforms.length === 0 ||
+                selectedSeqPlatforms.includes(item.sequencing_platform)) &&
+            (selectedSeqTechnologies.length === 0 ||
+                selectedSeqTechnologies.includes(item.sequencing_technology)) &&
             (selectedSampleTypes.length === 0 || selectedSampleTypes.includes(item.sample_type)) &&
             (selectedFamilyIds.length === 0 ||
                 selectedFamilyIds.includes(item.family_id?.toString() || '')) &&
@@ -143,6 +150,12 @@ const InsightsDetails: React.FC = () => {
         switch (columnName) {
             case 'sample_type':
                 setSelectedSampleTypes(selectedOptions)
+                break
+            case 'sequencing_platform':
+                setSelectedSeqPlatforms(selectedOptions)
+                break
+            case 'sequencing_technology':
+                setSelectedSeqTechnologies(selectedOptions)
                 break
             case 'family_id':
                 setSelectedFamilyIds(selectedOptions)
@@ -201,11 +214,13 @@ const InsightsDetails: React.FC = () => {
                 onProjectChange={handleProjectChange}
                 onSeqTypeChange={handleSeqTypeChange}
             />
-            <InsightsDetailsTable
+            <DetailsTable
                 allData={allData}
                 filteredData={filteredData}
                 selectedProjects={selectedProjects}
                 selectedSeqTypes={selectedSeqTypes}
+                selectedSeqPlatforms={selectedSeqPlatforms}
+                selectedSeqTechnologies={selectedSeqTechnologies}
                 selectedSampleTypes={selectedSampleTypes}
                 selectedFamilyIds={selectedFamilyIds}
                 selectedFamilyExtIds={selectedFamilyExtIds}
@@ -221,9 +236,9 @@ const InsightsDetails: React.FC = () => {
                 selectedStripy={selectedStripy}
                 selectedMito={selectedMito}
                 handleSelectionChange={handleSelectionChange}
-            ></InsightsDetailsTable>
+            ></DetailsTable>
         </div>
     )
 }
 
-export default InsightsDetails
+export default Details

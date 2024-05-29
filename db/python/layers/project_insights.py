@@ -203,9 +203,9 @@ GROUP BY
     async def _crams_by_project_id_and_seq_fields(
         self, project_ids: list[ProjectId], sequencing_types: list[str], 
     ) -> defaultdict[tuple[ProjectId, str], list[int]]:
-       
+       # Select distinct because there can be multiple completed CRAM analyses for a single sequencing group
         _query = """
-SELECT DISTINCT  --Select distinct because there can be multiple completed CRAM analyses for a single sequencing group
+SELECT DISTINCT
     a.project,
     sg.type as sequencing_type,
     sg.technology as sequencing_technology,
@@ -426,7 +426,7 @@ WHERE
         _query = """
 SELECT
     analysis_id,
-    JSON_ARRYAGG(sequencing_group_id) as sequencing_group_ids
+    GROUP_CONCAT(sequencing_group_id) as sequencing_group_ids
 FROM
     analysis_sequencing_group
 WHERE
@@ -441,7 +441,7 @@ GROUP BY
             },
         )
         # Return a dictionary with the analysis ids as keys and their sequencing group ids as values
-        sequencing_groups_by_analysis_id = {[row['analysis_id']] : row['sequencing_group_ids'] for row in _query_results}
+        sequencing_groups_by_analysis_id = {row['analysis_id'] : [int(sgid) for sgid in row['sequencing_group_ids'].split(',')] for row in _query_results}
         return sequencing_groups_by_analysis_id
 
     async def get_analysis_sequencing_groups(self, all_group_analysis_rows: list[dict]):
@@ -591,7 +591,7 @@ GROUP BY
 
         return response
 
-    async def get_projects_insights_details(
+    async def get_project_insights_details(
         self, project_ids: list[ProjectId], sequencing_types: list[str]
     ):
         """Combines the results of the queries above into a response"""
@@ -650,19 +650,20 @@ GROUP BY
                 AnalysisInternal(
                     id=latest_annotate_dataset.get('id'),
                     type='CUSTOM',
-                    status='COMPLETED',
-                    meta=latest_annotate_dataset.get('output'),
+                    status='completed',
+                    output=latest_annotate_dataset.get('output'),
+                    meta=latest_annotate_dataset.get('meta', {}),
                     timestamp_completed=latest_annotate_dataset.get('timestamp_completed'),
-                    sequencing_group_ids=analysis_sequencing_groups[latest_annotate_dataset.get('id')],
+                    sequencing_group_ids=analysis_sequencing_groups.get(latest_annotate_dataset.get('id'), []),
                 )
             
                 latest_annotate_dataset_id = latest_annotate_dataset.get('id')
                 latest_snv_es_index_id = latest_snv_es_index.get('id')
                 latest_sv_es_index_id = latest_sv_es_index.get('id')
                 
-                sequencing_groups_in_latest_annotate_dataset = analysis_sequencing_groups.get(latest_annotate_dataset_id)
-                sequencing_groups_in_latest_snv_es_index = analysis_sequencing_groups.get(latest_snv_es_index_id)
-                sequencing_groups_in_latest_sv_es_index = analysis_sequencing_groups.get(latest_sv_es_index_id)
+                sequencing_groups_in_latest_annotate_dataset = analysis_sequencing_groups.get(latest_annotate_dataset.get('id'), [])
+                sequencing_groups_in_latest_snv_es_index = analysis_sequencing_groups.get(latest_annotate_dataset.get('id'), [])
+                sequencing_groups_in_latest_sv_es_index = analysis_sequencing_groups.get(latest_annotate_dataset.get('id'), [])
             
             else:
                 # If the sequencing platform or technology is not illumina or short-read, set the latest analysis ids to None
@@ -674,6 +675,8 @@ GROUP BY
                 sequencing_groups_in_latest_sv_es_index = []
             
             for family_row in family_rows:
+                if not family_row:
+                    continue
                 sequencing_group_id = family_row['sequencing_group_id']
                 report_links = self.get_sg_web_report_links(sequencing_group_web_reports, project, sequencing_type, sequencing_group_id)
                 response.append(

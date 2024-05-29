@@ -1,11 +1,11 @@
-// InsightsSummaryTable.tsx
+// projectInsights/SummaryTable.tsx
 import React, { useState } from 'react'
 import { ProjectInsightsSummary } from '../../sm-api'
 import { Table } from 'semantic-ui-react'
 import Tooltip, { TooltipProps } from '@mui/material/Tooltip'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
 
-interface InsightsSummaryTableProps {
+interface SummaryTableProps {
     filteredData: ProjectInsightsSummary[]
 }
 
@@ -32,7 +32,7 @@ const getRowClassName = (sequencingType: string) => {
     }
 }
 
-const InsightsSummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summary }) => {
+const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summary }) => {
     const theme = React.useContext(ThemeContext)
     const isDarkMode = theme.theme === 'dark-mode'
     const percentageAligned =
@@ -154,7 +154,7 @@ const InsightsSummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = (
     )
 }
 
-const InsightsSummaryTable: React.FC<InsightsSummaryTableProps> = ({ filteredData }) => {
+const SummaryTable: React.FC<SummaryTableProps> = ({ filteredData }) => {
     const [sortColumn, setSortColumn] = useState<keyof ProjectInsightsSummary | null>(null)
     const [sortDirection, setSortDirection] = useState<'ascending' | 'descending'>('ascending')
     const handleSort = (column: keyof ProjectInsightsSummary) => {
@@ -300,7 +300,7 @@ const InsightsSummaryTable: React.FC<InsightsSummaryTableProps> = ({ filteredDat
             </Table.Header>
             <Table.Body>
                 {sortedData.map((summary) => (
-                    <InsightsSummaryTableRow
+                    <SummaryTableRow
                         key={`${summary.dataset}-${summary.sequencing_type}`}
                         summary={summary}
                     />
@@ -471,4 +471,4 @@ const InsightsSummaryTable: React.FC<InsightsSummaryTableProps> = ({ filteredDat
     )
 }
 
-export default InsightsSummaryTable
+export default SummaryTable

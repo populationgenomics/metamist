@@ -1,15 +1,15 @@
-// InsightsSummary.tsx
+// projectInsights/Summary.tsx
 import React, { useState, useEffect } from 'react'
 import { ProjectInsightsSummary, ProjectApi, ProjectInsightsApi, EnumsApi } from '../../sm-api'
 import ProjectAndSeqTypeSelector from './ProjectAndSeqTypeSelector'
-import SummaryTable from './InsightsSummaryTable'
+import SummaryTable from './SummaryTable'
 
 interface SelectedProject {
     id: number
     name: string
 }
 
-const InsightsSummary: React.FC = () => {
+const Summary: React.FC = () => {
     // Get the list of projects from the project API
     const [allData, setAllData] = useState<ProjectInsightsSummary[]>([])
     const [projectNames, setProjectNames] = React.useState<string[]>([])
@@ -110,4 +110,4 @@ const InsightsSummary: React.FC = () => {
     )
 }
 
-export default InsightsSummary
+export default Summary
