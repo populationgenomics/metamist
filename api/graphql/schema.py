@@ -362,11 +362,13 @@ class GraphQLProject:
         active: GraphQLFilter[bool] | None = None,
         meta: GraphQLMetaFilter | None = None,
         timestamp_completed: GraphQLFilter[datetime.datetime] | None = None,
+        ids: GraphQLFilter[int] | None = None,
     ) -> list['GraphQLAnalysis']:
         connection = info.context['connection']
         connection.project = root.id
         internal_analysis = await AnalysisLayer(connection).query(
             AnalysisFilter(
+                id=ids.to_internal_filter() if ids else None,
                 type=type.to_internal_filter() if type else None,
                 status=(
                     status.to_internal_filter()
