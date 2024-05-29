@@ -390,7 +390,7 @@ class GraphQLProject:
         self,
         info: Info,
         root: 'Project',
-        id: GraphQLFilter[int] | None = None,
+        id: GraphQLFilter[str] | None = None,
         name: GraphQLFilter[str] | None = None,
         author: GraphQLFilter[str] | None = None,
         template_id: GraphQLFilter[str] | None = None,
