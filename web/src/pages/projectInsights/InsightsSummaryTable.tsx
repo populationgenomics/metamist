@@ -1,12 +1,12 @@
-// StatsTable.tsx
+// InsightsSummaryTable.tsx
 import React, { useState } from 'react'
-import { SeqrProjectsSummary } from '../../sm-api'
+import { ProjectInsightsSummary } from '../../sm-api'
 import { Table } from 'semantic-ui-react'
 import Tooltip, { TooltipProps } from '@mui/material/Tooltip'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
 
-interface StatsTableProps {
-    filteredData: SeqrProjectsSummary[]
+interface InsightsSummaryTableProps {
+    filteredData: ProjectInsightsSummary[]
 }
 
 function getPercentageColor(percentage: number, isDarkMode: boolean) {
@@ -32,38 +32,38 @@ const getRowClassName = (sequencingType: string) => {
     }
 }
 
-const StatsTableRow: React.FC<{ stats: SeqrProjectsSummary }> = ({ stats }) => {
+const InsightsSummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summary }) => {
     const theme = React.useContext(ThemeContext)
     const isDarkMode = theme.theme === 'dark-mode'
     const percentageAligned =
-        stats.total_sequencing_groups > 0
-            ? (stats.total_crams / stats.total_sequencing_groups) * 100
+        summary.total_sequencing_groups > 0
+            ? (summary.total_crams / summary.total_sequencing_groups) * 100
             : 0
 
     const percentageInJointCall =
-        stats.latest_annotate_dataset?.sg_count ?? 0 > 0
-            ? ((stats.latest_annotate_dataset?.sg_count ?? 0) / stats.total_sequencing_groups) * 100
+        summary.latest_annotate_dataset?.sg_count ?? 0 > 0
+            ? ((summary.latest_annotate_dataset?.sg_count ?? 0) / summary.total_sequencing_groups) * 100
             : 0
     const percentageInSnvIndex =
-        stats.latest_snv_es_index?.sg_count ?? 0 > 0
-            ? ((stats.latest_snv_es_index?.sg_count ?? 0) / stats.total_sequencing_groups) * 100
+        summary.latest_snv_es_index?.sg_count ?? 0 > 0
+            ? ((summary.latest_snv_es_index?.sg_count ?? 0) / summary.total_sequencing_groups) * 100
             : 0
     const percentageInSvIndex =
-        stats.latest_sv_es_index?.sg_count ?? 0 > 0
-            ? ((stats.latest_sv_es_index?.sg_count ?? 0) / stats.total_sequencing_groups) * 100
+        summary.latest_sv_es_index?.sg_count ?? 0 > 0
+            ? ((summary.latest_sv_es_index?.sg_count ?? 0) / summary.total_sequencing_groups) * 100
             : 0
 
-    const rowClassName = getRowClassName(stats.sequencing_type)
+    const rowClassName = getRowClassName(summary.sequencing_type)
 
     return (
-        <Table.Row key={`${stats.project}-${stats.sequencing_type}`} className={rowClassName}>
-            <Table.Cell className="dataset-cell">{stats.dataset}</Table.Cell>
-            <Table.Cell className="table-cell">{stats.sequencing_type}</Table.Cell>
-            <Table.Cell className="table-cell">{stats.total_families}</Table.Cell>
-            <Table.Cell className="table-cell">{stats.total_participants}</Table.Cell>
-            <Table.Cell className="table-cell">{stats.total_samples}</Table.Cell>
-            <Table.Cell className="table-cell">{stats.total_sequencing_groups}</Table.Cell>
-            <Table.Cell className="table-cell">{stats.total_crams}</Table.Cell>
+        <Table.Row key={`${summary.project}-${summary.sequencing_type}`} className={rowClassName}>
+            <Table.Cell className="dataset-cell">{summary.dataset}</Table.Cell>
+            <Table.Cell className="table-cell">{summary.sequencing_type}</Table.Cell>
+            <Table.Cell className="table-cell">{summary.total_families}</Table.Cell>
+            <Table.Cell className="table-cell">{summary.total_participants}</Table.Cell>
+            <Table.Cell className="table-cell">{summary.total_samples}</Table.Cell>
+            <Table.Cell className="table-cell">{summary.total_sequencing_groups}</Table.Cell>
+            <Table.Cell className="table-cell">{summary.total_crams}</Table.Cell>
             <Table.Cell
                 className="table-cell"
                 style={{
@@ -75,7 +75,7 @@ const StatsTableRow: React.FC<{ stats: SeqrProjectsSummary }> = ({ stats }) => {
                     <HtmlTooltip
                         title={
                             <p>
-                                {stats.total_crams} / {stats.total_sequencing_groups} Total
+                                {summary.total_crams} / {summary.total_sequencing_groups} Total
                                 Sequencing Groups with a Completed CRAM Analysis
                             </p>
                         }
@@ -95,10 +95,10 @@ const StatsTableRow: React.FC<{ stats: SeqrProjectsSummary }> = ({ stats }) => {
                     <HtmlTooltip
                         title={
                             <p>
-                                {stats.latest_annotate_dataset?.sg_count} /{' '}
-                                {stats.total_sequencing_groups} Total Sequencing Groups in the
-                                latest {stats.sequencing_type} AnnotateDataset analysis Analysis ID:{' '}
-                                {stats.latest_annotate_dataset?.id}
+                                {summary.latest_annotate_dataset?.sg_count} /{' '}
+                                {summary.total_sequencing_groups} Total Sequencing Groups in the
+                                latest {summary.sequencing_type} AnnotateDataset analysis Analysis ID:{' '}
+                                {summary.latest_annotate_dataset?.id}
                             </p>
                         }
                     >
@@ -117,10 +117,10 @@ const StatsTableRow: React.FC<{ stats: SeqrProjectsSummary }> = ({ stats }) => {
                     <HtmlTooltip
                         title={
                             <p>
-                                {stats.latest_snv_es_index?.sg_count} /{' '}
-                                {stats.total_sequencing_groups} Total Sequencing Groups in the
-                                latest {stats.sequencing_type} SNV Elasticsearch Index Analysis ID:{' '}
-                                {stats.latest_snv_es_index?.id}
+                                {summary.latest_snv_es_index?.sg_count} /{' '}
+                                {summary.total_sequencing_groups} Total Sequencing Groups in the
+                                latest {summary.sequencing_type} SNV Elasticsearch Index Analysis ID:{' '}
+                                {summary.latest_snv_es_index?.id}
                             </p>
                         }
                     >
@@ -139,10 +139,10 @@ const StatsTableRow: React.FC<{ stats: SeqrProjectsSummary }> = ({ stats }) => {
                     <HtmlTooltip
                         title={
                             <p>
-                                {stats.latest_sv_es_index?.sg_count} /{' '}
-                                {stats.total_sequencing_groups} Total Sequencing Groups in the
-                                latest {stats.sequencing_type} SV Elasticsearch Index Analysis ID:{' '}
-                                {stats.latest_sv_es_index?.id}
+                                {summary.latest_sv_es_index?.sg_count} /{' '}
+                                {summary.total_sequencing_groups} Total Sequencing Groups in the
+                                latest {summary.sequencing_type} SV Elasticsearch Index Analysis ID:{' '}
+                                {summary.latest_sv_es_index?.id}
                             </p>
                         }
                     >
@@ -154,10 +154,10 @@ const StatsTableRow: React.FC<{ stats: SeqrProjectsSummary }> = ({ stats }) => {
     )
 }
 
-const StatsTable: React.FC<StatsTableProps> = ({ filteredData }) => {
-    const [sortColumn, setSortColumn] = useState<keyof SeqrProjectsSummary | null>(null)
+const InsightsSummaryTable: React.FC<InsightsSummaryTableProps> = ({ filteredData }) => {
+    const [sortColumn, setSortColumn] = useState<keyof ProjectInsightsSummary | null>(null)
     const [sortDirection, setSortDirection] = useState<'ascending' | 'descending'>('ascending')
-    const handleSort = (column: keyof SeqrProjectsSummary) => {
+    const handleSort = (column: keyof ProjectInsightsSummary) => {
         if (sortColumn === column) {
             setSortDirection(sortDirection === 'ascending' ? 'descending' : 'ascending')
         } else {
@@ -299,10 +299,10 @@ const StatsTable: React.FC<StatsTableProps> = ({ filteredData }) => {
                 </Table.Row>
             </Table.Header>
             <Table.Body>
-                {sortedData.map((stats) => (
-                    <StatsTableRow
-                        key={`${stats.dataset}-${stats.sequencing_type}`}
-                        stats={stats}
+                {sortedData.map((summary) => (
+                    <InsightsSummaryTableRow
+                        key={`${summary.dataset}-${summary.sequencing_type}`}
+                        summary={summary}
                     />
                 ))}
             </Table.Body>
@@ -366,7 +366,7 @@ const StatsTable: React.FC<StatsTableProps> = ({ filteredData }) => {
                                     <p>
                                         {filteredData.reduce(
                                             (acc, curr) =>
-                                                acc + curr.latest_annotate_dataset?.sg_count,
+                                                acc + (curr.latest_annotate_dataset?.sg_count ?? 0),
                                             0
                                         )}{' '}
                                         /{' '}
@@ -383,7 +383,7 @@ const StatsTable: React.FC<StatsTableProps> = ({ filteredData }) => {
                                     {(
                                         filteredData.reduce(
                                             (acc, curr) =>
-                                                acc + curr.latest_annotate_dataset?.sg_count,
+                                                acc + (curr.latest_annotate_dataset?.sg_count ?? 0),
                                             0
                                         ) /
                                             filteredData.reduce(
@@ -402,7 +402,7 @@ const StatsTable: React.FC<StatsTableProps> = ({ filteredData }) => {
                                 title={
                                     <p>
                                         {filteredData.reduce(
-                                            (acc, curr) => acc + curr.latest_snv_es_index?.sg_count,
+                                            (acc, curr) => acc + (curr.latest_snv_es_index?.sg_count ?? 0),
                                             0
                                         )}{' '}
                                         /{' '}
@@ -418,7 +418,7 @@ const StatsTable: React.FC<StatsTableProps> = ({ filteredData }) => {
                                 <div>
                                     {(
                                         filteredData.reduce(
-                                            (acc, curr) => acc + curr.latest_snv_es_index?.sg_count,
+                                            (acc, curr) => acc + (curr.latest_snv_es_index?.sg_count ?? 0),
                                             0
                                         ) /
                                             filteredData.reduce(
@@ -437,7 +437,7 @@ const StatsTable: React.FC<StatsTableProps> = ({ filteredData }) => {
                                 title={
                                     <p>
                                         {filteredData.reduce(
-                                            (acc, curr) => acc + curr.latest_sv_es_index?.sg_count,
+                                            (acc, curr) => acc + (curr.latest_sv_es_index?.sg_count ?? 0),
                                             0
                                         )}{' '}
                                         /{' '}
@@ -452,7 +452,7 @@ const StatsTable: React.FC<StatsTableProps> = ({ filteredData }) => {
                                 <div>
                                     {(
                                         filteredData.reduce(
-                                            (acc, curr) => acc + curr.latest_sv_es_index?.sg_count,
+                                            (acc, curr) => acc + (curr.latest_sv_es_index?.sg_count ?? 0),
                                             0
                                         ) /
                                             filteredData.reduce(
@@ -471,4 +471,4 @@ const StatsTable: React.FC<StatsTableProps> = ({ filteredData }) => {
     )
 }
 
-export default StatsTable
+export default InsightsSummaryTable

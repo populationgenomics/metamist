@@ -15,50 +15,57 @@ from db.python.tables.project import ProjectPermissionsTable
 from models.models import (
     AnalysisInternal,
     AnalysisStats,
-    SeqrProjectsSummaryDetailsInternal,
-    SeqrProjectsSummaryStatsInternal,
+    ProjectInsightsDetailsInternal,
+    ProjectInsightsSummaryInternal,
 )
 from models.models.project import ProjectId
 
 
-class SeqrProjectsStatsLayer(BaseLayer):
-    """Seqr Projects Stats layer - business logic for the seqr projects stats dashboards"""
+class ProjectInsightsLayer(BaseLayer):
+    """Project Insights layer - business logic for the project insights dashboards"""
 
-    async def get_seqr_projects_stats_summary(
+    async def get_project_insights_summary(
         self,
         project_ids: list[ProjectId],
         sequencing_types: list[str],
-    ) -> list[SeqrProjectsSummaryStatsInternal]:
+    ) -> list[ProjectInsightsSummaryInternal]:
         """
         Get summary and analysis stats for a list of projects
         """
-        spsdb = SeqrProjectsSummaryStatsDb(self.connection)
-        return await spsdb.get_seqr_projects_stats_summary(
+        spsdb = ProjectInsightsSummaryDb(self.connection)
+        return await spsdb.get_project_insights_summary(
             project_ids=project_ids, sequencing_types=sequencing_types
         )
 
-    async def get_seqr_projects_stats_details(
+    async def get_project_insights_details(
         self,
         project_ids: list[ProjectId],
         sequencing_types: list[str],
-    ) -> list[SeqrProjectsSummaryDetailsInternal]:
+    ) -> list[ProjectInsightsDetailsInternal]:
         """
-        Get details for a list of projects
+        Get extensive sequencing group details for a list of projects
         """
-        spsdb = SeqrProjectsSummaryStatsDb(self.connection)
-        return await spsdb.get_seqr_projects_stats_details(
+        spsdb = ProjectInsightsSummaryDb(self.connection)
+        return await spsdb.get_project_insights_details(
             project_ids=project_ids, sequencing_types=sequencing_types
         )
 
 
-class SeqrProjectsSummaryStatsDb(DbBase):
+class ProjectInsightsSummaryDb(DbBase):
     """
-    Db layer for seqr projects stats summary and details routes
+    Db layer for project insights summary and details routes
 
-    The following queries are used to get the summary and details for the seqr projects stats dashboard
-    For the summary stats, the queries return a dictionary with the project and sequencing fields - type,
-    technology, and platform, as the keys, and the number of families, participants, samples, sequencing 
-    groups, CRAMs, etc. as the values.
+    Used to get the summary and details for the projects stats dashboard
+        - Summary
+            - One row per project, sequencing type, platform, and technology
+            - Total families, participants, samples, sequencing groups, CRAMs, and latest analyses
+        - Details
+            - One row per sequencing group 
+            - Only for sequencing groups that belong to participants with a family record
+            - Gets web report links for each sequencing group
+            - Checks if the sequencing group is in the latest completed analyses 
+                (CRAM, AnnotateDataset, SNV es-index, SV/gCNV es-index)
+            - Get the family, participant, sample, and sequencing group details
     """
     # Summary queries
     async def _total_families_by_project_id_and_seq_fields(
@@ -196,9 +203,9 @@ GROUP BY
     async def _crams_by_project_id_and_seq_fields(
         self, project_ids: list[ProjectId], sequencing_types: list[str], 
     ) -> defaultdict[tuple[ProjectId, str], list[int]]:
-        # Select distinct because there can be multiple completed CRAM analyses for a single sequencing group
+       
         _query = """
-SELECT DISTINCT
+SELECT DISTINCT  --Select distinct because there can be multiple completed CRAM analyses for a single sequencing group
     a.project,
     sg.type as sequencing_type,
     sg.technology as sequencing_technology,
@@ -476,7 +483,7 @@ GROUP BY
         return report_links
 
     # Main functions
-    async def get_seqr_projects_stats_summary(
+    async def get_project_insights_summary(
         self, project_ids: list[ProjectId], sequencing_types: list[str]
     ):
         """Combines the results of the above queries into a response"""
@@ -554,7 +561,7 @@ GROUP BY
                 latest_sv_index_name = None
 
             response.append(
-                SeqrProjectsSummaryStatsInternal(
+                ProjectInsightsSummaryInternal(
                     project=project.id,
                     dataset=project.name,
                     sequencing_type=sequencing_type,
@@ -584,7 +591,7 @@ GROUP BY
 
         return response
 
-    async def get_seqr_projects_stats_details(
+    async def get_projects_insights_details(
         self, project_ids: list[ProjectId], sequencing_types: list[str]
     ):
         """Combines the results of the queries above into a response"""
@@ -670,7 +677,7 @@ GROUP BY
                 sequencing_group_id = family_row['sequencing_group_id']
                 report_links = self.get_sg_web_report_links(sequencing_group_web_reports, project, sequencing_type, sequencing_group_id)
                 response.append(
-                    SeqrProjectsSummaryDetailsInternal(
+                    ProjectInsightsDetailsInternal(
                         project=project.id,
                         dataset=project.name,
                         sequencing_type=sequencing_type,

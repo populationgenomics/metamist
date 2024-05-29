@@ -18,8 +18,8 @@ import ProjectSummaryView from './pages/project/ProjectSummary'
 import ProjectsAdmin from './pages/admin/ProjectsAdmin'
 import ErrorBoundary from './shared/utilities/errorBoundary'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
-import SeqrStats from './pages/seqrStats/SeqrStats'
-import SeqrDeets from './pages/seqrStats/SeqrDeets'
+import InsightsSummary from './pages/projectInsights/InsightsSummary'
+import InsightsDetails from './pages/projectInsights/InsightsDetails'
 
 const Routes: React.FunctionComponent = () => (
     <Switch>
@@ -117,19 +117,19 @@ const Routes: React.FunctionComponent = () => (
         />
 
         <Route
-            path="seqr/stats"
+            path="projectInsights/summary"
             element={
                 <ErrorBoundary>
-                    <SeqrStats />
+                    <InsightsSummary />
                 </ErrorBoundary>
             }
         />
 
         <Route
-            path="seqr/deets"
+            path="projectInsights/details"
             element={
                 <ErrorBoundary>
-                    <SeqrDeets />
+                    <InsightsDetails />
                 </ErrorBoundary>
             }
         />

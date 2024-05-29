@@ -1,18 +1,19 @@
+// InsightsSummary.tsx
 import React, { useState, useEffect } from 'react'
-import { SeqrProjectsSummary, ProjectApi, SeqrProjectsStatsApi, EnumsApi } from '../../sm-api'
+import { ProjectInsightsSummary, ProjectApi, ProjectInsightsApi, EnumsApi } from '../../sm-api'
 import ProjectAndSeqTypeSelector from './ProjectAndSeqTypeSelector'
-import StatsTable from './StatsTable'
+import SummaryTable from './InsightsSummaryTable'
 
 interface SelectedProject {
     id: number
     name: string
 }
 
-const InsightsStats: React.FC = () => {
-    // Get the list of seqr projects from the project API
-    const [allData, setAllData] = useState<SeqrProjectsSummary[]>([])
-    const [seqrProjectNames, setSeqrProjectNames] = React.useState<string[]>([])
-    const [seqrProjectIds, setSeqrProjectIds] = React.useState<number[]>([])
+const InsightsSummary: React.FC = () => {
+    // Get the list of projects from the project API
+    const [allData, setAllData] = useState<ProjectInsightsSummary[]>([])
+    const [projectNames, setProjectNames] = React.useState<string[]>([])
+    const [projectIds, setProjectIds] = React.useState<number[]>([])
     const [selectedProjects, setSelectedProjects] = React.useState<SelectedProject[]>([])
     // New state for sequencing types
     const [seqTypes, setSeqTypes] = React.useState<string[]>([])
@@ -25,17 +26,17 @@ const InsightsStats: React.FC = () => {
                 setSeqTypes(sequencingTypes)
 
                 const projects: { id: number; name: string }[] = projectsResp.data
-                setSeqrProjectNames(projects.map((project) => project.name))
-                setSeqrProjectIds(projects.map((project) => project.id))
+                setProjectNames(projects.map((project) => project.name))
+                setProjectIds(projects.map((project) => project.id))
 
-                // Call getProjectsInsightsStats with the project IDs and sequencing types
-                return new SeqrProjectsStatsApi().getSeqrProjectsStats({
+                // Call getProjectInsightsSummary with the project IDs and sequencing types
+                return new ProjectInsightsApi().getProjectInsightsSummary({
                     project_ids: projects.map((project) => project.id),
                     sequencing_types: sequencingTypes,
                 })
             })
-            .then((statsResp) => {
-                setAllData(statsResp.data)
+            .then((summarysResp) => {
+                setAllData(summarysResp.data)
             })
             .catch((error) => {
                 // Handle any errors that occur during the API calls
@@ -50,9 +51,9 @@ const InsightsStats: React.FC = () => {
             if (isSelected[index]) {
                 // Add the project to the list of selected projects if it is not already there
                 if (!newSelectedProjects.some((p) => p.name === projectName)) {
-                    const projectIndex = seqrProjectNames.indexOf(projectName)
+                    const projectIndex = projectNames.indexOf(projectName)
                     newSelectedProjects.push({
-                        id: seqrProjectIds[projectIndex],
+                        id: projectIds[projectIndex],
                         name: projectName,
                     })
                 }
@@ -94,8 +95,8 @@ const InsightsStats: React.FC = () => {
     return (
         <div>
             <ProjectAndSeqTypeSelector
-                projects={seqrProjectNames.map((name, index) => ({
-                    id: seqrProjectIds[index],
+                projects={projectNames.map((name, index) => ({
+                    id: projectIds[index],
                     name,
                 }))}
                 seqTypes={seqTypes}
@@ -104,9 +105,9 @@ const InsightsStats: React.FC = () => {
                 onProjectChange={handleProjectChange}
                 onSeqTypeChange={handleSeqTypeChange}
             />
-            <StatsTable filteredData={filteredData}> </StatsTable>
+            <SummaryTable filteredData={filteredData}> </SummaryTable>
         </div>
     )
 }
 
-export default InsightsStats
+export default InsightsSummary

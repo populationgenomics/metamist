@@ -54,12 +54,12 @@ from models.models.search import (
     SearchResponseData,
     SequencingGroupSearchResponseData,
 )
-from models.models.seqr_projects_summary import (
+from models.models.project_insights import (
     AnalysisStats,
-    SeqrProjectsSummaryDetails,
-    SeqrProjectsSummaryDetailsInternal,
-    SeqrProjectsSummaryStats,
-    SeqrProjectsSummaryStatsInternal,
+    ProjectInsightsDetails,
+    ProjectInsightsDetailsInternal,
+    ProjectInsightsSummary,
+    ProjectInsightsSummaryInternal,
 )
 from models.models.sequencing_group import (
     NestedSequencingGroup,

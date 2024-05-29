@@ -19,8 +19,8 @@ class AnalysisStats:
 
 
 @dataclass
-class SeqrProjectsSummaryDetailsInternal:
-    """Return class for the seqr projects stats details endpoint"""
+class ProjectInsightsDetailsInternal:
+    """Return class for the seqr projects insights details endpoint"""
 
     project: int
     dataset: str
@@ -43,7 +43,7 @@ class SeqrProjectsSummaryDetailsInternal:
 
     def to_external(self):
         """Convert to transport model"""
-        return SeqrProjectsSummaryDetails(
+        return ProjectInsightsDetails(
             project=self.project,
             dataset=self.dataset,
             sequencing_type=self.sequencing_type,
@@ -65,8 +65,8 @@ class SeqrProjectsSummaryDetailsInternal:
         )
 
 
-class SeqrProjectsSummaryDetails(SMBase):
-    """External return class for the seqr projects stats details endpoint"""
+class ProjectInsightsDetails(SMBase):
+    """External return class for the project insights details endpoint"""
 
     project: int
     dataset: str
@@ -89,8 +89,8 @@ class SeqrProjectsSummaryDetails(SMBase):
 
 
 @dataclass
-class SeqrProjectsSummaryStatsInternal:
-    """Return class for the seqr projects summary endpoint"""
+class ProjectInsightsSummaryInternal:
+    """Return class for the project insights summary endpoint"""
 
     project: int
     dataset: str
@@ -108,7 +108,7 @@ class SeqrProjectsSummaryStatsInternal:
 
     def to_external(self):
         """Convert to transport model"""
-        return SeqrProjectsSummaryStats(
+        return ProjectInsightsSummary(
             project=self.project,
             dataset=self.dataset,
             sequencing_type=self.sequencing_type,
@@ -125,8 +125,8 @@ class SeqrProjectsSummaryStatsInternal:
         )
 
 
-class SeqrProjectsSummaryStats(SMBase):
-    """Return class for the project insights stats endpoint"""
+class ProjectInsightsSummary(SMBase):
+    """Return class for the project insights summary endpoint"""
 
     project: int
     dataset: str
