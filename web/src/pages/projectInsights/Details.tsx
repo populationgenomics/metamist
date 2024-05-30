@@ -9,7 +9,6 @@ interface SelectedProject {
     name: string
 }
 
-
 const Details: React.FC = () => {
     // Get the list of  projects from the project API
     const [allData, setAllData] = useState<ProjectInsightsDetails[]>([])

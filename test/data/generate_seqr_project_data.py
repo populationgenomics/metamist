@@ -215,6 +215,22 @@ def generate_sequencing_type(count_distribution: dict[int, float], sequencing_ty
     return random.choices(sequencing_types, weights=[0.49, 0.49, 0.02], k=k)
 
 
+def generate_seq_platform(sequencing_platforms: list[str], technology: str):
+    """Return a random sequencing platforms, always pacbio for long-reads, biased towards illumina for short-reads"""
+    if technology == 'long-read':
+        return 'pacbio'
+    return random.choices(sequencing_platforms, weights=[0.90, 0.8, 0.02], k=1)[0]
+
+
+def generate_seq_technology(sequencing_technologies: list[str], sequencing_type: str):
+    """Return a random sequencing technology, biased towards illumina for short-reads"""
+    if sequencing_type == 'genome':
+        return random.choices(['short-read', 'long-read'], weights=[0.95, 0.05], k=1)[0]
+    if sequencing_type == 'exome':
+        return 'short-read'
+    return random.choice([t for t in sequencing_technologies if 'rna' in t])
+
+
 def generate_random_number_within_distribution(count_distribution: dict[int, float]):
     """Return a random number within a distribution"""
     return random.choices(
@@ -227,7 +243,7 @@ async def generate_project_pedigree(project: str):
     Generates a pedigree file for a project with random families and participants
     Returns the participant internal - external id map for the project
     """
-    project_pedigree = generate_pedigree_rows(num_families=random.randint(1, 10))
+    project_pedigree = generate_pedigree_rows(num_families=random.randint(1, 100))
     participant_eids = [row.individual_id for row in project_pedigree]
 
     pedfile = tempfile.NamedTemporaryFile(mode='w')
@@ -262,8 +278,17 @@ async def generate_sample_entries(
     """
 
     sample_types = metamist_enums['enum']['sampleType']
-    sequencing_technologies = metamist_enums['enum']['sequencingTechnology']
-    sequencing_platforms = metamist_enums['enum']['sequencingPlatform']
+    sequencing_technologies = [
+        'short-read',
+        'long-read',
+        'bulk-rna-seq',
+        'single-cell-rna-seq'
+    ]
+    sequencing_platforms = [
+        'illumina',
+        'oxford-nanopore',
+        'pacbio'
+    ]
     sequencing_types = ['genome', 'exome', 'transcriptome']
 
     # Arbitrary distribution for number of samples, sequencing groups, assays
@@ -296,8 +321,8 @@ async def generate_sample_entries(
                         'Dept of Seq.',
                     ]
                 )
-                stechnology = random.choice(sequencing_technologies)
-                splatform = random.choice(sequencing_platforms)
+                stechnology = generate_seq_technology(sequencing_technologies, stype)
+                splatform = generate_seq_platform(sequencing_platforms, stechnology)
                 sg = SequencingGroupUpsert(
                     type=stype,
                     technology=stechnology,
@@ -331,7 +356,9 @@ async def generate_cram_analyses(project: str, analyses_to_insert: list[Analysis
     Queries the list of sequencing groups for a project and randomly selects some
     to generate CRAM analysis entries for.
     """
+    logging.getLogger().setLevel(logging.WARN)
     sgid_response = await query_async(QUERY_PROJECT_SGS, {'project': project})
+    logging.getLogger().setLevel(logging.INFO)
     sequencing_groups = list(sgid_response['project']['sequencingGroups'])
 
     # Randomly allocate some of the sequencing groups to be aligned
@@ -517,4 +544,5 @@ if __name__ == '__main__':
         datefmt='%Y-%m-%d %H:%M:%S',
         stream=sys.stderr,
     )
+    logging.getLogger().setLevel(logging.INFO)
     asyncio.new_event_loop().run_until_complete(main())

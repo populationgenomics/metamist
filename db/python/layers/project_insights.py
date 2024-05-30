@@ -57,7 +57,7 @@ class ProjectInsightsSummaryDb(DbBase):
 
     Used to get the summary and details for the projects stats dashboard
         - Summary
-            - One row per project, sequencing type, platform, and technology
+            - One row per project, sequencing type, and technology (platform not needed for now)
             - Total families, participants, samples, sequencing groups, CRAMs, and latest analyses
         - Details
             - One row per sequencing group 
@@ -75,7 +75,6 @@ class ProjectInsightsSummaryDb(DbBase):
 SELECT
     f.project,
     sg.type as sequencing_type,
-    sg.platform as sequencing_platform,
     sg.technology as sequencing_technology,
     COUNT(DISTINCT f.id) as num_families
 FROM
@@ -89,7 +88,6 @@ WHERE
 GROUP BY
     f.project,
     sg.type,
-    sg.platform,
     sg.technology;
         """
 
@@ -100,7 +98,7 @@ GROUP BY
                 'sequencing_types': sequencing_types,
             },
         )
-        total_families_by_project_id_and_seq_fields = { (row['project'], row['sequencing_type'], row['sequencing_platform'], row['sequencing_technology']): row['num_families'] for row in _query_results }
+        total_families_by_project_id_and_seq_fields = { (row['project'], row['sequencing_type'], row['sequencing_technology']): row['num_families'] for row in _query_results }
         return defaultdict(int, total_families_by_project_id_and_seq_fields)
 
     async def _total_participants_by_project_id_and_seq_fields(
@@ -110,7 +108,6 @@ GROUP BY
 SELECT
     p.project,
     sg.type as sequencing_type,
-    sg.platform as sequencing_platform,
     sg.technology as sequencing_technology,
     COUNT(DISTINCT p.id) as num_participants
 FROM
@@ -123,7 +120,6 @@ WHERE
 GROUP BY
     p.project,
     sg.type,
-    sg.platform,
     sg.technology;
         """
         _query_results = await self.connection.fetch_all(
@@ -133,7 +129,7 @@ GROUP BY
                 'sequencing_types': sequencing_types,
             },
         )
-        total_participants_by_project_id_and_seq_fields = { (row['project'], row['sequencing_type'], row['sequencing_platform'], row['sequencing_technology']): row['num_participants'] for row in _query_results}
+        total_participants_by_project_id_and_seq_fields = { (row['project'], row['sequencing_type'], row['sequencing_technology']): row['num_participants'] for row in _query_results}
         return defaultdict(int, total_participants_by_project_id_and_seq_fields)
 
     async def _total_samples_by_project_id_and_seq_fields(
@@ -143,7 +139,6 @@ GROUP BY
 SELECT
     s.project,
     sg.type as sequencing_type,
-    sg.platform as sequencing_platform,
     sg.technology as sequencing_technology,
     COUNT(DISTINCT s.id) as num_samples
 FROM
@@ -155,7 +150,6 @@ WHERE
 GROUP BY
     s.project,
     sg.type,
-    sg.platform,
     sg.technology;
         """
         _query_results = await self.connection.fetch_all(
@@ -165,7 +159,7 @@ GROUP BY
                 'sequencing_types': sequencing_types,
             },
         )
-        total_samples_by_project_id_and_seq_fields = { (row['project'], row['sequencing_type'], row['sequencing_platform'], row['sequencing_technology']): row['num_samples'] for row in _query_results}
+        total_samples_by_project_id_and_seq_fields = { (row['project'], row['sequencing_type'], row['sequencing_technology']): row['num_samples'] for row in _query_results}
         return defaultdict(int, total_samples_by_project_id_and_seq_fields)
 
     async def _total_sequencing_groups_by_project_id_and_seq_fields(
@@ -175,6 +169,7 @@ GROUP BY
 SELECT
     s.project,
     sg.type as sequencing_type,
+    sg.technology as sequencing_technology,
     COUNT(DISTINCT sg.id) as num_sgs
 FROM
     sequencing_group sg
@@ -185,7 +180,6 @@ WHERE
 GROUP BY
     s.project,
     sg.type,
-    sg.platform,
     sg.technology;
         """
         _query_results = (
@@ -197,7 +191,7 @@ GROUP BY
                 },
             )
         )
-        total_sequencing_groups_by_project_id_and_seq_fields = { (row['project'], row['sequencing_type'], row['sequencing_platform'], row['sequencing_technology']): row['num_sgs'] for row in _query_results}
+        total_sequencing_groups_by_project_id_and_seq_fields = { (row['project'], row['sequencing_type'], row['sequencing_technology']): row['num_sgs'] for row in _query_results}
         return defaultdict(int, total_sequencing_groups_by_project_id_and_seq_fields)
 
     async def _crams_by_project_id_and_seq_fields(
@@ -209,7 +203,6 @@ SELECT DISTINCT
     a.project,
     sg.type as sequencing_type,
     sg.technology as sequencing_technology,
-    sg.platform as sequencing_platform,
     asg.sequencing_group_id
 FROM
     analysis a
@@ -231,7 +224,7 @@ WHERE
         # Return a dictionary with the project and sequencing fields as the key and a list of sequencing group ids as the value
         crams_by_project_id_and_seq_fields = defaultdict(list)
         for row in _query_results:
-            crams_by_project_id_and_seq_fields[(row['project'], row['sequencing_type'], row['sequencing_platform'], row['sequencing_technology'])].append(row['sequencing_group_id'])
+            crams_by_project_id_and_seq_fields[(row['project'], row['sequencing_type'], row['sequencing_technology'])].append(row['sequencing_group_id'])
 
         return crams_by_project_id_and_seq_fields
 
@@ -519,22 +512,22 @@ GROUP BY
         # TODO: Add multiQC and other grouped analyses to this
         analysis_sequencing_groups = await self.get_analysis_sequencing_groups([latest_annotate_dataset_by_project_id_and_seq_type, latest_es_indices_by_project_id_and_seq_type_and_stage])
         
-        sequencing_platforms = await SequencingPlatformTable(self._connection).get()
+        # sequencing_platforms = await SequencingPlatformTable(self._connection).get()
         sequencing_technologies = await SequencingTechnologyTable(self._connection).get()
         # sequencing_types = await SequencingTypeTable(self._connection).get()
         
-        # Get all possible permutations of the projects, sequencing types, sequencing platforms, and sequencing technologies
-        permutations = itertools.product(projects, sequencing_types, sequencing_platforms, sequencing_technologies)
+        # Get all possible permutations of the projects, sequencing types, and sequencing technologies
+        permutations = itertools.product(projects, sequencing_types, sequencing_technologies)
 
         response = []
-        for project, sequencing_type, sequencing_platform, sequencing_technology in permutations:
-            total_sequencing_groups=total_sequencing_groups_by_project_id_and_seq_fields[(project.id, sequencing_type, sequencing_platform, sequencing_technology)]
+        for project, sequencing_type, sequencing_technology in permutations:
+            total_sequencing_groups=total_sequencing_groups_by_project_id_and_seq_fields[(project.id, sequencing_type, sequencing_technology)]
             if total_sequencing_groups == 0:
                 continue           
             
-            crams_in_project_with_sequencing_fields = crams_by_project_id_and_seq_fields[(project.id, sequencing_type, sequencing_platform, sequencing_technology)]
+            crams_in_project_with_sequencing_fields = crams_by_project_id_and_seq_fields[(project.id, sequencing_type, sequencing_technology)]
             
-            if sequencing_technology == 'short-read' and sequencing_platform == 'illumina':
+            if sequencing_technology == 'short-read':
                 latest_annotate_dataset_id = latest_annotate_dataset_by_project_id_and_seq_type[(project.id, sequencing_type)].get('id')
                 latest_snv_index_id = latest_es_indices_by_project_id_and_seq_type_and_stage[(project.id, sequencing_type, 'MtToEs')].get('id')
                 latest_snv_index_name = latest_es_indices_by_project_id_and_seq_type_and_stage[(project.id, sequencing_type, 'MtToEs')].get('output')
@@ -553,7 +546,7 @@ GROUP BY
                     latest_sv_index_name = None
 
             else:
-                # If the sequencing platform or technology is not illumina or short-read, set the latest analysis ids to None
+                # If the sequencing technology is not short-read, set the latest analysis ids to None
                 latest_annotate_dataset_id = None
                 latest_snv_index_id = None
                 latest_snv_index_name = None
@@ -565,26 +558,25 @@ GROUP BY
                     project=project.id,
                     dataset=project.name,
                     sequencing_type=sequencing_type,
-                    sequencing_platform=sequencing_platform,
                     sequencing_technology=sequencing_technology,
-                    total_families=total_families_by_project_id_and_seq_fields[(project.id, sequencing_type, sequencing_platform, sequencing_technology)],
-                    total_participants=total_participants_by_project_id_and_seq_fields[(project.id, sequencing_type, sequencing_platform, sequencing_technology)],
-                    total_samples=total_samples_by_project_id_and_seq_fields[(project.id, sequencing_type, sequencing_platform, sequencing_technology)],
+                    total_families=total_families_by_project_id_and_seq_fields[(project.id, sequencing_type, sequencing_technology)],
+                    total_participants=total_participants_by_project_id_and_seq_fields[(project.id, sequencing_type, sequencing_technology)],
+                    total_samples=total_samples_by_project_id_and_seq_fields[(project.id, sequencing_type, sequencing_technology)],
                     total_sequencing_groups=total_sequencing_groups,
                     total_crams=len(set(crams_in_project_with_sequencing_fields)),
                     latest_annotate_dataset=AnalysisStats(
                         id=latest_annotate_dataset_id,
-                        sg_count=len(analysis_sequencing_groups[latest_annotate_dataset_id])
+                        sg_count=len(analysis_sequencing_groups.get(latest_annotate_dataset_id, []))
                     ),
                     latest_snv_es_index=AnalysisStats(
                         id=latest_snv_index_id,
                         name=latest_snv_index_name,
-                        sg_count=len(analysis_sequencing_groups[latest_snv_index_id]),
+                        sg_count=len(analysis_sequencing_groups.get(latest_snv_index_id, [])),
                     ),
                     latest_sv_es_index=AnalysisStats(
                         id=latest_sv_index_id,
                         name=latest_sv_index_name,
-                        sg_count=len(analysis_sequencing_groups[latest_sv_index_id]),
+                        sg_count=len(analysis_sequencing_groups.get(latest_sv_index_id, [])),
                     ),
                 )
             )
@@ -636,9 +628,9 @@ GROUP BY
             if not family_rows:
                 continue
             
-            if sequencing_technology == 'short-read' and sequencing_platform == 'illumina':
+            if sequencing_technology == 'short-read':
                 # The grouped analyses rows are keyed by (project_id, sequencing_type)
-                latest_annotate_dataset = latest_annotate_dataset_by_project_id_and_seq_type[(project.id, sequencing_type, sequencing_platform, sequencing_technology)]
+                latest_annotate_dataset = latest_annotate_dataset_by_project_id_and_seq_type[(project.id, sequencing_type)]
                 latest_snv_es_index = latest_es_indices_by_project_id_and_seq_type_and_stage[(project.id, sequencing_type, 'MtToEs')]
                 if sequencing_type == 'genome':
                     latest_sv_es_index = latest_es_indices_by_project_id_and_seq_type_and_stage[(project.id, sequencing_type, 'MtToEsSv')]
@@ -661,9 +653,9 @@ GROUP BY
                 latest_snv_es_index_id = latest_snv_es_index.get('id')
                 latest_sv_es_index_id = latest_sv_es_index.get('id')
                 
-                sequencing_groups_in_latest_annotate_dataset = analysis_sequencing_groups.get(latest_annotate_dataset.get('id'), [])
-                sequencing_groups_in_latest_snv_es_index = analysis_sequencing_groups.get(latest_annotate_dataset.get('id'), [])
-                sequencing_groups_in_latest_sv_es_index = analysis_sequencing_groups.get(latest_annotate_dataset.get('id'), [])
+                sequencing_groups_in_latest_annotate_dataset = analysis_sequencing_groups.get(latest_annotate_dataset_id, [])
+                sequencing_groups_in_latest_snv_es_index = analysis_sequencing_groups.get(latest_snv_es_index_id, [])
+                sequencing_groups_in_latest_sv_es_index = analysis_sequencing_groups.get(latest_sv_es_index_id, [])
             
             else:
                 # If the sequencing platform or technology is not illumina or short-read, set the latest analysis ids to None

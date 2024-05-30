@@ -95,7 +95,6 @@ class ProjectInsightsSummaryInternal:
     project: int
     dataset: str
     sequencing_type: str
-    sequencing_platform: str
     sequencing_technology: str
     total_families: int = 0
     total_participants: int = 0
@@ -112,7 +111,6 @@ class ProjectInsightsSummaryInternal:
             project=self.project,
             dataset=self.dataset,
             sequencing_type=self.sequencing_type,
-            sequencing_platform=self.sequencing_platform,
             sequencing_technology=self.sequencing_technology,
             total_families=self.total_families,
             total_participants=self.total_participants,
@@ -131,7 +129,6 @@ class ProjectInsightsSummary(SMBase):
     project: int
     dataset: str
     sequencing_type: str
-    sequencing_platform: str
     sequencing_technology: str
     total_families: int
     total_participants: int

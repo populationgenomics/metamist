@@ -1,12 +1,18 @@
 // projectInsights/SummaryTable.tsx
 import React, { useState } from 'react'
 import { ProjectInsightsSummary } from '../../sm-api'
-import { Table } from 'semantic-ui-react'
+import { Icon, Table } from 'semantic-ui-react'
 import Tooltip, { TooltipProps } from '@mui/material/Tooltip'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
+import FilterButton from './FilterButton'
 
 interface SummaryTableProps {
+    allData: ProjectInsightsSummary[]
     filteredData: ProjectInsightsSummary[]
+    selectedProjects: { name: string }[]
+    selectedSeqTypes: string[]
+    selectedSeqTechnologies: string[]
+    handleSelectionChange: (columnName: string, selectedOptions: string[]) => void
 }
 
 function getPercentageColor(percentage: number, isDarkMode: boolean) {
@@ -42,7 +48,8 @@ const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summar
 
     const percentageInJointCall =
         summary.latest_annotate_dataset?.sg_count ?? 0 > 0
-            ? ((summary.latest_annotate_dataset?.sg_count ?? 0) / summary.total_sequencing_groups) * 100
+            ? ((summary.latest_annotate_dataset?.sg_count ?? 0) / summary.total_sequencing_groups) *
+              100
             : 0
     const percentageInSnvIndex =
         summary.latest_snv_es_index?.sg_count ?? 0 > 0
@@ -57,8 +64,9 @@ const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summar
 
     return (
         <Table.Row key={`${summary.project}-${summary.sequencing_type}`} className={rowClassName}>
-            <Table.Cell className="dataset-cell">{summary.dataset}</Table.Cell>
-            <Table.Cell className="table-cell">{summary.sequencing_type}</Table.Cell>
+            <Table.Cell data-cell className="category-cell">{summary.dataset}</Table.Cell>
+            <Table.Cell data-cell className="category-cell">{summary.sequencing_type}</Table.Cell>
+            <Table.Cell className="table-cell">{summary.sequencing_technology}</Table.Cell>
             <Table.Cell className="table-cell">{summary.total_families}</Table.Cell>
             <Table.Cell className="table-cell">{summary.total_participants}</Table.Cell>
             <Table.Cell className="table-cell">{summary.total_samples}</Table.Cell>
@@ -97,8 +105,8 @@ const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summar
                             <p>
                                 {summary.latest_annotate_dataset?.sg_count} /{' '}
                                 {summary.total_sequencing_groups} Total Sequencing Groups in the
-                                latest {summary.sequencing_type} AnnotateDataset analysis Analysis ID:{' '}
-                                {summary.latest_annotate_dataset?.id}
+                                latest {summary.sequencing_type} AnnotateDataset analysis Analysis
+                                ID: {summary.latest_annotate_dataset?.id}
                             </p>
                         }
                     >
@@ -119,8 +127,8 @@ const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summar
                             <p>
                                 {summary.latest_snv_es_index?.sg_count} /{' '}
                                 {summary.total_sequencing_groups} Total Sequencing Groups in the
-                                latest {summary.sequencing_type} SNV Elasticsearch Index Analysis ID:{' '}
-                                {summary.latest_snv_es_index?.id}
+                                latest {summary.sequencing_type} SNV Elasticsearch Index Analysis
+                                ID: {summary.latest_snv_es_index?.id}
                             </p>
                         }
                     >
@@ -154,91 +162,273 @@ const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summar
     )
 }
 
-const SummaryTable: React.FC<SummaryTableProps> = ({ filteredData }) => {
-    const [sortColumn, setSortColumn] = useState<keyof ProjectInsightsSummary | null>(null)
-    const [sortDirection, setSortDirection] = useState<'ascending' | 'descending'>('ascending')
-    const handleSort = (column: keyof ProjectInsightsSummary) => {
-        if (sortColumn === column) {
-            setSortDirection(sortDirection === 'ascending' ? 'descending' : 'ascending')
+const SummaryTable: React.FC<SummaryTableProps> = ({ 
+    allData,
+    filteredData,
+    selectedProjects,
+    selectedSeqTypes,
+    selectedSeqTechnologies,
+    handleSelectionChange,
+}) => {
+    const [sortColumns, setSortColumns] = useState<
+        Array<{ column: keyof ProjectInsightsSummary; direction: 'ascending' | 'descending' }>
+    >([])
+    const handleSort = (column: keyof ProjectInsightsSummary, isMultiSort: boolean) => {
+        if (isMultiSort) {
+            const existingColumnIndex = sortColumns.findIndex(
+                (sortColumn) => sortColumn.column === column
+            )
+
+            if (existingColumnIndex !== -1) {
+                const updatedSortColumns = [...sortColumns]
+                updatedSortColumns[existingColumnIndex].direction =
+                    updatedSortColumns[existingColumnIndex].direction === 'ascending'
+                        ? 'descending'
+                        : 'ascending'
+                setSortColumns(updatedSortColumns)
+            } else {
+                setSortColumns([...sortColumns, { column, direction: 'ascending' }])
+            }
         } else {
-            setSortColumn(column)
-            setSortDirection('ascending')
+            if (sortColumns.length === 1 && sortColumns[0].column === column) {
+                setSortColumns([
+                    {
+                        column,
+                        direction:
+                            sortColumns[0].direction === 'ascending' ? 'descending' : 'ascending',
+                    },
+                ])
+            } else {
+                setSortColumns([{ column, direction: 'ascending' }])
+            }
         }
     }
 
     const sortedData = React.useMemo(() => {
         const data = [...filteredData]
-        if (sortColumn) {
-            data.sort((a, b) => {
-                const valueA = a[sortColumn]
-                const valueB = b[sortColumn]
-                if (valueA === valueB) return 0
+        data.sort((a, b) => {
+            for (const { column, direction } of sortColumns) {
+                const valueA = a[column]
+                const valueB = b[column]
+                if (valueA === valueB) continue
                 if (typeof valueA === 'number' && typeof valueB === 'number') {
-                    return sortDirection === 'ascending' ? valueA - valueB : valueB - valueA
+                    return direction === 'ascending' ? valueA - valueB : valueB - valueA
                 } else {
-                    return sortDirection === 'ascending'
+                    return direction === 'ascending'
                         ? String(valueA).localeCompare(String(valueB))
                         : String(valueB).localeCompare(String(valueA))
                 }
-            })
-        }
+            }
+            return 0
+        })
         return data
-    }, [filteredData, sortColumn, sortDirection])
+    }, [filteredData, sortColumns])
+
+    const getUniqueOptionsForColumn = (
+        columnName: keyof ProjectInsightsSummary
+    ) => {
+        const filteredDataExcludingCurrentColumn = allData.filter((item) => {
+            return (
+                selectedProjects.some((p) => p.name === item.dataset) &&
+                selectedSeqTypes.includes(item.sequencing_type) &&
+                (columnName === 'sequencing_technology' ||
+                    selectedSeqTechnologies.length === 0 ||
+                    selectedSeqTechnologies.includes(item.sequencing_technology))
+            )
+        })
+
+        let uniqueOptions: string[] = []
+        switch (columnName) {
+            case 'sequencing_technology':
+                uniqueOptions = Array.from(
+                    new Set(
+                        filteredDataExcludingCurrentColumn.map((item) =>
+                            item[columnName]?.toString() || ''
+                        )
+                    )
+                )
+                break
+            default:
+                uniqueOptions = Array.from(
+                    new Set(filteredDataExcludingCurrentColumn.map((item) => item[columnName]))
+                ).map((option) => option?.toString() || '')
+        }
+
+        return uniqueOptions
+    }
 
     return (
+        <div>
         <Table sortable>
             <Table.Header>
                 <Table.Row>
                     <Table.HeaderCell
-                        className="header-cell"
-                        sorted={sortColumn === 'dataset' ? sortDirection : undefined}
-                        onClick={() => handleSort('dataset')}
-                    >
-                        Dataset
-                    </Table.HeaderCell>
+                            className="header-cell"
+                            sorted={
+                                sortColumns.find((column) => column.column === 'dataset')?.direction
+                            }
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('dataset', event.shiftKey)
+                            }
+                        >
+                            Dataset
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell"
+                            sorted={
+                                sortColumns.find((column) => column.column === 'sequencing_type')
+                                    ?.direction
+                            }
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('sequencing_type', event.shiftKey)
+                            }
+                        >
+                            Seq Type
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell"
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('sequencing_technology', event.shiftKey)
+                            }
+                        >
+                            <div className="filter-button">
+                                <FilterButton
+                                    columnName="Technology"
+                                    options={getUniqueOptionsForColumn('sequencing_technology')}
+                                    selectedOptions={selectedSeqTechnologies}
+                                    onSelectionChange={(selectedOptions) =>
+                                        handleSelectionChange(
+                                            'sequencing_technology',
+                                            selectedOptions
+                                        )
+                                    }
+                                />
+                            </div>
+                            {sortColumns.find(
+                                (column) => column.column === 'sequencing_technology'
+                            ) && (
+                                <Icon
+                                    name={
+                                        sortColumns.find(
+                                            (column) => column.column === 'sequencing_technology'
+                                        )?.direction === 'ascending'
+                                            ? 'caret up'
+                                            : 'caret down'
+                                    }
+                                    className="sort-icon"
+                                />
+                            )}
+                            <div className="header-text">Technology</div>
+                        </Table.HeaderCell>
                     <Table.HeaderCell
                         className="header-cell"
-                        sorted={sortColumn === 'sequencing_type' ? sortDirection : undefined}
-                        onClick={() => handleSort('sequencing_type')}
-                    >
-                        Sequencing Type
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        sorted={sortColumn === 'total_families' ? sortDirection : undefined}
-                        onClick={() => handleSort('total_families')}
-                    >
-                        Families
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        sorted={sortColumn === 'total_participants' ? sortDirection : undefined}
-                        onClick={() => handleSort('total_participants')}
-                    >
-                        Participants
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        sorted={sortColumn === 'total_samples' ? sortDirection : undefined}
-                        onClick={() => handleSort('total_samples')}
-                    >
-                        Samples
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        sorted={
-                            sortColumn === 'total_sequencing_groups' ? sortDirection : undefined
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('total_families', event.shiftKey)
                         }
-                        onClick={() => handleSort('total_sequencing_groups')}
                     >
-                        Sequencing Groups
+                    {sortColumns.find(
+                                (column) => column.column === 'total_families'
+                            ) && (
+                                <Icon
+                                    name={
+                                        sortColumns.find(
+                                            (column) => column.column === 'total_families'
+                                        )?.direction === 'ascending'
+                                            ? 'caret up'
+                                            : 'caret down'
+                                    }
+                                    className="sort-icon"
+                                />
+                            )}
+                        <div className="header-text">Families</div>
                     </Table.HeaderCell>
                     <Table.HeaderCell
                         className="header-cell"
-                        sorted={sortColumn === 'total_crams' ? sortDirection : undefined}
-                        onClick={() => handleSort('total_crams')}
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('total_participants', event.shiftKey)
+                        }
                     >
-                        CRAMs
+                    {sortColumns.find(
+                                (column) => column.column === 'total_participants'
+                            ) && (
+                                <Icon
+                                    name={
+                                        sortColumns.find(
+                                            (column) => column.column === 'total_participants'
+                                        )?.direction === 'ascending'
+                                            ? 'caret up'
+                                            : 'caret down'
+                                    }
+                                    className="sort-icon"
+                                />
+                            )}
+                        <div className="header-text">Participants</div>
+                    </Table.HeaderCell>
+                    <Table.HeaderCell
+                        className="header-cell"
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('total_samples', event.shiftKey)
+                        }
+                    >
+                    {sortColumns.find(
+                                (column) => column.column === 'total_samples'
+                            ) && (
+                                <Icon
+                                    name={
+                                        sortColumns.find(
+                                            (column) => column.column === 'total_samples'
+                                        )?.direction === 'ascending'
+                                            ? 'caret up'
+                                            : 'caret down'
+                                    }
+                                    className="sort-icon"
+                                />
+                            )}
+                        <div className="header-text">Samples</div>
+                    </Table.HeaderCell>
+                    <Table.HeaderCell
+                        className="header-cell"
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('total_sequencing_groups', event.shiftKey)
+                        }
+                    >
+                    {sortColumns.find(
+                                (column) => column.column === 'total_sequencing_groups'
+                            ) && (
+                                <Icon
+                                    name={
+                                        sortColumns.find(
+                                            (column) => column.column === 'total_sequencing_groups'
+                                        )?.direction === 'ascending'
+                                            ? 'caret up'
+                                            : 'caret down'
+                                    }
+                                    className="sort-icon"
+                                />
+                            )}
+                        <div className="header-text">Sequencing Groups</div>
+                    </Table.HeaderCell>
+                    <Table.HeaderCell
+                        className="header-cell"
+                        onClick={(event: React.MouseEvent<HTMLElement>) =>
+                            handleSort('total_crams', event.shiftKey)
+                        }
+                    >
+                    {sortColumns.find(
+                                (column) => column.column === 'total_crams'
+                            ) && (
+                                <Icon
+                                    name={
+                                        sortColumns.find(
+                                            (column) => column.column === 'total_crams'
+                                        )?.direction === 'ascending'
+                                            ? 'caret up'
+                                            : 'caret down'
+                                    }
+                                    className="sort-icon"
+                                />
+                            )}
+                        <div className="header-text">CRAMs</div>
                     </Table.HeaderCell>
                     <Table.HeaderCell className="header-cell">
                         <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -264,7 +454,7 @@ const SummaryTable: React.FC<SummaryTableProps> = ({ filteredData }) => {
                                     </p>
                                 }
                             >
-                                <div>% in Annotated Dataset</div>
+                                <div className="header-text">% in Annotated Dataset</div>
                             </HtmlTooltip>
                         </div>
                     </Table.HeaderCell>
@@ -278,7 +468,7 @@ const SummaryTable: React.FC<SummaryTableProps> = ({ filteredData }) => {
                                     </p>
                                 }
                             >
-                                <div>% in SNV ES-Index</div>
+                                <div className="header-text">% in SNV ES-Index</div>
                             </HtmlTooltip>
                         </div>
                     </Table.HeaderCell>
@@ -292,7 +482,7 @@ const SummaryTable: React.FC<SummaryTableProps> = ({ filteredData }) => {
                                     </p>
                                 }
                             >
-                                <div>% in SV ES-Index</div>
+                                <div className="header-text">% in SV ES-Index</div>
                             </HtmlTooltip>
                         </div>
                     </Table.HeaderCell>
@@ -301,7 +491,7 @@ const SummaryTable: React.FC<SummaryTableProps> = ({ filteredData }) => {
             <Table.Body>
                 {sortedData.map((summary) => (
                     <SummaryTableRow
-                        key={`${summary.dataset}-${summary.sequencing_type}`}
+                        key={`${summary.dataset}-${summary.sequencing_type}-${summary.sequencing_technology}`}
                         summary={summary}
                     />
                 ))}
@@ -310,6 +500,7 @@ const SummaryTable: React.FC<SummaryTableProps> = ({ filteredData }) => {
                 <Table.Row className="grand-total-row" key="grandTotals">
                     <Table.Cell className="table-cell">Grand Total</Table.Cell>
                     <Table.Cell className="table-cell">{sortedData.length} entries</Table.Cell>
+                    <Table.Cell className="table-cell"></Table.Cell>
                     <Table.Cell className="table-cell">
                         {filteredData.reduce((acc, curr) => acc + curr.total_families, 0)}
                     </Table.Cell>
@@ -402,7 +593,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({ filteredData }) => {
                                 title={
                                     <p>
                                         {filteredData.reduce(
-                                            (acc, curr) => acc + (curr.latest_snv_es_index?.sg_count ?? 0),
+                                            (acc, curr) =>
+                                                acc + (curr.latest_snv_es_index?.sg_count ?? 0),
                                             0
                                         )}{' '}
                                         /{' '}
@@ -418,7 +610,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({ filteredData }) => {
                                 <div>
                                     {(
                                         filteredData.reduce(
-                                            (acc, curr) => acc + (curr.latest_snv_es_index?.sg_count ?? 0),
+                                            (acc, curr) =>
+                                                acc + (curr.latest_snv_es_index?.sg_count ?? 0),
                                             0
                                         ) /
                                             filteredData.reduce(
@@ -437,7 +630,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({ filteredData }) => {
                                 title={
                                     <p>
                                         {filteredData.reduce(
-                                            (acc, curr) => acc + (curr.latest_sv_es_index?.sg_count ?? 0),
+                                            (acc, curr) =>
+                                                acc + (curr.latest_sv_es_index?.sg_count ?? 0),
                                             0
                                         )}{' '}
                                         /{' '}
@@ -452,7 +646,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({ filteredData }) => {
                                 <div>
                                     {(
                                         filteredData.reduce(
-                                            (acc, curr) => acc + (curr.latest_sv_es_index?.sg_count ?? 0),
+                                            (acc, curr) =>
+                                                acc + (curr.latest_sv_es_index?.sg_count ?? 0),
                                             0
                                         ) /
                                             filteredData.reduce(
@@ -468,6 +663,7 @@ const SummaryTable: React.FC<SummaryTableProps> = ({ filteredData }) => {
                 </Table.Row>
             </Table.Footer>
         </Table>
+        </div>
     )
 }
 

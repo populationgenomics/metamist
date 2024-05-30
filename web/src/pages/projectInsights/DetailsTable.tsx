@@ -53,28 +53,46 @@ const DetailsTableRow: React.FC<{ details: ProjectInsightsDetails }> = ({ detail
 
     return (
         <Table.Row key={`${details.sequencing_group_id}`} className={rowClassName}>
-            <Table.Cell data-cell className="category-cell">{details.dataset}</Table.Cell>
-            <Table.Cell data-cell className="category-cell">{details.sequencing_type}</Table.Cell>
-            <Table.Cell data-cell className="category-cell">{details.sequencing_platform}</Table.Cell>
-            <Table.Cell data-cell className="category-cell">{details.sequencing_technology}</Table.Cell>
-            <Table.Cell data-cell className="category-cell">{details.sample_type}</Table.Cell>
-            <Table.Cell data-cell className="table-cell">{details.sequencing_group_id}</Table.Cell>
-            <Table.Cell data-cell className="table-cell">{details.family_id}</Table.Cell>
-            <Table.Cell data-cell className="table-cell">{details.family_ext_id}</Table.Cell>
-            <Table.Cell data-cell className="table-cell">{details.participant_id}</Table.Cell>
-            <Table.Cell data-cell className="table-cell">{details.participant_ext_id}</Table.Cell>
-            <Table.Cell data-cell className="table-cell">{details.sample_id}</Table.Cell>
-            <Table.Cell data-cell className="table-cell">{details.sample_ext_ids}</Table.Cell>
+            <Table.Cell data-cell className="category-cell">
+                {details.dataset}
+            </Table.Cell>
+            <Table.Cell data-cell className="category-cell">
+                {details.sequencing_type}
+            </Table.Cell>
             <Table.Cell data-cell className="table-cell">
-                <HtmlTooltip
-                        title={
-                            <p>
-                                {details.in_latest_annotate_dataset}
-                            </p>
-                        }
-                    >
-                        <div>{details.completed_cram ? '✅' : '❌'}</div>
-                    </HtmlTooltip>
+                {details.sequencing_platform}
+            </Table.Cell>
+            <Table.Cell data-cell className="table-cell">
+                {details.sequencing_technology}
+            </Table.Cell>
+            <Table.Cell data-cell className="table-cell">
+                {details.sample_type}
+            </Table.Cell>
+            <Table.Cell data-cell className="table-cell">
+                {details.sequencing_group_id}
+            </Table.Cell>
+            <Table.Cell data-cell className="table-cell">
+                {details.family_id}
+            </Table.Cell>
+            <Table.Cell data-cell className="table-cell">
+                {details.family_ext_id}
+            </Table.Cell>
+            <Table.Cell data-cell className="table-cell">
+                {details.participant_id}
+            </Table.Cell>
+            <Table.Cell data-cell className="table-cell">
+                {details.participant_ext_id}
+            </Table.Cell>
+            <Table.Cell data-cell className="table-cell">
+                {details.sample_id}
+            </Table.Cell>
+            <Table.Cell data-cell className="table-cell">
+                {details.sample_ext_ids}
+            </Table.Cell>
+            <Table.Cell data-cell className="table-cell">
+                <HtmlTooltip title={<p>{details.in_latest_annotate_dataset}</p>}>
+                    <div>{details.completed_cram ? '✅' : '❌'}</div>
+                </HtmlTooltip>
             </Table.Cell>
             <Table.Cell className="table-cell">
                 {details.in_latest_annotate_dataset ? '✅' : '❌'}
@@ -276,557 +294,598 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
         return uniqueOptions
     }
     const exportToCSV = () => {
-        const headerCells = document.querySelectorAll('.ui.table thead tr th');
-        const headerData = Array.from(headerCells).map(cell => cell.textContent);
-      
-        const rows = document.querySelectorAll('.ui.table tbody tr');
-        const rowData = Array.from(rows).map(row => {
-            const cells = row.querySelectorAll('td');
-            return Array.from(cells).map(cell => {
+        const headerCells = document.querySelectorAll('.ui.table thead tr th')
+        const headerData = Array.from(headerCells).map((cell) => cell.textContent)
+
+        const rows = document.querySelectorAll('.ui.table tbody tr')
+        const rowData = Array.from(rows).map((row) => {
+            const cells = row.querySelectorAll('td')
+            return Array.from(cells).map((cell) => {
                 if (cell.textContent === '✅') {
-                    return 'TRUE';
+                    return 'TRUE'
                 } else if (cell.textContent === '❌') {
-                    return 'FALSE';
+                    return 'FALSE'
                 } else if (cell.querySelector('a')) {
-                    const anchor = cell.querySelector('a');
-                    return anchor ? anchor.href : null;
+                    const anchor = cell.querySelector('a')
+                    return anchor ? anchor.href : null
                 } else {
-                    return cell.textContent;
+                    return cell.textContent
                 }
-            });
-        });
-      
-        const csvData = [headerData, ...rowData].map(row => row.join(',')).join('\n');
-      
-        const blob = new Blob([csvData], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', 'table_data.csv');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      };
+            })
+        })
+
+        const csvData = [headerData, ...rowData].map((row) => row.join(',')).join('\n')
+
+        const blob = new Blob([csvData], { type: 'text/csv' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.setAttribute('download', 'table_data.csv')
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+    }
 
     return (
         <div>
-        <Button onClick={exportToCSV}>Export to CSV</Button>
-        <Table sortable>
-            <Table.Header>
-                <Table.Row>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        sorted={
-                            sortColumns.find((column) => column.column === 'dataset')?.direction
-                        }
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('dataset', event.shiftKey)
-                        }
-                    >
-                        Dataset
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        sorted={
-                            sortColumns.find((column) => column.column === 'sequencing_type')
-                                ?.direction
-                        }
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('sequencing_type', event.shiftKey)
-                        }
-                    >
-                        Seq Type
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('sequencing_platform', event.shiftKey)
-                        }
-                    >
-                        <div className="filter-button">
-                            <FilterButton
-                                columnName="Platform"
-                                options={getUniqueOptionsForColumn('sequencing_platform')}
-                                selectedOptions={selectedSampleTypes}
-                                onSelectionChange={(selectedOptions) =>
-                                    handleSelectionChange('sequencing_platform', selectedOptions)
-                                }
-                            />
-                        </div>
-                        {sortColumns.find((column) => column.column === 'sequencing_platform') && (
-                            <Icon
-                                name={
-                                    sortColumns.find((column) => column.column === 'sequencing_platform')
-                                        ?.direction === 'ascending'
-                                        ? 'caret up'
-                                        : 'caret down'
-                                }
-                                className="sort-icon"
-                            />
-                        )}
-                        <div className="header-text">Platform</div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('sequencing_technology', event.shiftKey)
-                        }
-                    >
-                        <div className="filter-button">
-                            <FilterButton
-                                columnName="Technology"
-                                options={getUniqueOptionsForColumn('sequencing_technology')}
-                                selectedOptions={selectedSampleTypes}
-                                onSelectionChange={(selectedOptions) =>
-                                    handleSelectionChange('sequencing_technology', selectedOptions)
-                                }
-                            />
-                        </div>
-                        {sortColumns.find((column) => column.column === 'sequencing_technology') && (
-                            <Icon
-                                name={
-                                    sortColumns.find((column) => column.column === 'sequencing_technology')
-                                        ?.direction === 'ascending'
-                                        ? 'caret up'
-                                        : 'caret down'
-                                }
-                                className="sort-icon"
-                            />
-                        )}
-                        <div className="header-text">Technology</div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('sample_type', event.shiftKey)
-                        }
-                    >
-                        <div className="filter-button">
-                            <FilterButton
-                                columnName="Sample Type"
-                                options={getUniqueOptionsForColumn('sample_type')}
-                                selectedOptions={selectedSampleTypes}
-                                onSelectionChange={(selectedOptions) =>
-                                    handleSelectionChange('sample_type', selectedOptions)
-                                }
-                            />
-                        </div>
-                        {sortColumns.find((column) => column.column === 'sample_type') && (
-                            <Icon
-                                name={
-                                    sortColumns.find((column) => column.column === 'sample_type')
-                                        ?.direction === 'ascending'
-                                        ? 'caret up'
-                                        : 'caret down'
-                                }
-                                className="sort-icon"
-                            />
-                        )}
-                        <div className="header-text">Sample Type</div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('sequencing_group_id', event.shiftKey)
-                        }
-                    >
-                        <div className="filter-button">
-                            <FilterButton
-                                columnName="SG ID"
-                                options={getUniqueOptionsForColumn('sequencing_group_id')}
-                                selectedOptions={selectedSequencingGroupIds}
-                                onSelectionChange={(selectedOptions) =>
-                                    handleSelectionChange('sequencing_group_id', selectedOptions)
-                                }
-                            />
-                        </div>
-                        {sortColumns.find((column) => column.column === 'sequencing_group_id') && (
-                            <Icon
-                                name={
-                                    sortColumns.find(
-                                        (column) => column.column === 'sequencing_group_id'
-                                    )?.direction === 'ascending'
-                                        ? 'caret up'
-                                        : 'caret down'
-                                }
-                                className="sort-icon"
-                            />
-                        )}
-                        <div className="header-text">SG ID</div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('family_id', event.shiftKey)
-                        }
-                    >
-                        <div className="filter-button">
-                            <FilterButton
-                                columnName="Family ID"
-                                options={getUniqueOptionsForColumn('family_id')}
-                                selectedOptions={selectedFamilyIds}
-                                onSelectionChange={(selectedOptions) =>
-                                    handleSelectionChange('family_id', selectedOptions)
-                                }
-                            />
-                        </div>
-                        {sortColumns.find((column) => column.column === 'family_id') && (
-                            <Icon
-                                name={
-                                    sortColumns.find((column) => column.column === 'family_id')
-                                        ?.direction === 'ascending'
-                                        ? 'caret up'
-                                        : 'caret down'
-                                }
-                                className="sort-icon"
-                            />
-                        )}
-                        <div className="header-text">Family ID</div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('family_ext_id', event.shiftKey)
-                        }
-                    >
-                        <div className="filter-button">
-                            <FilterButton
-                                columnName="Family Ext. ID"
-                                options={getUniqueOptionsForColumn('family_ext_id')}
-                                selectedOptions={selectedFamilyExtIds}
-                                onSelectionChange={(selectedOptions) =>
-                                    handleSelectionChange('family_ext_id', selectedOptions)
-                                }
-                            />
-                        </div>
-                        {sortColumns.find((column) => column.column === 'family_ext_id') && (
-                            <Icon
-                                name={
-                                    sortColumns.find((column) => column.column === 'family_ext_id')
-                                        ?.direction === 'ascending'
-                                        ? 'caret up'
-                                        : 'caret down'
-                                }
-                                className="sort-icon"
-                            />
-                        )}
-                        <div className="header-text">Family Ext. ID</div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('participant_id', event.shiftKey)
-                        }
-                    >
-                        <div className="filter-button">
-                            <FilterButton
-                                columnName="Participant ID"
-                                options={getUniqueOptionsForColumn('participant_id')}
-                                selectedOptions={selectedParticipantIds}
-                                onSelectionChange={(selectedOptions) =>
-                                    handleSelectionChange('participant_id', selectedOptions)
-                                }
-                            />
-                        </div>
-                        {sortColumns.find((column) => column.column === 'participant_id') && (
-                            <Icon
-                                name={
-                                    sortColumns.find((column) => column.column === 'participant_id')
-                                        ?.direction === 'ascending'
-                                        ? 'caret up'
-                                        : 'caret down'
-                                }
-                                className="sort-icon"
-                            />
-                        )}
-                        <div className="header-text">Participant ID</div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('participant_ext_id', event.shiftKey)
-                        }
-                    >
-                        <div className="filter-button">
-                            <FilterButton
-                                columnName="Participant Ext. ID"
-                                options={getUniqueOptionsForColumn('participant_ext_id')}
-                                selectedOptions={selectedParticipantExtIds}
-                                onSelectionChange={(selectedOptions) =>
-                                    handleSelectionChange('participant_ext_id', selectedOptions)
-                                }
-                            />
-                        </div>
-                        {sortColumns.find((column) => column.column === 'participant_ext_id') && (
-                            <Icon
-                                name={
-                                    sortColumns.find(
-                                        (column) => column.column === 'participant_ext_id'
-                                    )?.direction === 'ascending'
-                                        ? 'caret up'
-                                        : 'caret down'
-                                }
-                                className="sort-icon"
-                            />
-                        )}
-                        <div className="header-text">Participant Ext. ID</div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('sample_id', event.shiftKey)
-                        }
-                    >
-                        <div className="filter-button">
-                            <FilterButton
-                                columnName="Sample ID"
-                                options={getUniqueOptionsForColumn('sample_id')}
-                                selectedOptions={selectedSampleIds}
-                                onSelectionChange={(selectedOptions) =>
-                                    handleSelectionChange('sample_id', selectedOptions)
-                                }
-                            />
-                        </div>
-                        {sortColumns.find((column) => column.column === 'sample_id') && (
-                            <Icon
-                                name={
-                                    sortColumns.find((column) => column.column === 'sample_id')
-                                        ?.direction === 'ascending'
-                                        ? 'caret up'
-                                        : 'caret down'
-                                }
-                                className="sort-icon"
-                            />
-                        )}
-                        <div className="header-text">Sample ID</div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('sample_ext_ids', event.shiftKey)
-                        }
-                    >
-                        <div className="filter-button">
-                            <FilterButton
-                                columnName="Sample Ext. ID(s)"
-                                options={getUniqueOptionsForColumn('sample_ext_ids')}
-                                selectedOptions={selectedSampleExtIds}
-                                onSelectionChange={(selectedOptions) =>
-                                    handleSelectionChange('sample_ext_ids', selectedOptions)
-                                }
-                            />
-                        </div>
-                        {sortColumns.find((column) => column.column === 'sample_ext_ids') && (
-                            <Icon
-                                name={
-                                    sortColumns.find((column) => column.column === 'sample_ext_ids')
-                                        ?.direction === 'ascending'
-                                        ? 'caret up'
-                                        : 'caret down'
-                                }
-                                className="sort-icon"
-                            />
-                        )}
-                        <div className="header-text">Sample Ext. ID(s)</div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                      className="header-cell collapsible-header"
-                      onClick={(event: React.MouseEvent<HTMLElement>) =>
-                        handleSort('completed_cram', event.shiftKey)
-                      }
-                      onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
-                        event.currentTarget.classList.add('expanded');
-                      }}
-                      onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
-                        event.currentTarget.classList.remove('expanded');
-                      }}
-                    >
-                      <div className="filter-button">
-                        <FilterButton
-                          columnName="Completed CRAM"
-                          options={getUniqueOptionsForColumn('completed_cram')}
-                          selectedOptions={selectedCompletedCram}
-                          onSelectionChange={(selectedOptions) =>
-                            handleSelectionChange('completed_cram', selectedOptions)
-                          }
+            <Button onClick={exportToCSV}>Export to CSV</Button>
+            <Table sortable>
+                <Table.Header>
+                    <Table.Row>
+                        <Table.HeaderCell
+                            className="header-cell"
+                            sorted={
+                                sortColumns.find((column) => column.column === 'dataset')?.direction
+                            }
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('dataset', event.shiftKey)
+                            }
+                        >
+                            Dataset
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell"
+                            sorted={
+                                sortColumns.find((column) => column.column === 'sequencing_type')
+                                    ?.direction
+                            }
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('sequencing_type', event.shiftKey)
+                            }
+                        >
+                            Seq Type
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell"
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('sequencing_platform', event.shiftKey)
+                            }
+                        >
+                            <div className="filter-button">
+                                <FilterButton
+                                    columnName="Platform"
+                                    options={getUniqueOptionsForColumn('sequencing_platform')}
+                                    selectedOptions={selectedSeqPlatforms}
+                                    onSelectionChange={(selectedOptions) =>
+                                        handleSelectionChange(
+                                            'sequencing_platform',
+                                            selectedOptions
+                                        )
+                                    }
+                                />
+                            </div>
+                            {sortColumns.find(
+                                (column) => column.column === 'sequencing_platform'
+                            ) && (
+                                <Icon
+                                    name={
+                                        sortColumns.find(
+                                            (column) => column.column === 'sequencing_platform'
+                                        )?.direction === 'ascending'
+                                            ? 'caret up'
+                                            : 'caret down'
+                                    }
+                                    className="sort-icon"
+                                />
+                            )}
+                            <div className="header-text">Platform</div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell"
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('sequencing_technology', event.shiftKey)
+                            }
+                        >
+                            <div className="filter-button">
+                                <FilterButton
+                                    columnName="Technology"
+                                    options={getUniqueOptionsForColumn('sequencing_technology')}
+                                    selectedOptions={selectedSeqTechnologies}
+                                    onSelectionChange={(selectedOptions) =>
+                                        handleSelectionChange(
+                                            'sequencing_technology',
+                                            selectedOptions
+                                        )
+                                    }
+                                />
+                            </div>
+                            {sortColumns.find(
+                                (column) => column.column === 'sequencing_technology'
+                            ) && (
+                                <Icon
+                                    name={
+                                        sortColumns.find(
+                                            (column) => column.column === 'sequencing_technology'
+                                        )?.direction === 'ascending'
+                                            ? 'caret up'
+                                            : 'caret down'
+                                    }
+                                    className="sort-icon"
+                                />
+                            )}
+                            <div className="header-text">Technology</div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell"
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('sample_type', event.shiftKey)
+                            }
+                        >
+                            <div className="filter-button">
+                                <FilterButton
+                                    columnName="Sample Type"
+                                    options={getUniqueOptionsForColumn('sample_type')}
+                                    selectedOptions={selectedSampleTypes}
+                                    onSelectionChange={(selectedOptions) =>
+                                        handleSelectionChange('sample_type', selectedOptions)
+                                    }
+                                />
+                            </div>
+                            {sortColumns.find((column) => column.column === 'sample_type') && (
+                                <Icon
+                                    name={
+                                        sortColumns.find(
+                                            (column) => column.column === 'sample_type'
+                                        )?.direction === 'ascending'
+                                            ? 'caret up'
+                                            : 'caret down'
+                                    }
+                                    className="sort-icon"
+                                />
+                            )}
+                            <div className="header-text">Sample Type</div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell"
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('sequencing_group_id', event.shiftKey)
+                            }
+                        >
+                            <div className="filter-button">
+                                <FilterButton
+                                    columnName="SG ID"
+                                    options={getUniqueOptionsForColumn('sequencing_group_id')}
+                                    selectedOptions={selectedSequencingGroupIds}
+                                    onSelectionChange={(selectedOptions) =>
+                                        handleSelectionChange(
+                                            'sequencing_group_id',
+                                            selectedOptions
+                                        )
+                                    }
+                                />
+                            </div>
+                            {sortColumns.find(
+                                (column) => column.column === 'sequencing_group_id'
+                            ) && (
+                                <Icon
+                                    name={
+                                        sortColumns.find(
+                                            (column) => column.column === 'sequencing_group_id'
+                                        )?.direction === 'ascending'
+                                            ? 'caret up'
+                                            : 'caret down'
+                                    }
+                                    className="sort-icon"
+                                />
+                            )}
+                            <div className="header-text">SG ID</div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell"
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('family_id', event.shiftKey)
+                            }
+                        >
+                            <div className="filter-button">
+                                <FilterButton
+                                    columnName="Family ID"
+                                    options={getUniqueOptionsForColumn('family_id')}
+                                    selectedOptions={selectedFamilyIds}
+                                    onSelectionChange={(selectedOptions) =>
+                                        handleSelectionChange('family_id', selectedOptions)
+                                    }
+                                />
+                            </div>
+                            {sortColumns.find((column) => column.column === 'family_id') && (
+                                <Icon
+                                    name={
+                                        sortColumns.find((column) => column.column === 'family_id')
+                                            ?.direction === 'ascending'
+                                            ? 'caret up'
+                                            : 'caret down'
+                                    }
+                                    className="sort-icon"
+                                />
+                            )}
+                            <div className="header-text">Family ID</div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell"
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('family_ext_id', event.shiftKey)
+                            }
+                        >
+                            <div className="filter-button">
+                                <FilterButton
+                                    columnName="Family Ext. ID"
+                                    options={getUniqueOptionsForColumn('family_ext_id')}
+                                    selectedOptions={selectedFamilyExtIds}
+                                    onSelectionChange={(selectedOptions) =>
+                                        handleSelectionChange('family_ext_id', selectedOptions)
+                                    }
+                                />
+                            </div>
+                            {sortColumns.find((column) => column.column === 'family_ext_id') && (
+                                <Icon
+                                    name={
+                                        sortColumns.find(
+                                            (column) => column.column === 'family_ext_id'
+                                        )?.direction === 'ascending'
+                                            ? 'caret up'
+                                            : 'caret down'
+                                    }
+                                    className="sort-icon"
+                                />
+                            )}
+                            <div className="header-text">Family Ext. ID</div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell"
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('participant_id', event.shiftKey)
+                            }
+                        >
+                            <div className="filter-button">
+                                <FilterButton
+                                    columnName="Participant ID"
+                                    options={getUniqueOptionsForColumn('participant_id')}
+                                    selectedOptions={selectedParticipantIds}
+                                    onSelectionChange={(selectedOptions) =>
+                                        handleSelectionChange('participant_id', selectedOptions)
+                                    }
+                                />
+                            </div>
+                            {sortColumns.find((column) => column.column === 'participant_id') && (
+                                <Icon
+                                    name={
+                                        sortColumns.find(
+                                            (column) => column.column === 'participant_id'
+                                        )?.direction === 'ascending'
+                                            ? 'caret up'
+                                            : 'caret down'
+                                    }
+                                    className="sort-icon"
+                                />
+                            )}
+                            <div className="header-text">Participant ID</div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell"
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('participant_ext_id', event.shiftKey)
+                            }
+                        >
+                            <div className="filter-button">
+                                <FilterButton
+                                    columnName="Participant Ext. ID"
+                                    options={getUniqueOptionsForColumn('participant_ext_id')}
+                                    selectedOptions={selectedParticipantExtIds}
+                                    onSelectionChange={(selectedOptions) =>
+                                        handleSelectionChange('participant_ext_id', selectedOptions)
+                                    }
+                                />
+                            </div>
+                            {sortColumns.find(
+                                (column) => column.column === 'participant_ext_id'
+                            ) && (
+                                <Icon
+                                    name={
+                                        sortColumns.find(
+                                            (column) => column.column === 'participant_ext_id'
+                                        )?.direction === 'ascending'
+                                            ? 'caret up'
+                                            : 'caret down'
+                                    }
+                                    className="sort-icon"
+                                />
+                            )}
+                            <div className="header-text">Participant Ext. ID</div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell"
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('sample_id', event.shiftKey)
+                            }
+                        >
+                            <div className="filter-button">
+                                <FilterButton
+                                    columnName="Sample ID"
+                                    options={getUniqueOptionsForColumn('sample_id')}
+                                    selectedOptions={selectedSampleIds}
+                                    onSelectionChange={(selectedOptions) =>
+                                        handleSelectionChange('sample_id', selectedOptions)
+                                    }
+                                />
+                            </div>
+                            {sortColumns.find((column) => column.column === 'sample_id') && (
+                                <Icon
+                                    name={
+                                        sortColumns.find((column) => column.column === 'sample_id')
+                                            ?.direction === 'ascending'
+                                            ? 'caret up'
+                                            : 'caret down'
+                                    }
+                                    className="sort-icon"
+                                />
+                            )}
+                            <div className="header-text">Sample ID</div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell"
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('sample_ext_ids', event.shiftKey)
+                            }
+                        >
+                            <div className="filter-button">
+                                <FilterButton
+                                    columnName="Sample Ext. ID(s)"
+                                    options={getUniqueOptionsForColumn('sample_ext_ids')}
+                                    selectedOptions={selectedSampleExtIds}
+                                    onSelectionChange={(selectedOptions) =>
+                                        handleSelectionChange('sample_ext_ids', selectedOptions)
+                                    }
+                                />
+                            </div>
+                            {sortColumns.find((column) => column.column === 'sample_ext_ids') && (
+                                <Icon
+                                    name={
+                                        sortColumns.find(
+                                            (column) => column.column === 'sample_ext_ids'
+                                        )?.direction === 'ascending'
+                                            ? 'caret up'
+                                            : 'caret down'
+                                    }
+                                    className="sort-icon"
+                                />
+                            )}
+                            <div className="header-text">Sample Ext. ID(s)</div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell collapsible-header"
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('completed_cram', event.shiftKey)
+                            }
+                            onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
+                                event.currentTarget.classList.add('expanded')
+                            }}
+                            onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
+                                event.currentTarget.classList.remove('expanded')
+                            }}
+                        >
+                            <div className="filter-button">
+                                <FilterButton
+                                    columnName="Completed CRAM"
+                                    options={getUniqueOptionsForColumn('completed_cram')}
+                                    selectedOptions={selectedCompletedCram}
+                                    onSelectionChange={(selectedOptions) =>
+                                        handleSelectionChange('completed_cram', selectedOptions)
+                                    }
+                                />
+                            </div>
+                            {sortColumns.find((column) => column.column === 'completed_cram') && (
+                                <Icon
+                                    name={
+                                        sortColumns.find(
+                                            (column) => column.column === 'completed_cram'
+                                        )?.direction === 'ascending'
+                                            ? 'caret up'
+                                            : 'caret down'
+                                    }
+                                    className="sort-icon"
+                                />
+                            )}
+                            <div className="header-text">CRAM</div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell collapsible-header"
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('in_latest_annotate_dataset', event.shiftKey)
+                            }
+                            onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
+                                event.currentTarget.classList.add('expanded')
+                            }}
+                            onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
+                                event.currentTarget.classList.remove('expanded')
+                            }}
+                        >
+                            <div className="filter-button">
+                                <FilterButton
+                                    columnName="In Latest Annotate Dataset"
+                                    options={getUniqueOptionsForColumn(
+                                        'in_latest_annotate_dataset'
+                                    )}
+                                    selectedOptions={selectedInLatestAnnotateDataset}
+                                    onSelectionChange={(selectedOptions) =>
+                                        handleSelectionChange(
+                                            'in_latest_annotate_dataset',
+                                            selectedOptions
+                                        )
+                                    }
+                                />
+                            </div>
+                            {sortColumns.find(
+                                (column) => column.column === 'in_latest_annotate_dataset'
+                            ) && (
+                                <Icon
+                                    name={
+                                        sortColumns.find(
+                                            (column) =>
+                                                column.column === 'in_latest_annotate_dataset'
+                                        )?.direction === 'ascending'
+                                            ? 'caret up'
+                                            : 'caret down'
+                                    }
+                                    className="sort-icon"
+                                />
+                            )}
+                            <div className="header-text">Joint Callset</div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell collapsible-header"
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('in_latest_snv_es_index', event.shiftKey)
+                            }
+                            onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
+                                event.currentTarget.classList.add('expanded')
+                            }}
+                            onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
+                                event.currentTarget.classList.remove('expanded')
+                            }}
+                        >
+                            <div className="filter-button">
+                                <FilterButton
+                                    columnName="In Latest SNV ES-Index"
+                                    options={getUniqueOptionsForColumn('in_latest_snv_es_index')}
+                                    selectedOptions={selectedInLatestSnvEsIndex}
+                                    onSelectionChange={(selectedOptions) =>
+                                        handleSelectionChange(
+                                            'in_latest_snv_es_index',
+                                            selectedOptions
+                                        )
+                                    }
+                                />
+                            </div>
+                            {sortColumns.find(
+                                (column) => column.column === 'in_latest_snv_es_index'
+                            ) && (
+                                <Icon
+                                    name={
+                                        sortColumns.find(
+                                            (column) => column.column === 'in_latest_snv_es_index'
+                                        )?.direction === 'ascending'
+                                            ? 'caret up'
+                                            : 'caret down'
+                                    }
+                                    className="sort-icon"
+                                />
+                            )}
+                            <div className="header-text">SNV ES-Index</div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell collapsible-header"
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('in_latest_sv_es_index', event.shiftKey)
+                            }
+                            onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
+                                event.currentTarget.classList.add('expanded')
+                            }}
+                            onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
+                                event.currentTarget.classList.remove('expanded')
+                            }}
+                        >
+                            <div className="filter-button">
+                                <FilterButton
+                                    columnName="In Latest SV ES-Index"
+                                    options={getUniqueOptionsForColumn('in_latest_sv_es_index')}
+                                    selectedOptions={selectedInLatestSvEsIndex}
+                                    onSelectionChange={(selectedOptions) =>
+                                        handleSelectionChange(
+                                            'in_latest_sv_es_index',
+                                            selectedOptions
+                                        )
+                                    }
+                                />
+                            </div>
+                            {sortColumns.find(
+                                (column) => column.column === 'in_latest_sv_es_index'
+                            ) && (
+                                <Icon
+                                    name={
+                                        sortColumns.find(
+                                            (column) => column.column === 'in_latest_sv_es_index'
+                                        )?.direction === 'ascending'
+                                            ? 'caret up'
+                                            : 'caret down'
+                                    }
+                                    className="sort-icon"
+                                />
+                            )}
+                            <div className="header-text">SV ES-Index</div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell collapsible-header"
+                            onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
+                                event.currentTarget.classList.add('expanded')
+                            }}
+                            onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
+                                event.currentTarget.classList.remove('expanded')
+                            }}
+                        >
+                            <div className="filter-button">
+                                <FilterButton
+                                    columnName="STRipy Report"
+                                    options={getUniqueOptionsForColumn('stripy')}
+                                    selectedOptions={selectedStripy}
+                                    onSelectionChange={(selectedOptions) =>
+                                        handleSelectionChange('stripy', selectedOptions)
+                                    }
+                                />
+                            </div>
+                            <div className="header-text">STRipy Report</div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell collapsible-header"
+                            onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
+                                event.currentTarget.classList.add('expanded')
+                            }}
+                            onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
+                                event.currentTarget.classList.remove('expanded')
+                            }}
+                        >
+                            <div className="filter-button">
+                                <FilterButton
+                                    columnName="Mito Report"
+                                    options={getUniqueOptionsForColumn('mito')}
+                                    selectedOptions={selectedMito}
+                                    onSelectionChange={(selectedOptions) =>
+                                        handleSelectionChange('mito', selectedOptions)
+                                    }
+                                />
+                            </div>
+                            <div className="header-text">Mito Report</div>
+                        </Table.HeaderCell>
+                    </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                    {sortedData.map((details) => (
+                        <DetailsTableRow
+                            data-row
+                            key={`${details.sequencing_group_id}`}
+                            details={details}
                         />
-                      </div>
-                      {sortColumns.find((column) => column.column === 'completed_cram') && (
-                        <Icon
-                          name={
-                            sortColumns.find((column) => column.column === 'completed_cram')
-                              ?.direction === 'ascending'
-                              ? 'caret up'
-                              : 'caret down'
-                          }
-                          className="sort-icon"
-                        />
-                      )}
-                      <div className="header-text">CRAM</div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell collapsible-header"
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('in_latest_annotate_dataset', event.shiftKey)
-                        }
-                        onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
-                            event.currentTarget.classList.add('expanded');
-                          }}
-                          onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
-                            event.currentTarget.classList.remove('expanded');
-                          }}
-                    >
-                        <div className="filter-button">
-                            <FilterButton
-                                columnName="In Latest Annotate Dataset"
-                                options={getUniqueOptionsForColumn('in_latest_annotate_dataset')}
-                                selectedOptions={selectedInLatestAnnotateDataset}
-                                onSelectionChange={(selectedOptions) =>
-                                    handleSelectionChange(
-                                        'in_latest_annotate_dataset',
-                                        selectedOptions
-                                    )
-                                }
-                            />
-                        </div>
-                        {sortColumns.find(
-                            (column) => column.column === 'in_latest_annotate_dataset'
-                        ) && (
-                            <Icon
-                                name={
-                                    sortColumns.find(
-                                        (column) => column.column === 'in_latest_annotate_dataset'
-                                    )?.direction === 'ascending'
-                                        ? 'caret up'
-                                        : 'caret down'
-                                }
-                                className="sort-icon"
-                            />
-                        )}
-                        <div className="header-text">Joint Callset</div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell collapsible-header"
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('in_latest_snv_es_index', event.shiftKey)
-                        }
-                        onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
-                            event.currentTarget.classList.add('expanded');
-                          }}
-                          onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
-                            event.currentTarget.classList.remove('expanded');
-                          }}
-                    >
-                        <div className="filter-button">
-                            <FilterButton
-                                columnName="In Latest SNV ES-Index"
-                                options={getUniqueOptionsForColumn('in_latest_snv_es_index')}
-                                selectedOptions={selectedInLatestSnvEsIndex}
-                                onSelectionChange={(selectedOptions) =>
-                                    handleSelectionChange('in_latest_snv_es_index', selectedOptions)
-                                }
-                            />
-                        </div>
-                        {sortColumns.find(
-                            (column) => column.column === 'in_latest_snv_es_index'
-                        ) && (
-                            <Icon
-                                name={
-                                    sortColumns.find(
-                                        (column) => column.column === 'in_latest_snv_es_index'
-                                    )?.direction === 'ascending'
-                                        ? 'caret up'
-                                        : 'caret down'
-                                }
-                                className="sort-icon"
-                            />
-                        )}
-                        <div className="header-text">SNV ES-Index</div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell collapsible-header"
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('in_latest_sv_es_index', event.shiftKey)
-                        }
-                        onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
-                            event.currentTarget.classList.add('expanded');
-                          }}
-                          onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
-                            event.currentTarget.classList.remove('expanded');
-                          }}
-                    >
-                        <div className="filter-button">
-                            <FilterButton
-                                columnName="In Latest SV ES-Index"
-                                options={getUniqueOptionsForColumn('in_latest_sv_es_index')}
-                                selectedOptions={selectedInLatestSvEsIndex}
-                                onSelectionChange={(selectedOptions) =>
-                                    handleSelectionChange('in_latest_sv_es_index', selectedOptions)
-                                }
-                            />
-                        </div>
-                        {sortColumns.find(
-                            (column) => column.column === 'in_latest_sv_es_index'
-                        ) && (
-                            <Icon
-                                name={
-                                    sortColumns.find(
-                                        (column) => column.column === 'in_latest_sv_es_index'
-                                    )?.direction === 'ascending'
-                                        ? 'caret up'
-                                        : 'caret down'
-                                }
-                                className="sort-icon"
-                            />
-                        )}
-                        <div className="header-text">SV ES-Index</div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell className="header-cell collapsible-header"
-                    onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
-                        event.currentTarget.classList.add('expanded');
-                      }}
-                      onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
-                        event.currentTarget.classList.remove('expanded');
-                      }}>
-                        <div className="filter-button">
-                            <FilterButton
-                                columnName="STRipy Report"
-                                options={getUniqueOptionsForColumn('stripy')}
-                                selectedOptions={selectedStripy}
-                                onSelectionChange={(selectedOptions) =>
-                                    handleSelectionChange('stripy', selectedOptions)
-                                }
-                            />
-                        </div>
-                        <div className="header-text">STRipy Report</div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell className="header-cell collapsible-header"
-                    onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
-                        event.currentTarget.classList.add('expanded');
-                      }}
-                      onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
-                        event.currentTarget.classList.remove('expanded');
-                      }}>
-                        <div className="filter-button">
-                            <FilterButton
-                                columnName="Mito Report"
-                                options={getUniqueOptionsForColumn('mito')}
-                                selectedOptions={selectedMito}
-                                onSelectionChange={(selectedOptions) =>
-                                    handleSelectionChange('mito', selectedOptions)
-                                }
-                            />
-                        </div>
-                        <div className="header-text">Mito Report</div>
-                    </Table.HeaderCell>
-                </Table.Row>
-            </Table.Header>
-            <Table.Body>
-                {sortedData.map((details) => (
-                    <DetailsTableRow data-row key={`${details.sequencing_group_id}`} details={details} />
-                ))}
-            </Table.Body>
-        </Table>
+                    ))}
+                </Table.Body>
+            </Table>
         </div>
     )
 }

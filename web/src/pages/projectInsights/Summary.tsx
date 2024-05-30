@@ -18,6 +18,7 @@ const Summary: React.FC = () => {
     // New state for sequencing types
     const [seqTypes, setSeqTypes] = React.useState<string[]>([])
     const [selectedSeqTypes, setSelectedSeqTypes] = React.useState<string[]>([])
+    const [selectedSeqTechnologies, setSelectedSeqTechnologies] = React.useState<string[]>([])
 
     useEffect(() => {
         Promise.all([new EnumsApi().getSequencingTypes(), new ProjectApi().getSeqrProjects({})])
@@ -89,8 +90,20 @@ const Summary: React.FC = () => {
                 item.total_participants > 0 ||
                 item.total_samples > 0 ||
                 item.total_sequencing_groups > 0 ||
-                item.total_crams > 0)
+                item.total_crams > 0) &&
+            (selectedSeqTechnologies.length === 0 ||
+                selectedSeqTechnologies.includes(item.sequencing_technology))
     )
+    const handleSelectionChange = (columnName: string, selectedOptions: string[]) => {
+        // Update the selected options for the given column based on the state variable
+        switch (columnName) {
+            case 'sequencing_technology':
+                setSelectedSeqTechnologies(selectedOptions)
+                break
+            default:
+                break
+        }
+    }
 
     return (
         <div>
@@ -105,7 +118,14 @@ const Summary: React.FC = () => {
                 onProjectChange={handleProjectChange}
                 onSeqTypeChange={handleSeqTypeChange}
             />
-            <SummaryTable filteredData={filteredData}> </SummaryTable>
+            <SummaryTable 
+                allData={allData} 
+                filteredData={filteredData}
+                selectedProjects={selectedProjects}
+                selectedSeqTypes={selectedSeqTypes}
+                selectedSeqTechnologies={selectedSeqTechnologies}
+                handleSelectionChange={handleSelectionChange}
+            ></SummaryTable>
         </div>
     )
 }
