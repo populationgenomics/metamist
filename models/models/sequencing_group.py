@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 from models.base import OpenApiGenNoneType, SMBase
 from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
@@ -34,7 +35,7 @@ class SequencingGroupInternal(SMBase):
     type: str | None = None
     technology: str | None = None
     platform: str | None = None
-    meta: dict[str, str] | None = None
+    meta: dict[str, Any] | None = None
     sample_id: int | None = None
     external_ids: dict[str, str] | None = {}
     archived: bool | None = None
@@ -52,7 +53,15 @@ class SequencingGroupInternal(SMBase):
 
         _archived = kwargs.pop('archived', None)
         if _archived is not None:
-            _archived = _archived != b'\x00'
+            if isinstance(_archived, int):
+                _archived = _archived != 0
+            elif isinstance(_archived, bytes):
+                _archived = _archived != b'\x00'
+            else:
+                raise TypeError(
+                    f"Received type '{type(_archived)}' for SequencingGroup column 'archived'. "
+                    + "Allowed types are either 'int' or 'bytes'."
+                )
 
         return SequencingGroupInternal(**kwargs, archived=_archived, meta=meta)
 
@@ -78,7 +87,7 @@ class NestedSequencingGroupInternal(SMBase):
     type: str | None = None
     technology: str | None = None
     platform: str | None = None
-    meta: dict[str, str] | None = None
+    meta: dict[str, Any] | None = None
     external_ids: dict[str, str] | None = None
 
     assays: list[AssayInternal] | None = None
@@ -105,7 +114,7 @@ class SequencingGroupUpsertInternal(SMBase):
     type: str | None = None
     technology: str | None = None  # fk
     platform: str | None = None  # fk
-    meta: dict[str, str] | None = None
+    meta: dict[str, Any] | None = None
     sample_id: int | None = None
     external_ids: dict[str, str] | None = None
 
@@ -141,7 +150,7 @@ class SequencingGroup(SMBase):
     type: str
     technology: str
     platform: str  # uppercase
-    meta: dict[str, str]
+    meta: dict[str, Any]
     sample_id: str
     external_ids: dict[str, str]
     archived: bool
@@ -155,7 +164,7 @@ class NestedSequencingGroup(SMBase):
     type: str
     technology: str
     platform: str
-    meta: dict[str, str]
+    meta: dict[str, Any]
     external_ids: dict[str, str]
 
     assays: list[Assay] | None = None
@@ -170,7 +179,7 @@ class SequencingGroupUpsert(SMBase):
     type: str | OpenApiGenNoneType = None
     technology: str | OpenApiGenNoneType = None
     platform: str | OpenApiGenNoneType = None
-    meta: dict[str, str] | OpenApiGenNoneType = None
+    meta: dict[str, Any] | OpenApiGenNoneType = None
     sample_id: str | OpenApiGenNoneType = None
     external_ids: dict[str, str] | OpenApiGenNoneType = None
 

@@ -1,0 +1,49 @@
+name: Trigger Schema Updater
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment (prod or dev)'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - prod
+          - dev
+
+permissions:
+  contents: 'read'
+  id-token: 'write'
+
+jobs:
+  invoke-cloud-run:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: "branch-check"
+        name: Fail if branch is not main or dev
+        if: github.event_name == 'workflow_dispatch' && (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev')
+        run: |
+          echo "This workflow should not be triggered with workflow_dispatch on a branch other than main or dev"
+          exit 1
+
+      - id: "google-cloud-auth"
+        name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v2"
+        with:
+          workload_identity_provider: "projects/774248915715/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
+          service_account: "sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com"
+
+      - id: "google-cloud-sdk-setup"
+        name: "Set up Cloud SDK"
+        uses: google-github-actions/setup-gcloud@v2
+
+      - id: "invoke-cloud-run"
+        name: "Invoke Cloud Run"
+        run: |
+          CLOUD_RUN_URL=$(gcloud run services describe schema-updater --region australia-southeast1 --format 'value(status.url)')/execute-liquibase?environment=${{ github.event.inputs.environment }}
+          TOKEN=$(gcloud auth print-identity-token --impersonate-service-account="sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com" --audiences="$CLOUD_RUN_URL" --include-email)
+            curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/xml" --data-binary "@db/project.xml" $CLOUD_RUN_URL

@@ -843,6 +843,7 @@
 		<sql>INSERT INTO `group` (name) VALUES ('project-creators');</sql>
 		<sql>INSERT INTO `group` (name) VALUES ('members-admin');</sql>
 	</changeSet>
+
 	<changeSet id="2023-11-03_audit_log" author="michael.franklin">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
 		<createTable tableName="audit_log">
@@ -1106,5 +1107,178 @@
 		<sql>ALTER TABLE sequencing_group CHANGE author author VARCHAR(255) NULL;</sql>
 		<sql>ALTER TABLE sequencing_group_assay CHANGE author author VARCHAR(255) NULL;</sql>
 		<sql>ALTER TABLE sequencing_group_external_id CHANGE author author VARCHAR(255) NULL;</sql>
+	</changeSet>
+	<changeSet id="2024-02-27_analysis-runner-table" author="michael.franklin">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<createTable tableName="analysis_runner">
+			<column name="ar_guid" type="VARCHAR(255)">
+				<constraints nullable="false" unique="true" />
+			</column>
+			<column name="project" type="int">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_AR_PROJECT"
+					references="project(id)"
+				/>
+
+			</column>
+			<column name="timestamp" type="timestamp" />
+			<column name="access_level" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="repository" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="commit" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="output_path" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="script" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="description" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="driver_image" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="config_path" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="cwd" type="VARCHAR(255)">
+				<constraints nullable="true" />
+			</column>
+			<column name="environment" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="hail_version" type="VARCHAR(255)">
+				<constraints nullable="true" />
+			</column>
+			<column name="batch_url" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="submitting_user" type="VARCHAR(255)" />
+			<column name="meta" type="JSON" />
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_ANALYSIS_RUNNER_CHANGELOG_ID"
+					references="audit_log(id)"
+				/>
+			</column>
+		</createTable>
+
+		<createIndex indexName="idx_ar_guid" tableName="analysis_runner">
+			<column name="ar_guid" />
+		</createIndex>
+		<createIndex tableName="analysis_runner" indexName="idx_ar_submitting_user">
+			<column name="submitting_user" />
+		</createIndex>
+		<sql> ALTER TABLE analysis_runner ADD SYSTEM VERSIONING; </sql>
+	</changeSet>
+	<changeSet id="2024-03-15_analysis-runner-table-migration" author="michael.franklin">
+
+	<!-- make the configPath nullable -->
+
+	<sql>
+	SET @@system_versioning_alter_history = 1;
+	ALTER TABLE analysis_runner MODIFY COLUMN config_path VARCHAR(255) NULL;
+	ALTER TABLE analysis_runner MODIFY COLUMN audit_log_id INT NULL;
+	ALTER TABLE analysis_runner MODIFY COLUMN script TEXT;
+	</sql>
+
+	<!-- Migrate all the old analysis_runner records into the new table (don't delete existing ones for now) -->
+
+		<sql> INSERT INTO analysis_runner ( ar_guid, project, timestamp, access_level, repository,
+			`commit`, output_path, script, description, driver_image, config_path, cwd, environment,
+			hail_version, batch_url, submitting_user, meta, audit_log_id ) SELECT
+			COALESCE(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.ar-guid')), UUID()) as ar_guid,
+			analysis.project as project,
+			STR_TO_DATE(SUBSTRING_INDEX(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp')), '.', 1), '%Y-%m-%dT%H:%i:%s') -- date portion
+				+ INTERVAL (
+					60 * SUBSTRING(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp')), LENGTH(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp'))) - 4, 2) -- hours offset
+					+ SUBSTRING(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp')), LENGTH(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp'))) - 1, 2) -- minutes offset
+				) * (CASE WHEN JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.timestamp')) LIKE '%+%' THEN 1 ELSE -1 END) MINUTE-- +/- offset
+			as timestamp,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta,
+			'$.accessLevel')) as access_level, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.repo'))
+			as repository, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.commit')) as `commit`,
+			analysis.output as output_path, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.script')) as
+			script, JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.description')) as description,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.driverImage')) as driver_image,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.configPath')) as config_path,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.cwd')) as cwd,
+			COALESCE(JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.environment')), 'gcp') as environment,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.hailVersion')) as hail_version,
+			JSON_UNQUOTE(JSON_EXTRACT(analysis.meta, '$.batch_url')) as batch_url,
+			COALESCE(audit_log.on_behalf_of, analysis.author) as submitting_user, JSON_REMOVE(
+			analysis.meta, '$.ar-guid', '$.timestamp', '$.accessLevel', '$.repo', '$.commit',
+			'$.script', '$.description', '$.driverImage', '$.configPath', '$.cwd', '$.environment',
+			'$.hailVersion', '$.batch_url' ) as meta, analysis.audit_log_id FROM analysis LEFT JOIN
+			audit_log ON analysis.audit_log_id = audit_log.id WHERE analysis.type =
+			"analysis-runner" </sql>
+
+	</changeSet>
+
+	<changeSet id="2024-03-27_custom-cohort-changes" author="vivian.bakiris">
+		<!-- Add columns 'project' and 'name' to the cohort table -->
+		<addColumn tableName="cohort">
+			<column name="project" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_project_cohort" references="project(id)" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" unique="true" />
+			</column>
+		</addColumn>
+		<renameColumn
+			columnDataType="INT"
+			newColumnName="template_id"
+			oldColumnName="derived_from"
+			remarks="Following user feedback session, we are renaming the derived_from column to template_id to better reflect its purpose."
+			tableName="cohort"
+		/>
+		<!-- Add 'cohort_template' table -->
+		<createTable tableName="cohort_template">
+			<column name="id" type="INT" autoIncrement="true">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="description" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="criteria" type="JSON">
+				<constraints nullable="false" />
+			</column>
+			<column name="project" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_project_cohort_template" references="project(id)" />
+			</column>
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_COHORT_TEMPLATE_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+		<!-- Since we renamed derived_from to template_id, we also need to modify the FK name. -->
+		<dropForeignKeyConstraint
+			baseTableName="cohort"
+			constraintName="FK_COHORT_DERIVED_FROM_ID_COHORT"
+        />
+		<!-- Recreate the foreign key constraint with the new column name -->
+		<addForeignKeyConstraint
+			baseTableName="cohort"
+			constraintName="FK_COHORT_TEMPLATE_ID_COHORT"
+			referencedTableName="cohort_template"
+			baseColumnNames="template_id"
+			referencedColumnNames="id"
+        />
+		<sql>ALTER TABLE cohort_template ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE cohort ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE cohort_sequencing_group ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE analysis_cohort ADD SYSTEM VERSIONING;</sql>
 	</changeSet>
 </databaseChangeLog>

@@ -21,7 +21,7 @@ class SampleInternal(SMBase):
     type: str | None
     participant_id: int | None
     active: bool | None
-    author: str | None
+    author: str | None = None
 
     @staticmethod
     def from_db(d: dict):

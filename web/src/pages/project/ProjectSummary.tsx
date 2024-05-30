@@ -106,7 +106,7 @@ const ProjectSummaryView: React.FunctionComponent = () => {
                     }
                     const is_meta = field.startsWith('meta.')
                     const fieldName = is_meta ? field.slice(5) : field
-                    filter.push({ query: value, is_meta, model_type: category, field: fieldName })
+                    filter.push({ query: value, is_meta, type: category, field: fieldName })
                     return filter
                 },
                 [] as SearchItem[]
@@ -206,9 +206,10 @@ const ProjectSummaryView: React.FunctionComponent = () => {
                             <PageOptions
                                 isLoading={isLoading}
                                 totalPageNumbers={totalPageNumbers}
-                                totalSamples={summary?.total_samples_in_query}
+                                total={summary?.total_samples_in_query}
                                 pageNumber={pageNumber}
                                 handleOnClick={handleOnClick}
+                                title="samples"
                             />
                         </div>
                         <div style={{ position: 'absolute', paddingBottom: '80px' }}>
@@ -221,9 +222,10 @@ const ProjectSummaryView: React.FunctionComponent = () => {
                             <PageOptions
                                 isLoading={isLoading}
                                 totalPageNumbers={totalPageNumbers}
-                                totalSamples={summary?.total_samples_in_query}
+                                total={summary?.total_samples_in_query}
                                 pageNumber={pageNumber}
                                 handleOnClick={handleOnClick}
+                                title="samples"
                             />
                         </div>
                     </>

@@ -26,7 +26,6 @@ from models.models.analysis import (
     AnalysisInternal,
     ProportionalDateTemporalMethod,
 )
-from models.utils.sample_id_format import sample_id_transform_to_raw_list
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
     sequencing_group_id_format_list,
@@ -65,10 +64,7 @@ class AnalysisQueryModel(BaseModel):
     """Used to query for many analysis"""
 
     # sequencing_group_ids means it the analysis contains at least one of in the list
-    sample_ids: list[str] | None = None
     sequencing_group_ids: list[str] | None
-    # # sample_ids_all means the analysis contains ALL of the sample_ids
-    # sample_ids_all: list[str] = None
     projects: list[str]
     type: str | None = None
     status: AnalysisStatus | None = None
@@ -79,19 +75,20 @@ class AnalysisQueryModel(BaseModel):
     def to_filter(self, project_id_map: dict[str, int]) -> AnalysisFilter:
         """Convert to internal analysis filter"""
         return AnalysisFilter(
-            sample_id=GenericFilter(
-                in_=sample_id_transform_to_raw_list(self.sample_ids)
-            )
-            if self.sample_ids
-            else None,
-            sequencing_group_id=GenericFilter(
-                in_=sequencing_group_id_transform_to_raw_list(self.sequencing_group_ids)
-            )
-            if self.sequencing_group_ids
-            else None,
-            project=GenericFilter(in_=[project_id_map.get(p) for p in self.projects])
-            if self.projects
-            else None,
+            sequencing_group_id=(
+                GenericFilter(
+                    in_=sequencing_group_id_transform_to_raw_list(
+                        self.sequencing_group_ids
+                    )
+                )
+                if self.sequencing_group_ids
+                else None
+            ),
+            project=(
+                GenericFilter(in_=[project_id_map.get(p) for p in self.projects])
+                if self.projects
+                else None
+            ),
             type=GenericFilter(eq=self.type) if self.type else None,
         )
 
@@ -107,6 +104,9 @@ async def create_analysis(
     if analysis.author:
         # special tracking here, if we can't catch it through the header
         connection.on_behalf_of = analysis.author
+
+    if not analysis.sequencing_group_ids and not analysis.cohort_ids:
+        raise ValueError('Must specify "sequencing_group_ids" or "cohort_ids"')
 
     analysis_id = await atable.create_analysis(
         analysis.to_internal(),
@@ -241,8 +241,9 @@ async def query_analyses(
 @router.get('/analysis-runner', operation_id='getAnalysisRunnerLog')
 async def get_analysis_runner_log(
     project_names: list[str] = Query(None),  # type: ignore
-    author: str = None,
+    # author: str = None, # not implemented yet, uncomment when we do
     output_dir: str = None,
+    ar_guid: str = None,
     connection: Connection = get_projectless_db_connection,
 ) -> list[AnalysisInternal]:
     """
@@ -257,7 +258,10 @@ async def get_analysis_runner_log(
         )
 
     results = await atable.get_analysis_runner_log(
-        project_ids=project_ids, author=author, output_dir=output_dir
+        project_ids=project_ids,
+        # author=author,
+        output_dir=output_dir,
+        ar_guid=ar_guid,
     )
     return [a.to_external() for a in results]
 

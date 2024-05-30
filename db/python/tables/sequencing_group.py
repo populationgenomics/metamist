@@ -34,6 +34,13 @@ class SequencingGroupFilter(GenericFilterModel):
     active_only: GenericFilter[bool] | None = GenericFilter(eq=True)
     meta: GenericMetaFilter | None = None
 
+    # These fields are manually handled in the query to speed things up, because multiple table
+    # joins and dynamic computation are required.
+    created_on: GenericFilter[date] | None = None
+    assay_meta: GenericMetaFilter | None = None
+    has_cram: bool | None = None
+    has_gvcf: bool | None = None
+
     def __hash__(self):  # pylint: disable=useless-super-delegation
         return super().__hash__()
 
@@ -52,7 +59,6 @@ class SequencingGroupTable(DbBase):
         'sg.technology',
         'sg.platform',
         'sg.meta',
-        'sg.author',
         'sg.archived',
     ]
     common_get_keys_str = ', '.join(common_get_keys)
@@ -61,6 +67,9 @@ class SequencingGroupTable(DbBase):
         self, filter_: SequencingGroupFilter
     ) -> tuple[set[ProjectId], list[SequencingGroupInternal]]:
         """Query samples"""
+        if filter_.is_false():
+            return set(), []
+
         sql_overrides = {
             'project': 's.project',
             'sample_id': 'sg.sample_id',
@@ -71,17 +80,108 @@ class SequencingGroupTable(DbBase):
             'platform': 'sg.platform',
             'active_only': 'NOT sg.archived',
             'external_id': 'sgexid.external_id',
+            'created_on': 'DATE(row_start)',
+            'assay_meta': 'meta',
         }
 
-        wheres, values = filter_.to_sql(sql_overrides)
-        _query = f"""
-            SELECT {self.common_get_keys_str}
-            FROM sequencing_group sg
+        # Progressively build up the query and query values based on the filters provided to
+        # avoid uneccessary joins and improve performance.
+        _query: list[str] = []
+        query_values: dict[str, Any] = {}
+        # These fields are manually handled in the query
+        exclude_fields: list[str] = []
+
+        # Base query
+        _query.append(
+            f"""
+            SELECT
+                {self.common_get_keys_str}
+            FROM sequencing_group AS sg
             LEFT JOIN sample s ON s.id = sg.sample_id
-            LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id
-            WHERE {wheres}
-        """
-        rows = await self.connection.fetch_all(_query, values)
+            LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id"""
+        )
+
+        if filter_.assay_meta is not None:
+            exclude_fields.append('assay_meta')
+            wheres, values = filter_.to_sql(sql_overrides, only=['assay_meta'])
+            query_values.update(values)
+            _query.append(
+                f"""
+            INNER JOIN (
+                SELECT DISTINCT
+                    sequencing_group_id
+                FROM
+                    sequencing_group_assay
+                    INNER JOIN (
+                        SELECT
+                            id
+                        FROM
+                            assay
+                        WHERE
+                            {wheres}
+                    ) AS assay_subquery ON sequencing_group_assay.assay_id = assay_subquery.id
+                ) AS sga_subquery ON sg.id = sga_subquery.sequencing_group_id
+            """
+            )
+
+        if filter_.created_on is not None:
+            exclude_fields.append('created_on')
+            wheres, values = filter_.to_sql(sql_overrides, only=['created_on'])
+            query_values.update(values)
+            _query.append(
+                f"""
+            INNER JOIN (
+                SELECT
+                    id,
+                    TIMESTAMP(min(row_start)) AS created_on
+                FROM
+                    sequencing_group FOR SYSTEM_TIME ALL
+                WHERE
+                    {wheres}
+                GROUP BY
+                    id
+            ) AS sg_timequery ON sg.id = sg_timequery.id
+            """
+            )
+
+        if filter_.has_cram is not None or filter_.has_gvcf is not None:
+            exclude_fields.extend(['has_cram', 'has_gvcf'])
+            wheres, values = filter_.to_sql(
+                sql_overrides, only=['has_cram', 'has_gvcf']
+            )
+            query_values.update(values)
+            _query.append(
+                f"""
+            INNER JOIN (
+                SELECT
+                    sequencing_group_id,
+                    FIND_IN_SET('cram', GROUP_CONCAT(LOWER(anlysis_query.type))) > 0 AS has_cram,
+                    FIND_IN_SET('gvcf', GROUP_CONCAT(LOWER(anlysis_query.type))) > 0 AS has_gvcf
+                FROM
+                    analysis_sequencing_group
+                    INNER JOIN (
+                        SELECT
+                            id, type
+                        FROM
+                            analysis
+                    ) AS anlysis_query ON analysis_sequencing_group.analysis_id = anlysis_query.id
+                GROUP BY
+                    sequencing_group_id
+                HAVING
+                    {wheres}
+            ) AS sg_filequery ON sg.id = sg_filequery.sequencing_group_id
+            """
+            )
+
+        # Add the rest of the filters
+        wheres, values = filter_.to_sql(sql_overrides, exclude=exclude_fields)
+        _query.append(
+            f"""
+            WHERE {wheres}"""
+        )
+        query_values.update(values)
+
+        rows = await self.connection.fetch_all('\n'.join(_query), query_values)
         sgs = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
         projects = set(sg.project for sg in sgs)
         return projects, sgs
@@ -166,9 +266,9 @@ class SequencingGroupTable(DbBase):
         WHERE project = :project
         """
         rows = await self.connection.fetch_all(_query, {'project': self.project})
-        sequencing_group_ids_by_sample_ids_by_type: dict[
-            int, dict[str, list[int]]
-        ] = defaultdict(lambda: defaultdict(list))
+        sequencing_group_ids_by_sample_ids_by_type: dict[int, dict[str, list[int]]] = (
+            defaultdict(lambda: defaultdict(list))
+        )
         for row in rows:
             sample_id = row['sid']
             sg_id = row['sgid']

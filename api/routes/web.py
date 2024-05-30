@@ -1,6 +1,8 @@
+# pylint: disable=kwarg-superseded-by-positional-arg
 """
 Web routes
 """
+
 from typing import Optional
 
 from fastapi import APIRouter, Request
@@ -16,6 +18,7 @@ from db.python.layers.search import SearchLayer
 from db.python.layers.seqr import SeqrLayer
 from db.python.layers.web import SearchItem, WebLayer
 from db.python.tables.project import ProjectPermissionsTable
+from models.enums.web import SeqrDatasetType
 from models.models.search import SearchResponse
 from models.models.web import PagingLinks, ProjectSummary
 
@@ -56,12 +59,12 @@ async def get_project_summary(
         new_token = max(int(sample.id) for p in participants for sample in p.samples)
 
     links = PagingLinks(
-        next=str(request.base_url)
-        + request.url.path.lstrip('/')
-        + f'?token={new_token}'
-        if new_token
-        else None,
         self=str(request.url),
+        next=(
+            str(request.base_url) + request.url.path.lstrip('/') + f'?token={new_token}'
+            if new_token
+            else None
+        ),
         token=str(new_token) if new_token else None,
     )
 
@@ -102,6 +105,7 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
 )
 async def sync_seqr_project(
     sequencing_type: str,
+    es_index_types: list[SeqrDatasetType],
     sync_families: bool = True,
     sync_individual_metadata: bool = True,
     sync_individuals: bool = True,
@@ -113,6 +117,7 @@ async def sync_seqr_project(
 ):
     """
     Sync a metamist project with its seqr project (for a specific sequence type)
+    es_index_types: list of any of 'Haplotypecaller', 'SV_Caller', 'Mitochondria_Caller'
     """
     seqr = SeqrLayer(connection)
     try:
@@ -122,6 +127,7 @@ async def sync_seqr_project(
             sync_individual_metadata=sync_individual_metadata,
             sync_individuals=sync_individuals,
             sync_es_index=sync_es_index,
+            es_index_types=es_index_types,
             sync_saved_variants=sync_saved_variants,
             sync_cram_map=sync_cram_map,
             post_slack_notification=post_slack_notification,

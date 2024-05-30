@@ -221,7 +221,7 @@ class TestWeb(DbIsolatedTest):
             seqr_sync_types=[],
         )
 
-        self.assertEqual(expected, result)
+        self.assertDataclassEqual(expected, result)
 
     @run_as_sync
     async def test_project_summary_single_entry(self):
@@ -232,7 +232,7 @@ class TestWeb(DbIsolatedTest):
         result = await self.webl.get_project_summary(token=0, grid_filter=[])
 
         result.participants = []
-        self.assertEqual(SINGLE_PARTICIPANT_RESULT, result)
+        self.assertDataclassEqual(SINGLE_PARTICIPANT_RESULT, result)
 
     @run_as_sync
     async def test_project_summary_to_external(self):
@@ -281,7 +281,7 @@ class TestWeb(DbIsolatedTest):
             token=0,
             grid_filter=[
                 SearchItem(
-                    model_type=MetaSearchEntityPrefix.ASSAY,
+                    type=MetaSearchEntityPrefix.ASSAY,
                     query='M001',
                     field='batch',
                     is_meta=True,
@@ -289,7 +289,7 @@ class TestWeb(DbIsolatedTest):
             ],
         )
         filtered_result_success.participants = []
-        self.assertEqual(SINGLE_PARTICIPANT_RESULT, filtered_result_success)
+        self.assertDataclassEqual(SINGLE_PARTICIPANT_RESULT, filtered_result_success)
 
     @run_as_sync
     async def project_summary_with_filter_no_results(self):
@@ -298,7 +298,7 @@ class TestWeb(DbIsolatedTest):
             token=0,
             grid_filter=[
                 SearchItem(
-                    model_type=MetaSearchEntityPrefix.ASSAY,
+                    type=MetaSearchEntityPrefix.ASSAY,
                     query='M002',
                     field='batch',
                     is_meta=True,
@@ -323,7 +323,7 @@ class TestWeb(DbIsolatedTest):
             seqr_sync_types=[],
         )
 
-        self.assertEqual(empty_result, filtered_result_empty)
+        self.assertDataclassEqual(empty_result, filtered_result_empty)
 
     @run_as_sync
     async def test_project_summary_multiple_participants(self):
@@ -376,7 +376,7 @@ class TestWeb(DbIsolatedTest):
 
         two_samples_result.participants = []
 
-        self.assertEqual(expected_data_two_samples, two_samples_result)
+        self.assertDataclassEqual(expected_data_two_samples, two_samples_result)
 
     @run_as_sync
     async def test_project_summary_multiple_participants_and_filter(self):
@@ -427,7 +427,7 @@ class TestWeb(DbIsolatedTest):
             token=0,
             grid_filter=[
                 SearchItem(
-                    model_type=MetaSearchEntityPrefix.SAMPLE,
+                    type=MetaSearchEntityPrefix.SAMPLE,
                     query='sample_id002',
                     field='external_id',
                     is_meta=False,
@@ -436,7 +436,7 @@ class TestWeb(DbIsolatedTest):
         )
         two_samples_result_filtered.participants = []
 
-        self.assertEqual(
+        self.assertDataclassEqual(
             expected_data_two_samples_filtered, two_samples_result_filtered
         )
 
@@ -451,7 +451,7 @@ class TestWeb(DbIsolatedTest):
             token=0,
             grid_filter=[
                 SearchItem(
-                    model_type=MetaSearchEntityPrefix.ASSAY,
+                    type=MetaSearchEntityPrefix.ASSAY,
                     query='field wi',
                     field='field with spaces',
                     is_meta=True,
@@ -499,7 +499,9 @@ class TestWeb(DbIsolatedTest):
             seqr_sync_types=[],
         )
 
-        self.assertEqual(expected_data_two_samples_filtered, test_field_with_space)
+        self.assertDataclassEqual(
+            expected_data_two_samples_filtered, test_field_with_space
+        )
 
     @run_as_sync
     async def test_project_summary_inactive_sequencing_group(self):

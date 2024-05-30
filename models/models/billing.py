@@ -135,25 +135,13 @@ class BillingColumn(str, Enum):
     def raw_cols(cls) -> list[str]:
         """Return list of raw column names"""
         return [
-            BillingColumn.ID.value,
             BillingColumn.TOPIC.value,
-            BillingColumn.SERVICE.value,
             BillingColumn.SKU.value,
             BillingColumn.USAGE_START_TIME.value,
             BillingColumn.USAGE_END_TIME.value,
-            BillingColumn.PROJECT.value,
             BillingColumn.LABELS.value,
-            BillingColumn.SYSTEM_LABELS.value,
-            BillingColumn.LOCATION.value,
-            BillingColumn.EXPORT_TIME.value,
             BillingColumn.COST.value,
             BillingColumn.CURRENCY.value,
-            BillingColumn.CURRENCY_CONVERSION_RATE.value,
-            BillingColumn.USAGE.value,
-            BillingColumn.CREDITS.value,
-            BillingColumn.INVOICE.value,
-            BillingColumn.COST_TYPE.value,
-            BillingColumn.ADJUSTMENT_INFO.value,
         ]
 
     @classmethod
@@ -243,7 +231,11 @@ class BillingTotalCostQueryModel(SMBase):
             # add filters as attributes
             for fk, fv in self.filters.items():
                 # fk is BillColumn, fv is value
-                setattr(billing_filter, fk.value, GenericBQFilter(eq=fv))
+                # if fv is a list, then use IN filter
+                if isinstance(fv, list):
+                    setattr(billing_filter, fk.value, GenericBQFilter(in_=fv))
+                else:
+                    setattr(billing_filter, fk.value, GenericBQFilter(eq=fv))
 
         return billing_filter
 
@@ -358,9 +350,191 @@ class BillingCostBudgetRecord(SMBase):
         )
 
 
-class BillingHailBatchCostRecord(SMBase):
-    """Return class for the Billing Cost by batch_id/ar_guid"""
+class AnalysisCostRecordTotal(SMBase):
+    """A model of attributes about the total for an analysis"""
 
     ar_guid: str | None
-    batch_ids: list[str] | None
-    costs: list[dict] | None
+    cost: float | None
+    usage_start_time: datetime.datetime | None
+    usage_end_time: datetime.datetime | None
+
+
+class AnalysisCostRecordSku(SMBase):
+    """Cost for an SKU"""
+
+    sku: str
+    cost: float
+
+
+class AnalysisCostRecordSeqGroup(SMBase):
+    """
+    Cost of a sequencing_group for some stage
+        sequencing_group = None: cost of all jobs for a stage without a sg
+        stage = None: cost of all jobs for a sg without a stage
+    """
+
+    sequencing_group: str | None
+    stage: str | None
+    cost: float
+
+
+class AnalysisCostRecordBatchJob(SMBase):
+    """Hail batch container cost record"""
+
+    job_id: str
+    job_name: str | None
+    skus: list[AnalysisCostRecordSku]
+    cost: float
+    usage_start_time: datetime.datetime
+    usage_end_time: datetime.datetime
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        return AnalysisCostRecordBatchJob(
+            job_id=d['job_id'],
+            job_name=d.get('job_name'),
+            skus=[AnalysisCostRecordSku.from_dict(row) for row in d.get('skus') or []],
+            cost=d['cost'],
+            usage_start_time=d['usage_start_time'],
+            usage_end_time=d['usage_end_time'],
+        )
+
+
+class AnalysisCostRecordBatch(SMBase):
+    """
+    A list of these is on the 'BillingBatchCostRecord'
+    """
+
+    batch_id: str
+    batch_name: str | None
+    cost: float
+    usage_start_time: datetime.datetime
+    usage_end_time: datetime.datetime
+    jobs_cnt: int
+    skus: list[AnalysisCostRecordSku]
+    jobs: list[AnalysisCostRecordBatchJob]
+    seq_groups: list[AnalysisCostRecordSeqGroup]
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        return AnalysisCostRecordBatch(
+            batch_id=d['batch_id'],
+            batch_name=d.get('batch_name'),
+            cost=d['cost'],
+            usage_start_time=d['usage_start_time'],
+            usage_end_time=d['usage_end_time'],
+            jobs_cnt=d['jobs_cnt'],
+            skus=[AnalysisCostRecordSku.from_dict(row) for row in d.get('skus') or []],
+            jobs=[
+                AnalysisCostRecordBatchJob.from_dict(row) for row in d.get('jobs') or []
+            ],
+            seq_groups=[
+                AnalysisCostRecordSeqGroup.from_dict(row)
+                for row in d.get('seq_groups') or []
+            ],
+        )
+
+
+class AnalysisCostRecordCategory(SMBase):
+    """Category, cost, workflows"""
+
+    category: str
+    cost: float
+    workflows: int | None
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        return AnalysisCostRecordCategory(**dict(d))
+
+
+class AnalysisCostRecordTopic(SMBase):
+    """Topic, cost"""
+
+    topic: str
+    cost: float
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        return AnalysisCostRecordTopic(**dict(d))
+
+
+class AnalysisCostRecordWdlTask(SMBase):
+    """Cost of a WDL task"""
+
+    wdl_task_name: str
+    cost: float
+    usage_start_time: datetime.datetime
+    usage_end_time: datetime.datetime
+    skus: list[AnalysisCostRecordSku]
+
+
+class AnalysisCostRecordCromwellSubworkflow(SMBase):
+    """Cost of a Cromwell subworkflow"""
+
+    cromwell_sub_workflow_name: str
+    cost: float
+    usage_start_time: datetime.datetime
+    usage_end_time: datetime.datetime
+    skus: list[AnalysisCostRecordSku]
+
+
+class AnalysisCostRecordCromwellWorkflow(SMBase):
+    """Cost of a Cromwell workflow"""
+
+    cromwell_workflow_id: str
+    cost: float
+    usage_start_time: datetime.datetime
+    usage_end_time: datetime.datetime
+    skus: list[AnalysisCostRecordSku]
+
+
+class AnalysisCostRecord(SMBase):
+    """Return class for the Billing Cost by batch_id/ar_guid"""
+
+    total: AnalysisCostRecordTotal | None
+    topics: list[AnalysisCostRecordTopic] | None
+    categories: list[AnalysisCostRecordCategory] | None
+    batches: list[AnalysisCostRecordBatch] | None
+    skus: list[AnalysisCostRecordSku] | None
+    seq_groups: list[AnalysisCostRecordSeqGroup] | None
+
+    wdl_tasks: list[AnalysisCostRecordWdlTask] | None
+    cromwell_sub_workflows: list[AnalysisCostRecordCromwellSubworkflow] | None
+    cromwell_workflows: list[AnalysisCostRecordCromwellWorkflow] | None
+    dataproc: list[dict] | None
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        """Create BillingBatchCostRecord from json"""
+
+        return AnalysisCostRecord(
+            total=AnalysisCostRecordTotal.from_dict(d['total']),
+            topics=[
+                AnalysisCostRecordTopic.from_dict(row) for row in d.get('topics') or []
+            ],
+            categories=[
+                AnalysisCostRecordCategory.from_dict(row)
+                for row in d.get('categories') or []
+            ],
+            batches=[
+                AnalysisCostRecordBatch.from_dict(row) for row in d.get('batches') or []
+            ],
+            skus=[AnalysisCostRecordSku.from_dict(row) for row in d.get('skus') or []],
+            seq_groups=[
+                AnalysisCostRecordSeqGroup.from_dict(row)
+                for row in d.get('seq_groups') or []
+            ],
+            wdl_tasks=[
+                AnalysisCostRecordWdlTask.from_dict(row)
+                for row in d.get('wdl_tasks') or []
+            ],
+            cromwell_sub_workflows=[
+                AnalysisCostRecordCromwellSubworkflow.from_dict(row)
+                for row in d.get('cromwell_sub_workflows') or []
+            ],
+            cromwell_workflows=[
+                AnalysisCostRecordCromwellWorkflow.from_dict(row)
+                for row in d.get('cromwell_workflows') or []
+            ],
+            dataproc=d.get('dataproc'),
+        )

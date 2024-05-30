@@ -44,7 +44,7 @@ ON DUPLICATE KEY UPDATE
         )
 
     async def get_key_value_rows_for_participant_ids(
-        self, participant_ids=List[int]
+        self, participant_ids: List[int]
     ) -> Dict[int, Dict[str, Any]]:
         """
         Get (participant_id, description, value),
@@ -64,7 +64,9 @@ WHERE participant_id in :participant_ids AND value IS NOT NULL
         )
         formed_key_value_pairs: Dict[int, Dict[str, Any]] = defaultdict(dict)
         for row in rows:
-            pid, key, value = row
+            pid = row['participant_id']
+            key = row['description']
+            value = row['value']
             formed_key_value_pairs[pid][key] = json.loads(value)
 
         return formed_key_value_pairs
@@ -86,7 +88,9 @@ WHERE p.project = :project AND pp.value IS NOT NULL
         rows = await self.connection.fetch_all(_query, {'project': project})
         formed_key_value_pairs: Dict[int, Dict[str, Any]] = defaultdict(dict)
         for row in rows:
-            pid, key, value = row
+            pid = row['participant_id']
+            key = row['description']
+            value = row['value']
             formed_key_value_pairs[pid][key] = json.loads(value)
 
         return formed_key_value_pairs

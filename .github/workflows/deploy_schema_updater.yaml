@@ -1,0 +1,41 @@
+name: Deploy Schema Updater
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: 'read'
+  id-token: 'write'
+
+jobs:
+  build-image:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: "branch-check"
+        name: Fail if branch is not main or dev
+        if: github.event_name == 'workflow_dispatch' && (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev')
+        run: |
+          echo "This workflow should not be triggered with workflow_dispatch on a branch other than main or dev"
+          exit 1
+
+      - id: "google-cloud-auth"
+        name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v2"
+        with:
+          workload_identity_provider: "projects/774248915715/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
+          service_account: "sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com"
+
+      - id: "google-cloud-sdk-setup"
+        name: "Set up Cloud SDK"
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build image with Cloud Build
+        run: |
+          gcloud builds submit --tag gcr.io/sample-metadata/schema-updater:latest --gcs-log-dir=gs://sample-metadata_cloudbuild ./db/deploy
+
+      - name: Deploy image to Cloud Run
+        run: |
+          gcloud run deploy schema-updater --image gcr.io/sample-metadata/schema-updater --platform managed --region australia-southeast1 --no-allow-unauthenticated

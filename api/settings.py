@@ -36,6 +36,12 @@ SAMPLE_CHECKSUM_OFFSET = int(os.getenv('SM_SAMPLECHECKOFFSET', '2'))
 SEQUENCING_GROUP_PREFIX = os.getenv('SM_SEQUENCINGGROUPPREFIX', 'CPGLCL').upper()
 SEQUENCING_GROUP_CHECKSUM_OFFSET = int(os.getenv('SM_SEQUENCINGGROUPCHECKOFFSET', '9'))
 
+COHORT_PREFIX = os.getenv('SM_COHORTPREFIX', 'COH').upper()
+COHORT_CHECKSUM_OFFSET = int(os.getenv('SM_COHORTCHECKOFFSET', '5'))
+
+COHORT_TEMPLATE_PREFIX = os.getenv('SM_COHORTTEMPLATEPREFIX', 'CTPL').upper()
+COHORT_TEMPLATE_CHECKSUM_OFFSET = int(os.getenv('SM_COHORTTEMPLATECHECKOFFSET', '3'))
+
 # billing settings
 BQ_AGGREG_VIEW = os.getenv('SM_GCP_BQ_AGGREG_VIEW')
 BQ_AGGREG_RAW = os.getenv('SM_GCP_BQ_AGGREG_RAW')
@@ -43,6 +49,9 @@ BQ_AGGREG_EXT_VIEW = os.getenv('SM_GCP_BQ_AGGREG_EXT_VIEW')
 BQ_BUDGET_VIEW = os.getenv('SM_GCP_BQ_BUDGET_VIEW')
 BQ_GCP_BILLING_VIEW = os.getenv('SM_GCP_BQ_BILLING_VIEW')
 BQ_BATCHES_VIEW = os.getenv('SM_GCP_BQ_BATCHES_VIEW')
+
+# BQ cost per 1 TB, used to calculate cost of BQ queries
+BQ_COST_PER_TB = 6.25
 
 # This is to optimise BQ queries, DEV table has data only for Mar 2023
 BQ_DAYS_BACK_OPTIMAL = 30  # Look back 30 days for optimal query

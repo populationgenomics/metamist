@@ -34,6 +34,11 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'family_participant',
     'participant_phenotypes',
     'group_member',
+    'cohort_template',
+    'cohort',
+    'cohort_sequencing_group',
+    'analysis_cohort',
+    'analysis_runner',
 ][::-1]
 
 
