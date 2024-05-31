@@ -250,6 +250,7 @@ class ParticipantLayer(BaseLayer):
     ) -> list[ParticipantInternal]:
         """
         Get participants by IDs
+        (note that the list returned need not be ordered as per the pids argument)
         """
         projects, participants = await self.pttable.get_participants_by_ids(pids)
 

@@ -91,7 +91,7 @@ class ParticipantTable(DbBase):
         if not (project or self.project):
             raise ValueError('Must provide project to create participant')
 
-        if not external_ids or PRIMARY_EXTERNAL_ORG not in external_ids:
+        if not external_ids or external_ids.get(PRIMARY_EXTERNAL_ORG, None) is None:
             raise ValueError('Participant must have primary external_id')
 
         audit_log_id = await self.audit_log_id()
@@ -128,7 +128,7 @@ RETURNING id
                 'external_id': eid,
                 'audit_log_id': audit_log_id,
             }
-            for name, eid in external_ids.items()
+            for name, eid in external_ids.items() if eid is not None
         ]
         await self.connection.execute_many(_eid_query, _eid_values)
 
@@ -206,7 +206,10 @@ RETURNING id
                 SET audit_log_id = :audit_log_id
                 WHERE participant_id = :pid AND name IN :names
                 """
-                await self.connection.execute(_audit_update_query, {'pid': participant_id, 'names': to_delete})
+                await self.connection.execute(
+                    _audit_update_query,
+                    {'pid': participant_id, 'names': to_delete, 'audit_log_id': audit_log_id},
+                )
 
                 _delete_query = """
                 DELETE FROM participant_external_id

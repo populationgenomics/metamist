@@ -157,7 +157,7 @@ class SampleTable(DbBase):
         """
         Create a new sample, and add it to database
         """
-        if not external_ids or PRIMARY_EXTERNAL_ORG not in external_ids:
+        if not external_ids or external_ids.get(PRIMARY_EXTERNAL_ORG, None) is None:
             raise ValueError('Sample must have primary external_id')
 
         audit_log_id = await self.audit_log_id()
@@ -196,7 +196,7 @@ class SampleTable(DbBase):
                 'external_id': eid,
                 'audit_log_id': audit_log_id,
             }
-            for name, eid in external_ids.items()
+            for name, eid in external_ids.items() if eid is not None
         ]
         await self.connection.execute_many(_eid_query, _eid_values)
 
@@ -236,7 +236,10 @@ class SampleTable(DbBase):
                 SET audit_log_id = :audit_log_id
                 WHERE sample_id = :id AND name IN :names
                 """
-                await self.connection.execute(_audit_update_query, {'id': id_, 'names': to_delete})
+                await self.connection.execute(
+                    _audit_update_query,
+                    {'id': id_, 'names': to_delete, 'audit_log_id': audit_log_id},
+                )
 
                 _delete_query = """
                 DELETE FROM sample_external_id
@@ -542,6 +545,7 @@ class SampleTable(DbBase):
         keys = [
             's.id',
             'JSON_OBJECTAGG(seid.name, seid.external_id) AS external_ids',
+            's.participant_id',
             's.meta',
             's.active',
             's.type',
