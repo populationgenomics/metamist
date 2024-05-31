@@ -4,19 +4,14 @@ This is a simple script to generate 3 participants & its samples in the ourdna p
 Local Backend API needs to run prior executing this script
 
 NOTE: This is WIP and will be updated with more features
-If you want to regenerate the data you would need to 
+If you want to regenerate the data you would need to
 delete records from table sample and participant first
 """
 import argparse
 import asyncio
 
-from metamist.apis import (
-    ParticipantApi,
-)
-from metamist.models import (
-    ParticipantUpsert,
-    SampleUpsert,
-)
+from metamist.apis import ParticipantApi
+from metamist.models import ParticipantUpsert, SampleUpsert
 
 PARTICIPANTS = [
     ParticipantUpsert(
