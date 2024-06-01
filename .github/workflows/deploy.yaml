@@ -14,6 +14,7 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: production
     env:
       DOCKER_BUILDKIT: 1
       BUILDKIT_PROGRESS: plain
@@ -30,7 +31,7 @@ jobs:
         name: "Authenticate to Google Cloud"
         uses: "google-github-actions/auth@v2"
         with:
-          workload_identity_provider: "projects/774248915715/locations/global/workloadIdentityPools/gh-deploy-pool/providers/gh-provider"
+          workload_identity_provider: "projects/774248915715/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
           service_account: "sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com"
 
       - id: "google-cloud-sdk-setup"
@@ -52,8 +53,7 @@ jobs:
 
       - name: Setup build env
         run: |
-          pip install -r requirements-dev.txt
-          pip install -r requirements.txt
+          pip install --no-deps -r requirements-dev.txt
           wget https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/5.3.0/openapi-generator-cli-5.3.0.jar -O openapi-generator-cli.jar
 
       - name: prepare-deployment

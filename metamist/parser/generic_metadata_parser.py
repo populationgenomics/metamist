@@ -4,7 +4,7 @@ import logging
 import re
 import shlex
 from functools import reduce
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any
 
 import click
 
@@ -77,39 +77,49 @@ class GenericMetadataParser(GenericParser):
 
     def __init__(
         self,
-        search_locations: List[str],
-        participant_meta_map: Dict[str, str],
-        sample_meta_map: Dict[str, str],
-        assay_meta_map: Dict[str, str],
-        qc_meta_map: Dict[str, str],
         project: str,
+        search_locations: list[str],
         sample_name_column: str,
-        participant_column: Optional[str] = None,
-        assay_id_column: Optional[str] = None,
-        reported_sex_column: Optional[str] = None,
-        reported_gender_column: Optional[str] = None,
-        karyotype_column: Optional[str] = None,
-        reads_column: Optional[str] = None,
-        checksum_column: Optional[str] = None,
-        seq_type_column: Optional[str] = None,
-        seq_technology_column: Optional[str] = None,
-        seq_platform_column: Optional[str] = None,
-        seq_facility_column: Optional[str] = None,
-        seq_library_column: Optional[str] = None,
-        read_end_type_column: Optional[str] = None,
-        read_length_column: Optional[str] = None,
-        gvcf_column: Optional[str] = None,
-        meta_column: Optional[str] = None,
-        seq_meta_column: Optional[str] = None,
-        batch_number: Optional[str] = None,
-        reference_assembly_location_column: Optional[str] = None,
-        default_reference_assembly_location: Optional[str] = None,
-        default_sample_type=None,
+
+        # Participant columns
+        participant_column: str | None = None,
+        reported_sex_column: str | None = None,
+        reported_gender_column: str | None = None,
+        karyotype_column: str | None = None,
+
+        # Sequencing metadata columns
+        seq_type_column: str | None = None,
+        seq_technology_column: str | None = None,
+        seq_platform_column: str | None = None,
+        seq_facility_column: str | None = None,
+        seq_library_column: str | None = None,
+
+        # Assay columns
+        assay_id_column: str | None = None,
+        reads_column: str | None = None,
+        checksum_column: str | None = None,
+        read_end_type_column: str | None = None,
+        read_length_column: str | None = None,
+        reference_assembly_location_column: str | None = None,
+
+        # GVCF columns
+        gvcf_column: str | None = None,
+
+        # Meta field key maps
+        participant_meta_map: dict[str, str] | None = None,
+        sample_meta_map: dict[str, str] | None = None,
+        assay_meta_map: dict[str, str] | None = None,
+        qc_meta_map: dict[str, str] | None = None,
+
+        # Default values
+        default_reference_assembly_location: str | None = None,
+        default_sample_type: str | None = None,
         default_sequencing=DefaultSequencing(
             seq_type='genome', technology='short-read', platform='illumina'
         ),
-        default_read_end_type: Optional[str] = None,
-        default_read_length: Optional[str | int] = None,
+        default_read_end_type: str | None = None,
+        default_read_length: str | int | None = None,
+        batch_number: str | None = None,
         allow_extra_files_in_search_path=False,
         **kwargs,
     ):
@@ -127,41 +137,49 @@ class GenericMetadataParser(GenericParser):
         if not sample_name_column:
             raise ValueError('A sample name column MUST be provided')
 
-        self.cpg_id_column = 'Internal CPG Sample ID'
-
+        self.cpg_id_column = 'Internal CPG Sequencing Group ID'
         self.sample_name_column = sample_name_column
+
+        # Participant columns
         self.participant_column = participant_column
-        self.assay_id_column = assay_id_column
         self.reported_sex_column = reported_sex_column
         self.reported_gender_column = reported_gender_column
         self.karyotype_column = karyotype_column
+
+        # Sequencing metadata columns
         self.seq_type_column = seq_type_column
         self.seq_technology_column = seq_technology_column
         self.seq_platform_column = seq_platform_column
         self.seq_facility_column = seq_facility_column
         self.seq_library_column = seq_library_column
+
+        # Assay columns
+        self.assay_id_column = assay_id_column
+        self.reads_column = reads_column
+        self.checksum_column = checksum_column
         self.read_end_type_column = read_end_type_column
         self.read_length_column = read_length_column
         self.reference_assembly_location_column = reference_assembly_location_column
-        self.default_reference_assembly_location = default_reference_assembly_location
 
+        # Meta field key maps
         self.participant_meta_map = participant_meta_map or {}
         self.sample_meta_map = sample_meta_map or {}
         self.assay_meta_map = assay_meta_map or {}
         self.qc_meta_map = qc_meta_map or {}
-        self.reads_column = reads_column
-        self.checksum_column = checksum_column
+
+        # GVCF column
         self.gvcf_column = gvcf_column
-        self.meta_column = meta_column
-        self.seq_meta_column = seq_meta_column
-        self.allow_extra_files_in_search_path = allow_extra_files_in_search_path
+
+        # Default values
         self.batch_number = batch_number
+        self.default_reference_assembly_location = default_reference_assembly_location
+        self.allow_extra_files_in_search_path = allow_extra_files_in_search_path
 
     def get_sample_id(self, row: SingleRow) -> str:
         """Get external sample ID from row"""
         return row[self.sample_name_column].strip()
 
-    async def get_cpg_sample_id_from_row(self, row: SingleRow) -> Optional[str]:
+    async def get_cpg_sample_id_from_row(self, row: SingleRow) -> str | None:
         """Get internal cpg id from a row using get_sample_id and an api call"""
         return row.get(self.cpg_id_column, None)
 
@@ -257,18 +275,18 @@ class GenericMetadataParser(GenericParser):
         value = int(value) if value else None
         return value
 
-    def get_assay_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
+    def get_assay_id(self, row: GroupedRow) -> dict[str, str] | None:
         """Get external assay ID from row. Needs to be implemented per parser.
         NOTE: To be re-thought after assay group changes are applied"""
         return None
 
-    def get_participant_id(self, row: SingleRow) -> Optional[str]:
+    def get_participant_id(self, row: SingleRow) -> str | None:
         """Get external participant ID from row"""
         if not self.participant_column or self.participant_column not in row:
             raise ValueError('Participant column does not exist')
         return row[self.participant_column]
 
-    def get_reported_sex(self, row: GroupedRow) -> Optional[int]:
+    def get_reported_sex(self, row: GroupedRow) -> int | None:
         """Get reported sex from grouped row"""
 
         if not self.reported_sex_column:
@@ -289,11 +307,11 @@ class GenericMetadataParser(GenericParser):
             f'{reported_sex} could not be identified as an input for reported_sex'
         )
 
-    def get_reported_gender(self, row: GroupedRow) -> Optional[str]:
+    def get_reported_gender(self, row: GroupedRow) -> str | None:
         """Get reported gender from grouped row"""
         return row[0].get(self.reported_gender_column, None)
 
-    def get_karyotype(self, row: GroupedRow) -> Optional[str]:
+    def get_karyotype(self, row: GroupedRow) -> str | None:
         """Get karyotype from grouped row"""
         return row[0].get(self.karyotype_column, None)
 
@@ -335,8 +353,8 @@ class GenericMetadataParser(GenericParser):
         return self.flatten_irregular_list(fns)
 
     async def check_files_covered_by_rows(
-        self, rows: List[Dict[str, Any]]
-    ) -> List[str]:
+        self, rows: list[dict[str, Any]]
+    ) -> list[str]:
         """
         Check that the files in the search_paths are completely covered by the sample_map
         """
@@ -347,7 +365,7 @@ class GenericMetadataParser(GenericParser):
                     self.get_all_files_from_row(self.get_sample_id(r), r)
                 )
 
-        files_from_rows: List[str] = sum(await asyncio.gather(*filename_promises), [])
+        files_from_rows: list[str] = sum(await asyncio.gather(*filename_promises), [])
         filenames_from_rows = set(f.strip() for f in files_from_rows if f and f.strip())
         relevant_extensions = ('.cram', '.fastq.gz', '.fastq', 'fq.gz', '.fq', '.bam')
 
@@ -388,7 +406,7 @@ class GenericMetadataParser(GenericParser):
         return errors
 
     @staticmethod
-    def merge_dicts(a: Dict, b: Dict):
+    def merge_dicts(a: dict, b: dict):
         """
         Recursively merge two dictionaries:
         - collapse equal values
@@ -421,7 +439,7 @@ class GenericMetadataParser(GenericParser):
         return res
 
     @staticmethod
-    def collapse_arbitrary_meta(key_map: Dict[str, str], row: GroupedRow):
+    def collapse_arbitrary_meta(key_map: dict[str, str], row: GroupedRow):
         """
         This is a little bit tricky
 
@@ -450,7 +468,23 @@ class GenericMetadataParser(GenericParser):
         if not key_map or not row:
             return {}
 
-        def prepare_dict_from_keys(key_parts: List[str], val):
+        def unstring_value(value: Any) -> bool:
+            """Convert strings to boolean or number if possible"""
+            if not isinstance(value, str):
+                return value
+            if value.lower() == 'true':
+                return True
+            if value.lower() == 'false':
+                return False
+            try:
+                return int(value)
+            except ValueError:
+                try:
+                    return float(value)
+                except ValueError:
+                    return value
+
+        def prepare_dict_from_keys(key_parts: list[str], val):
             """Recursive production of dictionary"""
             if len(key_parts) == 1:
                 return {key_parts[0]: val}
@@ -459,27 +493,26 @@ class GenericMetadataParser(GenericParser):
         dicts = []
         for row_key, dict_key in key_map.items():
             if isinstance(row, list):
-                inner_values = [r[row_key] for r in row if r.get(row_key) is not None]
+                inner_values = [unstring_value(r[row_key]) for r in row if r.get(row_key) is not None]
                 if any(isinstance(inner, list) for inner in inner_values):
                     # lists are unhashable
                     value = inner_values
                 else:
-                    value = list(set(inner_values))
+                    value = sorted(set(inner_values), key=str)  # sorted for unit test consistency
                     if len(value) == 0:
                         continue
                     if len(value) == 1:
-                        value = value[0]
+                        value = unstring_value(value[0])
             else:
                 if row_key not in row:
                     continue
-                value = row[row_key]
-
+                value = unstring_value(row[row_key])
             dicts.append(prepare_dict_from_keys(dict_key.split('.'), value))
 
         return reduce(GenericMetadataParser.merge_dicts, dicts)
 
     @staticmethod
-    def process_filename_value(string: Union[str, List[str]]) -> List[str]:
+    def process_filename_value(string: str | list[str]) -> list[str]:
         """
         Split on multiple delimiters, ;,
 
@@ -519,8 +552,8 @@ class GenericMetadataParser(GenericParser):
         return filenames
 
     async def get_read_filenames(
-        self, sample_id: Optional[str], row: SingleRow
-    ) -> List[str]:
+        self, sample_id: str | None, row: SingleRow
+    ) -> list[str]:
         """Get paths to reads from a row"""
         if not self.reads_column or self.reads_column not in row:
             return []
@@ -528,8 +561,8 @@ class GenericMetadataParser(GenericParser):
         return self.process_filename_value(row[self.reads_column])
 
     async def get_checksums_from_row(
-        self, sample_id: Optional[str], row: SingleRow, read_filenames: List[str]
-    ) -> Optional[List[Optional[str]]]:
+        self, sample_id: str | None, row: SingleRow, read_filenames: list[str]
+    ) -> list[str | None] | None:
         """
         Get checksums for some row, you must either return:
             - no elements, or
@@ -542,12 +575,12 @@ class GenericMetadataParser(GenericParser):
 
         return self.process_filename_value(row[self.checksum_column])
 
-    async def get_gvcf_filenames(self, sample_id: str, row: GroupedRow) -> List[str]:
+    async def get_gvcf_filenames(self, sample_id: str, row: GroupedRow) -> list[str]:
         """Get paths to gvcfs from a row"""
         if not self.gvcf_column:
             return []
 
-        gvcf_filenames: List[str] = []
+        gvcf_filenames: list[str] = []
         for r in row if isinstance(row, list) else [row]:
             if self.gvcf_column in r:
                 gvcf_filenames.extend(self.process_filename_value(r[self.gvcf_column]))
@@ -573,24 +606,24 @@ class GenericMetadataParser(GenericParser):
                 await self.get_cpg_sample_id_from_row(sequencing_group.rows[0])
             )
 
-        gvcf_filenames: List[str] = []
+        gvcf_filenames: list[str] = []
 
         for r in sequencing_group.rows:
             if self.gvcf_column and self.gvcf_column in r:
                 gvcf_filenames.extend(self.process_filename_value(r[self.gvcf_column]))
 
         # strip in case collaborator put "file1, file2"
-        full_gvcf_filenames: List[str] = []
+        full_gvcf_filenames: list[str] = []
 
         if gvcf_filenames:
             full_gvcf_filenames.extend(
                 self.file_path(f.strip()) for f in gvcf_filenames if f.strip()
             )
 
-        variant_file_types: Dict[str, Dict[str, List]] = await self.parse_files(
+        variant_file_types: dict[str, dict[str, list]] = await self.parse_files(
             sequencing_group.sample.external_sid, full_gvcf_filenames, None
         )
-        variants: Dict[str, List] = variant_file_types.get('variants')
+        variants: dict[str, list] = variant_file_types.get('variants')
 
         if variants:
             if 'gvcf' in variants:
@@ -604,10 +637,10 @@ class GenericMetadataParser(GenericParser):
         return meta
 
     async def get_read_and_ref_files_and_checksums(self, sample_id: str, rows: GroupedRow) -> (
-            Tuple[List[str], List[str], Set[str]]):
+            tuple[list[str], list[str], set[str]]):
         """Get read filenames and checksums from rows."""
-        read_filenames: List[str] = []
-        read_checksums: List[str] = []
+        read_filenames: list[str] = []
+        read_checksums: list[str] = []
         reference_assemblies: set[str] = set()
         for r in rows:
             _rfilenames = await self.get_read_filenames(sample_id=sample_id, row=r)
@@ -671,15 +704,15 @@ class GenericMetadataParser(GenericParser):
         )
 
         # strip in case collaborator put "file1, file2"
-        full_read_filenames: List[str] = []
+        full_read_filenames: list[str] = []
         if read_filenames:
             full_read_filenames.extend(
                 self.file_path(f.strip()) for f in read_filenames if f.strip()
             )
-        read_file_types: Dict[str, Dict[str, List]] = await self.parse_files(
+        read_file_types: dict[str, dict[str, list]] = await self.parse_files(
             sample.external_sid, full_read_filenames, read_checksums
         )
-        reads: Dict[str, List] = read_file_types.get('reads')
+        reads: dict[str, list] = read_file_types.get('reads')
         if not reads:
             return []
 
@@ -784,18 +817,11 @@ class GenericMetadataParser(GenericParser):
     required=True,
     help='The metamist project ($DATASET) to import manifest into',
 )
+@click.option('--search-path', multiple=True, required=True)
 @click.option('--sample-name-column', required=True)
 @click.option(
     '--participant-column',
     help='Column where the external participant id is held',
-)
-@click.option(
-    '--reads-column',
-    help='Column where the reads information is held, comma-separated if multiple',
-)
-@click.option(
-    '--gvcf-column',
-    help='Column where the reads information is held, comma-separated if multiple',
 )
 @click.option(
     '--reported-sex-column',
@@ -810,10 +836,12 @@ class GenericMetadataParser(GenericParser):
     help='Column where the karyotype is held',
 )
 @click.option(
-    '--qc-meta-field-map',
-    nargs=2,
-    multiple=True,
-    help='Two arguments per listing, eg: --qc-meta-field "name-in-manifest" "name-in-analysis.meta"',
+    '--reads-column',
+    help='Column where the reads information is held, comma-separated if multiple',
+)
+@click.option(
+    '--gvcf-column',
+    help='Column where the reads information is held, comma-separated if multiple',
 )
 @click.option(
     '--participant-meta-field',
@@ -848,34 +876,37 @@ class GenericMetadataParser(GenericParser):
     multiple=True,
     help='Two arguments per listing, eg: --assay-meta-field "name-in-manifest" "name-in-assay.meta"',
 )
+@click.option(
+    '--qc-meta-field-map',
+    nargs=2,
+    multiple=True,
+    help='Two arguments per listing, eg: --qc-meta-field "name-in-manifest" "name-in-analysis.meta"',
+)
 @click.option('--default-sample-type', default='blood')
-@click.option('--default-assay-type', default='wgs')
 @click.option(
     '--confirm', is_flag=True, help='Confirm with user input before updating server'
 )
-@click.option('--search-path', multiple=True, required=True)
 @click.argument('manifests', nargs=-1)
 @run_as_sync
 async def main(
     manifests,
-    search_path: list[str],
     project,
+    search_path: list[str],
     sample_name_column: str,
-    participant_meta_field: List[str],
-    participant_meta_field_map: List[Tuple[str, str]],
-    sample_meta_field: List[str],
-    sample_meta_field_map: List[Tuple[str, str]],
-    assay_meta_field: List[str],
-    assay_meta_field_map: List[Tuple[str, str]],
-    qc_meta_field_map: List[Tuple[str, str]] = None,
-    reads_column: Optional[str] = None,
-    gvcf_column: Optional[str] = None,
-    participant_column: Optional[str] = None,
-    reported_sex_column: Optional[str] = None,
-    reported_gender_column: Optional[str] = None,
-    karyotype_column: Optional[str] = None,
-    default_sample_type: Optional[str] = None,
-    default_assay_type='sequencing',
+    participant_column: str | None = None,
+    reported_sex_column: str | None = None,
+    reported_gender_column: str | None = None,
+    karyotype_column: str | None = None,
+    participant_meta_field: list[str] | None = None,
+    participant_meta_field_map: list[tuple[str, str]] | None = None,
+    sample_meta_field: list[str] | None = None,
+    sample_meta_field_map: list[tuple[str, str]] | None = None,
+    assay_meta_field: list[str] | None = None,
+    assay_meta_field_map: list[tuple[str, str]] | None = None,
+    qc_meta_field_map: list[tuple[str, str]] = None,
+    reads_column: str | None = None,
+    gvcf_column: str | None = None,
+    default_sample_type: str | None = None,
     confirm=False,
 ):
     """Run script from CLI arguments"""
@@ -886,9 +917,9 @@ async def main(
     if extra_search_paths:
         search_path = list(set(search_path).union(set(extra_search_paths)))
 
-    participant_meta_map: Dict[Any, Any] = {}
-    sample_meta_map: Dict[Any, Any] = {}
-    assay_meta_map: Dict[Any, Any] = {}
+    participant_meta_map: dict[Any, Any] = {}
+    sample_meta_map: dict[Any, Any] = {}
+    assay_meta_map: dict[Any, Any] = {}
 
     qc_meta_map = dict(qc_meta_field_map or {})
     if participant_meta_field_map:
@@ -908,15 +939,15 @@ async def main(
         project=project,
         sample_name_column=sample_name_column,
         participant_column=participant_column,
+        reported_sex_column=reported_sex_column,
+        reported_gender_column=reported_gender_column,
+        karyotype_column=karyotype_column,
         participant_meta_map=participant_meta_map,
         sample_meta_map=sample_meta_map,
         assay_meta_map=assay_meta_map,
         qc_meta_map=qc_meta_map,
         reads_column=reads_column,
         gvcf_column=gvcf_column,
-        reported_sex_column=reported_sex_column,
-        reported_gender_column=reported_gender_column,
-        karyotype_column=karyotype_column,
         default_sample_type=default_sample_type,
         default_sequencing=DefaultSequencing(
             seq_type='genome', technology='short-read', platform='illumina'

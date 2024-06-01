@@ -17,7 +17,7 @@ class BillingArBatchTable(BillingBaseTable):
 
     async def get_batches_by_ar_guid(
         self, ar_guid: str
-    ) -> tuple[datetime, datetime, list[str]]:
+    ) -> tuple[datetime | None, datetime | None, list[str]]:
         """
         Get batches for given ar_guid
         """
@@ -46,16 +46,24 @@ class BillingArBatchTable(BillingBaseTable):
         # return empty list if no record found
         return None, None, []
 
-    async def get_ar_guid_by_batch_id(self, batch_id: str) -> str:
+    async def get_ar_guid_by_batch_id(
+        self, batch_id: str | None
+    ) -> tuple[datetime | None, datetime | None, str | None]:
         """
-        Get ar_guid for given batch_id
+        Get ar_guid for given batch_id,
+        if batch_id is found, but not ar_guid, then return batch_id back
         """
+        if batch_id is None:
+            return None, None, None
+
         _query = f"""
-        SELECT ar_guid
+        SELECT ar_guid,
+            MIN(min_day) as start_day,
+            MAX(max_day) as end_day
         FROM `{self.table_name}`
         WHERE batch_id = @batch_id
-        AND ar_guid IS NOT NULL
-        LIMIT 1;
+        GROUP BY ar_guid
+        ORDER BY ar_guid DESC;  -- make NULL values appear last
         """
 
         query_parameters = [
@@ -63,7 +71,17 @@ class BillingArBatchTable(BillingBaseTable):
         ]
         query_job_result = self._execute_query(_query, query_parameters)
         if query_job_result:
-            return query_job_result[0]['ar_guid']
+            if len(query_job_result) > 1 and query_job_result[1]['ar_guid'] is not None:
+                raise ValueError(f'Multiple ARs found for batch_id: {batch_id}')
+
+            ar_guid = query_job_result[0]['ar_guid']
+            start_day = query_job_result[0]['start_day']
+            end_day = query_job_result[0]['end_day'] + timedelta(days=1)
+            if ar_guid:
+                return start_day, end_day, ar_guid
+
+            # if ar_guid not found but batch_id exists
+            return start_day, end_day, batch_id
 
         # return None if no ar_guid found
-        return None
+        return None, None, None

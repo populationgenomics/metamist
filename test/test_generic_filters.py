@@ -24,6 +24,38 @@ class TestGenericFilters(unittest.TestCase):
         self.assertEqual('test_string = :test_string_eq', sql)
         self.assertDictEqual({'test_string_eq': 'test'}, values)
 
+    def test_contains_case_sensitive(self):
+        """Test that the basic filter converts to SQL as expected"""
+        filter_ = GenericFilterTest(test_string=GenericFilter(contains='test'))
+        sql, values = filter_.to_sql()
+
+        self.assertEqual('test_string LIKE :test_string_contains', sql)
+        self.assertDictEqual({'test_string_contains': '%test%'}, values)
+
+    def test_malicious_contains(self):
+        """Test that a contains-% filter converts to SQL by appropriately encoding _ and %"""
+        filter_ = GenericFilterTest(test_string=GenericFilter(contains='per%ce_nt'))
+        sql, values = filter_.to_sql()
+
+        self.assertEqual('test_string LIKE :test_string_contains', sql)
+        self.assertDictEqual({'test_string_contains': r'%per\%ce\_nt%'}, values)
+
+    def test_icontains_is_not_case_sensitive(self):
+        """Test that the basic filter converts to SQL as expected"""
+        filter_ = GenericFilterTest(test_string=GenericFilter(icontains='test'))
+        sql, values = filter_.to_sql()
+
+        self.assertEqual('LOWER(test_string) LIKE LOWER(:test_string_icontains)', sql)
+        self.assertDictEqual({'test_string_icontains': '%test%'}, values)
+
+    def test_malicious_icontains(self):
+        """Test that an icontains-% filter converts to SQL by appropriately encoding _ and %"""
+        filter_ = GenericFilterTest(test_string=GenericFilter(icontains='per%ce_nt'))
+        sql, values = filter_.to_sql()
+
+        self.assertEqual('LOWER(test_string) LIKE LOWER(:test_string_icontains)', sql)
+        self.assertDictEqual({'test_string_icontains': r'%per\%ce\_nt%'}, values)
+
     def test_basic_override(self):
         """Test that the basic filter with an override converts to SQL as expected"""
         filter_ = GenericFilterTest(test_string=GenericFilter(eq='test'))

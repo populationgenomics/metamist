@@ -69,8 +69,8 @@ class TestExistingCohortParser(DbIsolatedTest):
         expected_sequence_dict = {
             'reference_genome': 'hg38',
             'platform': 'App',
-            'concentration': '100',
-            'volume': '100',
+            'concentration': 100,
+            'volume': 100,
             'fluid_x_tube_id': '220405_FLUIDX1234',
             'reads_type': 'fastq',
             'reads': [
@@ -368,8 +368,8 @@ class TestExistingCohortParser(DbIsolatedTest):
                 expected_sequence_dict = {
                     'reference_genome': 'hg38',
                     'platform': 'App',
-                    'concentration': '100',
-                    'volume': '100',
+                    'concentration': 100,
+                    'volume': 100,
                     'fluid_x_tube_id': '220405_FLUIDX1234',
                     'reads_type': 'fastq',
                     'reads': [

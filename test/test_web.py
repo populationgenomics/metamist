@@ -327,7 +327,7 @@ class TestWeb(DbIsolatedTest):
             token=0,
             grid_filter=[
                 SearchItem(
-                    model_type=MetaSearchEntityPrefix.ASSAY,
+                    type=MetaSearchEntityPrefix.ASSAY,
                     query='M001',
                     field='batch',
                     is_meta=True,
@@ -344,7 +344,7 @@ class TestWeb(DbIsolatedTest):
             token=0,
             grid_filter=[
                 SearchItem(
-                    model_type=MetaSearchEntityPrefix.ASSAY,
+                    type=MetaSearchEntityPrefix.ASSAY,
                     query='M002',
                     field='batch',
                     is_meta=True,
@@ -473,7 +473,7 @@ class TestWeb(DbIsolatedTest):
             token=0,
             grid_filter=[
                 SearchItem(
-                    model_type=MetaSearchEntityPrefix.SAMPLE,
+                    type=MetaSearchEntityPrefix.SAMPLE,
                     query='sample_id002',
                     field='external_id',
                     is_meta=False,
@@ -497,7 +497,7 @@ class TestWeb(DbIsolatedTest):
             token=0,
             grid_filter=[
                 SearchItem(
-                    model_type=MetaSearchEntityPrefix.ASSAY,
+                    type=MetaSearchEntityPrefix.ASSAY,
                     query='field wi',
                     field='field with spaces',
                     is_meta=True,
