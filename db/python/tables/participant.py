@@ -229,13 +229,13 @@ class ParticipantTable(DbBase):
         ]
         query, values = await self._construct_participant_query(filter_, keys=keys)
 
-        if skip:
-            query += '\nOFFSET :offset'
-            values['offset'] = skip
-
         if limit:
             query += '\nLIMIT :limit'
             values['limit'] = limit
+
+        if skip:
+            query += '\nOFFSET :offset'
+            values['offset'] = skip
 
         rows = await self.connection.fetch_all(query, values)
         projects = set(r['project'] for r in rows)

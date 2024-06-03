@@ -99,7 +99,7 @@ class AssayTable(DbBase):
 
         _query = f"""
             SELECT
-                a.id, a.meta, a.project, a.type
+                a.id, a.meta, s.project, a.type, a.sample_id,
                 JSON_OBJECTAGG(aeid.name, aeid.external_id) as external_ids
             FROM assay a
             LEFT JOIN sample s ON s.id = a.sample_id
