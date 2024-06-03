@@ -17,7 +17,7 @@ class WebProject(SMBase):
 class PagingLinks(SMBase):
     """Model for PAGING"""
 
-    self: str
+    current: str
     next: str | None
     token: str | None
 
@@ -70,45 +70,6 @@ class ProjectSummaryInternal:
         )
 
 
-class ProjectParticipantGridResponseInternal(SMBase):
-    # grid
-    participants: list[NestedParticipant]
-    participant_keys: list[tuple[str, str]]
-    sample_keys: list[tuple[str, str]]
-    sequencing_group_keys: list[tuple[str, str]]
-    assay_keys: list[tuple[str, str]]
-
-    @staticmethod
-    def to_external(
-        participants: list[NestedParticipantInternal],
-        token_base_url: str,
-        current_url: str,
-        request_limit: int,
-    ):
-        """Convert to transport model"""
-        collected_samples = sum(
-            len(p.samples) if p.samples else 0 for p in participants
-        )
-        new_token = None
-        if collected_samples >= request_limit:
-            new_token = max(int(p.id) for p in participants)
-
-        links = PagingLinks(
-            next=token_base_url + f'?token={new_token}' if new_token else None,
-            self=current_url,
-            token=str(new_token) if new_token else None,
-        )
-
-        return ProjectParticipantGridResponse(
-            participants=[p.to_external() for p in self.participants],
-            participant_keys=self.participant_keys,
-            sample_keys=self.sample_keys,
-            sequencing_group_keys=self.sequencing_group_keys,
-            assay_keys=self.assay_keys,
-            links=links,
-        )
-
-
 class ProjectSummary(SMBase):
     """Return class for the project summary endpoint"""
 
@@ -128,6 +89,10 @@ class ProjectSummary(SMBase):
 
 
 class ProjectParticipantGridResponse(SMBase):
+    """
+    Web GridResponse including keys
+    """
+
     # grid
     participants: list[NestedParticipant]
     total_results: int
@@ -139,7 +104,7 @@ class ProjectParticipantGridResponse(SMBase):
     links: PagingLinks | None
 
     @staticmethod
-    def construct(
+    def from_params(
         participants: list[NestedParticipantInternal],
         total_results: int,
         token_base_url: str,
@@ -152,8 +117,8 @@ class ProjectParticipantGridResponse(SMBase):
             new_token = max(int(p.id) for p in participants)
 
         links = PagingLinks(
+            current=current_url,
             next=token_base_url + f'?token={new_token}' if new_token else None,
-            self=current_url,
             token=str(new_token) if new_token else None,
         )
 
@@ -171,6 +136,10 @@ class ProjectParticipantGridResponse(SMBase):
 
     @dataclasses.dataclass
     class ParticipantGridEntityKeys:
+        """
+        Tiny dataclass as returntype for get_entity_keys
+        """
+
         participant_keys: list[tuple[str, str]]
         sample_keys: list[tuple[str, str]]
         sequencing_group_keys: list[tuple[str, str]]
@@ -180,6 +149,9 @@ class ProjectParticipantGridResponse(SMBase):
     def get_entity_keys(
         participants: list[NestedParticipantInternal],
     ) -> 'ParticipantGridEntityKeys':
+        """
+        Read through nested participants and full out the keys for the grid response
+        """
         ignore_sample_meta_keys = {'reads', 'vcfs', 'gvcf'}
         ignore_assay_meta_keys = {
             'reads',

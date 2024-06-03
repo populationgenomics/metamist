@@ -51,6 +51,10 @@ class AssayFilter(GenericFilterModel):
 
 
 class BatchStatisticsRow(NamedTuple):
+    """
+    Tiny namedtuple for batch statistics
+    """
+
     batch: str | None
     sequencing_type: str
     sequencing_group_ids: list[tuple[SequencingGroupInternalId, int]]

@@ -98,6 +98,7 @@ class GenericFilter(SMBase, Generic[T]):
     lte: T | None = None
     contains: T | None = None
     icontains: T | None = None
+    startswith: T | None = None
 
     def __repr__(self):
         keys = ['eq', 'in_', 'nin', 'gt', 'gte', 'lt', 'lte', 'contains', 'icontains']
@@ -120,6 +121,7 @@ class GenericFilter(SMBase, Generic[T]):
                 self.lte,
                 self.contains,
                 self.icontains,
+                self.startswith,
             )
         )
 
@@ -218,6 +220,11 @@ class GenericFilter(SMBase, Generic[T]):
             k = self.generate_field_name(column + '_icontains')
             conditionals.append(f'LOWER({column}) LIKE LOWER(:{k})')
             values[k] = self._sql_value_prep(f'%{search_term}%')
+        if self.startswith is not None:
+            search_term = escape_like_term(str(self.startswith))
+            k = self.generate_field_name(column + '_startswith')
+            conditionals.append(f'{column} LIKE :{k}')
+            values[k] = self._sql_value_prep(escape_like_term(search_term) + '%')
 
         return ' AND '.join(conditionals), values
 

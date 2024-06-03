@@ -9,16 +9,17 @@ from models.models.sample import SampleUpsertInternal
 from models.models.sequencing_group import SequencingGroupUpsertInternal
 
 
-def get_participant_to_insert(id_suffix="1"):
+def get_participant_to_insert(id_suffix='1'):
+    """Helper function to create a participant object for insertion into the database"""
     return ParticipantUpsertInternal(
-        external_id="P0" + id_suffix,
+        external_id='P0' + id_suffix,
         meta={'pmeta': 'pvalue'},
         reported_sex=2,
         reported_gender='FEMALE',
         karyotype='XX',
         samples=[
             SampleUpsertInternal(
-                external_id="S0" + id_suffix,
+                external_id='S0' + id_suffix,
                 type='blood',
                 meta={'smeta': 'svalue'},
                 sequencing_groups=[
@@ -48,6 +49,8 @@ def get_participant_to_insert(id_suffix="1"):
 
 
 class TestParticipant(DbIsolatedTest):
+    """Test participant related functionality"""
+
     @run_as_sync
     async def setUp(self) -> None:
         super().setUp()  # type: ignore
@@ -70,7 +73,7 @@ class TestParticipant(DbIsolatedTest):
 
     @run_as_sync
     async def test_graphql_query_by_id(self):
-
+        """Test query by id using graphql"""
         p = await self.player.upsert_participant(get_participant_to_insert())
 
         q = """
@@ -119,8 +122,8 @@ query TestGraphqlQueryById($projectName: String!, $pid: Int!) {
     async def test_query_with_offset(self):
         """Test query providing an offset and a limit"""
 
-        p1 = await self.player.upsert_participant(get_participant_to_insert("1"))
-        p2 = await self.player.upsert_participant(get_participant_to_insert("2"))
+        p1 = await self.player.upsert_participant(get_participant_to_insert('1'))
+        p2 = await self.player.upsert_participant(get_participant_to_insert('2'))
 
         participants = await self.player.query(
             ParticipantFilter(project=GenericFilter(eq=self.project_id)),

@@ -10,13 +10,13 @@ import SeqrSync from './SeqrSync'
 import SummaryStatistics from './SummaryStatistics'
 import TotalsStats from './TotalsStats'
 
-
 interface ProjectSummaryProps {
     projectName: string
 }
 
-export const ProjectSummaryView: React.FunctionComponent<ProjectSummaryProps> = ({ projectName }) => {
-
+export const ProjectSummaryView: React.FunctionComponent<ProjectSummaryProps> = ({
+    projectName,
+}) => {
     const [summary, setSummary] = React.useState<ProjectSummary | undefined>()
 
     const [isLoading, setIsLoading] = React.useState<boolean>(false)
@@ -29,14 +29,14 @@ export const ProjectSummaryView: React.FunctionComponent<ProjectSummaryProps> = 
         }
         setError(undefined)
         setIsLoading(true)
-        new WebApi().getProjectSummary(projectName)
-            .then(resp => {
+        new WebApi()
+            .getProjectSummary(projectName)
+            .then((resp) => {
                 setSummary(resp.data)
                 setIsLoading(false)
             })
             .catch((er: Error) => {
                 setError(er.message)
-
             })
     }, [projectName])
 
@@ -45,25 +45,29 @@ export const ProjectSummaryView: React.FunctionComponent<ProjectSummaryProps> = 
     }
 
     if (error || !summary) {
-        return <MuckError
-            message={`Ah Muck, An error occurred when fetching project summary: ${error}`}
-        />
+        return (
+            <MuckError
+                message={`Ah Muck, An error occurred when fetching project summary: ${error}`}
+            />
+        )
     }
 
-    return <>
-        <TotalsStats summary={summary ?? {}} />
-        <SummaryStatistics
-            projectName={projectName}
-            cramSeqrStats={summary?.cram_seqr_stats ?? {}}
-        />
-        <BatchStatistics
-            projectName={projectName}
-            cramSeqrStats={summary?.cram_seqr_stats ?? {}}
-            batchSequenceStats={summary?.batch_sequencing_group_stats ?? {}}
-        />
-        <hr />
-        <MultiQCReports projectName={projectName} />
-        <SeqrLinks seqrLinks={summary?.seqr_links ?? {}} />
-        <SeqrSync syncTypes={summary?.seqr_sync_types} project={projectName} />
-    </>
+    return (
+        <>
+            <TotalsStats summary={summary ?? {}} />
+            <SummaryStatistics
+                projectName={projectName}
+                cramSeqrStats={summary?.cram_seqr_stats ?? {}}
+            />
+            <BatchStatistics
+                projectName={projectName}
+                cramSeqrStats={summary?.cram_seqr_stats ?? {}}
+                batchSequenceStats={summary?.batch_sequencing_group_stats ?? {}}
+            />
+            <hr />
+            <MultiQCReports projectName={projectName} />
+            <SeqrLinks seqrLinks={summary?.seqr_links ?? {}} />
+            <SeqrSync syncTypes={summary?.seqr_sync_types} project={projectName} />
+        </>
+    )
 }

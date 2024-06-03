@@ -651,14 +651,16 @@ class TestAssay(DbIsolatedTest):
             ),
         ]
 
-        samples = await SampleLayer(self.connection).upsert_samples(samples_to_insert)
+        await SampleLayer(self.connection).upsert_samples(samples_to_insert)
         assay_layer = AssayTable(self.connection)
         rows = await assay_layer.get_assay_type_numbers_by_batch_for_project(
             self.project_id
         )
 
-        assays_in_batch = defaultdict(int)
-        sgs_in_seq_type_batch = defaultdict(lambda: defaultdict(int))
+        assays_in_batch: dict[str, int] = defaultdict(int)
+        sgs_in_seq_type_batch: dict[str, dict[str, int]] = defaultdict(
+            lambda: defaultdict(int)
+        )
         for r in rows:
             # sequencing_group_ids has format [(sg_id, assay_count), ...]
             assays_in_batch[r.batch] += sum(sg[1] for sg in r.sequencing_group_ids)

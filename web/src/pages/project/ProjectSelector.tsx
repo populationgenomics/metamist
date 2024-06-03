@@ -55,7 +55,9 @@ const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({ onProj
                 search
                 selection
                 fluid
-                onChange={(_, data) => onProjectSelect(projectsByName[data?.value] as IMetamistProject)}
+                onChange={(_, data) =>
+                    onProjectSelect(projectsByName[data?.value] as IMetamistProject)
+                }
                 placeholder="Select a project"
                 value={projectName}
                 options={

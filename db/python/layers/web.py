@@ -11,7 +11,7 @@ from db.python.layers.sample import SampleLayer
 from db.python.layers.seqr import SeqrLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisTable
-from db.python.tables.assay import AssayFilter, AssayTable, BatchStatisticsRow
+from db.python.tables.assay import AssayFilter, AssayTable
 from db.python.tables.base import DbBase
 from db.python.tables.participant import ParticipantFilter
 from db.python.tables.project import ProjectPermissionsTable
@@ -27,10 +27,7 @@ from models.models import (
     NestedSampleInternal,
     NestedSequencingGroupInternal,
 )
-from models.models.participant import (
-    NestedParticipantInternal,
-    ParticipantInternal,
-)
+from models.models.participant import NestedParticipantInternal, ParticipantInternal
 from models.models.sample import SampleInternal
 from models.models.sequencing_group import SequencingGroupInternal
 from models.models.web import ProjectSummaryInternal, WebProject
@@ -59,6 +56,7 @@ class WebLayer(BaseLayer):
         return await webdb.query_participants(query, limit)
 
     async def count_participants(self, query: ParticipantFilter) -> int:
+        """Run query to count participants"""
         webdb = WebDb(self.connection)
         return await webdb.count_participants(query)
 
@@ -187,11 +185,10 @@ class WebDb(DbBase):
             SeqrLayer(self._connection).get_synchronisable_types(project_db),
         )
 
-        seen_seq_types = set(cram_number_by_seq_type.keys()).union(
+        seen_seq_types: set[str] = set(cram_number_by_seq_type.keys()).union(
             set(seq_number_by_seq_type.keys())
         )
-        seq_number_by_seq_type_and_batch = defaultdict(dict)
-        list[BatchStatisticsRow]
+        seq_number_by_seq_type_and_batch: dict[str, dict[str, int]] = defaultdict(dict)
         for stat in assay_batch_stats:
             # batch, sequencing_type,
             seq_number_by_seq_type_and_batch[stat.batch][stat.sequencing_type] = len(
@@ -200,7 +197,7 @@ class WebDb(DbBase):
 
         seen_batches = set(a.batch for a in assay_batch_stats)
 
-        sequence_stats: dict[str, dict[str, str]] = {}
+        sequence_stats: dict[str, dict[str, int]] = {}
         cram_seqr_stats = {}
 
         for seq in seen_seq_types:
@@ -240,6 +237,7 @@ class WebDb(DbBase):
     async def query_participants(
         self, query: ParticipantFilter, limit: int | None
     ) -> list[NestedParticipantInternal]:
+        """Use query to build up nested participants"""
         player = ParticipantLayer(self._connection)
         slayer = SampleLayer(self._connection)
         sglayer = SequencingGroupLayer(self._connection)

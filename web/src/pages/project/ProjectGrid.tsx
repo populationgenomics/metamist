@@ -1,11 +1,7 @@
 import _, { capitalize } from 'lodash'
 import * as React from 'react'
-import { Form, Popup, Table as SUITable } from 'semantic-ui-react'
+import { Table as SUITable } from 'semantic-ui-react'
 
-import CloseIcon from '@mui/icons-material/Close'
-import FilterAltIcon from '@mui/icons-material/FilterAlt'
-import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined'
-import { IconButton } from '@mui/material'
 import Table from '../../shared/components/Table'
 import FamilyLink from '../../shared/components/links/FamilyLink'
 import SampleLink from '../../shared/components/links/SampleLink'
@@ -28,91 +24,18 @@ enum MetaSearchEntityPrefix {
     A = 'assay',
 }
 
-interface IValueFilter {
-    filterValues: ProjectParticipantGridFilter
-    updateFilterValues: (e: Partial<ProjectParticipantGridFilter>) => void
-
-    category: MetaSearchEntityPrefix
-    key: string
-    isMeta?: boolean
-    position?: 'top right' | 'top center'
-
-}
-const ValueFilter: React.FC<IValueFilter> = ({ filterValues, category, key, position, updateFilterValues, isMeta = false, ...props }) => {
-    // TODO: remove this type ignore
-    // @ts-ignore
-    const optionsToCheck = category == MetaSearchEntityPrefix.P ? filterValues : filterValues[category]
-    const isHighlighted = key in optionsToCheck
-
-    const [tempValue, setTempValue] = React.useState<string | undefined>(optionsToCheck[key] ?? '')
-
-    const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
-        const updateFilterValue =
-
-            updateFilterValues()
-        // updateFilterValues({
-        //     ...filterValues,
-        //     [category]: {
-        //         ...optionsToCheck,
-        //         [key]: tempValue,
-        //     },
-        // })
-    }
-
-    return <div style={{ position: 'relative' }}>
-        <div style={{ position: 'absolute', top: 0, right: 0 }}>
-            <Popup
-                position={position || 'top right'}
-                trigger={isHighlighted ? <FilterAltIcon /> : <FilterAltOutlinedIcon />}
-                hoverable
-            >
-                <Form onSubmit={onSubmit}>
-                    <Form.Group
-                        inline
-                        style={{ padding: 0, margin: 0 }}
-                    >
-                        <Form.Field style={{ padding: 0, margin: 0 }}>
-                            <Form.Input
-                                action={{ icon: 'search' }}
-                                placeholder="Filter..."
-                                name={name}
-                                value={tempValue}
-                                onChange={(e) =>
-                                    onFilterValueChange(
-                                        e,
-                                        category,
-                                        title
-                                    )
-                                }
-                            />
-                        </Form.Field>
-                        {`${category}.${name}` in filterValues && (
-                            <Form.Field style={{ padding: 0 }}>
-                                <IconButton
-                                    onClick={() =>
-                                        onClear(name, category)
-                                    }
-                                    style={{ padding: 0 }}
-                                >
-                                    <CloseIcon />
-                                </IconButton>
-                            </Form.Field>
-                        )}
-                    </Form.Group>
-                </Form>
-            </Popup>
-        </div>
-    </div>
-}
-
 const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
     participantResponse: summary,
     projectName,
     filterValues,
     updateFilters,
 }) => {
-    if (!summary) return <p><em>No data</em></p>
+    if (!summary)
+        return (
+            <p>
+                <em>No data</em>
+            </p>
+        )
     let headers = [
         {
             name: 'external_id',
@@ -154,7 +77,8 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
         { title: 'Assay', width: summary.assay_keys.length },
     ]
 
-    const [tempFilterValues, setTempFilterValues] = React.useState<ProjectParticipantGridFilter>(filterValues)
+    const [tempFilterValues, setTempFilterValues] =
+        React.useState<ProjectParticipantGridFilter>(filterValues)
 
     const onFilterValueChange = (
         e: React.ChangeEvent<HTMLInputElement>,
@@ -196,6 +120,7 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
 
     return (
         <Table
+            unstackable
             className="projectSummaryGrid"
             celled
             style={{
@@ -243,6 +168,7 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                 ></SUITable.HeaderCell>
                             )
                         }
+                        // debugger
                         return (
                             <SUITable.HeaderCell
                                 key={`filter-${title}-${i}`}
@@ -253,7 +179,12 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                         : '1px solid var(--color-border-default)',
                                 }}
                             >
-                                <ValueFilter />
+                                <ValueFilter
+                                    filterValues={filterValues}
+                                    updateFilterValues={updateFilters}
+                                    category={category}
+                                    filterKey={name}
+                                />
                             </SUITable.HeaderCell>
                         )
                     })}
@@ -309,11 +240,10 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                             sgs = [{}]
                         }
                         return sgs.map((sg, sgidx) =>
-                            ((!!sg?.assays) ? sg.assays : [{ id: 0 }]).map((assay, assayidx) => {
+                            (!!sg?.assays ? sg.assays : [{ id: 0 }]).map((assay, assayidx) => {
                                 const isFirstOfGroup = sidx === 0 && sgidx === 0 && assayidx === 0
                                 const border = '1px solid #dee2e6'
                                 // const border = '1px solid'
-                                // debugger
                                 return (
                                     <SUITable.Row
                                         key={`${p.external_id}-${s.id}-${sg.id}-${assay.id}`}

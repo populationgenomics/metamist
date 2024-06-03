@@ -6,7 +6,6 @@ import ProjectSelector, { IMetamistProject } from './ProjectSelector'
 import { ProjectGridContainer } from './ProjectGridContainer'
 import { ProjectSummaryView } from './ProjectSummary'
 
-
 const ProjectOverview: React.FunctionComponent = () => {
     const navigate = useNavigate()
 
@@ -17,13 +16,19 @@ const ProjectOverview: React.FunctionComponent = () => {
         navigate(`/project/${_project.name}`)
     }
 
-    let body = <p><em>Please select a project</em></p>
+    let body = (
+        <p>
+            <em>Please select a project</em>
+        </p>
+    )
     if (!!projectName) {
-        body = <>
-            <ProjectSummaryView projectName={projectName} />
+        body = (
+            <>
+                <ProjectSummaryView projectName={projectName} />
 
-            <ProjectGridContainer projectName={projectName} />
-        </>
+                <ProjectGridContainer projectName={projectName} />
+            </>
+        )
     }
 
     return (

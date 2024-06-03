@@ -5,6 +5,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Dropdown } from 'semantic-ui-react'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import MuckError from '../../shared/components/MuckError'
+import ErrorBoundary from '../../shared/utilities/errorBoundary'
 import { ProjectParticipantGridFilter, ProjectParticipantGridResponse, WebApi } from '../../sm-api'
 import PageOptions from './PageOptions'
 import ProjectGrid from './ProjectGrid'
@@ -14,8 +15,9 @@ interface IProjectGridContainerProps {
 }
 const PAGE_SIZES = [20, 40, 100, 1000]
 
-
-export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainerProps> = ({ projectName }) => {
+export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainerProps> = ({
+    projectName,
+}) => {
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
     const { page } = useParams()
@@ -28,12 +30,13 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
         validPages ? +pageSize : PAGE_SIZES[0]
     )
     const [pageNumber, _setPageNumber] = React.useState<number>(1)
-    const [tokens, setTokens] = React.useState<(number | undefined)[]>([undefined])
-
+    const [tokens, setTokens] = React.useState<(number | string | undefined)[]>([undefined])
 
     // fetched data
     const [numberOfEntries, setNumberOfEntries] = React.useState<number>(0)
-    const [participants, setParticipants] = React.useState<ProjectParticipantGridResponse | undefined>()
+    const [participants, setParticipants] = React.useState<
+        ProjectParticipantGridResponse | undefined
+    >()
     const [filterValues, _setFilterValues] = React.useState<ProjectParticipantGridFilter>({})
 
     const [isLoading, setIsLoading] = React.useState<boolean>(false)
@@ -42,39 +45,41 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
     const setFilterValues = (values: Partial<ProjectParticipantGridFilter>) => {
         // nested merge
         _setFilterValues(_.merge({}, filterValues, values))
+        // load data with new filter values
+        setPage(1, pageLimit)
     }
 
-    const getParticipantsFor = React.useCallback(
-        (token: number | undefined, _pageLimit: number) => {
-            if (!projectName) {
-                setParticipants(undefined)
-                return
-            }
-            const sanitisedToken = token || undefined
-            setError(undefined)
-            setIsLoading(true)
-            return new WebApi().getProjectParticipantsGridWithLimit(
+    const getParticipantsFor = (token: number | string | undefined, _pageLimit: number) => {
+        if (!projectName) {
+            setParticipants(undefined)
+            return
+        }
+        const sanitisedToken = token || undefined
+        setError(undefined)
+        setIsLoading(true)
+        return new WebApi()
+            .getProjectParticipantsGridWithLimit(
                 projectName,
                 _pageLimit,
                 filterValues,
-                sanitisedToken,
-            ).then(resp => {
+                !!sanitisedToken ? parseInt(sanitisedToken as string) : undefined
+            )
+            .then((resp) => {
                 setParticipants(resp.data)
                 setIsLoading(false)
                 const nextToken = resp.data.links?.token
                 if (nextToken) {
                     setTokens([...(tokens || []), nextToken])
                 }
-            }).catch((er: Error) => {
+            })
+            .catch((er: Error) => {
                 setError(er.message)
                 setIsLoading(false)
             })
-        },
-        [projectName, pageLimit, filterValues]
-    )
+    }
 
     const setPage = (p: number, _pageLimit: number) => {
-        debugger
+        // debugger
         const q: any = { size: _pageLimit }
         const _token = p > 1 ? tokens[p - 1] : undefined
         if (_token) {
@@ -83,7 +88,6 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
         const qq = new URLSearchParams(q).toString()
         navigate(`/project/${projectName}/?${qq}`)
         getParticipantsFor(_token, _pageLimit)
-
     }
 
     const setPageLimit = (pageLimit: number) => {
@@ -100,13 +104,17 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
         return <LoadingDucks />
     }
     if (error) {
-        return <MuckError message={`Ah Muck, An error occurred when fetching project participants: ${error}`} />
+        return (
+            <MuckError
+                message={`Ah Muck, An error occurred when fetching project participants: ${error}`}
+            />
+        )
     }
 
     const handleOnClick = console.log
 
     return (
-        <div>
+        <ErrorBoundary title="Error rendering project grid">
             <div
                 style={{
                     marginBottom: '10px',
@@ -138,8 +146,8 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
                 <ProjectGrid
                     participantResponse={participants}
                     projectName={projectName}
-                    updateFilters={console.log}
-                    filterValues={{}}
+                    updateFilters={setFilterValues}
+                    filterValues={filterValues}
                 />
                 <PageOptions
                     isLoading={isLoading}
@@ -150,6 +158,6 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
                     title="participants"
                 />
             </div>
-        </div>
+        </ErrorBoundary>
     )
 }
