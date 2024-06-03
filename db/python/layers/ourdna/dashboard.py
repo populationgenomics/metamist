@@ -1,4 +1,5 @@
 # pylint: disable=too-many-locals
+import json
 from collections import defaultdict
 from datetime import datetime
 from math import ceil
@@ -6,10 +7,10 @@ from typing import Any
 
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
-from db.python.tables.participant import ParticipantTable
-from db.python.tables.sample import SampleFilter, SampleTable
-from models.models.participant import ParticipantInternal
-from models.models.sample import Sample, SampleInternal
+from db.python.layers.participant import ParticipantLayer
+from db.python.layers.sample import SampleLayer
+from db.python.tables.sample import SampleFilter
+from models.models import ProjectId, Sample, SampleInternal
 
 
 class OurDnaDashboardLayer(BaseLayer):
@@ -21,8 +22,8 @@ class OurDnaDashboardLayer(BaseLayer):
         # TODO initialize other layers here as needed for aggregation
         # self.at = AnalysisRunnerTable(connection)
 
-        self.sample_table = SampleTable(connection)
-        self.participant_table = ParticipantTable(connection)
+        self.sample_layer = SampleLayer(connection)
+        self.participant_layer = ParticipantLayer(connection)
 
     @staticmethod
     def get_meta_property(sample: Sample, property_name: str) -> Any:
@@ -103,18 +104,28 @@ class OurDnaDashboardLayer(BaseLayer):
 
         return int(time_taken.total_seconds())
 
+    def fetch_key_from_meta(self, key: str, meta: str | dict[str, Any]) -> bool:
+        """
+        Fetches a key from the given meta, if it exists, and checks if it is not False or None
+        """
+        if isinstance(meta, str):
+            meta = json.loads(meta)
+        if isinstance(meta, dict):
+            if key in meta:
+                value = meta.get(key)
+                if value is not False and value is not None:
+                    return True
+        return False
+
     async def query(
         self,
         filter_: SampleFilter,
-        check_project_ids: bool = True,
-        project_id: int = None,
+        project_id: ProjectId = None,
     ) -> dict:
         """Get dashboard data"""
-        projects: set[int]
         samples_internal: list[SampleInternal] = []
         samples: list[Sample] = []
-        participants: list[ParticipantInternal] = []
-        sample_participants: list[ParticipantInternal] = []
+        participants: list[tuple[int, dict, dict]] = []
 
         # Data to be returned
         collection_to_process_end_time: dict[str, int] = {}
@@ -129,47 +140,33 @@ class OurDnaDashboardLayer(BaseLayer):
         participants_consented_not_collected: list[int] = []
         participants_signed_not_consented: list[int] = []
 
-        # TODO We should figure out if we need to handle more than a single project_id
-        # for project_id in project_ids:
-        participants.extend(
-            await self.participant_table.get_participants(project=project_id)
-        )
-
-        projects, samples_internal = await self.sample_table.query(filter_=filter_)
+        samples_internal = await self.sample_layer.query(filter_=filter_)
         samples = [s.to_external() for s in samples_internal]
 
-        if check_project_ids:
-            await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
+        participants = (
+            await self.participant_layer.get_participants_and_samples_meta_by_project(
+                project=project_id
             )
+        )
 
-        for participant in participants:
-            samples_for_participant = [
-                sample for sample in samples if sample.participant_id == participant.id
+        # Get the participants who have been consented but have not had a sample collected
+        participants_consented_not_collected.extend(
+            [
+                p[0]
+                for p in participants
+                if self.fetch_key_from_meta('consent', p[1])
+                and not self.fetch_key_from_meta('collection-time', p[2])
             ]
+        )
 
-            # Create a new participant object with the samples for this participant
-            sample_participants.append(
-                participant.copy(update={'samples': samples_for_participant})
-            )
-
-            # Get the samples that have been collected and consented
-            samples_consented_not_collected = [
-                sample
-                for sample in samples_for_participant
-                if participant.meta.get('consent')
-                and self.get_meta_property(
-                    sample=sample, property_name='collection-time'
-                )
-                is None
+        # Get the participants who have signed but have not been consented
+        participants_signed_not_consented.extend(
+            [
+                p[0]
+                for p in participants
+                if not self.fetch_key_from_meta('consent', p[1])
             ]
-
-            if len(samples_consented_not_collected) > 0:
-                participants_consented_not_collected.append(participant.id)
-
-            # Get the participants that have signed but not consented
-            if participant.meta.get('consent') is None:
-                participants_signed_not_consented.append(participant.id)
+        )
 
         # TODO Add logic here to query and aggregate the data
 

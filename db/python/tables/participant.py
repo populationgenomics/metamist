@@ -343,3 +343,20 @@ WHERE {' AND '.join(wheres)}
             },
         )
         return [(r['project'], r['id'], r['external_id']) for r in rows]
+
+    async def get_participants_and_samples_meta_by_project(
+        self, project: ProjectId
+    ) -> list[tuple[int, dict, dict]]:
+        """
+        Get participants who have consented but not collected
+        """
+        _query = """
+        SELECT p.id as participant_id, p.meta as participant_meta, s.meta as sample_meta
+        FROM participant p
+        LEFT JOIN sample s ON p.id = s.participant_id
+        WHERE p.project = :project
+        """
+        rows = await self.connection.fetch_all(_query, {'project': project})
+        return [
+            (r['participant_id'], r['participant_meta'], r['sample_meta']) for r in rows
+        ]
