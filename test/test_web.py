@@ -3,8 +3,8 @@ from test.testbase import DbIsolatedTest, run_as_sync
 from db.python.layers import (
     AssayLayer,
     ParticipantLayer,
+    ProjectInsightsLayer,
     SampleLayer,
-    SeqrProjectsStatsLayer,
     SequencingGroupLayer,
     WebLayer,
 )
@@ -14,10 +14,10 @@ from models.models import (
     AssayInternal,
     AssayUpsertInternal,
     ParticipantUpsertInternal,
+    ProjectInsightsSummaryInternal,
     ProjectSummaryInternal,
     SampleUpsertInternal,
     SearchItem,
-    SeqrProjectsSummaryInternal,
     SequencingGroupUpsertInternal,
     WebProject,
 )
@@ -198,7 +198,7 @@ class TestWeb(DbIsolatedTest):
         super().setUp()
         self.webl = WebLayer(self.connection)
         self.partl = ParticipantLayer(self.connection)
-        self.spsl = SeqrProjectsStatsLayer(self.connection)
+        self.pil = ProjectInsightsLayer(self.connection)
         self.sampl = SampleLayer(self.connection)
         self.seql = AssayLayer(self.connection)
 
@@ -208,15 +208,16 @@ class TestWeb(DbIsolatedTest):
 
         await self.partl.upsert_participant(get_test_participant())
 
-        result = await self.spsl.get_seqr_projects_stats_summary(
-            projects=[self.project_id], sequencing_types=['genome', 'exome']
+        result = await self.pil.get_project_insights_summary(
+            project_ids=[self.project_id], sequencing_types=['genome', 'exome']
         )
 
         expected = [
-            SeqrProjectsSummaryInternal(
+            ProjectInsightsSummaryInternal(
                 project=self.project_id,
                 dataset='test',
                 sequencing_type='genome',
+                sequencing_technology='short-read',
                 total_families=0,
                 total_participants=1,
                 total_samples=1,
@@ -226,10 +227,11 @@ class TestWeb(DbIsolatedTest):
                 latest_snv_es_index=None,
                 latest_sv_es_index=None,
             ),
-            SeqrProjectsSummaryInternal(
+            ProjectInsightsSummaryInternal(
                 project=self.project_id,
                 dataset='test',
                 sequencing_type='exome',
+                sequencing_technology='short-read',
                 total_families=0,
                 total_participants=0,
                 total_samples=0,

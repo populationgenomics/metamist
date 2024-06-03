@@ -37,6 +37,13 @@ from models.models.participant import (
     ParticipantUpsertInternal,
 )
 from models.models.project import Project, ProjectId
+from models.models.project_insights import (
+    AnalysisStats,
+    ProjectInsightsDetails,
+    ProjectInsightsDetailsInternal,
+    ProjectInsightsSummary,
+    ProjectInsightsSummaryInternal,
+)
 from models.models.sample import (
     NestedSample,
     NestedSampleInternal,
@@ -54,13 +61,6 @@ from models.models.search import (
     SearchResponse,
     SearchResponseData,
     SequencingGroupSearchResponseData,
-)
-from models.models.project_insights import (
-    AnalysisStats,
-    ProjectInsightsDetails,
-    ProjectInsightsDetailsInternal,
-    ProjectInsightsSummary,
-    ProjectInsightsSummaryInternal,
 )
 from models.models.sequencing_group import (
     NestedSequencingGroup,

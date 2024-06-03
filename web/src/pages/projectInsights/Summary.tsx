@@ -45,25 +45,8 @@ const Summary: React.FC = () => {
             })
     }, [])
 
-    const handleProjectChange = (projectNames: string[], isSelected: boolean[]) => {
-        let newSelectedProjects: SelectedProject[] = [...selectedProjects]
-
-        projectNames.forEach((projectName, index) => {
-            if (isSelected[index]) {
-                // Add the project to the list of selected projects if it is not already there
-                if (!newSelectedProjects.some((p) => p.name === projectName)) {
-                    const projectIndex = projectNames.indexOf(projectName)
-                    newSelectedProjects.push({
-                        id: projectIds[projectIndex],
-                        name: projectName,
-                    })
-                }
-            } else {
-                // Remove the project from the list of selected projects
-                newSelectedProjects = newSelectedProjects.filter((p) => p.name !== projectName)
-            }
-        })
-        setSelectedProjects(newSelectedProjects)
+    const handleProjectChange = (selectedProjects: { id: number; name: string }[]) => {
+        setSelectedProjects(selectedProjects)
     }
 
     const handleSeqTypeChange = (seqTypes: string[], isSelected: boolean[]) => {
@@ -113,13 +96,13 @@ const Summary: React.FC = () => {
                     name,
                 }))}
                 seqTypes={seqTypes}
-                selectedProjects={selectedProjects.map((p) => p.name)}
+                selectedProjects={selectedProjects}
                 selectedSeqTypes={selectedSeqTypes}
                 onProjectChange={handleProjectChange}
                 onSeqTypeChange={handleSeqTypeChange}
             />
-            <SummaryTable 
-                allData={allData} 
+            <SummaryTable
+                allData={allData}
                 filteredData={filteredData}
                 selectedProjects={selectedProjects}
                 selectedSeqTypes={selectedSeqTypes}

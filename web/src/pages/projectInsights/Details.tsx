@@ -1,6 +1,7 @@
 // Details.tsx
 import React, { useState, useEffect } from 'react'
 import { ProjectInsightsDetails, ProjectApi, ProjectInsightsApi, EnumsApi } from '../../sm-api'
+import { Button } from 'semantic-ui-react'
 import ProjectAndSeqTypeSelector from './ProjectAndSeqTypeSelector'
 import DetailsTable from './DetailsTable'
 
@@ -15,9 +16,11 @@ const Details: React.FC = () => {
     const [projectNames, setProjectNames] = React.useState<string[]>([])
     const [projectIds, setProjectIds] = React.useState<number[]>([])
     const [selectedProjects, setSelectedProjects] = React.useState<SelectedProject[]>([])
+    const [fetchedProjects, setFetchedProjects] = React.useState<SelectedProject[]>([])
     // New state for sequencing types
     const [seqTypes, setSeqTypes] = React.useState<string[]>([])
     const [selectedSeqTypes, setSelectedSeqTypes] = React.useState<string[]>([])
+    const [fetchedSeqTypes, setFetchedSeqTypes] = React.useState<string[]>([])
     // All the filters users can apply to the data
     const [selectedSeqPlatforms, setSelectedSeqPlatforms] = React.useState<string[]>([])
     const [selectedSeqTechnologies, setSelectedSeqTechnologies] = React.useState<string[]>([])
@@ -47,15 +50,6 @@ const Details: React.FC = () => {
                 const projects: { id: number; name: string }[] = projectsResp.data
                 setProjectNames(projects.map((project) => project.name))
                 setProjectIds(projects.map((project) => project.id))
-
-                // Call getProjectsDetails with the project IDs and sequencing types
-                return new ProjectInsightsApi().getProjectInsightsDetails({
-                    project_ids: projects.map((project) => project.id),
-                    sequencing_types: sequencingTypes,
-                })
-            })
-            .then((detailsResp) => {
-                setAllData(detailsResp.data)
             })
             .catch((error) => {
                 // Handle any errors that occur during the API calls
@@ -63,25 +57,8 @@ const Details: React.FC = () => {
             })
     }, [])
 
-    const handleProjectChange = (projectNames: string[], isSelected: boolean[]) => {
-        let newSelectedProjects: SelectedProject[] = [...selectedProjects]
-
-        projectNames.forEach((projectName, index) => {
-            if (isSelected[index]) {
-                // Add the project to the list of selected projects if it is not already there
-                if (!newSelectedProjects.some((p) => p.name === projectName)) {
-                    const projectIndex = projectNames.indexOf(projectName)
-                    newSelectedProjects.push({
-                        id: projectIds[projectIndex],
-                        name: projectName,
-                    })
-                }
-            } else {
-                // Remove the project from the list of selected projects
-                newSelectedProjects = newSelectedProjects.filter((p) => p.name !== projectName)
-            }
-        })
-        setSelectedProjects(newSelectedProjects)
+    const handleProjectChange = (selectedProjects: { id: number; name: string }[]) => {
+        setSelectedProjects(selectedProjects)
     }
 
     const handleSeqTypeChange = (seqTypes: string[], isSelected: boolean[]) => {
@@ -101,10 +78,26 @@ const Details: React.FC = () => {
         setSelectedSeqTypes(newSelectedSeqTypes)
     }
 
+    const fetchSelectedData = async () => {
+        const selectedProjectIds = selectedProjects.map((project) => project.id)
+
+        try {
+            const detailsResp = await new ProjectInsightsApi().getProjectInsightsDetails({
+                project_ids: selectedProjectIds,
+                sequencing_types: selectedSeqTypes,
+            })
+            setAllData(detailsResp.data)
+            setFetchedProjects(selectedProjects)
+            setFetchedSeqTypes(selectedSeqTypes)
+        } catch (error) {
+            console.error('Error fetching selected data:', error)
+        }
+    }
+
     const filteredData = allData.filter(
         (item) =>
-            selectedProjects.some((p) => p.name === item.dataset) &&
-            selectedSeqTypes.includes(item.sequencing_type) &&
+            fetchedProjects.some((p) => p.name === item.dataset) &&
+            fetchedSeqTypes.includes(item.sequencing_type) &&
             (selectedSeqPlatforms.length === 0 ||
                 selectedSeqPlatforms.includes(item.sequencing_platform)) &&
             (selectedSeqTechnologies.length === 0 ||
@@ -123,20 +116,30 @@ const Details: React.FC = () => {
                 selectedSampleExtIds.includes(item.sample_ext_ids[0])) &&
             (selectedSequencingGroupIds.length === 0 ||
                 selectedSequencingGroupIds.includes(item.sequencing_group_id)) &&
+            // (selectedCompletedCram.length === 0 ||
+            //     (selectedCompletedCram.includes('Yes') && item.completed_cram) ||
+            //     (selectedCompletedCram.includes('No') && !item.completed_cram)) &&
             (selectedCompletedCram.length === 0 ||
-                (selectedCompletedCram.includes('Yes') && item.completed_cram) ||
-                (selectedCompletedCram.includes('No') && !item.completed_cram)) &&
+                selectedCompletedCram.includes(item.completed_cram ? 'Yes' : 'No')) &&
+            // (selectedInLatestAnnotateDataset.length === 0 ||
+            //     (selectedInLatestAnnotateDataset.includes('Yes') &&
+            //         item.in_latest_annotate_dataset) ||
+            //     (selectedInLatestAnnotateDataset.includes('No') &&
+            //         !item.in_latest_annotate_dataset)) &&
             (selectedInLatestAnnotateDataset.length === 0 ||
-                (selectedInLatestAnnotateDataset.includes('Yes') &&
-                    item.in_latest_annotate_dataset) ||
-                (selectedInLatestAnnotateDataset.includes('No') &&
-                    !item.in_latest_annotate_dataset)) &&
+                selectedInLatestAnnotateDataset.includes(
+                    item.in_latest_annotate_dataset ? 'Yes' : 'No'
+                )) &&
+            // (selectedInLatestSnvEsIndex.length === 0 ||
+            //     (selectedInLatestSnvEsIndex.includes('Yes') && item.in_latest_snv_es_index) ||
+            //     (selectedInLatestSnvEsIndex.includes('No') && !item.in_latest_snv_es_index)) &&
+            // (selectedInLatestSvEsIndex.length === 0 ||
+            //     (selectedInLatestSvEsIndex.includes('Yes') && item.in_latest_sv_es_index) ||
+            //     (selectedInLatestSvEsIndex.includes('No') && !item.in_latest_sv_es_index)) &&
             (selectedInLatestSnvEsIndex.length === 0 ||
-                (selectedInLatestSnvEsIndex.includes('Yes') && item.in_latest_snv_es_index) ||
-                (selectedInLatestSnvEsIndex.includes('No') && !item.in_latest_snv_es_index)) &&
+                selectedInLatestSnvEsIndex.includes(item.in_latest_snv_es_index ? 'Yes' : 'No')) &&
             (selectedInLatestSvEsIndex.length === 0 ||
-                (selectedInLatestSvEsIndex.includes('Yes') && item.in_latest_sv_es_index) ||
-                (selectedInLatestSvEsIndex.includes('No') && !item.in_latest_sv_es_index)) &&
+                selectedInLatestSvEsIndex.includes(item.in_latest_sv_es_index ? 'Yes' : 'No')) &&
             (selectedStripy.length === 0 ||
                 (selectedStripy.includes('Yes') && item.sequencing_group_report_links?.stripy) ||
                 (selectedStripy.includes('No') && !item.sequencing_group_report_links?.stripy)) &&
@@ -171,7 +174,7 @@ const Details: React.FC = () => {
             case 'sample_id':
                 setSelectedSampleIds(selectedOptions)
                 break
-            case 'sample_ext_id':
+            case 'sample_ext_ids':
                 setSelectedSampleExtIds(selectedOptions)
                 break
             case 'sequencing_group_id':
@@ -208,11 +211,18 @@ const Details: React.FC = () => {
                     name,
                 }))}
                 seqTypes={seqTypes}
-                selectedProjects={selectedProjects.map((p) => p.name)}
+                selectedProjects={selectedProjects}
                 selectedSeqTypes={selectedSeqTypes}
                 onProjectChange={handleProjectChange}
                 onSeqTypeChange={handleSeqTypeChange}
             />
+            <Button
+                primary
+                onClick={fetchSelectedData}
+                disabled={selectedProjects.length === 0 || selectedSeqTypes.length === 0}
+            >
+                Fetch Selected Data
+            </Button>
             <DetailsTable
                 allData={allData}
                 filteredData={filteredData}

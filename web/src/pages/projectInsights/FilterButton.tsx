@@ -29,8 +29,12 @@ const FilterModal: React.FC<FilterModalProps> = ({
     const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(event.target.value)
     }
+    const handlePopupClick = (event: React.MouseEvent<HTMLDivElement>) => {
+        event.stopPropagation() // Avoid sorting the table when clicking inside the popup
+    }
 
-    const handleCheckboxChange = (option: string) => {
+    const handleCheckboxChange = (event: React.FormEvent<HTMLInputElement>, option: string) => {
+        event.stopPropagation()
         const updatedSelectedOptions = selectedOptions.includes(option)
             ? selectedOptions.filter((selectedOption) => selectedOption !== option)
             : [...selectedOptions, option]
@@ -42,23 +46,26 @@ const FilterModal: React.FC<FilterModalProps> = ({
     )
 
     return (
-        <div className="filter-popup-content">
+        <div className="filter-popup-content" onClick={handlePopupClick}>
             <Input
+                style={{ marginBottom: '10px' }}
                 placeholder={`Search ${columnName}`}
                 value={searchTerm}
                 onChange={handleSearch}
             />
-            <List divided relaxed>
-                {filteredOptions.map((option) => (
-                    <List.Item key={option}>
-                        <Checkbox
-                            label={option}
-                            checked={selectedOptions.includes(option)}
-                            onChange={() => handleCheckboxChange(option)}
-                        />
-                    </List.Item>
-                ))}
-            </List>
+            <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                <List divided relaxed>
+                    {filteredOptions.map((option) => (
+                        <List.Item key={option}>
+                            <Checkbox
+                                label={option}
+                                checked={selectedOptions.includes(option)}
+                                onChange={(event) => handleCheckboxChange(event, option)}
+                            />
+                        </List.Item>
+                    ))}
+                </List>
+            </div>
         </div>
     )
 }

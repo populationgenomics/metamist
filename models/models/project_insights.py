@@ -4,18 +4,20 @@ from dataclasses import dataclass
 from models.base import SMBase
 from models.utils import sample_id_format, sequencing_group_id_format
 
+
 @dataclass
 class AnalysisStats:
     """Model for Analysis Sequencing Group Stats"""
     id: int | None = None
     name: str | None = None
     sg_count: int | None = None
+    timestamp: str | None = None
 
     def to_external(self):
         """Convert to transport model"""
         if self.id is None:
             return None
-        return {'id': self.id, 'sg_count': self.sg_count}
+        return {'id': self.id, 'name': self.name, 'sg_count': self.sg_count, 'timestamp': self.timestamp}
 
 
 @dataclass
@@ -135,6 +137,6 @@ class ProjectInsightsSummary(SMBase):
     total_samples: int
     total_sequencing_groups: int
     total_crams: int
-    latest_annotate_dataset: dict[str, int] | None
-    latest_snv_es_index: dict[str, int] | None
-    latest_sv_es_index: dict[str, int] | None
+    latest_annotate_dataset: AnalysisStats | None
+    latest_snv_es_index: AnalysisStats | None
+    latest_sv_es_index: AnalysisStats | None

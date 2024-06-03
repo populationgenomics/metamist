@@ -381,7 +381,7 @@ html[data-theme='dark-mode'] .ui.table {
     width: 100px !important;
 }
 .ui.table .header-cell.collapsible-header:not(.expanded) {
-    width: 50px !important;
+    width: 70px !important;
 }
 
 .ui.table .header-cell.collapsible-header:not(.expanded) .header-text {
@@ -390,15 +390,6 @@ html[data-theme='dark-mode'] .ui.table {
     white-space: nowrap;
     max-width: 100%;
 }
-
-.ui.table .header-cell.collapsible-header.expanded .header-text {
-    visibility: visible;
-}
-
-/* .ui.table .header-cell.collapsible-header .header-text {
-    display: inline-block;
-    vertical-align: middle;
-  } */
 
 .ui.table .category-cell {
     text-align: center;

@@ -64,8 +64,12 @@ const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summar
 
     return (
         <Table.Row key={`${summary.project}-${summary.sequencing_type}`} className={rowClassName}>
-            <Table.Cell data-cell className="category-cell">{summary.dataset}</Table.Cell>
-            <Table.Cell data-cell className="category-cell">{summary.sequencing_type}</Table.Cell>
+            <Table.Cell data-cell className="category-cell">
+                {summary.dataset}
+            </Table.Cell>
+            <Table.Cell data-cell className="category-cell">
+                {summary.sequencing_type}
+            </Table.Cell>
             <Table.Cell className="table-cell">{summary.sequencing_technology}</Table.Cell>
             <Table.Cell className="table-cell">{summary.total_families}</Table.Cell>
             <Table.Cell className="table-cell">{summary.total_participants}</Table.Cell>
@@ -83,8 +87,8 @@ const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summar
                     <HtmlTooltip
                         title={
                             <p>
-                                {summary.total_crams} / {summary.total_sequencing_groups} Total
-                                Sequencing Groups with a Completed CRAM Analysis
+                                {summary.total_crams} / {summary.total_sequencing_groups} <br />
+                                Sequencing Groups Aligned
                             </p>
                         }
                     >
@@ -102,12 +106,17 @@ const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summar
                 <div style={{ display: 'flex', justifyContent: 'center' }}>
                     <HtmlTooltip
                         title={
-                            <p>
-                                {summary.latest_annotate_dataset?.sg_count} /{' '}
-                                {summary.total_sequencing_groups} Total Sequencing Groups in the
-                                latest {summary.sequencing_type} AnnotateDataset analysis Analysis
-                                ID: {summary.latest_annotate_dataset?.id}
-                            </p>
+                            <div>
+                                <p>
+                                    {summary.latest_annotate_dataset?.sg_count} /{' '}
+                                    {summary.total_sequencing_groups} Sequencing Groups
+                                </p>
+                                <p>{summary.latest_annotate_dataset?.timestamp}</p>
+                                <p>
+                                    Latest <em>{summary.sequencing_type}</em> AnnotateDataset <br />
+                                    Analysis ID: {summary.latest_annotate_dataset?.id}
+                                </p>
+                            </div>
                         }
                     >
                         <div>{percentageInJointCall.toFixed(2)}%</div>
@@ -124,12 +133,20 @@ const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summar
                 <div style={{ display: 'flex', justifyContent: 'center' }}>
                     <HtmlTooltip
                         title={
-                            <p>
-                                {summary.latest_snv_es_index?.sg_count} /{' '}
-                                {summary.total_sequencing_groups} Total Sequencing Groups in the
-                                latest {summary.sequencing_type} SNV Elasticsearch Index Analysis
-                                ID: {summary.latest_snv_es_index?.id}
-                            </p>
+                            <div>
+                                <p>
+                                    {summary.latest_snv_es_index?.sg_count} /{' '}
+                                    {summary.total_sequencing_groups} Sequencing Groups
+                                </p>
+                                <p>
+                                    Latest <em>{summary.sequencing_type}</em> SNV Index <br />
+                                    {summary.latest_snv_es_index?.timestamp}
+                                </p>
+                                <p>
+                                    Analysis ID: {summary.latest_snv_es_index?.id} <br />
+                                    {summary.latest_snv_es_index?.name}
+                                </p>
+                            </div>
                         }
                     >
                         <div>{percentageInSnvIndex.toFixed(2)}%</div>
@@ -146,12 +163,20 @@ const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summar
                 <div style={{ display: 'flex', justifyContent: 'center' }}>
                     <HtmlTooltip
                         title={
-                            <p>
-                                {summary.latest_sv_es_index?.sg_count} /{' '}
-                                {summary.total_sequencing_groups} Total Sequencing Groups in the
-                                latest {summary.sequencing_type} SV Elasticsearch Index Analysis ID:{' '}
-                                {summary.latest_sv_es_index?.id}
-                            </p>
+                            <div>
+                                <p>
+                                    {summary.latest_sv_es_index?.sg_count} /{' '}
+                                    {summary.total_sequencing_groups} Sequencing Groups
+                                </p>
+                                <p>
+                                    Latest <em>{summary.sequencing_type}</em> SV Index <br />
+                                    {summary.latest_sv_es_index?.timestamp}
+                                </p>
+                                <p>
+                                    Analysis ID: {summary.latest_sv_es_index?.id} <br />
+                                    {summary.latest_sv_es_index?.name} <br />
+                                </p>
+                            </div>
                         }
                     >
                         <div>{percentageInSvIndex.toFixed(2)}%</div>
@@ -162,7 +187,7 @@ const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summar
     )
 }
 
-const SummaryTable: React.FC<SummaryTableProps> = ({ 
+const SummaryTable: React.FC<SummaryTableProps> = ({
     allData,
     filteredData,
     selectedProjects,
@@ -224,9 +249,7 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
         return data
     }, [filteredData, sortColumns])
 
-    const getUniqueOptionsForColumn = (
-        columnName: keyof ProjectInsightsSummary
-    ) => {
+    const getUniqueOptionsForColumn = (columnName: keyof ProjectInsightsSummary) => {
         const filteredDataExcludingCurrentColumn = allData.filter((item) => {
             return (
                 selectedProjects.some((p) => p.name === item.dataset) &&
@@ -242,8 +265,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
             case 'sequencing_technology':
                 uniqueOptions = Array.from(
                     new Set(
-                        filteredDataExcludingCurrentColumn.map((item) =>
-                            item[columnName]?.toString() || ''
+                        filteredDataExcludingCurrentColumn.map(
+                            (item) => item[columnName]?.toString() || ''
                         )
                     )
                 )
@@ -259,10 +282,10 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
 
     return (
         <div>
-        <Table sortable>
-            <Table.Header>
-                <Table.Row>
-                    <Table.HeaderCell
+            <Table sortable>
+                <Table.Header>
+                    <Table.Row>
+                        <Table.HeaderCell
                             className="header-cell"
                             sorted={
                                 sortColumns.find((column) => column.column === 'dataset')?.direction
@@ -320,15 +343,13 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                             )}
                             <div className="header-text">Technology</div>
                         </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('total_families', event.shiftKey)
-                        }
-                    >
-                    {sortColumns.find(
-                                (column) => column.column === 'total_families'
-                            ) && (
+                        <Table.HeaderCell
+                            className="header-cell"
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('total_families', event.shiftKey)
+                            }
+                        >
+                            {sortColumns.find((column) => column.column === 'total_families') && (
                                 <Icon
                                     name={
                                         sortColumns.find(
@@ -340,15 +361,15 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                                     className="sort-icon"
                                 />
                             )}
-                        <div className="header-text">Families</div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('total_participants', event.shiftKey)
-                        }
-                    >
-                    {sortColumns.find(
+                            <div className="header-text">Families</div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell"
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('total_participants', event.shiftKey)
+                            }
+                        >
+                            {sortColumns.find(
                                 (column) => column.column === 'total_participants'
                             ) && (
                                 <Icon
@@ -362,17 +383,15 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                                     className="sort-icon"
                                 />
                             )}
-                        <div className="header-text">Participants</div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('total_samples', event.shiftKey)
-                        }
-                    >
-                    {sortColumns.find(
-                                (column) => column.column === 'total_samples'
-                            ) && (
+                            <div className="header-text">Participants</div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell"
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('total_samples', event.shiftKey)
+                            }
+                        >
+                            {sortColumns.find((column) => column.column === 'total_samples') && (
                                 <Icon
                                     name={
                                         sortColumns.find(
@@ -384,15 +403,15 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                                     className="sort-icon"
                                 />
                             )}
-                        <div className="header-text">Samples</div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('total_sequencing_groups', event.shiftKey)
-                        }
-                    >
-                    {sortColumns.find(
+                            <div className="header-text">Samples</div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell"
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('total_sequencing_groups', event.shiftKey)
+                            }
+                        >
+                            {sortColumns.find(
                                 (column) => column.column === 'total_sequencing_groups'
                             ) && (
                                 <Icon
@@ -406,17 +425,15 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                                     className="sort-icon"
                                 />
                             )}
-                        <div className="header-text">Sequencing Groups</div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell
-                        className="header-cell"
-                        onClick={(event: React.MouseEvent<HTMLElement>) =>
-                            handleSort('total_crams', event.shiftKey)
-                        }
-                    >
-                    {sortColumns.find(
-                                (column) => column.column === 'total_crams'
-                            ) && (
+                            <div className="header-text">Sequencing Groups</div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell"
+                            onClick={(event: React.MouseEvent<HTMLElement>) =>
+                                handleSort('total_crams', event.shiftKey)
+                            }
+                        >
+                            {sortColumns.find((column) => column.column === 'total_crams') && (
                                 <Icon
                                     name={
                                         sortColumns.find(
@@ -428,241 +445,287 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                                     className="sort-icon"
                                 />
                             )}
-                        <div className="header-text">CRAMs</div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell className="header-cell">
-                        <div style={{ display: 'flex', justifyContent: 'center' }}>
-                            <HtmlTooltip
-                                title={
-                                    <p>
-                                        Percentage of Sequencing Groups with a Completed CRAM
-                                        Analysis
-                                    </p>
-                                }
-                            >
-                                <div>% Aligned</div>
-                            </HtmlTooltip>
-                        </div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell className="header-cell">
-                        <div style={{ display: 'flex', justifyContent: 'center' }}>
-                            <HtmlTooltip
-                                title={
-                                    <p>
-                                        Percentage of Sequencing Groups in the latest
-                                        AnnotateDataset Analysis
-                                    </p>
-                                }
-                            >
-                                <div className="header-text">% in Annotated Dataset</div>
-                            </HtmlTooltip>
-                        </div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell className="header-cell">
-                        <div style={{ display: 'flex', justifyContent: 'center' }}>
-                            <HtmlTooltip
-                                title={
-                                    <p>
-                                        Percentage of Sequencing Groups in the latest SNV ES-Index
-                                        Analysis
-                                    </p>
-                                }
-                            >
-                                <div className="header-text">% in SNV ES-Index</div>
-                            </HtmlTooltip>
-                        </div>
-                    </Table.HeaderCell>
-                    <Table.HeaderCell className="header-cell">
-                        <div style={{ display: 'flex', justifyContent: 'center' }}>
-                            <HtmlTooltip
-                                title={
-                                    <p>
-                                        Percentage of Sequencing Groups in the latest SV (genome) or
-                                        gCNV (exome) ES-Index Analysis
-                                    </p>
-                                }
-                            >
-                                <div className="header-text">% in SV ES-Index</div>
-                            </HtmlTooltip>
-                        </div>
-                    </Table.HeaderCell>
-                </Table.Row>
-            </Table.Header>
-            <Table.Body>
-                {sortedData.map((summary) => (
-                    <SummaryTableRow
-                        key={`${summary.dataset}-${summary.sequencing_type}-${summary.sequencing_technology}`}
-                        summary={summary}
-                    />
-                ))}
-            </Table.Body>
-            <Table.Footer>
-                <Table.Row className="grand-total-row" key="grandTotals">
-                    <Table.Cell className="table-cell">Grand Total</Table.Cell>
-                    <Table.Cell className="table-cell">{sortedData.length} entries</Table.Cell>
-                    <Table.Cell className="table-cell"></Table.Cell>
-                    <Table.Cell className="table-cell">
-                        {filteredData.reduce((acc, curr) => acc + curr.total_families, 0)}
-                    </Table.Cell>
-                    <Table.Cell className="table-cell">
-                        {filteredData.reduce((acc, curr) => acc + curr.total_participants, 0)}
-                    </Table.Cell>
-                    <Table.Cell className="table-cell">
-                        {filteredData.reduce((acc, curr) => acc + curr.total_samples, 0)}
-                    </Table.Cell>
-                    <Table.Cell className="table-cell">
-                        {filteredData.reduce((acc, curr) => acc + curr.total_sequencing_groups, 0)}
-                    </Table.Cell>
-                    <Table.Cell className="table-cell">
-                        {filteredData.reduce((acc, curr) => acc + curr.total_crams, 0)}
-                    </Table.Cell>
-                    <Table.Cell className="table-cell">
-                        <div style={{ display: 'flex', justifyContent: 'center' }}>
-                            <HtmlTooltip
-                                title={
-                                    <p>
-                                        {filteredData.reduce(
-                                            (acc, curr) => acc + curr.total_crams,
-                                            0
-                                        )}{' '}
-                                        /{' '}
-                                        {filteredData.reduce(
-                                            (acc, curr) => acc + curr.total_sequencing_groups,
-                                            0
-                                        )}{' '}
-                                        Total Sequencing Groups with a Completed CRAM Analysis
-                                    </p>
-                                }
-                            >
-                                <div>
-                                    {(
-                                        filteredData.reduce(
-                                            (acc, curr) => acc + curr.total_crams,
-                                            0
-                                        ) /
-                                            filteredData.reduce(
+                            <div className="header-text">CRAMs</div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell collapsible-header"
+                            onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
+                                event.currentTarget.classList.add('expanded')
+                            }}
+                            onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
+                                event.currentTarget.classList.remove('expanded')
+                            }}
+                        >
+                            <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                <HtmlTooltip
+                                    title={
+                                        <p>
+                                            Percentage of Sequencing Groups with a Completed CRAM
+                                            Analysis
+                                        </p>
+                                    }
+                                >
+                                    <div className="header-text">% Aligned</div>
+                                </HtmlTooltip>
+                            </div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell collapsible-header"
+                            onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
+                                event.currentTarget.classList.add('more-expanded')
+                            }}
+                            onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
+                                event.currentTarget.classList.remove('more-expanded')
+                            }}
+                        >
+                            <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                <HtmlTooltip
+                                    title={
+                                        <p>
+                                            Percentage of Sequencing Groups in the latest
+                                            AnnotateDataset Analysis
+                                        </p>
+                                    }
+                                >
+                                    <div className="header-text">% in Annotated Dataset</div>
+                                </HtmlTooltip>
+                            </div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell collapsible-header"
+                            onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
+                                event.currentTarget.classList.add('more-expanded')
+                            }}
+                            onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
+                                event.currentTarget.classList.remove('more-expanded')
+                            }}
+                        >
+                            <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                <HtmlTooltip
+                                    title={
+                                        <p>
+                                            Percentage of Sequencing Groups in the latest SNV
+                                            ES-Index Analysis
+                                        </p>
+                                    }
+                                >
+                                    <div className="header-text">% in SNV ES-Index</div>
+                                </HtmlTooltip>
+                            </div>
+                        </Table.HeaderCell>
+                        <Table.HeaderCell
+                            className="header-cell collapsible-header"
+                            onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
+                                event.currentTarget.classList.add('more-expanded')
+                            }}
+                            onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
+                                event.currentTarget.classList.remove('more-expanded')
+                            }}
+                        >
+                            <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                <HtmlTooltip
+                                    title={
+                                        <p>
+                                            Percentage of Sequencing Groups in the latest SV
+                                            (genome) or gCNV (exome) ES-Index Analysis
+                                        </p>
+                                    }
+                                >
+                                    <div className="header-text">% in SV ES-Index</div>
+                                </HtmlTooltip>
+                            </div>
+                        </Table.HeaderCell>
+                    </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                    {sortedData.map((summary) => (
+                        <SummaryTableRow
+                            key={`${summary.dataset}-${summary.sequencing_type}-${summary.sequencing_technology}`}
+                            summary={summary}
+                        />
+                    ))}
+                </Table.Body>
+                <Table.Footer>
+                    <Table.Row className="grand-total-row" key="grandTotals">
+                        <Table.Cell className="table-cell">Grand Total</Table.Cell>
+                        <Table.Cell className="table-cell">{sortedData.length} entries</Table.Cell>
+                        <Table.Cell className="table-cell"></Table.Cell>
+                        <Table.Cell className="table-cell">
+                            {filteredData.reduce((acc, curr) => acc + curr.total_families, 0)}
+                        </Table.Cell>
+                        <Table.Cell className="table-cell">
+                            {filteredData.reduce((acc, curr) => acc + curr.total_participants, 0)}
+                        </Table.Cell>
+                        <Table.Cell className="table-cell">
+                            {filteredData.reduce((acc, curr) => acc + curr.total_samples, 0)}
+                        </Table.Cell>
+                        <Table.Cell className="table-cell">
+                            {filteredData.reduce(
+                                (acc, curr) => acc + curr.total_sequencing_groups,
+                                0
+                            )}
+                        </Table.Cell>
+                        <Table.Cell className="table-cell">
+                            {filteredData.reduce((acc, curr) => acc + curr.total_crams, 0)}
+                        </Table.Cell>
+                        <Table.Cell className="table-cell">
+                            <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                <HtmlTooltip
+                                    title={
+                                        <p>
+                                            {filteredData.reduce(
+                                                (acc, curr) => acc + curr.total_crams,
+                                                0
+                                            )}{' '}
+                                            /{' '}
+                                            {filteredData.reduce(
                                                 (acc, curr) => acc + curr.total_sequencing_groups,
                                                 0
-                                            ) || 0 * 100
-                                    ).toFixed(2)}
-                                    %
-                                </div>
-                            </HtmlTooltip>
-                        </div>
-                    </Table.Cell>
-                    <Table.Cell className="table-cell">
-                        <div style={{ display: 'flex', justifyContent: 'center' }}>
-                            <HtmlTooltip
-                                title={
-                                    <p>
-                                        {filteredData.reduce(
-                                            (acc, curr) =>
-                                                acc + (curr.latest_annotate_dataset?.sg_count ?? 0),
-                                            0
-                                        )}{' '}
-                                        /{' '}
-                                        {filteredData.reduce(
-                                            (acc, curr) => acc + curr.total_sequencing_groups,
-                                            0
-                                        )}{' '}
-                                        Total Sequencing Groups in the latest AnnotateDataset
-                                        analysis
-                                    </p>
-                                }
-                            >
-                                <div>
-                                    {(
-                                        filteredData.reduce(
-                                            (acc, curr) =>
-                                                acc + (curr.latest_annotate_dataset?.sg_count ?? 0),
-                                            0
-                                        ) /
-                                            filteredData.reduce(
+                                            )}{' '}
+                                            Total Sequencing Groups with a Completed CRAM Analysis
+                                        </p>
+                                    }
+                                >
+                                    <div>
+                                        {(
+                                            (filteredData.reduce(
+                                                (acc, curr) => acc + curr.total_crams,
+                                                0
+                                            ) /
+                                                filteredData.reduce(
+                                                    (acc, curr) =>
+                                                        acc + curr.total_sequencing_groups,
+                                                    0
+                                                )) *
+                                                100 || 0
+                                        ).toFixed(2)}
+                                        %
+                                    </div>
+                                </HtmlTooltip>
+                            </div>
+                        </Table.Cell>
+                        <Table.Cell className="table-cell">
+                            <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                <HtmlTooltip
+                                    title={
+                                        <p>
+                                            {filteredData.reduce(
+                                                (acc, curr) =>
+                                                    acc +
+                                                    (curr.latest_annotate_dataset?.sg_count ?? 0),
+                                                0
+                                            )}{' '}
+                                            /{' '}
+                                            {filteredData.reduce(
                                                 (acc, curr) => acc + curr.total_sequencing_groups,
                                                 0
-                                            ) || 0 * 100
-                                    ).toFixed(2)}
-                                    %
-                                </div>
-                            </HtmlTooltip>
-                        </div>
-                    </Table.Cell>
-                    <Table.Cell className="table-cell">
-                        <div style={{ display: 'flex', justifyContent: 'center' }}>
-                            <HtmlTooltip
-                                title={
-                                    <p>
-                                        {filteredData.reduce(
-                                            (acc, curr) =>
-                                                acc + (curr.latest_snv_es_index?.sg_count ?? 0),
-                                            0
-                                        )}{' '}
-                                        /{' '}
-                                        {filteredData.reduce(
-                                            (acc, curr) => acc + curr.total_sequencing_groups,
-                                            0
-                                        )}{' '}
-                                        Total Sequencing Groups in the latest SNV Elasticsearch
-                                        Index
-                                    </p>
-                                }
-                            >
-                                <div>
-                                    {(
-                                        filteredData.reduce(
-                                            (acc, curr) =>
-                                                acc + (curr.latest_snv_es_index?.sg_count ?? 0),
-                                            0
-                                        ) /
-                                            filteredData.reduce(
+                                            )}{' '}
+                                            Total Sequencing Groups in the latest AnnotateDataset
+                                            analysis
+                                        </p>
+                                    }
+                                >
+                                    <div>
+                                        {(
+                                            (filteredData.reduce(
+                                                (acc, curr) =>
+                                                    acc +
+                                                    (curr.latest_annotate_dataset?.sg_count ?? 0),
+                                                0
+                                            ) /
+                                                filteredData.reduce(
+                                                    (acc, curr) =>
+                                                        acc + curr.total_sequencing_groups,
+                                                    0
+                                                )) *
+                                                100 || 0
+                                        ).toFixed(2)}
+                                        %
+                                    </div>
+                                </HtmlTooltip>
+                            </div>
+                        </Table.Cell>
+                        <Table.Cell className="table-cell">
+                            <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                <HtmlTooltip
+                                    title={
+                                        <p>
+                                            {filteredData.reduce(
+                                                (acc, curr) =>
+                                                    acc + (curr.latest_snv_es_index?.sg_count ?? 0),
+                                                0
+                                            )}{' '}
+                                            /{' '}
+                                            {filteredData.reduce(
                                                 (acc, curr) => acc + curr.total_sequencing_groups,
                                                 0
-                                            ) || 0 * 100
-                                    ).toFixed(2)}
-                                    %
-                                </div>
-                            </HtmlTooltip>
-                        </div>
-                    </Table.Cell>
-                    <Table.Cell className="table-cell">
-                        <div style={{ display: 'flex', justifyContent: 'center' }}>
-                            <HtmlTooltip
-                                title={
-                                    <p>
-                                        {filteredData.reduce(
-                                            (acc, curr) =>
-                                                acc + (curr.latest_sv_es_index?.sg_count ?? 0),
-                                            0
-                                        )}{' '}
-                                        /{' '}
-                                        {filteredData.reduce(
-                                            (acc, curr) => acc + curr.total_sequencing_groups,
-                                            0
-                                        )}{' '}
-                                        Total Sequencing Groups in the latest SV Elasticsearch Index
-                                    </p>
-                                }
-                            >
-                                <div>
-                                    {(
-                                        filteredData.reduce(
-                                            (acc, curr) =>
-                                                acc + (curr.latest_sv_es_index?.sg_count ?? 0),
-                                            0
-                                        ) /
-                                            filteredData.reduce(
+                                            )}{' '}
+                                            Total Sequencing Groups in the latest SNV Elasticsearch
+                                            Index
+                                        </p>
+                                    }
+                                >
+                                    <div>
+                                        {(
+                                            (filteredData.reduce(
+                                                (acc, curr) =>
+                                                    acc + (curr.latest_snv_es_index?.sg_count ?? 0),
+                                                0
+                                            ) /
+                                                filteredData.reduce(
+                                                    (acc, curr) =>
+                                                        acc + curr.total_sequencing_groups,
+                                                    0
+                                                )) *
+                                                100 || 0
+                                        ).toFixed(2)}
+                                        %
+                                    </div>
+                                </HtmlTooltip>
+                            </div>
+                        </Table.Cell>
+                        <Table.Cell className="table-cell">
+                            <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                <HtmlTooltip
+                                    title={
+                                        <p>
+                                            {filteredData.reduce(
+                                                (acc, curr) =>
+                                                    acc + (curr.latest_sv_es_index?.sg_count ?? 0),
+                                                0
+                                            )}{' '}
+                                            /{' '}
+                                            {filteredData.reduce(
                                                 (acc, curr) => acc + curr.total_sequencing_groups,
                                                 0
-                                            ) || 0 * 100
-                                    ).toFixed(2)}
-                                    %
-                                </div>
-                            </HtmlTooltip>
-                        </div>
-                    </Table.Cell>
-                </Table.Row>
-            </Table.Footer>
-        </Table>
+                                            )}{' '}
+                                            Total Sequencing Groups in the latest SV Elasticsearch
+                                            Index
+                                        </p>
+                                    }
+                                >
+                                    <div>
+                                        {(
+                                            (filteredData.reduce(
+                                                (acc, curr) =>
+                                                    acc + (curr.latest_sv_es_index?.sg_count ?? 0),
+                                                0
+                                            ) /
+                                                filteredData.reduce(
+                                                    (acc, curr) =>
+                                                        acc + curr.total_sequencing_groups,
+                                                    0
+                                                )) *
+                                                100 || 0
+                                        ).toFixed(2)}
+                                        %
+                                    </div>
+                                </HtmlTooltip>
+                            </div>
+                        </Table.Cell>
+                    </Table.Row>
+                </Table.Footer>
+            </Table>
         </div>
     )
 }

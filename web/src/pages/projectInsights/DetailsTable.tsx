@@ -1,8 +1,7 @@
-// DetailsRable.tsx
+// DetailsTable.tsx
 import React, { useState } from 'react'
 import { ProjectInsightsDetails } from '../../sm-api'
 import { Button, Table, Icon } from 'semantic-ui-react'
-import Tooltip, { TooltipProps } from '@mui/material/Tooltip'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
 import FilterButton from './FilterButton'
 
@@ -42,13 +41,8 @@ const getRowClassName = (sequencingType: string) => {
     }
 }
 
-const HtmlTooltip = (props: TooltipProps) => (
-    <Tooltip {...props} classes={{ popper: 'html-tooltip' }} />
-)
-
 const DetailsTableRow: React.FC<{ details: ProjectInsightsDetails }> = ({ details }) => {
     const theme = React.useContext(ThemeContext)
-    const isDarkMode = theme.theme === 'dark-mode'
     const rowClassName = getRowClassName(details.sequencing_type)
 
     return (
@@ -90,9 +84,7 @@ const DetailsTableRow: React.FC<{ details: ProjectInsightsDetails }> = ({ detail
                 {details.sample_ext_ids}
             </Table.Cell>
             <Table.Cell data-cell className="table-cell">
-                <HtmlTooltip title={<p>{details.in_latest_annotate_dataset}</p>}>
-                    <div>{details.completed_cram ? '✅' : '❌'}</div>
-                </HtmlTooltip>
+                {details.completed_cram ? '✅' : '❌'}
             </Table.Cell>
             <Table.Cell className="table-cell">
                 {details.in_latest_annotate_dataset ? '✅' : '❌'}
@@ -235,23 +227,28 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                     selectedSampleIds.includes(item.sample_id)) &&
                 (columnName === 'sample_ext_ids' ||
                     selectedSampleExtIds.length === 0 ||
-                    selectedSampleExtIds.includes(item.sample_ext_ids[0])) &&
+                    item.sample_ext_ids.some((extId) => selectedSampleExtIds.includes(extId))) &&
                 (columnName === 'sequencing_group_id' ||
                     selectedSequencingGroupIds.length === 0 ||
                     selectedSequencingGroupIds.includes(item.sequencing_group_id)) &&
                 (columnName === 'completed_cram' ||
                     selectedCompletedCram.length === 0 ||
-                    item.completed_cram === (selectedCompletedCram[0] === 'true')) &&
+                    selectedCompletedCram.includes(item.completed_cram ? 'Yes' : 'No')) &&
                 (columnName === 'in_latest_annotate_dataset' ||
                     selectedInLatestAnnotateDataset.length === 0 ||
-                    item.in_latest_annotate_dataset ===
-                        (selectedInLatestAnnotateDataset[0] === 'true')) &&
+                    selectedInLatestAnnotateDataset.includes(
+                        item.in_latest_annotate_dataset ? 'Yes' : 'No'
+                    )) &&
                 (columnName === 'in_latest_snv_es_index' ||
                     selectedInLatestSnvEsIndex.length === 0 ||
-                    item.in_latest_snv_es_index === (selectedInLatestSnvEsIndex[0] === 'true')) &&
+                    selectedInLatestSnvEsIndex.includes(
+                        item.in_latest_snv_es_index ? 'Yes' : 'No'
+                    )) &&
                 (columnName === 'in_latest_sv_es_index' ||
                     selectedInLatestSvEsIndex.length === 0 ||
-                    item.in_latest_sv_es_index === (selectedInLatestSvEsIndex[0] === 'true')) &&
+                    selectedInLatestSvEsIndex.includes(
+                        item.in_latest_sv_es_index ? 'Yes' : 'No'
+                    )) &&
                 (columnName === 'stripy' ||
                     selectedStripy.length === 0 ||
                     item.sequencing_group_report_links?.stripy) &&
@@ -273,6 +270,13 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                     )
                 )
                 break
+            case 'sample_ext_ids':
+                uniqueOptions = Array.from(
+                    new Set(
+                        filteredDataExcludingCurrentColumn.flatMap((item) => item.sample_ext_ids)
+                    )
+                ).map((option) => option?.toString() || '')
+                break
             case 'completed_cram':
             case 'in_latest_annotate_dataset':
             case 'in_latest_snv_es_index':
@@ -293,10 +297,10 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
 
         return uniqueOptions
     }
-    const exportToCSV = () => {
+
+    const exportToFile = (format: 'csv' | 'tsv') => {
         const headerCells = document.querySelectorAll('.ui.table thead tr th')
         const headerData = Array.from(headerCells).map((cell) => cell.textContent)
-
         const rows = document.querySelectorAll('.ui.table tbody tr')
         const rowData = Array.from(rows).map((row) => {
             const cells = row.querySelectorAll('td')
@@ -314,13 +318,16 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
             })
         })
 
-        const csvData = [headerData, ...rowData].map((row) => row.join(',')).join('\n')
-
-        const blob = new Blob([csvData], { type: 'text/csv' })
+        const separator = format === 'csv' ? ',' : '\t'
+        const fileData = [headerData, ...rowData].map((row) => row.join(separator)).join('\n')
+        const blob = new Blob([fileData], { type: `text/${format}` })
         const url = URL.createObjectURL(blob)
         const link = document.createElement('a')
         link.href = url
-        link.setAttribute('download', 'table_data.csv')
+        // Generate the file name with the current date timestamp
+        const currentDate = new Date().toISOString().slice(0, 19)
+        const fileName = `project_insights_details_${currentDate}.${format}`
+        link.setAttribute('download', fileName)
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
@@ -328,7 +335,10 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
 
     return (
         <div>
-            <Button onClick={exportToCSV}>Export to CSV</Button>
+            <div style={{ textAlign: 'right' }}>
+                <Button onClick={() => exportToFile('csv')}>Export to CSV</Button>
+                <Button onClick={() => exportToFile('tsv')}>Export to TSV</Button>
+            </div>
             <Table sortable>
                 <Table.Header>
                     <Table.Row>
@@ -671,7 +681,7 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                             <div className="header-text">Sample Ext. ID(s)</div>
                         </Table.HeaderCell>
                         <Table.HeaderCell
-                            className="header-cell collapsible-header"
+                            className="header-cell"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('completed_cram', event.shiftKey)
                             }
@@ -833,7 +843,7 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                             <div className="header-text">SV ES-Index</div>
                         </Table.HeaderCell>
                         <Table.HeaderCell
-                            className="header-cell collapsible-header"
+                            className="header-cell"
                             onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
                                 event.currentTarget.classList.add('expanded')
                             }}
@@ -843,7 +853,7 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                         >
                             <div className="filter-button">
                                 <FilterButton
-                                    columnName="STRipy Report"
+                                    columnName="STRipy"
                                     options={getUniqueOptionsForColumn('stripy')}
                                     selectedOptions={selectedStripy}
                                     onSelectionChange={(selectedOptions) =>
@@ -851,10 +861,10 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                     }
                                 />
                             </div>
-                            <div className="header-text">STRipy Report</div>
+                            <div className="header-text">STRipy</div>
                         </Table.HeaderCell>
                         <Table.HeaderCell
-                            className="header-cell collapsible-header"
+                            className="header-cell"
                             onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
                                 event.currentTarget.classList.add('expanded')
                             }}
@@ -864,7 +874,7 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                         >
                             <div className="filter-button">
                                 <FilterButton
-                                    columnName="Mito Report"
+                                    columnName="Mito"
                                     options={getUniqueOptionsForColumn('mito')}
                                     selectedOptions={selectedMito}
                                     onSelectionChange={(selectedOptions) =>
@@ -872,7 +882,7 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                     }
                                 />
                             </div>
-                            <div className="header-text">Mito Report</div>
+                            <div className="header-text">Mito</div>
                         </Table.HeaderCell>
                     </Table.Row>
                 </Table.Header>

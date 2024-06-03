@@ -1,21 +1,22 @@
+// ProjectAndSeqTypeSelector.tsx
 import React from 'react'
 import { Checkbox } from 'semantic-ui-react'
 
 interface ProjectAndSeqTypeSelectorProps {
     projects: { id: number; name: string }[]
+    selectedProjects: { id: number; name: string }[]
     seqTypes: string[]
-    selectedProjects: string[]
     selectedSeqTypes: string[]
-    onProjectChange: (projectName: string[], isSelected: boolean[]) => void
+    onProjectChange: (projects: { id: number; name: string }[], isSelected: boolean[]) => void
     onSeqTypeChange: (seqTypes: string[], isSelected: boolean[]) => void
 }
 
 const handleSelectAllProjects = (
     projects: { id: number; name: string }[],
-    onProjectChange: (projectNames: string[], isSelected: boolean[]) => void,
+    onProjectChange: (projects: { id: number; name: string }[], isSelected: boolean[]) => void,
     selectAll: boolean
 ) => {
-    let newSelectedProjects: string[] = projects.map((project) => project.name)
+    let newSelectedProjects: { id: number; name: string }[] = projects
     let isSelected: boolean[] = newSelectedProjects.map(() => selectAll)
     onProjectChange(newSelectedProjects, isSelected)
 }
@@ -78,10 +79,17 @@ const ProjectAndSeqTypeSelector: React.FC<ProjectAndSeqTypeSelectorProps> = ({
                             <Checkbox
                                 className="seq-type-project-checkbox"
                                 label={project.name}
-                                checked={selectedProjects.includes(project.name)}
-                                onChange={(_, data) =>
-                                    onProjectChange([project.name], [data.checked ?? false])
-                                }
+                                checked={selectedProjects.some((p) => p.id === project.id)}
+                                onChange={(_, data) => {
+                                    const isChecked = data.checked ?? false
+                                    const updatedSelectedProjects = isChecked
+                                        ? [...selectedProjects, project]
+                                        : selectedProjects.filter((p) => p.id !== project.id)
+                                    onProjectChange(
+                                        updatedSelectedProjects,
+                                        updatedSelectedProjects.map(() => true)
+                                    )
+                                }}
                             />
                         </div>
                     ))}

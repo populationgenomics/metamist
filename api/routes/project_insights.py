@@ -2,7 +2,10 @@ from fastapi import APIRouter
 
 from api.utils.db import Connection, get_projectless_db_connection
 from db.python.layers.project_insights import ProjectInsightsLayer
-from models.models.project_insights import ProjectInsightsDetails, ProjectInsightsSummary
+from models.models.project_insights import (
+    ProjectInsightsDetails,
+    ProjectInsightsSummary,
+)
 
 router = APIRouter(prefix='/project-insights', tags=['project-insights', 'summary', 'details', 'seqr', 'dashboard'])
 
