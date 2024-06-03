@@ -116,26 +116,12 @@ const Details: React.FC = () => {
                 selectedSampleExtIds.includes(item.sample_ext_ids[0])) &&
             (selectedSequencingGroupIds.length === 0 ||
                 selectedSequencingGroupIds.includes(item.sequencing_group_id)) &&
-            // (selectedCompletedCram.length === 0 ||
-            //     (selectedCompletedCram.includes('Yes') && item.completed_cram) ||
-            //     (selectedCompletedCram.includes('No') && !item.completed_cram)) &&
             (selectedCompletedCram.length === 0 ||
                 selectedCompletedCram.includes(item.completed_cram ? 'Yes' : 'No')) &&
-            // (selectedInLatestAnnotateDataset.length === 0 ||
-            //     (selectedInLatestAnnotateDataset.includes('Yes') &&
-            //         item.in_latest_annotate_dataset) ||
-            //     (selectedInLatestAnnotateDataset.includes('No') &&
-            //         !item.in_latest_annotate_dataset)) &&
             (selectedInLatestAnnotateDataset.length === 0 ||
                 selectedInLatestAnnotateDataset.includes(
                     item.in_latest_annotate_dataset ? 'Yes' : 'No'
                 )) &&
-            // (selectedInLatestSnvEsIndex.length === 0 ||
-            //     (selectedInLatestSnvEsIndex.includes('Yes') && item.in_latest_snv_es_index) ||
-            //     (selectedInLatestSnvEsIndex.includes('No') && !item.in_latest_snv_es_index)) &&
-            // (selectedInLatestSvEsIndex.length === 0 ||
-            //     (selectedInLatestSvEsIndex.includes('Yes') && item.in_latest_sv_es_index) ||
-            //     (selectedInLatestSvEsIndex.includes('No') && !item.in_latest_sv_es_index)) &&
             (selectedInLatestSnvEsIndex.length === 0 ||
                 selectedInLatestSnvEsIndex.includes(item.in_latest_snv_es_index ? 'Yes' : 'No')) &&
             (selectedInLatestSvEsIndex.length === 0 ||

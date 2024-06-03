@@ -311,7 +311,7 @@ html[data-theme='dark-mode'] .ui.table {
     font-weight: bold;
 }
 
-/* seqr projects stats dashboard */
+/* Project Insights dashboard */
 .html-tooltip .MuiTooltip-tooltip {
     background-color: #f5f5f9;
     color: rgba(0, 0, 0, 0.87);
@@ -327,11 +327,9 @@ html[data-theme='dark-mode'] .ui.table {
 .ui.table .table-cell {
     text-align: center;
     vertical-align: middle;
-    /* font-size: 0.8em; */
     color: var(--color-text-primary) !important;
     word-wrap: break-word !important;
     overflow-wrap: break-word !important;
-    /* white-space: normal !important; */
 }
 
 .ui.table .header-cell {

@@ -23,8 +23,8 @@ async def get_project_insights_summary(
     """
     Get summary stats for a list of projects and sequencing types
     """
-    spslayer = ProjectInsightsLayer(connection)
-    projects_insights_stats = await spslayer.get_project_insights_summary(
+    pilayer = ProjectInsightsLayer(connection)
+    projects_insights_stats = await pilayer.get_project_insights_summary(
         project_ids=project_ids, sequencing_types=sequencing_types
     )
 
@@ -44,8 +44,8 @@ async def get_project_insights_details(
     """
     Get extensive sequencing group details for a list of projects and sequencing types
     """
-    spslayer = ProjectInsightsLayer(connection)
-    projects_insights_details = await spslayer.get_project_insights_details(
+    pilayer = ProjectInsightsLayer(connection)
+    projects_insights_details = await pilayer.get_project_insights_details(
         project_ids=project_ids, sequencing_types=sequencing_types
     )
 

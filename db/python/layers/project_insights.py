@@ -480,7 +480,7 @@ GROUP BY
             user=self.author, project_ids=project_ids, readonly=True
         )
 
-        (   # each of these is keyed by (project_id, sequencing_type)
+        (
             total_families_by_project_id_and_seq_fields,
             total_participants_by_project_id_and_seq_fields,
             total_samples_by_project_id_and_seq_fields,
@@ -503,13 +503,9 @@ GROUP BY
         )
 
         # Get the sequencing groups for each of the analyses in the grouped analyses rows
-        # (latest_annotate_dataset and latest_es_indices)
-        # TODO: Add multiQC and other grouped analyses to this
         analysis_sequencing_groups = await self.get_analysis_sequencing_groups([latest_annotate_dataset_by_project_id_and_seq_type, latest_es_indices_by_project_id_and_seq_type_and_stage])
 
-        # sequencing_platforms = await SequencingPlatformTable(self._connection).get()
         sequencing_technologies = await SequencingTechnologyTable(self._connection).get()
-        # sequencing_types = await SequencingTypeTable(self._connection).get()
 
         # Get all possible permutations of the projects, sequencing types, and sequencing technologies
         permutations = itertools.product(projects, sequencing_types, sequencing_technologies)
@@ -612,13 +608,10 @@ GROUP BY
             ),
         )
         # Get the sequencing groups for each of the analyses in the grouped analyses rows
-        # (latest_annotate_dataset and latest_es_indices)
-        # TODO: Add multiQC and other grouped analyses to this
         analysis_sequencing_groups = await self.get_analysis_sequencing_groups([latest_annotate_dataset_by_project_id_and_seq_type, latest_es_indices_by_project_id_and_seq_type_and_stage])
 
         sequencing_platforms = await SequencingPlatformTable(self._connection).get()
         sequencing_technologies = await SequencingTechnologyTable(self._connection).get()
-        # sequencing_types = await SequencingTypeTable(self._connection).get()
 
         # Get all possible permutations of the projects, sequencing types, sequencing platforms, and sequencing technologies
         permutations = itertools.product(projects, sequencing_types, sequencing_platforms, sequencing_technologies)
@@ -631,7 +624,6 @@ GROUP BY
                 continue
 
             if sequencing_technology == 'short-read':
-                # The grouped analyses rows are keyed by (project_id, sequencing_type)
                 latest_annotate_dataset = latest_annotate_dataset_by_project_id_and_seq_type[(project.id, sequencing_type)]
                 latest_snv_es_index = latest_es_indices_by_project_id_and_seq_type_and_stage[(project.id, sequencing_type, 'MtToEs')]
                 if sequencing_type == 'genome':

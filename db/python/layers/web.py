@@ -1,4 +1,4 @@
-# pylint: disable=too-many-locals, too-many-instance-attributes, too-many-lines
+# pylint: disable=too-many-locals, too-many-instance-attributes
 import asyncio
 import itertools
 import json
