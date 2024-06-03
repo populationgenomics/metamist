@@ -19,9 +19,6 @@ class OurDnaDashboardLayer(BaseLayer):
     def __init__(self, connection: Connection):
         super().__init__(connection)
 
-        # TODO initialize other layers here as needed for aggregation
-        # self.at = AnalysisRunnerTable(connection)
-
         self.sample_layer = SampleLayer(connection)
         self.participant_layer = ParticipantLayer(connection)
 
@@ -167,8 +164,6 @@ class OurDnaDashboardLayer(BaseLayer):
                 if not self.fetch_key_from_meta('consent', p[1])
             ]
         )
-
-        # TODO Add logic here to query and aggregate the data
 
         # go through all samples and get the meta and do something with it
         # if we want stats for samples by participant, move this logic up before participant and make use of
