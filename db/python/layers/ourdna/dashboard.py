@@ -10,7 +10,7 @@ from db.python.layers.base import BaseLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from db.python.tables.sample import SampleFilter
-from models.models import ProjectId, Sample, SampleInternal
+from models.models import OurDNADashboard, ProjectId, Sample
 
 
 class OurDnaDashboardLayer(BaseLayer):
@@ -118,27 +118,14 @@ class OurDnaDashboardLayer(BaseLayer):
         self,
         filter_: SampleFilter,
         project_id: ProjectId = None,
-    ) -> dict:
+    ) -> OurDNADashboard:
         """Get dashboard data"""
-        samples_internal: list[SampleInternal] = []
         samples: list[Sample] = []
         participants: list[tuple[int, dict, dict]] = []
 
-        # Data to be returned
-        collection_to_process_end_time: dict[str, int] = {}
-        collection_to_process_end_time_statistics: dict[str, float | None] = {}
-        collection_to_process_end_time_24h: dict[str, int] = {}
-        processing_times_by_site: dict[str, dict[int, int]] = defaultdict(
-            lambda: defaultdict(int)
-        )  # {site: {hour_bucket: count}}
-        total_samples_by_collection_event_name: dict[str, int] = defaultdict(int)
-        samples_lost_after_collection: dict[str, dict[str, Any]] = {}
-        samples_concentration_gt_1ug: dict[str, float] = {}
-        participants_consented_not_collected: list[int] = []
-        participants_signed_not_consented: list[int] = []
-
-        samples_internal = await self.sample_layer.query(filter_=filter_)
-        samples = [s.to_external() for s in samples_internal]
+        samples = [
+            s.to_external() for s in await self.sample_layer.query(filter_=filter_)
+        ]
 
         participants = (
             await self.participant_layer.get_participants_and_samples_meta_by_project(
@@ -146,46 +133,131 @@ class OurDnaDashboardLayer(BaseLayer):
             )
         )
 
-        # Get the participants who have been consented but have not had a sample collected
-        participants_consented_not_collected.extend(
-            [
-                p[0]
-                for p in participants
-                if self.fetch_key_from_meta('consent', p[1])
-                and not self.fetch_key_from_meta('collection-time', p[2])
-            ]
+        # Data to be returned
+        collection_to_process_end_time: dict[str, int] = (
+            self.process_collection_to_process_end_times(samples=samples)
+        )
+        collection_to_process_end_time_statistics: dict[str, float | None] = (
+            self.process_collection_to_process_end_times_statistics(
+                collection_to_process_end_time=collection_to_process_end_time
+            )
+        )
+        collection_to_process_end_time_24h: dict[str, int] = (
+            self.process_collection_to_process_end_times_24h(samples=samples)
+        )
+        processing_times_by_site: dict[str, dict[int, int]] = (
+            self.proccess_processing_times_by_site(samples=samples)
+        )
+        total_samples_by_collection_event_name: dict[str, int] = (
+            self.process_total_samples_by_collection_event_name(samples=samples)
+        )
+        samples_lost_after_collection: dict[str, dict[str, Any]] = (
+            self.process_samples_lost_after_collection(samples=samples)
+        )
+        samples_concentration_gt_1ug: dict[str, float] = (
+            self.process_samples_concentration_gt_1ug(samples=samples)
+        )
+        participants_consented_not_collected: list[int] = (
+            self.process_participants_consented_not_collected(participants)
+        )
+        participants_signed_not_consented: list[int] = (
+            self.process_participants_signed_not_consented(participants)
         )
 
-        # Get the participants who have signed but have not been consented
-        participants_signed_not_consented.extend(
-            [
-                p[0]
-                for p in participants
-                if not self.fetch_key_from_meta('consent', p[1])
-            ]
+        return OurDNADashboard.from_sample(
+            d={
+                'collection_to_process_end_time': collection_to_process_end_time,
+                'collection_to_process_end_time_statistics': collection_to_process_end_time_statistics,
+                'collection_to_process_end_time_24h': collection_to_process_end_time_24h,
+                'processing_times_by_site': processing_times_by_site,
+                'total_samples_by_collection_event_name': total_samples_by_collection_event_name,
+                'samples_lost_after_collection': samples_lost_after_collection,
+                'samples_concentration_gt_1ug': samples_concentration_gt_1ug,
+                'participants_consented_not_collected': participants_consented_not_collected,
+                'participants_signed_not_consented': participants_signed_not_consented,
+            }
         )
 
-        # go through all samples and get the meta and do something with it
-        # if we want stats for samples by participant, move this logic up before participant and make use of
-        # the filtered samples to map to each participant
+    def process_collection_to_process_end_times(self, samples: list[Sample]) -> dict:
+        """Get the time between blood collection and sample processing"""
+        collection_to_process_end_time: dict[str, int] = {}
+
         for sample in samples:
-            # Get the time between blood collection and sample processing
             time_to_process_end = self.get_collection_to_process_end_time(sample)
             if time_to_process_end is not None:
                 collection_to_process_end_time[sample.id] = time_to_process_end
 
-            # Get the time between blood collection and sample processing, where time taken is more than 24 hours
+        return collection_to_process_end_time
+
+    def process_collection_to_process_end_times_statistics(
+        self, collection_to_process_end_time: dict[str, int]
+    ) -> dict:
+        """Get the statistics for the time between blood collection and sample processing"""
+        collection_to_process_end_time_statistics: dict[str, float | None] = {}
+
+        collection_to_process_end_time_statistics['average'] = (
+            sum(collection_to_process_end_time.values())
+            / len(collection_to_process_end_time)
+            if collection_to_process_end_time
+            else None
+        )
+
+        collection_to_process_end_time_statistics['min'] = (
+            min(collection_to_process_end_time.values())
+            if collection_to_process_end_time
+            else None
+        )
+
+        collection_to_process_end_time_statistics['max'] = (
+            max(collection_to_process_end_time.values())
+            if collection_to_process_end_time
+            else None
+        )
+
+        return collection_to_process_end_time_statistics
+
+    def process_collection_to_process_end_times_24h(
+        self, samples: list[Sample]
+    ) -> dict:
+        """Get the time between blood collection and sample processing"""
+        collection_to_process_end_time_24h: dict[str, int] = {}
+
+        for sample in samples:
+            time_to_process_end = self.get_collection_to_process_end_time(sample)
             if time_to_process_end is not None and time_to_process_end > 24 * 60 * 60:
                 collection_to_process_end_time_24h[sample.id] = time_to_process_end
 
-            # Get the sample processing times for each sample at each designated site"""
-            processing_site, processing_time = self.get_processing_times_by_site(sample)
-            if processing_site is not None:
-                # Take the ceiling of the processing time, then update the count for the dict accordingly for the site
-                current_bucket = ceil(processing_time / 3600)
-                processing_times_by_site[processing_site][current_bucket] += 1
+        return collection_to_process_end_time_24h
 
-            # Get total number of samples collected from each type of collection-event-name"""
+    def proccess_processing_times_by_site(self, samples: list[Sample]) -> dict:
+        """Get the processing times by site"""
+        processing_times_by_site: dict[str, dict[int, int]] = defaultdict(
+            lambda: defaultdict(int)
+        )
+
+        for sample in samples:
+            processing_site, processing_time = self.get_processing_times_by_site(sample)
+            if processing_site is not None and processing_time is not None:
+                hour_bucket = ceil(processing_time / 3600)
+                processing_times_by_site[processing_site][hour_bucket] += 1
+
+        for site in processing_times_by_site:
+            min_bucket = min(processing_times_by_site[site].keys())
+            max_bucket = max(processing_times_by_site[site].keys())
+
+            for i in range(min_bucket, max_bucket + 1):
+                if i not in processing_times_by_site[site]:
+                    processing_times_by_site[site][i] = 0
+
+        return processing_times_by_site
+
+    def process_total_samples_by_collection_event_name(
+        self, samples: list[Sample]
+    ) -> dict:
+        """Get total number of samples collected from each type of collection-event-name"""
+        total_samples_by_collection_event_name: dict[str, int] = defaultdict(int)
+
+        for sample in samples:
             _collection_event_name = self.get_meta_property(
                 sample=sample, property_name='collection-event-name'
             )
@@ -194,12 +266,15 @@ class OurDnaDashboardLayer(BaseLayer):
             else:
                 total_samples_by_collection_event_name['Unknown'] += 1
 
-            # Get total number of many samples have been lost, EG: participants have been consented, blood collected, not processed (etc), Alert here (highlight after 72 hours)
+        return total_samples_by_collection_event_name
+
+    def process_samples_lost_after_collection(self, samples: list[Sample]) -> dict:
+        """Get total number of many samples have been lost, EG: participants have been consented, blood collected, not processed (etc), Alert here (highlight after 72 hours)"""
+        samples_lost_after_collection: dict[str, dict[str, Any]] = {}
+
+        for sample in samples:
             time_to_process_start = self.get_collection_to_process_start_time(sample)
 
-            # If we decide to handle None, we can separate into separate checks and handle explicitly
-            # can show time to now if process_start_time is None and have an alert field for this to
-            # to show a warning that the sample has not been processed yet
             if (
                 time_to_process_start is not None
                 and time_to_process_start > 72 * 60 * 60
@@ -244,7 +319,13 @@ class OurDnaDashboardLayer(BaseLayer):
                     ),
                 }
 
-            # Get the concentration of the sample where the concentration is more than 1 ug of DNA
+        return samples_lost_after_collection
+
+    def process_samples_concentration_gt_1ug(self, samples: list[Sample]) -> dict:
+        """Get the concentration of the sample where the concentration is more than 1 ug of DNA"""
+        samples_concentration_gt_1ug: dict[str, float] = {}
+
+        for sample in samples:
             if (
                 sample.meta.get('concentration') is not None
                 and float(sample.meta.get('concentration')) > 1
@@ -253,44 +334,23 @@ class OurDnaDashboardLayer(BaseLayer):
                     sample.meta.get('concentration')
                 )
 
-        # Populate missing buckets with 0 count for new_processing_times_by_site
-        # Get the lowest value and highest value for each site. Then iterate through the range and populate the missing buckets with 0
-        for site in processing_times_by_site:
-            min_bucket = min(processing_times_by_site[site].keys())
-            max_bucket = max(processing_times_by_site[site].keys())
+        return samples_concentration_gt_1ug
 
-            for i in range(min_bucket, max_bucket + 1):
-                if i not in processing_times_by_site[site]:
-                    processing_times_by_site[site][i] = 0
+    def process_participants_consented_not_collected(
+        self, participants: list[tuple[int, dict, dict]]
+    ) -> list[int]:
+        """Get the participants who have been consented but have not had a sample collected"""
+        return [
+            p[0]
+            for p in participants
+            if self.fetch_key_from_meta('consent', p[1])
+            and not self.fetch_key_from_meta('collection-time', p[2])
+        ]
 
-        # Pull collection_to_process_end_time statistics, including average, median, min, max
-        collection_to_process_end_time_statistics['average'] = (
-            sum(collection_to_process_end_time.values())
-            / len(collection_to_process_end_time)
-            if collection_to_process_end_time
-            else None
-        )
-
-        collection_to_process_end_time_statistics['min'] = (
-            min(collection_to_process_end_time.values())
-            if collection_to_process_end_time
-            else None
-        )
-
-        collection_to_process_end_time_statistics['max'] = (
-            max(collection_to_process_end_time.values())
-            if collection_to_process_end_time
-            else None
-        )
-
-        return {
-            'collection_to_process_end_time': collection_to_process_end_time,
-            'collection_to_process_end_time_statistics': collection_to_process_end_time_statistics,
-            'collection_to_process_end_time_24h': collection_to_process_end_time_24h,
-            'processing_times_by_site': processing_times_by_site,
-            'total_samples_by_collection_event_name': total_samples_by_collection_event_name,
-            'samples_lost_after_collection': samples_lost_after_collection,
-            'samples_concentration_gt_1ug': samples_concentration_gt_1ug,
-            'participants_consented_not_collected': participants_consented_not_collected,
-            'participants_signed_not_consented': participants_signed_not_consented,
-        }
+    def process_participants_signed_not_consented(
+        self, participants: list[tuple[int, dict, dict]]
+    ) -> list[int]:
+        """Get the participants who have signed but have not been consented"""
+        return [
+            p[0] for p in participants if not self.fetch_key_from_meta('consent', p[1])
+        ]
