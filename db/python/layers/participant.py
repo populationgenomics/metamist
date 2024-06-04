@@ -981,3 +981,9 @@ class ParticipantLayer(BaseLayer):
                 maternal_id=fp_row.maternal_id,
                 affected=fp_row.affected,
             )
+
+    async def get_participants_and_samples_meta_by_project(
+        self, project: ProjectId
+    ) -> list[tuple[int, dict, dict]]:
+        """Get participants who have consented but not collected samples"""
+        return await self.pttable.get_participants_and_samples_meta_by_project(project)

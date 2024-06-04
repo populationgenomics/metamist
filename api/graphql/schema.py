@@ -253,9 +253,10 @@ class GraphQLProject:
         ourdna_layer = OurDnaDashboardLayer(connection)
         if not root.id:
             raise ValueError('Project must have an id')
-        return await ourdna_layer.query(
+        ourdna_dashboard = await ourdna_layer.query(
             SampleFilter(project=GenericFilter(eq=root.id)), project_id=root.id
         )
+        return ourdna_dashboard.to_dict()
 
     @strawberry.field()
     async def pedigree(
