@@ -66,7 +66,7 @@ const Dashboard = () => {
 
     const samplesLostAfterCollections = Object.entries(
         data.project.ourdnaDashboard.samples_lost_after_collection
-    ).reduce((rr, [key, sample]) => {
+    ).reduce((rr: Record<string, number>, [key, sample]) => {
         rr[key] = sample.time_to_process_start / 3600
         return rr
     }, {})
