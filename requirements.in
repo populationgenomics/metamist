@@ -7,7 +7,7 @@ cpg-utils>=5.0.5
 aiohttp
 async_lru
 cloudpathlib
-requests==2.31.0
+requests
 google-auth>=2.19.0
 google-cloud-bigquery==3.11.4
 google-cloud-logging==2.7.0
