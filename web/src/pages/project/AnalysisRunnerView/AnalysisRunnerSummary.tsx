@@ -1,19 +1,16 @@
-import * as React from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@apollo/client'
-import { Dropdown } from 'semantic-ui-react'
 import _ from 'lodash'
+import * as React from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Dropdown } from 'semantic-ui-react'
+import { gql } from '../../../__generated__/gql'
+import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
+import MuckError from '../../../shared/components/MuckError'
+import sanitiseValue from '../../../shared/utilities/sanitiseValue'
+import PageOptions from '../PageOptions'
 import ProjectSelector from '../ProjectSelector'
 import AnalysisRunnerGrid, { AnalysisRunnerGridItem } from './AnalysisRunnerGrid'
-import { gql } from '../../../__generated__/gql'
-import MuckError from '../../../shared/components/MuckError'
-import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
-import PageOptions from '../PageOptions'
 import { Filter } from './Filter'
-import sanitiseValue from '../../../shared/utilities/sanitiseValue'
-import parseDate from '../../../shared/utilities/parseDate'
-import parseEmail from '../../../shared/utilities/parseEmail'
-import parseDriverImage from '../../../shared/utilities/parseDriverImage'
 
 const PAGE_SIZES = [20, 40, 100, 1000]
 
@@ -49,6 +46,7 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
     const { loading, error, data } = useQuery(GET_ANALYSIS_RUNNER_LOGS, {
         variables: { project_name },
     })
+
     const [pageNumber, setPageNumber] = React.useState<number>(1)
     const [pageLimit, _setPageLimit] = React.useState<number>(PAGE_SIZES[2])
     const [filters, setFilters] = React.useState<Filter[]>([])

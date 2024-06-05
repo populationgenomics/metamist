@@ -14,6 +14,8 @@ interface IValueFilter {
     category: keyof ProjectParticipantGridFilter
     filterKey: string
     position?: 'top right' | 'top center'
+
+    size?: 'mini' | 'small' | 'large' | 'big' | 'huge' | 'massive'
 }
 export const ValueFilter: React.FC<IValueFilter> = ({
     category,
@@ -69,39 +71,59 @@ export const ValueFilter: React.FC<IValueFilter> = ({
     }
 
     return (
+        <Form onSubmit={onSubmit}>
+            <Form.Group inline style={{ padding: 0, margin: 0 }}>
+                <Form.Field style={{ padding: 0, margin: 0 }}>
+                    <Form.Input
+                        action={{ icon: 'search' }}
+                        placeholder={`Filter ${name}...`}
+                        name={name}
+                        value={tempValue}
+                        onChange={(e) => setTempValue(e.target.value)}
+                        size={props.size}
+                    />
+                </Form.Field>
+                {isHighlighted && (
+                    <Form.Field style={{ padding: 0 }}>
+                        <IconButton
+                            onClick={() => {
+                                setTempValue('')
+                                postValue(undefined)
+                            }}
+                            style={{ padding: 0 }}
+                        >
+                            <CloseIcon />
+                        </IconButton>
+                    </Form.Field>
+                )}
+            </Form.Group>
+        </Form>
+    )
+}
+
+export const ValueFilterPopup: React.FC<IValueFilter> = (props) => {
+    if (!props.filterKey) return <>No key</>
+    const isMeta = props.filterKey?.startsWith('meta.')
+    // set name to the filterKey without the .meta prefix
+    const name = props.filterKey.replace(/^meta\./, '')
+
+    let optionsToCheck = props?.filterValues?.[props.category] || {}
+
+    if (isMeta) {
+        // get the meta bit from the filterValues
+        optionsToCheck = optionsToCheck?.meta || {}
+    }
+    const isHighlighted = !!optionsToCheck && name in optionsToCheck
+
+    return (
         <div style={{ position: 'relative' }}>
             <div style={{ position: 'absolute', top: 0, right: 0 }}>
                 <Popup
-                    position={position || 'top right'}
+                    position={props.position || 'top right'}
                     trigger={isHighlighted ? <FilterAltIcon /> : <FilterAltOutlinedIcon />}
                     hoverable
                 >
-                    <Form onSubmit={onSubmit}>
-                        <Form.Group inline style={{ padding: 0, margin: 0 }}>
-                            <Form.Field style={{ padding: 0, margin: 0 }}>
-                                <Form.Input
-                                    action={{ icon: 'search' }}
-                                    placeholder={`Filter ${name}...`}
-                                    name={name}
-                                    value={tempValue}
-                                    onChange={(e) => setTempValue(e.target.value)}
-                                />
-                            </Form.Field>
-                            {isHighlighted && (
-                                <Form.Field style={{ padding: 0 }}>
-                                    <IconButton
-                                        onClick={() => {
-                                            setTempValue('')
-                                            postValue(undefined)
-                                        }}
-                                        style={{ padding: 0 }}
-                                    >
-                                        <CloseIcon />
-                                    </IconButton>
-                                </Form.Field>
-                            )}
-                        </Form.Group>
-                    </Form>
+                    <ValueFilter {...props} />
                 </Popup>
             </div>
         </div>
