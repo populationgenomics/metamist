@@ -39,6 +39,7 @@ from models.models.participant import (
 from models.models.project import Project, ProjectId
 from models.models.project_insights import (
     AnalysisStats,
+    AnalysisStatsInternal,
     ProjectInsightsDetails,
     ProjectInsightsDetailsInternal,
     ProjectInsightsSummary,

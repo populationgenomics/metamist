@@ -1,23 +1,41 @@
 # pylint: disable=too-many-instance-attributes
 from dataclasses import dataclass
 
+
+from datetime import datetime
+from typing import Any, Optional
 from models.base import SMBase
 from models.utils import sample_id_format, sequencing_group_id_format
 
 
 @dataclass
-class AnalysisStats:
+class AnalysisStatsInternal:
     """Model for Analysis Sequencing Group Stats"""
     id: int | None = None
     name: str | None = None
     sg_count: int | None = None
-    timestamp: str | None = None
+    timestamp: str | datetime | None = None
 
-    def to_external(self):
+    def to_external(self) -> Optional['AnalysisStats']:
         """Convert to transport model"""
         if self.id is None:
             return None
-        return {'id': self.id, 'name': self.name, 'sg_count': self.sg_count, 'timestamp': self.timestamp}
+        timestamp = self.timestamp if isinstance(self.timestamp, str) else self.timestamp.isoformat()
+        return AnalysisStats(
+            id=self.id,
+            name=self.name,
+            sg_count=self.sg_count,
+            timestamp=timestamp,
+        )
+
+
+class AnalysisStats(SMBase):
+    """Model for Analysis Sequencing Group Stats"""
+
+    id: int | None
+    name: str | None
+    sg_count: int | None
+    timestamp: str | None
 
 
 @dataclass
@@ -41,7 +59,7 @@ class ProjectInsightsDetailsInternal:
     in_latest_annotate_dataset: bool
     in_latest_snv_es_index: bool
     in_latest_sv_es_index: bool
-    sequencing_group_report_links: dict[str, str]
+    web_reports: dict[str, dict[str, Any]]
 
     def to_external(self):
         """Convert to transport model"""
@@ -63,7 +81,7 @@ class ProjectInsightsDetailsInternal:
             in_latest_annotate_dataset=self.in_latest_annotate_dataset,
             in_latest_snv_es_index=self.in_latest_snv_es_index,
             in_latest_sv_es_index=self.in_latest_sv_es_index,
-            sequencing_group_report_links=self.sequencing_group_report_links,
+            web_reports=self.web_reports,
         )
 
 
@@ -87,7 +105,7 @@ class ProjectInsightsDetails(SMBase):
     in_latest_annotate_dataset: bool
     in_latest_snv_es_index: bool
     in_latest_sv_es_index: bool
-    sequencing_group_report_links: dict[str, str]
+    web_reports: dict[str, dict[str, Any]]
 
 
 @dataclass
@@ -103,9 +121,9 @@ class ProjectInsightsSummaryInternal:
     total_samples: int = 0
     total_sequencing_groups: int = 0
     total_crams: int = 0
-    latest_annotate_dataset: AnalysisStats = None
-    latest_snv_es_index: AnalysisStats = None
-    latest_sv_es_index: AnalysisStats = None
+    latest_annotate_dataset: AnalysisStats | None = None
+    latest_snv_es_index: AnalysisStats | None = None
+    latest_sv_es_index: AnalysisStats | None = None
 
     def to_external(self):
         """Convert to transport model"""
