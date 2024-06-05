@@ -1,5 +1,5 @@
 # pylint: disable=too-many-locals
-import json
+import asyncio
 from collections import defaultdict
 from datetime import datetime
 from math import ceil
@@ -10,7 +10,9 @@ from db.python.layers.base import BaseLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from db.python.tables.sample import SampleFilter
-from models.models import OurDNADashboard, ProjectId, Sample
+from db.python.utils import GenericFilter
+from models.models import OurDNADashboard, OurDNALostSample, ProjectId, Sample
+from models.models.participant import ParticipantInternal
 
 
 class OurDnaDashboardLayer(BaseLayer):
@@ -101,37 +103,31 @@ class OurDnaDashboardLayer(BaseLayer):
 
         return int(time_taken.total_seconds())
 
-    def fetch_key_from_meta(self, key: str, meta: str | dict[str, Any]) -> bool:
-        """
-        Fetches a key from the given meta, if it exists, and checks if it is not False or None
-        """
-        if isinstance(meta, str):
-            meta = json.loads(meta)
-        if isinstance(meta, dict):
-            if key in meta:
-                value = meta.get(key)
-                if value is not False and value is not None:
-                    return True
-        return False
-
     async def query(
         self,
-        filter_: SampleFilter,
-        project_id: ProjectId = None,
+        project_id: ProjectId,
     ) -> OurDNADashboard:
         """Get dashboard data"""
         samples: list[Sample] = []
-        participants: list[tuple[int, dict, dict]] = []
+        participants: list[ParticipantInternal] = []
 
-        samples = [
-            s.to_external() for s in await self.sample_layer.query(filter_=filter_)
-        ]
-
-        participants = (
-            await self.participant_layer.get_participants_and_samples_meta_by_project(
-                project=project_id
-            )
+        s, participants = await asyncio.gather(
+            self.sample_layer.query(
+                filter_=SampleFilter(project=GenericFilter(eq=project_id))
+            ),
+            self.participant_layer.get_participants(project=project_id),
         )
+
+        # Converting to external to show stats per sample (with XPG ID) via the GraphQL API
+        samples = [sample.to_external() for sample in s]
+        participants_by_id = {p.id: p for p in participants}
+
+        grouped_participant_samples: dict[int, list] = defaultdict(list)
+
+        # Group instances of A by their foreign key
+        for sample in samples:
+            if sample.participant_id:
+                grouped_participant_samples[sample.participant_id].append(sample)
 
         # Data to be returned
         collection_to_process_end_time: dict[str, int] = (
@@ -151,31 +147,33 @@ class OurDnaDashboardLayer(BaseLayer):
         total_samples_by_collection_event_name: dict[str, int] = (
             self.process_total_samples_by_collection_event_name(samples=samples)
         )
-        samples_lost_after_collection: dict[str, dict[str, Any]] = (
+        samples_lost_after_collection: list[OurDNALostSample] = (
             self.process_samples_lost_after_collection(samples=samples)
         )
         samples_concentration_gt_1ug: dict[str, float] = (
             self.process_samples_concentration_gt_1ug(samples=samples)
         )
         participants_consented_not_collected: list[int] = (
-            self.process_participants_consented_not_collected(participants)
+            self.process_participants_consented_not_collected(
+                participants_by_id, grouped_participant_samples
+            )
         )
         participants_signed_not_consented: list[int] = (
-            self.process_participants_signed_not_consented(participants)
+            self.process_participants_signed_not_consented(
+                participants_by_id, grouped_participant_samples
+            )
         )
 
-        return OurDNADashboard.from_sample(
-            d={
-                'collection_to_process_end_time': collection_to_process_end_time,
-                'collection_to_process_end_time_statistics': collection_to_process_end_time_statistics,
-                'collection_to_process_end_time_24h': collection_to_process_end_time_24h,
-                'processing_times_by_site': processing_times_by_site,
-                'total_samples_by_collection_event_name': total_samples_by_collection_event_name,
-                'samples_lost_after_collection': samples_lost_after_collection,
-                'samples_concentration_gt_1ug': samples_concentration_gt_1ug,
-                'participants_consented_not_collected': participants_consented_not_collected,
-                'participants_signed_not_consented': participants_signed_not_consented,
-            }
+        return OurDNADashboard(
+            collection_to_process_end_time=collection_to_process_end_time,
+            collection_to_process_end_time_statistics=collection_to_process_end_time_statistics,
+            collection_to_process_end_time_24h=collection_to_process_end_time_24h,
+            processing_times_by_site=processing_times_by_site,
+            total_samples_by_collection_event_name=total_samples_by_collection_event_name,
+            samples_lost_after_collection=samples_lost_after_collection,
+            samples_concentration_gt_1ug=samples_concentration_gt_1ug,
+            participants_consented_not_collected=participants_consented_not_collected,
+            participants_signed_not_consented=participants_signed_not_consented,
         )
 
     def process_collection_to_process_end_times(self, samples: list[Sample]) -> dict:
@@ -268,9 +266,11 @@ class OurDnaDashboardLayer(BaseLayer):
 
         return total_samples_by_collection_event_name
 
-    def process_samples_lost_after_collection(self, samples: list[Sample]) -> dict:
+    def process_samples_lost_after_collection(
+        self, samples: list[Sample]
+    ) -> list[OurDNALostSample]:
         """Get total number of many samples have been lost, EG: participants have been consented, blood collected, not processed (etc), Alert here (highlight after 72 hours)"""
-        samples_lost_after_collection: dict[str, dict[str, Any]] = {}
+        samples_lost_after_collection: list[OurDNALostSample] = []
 
         for sample in samples:
             time_to_process_start = self.get_collection_to_process_start_time(sample)
@@ -279,45 +279,49 @@ class OurDnaDashboardLayer(BaseLayer):
                 time_to_process_start is not None
                 and time_to_process_start > 72 * 60 * 60
             ):
-                samples_lost_after_collection[sample.id] = {
-                    'time_to_process_start': time_to_process_start,
-                    'collection_time': self.get_meta_property(
-                        sample=sample, property_name='collection-time'
-                    ),
-                    'process_start_time': self.get_meta_property(
-                        sample=sample, property_name='process-start-time'
-                    ),
-                    'process_end_time': self.get_meta_property(
-                        sample=sample, property_name='process-end-time'
-                    ),
-                    'received_time': self.get_meta_property(
-                        sample=sample, property_name='received-time'
-                    ),
-                    'received_by': self.get_meta_property(
-                        sample=sample, property_name='received-by'
-                    ),
-                    'collection_lab': self.get_meta_property(
-                        sample=sample, property_name='collection-lab'
-                    ),
-                    'courier': self.get_meta_property(
-                        sample=sample, property_name='courier'
-                    ),
-                    'courier_tracking_number': self.get_meta_property(
-                        sample=sample, property_name='courier-tracking-number'
-                    ),
-                    'courier_scheduled_pickup_time': self.get_meta_property(
-                        sample=sample, property_name='courier-scheduled-pickup-time'
-                    ),
-                    'courier_actual_pickup_time': self.get_meta_property(
-                        sample=sample, property_name='courier-actual-pickup-time'
-                    ),
-                    'courier_scheduled_dropoff_time': self.get_meta_property(
-                        sample=sample, property_name='courier-scheduled-dropoff-time'
-                    ),
-                    'courier_actual_dropoff_time': self.get_meta_property(
-                        sample=sample, property_name='courier-actual-dropoff-time'
-                    ),
-                }
+                samples_lost_after_collection.append(
+                    OurDNALostSample(
+                        sample_id=sample.id,
+                        time_to_process_start=time_to_process_start,
+                        collection_time=self.get_meta_property(
+                            sample=sample, property_name='collection-time'
+                        ),
+                        process_start_time=self.get_meta_property(
+                            sample=sample, property_name='process-start-time'
+                        ),
+                        process_end_time=self.get_meta_property(
+                            sample=sample, property_name='process-end-time'
+                        ),
+                        received_time=self.get_meta_property(
+                            sample=sample, property_name='received-time'
+                        ),
+                        received_by=self.get_meta_property(
+                            sample=sample, property_name='received-by'
+                        ),
+                        collection_lab=self.get_meta_property(
+                            sample=sample, property_name='collection-lab'
+                        ),
+                        courier=self.get_meta_property(
+                            sample=sample, property_name='courier'
+                        ),
+                        courier_tracking_number=self.get_meta_property(
+                            sample=sample, property_name='courier-tracking-number'
+                        ),
+                        courier_scheduled_pickup_time=self.get_meta_property(
+                            sample=sample, property_name='courier-scheduled-pickup-time'
+                        ),
+                        courier_actual_pickup_time=self.get_meta_property(
+                            sample=sample, property_name='courier-actual-pickup-time'
+                        ),
+                        courier_scheduled_dropoff_time=self.get_meta_property(
+                            sample=sample,
+                            property_name='courier-scheduled-dropoff-time',
+                        ),
+                        courier_actual_dropoff_time=self.get_meta_property(
+                            sample=sample, property_name='courier-actual-dropoff-time'
+                        ),
+                    )
+                )
 
         return samples_lost_after_collection
 
@@ -327,30 +331,41 @@ class OurDnaDashboardLayer(BaseLayer):
 
         for sample in samples:
             if (
-                sample.meta.get('concentration') is not None
-                and float(sample.meta.get('concentration')) > 1
+                sample.meta.get('concentration')
+                and float(sample.meta['concentration']) > 1
             ):
                 samples_concentration_gt_1ug[sample.id] = float(
-                    sample.meta.get('concentration')
+                    sample.meta['concentration']
                 )
 
         return samples_concentration_gt_1ug
 
     def process_participants_consented_not_collected(
-        self, participants: list[tuple[int, dict, dict]]
+        self,
+        participants: dict[int, ParticipantInternal],
+        grouped_participants_samples: dict[int, list[Sample]],
     ) -> list[int]:
         """Get the participants who have been consented but have not had a sample collected"""
-        return [
-            p[0]
-            for p in participants
-            if self.fetch_key_from_meta('consent', p[1])
-            and not self.fetch_key_from_meta('collection-time', p[2])
-        ]
+        filtered_participants: list[int] = []
+        for participant_id, samples in grouped_participants_samples.items():
+            participant = participants[participant_id]
+            if participant.meta.get('consent') and any(
+                sample.meta.get('collection-time') is None for sample in samples
+            ):
+                filtered_participants.append(participant.id)
+
+        return filtered_participants
 
     def process_participants_signed_not_consented(
-        self, participants: list[tuple[int, dict, dict]]
+        self,
+        participants: dict[int, ParticipantInternal],
+        grouped_participants_samples: dict[int, list[Sample]],
     ) -> list[int]:
         """Get the participants who have signed but have not been consented"""
-        return [
-            p[0] for p in participants if not self.fetch_key_from_meta('consent', p[1])
-        ]
+        filtered_participants: list[int] = []
+        for participant_id, _ in grouped_participants_samples.items():
+            participant = participants[participant_id]
+            if not participant.meta.get('consent'):
+                filtered_participants.append(participant.id)
+
+        return filtered_participants
