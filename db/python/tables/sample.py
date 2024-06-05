@@ -483,9 +483,10 @@ class SampleTable(DbBase):
     ) -> dict[int, str]:
         """Get sample id map for all samples"""
         _query = f"""
-        SELECT sample_id AS id, external_id
-        FROM sample_external_id
-        WHERE sample_id IN :ids AND name = '{PRIMARY_EXTERNAL_ORG}'
+        SELECT s.id, seid.external_id
+        FROM sample s
+        INNER JOIN sample_external_id seid ON s.project = seid.project AND s.id = seid.sample_id
+        WHERE s.project = :project AND name = '{PRIMARY_EXTERNAL_ORG}'
         """
         rows = await self.connection.fetch_all(
             _query, {'project': project or self.project}

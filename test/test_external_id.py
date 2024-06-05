@@ -2,11 +2,13 @@ from test.testbase import DbIsolatedTest, run_as_sync
 
 from pymysql.err import IntegrityError
 
-from db.python.layers import ParticipantLayer, SampleLayer
+from db.python.layers import FamilyLayer, ParticipantLayer, SampleLayer
+from db.python.utils import NotFoundError
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
     ParticipantUpsertInternal,
     SampleUpsertInternal,
+    SequencingGroupUpsertInternal,
 )
 
 
@@ -123,6 +125,72 @@ class TestParticipant(DbIsolatedTest):
             expected_eids = self.p1_external_ids if s.id == s1.id else s.external_ids
             self.assertEqual(p_map[s.participant_id].external_ids, expected_eids)
 
+    @run_as_sync
+    async def test_get_by_families(self):
+        """Exercise get_participants_by_families() method"""
+        flayer = FamilyLayer(self.connection)
+        fid = await flayer.create_family(external_id='Jones')
+
+        child = await self.player.upsert_participant(
+            ParticipantUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'P20', 'd': 'D20'}),
+        )
+
+        await self.player.add_participant_to_family(
+            family_id=fid,
+            participant_id=child.id,
+            paternal_id=self.p1.id,
+            maternal_id=self.p2.id,
+            affected=2,
+        )
+
+        result = await self.player.get_participants_by_families([fid])
+        self.assertEqual(len(result), 1)
+        self.assertEqual(len(result[fid]), 1)
+        self.assertDictEqual(result[fid][0].external_ids, {PRIMARY_EXTERNAL_ORG: 'P20', 'd': 'D20'})
+
+    @run_as_sync
+    async def test_update_many(self):
+        """Exercise update_many_participant_external_ids() method"""
+        result = await self.player.update_many_participant_external_ids({self.p1.id: 'P1B', self.p2.id: 'P2B'})
+        self.assertTrue(result)
+
+        participants = await self.player.get_participants_by_ids([self.p1.id, self.p2.id])
+        p_map = {p.id: p for p in participants}
+        outp1 = p_map[self.p1.id]
+        outp2 = p_map[self.p2.id]
+        self.assertDictEqual(outp1.external_ids, {PRIMARY_EXTERNAL_ORG: 'P1B', 'control': '86', 'kaos': 'shoe'})
+        self.assertDictEqual(outp2.external_ids, {PRIMARY_EXTERNAL_ORG: 'P2B'})
+
+    @run_as_sync
+    async def test_get_etoi_map(self):
+        """Exercise get_external_participant_id_to_internal_sequencing_group_id_map() method"""
+        slayer = SampleLayer(self.connection)
+
+        _ = await slayer.upsert_sample(
+            SampleUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'SE1'}, participant_id=self.p1.id),
+        )
+
+        s2 = await slayer.upsert_sample(
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'SE2', 'other': 'SO1'},
+                participant_id=self.p1.id,
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        assays=[],
+                    ),
+                ],
+            ),
+        )
+
+        result = await self.player.get_external_participant_id_to_internal_sequencing_group_id_map(self.project_id)
+        self.assertEqual(len(result), 3)
+        for eid, sgid in result:
+            self.assertIn(eid, self.p1.external_ids.values())
+            self.assertEqual(sgid, s2.sequencing_groups[0].id)
+
 
 class TestSample(DbIsolatedTest):
     """Test sample external ids"""
@@ -212,3 +280,27 @@ class TestSample(DbIsolatedTest):
             )
         sample = await self.slayer.get_sample_by_id(result.id)
         self.assertDictEqual(sample.external_ids, {PRIMARY_EXTERNAL_ORG: 'S1B', 'control': '86B', 'c': 'A1'})
+
+    @run_as_sync
+    async def test_get_single(self):
+        """Exercise get_single_by_external_id() method"""
+        with self.assertRaises(NotFoundError):
+            _ = await self.slayer.get_single_by_external_id('non-existent', self.project_id)
+
+        result = await self.slayer.get_single_by_external_id('86', self.project_id)
+        self.assertEqual(result.id, self.s1.id)
+
+        result = await self.slayer.get_single_by_external_id('S2', self.project_id)
+        self.assertEqual(result.id, self.s2.id)
+
+    @run_as_sync
+    async def test_get_internal_to_external(self):
+        """Exercise get_internal_to_external_sample_id_map() method"""
+        result = await self.slayer.get_internal_to_external_sample_id_map([self.s1.id, self.s2.id])
+        self.assertDictEqual(result, {self.s1.id: 'S1', self.s2.id: 'S2'})
+
+    @run_as_sync
+    async def test_get_all(self):
+        """Exercise get_all_sample_id_map_by_internal_ids() method"""
+        result = await self.slayer.get_all_sample_id_map_by_internal_ids(self.project_id)
+        self.assertDictEqual(result, {self.s1.id: 'S1', self.s2.id: 'S2'})
