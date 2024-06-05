@@ -294,10 +294,13 @@ class OurDNADashboardTest(DbIsolatedTest):
 
         # Check that samples_lost_after_collection is not empty and is a dict
         assert samples_lost_after_collection
-        assert isinstance(samples_lost_after_collection, dict)
+        assert isinstance(samples_lost_after_collection, list)
 
         # Check that the number of samples in the list is correct
         samples_filtered: list[SampleUpsert] = []
+        sample_ids_lost_after_collection = [
+            sample.sample_id for sample in samples_lost_after_collection
+        ]
         for sample in self.sample_external_objects:
             assert isinstance(sample.meta, dict)
             collection_time = sample.meta.get('collection-time')
@@ -313,16 +316,18 @@ class OurDNADashboardTest(DbIsolatedTest):
 
                 # Check that the time difference matches
                 assert isinstance(sample.id, str)
-                assert (
-                    time_difference.total_seconds()
-                    == samples_lost_after_collection[sample.id]['time_to_process_start']
-                )
+                for sample_data in samples_lost_after_collection:
+                    if sample_data.sample_id == sample.id:
+                        assert (
+                            time_difference.total_seconds()
+                            == sample_data.time_to_process_start
+                        )
 
                 # Check that the sample id is in the dict
-                assert sample.id in samples_lost_after_collection
+                assert sample.id in sample_ids_lost_after_collection
 
         # check that there are a correct number of matching results
-        assert len(samples_lost_after_collection.keys()) == len(samples_filtered)
+        assert len(samples_lost_after_collection) == len(samples_filtered)
 
         # TODO: Add assertions VB
 
