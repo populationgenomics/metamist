@@ -1,6 +1,7 @@
 import React from 'react'
 import { Container, Grid, GridRow, GridColumn } from 'semantic-ui-react'
-import { gql, useQuery } from '@apollo/client'
+import { useQuery } from '@apollo/client'
+import { gql } from '../../__generated__'
 
 import Tile from '../../shared/components/ourdna/Tile'
 import TableTile from '../../shared/components/ourdna/TableTile'
@@ -22,13 +23,38 @@ import ClockIcon from '../../shared/components/ourdna/dashboardIcons/ClockIcon'
 import RocketIcon from '../../shared/components/ourdna/dashboardIcons/RocketIcon'
 import AlarmIcon from '../../shared/components/ourdna/dashboardIcons/AlarmIcon'
 
-const GET_OURDNA_DASHBOARD = gql`
+const GET_OURDNA_DASHBOARD = gql(`
     query DashboardQuery($project: String!) {
         project(name: $project) {
-            ourdnaDashboard
+            ourdnaDashboard {
+                collectionToProcessEndTime
+                collectionToProcessEndTime24h
+                collectionToProcessEndTimeStatistics
+                participantsConsentedNotCollected
+                participantsSignedNotConsented
+                processingTimesBySite
+                samplesConcentrationGt1ug
+                samplesLostAfterCollection {
+                    collectionLab
+                    collectionTime
+                    courier
+                    courierActualDropoffTime
+                    courierActualPickupTime
+                    courierScheduledDropoffTime
+                    courierScheduledPickupTime
+                    courierTrackingNumber
+                    processEndTime
+                    processStartTime
+                    receivedBy
+                    receivedTime
+                    sampleId
+                    timeToProcessStart
+                }
+                totalSamplesByCollectionEventName
+            }
         }
     }
-`
+`)
 
 const iconStyle = {
     marginRight: '10px',
@@ -36,27 +62,8 @@ const iconStyle = {
     height: '24px',
 }
 
-type OurDNADashboardData = {
-    project: {
-        ourdnaDashboard: {
-            participants_signed_not_consented: number[]
-            participants_consented_not_collected: number[]
-            samples_lost_after_collection: Record<string, Record<string, any>>
-            collection_to_process_end_time: Record<string, number>
-            collection_to_process_end_time_statistics: {
-                min: number
-                max: number
-                average: number
-            }
-            collection_to_process_end_time_24h: Record<string, number>
-            total_samples_by_collection_event_name: Record<string, number>
-            processing_times_by_site: Record<string, Record<number, number>>
-            samples_concentration_gt_1ug: Record<string, number>
-        }
-    }
-}
 const Dashboard = () => {
-    const { loading, error, data } = useQuery<OurDNADashboardData>(GET_OURDNA_DASHBOARD, {
+    const { loading, error, data } = useQuery(GET_OURDNA_DASHBOARD, {
         variables: { project: import.meta.env.VITE_OURDNA_PROJECT_NAME || 'ourdna' },
     })
 
@@ -64,12 +71,14 @@ const Dashboard = () => {
     if (loading) return <LoadingDucks />
     if (error) return <>Error! {error.message}</>
 
-    const samplesLostAfterCollections = Object.entries(
-        data.project.ourdnaDashboard.samples_lost_after_collection
-    ).reduce((rr: Record<string, number>, [key, sample]) => {
-        rr[key] = sample.time_to_process_start / 3600
-        return rr
-    }, {})
+    const samplesLostAfterCollections =
+        data.project.ourdnaDashboard.samplesLostAfterCollection.reduce(
+            (rr: Record<string, any>, sample) => {
+                rr[sample.sampleId] = sample.timeToProcessStart / 3600
+                return rr
+            },
+            {}
+        )
 
     return (
         <>
@@ -91,7 +100,7 @@ const Dashboard = () => {
                             <GridColumn>
                                 <Tile
                                     header="Awaiting Consent"
-                                    stat={`${data.project.ourdnaDashboard.participants_signed_not_consented.length}`}
+                                    stat={`${data.project.ourdnaDashboard.participantsSignedNotConsented.length}`}
                                     units="participants"
                                     unitsColour="ourdna-blue-transparent"
                                     description="The number of people who have signed up but not consented."
@@ -106,7 +115,7 @@ const Dashboard = () => {
                             <GridColumn>
                                 <Tile
                                     header="Awaiting Collection"
-                                    stat={`${data.project.ourdnaDashboard.participants_consented_not_collected.length}`}
+                                    stat={`${data.project.ourdnaDashboard.participantsConsentedNotCollected.length}`}
                                     units="participants"
                                     unitsColour="ourdna-yellow-transparent"
                                     description="The number of people who have consented but not given blood."
@@ -123,8 +132,7 @@ const Dashboard = () => {
                                     header="Samples Lost"
                                     stat={`${
                                         Object.keys(
-                                            data.project.ourdnaDashboard
-                                                .samples_lost_after_collection
+                                            data.project.ourdnaDashboard.samplesLostAfterCollection
                                         ).length
                                     }`}
                                     units="samples"
@@ -145,8 +153,7 @@ const Dashboard = () => {
                                         {
                                             value: `${(
                                                 data.project.ourdnaDashboard
-                                                    .collection_to_process_end_time_statistics.min /
-                                                3600
+                                                    .collectionToProcessEndTimeStatistics.min / 3600
                                             ).toFixed(1)}`,
                                             units: 'shortest (h)',
                                             unitsColour: 'ourdna-green-transparent',
@@ -154,8 +161,7 @@ const Dashboard = () => {
                                         {
                                             value: `${(
                                                 data.project.ourdnaDashboard
-                                                    .collection_to_process_end_time_statistics.max /
-                                                3600
+                                                    .collectionToProcessEndTimeStatistics.max / 3600
                                             ).toFixed(1)}`,
                                             units: 'longest (h)',
                                             unitsColour: 'ourdna-red-transparent',
@@ -163,8 +169,8 @@ const Dashboard = () => {
                                         {
                                             value: `${(
                                                 data.project.ourdnaDashboard
-                                                    .collection_to_process_end_time_statistics
-                                                    .average / 3600
+                                                    .collectionToProcessEndTimeStatistics.average /
+                                                3600
                                             ).toFixed(1)}`,
                                             units: 'average (h)',
                                             unitsColour: 'ourdna-blue-transparent',
@@ -184,9 +190,7 @@ const Dashboard = () => {
                     <GridColumn width={6}>
                         <OurDonutChart
                             header="Where we collected our samples"
-                            data={
-                                data.project.ourdnaDashboard.total_samples_by_collection_event_name
-                            }
+                            data={data.project.ourdnaDashboard.totalSamplesByCollectionEventName}
                             icon={
                                 <TestTubeIcon fill={ourdnaColours.blue} style={{ ...iconStyle }} />
                             }
@@ -197,7 +201,7 @@ const Dashboard = () => {
                     <GridColumn width={10}>
                         <BarChart
                             header="Processing time per site"
-                            data={data.project.ourdnaDashboard.processing_times_by_site}
+                            data={data.project.ourdnaDashboard.processingTimesBySite}
                             icon={
                                 <ClockIcon fill={ourdnaColours.yellow} style={{ ...iconStyle }} />
                             }
@@ -208,7 +212,7 @@ const Dashboard = () => {
                             <GridColumn>
                                 <TableTile
                                     header="Viable Long Read"
-                                    data={data.project.ourdnaDashboard.samples_concentration_gt_1ug}
+                                    data={data.project.ourdnaDashboard.samplesConcentrationGt1ug}
                                     columns={['Sample ID', 'Concentration']}
                                     icon={
                                         <RocketIcon
