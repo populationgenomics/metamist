@@ -229,18 +229,20 @@ class SampleTable(DbBase):
             if PRIMARY_EXTERNAL_ORG in to_delete:
                 raise ValueError("Can't remove sample's primary external_id")
 
-            if to_delete:
-                # Set audit_log_id to this transaction before deleting the rows
-                _audit_update_query = """
-                UPDATE sample_external_id
-                SET audit_log_id = :audit_log_id
-                WHERE sample_id = :id AND name IN :names
-                """
-                await self.connection.execute(
-                    _audit_update_query,
-                    {'id': id_, 'names': to_delete, 'audit_log_id': audit_log_id},
-                )
+            # "touch" all sample_external_id rows for this sample (especially those about to be deleted)
+            # except for those that are about to be updated via to_update anyway
+            _sync_query = """
+            UPDATE sample_external_id
+            SET audit_log_id = :audit_log_id
+            WHERE sample_id = :id
+            """
+            _sync_values = {'id': id_, 'audit_log_id': audit_log_id}
+            if to_update:
+                _sync_query += ' AND name NOT IN :names'
+                _sync_values['names'] = list(to_update.keys())
+            await self.connection.execute(_sync_query, _sync_values)
 
+            if to_delete:
                 _delete_query = """
                 DELETE FROM sample_external_id
                 WHERE sample_id = :id AND name IN :names
@@ -268,6 +270,14 @@ class SampleTable(DbBase):
                     for name, eid in to_update.items()
                 ]
                 await self.connection.execute_many(_update_query, _eid_values)
+        else:
+            # "touch" all sample_external_id rows for this sample
+            _sync_query = """
+            UPDATE sample_external_id
+            SET audit_log_id = :audit_log_id
+            WHERE sample_id = :id
+            """
+            await self.connection.execute(_sync_query, {'id': id_, 'audit_log_id': audit_log_id})
 
         if type_:
             values['type'] = type_
@@ -525,11 +535,11 @@ class SampleTable(DbBase):
         keys_str = ', '.join(keys)
         _query = f"""
         SELECT {keys_str}
-        FROM sample s
-        INNER JOIN sample_external_id seid ON s.project = seid.project AND s.id = seid.sample_id
-        FOR SYSTEM_TIME ALL
+        FROM sample FOR SYSTEM_TIME ALL AS s
+        INNER JOIN sample_external_id FOR SYSTEM_TIME ALL AS seid
+          ON s.project = seid.project AND s.id = seid.sample_id AND s.audit_log_id = seid.audit_log_id
         WHERE s.id = :id
-        GROUP BY s.id
+        GROUP BY s.id, s.audit_log_id
         """
 
         rows = await self.connection.fetch_all(_query, {'id': id_})

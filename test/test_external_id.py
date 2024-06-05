@@ -2,6 +2,7 @@ from test.testbase import DbIsolatedTest, run_as_sync
 
 from pymysql.err import IntegrityError
 
+from db.python.connect import Connection
 from db.python.layers import FamilyLayer, ParticipantLayer, SampleLayer
 from db.python.utils import NotFoundError
 from models.models import (
@@ -304,3 +305,40 @@ class TestSample(DbIsolatedTest):
         """Exercise get_all_sample_id_map_by_internal_ids() method"""
         result = await self.slayer.get_all_sample_id_map_by_internal_ids(self.project_id)
         self.assertDictEqual(result, {self.s1.id: 'S1', self.s2.id: 'S2'})
+
+    def new_slayer(self):
+        """Create a new connection and layer so as to get a new audit_log_id"""
+        return SampleLayer(
+            Connection(
+                connection=self._connection,
+                project=self.project_id,
+                author=self.author,
+                readonly=False,
+                ar_guid=None,
+                on_behalf_of=None,
+                )
+            )
+
+    @run_as_sync
+    async def test_get_history(self):
+        """Exercise get_history_of_sample() method"""
+        # First create some history
+        await self.new_slayer().upsert_sample(SampleUpsertInternal(id=self.s1.id, meta={'foo': 'bar'}))
+
+        await self.new_slayer().upsert_sample(
+            SampleUpsertInternal(
+                id=self.s1.id,
+                external_ids={'fruit': 'apple'},
+                meta={'fruit': 'banana'},
+                )
+            )
+
+        sample = await self.slayer.get_sample_by_id(self.s1.id)
+
+        result = await self.slayer.get_history_of_sample(self.s1.id)
+        self.assertEqual(len(result), 3)
+        self.assertDictEqual(result[0].meta, {})
+        self.assertDictEqual(result[1].meta, {'foo': 'bar'})
+        self.assertDictEqual(result[2].meta, {'foo': 'bar', 'fruit': 'banana'})
+        self.assertDictEqual(result[2].meta, sample.meta)
+        self.assertDictEqual(result[2].external_ids, sample.external_ids)

@@ -23,6 +23,8 @@ class SampleInternal(SMBase):
     active: bool | None
     author: str | None = None
 
+    audit_log_id: int | None = None
+
     @staticmethod
     def from_db(d: dict):
         """
