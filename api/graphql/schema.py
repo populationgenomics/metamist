@@ -54,6 +54,7 @@ from models.models import (
 )
 from models.models.analysis_runner import AnalysisRunnerInternal
 from models.models.family import PedRowInternal
+from models.models.ourdna import OurDNADashboard, OurDNALostSample
 from models.models.project import ProjectId
 from models.models.sample import sample_id_transform_to_raw
 from models.utils.cohort_id_format import cohort_id_format, cohort_id_transform_to_raw
@@ -88,6 +89,28 @@ for enum in enum_tables.__dict__.values():
 GraphQLEnum = strawberry.type(type('GraphQLEnum', (object,), enum_methods))
 
 GraphQLAnalysisStatus = strawberry.enum(AnalysisStatus)
+
+
+@strawberry.experimental.pydantic.type(model=OurDNALostSample, all_fields=True)  # type: ignore
+class GraphQLOurDNALostSample:
+    """OurDNA Lost Sample GraphQL model to be used in OurDNA Dashboard"""
+
+    pass  # pylint: disable=unnecessary-pass
+
+
+@strawberry.experimental.pydantic.type(model=OurDNADashboard)  # type: ignore
+class GraphQLOurDNADashboard:
+    """OurDNA Dashboard model"""
+
+    collection_to_process_end_time: strawberry.scalars.JSON
+    collection_to_process_end_time_statistics: strawberry.scalars.JSON
+    collection_to_process_end_time_24h: strawberry.scalars.JSON
+    processing_times_by_site: strawberry.scalars.JSON
+    total_samples_by_collection_event_name: strawberry.scalars.JSON
+    samples_lost_after_collection: list[GraphQLOurDNALostSample]
+    samples_concentration_gt_1ug: strawberry.scalars.JSON
+    participants_consented_not_collected: list[int]
+    participants_signed_not_consented: list[int]
 
 
 # Create cohort GraphQL model
@@ -248,15 +271,14 @@ class GraphQLProject:
     @strawberry.field
     async def ourdna_dashboard(
         self, info: Info, root: 'Project'
-    ) -> strawberry.scalars.JSON:
+    ) -> 'GraphQLOurDNADashboard':
         connection = info.context['connection']
         ourdna_layer = OurDnaDashboardLayer(connection)
         if not root.id:
             raise ValueError('Project must have an id')
-        ourdna_dashboard = await ourdna_layer.query(
-            SampleFilter(project=GenericFilter(eq=root.id)), project_id=root.id
-        )
-        return ourdna_dashboard.to_dict()
+        ourdna_dashboard = await ourdna_layer.query(project_id=root.id)
+        # pylint: disable=no-member
+        return GraphQLOurDNADashboard.from_pydantic(ourdna_dashboard)
 
     @strawberry.field()
     async def pedigree(

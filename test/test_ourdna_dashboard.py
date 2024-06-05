@@ -6,9 +6,8 @@ from test.testbase import DbIsolatedTest, run_as_sync
 from db.python.layers.ourdna.dashboard import OurDnaDashboardLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
-from db.python.tables.sample import SampleFilter
-from db.python.utils import GenericFilter
 from models.models import (
+    OurDNADashboard,
     ParticipantUpsert,
     ParticipantUpsertInternal,
     SampleUpsert,
@@ -143,19 +142,17 @@ class OurDNADashboardTest(DbIsolatedTest):
     @run_as_sync
     async def test_get_dashboard(self):
         """Test get_dashboard"""
-        sample_filter = SampleFilter(project=GenericFilter(eq=self.project_id))
-        dashboard = (await self.odd.query(sample_filter)).to_dict()
+        dashboard = await self.odd.query(project_id=self.project_id)
 
         # Check that the dashboard is not empty and is a dict
         assert dashboard
-        assert isinstance(dashboard, dict)
+        assert isinstance(dashboard, OurDNADashboard)
 
     @run_as_sync
     async def test_collection_to_process_end_time(self):
         """I want to know how long it took between blood collection and sample processing"""
-        sample_filter = SampleFilter(project=GenericFilter(eq=self.project_id))
-        dashboard = (await self.odd.query(sample_filter)).to_dict()
-        collection_to_process_end_time = dashboard['collection_to_process_end_time']
+        dashboard = await self.odd.query(project_id=self.project_id)
+        collection_to_process_end_time = dashboard.collection_to_process_end_time
 
         # Check that collection_to_process_end_time is not empty and is a dict
         assert collection_to_process_end_time
@@ -176,6 +173,7 @@ class OurDNADashboardTest(DbIsolatedTest):
                 samples_filtered.append(sample)
 
                 # Check that the time difference matches
+                assert isinstance(sample.id, str)
                 assert (
                     time_difference.total_seconds()
                     == collection_to_process_end_time[sample.id]
@@ -196,10 +194,9 @@ class OurDNADashboardTest(DbIsolatedTest):
     @run_as_sync
     async def test_collection_to_process_end_time_24h(self):
         """I want to know which samples took more than 24 hours between blood collection and sample processing completion"""
-        sample_filter = SampleFilter(project=GenericFilter(eq=self.project_id))
-        dashboard = (await self.odd.query(sample_filter)).to_dict()
-        collection_to_process_end_time_24h = dashboard.get(
-            'collection_to_process_end_time_24h'
+        dashboard = await self.odd.query(project_id=self.project_id)
+        collection_to_process_end_time_24h = (
+            dashboard.collection_to_process_end_time_24h
         )
 
         # Check that collection_to_process_end_time is not empty and is a dict
@@ -221,6 +218,7 @@ class OurDNADashboardTest(DbIsolatedTest):
                 samples_filtered.append(sample)
 
                 # Check that the time difference matches
+                assert isinstance(sample.id, str)
                 assert (
                     time_difference.total_seconds()
                     == collection_to_process_end_time_24h[sample.id]
@@ -235,15 +233,14 @@ class OurDNADashboardTest(DbIsolatedTest):
     @run_as_sync
     async def test_processing_times_per_site(self):
         """I want to know what the sample processing times were for samples at each designated site"""
-        sample_filter = SampleFilter(project=GenericFilter(eq=self.project_id))
-        dashboard = (await self.odd.query(sample_filter)).to_dict()
-        processing_times_by_site = dashboard.get('processing_times_by_site')
+        dashboard = await self.odd.query(project_id=self.project_id)
+        processing_times_by_site = dashboard.processing_times_by_site
 
         # Check that processing_times_per_site is not empty and is a dict
         assert processing_times_by_site
         assert isinstance(processing_times_by_site, dict)
 
-        sample_tally: dict[str, dict[str, int]] = OrderedDict()
+        sample_tally: dict[str, dict[int, int]] = OrderedDict()
         for sample in self.sample_external_objects:
             assert isinstance(sample.meta, dict)
             processing_site = sample.meta.get('processing-site', 'Unknown')
@@ -268,10 +265,9 @@ class OurDNADashboardTest(DbIsolatedTest):
     @run_as_sync
     async def test_total_samples_by_collection_event_name(self):
         """I want to know how many samples were collected from walk-ins vs during events or scheduled activities"""
-        sample_filter = SampleFilter(project=GenericFilter(eq=self.project_id))
-        dashboard = (await self.odd.query(sample_filter)).to_dict()
-        total_samples_by_collection_event_name = dashboard.get(
-            'total_samples_by_collection_event_name'
+        dashboard = await self.odd.query(project_id=self.project_id)
+        total_samples_by_collection_event_name = (
+            dashboard.total_samples_by_collection_event_name
         )
 
         # Check that total_samples_by_collection_event_name is not empty and is a dict
@@ -293,9 +289,8 @@ class OurDNADashboardTest(DbIsolatedTest):
     @run_as_sync
     async def test_samples_lost_after_collection(self):
         """I need to know how many samples have been lost, EG: participants have been consented, blood collected, not processed"""
-        sample_filter = SampleFilter(project=GenericFilter(eq=self.project_id))
-        dashboard = (await self.odd.query(sample_filter)).to_dict()
-        samples_lost_after_collection = dashboard.get('samples_lost_after_collection')
+        dashboard = await self.odd.query(project_id=self.project_id)
+        samples_lost_after_collection = dashboard.samples_lost_after_collection
 
         # Check that samples_lost_after_collection is not empty and is a dict
         assert samples_lost_after_collection
@@ -317,6 +312,7 @@ class OurDNADashboardTest(DbIsolatedTest):
                 samples_filtered.append(sample)
 
                 # Check that the time difference matches
+                assert isinstance(sample.id, str)
                 assert (
                     time_difference.total_seconds()
                     == samples_lost_after_collection[sample.id]['time_to_process_start']
@@ -333,9 +329,8 @@ class OurDNADashboardTest(DbIsolatedTest):
     @run_as_sync
     async def test_samples_more_than_1ug_dna(self):
         """I want to generate a list of samples containing more than 1 ug of DNA to prioritise them for long-read sequencing applications"""
-        sample_filter = SampleFilter(project=GenericFilter(eq=self.project_id))
-        dashboard = (await self.odd.query(sample_filter)).to_dict()
-        samples_more_than_1ug_dna = dashboard.get('samples_concentration_gt_1ug')
+        dashboard = await self.odd.query(project_id=self.project_id)
+        samples_more_than_1ug_dna = dashboard.samples_concentration_gt_1ug
 
         # Check that samples_concentratiom_gt_1ug is not empty and is a dict
         assert samples_more_than_1ug_dna
@@ -345,10 +340,7 @@ class OurDNADashboardTest(DbIsolatedTest):
         samples_filtered: list[SampleUpsert] = []
         for sample in self.sample_external_objects:
             assert isinstance(sample.meta, dict)
-            if (
-                sample.meta.get('concentration')
-                and sample.meta.get('concentration') > 1
-            ):
+            if sample.meta['concentration'] and sample.meta['concentration'] > 1:
                 samples_filtered.append(sample)
 
                 # Check that the sample id is in the dict
@@ -359,16 +351,13 @@ class OurDNADashboardTest(DbIsolatedTest):
     @run_as_sync
     async def test_participants_consented_not_collected(self):
         """I want to know how many people who have consented and NOT given blood"""
-        sample_filter = SampleFilter(project=GenericFilter(eq=self.project_id))
-        dashboard = (
-            await self.odd.query(sample_filter, project_id=self.project_id)
-        ).to_dict()
+        dashboard = await self.odd.query(project_id=self.project_id)
         # print(dashboard)
-        participants_consented_not_collected = dashboard.get(
-            'participants_consented_not_collected'
+        participants_consented_not_collected = (
+            dashboard.participants_consented_not_collected
         )
 
-        # Check that participants_signed_not_consented is not empty and is a dict
+        # Check that participants_consented_not_collected is not empty and is a dict
         assert participants_consented_not_collected
         assert isinstance(participants_consented_not_collected, list)
 
@@ -382,8 +371,9 @@ class OurDNADashboardTest(DbIsolatedTest):
                 if sample.participant_id == participant.id
                 and isinstance(sample.meta, dict)
             ]
-            if participant.meta.get('consent') and not any(
-                isinstance(sample.meta, dict) and sample.meta.get('collection-time')
+            if participant.meta.get('consent') and any(
+                isinstance(sample.meta, dict)
+                and sample.meta.get('collection-time') is None
                 for sample in samples_for_participant
             ):
                 participants_filtered.append(participant)
@@ -396,14 +386,9 @@ class OurDNADashboardTest(DbIsolatedTest):
     @run_as_sync
     async def test_participants_signed_not_consented(self):
         """I want to know how many people have signed up but not consented"""
-        sample_filter = SampleFilter(project=GenericFilter(eq=self.project_id))
-        dashboard = (
-            await self.odd.query(sample_filter, project_id=self.project_id)
-        ).to_dict()
+        dashboard = await self.odd.query(project_id=self.project_id)
         # print(dashboard)
-        participants_signed_not_consented = dashboard.get(
-            'participants_signed_not_consented'
-        )
+        participants_signed_not_consented = dashboard.participants_signed_not_consented
 
         # Check that participants_signed_not_consented is not empty and is a dict
         assert participants_signed_not_consented
