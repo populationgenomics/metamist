@@ -82,7 +82,7 @@ class SampleTable(DbBase):
         _query = f"""
         SELECT {common_get_keys_str}
         FROM sample s
-        INNER JOIN sample_external_id seid ON s.project = seid.project AND s.id = seid.sample_id
+        INNER JOIN sample_external_id seid ON s.id = seid.sample_id
         WHERE {wheres}
         GROUP BY s.id
         """
@@ -430,7 +430,7 @@ class SampleTable(DbBase):
         _query = """
             SELECT s.project, s.id, seid.external_id, s.participant_id
             FROM sample s
-            INNER JOIN sample_external_id seid ON s.project = seid.project AND s.id = seid.sample_id
+            INNER JOIN sample_external_id seid ON s.id = seid.sample_id
             WHERE s.project IN :project_ids AND seid.external_id LIKE :search_pattern
             LIMIT :limit
         """.strip()
@@ -495,7 +495,7 @@ class SampleTable(DbBase):
         _query = f"""
         SELECT s.id, seid.external_id
         FROM sample s
-        INNER JOIN sample_external_id seid ON s.project = seid.project AND s.id = seid.sample_id
+        INNER JOIN sample_external_id seid ON s.id = seid.sample_id
         WHERE s.project = :project AND name = '{PRIMARY_EXTERNAL_ORG}'
         """
         rows = await self.connection.fetch_all(
@@ -537,7 +537,7 @@ class SampleTable(DbBase):
         SELECT {keys_str}
         FROM sample FOR SYSTEM_TIME ALL AS s
         INNER JOIN sample_external_id FOR SYSTEM_TIME ALL AS seid
-          ON s.project = seid.project AND s.id = seid.sample_id AND s.audit_log_id = seid.audit_log_id
+          ON s.id = seid.sample_id AND s.audit_log_id = seid.audit_log_id
         WHERE s.id = :id
         GROUP BY s.id, s.audit_log_id
         """
@@ -565,7 +565,7 @@ class SampleTable(DbBase):
         _query = f"""
             SELECT {', '.join(keys)}
             FROM sample s
-            INNER JOIN sample_external_id seid ON s.project = seid.project AND s.id = seid.sample_id
+            INNER JOIN sample_external_id seid ON s.id = seid.sample_id
             WHERE s.participant_id IS NULL AND s.project = :project
             GROUP BY s.id
         """

@@ -261,7 +261,7 @@ class TestUpsert(DbIsolatedTest):
             f"""
             SELECT s.participant_id, seid.external_id
             FROM sample s
-            INNER JOIN sample_external_id seid ON s.project = seid.project AND s.id = seid.sample_id
+            INNER JOIN sample_external_id seid ON s.id = seid.sample_id
             WHERE seid.name = '{PRIMARY_EXTERNAL_ORG}'
             ORDER BY s.id
             """

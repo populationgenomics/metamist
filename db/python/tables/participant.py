@@ -45,7 +45,7 @@ class ParticipantTable(DbBase):
         _query = f"""
         SELECT {self.keys_str}
         FROM participant p
-        INNER JOIN participant_external_id peid ON p.project = peid.project AND p.id = peid.participant_id
+        INNER JOIN participant_external_id peid ON p.id = peid.participant_id
         WHERE p.id IN :ids
         GROUP BY p.id
         """
@@ -69,7 +69,7 @@ class ParticipantTable(DbBase):
         _query = f"""
         SELECT {self.keys_str}
         FROM participant p
-        INNER JOIN participant_external_id peid ON p.project = peid.project AND p.id = peid.participant_id
+        INNER JOIN participant_external_id peid ON p.id = peid.participant_id
         WHERE {wheres}
         GROUP BY p.id
         """
@@ -330,7 +330,7 @@ RETURNING id
             SELECT fp.family_id, {self.keys_str}
             FROM participant p
             INNER JOIN family_participant fp ON fp.participant_id = p.id
-            INNER JOIN participant_external_id peid ON p.project = peid.project AND p.id = peid.participant_id
+            INNER JOIN participant_external_id peid ON p.id = peid.participant_id
             WHERE fp.family_id IN :fids
             GROUP BY p.id
         """
@@ -399,7 +399,7 @@ RETURNING id
         _query = f"""
 SELECT peid.external_id, sg.id
 FROM participant p
-INNER JOIN participant_external_id peid ON p.project = peid.project AND p.id = peid.participant_id
+INNER JOIN participant_external_id peid ON p.id = peid.participant_id
 INNER JOIN sample s ON p.id = s.participant_id
 INNER JOIN sequencing_group sg ON sg.sample_id = s.id
 WHERE {' AND '.join(wheres)}

@@ -89,7 +89,7 @@ class WebDb(DbBase):
         SELECT s.id, JSON_OBJECTAGG(seid.name, seid.external_id) AS external_ids,
                s.type, s.meta, s.participant_id, s.active
         FROM sample s
-        LEFT JOIN sample_external_id seid ON s.project = seid.project AND s.id = seid.sample_id
+        LEFT JOIN sample_external_id seid ON s.id = seid.sample_id
         LEFT JOIN assay a ON s.id = a.sample_id
         LEFT JOIN participant p ON p.id = s.participant_id
         LEFT JOIN family_participant fp on s.participant_id = fp.participant_id
@@ -344,7 +344,7 @@ class WebDb(DbBase):
             SELECT p.id, JSON_OBJECTAGG(peid.name, peid.external_id) AS external_ids,
                    p.meta, p.reported_sex, p.reported_gender, p.karyotype
             FROM participant p
-            INNER JOIN participant_external_id peid ON p.project = peid.project AND p.id = peid.participant_id
+            INNER JOIN participant_external_id peid ON p.id = peid.participant_id
             WHERE p.id in :pids
             GROUP BY p.id
         """
