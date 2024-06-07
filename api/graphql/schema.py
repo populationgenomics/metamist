@@ -392,11 +392,13 @@ class GraphQLProject:
         active: GraphQLFilter[bool] | None = None,
         meta: GraphQLMetaFilter | None = None,
         timestamp_completed: GraphQLFilter[datetime.datetime] | None = None,
+        ids: GraphQLFilter[int] | None = None,
     ) -> list['GraphQLAnalysis']:
         connection = info.context['connection']
         connection.project = root.id
         internal_analysis = await AnalysisLayer(connection).query(
             AnalysisFilter(
+                id=ids.to_internal_filter() if ids else None,
                 type=type.to_internal_filter() if type else None,
                 status=(
                     status.to_internal_filter()
@@ -420,7 +422,7 @@ class GraphQLProject:
         self,
         info: Info,
         root: 'Project',
-        id: GraphQLFilter[int] | None = None,
+        id: GraphQLFilter[str] | None = None,
         name: GraphQLFilter[str] | None = None,
         author: GraphQLFilter[str] | None = None,
         template_id: GraphQLFilter[str] | None = None,
