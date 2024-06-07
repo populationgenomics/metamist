@@ -1,4 +1,4 @@
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from datetime import datetime
 from math import ceil
 from test.testbase import DbIsolatedTest, run_as_sync
@@ -235,7 +235,7 @@ class OurDNADashboardTest(DbIsolatedTest):
         self.assertTrue(processing_times_by_site)
         self.assertIsInstance(processing_times_by_site, dict)
 
-        sample_tally: dict[str, dict[int, int]] = OrderedDict()
+        sample_tally: dict[str, dict[int, int]] = defaultdict()
         for sample in self.sample_external_objects:
             assert isinstance(sample.meta, dict)
             processing_site = sample.meta.get('processing-site', 'Unknown')
