@@ -98,7 +98,7 @@ const AnalysisRunnerRecordCard: React.FC<{ data: AnalysisCostRecord }> = ({ data
                             return (
                                 <DisplayRow
                                     label={_.startCase(tcat.category)}
-                                    key={`ar-guid-${arGuid}-category-${tcat}`}
+                                    key={`ar-guid-${arGuid}-category-${tcat.category}`}
                                 >
                                     {formatMoney(tcat.cost, 2)} {workflows}
                                 </DisplayRow>
