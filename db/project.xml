@@ -1319,6 +1319,13 @@
 			constraintName="UK_PARTICIPANT_EXTERNAL_ID_UNIQUE_EIDS"
 			validate="true"
 		/>
+		<createIndex tableName="participant" indexName="fk_project_participant">
+			<column name="project" />
+		</createIndex>
+		<dropUniqueConstraint
+			tableName="participant"
+			constraintName="UK_PARTICIPANT_SAMPLE_EXTERNALID"
+		/>
 
 		<createTable tableName="sample_external_id">
 			<column name="project" type="INT">
@@ -1356,6 +1363,13 @@
 			columnNames="project,name,external_id"
 			constraintName="UK_SAMPLE_EXTERNAL_ID_UNIQUE_EIDS"
 			validate="true"
+		/>
+		<createIndex tableName="sample" indexName="fk_project_sample">
+			<column name="project" />
+		</createIndex>
+		<dropUniqueConstraint
+			tableName="sample"
+			constraintName="UK_SAMPLE_PROJECT_EXTERNALID"
 		/>
 
 		<sql>ALTER TABLE participant_external_id ADD SYSTEM VERSIONING;</sql>
