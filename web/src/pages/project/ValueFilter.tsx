@@ -55,11 +55,7 @@ export const ValueFilter: React.FC<IValueFilter> = ({
         const f: GenericFilterAny = { icontains: value }
 
         const update: ProjectParticipantGridFilter = {
-            [category]: !isMeta
-                ? { name: f }
-                : {
-                      meta: { [name]: f },
-                  },
+            [category]: !isMeta ? { name: f } : { meta: { [name]: f } },
         }
 
         updateFilterValues(update)

@@ -1,7 +1,7 @@
 import _, { capitalize } from 'lodash'
 import * as React from 'react'
-import { Table as SUITable } from 'semantic-ui-react'
 
+import { TableHeader } from 'semantic-ui-react'
 import FamilyLink from '../../shared/components/links/FamilyLink'
 import SampleLink from '../../shared/components/links/SampleLink'
 import SequencingGroupLink from '../../shared/components/links/SequencingGroupLink'
@@ -48,35 +48,25 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
     )
 
     const headerGroupByCategory = _.keyBy(headerGroups, 'category')
-    const displayedFFields = headerGroupByCategory[MetaSearchEntityPrefix.F].fields.filter(
-        (f) => f.isVisible
-    )
-    const displayedPFields = headerGroupByCategory[MetaSearchEntityPrefix.P].fields.filter(
-        (f) => f.isVisible
-    )
-    const displayedSFields = headerGroupByCategory[MetaSearchEntityPrefix.S].fields.filter(
-        (f) => f.isVisible
-    )
-    const displayedSGFields = headerGroupByCategory[MetaSearchEntityPrefix.Sg].fields.filter(
-        (f) => f.isVisible
-    )
-    const displayedAFields = headerGroupByCategory[MetaSearchEntityPrefix.A].fields.filter(
-        (f) => f.isVisible
-    )
 
     return (
         <>
-            <ProjectExportButton projectName={projectName} filterValues={filterValues} />
+            <ProjectExportButton
+                participants_in_query={summary.total_results}
+                projectName={projectName}
+                filterValues={filterValues}
+                headerGroups={headerGroups}
+            />
             <ProjectColumnOptions
                 headerGroups={headerGroups}
                 setHeaderGroups={setHeaderGroups}
                 filterValues={filterValues}
                 updateFilters={updateFilters}
+                participantCount={summary.participants.length}
             />
+
             <Table
-                unstackable
                 className="projectSummaryGrid"
-                celled
                 style={{
                     borderCollapse: 'collapse',
                     borderTop: '2px solid var(--color-border-color)',
@@ -84,30 +74,36 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                     borderBottom: '2px solid var(--color-border-color)',
                 }}
             >
-                <ProjectGridCategoryHeader headerGroups={headerGroups} />
-                <ProjectGridFilterRow
-                    headerGroups={headerGroups}
-                    filterValues={filterValues}
-                    updateFilters={updateFilters}
-                />
-                <ProjectGridFieldHeaderRow headerGroups={headerGroups} />
-                <SUITable.Body>
+                <TableHeader>
+                    <ProjectGridCategoryHeader headerGroups={headerGroups} />
+                    <ProjectGridFilterRow
+                        headerGroups={headerGroups}
+                        filterValues={filterValues}
+                        updateFilters={updateFilters}
+                    />
+                    <ProjectGridFieldHeaderRow headerGroups={headerGroups} />
+                </TableHeader>
+                <tbody>
                     {summary.participants.map((p, pidx) => (
                         <ProjectGridParticipantRows
                             key={`participant-row-${p.id}`}
                             participant={p}
-                            familyFields={displayedFFields}
-                            participantFields={displayedPFields}
-                            sampleFields={displayedSFields}
-                            sequencingGroupFields={displayedSGFields}
-                            assayFields={displayedAFields}
+                            familyFields={headerGroupByCategory[MetaSearchEntityPrefix.F].fields}
+                            participantFields={
+                                headerGroupByCategory[MetaSearchEntityPrefix.P].fields
+                            }
+                            sampleFields={headerGroupByCategory[MetaSearchEntityPrefix.S].fields}
+                            sequencingGroupFields={
+                                headerGroupByCategory[MetaSearchEntityPrefix.Sg].fields
+                            }
+                            assayFields={headerGroupByCategory[MetaSearchEntityPrefix.A].fields}
                             projectName={projectName}
                             backgroundColor={
                                 pidx % 2 === 1 ? 'var(--color-bg)' : 'var(--color-bg-disabled)'
                             }
                         />
                     ))}
-                </SUITable.Body>
+                </tbody>
             </Table>
         </>
     )
@@ -117,28 +113,26 @@ const ProjectGridCategoryHeader: React.FC<{ headerGroups: ProjectGridHeaderGroup
     headerGroups,
 }) => {
     return (
-        <SUITable.Header>
-            <SUITable.Row>
-                {headerGroups.map(({ category, fields }) => {
-                    const visible = fields.filter((f) => f.isVisible).length
-                    if (visible === 0) return <React.Fragment />
-                    return (
-                        <SUITable.HeaderCell
-                            key={`category-header-${category}`}
-                            colSpan={fields.filter((f) => f.isVisible).length}
-                            style={{
-                                textAlign: 'center',
-                                borderLeft: '2px solid var(--color-border-color)',
-                                borderBottom: '2px solid var(--color-border-default)',
-                                backgroundColor: 'var(--color-table-header)',
-                            }}
-                        >
-                            {_.startCase(category.replaceAll('_', ' '))}
-                        </SUITable.HeaderCell>
-                    )
-                })}
-            </SUITable.Row>
-        </SUITable.Header>
+        <tr>
+            {headerGroups.map(({ category, fields }) => {
+                const visible = fields.filter((f) => f.isVisible).length
+                if (visible === 0) return <React.Fragment />
+                return (
+                    <th
+                        key={`category-header-${category}`}
+                        colSpan={fields.filter((f) => f.isVisible).length}
+                        style={{
+                            textAlign: 'center',
+                            borderLeft: '2px solid var(--color-border-color)',
+                            borderBottom: '2px solid var(--color-border-default)',
+                            backgroundColor: 'var(--color-table-header)',
+                        }}
+                    >
+                        {_.startCase(category.replaceAll('_', ' '))}
+                    </th>
+                )
+            })}
+        </tr>
     )
 }
 
@@ -148,34 +142,20 @@ const ProjectGridFilterRow: React.FC<{
     updateFilters: (e: Partial<ProjectParticipantGridFilter>) => void
 }> = ({ headerGroups, filterValues, updateFilters }) => {
     return (
-        <SUITable.Header>
-            <SUITable.Row>
-                {headerGroups.flatMap((hg) =>
-                    hg.fields
-                        .filter((f) => f.isVisible)
-                        .map((field, idx) => {
-                            if (
-                                field.title === 'Sample ID' ||
-                                field.title === 'Created date' ||
-                                field.title === 'Sequencing Group ID'
-                            ) {
-                                return (
-                                    <SUITable.HeaderCell
-                                        key={`${hg.category}-${field.name}-${idx}`}
-                                        style={{
-                                            borderBottom: 'none',
-                                            borderLeft:
-                                                idx === 0
-                                                    ? '2px solid var(--color-border-color)'
-                                                    : '1px solid var(--color-border-default)',
-                                        }}
-                                    ></SUITable.HeaderCell>
-                                )
-                            }
-                            // debugger
+        // <SUITable.Header>
+        <React.Fragment>
+            {headerGroups.flatMap((hg) =>
+                hg.fields
+                    .filter((f) => f.isVisible)
+                    .map((field, idx) => {
+                        if (
+                            field.title === 'Sample ID' ||
+                            field.title === 'Created date' ||
+                            field.title === 'Sequencing Group ID'
+                        ) {
                             return (
-                                <SUITable.HeaderCell
-                                    key={`filter-${hg.category}-${field.name}-${idx}`}
+                                <th
+                                    key={`${hg.category}-${field.name}-${idx}`}
                                     style={{
                                         borderBottom: 'none',
                                         borderLeft:
@@ -183,19 +163,33 @@ const ProjectGridFilterRow: React.FC<{
                                                 ? '2px solid var(--color-border-color)'
                                                 : '1px solid var(--color-border-default)',
                                     }}
-                                >
-                                    <ValueFilterPopup
-                                        filterValues={filterValues}
-                                        updateFilterValues={updateFilters}
-                                        category={hg.category}
-                                        filterKey={field.name}
-                                    />
-                                </SUITable.HeaderCell>
+                                ></th>
                             )
-                        })
-                )}
-            </SUITable.Row>
-        </SUITable.Header>
+                        }
+                        // debugger
+                        return (
+                            <th
+                                key={`filter-${hg.category}-${field.name}-${idx}`}
+                                style={{
+                                    borderBottom: 'none',
+                                    borderLeft:
+                                        idx === 0
+                                            ? '2px solid var(--color-border-color)'
+                                            : '1px solid var(--color-border-default)',
+                                }}
+                            >
+                                <ValueFilterPopup
+                                    filterValues={filterValues}
+                                    updateFilterValues={updateFilters}
+                                    category={hg.category}
+                                    filterKey={field.name}
+                                />
+                            </th>
+                        )
+                    })
+            )}
+        </React.Fragment>
+        // </SUITable.Header>
     )
 }
 
@@ -203,28 +197,28 @@ const ProjectGridFieldHeaderRow: React.FC<{ headerGroups: ProjectGridHeaderGroup
     headerGroups,
 }) => {
     return (
-        <SUITable.Header>
-            <SUITable.Row>
-                {headerGroups.flatMap((hg) =>
-                    hg.fields
-                        .filter((f) => f.isVisible)
-                        .map((field, idx) => (
-                            <SUITable.HeaderCell
-                                key={`field-header-row-${hg.category}-${field.name}-${idx}`}
-                                style={{
-                                    borderLeft:
-                                        idx === 0
-                                            ? '2px solid var(--color-border-color)'
-                                            : '1px solid var(--color-border-default)',
-                                    borderBottom: '2px solid var(--color-border-default)',
-                                }}
-                            >
-                                {field.title.includes(' ') ? field.title : capitalize(field.title)}
-                            </SUITable.HeaderCell>
-                        ))
-                )}
-            </SUITable.Row>
-        </SUITable.Header>
+        // <SUITable.Header>
+        <tr>
+            {headerGroups.flatMap((hg) =>
+                hg.fields
+                    .filter((f) => f.isVisible)
+                    .map((field, idx) => (
+                        <th
+                            key={`field-header-row-${hg.category}-${field.name}-${idx}`}
+                            style={{
+                                borderLeft:
+                                    idx === 0
+                                        ? '2px solid var(--color-border-color)'
+                                        : '1px solid var(--color-border-default)',
+                                borderBottom: '2px solid var(--color-border-default)',
+                            }}
+                        >
+                            {field.title.includes(' ') ? field.title : capitalize(field.title)}
+                        </th>
+                    ))
+            )}
+        </tr>
+        // </SUITable.Header>
     )
 }
 
@@ -244,10 +238,19 @@ interface IProjectGridParticipantRowProps {
 const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProps> = ({
     participant,
     backgroundColor,
+    projectName,
+    participantFields,
+    sampleFields,
+    sequencingGroupFields,
+    assayFields,
+    familyFields,
     ...props
 }) => {
-    console.log(props.sampleFields.map((s) => s.name))
-    const rows = participant.samples.map((s, sidx) => {
+    // console.log(
+    //     participant.external_id,
+    //     sampleFields.map((s) => s.name)
+    // )
+    const rows = participant.samples.flatMap((s, sidx) => {
         // const border = '1px solid #dee2e6'
         const lengthOfParticipant = participant.samples
             .map((s_) =>
@@ -274,15 +277,15 @@ const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProps> = ({
             // @ts-ignore
             sgs = [{}]
         }
-        return sgs.map((sg, sgidx) =>
+        return sgs.flatMap((sg, sgidx) =>
             (!!sg?.assays ? sg.assays : [{ id: 0 }]).map((assay, assayidx) => {
                 const isFirstOfGroup = sidx === 0 && sgidx === 0 && assayidx === 0
                 const border = '1px solid #dee2e6'
                 // const border = '1px solid'
                 return (
-                    <SUITable.Row key={`${participant.external_id}-${s.id}-${sg.id}-${assay.id}`}>
+                    <tr key={`${participant.external_id}-${s.id}-${sg.id}-${assay.id}`} {...props}>
                         {isFirstOfGroup && (
-                            <SUITable.Cell
+                            <td
                                 style={{
                                     backgroundColor,
                                     borderRight: border,
@@ -295,17 +298,18 @@ const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProps> = ({
                                 {
                                     <FamilyLink
                                         id={participant.families.map((f) => f.id).join(', ')}
-                                        projectName={props.projectName}
+                                        projectName={projectName}
                                     >
                                         {participant.families.map((f) => f.external_id).join(', ')}
                                     </FamilyLink>
                                 }
-                            </SUITable.Cell>
+                            </td>
                         )}
                         {isFirstOfGroup &&
-                            props.participantFields.map((field, i) => (
-                                <SUITable.Cell
+                            participantFields.map((field, i) => (
+                                <td
                                     style={{
+                                        display: field.isVisible ? 'table-cell' : 'none',
                                         backgroundColor,
                                         borderRight: border,
                                         borderBottom: border,
@@ -319,13 +323,14 @@ const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProps> = ({
                                     rowSpan={participantRowSpan}
                                 >
                                     {sanitiseValue(_.get(participant, field.name))}
-                                </SUITable.Cell>
+                                </td>
                             ))}
                         {sgidx === 0 &&
                             assayidx === 0 &&
-                            props.sampleFields.map((field, i) => (
-                                <SUITable.Cell
+                            sampleFields.map((field, i) => (
+                                <td
                                     style={{
+                                        display: field.isVisible ? 'table-cell' : 'none',
                                         backgroundColor,
                                         borderRight: border,
                                         borderBottom: border,
@@ -340,18 +345,19 @@ const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProps> = ({
                                     rowSpan={samplesRowSpan}
                                 >
                                     {field.name === 'external_id' || field.name === 'id' ? (
-                                        <SampleLink id={s.id} projectName={props.projectName}>
+                                        <SampleLink id={s.id} projectName={projectName}>
                                             {sanitiseValue(_.get(s, field.name))}
                                         </SampleLink>
                                     ) : (
                                         sanitiseValue(_.get(s, field.name))
                                     )}
-                                </SUITable.Cell>
+                                </td>
                             ))}
                         {assayidx === 0 &&
-                            props.sequencingGroupFields.map((field, i) => (
-                                <SUITable.Cell
+                            sequencingGroupFields.map((field, i) => (
+                                <td
                                     style={{
+                                        display: field.isVisible ? 'table-cell' : 'none',
                                         borderRight: border,
                                         borderBottom: border,
                                         borderTop: border,
@@ -370,7 +376,7 @@ const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProps> = ({
                                 >
                                     {field.name === 'id' ? (
                                         <SequencingGroupLink
-                                            projectName={props.projectName}
+                                            projectName={projectName}
                                             id={s.id}
                                             sg_id={_.get(sg, 'id')?.toString()}
                                         >
@@ -379,11 +385,12 @@ const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProps> = ({
                                     ) : (
                                         sanitiseValue(_.get(sg, field.name))
                                     )}
-                                </SUITable.Cell>
+                                </td>
                             ))}
-                        {props.assayFields.map((field, i) => (
-                            <SUITable.Cell
+                        {assayFields.map((field, i) => (
+                            <td
                                 style={{
+                                    display: field.isVisible ? 'table-cell' : 'none',
                                     backgroundColor,
                                     borderRight: border,
                                     borderBottom: border,
@@ -397,14 +404,14 @@ const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProps> = ({
                                 key={`${s.id}assay.${field.name}`}
                             >
                                 {sanitiseValue(_.get(assay, field.name))}
-                            </SUITable.Cell>
+                            </td>
                         ))}
-                    </SUITable.Row>
+                    </tr>
                 )
             })
         )
     })
-
+    // return rows
     return <>{rows}</>
 }
 

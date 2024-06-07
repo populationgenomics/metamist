@@ -121,6 +121,7 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
                     justifyContent: 'flex-end',
                     display: 'flex',
                     flexDirection: 'row',
+                    marginTop: '40px',
                 }}
             >
                 <Dropdown
@@ -142,22 +143,20 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
                     title="participants"
                 />
             </div>
-            <div style={{ position: 'absolute', paddingBottom: '80px' }}>
-                <ProjectGrid
-                    participantResponse={participants}
-                    projectName={projectName}
-                    updateFilters={setFilterValues}
-                    filterValues={filterValues}
-                />
-                <PageOptions
-                    isLoading={isLoading}
-                    totalPageNumbers={totalPageNumbers}
-                    total={participants?.total_results}
-                    pageNumber={pageNumber}
-                    handleOnClick={handleOnClick}
-                    title="participants"
-                />
-            </div>
+            <ProjectGrid
+                participantResponse={participants}
+                projectName={projectName}
+                updateFilters={setFilterValues}
+                filterValues={filterValues}
+            />
+            <PageOptions
+                isLoading={isLoading}
+                totalPageNumbers={totalPageNumbers}
+                total={participants?.total_results}
+                pageNumber={pageNumber}
+                handleOnClick={handleOnClick}
+                title="participants"
+            />
         </ErrorBoundary>
     )
 }

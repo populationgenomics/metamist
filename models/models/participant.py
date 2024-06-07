@@ -1,5 +1,7 @@
 import json
 
+from pydantic import Field
+
 from models.base import OpenApiGenNoneType, SMBase
 from models.models.family import FamilySimple, FamilySimpleInternal
 from models.models.project import ProjectId
@@ -49,13 +51,13 @@ class NestedParticipantInternal(SMBase):
     """ParticipantInternal with nested samples"""
 
     id: int
-    external_id: str = None
+    external_id: str
     reported_sex: int | None = None
     reported_gender: str | None = None
     karyotype: str | None = None
     meta: dict
-    samples: list[NestedSampleInternal] | None = None
-    families: list[FamilySimpleInternal] | None = None
+    samples: list[NestedSampleInternal] = Field(default_factory=list)
+    families: list[FamilySimpleInternal] = Field(default_factory=list)
 
     def to_external(self):
         """Convert to transport model"""
@@ -66,16 +68,16 @@ class NestedParticipantInternal(SMBase):
             reported_gender=self.reported_gender,
             karyotype=self.karyotype,
             meta=self.meta,
-            samples=[s.to_external() for s in self.samples or []],
-            families=[f.to_external() for f in self.families or []],
+            samples=[s.to_external() for s in self.samples],
+            families=[f.to_external() for f in self.families],
         )
 
 
 class ParticipantUpsertInternal(SMBase):
     """Internal upsert model for participant"""
 
+    external_id: str
     id: int | None = None
-    external_id: str = None
     reported_sex: int | None = None
     reported_gender: str | None = None
     karyotype: str | None = None

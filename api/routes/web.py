@@ -7,8 +7,9 @@ import asyncio
 import csv
 import io
 from datetime import date
+from typing import Generator
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -26,9 +27,12 @@ from db.python.tables.participant import ParticipantFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.utils import GenericFilter, GenericMetaFilter
 from models.enums.web import SeqrDatasetType
+from models.models.participant import NestedParticipant
 from models.models.project import ProjectId
 from models.models.search import SearchResponse
 from models.models.web import ProjectParticipantGridResponse, ProjectSummary
+from models.utils.sample_id_format import sample_id_transform_to_raw
+from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
 
 
 class SearchResponseModel(BaseModel):
@@ -79,7 +83,7 @@ class ProjectParticipantGridFilter(BaseModel):
     class ParticipantGridSampleFilter(BaseModel):
         """sample filter option for participant grid"""
 
-        id: GenericFilter[int] | None = None
+        id: GenericFilter[str] | None = None
         type: GenericFilter[str] | None = None
         external_id: GenericFilter[str] | None = None
         meta: GenericMetaFilter | None = None
@@ -87,7 +91,7 @@ class ProjectParticipantGridFilter(BaseModel):
     class ParticipantGridSequencingGroupFilter(BaseModel):
         """sequencing group filter option for participant grid"""
 
-        id: GenericFilter[int] | None = None
+        id: GenericFilter[str] | None = None
         external_id: GenericFilter[str] | None = None
         meta: GenericMetaFilter | None = None
         type: GenericFilter[str] | None = None
@@ -101,8 +105,6 @@ class ProjectParticipantGridFilter(BaseModel):
         external_id: GenericFilter[str] | None = None
         meta: GenericMetaFilter | None = None
         type: GenericFilter[str] | None = None
-        technology: GenericFilter[str] | None = None
-        platform: GenericFilter[str] | None = None
 
     family: ParticipantGridFamilyFilter | None = None
     participant: ParticipantGridParticipantFilter | None = None
@@ -110,12 +112,10 @@ class ProjectParticipantGridFilter(BaseModel):
     sequencing_group: ParticipantGridSequencingGroupFilter | None = None
     assay: ParticipantGridAssayFilter | None = None
 
-    def to_internal(
-        self, project: ProjectId, id_query: GenericFilter[int] | None = None
-    ) -> ParticipantFilter:
+    def to_internal(self, project: ProjectId) -> ParticipantFilter:
         """Convert to participant internal filter object"""
         return ParticipantFilter(
-            id=id_query or (self.participant.id if self.participant else None),
+            id=self.participant.id if self.participant else None,
             external_id=self.participant.external_id if self.participant else None,
             reported_sex=self.participant.reported_sex if self.participant else None,
             reported_gender=(
@@ -136,7 +136,11 @@ class ProjectParticipantGridFilter(BaseModel):
             ),
             sample=(
                 ParticipantFilter.ParticipantSampleFilter(
-                    id=self.sample.id,
+                    id=(
+                        self.sample.id.transform(sample_id_transform_to_raw)
+                        if self.sample.id
+                        else None
+                    ),
                     type=self.sample.type,
                     external_id=self.sample.external_id,
                     meta=self.sample.meta,
@@ -146,7 +150,13 @@ class ProjectParticipantGridFilter(BaseModel):
             ),
             sequencing_group=(
                 ParticipantFilter.ParticipantSequencingGroupFilter(
-                    id=self.sequencing_group.id,
+                    id=(
+                        self.sequencing_group.id.transform(
+                            sequencing_group_id_transform_to_raw
+                        )
+                        if self.sequencing_group.id
+                        else None
+                    ),
                     type=self.sequencing_group.type,
                     external_id=self.sequencing_group.external_id,
                     meta=self.sequencing_group.meta,
@@ -175,47 +185,9 @@ class ProjectParticipantGridFilter(BaseModel):
     operation_id='getProjectParticipantsGridWithLimit',
 )
 async def get_project_summary_with_limit(
-    request: Request,
     limit: int,
     query: ProjectParticipantGridFilter,
-    token: int | None = None,
-    connection=get_project_readonly_connection,
-):
-    """Get project summary (from query) with some limit"""
-
-    if not connection.project:
-        raise ValueError('No project was detected through the authentication')
-
-    wlayer = WebLayer(connection)
-    id_query = query.participant.id if query.participant else None
-    if token:
-        id_query = id_query or GenericFilter()
-        id_query.gt = int(token)
-    pfilter = query.to_internal(id_query=id_query, project=connection.project)
-
-    participants, pcount = await asyncio.gather(
-        wlayer.query_participants(pfilter, limit=limit),
-        wlayer.count_participants(pfilter),
-    )
-
-    # then have to get all nested objects
-
-    return ProjectParticipantGridResponse.from_params(
-        participants=participants,
-        total_results=pcount,
-        token_base_url=str(request.base_url) + request.url.path.lstrip('/'),
-        current_url=str(request.url),
-        request_limit=limit,
-    )
-
-
-@router.post(
-    '/{project}/participants/export/{export_type}',
-    operation_id='exportProjectParticipants',
-)
-async def export_project_summary(
-    export_type: ExportType,
-    query: ProjectParticipantGridFilter,
+    skip: int = 0,
     connection=get_project_readonly_connection,
 ):
     """Get project summary (from query) with some limit"""
@@ -226,17 +198,59 @@ async def export_project_summary(
     wlayer = WebLayer(connection)
     pfilter = query.to_internal(project=connection.project)
 
-    participants = await wlayer.query_participants(pfilter, limit=None)
+    participants, pcount = await asyncio.gather(
+        wlayer.query_participants(pfilter, limit=limit, skip=skip),
+        wlayer.count_participants(pfilter),
+    )
 
     # then have to get all nested objects
 
-    keys = ['p.id', 'p.external_id', 'p.meta']
-    rows = [(p.id, p.external_id, p.meta) for p in participants]
+    return ProjectParticipantGridResponse.from_params(
+        participants=participants,
+        total_results=pcount,
+    )
 
+
+class ExportProjectParticipantFields(BaseModel):
+    """fields for exporting project participants"""
+
+    family_keys: list[str]
+    participant_keys: list[str]
+    sample_keys: list[str]
+    sequencing_group_keys: list[str]
+    assay_keys: list[str]
+
+
+@router.post(
+    '/{project}/participants/export/{export_type}',
+    operation_id='exportProjectParticipants',
+)
+async def export_project_participants(
+    export_type: ExportType,
+    query: ProjectParticipantGridFilter,
+    fields: ExportProjectParticipantFields | None = None,
+    connection=get_project_readonly_connection,
+):
+    """Get project summary (from query) with some limit"""
+
+    if not connection.project:
+        raise ValueError('No project was detected through the authentication')
+
+    wlayer = WebLayer(connection)
+    pfilter = query.to_internal(project=connection.project)
+
+    participants_internal = await wlayer.query_participants(pfilter, limit=None)
+    participants = [p.to_external() for p in participants_internal]
+
+    if export_type == ExportType.JSON:
+        return participants
+
+    # then have to get all nested objects
     output = io.StringIO()
     writer = csv.writer(output, delimiter=export_type.get_delimiter())
-    writer.writerow(keys)
-    writer.writerows(rows)
+
+    for row in prepare_participants_for_export(participants, fields=fields):
+        writer.writerow(row)
 
     basefn = f'{connection.project}-project-summary-{connection.author}-{date.today().isoformat()}'
 
@@ -249,6 +263,75 @@ async def export_project_summary(
     )
 
 
+def get_field_from_obj(obj, field: str) -> str | None:
+    """Get field from object"""
+    if field.startswith('meta.'):
+        if not hasattr(obj, 'meta'):
+            raise ValueError(f'Object {type(obj)} does not have meta field: {obj}')
+
+        return obj.meta.get(field.removeprefix('meta.'), None)
+    if not hasattr(obj, field):
+        raise ValueError(f'Object {type(obj)} does not have field: {field}')
+
+    return getattr(obj, field, None)
+
+
+def prepare_participants_for_export(
+    participants: list[NestedParticipant], fields: ExportProjectParticipantFields | None
+) -> Generator[tuple[str, ...], None, None]:
+    """Prepare participants for export"""
+    if not fields:
+        new_fields = ProjectParticipantGridResponse.get_entity_keys(participants)
+        fields = ExportProjectParticipantFields(
+            family_keys=[t[0] for t in new_fields.family_keys],
+            participant_keys=[t[0] for t in new_fields.participant_keys],
+            sample_keys=[t[0] for t in new_fields.sample_keys],
+            sequencing_group_keys=[t[0] for t in new_fields.sequencing_group_keys],
+            assay_keys=[t[0] for t in new_fields.assay_keys],
+        )
+
+    header = (
+        *('family.' + fk for fk in fields.family_keys),
+        *('participant.' + pk for pk in fields.participant_keys),
+        *('sample.' + sk for sk in fields.sample_keys),
+        *('sequencing_group.' + sgk for sgk in fields.sequencing_group_keys),
+        *('assay.' + ak for ak in fields.assay_keys),
+    )
+    yield header
+    for participant in participants:
+        prow = []
+        for field in fields.family_keys:
+            prow.append(
+                ', '.join(
+                    str(get_field_from_obj(f, field)) for f in participant.families
+                )
+            )
+        for field in fields.participant_keys:
+            prow.append(get_field_from_obj(participant, field))
+
+        for sample in participant.samples:
+            srow = []
+            for field in fields.sample_keys:
+                srow.append(get_field_from_obj(sample, field))
+
+            for sg in sample.sequencing_groups or []:
+                sgrow = []
+                for field in fields.sequencing_group_keys:
+                    sgrow.append(get_field_from_obj(sg, field))
+
+                for assay in sg.assays or []:
+                    arow = []
+                    for field in fields.assay_keys:
+                        arow.append(get_field_from_obj(assay, field))
+
+                    yield (
+                        *prow,
+                        *srow,
+                        *sgrow,
+                        *arow,
+                    )
+
+
 @router.get(
     '/search', response_model=SearchResponseModel, operation_id='searchByKeyword'
 )
@@ -257,7 +340,7 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
     This searches the keyword, in families, participants + samples in the projects
     that you are a part of (automatically).
     """
-    # raise ValueError("Test")
+    # raise ValueError('Test')
     pt = ProjectPermissionsTable(connection)
     projects = await pt.get_projects_accessible_by_user(
         connection.author, readonly=True

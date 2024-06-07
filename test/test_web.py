@@ -1,522 +1,681 @@
-# from test.testbase import DbIsolatedTest, run_as_sync
+import unittest
+from test.testbase import DbIsolatedTest, run_as_sync
+from typing import Any
 
-# from db.python.layers import (
-#     AssayLayer,
-#     ParticipantLayer,
-#     SampleLayer,
-#     SequencingGroupLayer,
-#     WebLayer,
-# )
-# from models.enums import MetaSearchEntityPrefix
-# from models.models import (
-#     Assay,
-#     AssayInternal,
-#     AssayUpsertInternal,
-#     ParticipantUpsertInternal,
-#     ProjectSummaryInternal,
-#     SampleUpsertInternal,
-#     SearchItem,
-#     SequencingGroupUpsertInternal,
-#     WebProject,
-# )
-# from models.utils.sample_id_format import sample_id_transform_to_raw
-# from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
+from api.routes.web import (
+    ExportProjectParticipantFields,
+    ProjectParticipantGridFilter,
+    prepare_participants_for_export,
+)
+from db.python.layers import (
+    AssayLayer,
+    ParticipantLayer,
+    SampleLayer,
+    SequencingGroupLayer,
+    WebLayer,
+)
+from db.python.tables.participant import ParticipantFilter
+from db.python.utils import GenericFilter
+from models.models import (
+    Assay,
+    AssayInternal,
+    AssayUpsertInternal,
+    FamilySimple,
+    NestedParticipant,
+    NestedSample,
+    ParticipantUpsertInternal,
+    ProjectSummaryInternal,
+    SampleUpsertInternal,
+    SequencingGroupUpsertInternal,
+    WebProject,
+)
+from models.models.sequencing_group import NestedSequencingGroup
+from models.models.web import ProjectParticipantGridResponse
+from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
+from models.utils.sequencing_group_id_format import (
+    sequencing_group_id_format,
+    sequencing_group_id_transform_to_raw,
+)
 
-# default_assay_meta = {
-#     'sequencing_type': 'genome',
-#     'sequencing_technology': 'short-read',
-#     'sequencing_platform': 'illumina',
-# }
-
-
-# def data_to_class(data: dict | list) -> dict | list:
-#     """Convert the data into it's class using the _class field"""
-#     if isinstance(data, list):
-#         return [data_to_class(x) for x in data]
-
-#     if not isinstance(data, dict):
-#         return data
-
-#     cls = data.pop('_class', None)
-#     mapped_data = {k: data_to_class(v) for k, v in data.items()}
-
-#     if isinstance(cls, type):
-#         return cls(**mapped_data)
-
-#     return mapped_data
+default_assay_meta = {
+    'sequencing_type': 'genome',
+    'sequencing_technology': 'short-read',
+    'sequencing_platform': 'illumina',
+}
 
 
-# def merge(d1: dict, d2: dict):
-#     """Merges two dictionaries"""
-#     return dict(d1, **d2)
+def data_to_class(data: dict | list) -> dict | list:
+    """Convert the data into it's class using the _class field"""
+    if isinstance(data, list):
+        return [data_to_class(x) for x in data]
+
+    if not isinstance(data, dict):
+        return data
+
+    cls = data.pop('_class', None)
+    mapped_data = {k: data_to_class(v) for k, v in data.items()}
+
+    if isinstance(cls, type):
+        return cls(**mapped_data)
+
+    return mapped_data
 
 
-# def get_test_participant():
-#     """Do it like this to avoid an upsert writing the test value"""
-#     return ParticipantUpsertInternal(
-#         external_id='Demeter',
-#         meta={},
-#         samples=[
-#             SampleUpsertInternal(
-#                 external_id='sample_id001',
-#                 meta={},
-#                 type='blood',
-#                 sequencing_groups=[
-#                     SequencingGroupUpsertInternal(
-#                         type='genome',
-#                         technology='short-read',
-#                         platform='illumina',
-#                         assays=[
-#                             AssayUpsertInternal(
-#                                 type='sequencing',
-#                                 meta={
-#                                     'reads': [
-#                                         {
-#                                             'basename': 'sample_id001.filename-R1.fastq.gz',
-#                                             'checksum': None,
-#                                             'class': 'File',
-#                                             'location': '/path/to/sample_id001.filename-R1.fastq.gz',
-#                                             'size': 111,
-#                                         },
-#                                         {
-#                                             'basename': 'sample_id001.filename-R2.fastq.gz',
-#                                             'checksum': None,
-#                                             'class': 'File',
-#                                             'location': '/path/to/sample_id001.filename-R2.fastq.gz',
-#                                             'size': 111,
-#                                         },
-#                                     ],
-#                                     'reads_type': 'fastq',
-#                                     'batch': 'M001',
-#                                     **default_assay_meta,
-#                                 },
-#                             ),
-#                         ],
-#                     )
-#                 ],
-#             )
-#         ],
-#     )
+def merge(d1: dict, d2: dict):
+    """Merges two dictionaries"""
+    return dict(d1, **d2)
 
 
-# def get_test_participant_2():
-#     """Do it like this to avoid an upsert writing the test value"""
-#     return ParticipantUpsertInternal(
-#         external_id='Meter',
-#         meta={},
-#         samples=[
-#             SampleUpsertInternal(
-#                 external_id='sample_id002',
-#                 meta={},
-#                 type='blood',
-#                 sequencing_groups=[
-#                     SequencingGroupUpsertInternal(
-#                         type='genome',
-#                         technology='short-read',
-#                         platform='Illumina',
-#                         assays=[
-#                             AssayUpsertInternal(
-#                                 type='sequencing',
-#                                 meta={
-#                                     'reads': [
-#                                         {
-#                                             'basename': 'sample_id002.filename-R1.fastq.gz',
-#                                             'checksum': None,
-#                                             'class': 'File',
-#                                             'location': '/path/to/sample_id002.filename-R1.fastq.gz',
-#                                             'size': 112,
-#                                         },
-#                                         {
-#                                             'basename': 'sample_id002.filename-R2.fastq.gz',
-#                                             'checksum': None,
-#                                             'class': 'File',
-#                                             'location': '/path/to/sample_id002.filename-R2.fastq.gz',
-#                                             'size': 112,
-#                                         },
-#                                     ],
-#                                     'reads_type': 'fastq',
-#                                     'batch': 'M001',
-#                                     'field with spaces': 'field with spaces',
-#                                     **default_assay_meta,
-#                                 },
-#                             ),
-#                         ],
-#                     ),
-#                 ],
-#             )
-#         ],
-#     )
+def get_test_participant():
+    """Do it like this to avoid an upsert writing the test value"""
+    return ParticipantUpsertInternal(
+        external_id='Demeter',
+        meta={},
+        samples=[
+            SampleUpsertInternal(
+                external_id='sample_id001',
+                meta={},
+                type='blood',
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                meta={
+                                    'reads': [
+                                        {
+                                            'basename': 'sample_id001.filename-R1.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id001.filename-R1.fastq.gz',
+                                            'size': 111,
+                                        },
+                                        {
+                                            'basename': 'sample_id001.filename-R2.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id001.filename-R2.fastq.gz',
+                                            'size': 111,
+                                        },
+                                    ],
+                                    'reads_type': 'fastq',
+                                    'batch': 'M001',
+                                    **default_assay_meta,
+                                },
+                            ),
+                        ],
+                    )
+                ],
+            )
+        ],
+    )
 
 
-# SINGLE_PARTICIPANT_RESULT = ProjectSummaryInternal(
-#     project=WebProject(id=1, name='test', meta={}, dataset='test'),
-#     total_samples=1,
-#     total_samples_in_query=1,
-#     total_participants=1,
-#     total_sequencing_groups=1,
-#     total_assays=1,
-#     cram_seqr_stats={
-#         'genome': {
-#             'Sequences': '1',
-#             'Crams': '0',
-#             'Seqr': '0',
-#         }
-#     },
-#     batch_sequencing_group_stats={'M001': {'genome': '1'}},
-#     participants=[],
-#     participant_keys=[('external_id', 'Participant ID')],
-#     sample_keys=[
-#         ('id', 'Sample ID'),
-#         ('external_id', 'External Sample ID'),
-#         ('created_date', 'Created date'),
-#     ],
-#     sequencing_group_keys=[
-#         ('id', 'Sequencing Group ID'),
-#         ('platform', 'Platform'),
-#         ('technology', 'Technology'),
-#         ('type', 'Type'),
-#     ],
-#     assay_keys=[
-#         ('type', 'type'),
-#         ('meta.batch', 'batch'),
-#         ('meta.reads_type', 'reads_type'),
-#     ],
-#     seqr_links={},
-#     seqr_sync_types=[],
-# )
+def get_test_participant_2():
+    """Do it like this to avoid an upsert writing the test value"""
+    return ParticipantUpsertInternal(
+        external_id='Meter',
+        meta={},
+        samples=[
+            SampleUpsertInternal(
+                external_id='sample_id002',
+                meta={},
+                type='blood',
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform='Illumina',
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                meta={
+                                    'reads': [
+                                        {
+                                            'basename': 'sample_id002.filename-R1.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id002.filename-R1.fastq.gz',
+                                            'size': 112,
+                                        },
+                                        {
+                                            'basename': 'sample_id002.filename-R2.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id002.filename-R2.fastq.gz',
+                                            'size': 112,
+                                        },
+                                    ],
+                                    'reads_type': 'fastq',
+                                    'batch': 'M001',
+                                    'field with spaces': 'field with spaces',
+                                    **default_assay_meta,
+                                },
+                            ),
+                        ],
+                    ),
+                ],
+            )
+        ],
+    )
 
 
-# class TestWeb(DbIsolatedTest):
-#     """Test web class containing web endpoints"""
+SINGLE_PARTICIPANT_SUMMARY_RESULT = ProjectSummaryInternal(
+    project=WebProject(id=1, name='test', meta={}, dataset='test'),
+    total_samples=1,
+    total_participants=1,
+    total_sequencing_groups=1,
+    total_assays=1,
+    cram_seqr_stats={
+        'genome': {
+            'Sequences': '1',
+            'Crams': '0',
+            'Seqr': '0',
+        }
+    },
+    batch_sequencing_group_stats={'M001': {'genome': '1'}},
+    seqr_links={},
+    seqr_sync_types=[],
+)
 
-#     @run_as_sync
-#     async def setUp(self) -> None:
-#         super().setUp()
-#         self.webl = WebLayer(self.connection)
-#         self.partl = ParticipantLayer(self.connection)
-#         self.sampl = SampleLayer(self.connection)
-#         self.seql = AssayLayer(self.connection)
+SINGLE_PARTICIPANT_QUERY_RESULT = ProjectParticipantGridResponse(
+    participants=[],
+    total_results=1,
+    family_keys=[('external_id', 'Family ID')],
+    participant_keys=[('external_id', 'Participant ID')],
+    sample_keys=[
+        ('id', 'Sample ID'),
+        ('external_id', 'External Sample ID'),
+        ('created_date', 'Created date'),
+    ],
+    sequencing_group_keys=[
+        ('id', 'Sequencing Group ID'),
+        ('platform', 'Platform'),
+        ('technology', 'Technology'),
+        ('type', 'Type'),
+    ],
+    assay_keys=[
+        ('type', 'type'),
+        ('meta.batch', 'batch'),
+        ('meta.reads_type', 'reads_type'),
+    ],
+)
 
-#     @run_as_sync
-#     async def test_project_summary_empty(self):
-#         """Test getting the summary for a project"""
-#         result = await self.webl.get_project_summary(token=0, grid_filter=[])
 
-#         # Expect an empty project
-#         expected = ProjectSummaryInternal(
-#             project=WebProject(id=1, name='test', meta={}, dataset='test'),
-#             total_samples=0,
-#             total_participants=0,
-#             total_sequencing_groups=0,
-#             total_assays=0,
-#             batch_sequencing_group_stats={},
-#             cram_seqr_stats={},
-#             seqr_links={},
-#             seqr_sync_types=[],
-#         )
+class TestWeb(DbIsolatedTest):
+    """Test web class containing web endpoints"""
 
-#         self.assertDataclassEqual(expected, result)
+    @run_as_sync
+    async def setUp(self) -> None:
+        super().setUp()
+        self.webl = WebLayer(self.connection)
+        self.partl = ParticipantLayer(self.connection)
+        self.sampl = SampleLayer(self.connection)
+        self.seql = AssayLayer(self.connection)
 
-#     @run_as_sync
-#     async def test_project_summary_single_entry(self):
-#         """Test project summary with a single participant with all fields"""
-#         # Now add a participant with a sample and sequence
-#         await self.partl.upsert_participants(participants=[get_test_participant()])
+    @run_as_sync
+    async def test_project_summary_empty(self):
+        """Test getting the summary for a project"""
+        result = await self.webl.get_project_summary()
 
-#         result = await self.webl.get_project_summary(token=0, grid_filter=[])
+        # Expect an empty project
+        expected = ProjectSummaryInternal(
+            project=WebProject(id=1, name='test', meta={}, dataset='test'),
+            total_samples=0,
+            total_participants=0,
+            total_sequencing_groups=0,
+            total_assays=0,
+            batch_sequencing_group_stats={},
+            cram_seqr_stats={},
+            seqr_links={},
+            seqr_sync_types=[],
+        )
 
-#         result.participants = []
-#         self.assertDataclassEqual(SINGLE_PARTICIPANT_RESULT, result)
+        self.assertEqual(expected, result)
 
-#     @run_as_sync
-#     async def test_project_summary_to_external(self):
-#         """Test project summary to_external function"""
-#         # Now add a participant with a sample and sequence
-#         await self.partl.upsert_participants(participants=[get_test_participant()])
+    @run_as_sync
+    async def test_project_summary_single_entry(self):
+        """Test project summary with a single participant with all fields"""
+        # Now add a participant with a sample and sequence
+        await self.partl.upsert_participants(participants=[get_test_participant()])
 
-#         result = await self.webl.get_project_summary(token=0, grid_filter=[])
+        result = await self.webl.get_project_summary()
+        self.assertEqual(SINGLE_PARTICIPANT_SUMMARY_RESULT, result)
 
-#         ex_result = result.to_external(links=None)
+    @run_as_sync
+    async def test_project_summary_to_external(self):
+        """Test project summary to_external function"""
+        # Now add a participant with a sample and sequence
+        await self.partl.upsert_participants(participants=[get_test_participant()])
 
-#         self.assertIsInstance(result.participants[0].samples[0].id, int)
-#         self.assertIsInstance(ex_result.participants[0].samples[0].id, str)
-#         self.assertEqual(
-#             result.participants[0].samples[0].id,
-#             sample_id_transform_to_raw(ex_result.participants[0].samples[0].id),
-#         )
+        summary = await self.webl.get_project_summary()
+        self.assertEqual(
+            SINGLE_PARTICIPANT_SUMMARY_RESULT.to_external(),
+            summary.to_external(),
+        )
+        nested_participants = await self.webl.query_participants(
+            ParticipantFilter(), limit=None
+        )
 
-#         self.assertIsInstance(
-#             result.participants[0].samples[0].sequencing_groups[0].id, int
-#         )
-#         self.assertIsInstance(
-#             ex_result.participants[0].samples[0].sequencing_groups[0].id, str
-#         )
-#         self.assertEqual(
-#             result.participants[0].samples[0].sequencing_groups[0].id,
-#             sequencing_group_id_transform_to_raw(
-#                 ex_result.participants[0].samples[0].sequencing_groups[0].id
-#             ),
-#         )
+        result = ProjectParticipantGridResponse.from_params(
+            participants=nested_participants,
+            total_results=1,
+        )
 
-#         self.assertIsInstance(
-#             result.participants[0].samples[0].sequencing_groups[0].assays[0],
-#             AssayInternal,
-#         )
-#         self.assertIsInstance(
-#             ex_result.participants[0].samples[0].sequencing_groups[0].assays[0], Assay
-#         )
+        # ex_result = result.to_external(links=None)
+        assert isinstance(nested_participants[0].samples, list)
+        self.assertIsInstance(nested_participants[0].samples[0].id, int)
+        self.assertIsInstance(result.participants[0].samples[0].id, str)
+        self.assertEqual(
+            result.participants[0].samples[0].id,
+            sample_id_transform_to_raw(result.participants[0].samples[0].id),
+        )
 
-#     @run_as_sync
-#     async def project_summary_with_filter_with_results(self):
-#         """Project grid but with test filter, that shows results"""
-#         await self.partl.upsert_participants(participants=[get_test_participant()])
+        assert isinstance(nested_participants[0].samples[0].sequencing_groups, list)
+        assert isinstance(result.participants[0].samples[0].sequencing_groups, list)
 
-#         filtered_result_success = await self.webl.get_project_summary(
-#             token=0,
-#             grid_filter=[
-#                 SearchItem(
-#                     type=MetaSearchEntityPrefix.ASSAY,
-#                     query='M001',
-#                     field='batch',
-#                     is_meta=True,
-#                 )
-#             ],
-#         )
-#         filtered_result_success.participants = []
-#         self.assertDataclassEqual(SINGLE_PARTICIPANT_RESULT, filtered_result_success)
+        self.assertIsInstance(
+            nested_participants[0].samples[0].sequencing_groups[0].id, int
+        )
+        self.assertIsInstance(
+            result.participants[0].samples[0].sequencing_groups[0].id, str
+        )
+        self.assertEqual(
+            result.participants[0].samples[0].sequencing_groups[0].id,
+            sequencing_group_id_transform_to_raw(
+                result.participants[0].samples[0].sequencing_groups[0].id
+            ),
+        )
 
-#     @run_as_sync
-#     async def project_summary_with_filter_no_results(self):
-#         """Project grid but with test filter, that doesn't have results"""
-#         filtered_result_empty = await self.webl.get_project_summary(
-#             token=0,
-#             grid_filter=[
-#                 SearchItem(
-#                     type=MetaSearchEntityPrefix.ASSAY,
-#                     query='M002',
-#                     field='batch',
-#                     is_meta=True,
-#                 )
-#             ],
-#         )
-#         empty_result = ProjectSummaryInternal(
-#             project=WebProject(id=1, name='test', meta={}, dataset='test'),
-#             total_samples=0,
-#             total_samples_in_query=0,
-#             total_participants=0,
-#             total_sequencing_groups=0,
-#             total_assays=0,
-#             batch_sequencing_group_stats={},
-#             cram_seqr_stats={},
-#             participants=[],
-#             participant_keys=[],
-#             sample_keys=[],
-#             sequencing_group_keys=[],
-#             assay_keys=[],
-#             seqr_links={},
-#             seqr_sync_types=[],
-#         )
+        assert isinstance(
+            nested_participants[0].samples[0].sequencing_groups[0].assays, list
+        )
+        assert isinstance(
+            result.participants[0].samples[0].sequencing_groups[0].assays, list
+        )
+        self.assertIsInstance(
+            nested_participants[0].samples[0].sequencing_groups[0].assays[0],
+            AssayInternal,
+        )
+        self.assertIsInstance(
+            result.participants[0].samples[0].sequencing_groups[0].assays[0], Assay
+        )
 
-#         self.assertDataclassEqual(empty_result, filtered_result_empty)
+    @run_as_sync
+    async def project_summary_with_filter_with_results(self):
+        """Project grid but with test filter, that shows results"""
+        await self.partl.upsert_participants(participants=[get_test_participant()])
 
-#     @run_as_sync
-#     async def test_project_summary_multiple_participants(self):
-#         """Try with multiple participants as some extra security"""
-#         await self.partl.upsert_participants(
-#             participants=[get_test_participant(), get_test_participant_2()]
-#         )
+        pfilter = ProjectParticipantGridFilter(
+            assay=ProjectParticipantGridFilter.ParticipantGridAssayFilter(
+                meta={'batch': GenericFilter[Any](startswith='M001')}
+            )
+        )
 
-#         expected_data_two_samples = ProjectSummaryInternal(
-#             project=WebProject(id=1, name='test', meta={}, dataset='test'),
-#             total_samples=2,
-#             total_samples_in_query=2,
-#             total_participants=2,
-#             total_sequencing_groups=2,
-#             total_assays=2,
-#             cram_seqr_stats={
-#                 'genome': {
-#                     'Sequences': '2',
-#                     'Crams': '0',
-#                     'Seqr': '0',
-#                 }
-#             },
-#             batch_sequencing_group_stats={'M001': {'genome': '2'}},
-#             participants=[],  # data_to_class(expected_data_list),
-#             participant_keys=[('external_id', 'Participant ID')],
-#             sample_keys=[
-#                 ('id', 'Sample ID'),
-#                 ('external_id', 'External Sample ID'),
-#                 ('created_date', 'Created date'),
-#             ],
-#             sequencing_group_keys=[
-#                 ('id', 'Sequencing Group ID'),
-#                 ('platform', 'Platform'),
-#                 ('technology', 'Technology'),
-#                 ('type', 'Type'),
-#             ],
-#             assay_keys=[
-#                 ('type', 'type'),
-#                 ('meta.batch', 'batch'),
-#                 ('meta.field with spaces', 'field with spaces'),
-#                 ('meta.reads_type', 'reads_type'),
-#             ],
-#             seqr_links={},
-#             seqr_sync_types=[],
-#         )
+        nested_participants = await self.webl.query_participants(
+            pfilter.to_internal(project=self.project_id), limit=None
+        )
+        result = ProjectParticipantGridResponse.from_params(
+            participants=nested_participants,
+            total_results=1,
+        )
+        self.assertEqual(1, len(nested_participants))
+        result.participants = []
+        self.assertEqual(SINGLE_PARTICIPANT_QUERY_RESULT, result)
 
-#         two_samples_result = await self.webl.get_project_summary(
-#             token=0, grid_filter=[]
-#         )
+    @run_as_sync
+    async def project_summary_with_filter_no_results(self):
+        """Project grid but with test filter, that doesn't have results"""
+        await self.partl.upsert_participants(participants=[get_test_participant()])
+        pfilter = ProjectParticipantGridFilter(
+            assay=ProjectParticipantGridFilter.ParticipantGridAssayFilter(
+                meta={'batch': GenericFilter[Any](startswith='M002')}
+            )
+        )
 
-#         two_samples_result.participants = []
+        nested_participants = await self.webl.query_participants(
+            pfilter.to_internal(project=self.project_id), limit=None
+        )
+        self.assertEqual(0, len(nested_participants))
 
-#         self.assertDataclassEqual(expected_data_two_samples, two_samples_result)
+        result = ProjectParticipantGridResponse.from_params(
+            participants=nested_participants,
+            total_results=0,
+        )
+        result.participants = []
+        self.assertEqual(SINGLE_PARTICIPANT_QUERY_RESULT, result)
 
-#     @run_as_sync
-#     async def test_project_summary_multiple_participants_and_filter(self):
-#         """Try with multiple participants as some extra security"""
-#         await self.partl.upsert_participants(
-#             participants=[get_test_participant(), get_test_participant_2()]
-#         )
+        empty_result = ProjectParticipantGridResponse(
+            total_results=0,
+            participants=[],
+            family_keys=[],
+            participant_keys=[],
+            sample_keys=[],
+            sequencing_group_keys=[],
+            assay_keys=[],
+        )
 
-#         expected_data_two_samples_filtered = ProjectSummaryInternal(
-#             project=WebProject(id=1, name='test', meta={}, dataset='test'),
-#             total_samples=2,
-#             total_samples_in_query=1,
-#             total_participants=2,
-#             total_sequencing_groups=2,
-#             total_assays=2,
-#             cram_seqr_stats={
-#                 'genome': {
-#                     'Sequences': '2',
-#                     'Crams': '0',
-#                     'Seqr': '0',
-#                 }
-#             },
-#             batch_sequencing_group_stats={'M001': {'genome': '2'}},
-#             participants=[],  # data_to_class(expected_data_list_filtered),
-#             participant_keys=[('external_id', 'Participant ID')],
-#             sample_keys=[
-#                 ('id', 'Sample ID'),
-#                 ('external_id', 'External Sample ID'),
-#                 ('created_date', 'Created date'),
-#             ],
-#             sequencing_group_keys=[
-#                 ('id', 'Sequencing Group ID'),
-#                 ('platform', 'Platform'),
-#                 ('technology', 'Technology'),
-#                 ('type', 'Type'),
-#             ],
-#             assay_keys=[
-#                 ('type', 'type'),
-#                 ('meta.batch', 'batch'),
-#                 ('meta.field with spaces', 'field with spaces'),
-#                 ('meta.reads_type', 'reads_type'),
-#             ],
-#             seqr_links={},
-#             seqr_sync_types=[],
-#         )
+        self.assertEqual(empty_result, result)
 
-#         two_samples_result_filtered = await self.webl.get_project_summary(
-#             token=0,
-#             grid_filter=[
-#                 SearchItem(
-#                     type=MetaSearchEntityPrefix.SAMPLE,
-#                     query='sample_id002',
-#                     field='external_id',
-#                     is_meta=False,
-#                 )
-#             ],
-#         )
-#         two_samples_result_filtered.participants = []
+    @run_as_sync
+    async def test_project_summary_multiple_participants(self):
+        """Try with multiple participants as some extra security"""
+        await self.partl.upsert_participants(
+            participants=[get_test_participant(), get_test_participant_2()]
+        )
 
-#         self.assertDataclassEqual(
-#             expected_data_two_samples_filtered, two_samples_result_filtered
-#         )
+        expected_summary = ProjectSummaryInternal(
+            project=WebProject(id=1, name='test', meta={}, dataset='test'),
+            total_samples=2,
+            total_participants=2,
+            total_sequencing_groups=2,
+            total_assays=2,
+            cram_seqr_stats={
+                'genome': {
+                    'Sequences': '2',
+                    'Crams': '0',
+                    'Seqr': '0',
+                }
+            },
+            batch_sequencing_group_stats={'M001': {'genome': '2'}},
+            seqr_links={},
+            seqr_sync_types=[],
+        )
 
-#     @run_as_sync
-#     async def test_field_with_space(self):
-#         """Test filtering on a meta field with spaces"""
-#         await self.partl.upsert_participants(
-#             participants=[get_test_participant(), get_test_participant_2()]
-#         )
-#         print(await self.connection.connection.fetch_all('SELECT * FROM assay'))
-#         test_field_with_space = await self.webl.get_project_summary(
-#             token=0,
-#             grid_filter=[
-#                 SearchItem(
-#                     type=MetaSearchEntityPrefix.ASSAY,
-#                     query='field wi',
-#                     field='field with spaces',
-#                     is_meta=True,
-#                 )
-#             ],
-#         )
-#         self.assertEqual(1, len(test_field_with_space.participants))
-#         test_field_with_space.participants = []
+        expected_result = ProjectParticipantGridResponse(
+            participants=[],  # data_to_class(expected_data_list),
+            total_results=2,
+            family_keys=[('external_id', 'Family ID')],
+            participant_keys=[('external_id', 'Participant ID')],
+            sample_keys=[
+                ('id', 'Sample ID'),
+                ('external_id', 'External Sample ID'),
+                ('created_date', 'Created date'),
+            ],
+            sequencing_group_keys=[
+                ('id', 'Sequencing Group ID'),
+                ('platform', 'Platform'),
+                ('technology', 'Technology'),
+                ('type', 'Type'),
+            ],
+            assay_keys=[
+                ('type', 'type'),
+                ('meta.batch', 'batch'),
+                ('meta.field with spaces', 'field with spaces'),
+                ('meta.reads_type', 'reads_type'),
+            ],
+        )
 
-#         expected_data_two_samples_filtered = ProjectSummaryInternal(
-#             project=WebProject(id=1, name='test', meta={}, dataset='test'),
-#             total_samples=2,
-#             total_samples_in_query=1,
-#             total_participants=2,
-#             total_sequencing_groups=2,
-#             total_assays=2,
-#             cram_seqr_stats={
-#                 'genome': {
-#                     'Sequences': '2',
-#                     'Crams': '0',
-#                     'Seqr': '0',
-#                 }
-#             },
-#             batch_sequencing_group_stats={'M001': {'genome': '2'}},
-#             participants=[],
-#             participant_keys=[('external_id', 'Participant ID')],
-#             sample_keys=[
-#                 ('id', 'Sample ID'),
-#                 ('external_id', 'External Sample ID'),
-#                 ('created_date', 'Created date'),
-#             ],
-#             sequencing_group_keys=[
-#                 ('id', 'Sequencing Group ID'),
-#                 ('platform', 'Platform'),
-#                 ('technology', 'Technology'),
-#                 ('type', 'Type'),
-#             ],
-#             assay_keys=[
-#                 ('type', 'type'),
-#                 ('meta.batch', 'batch'),
-#                 ('meta.field with spaces', 'field with spaces'),
-#                 ('meta.reads_type', 'reads_type'),
-#             ],
-#             seqr_links={},
-#             seqr_sync_types=[],
-#         )
+        summary = await self.webl.get_project_summary()
 
-#         self.assertDataclassEqual(
-#             expected_data_two_samples_filtered, test_field_with_space
-#         )
+        self.assertEqual(expected_summary, summary)
 
-#     @run_as_sync
-#     async def test_project_summary_inactive_sequencing_group(self):
-#         """
-#         Insert a sequencing-group, archive it, then check that the summary
-#         doesn't return that sequencing group
-#         """
-#         participants = await self.partl.upsert_participants(
-#             participants=[get_test_participant()]
-#         )
-#         sg = participants[0].samples[0].sequencing_groups[0]
-#         assay_ids = [a.id for a in sg.assays]
-#         sglayer = SequencingGroupLayer(self.connection)
-#         new_sg_id = await sglayer.recreate_sequencing_group_with_new_assays(
-#             sequencing_group_id=sg.id,
-#             assays=assay_ids,
-#             meta={'new-meta': 'value'},
-#         )
+        nested_participants = await self.webl.query_participants(
+            ParticipantFilter(), limit=None
+        )
+        self.assertEqual(2, len(nested_participants))
+        result = ProjectParticipantGridResponse.from_params(
+            participants=nested_participants,
+            total_results=2,
+        )
+        # make it easier to test
+        result.participants = []
+        self.assertEqual(expected_result, result)
 
-#         psummary = await self.webl.get_project_summary(grid_filter=[])
+    @run_as_sync
+    async def test_project_summary_multiple_participants_and_filter(self):
+        """Try with multiple participants as some extra security"""
+        await self.partl.upsert_participants(
+            participants=[get_test_participant(), get_test_participant_2()]
+        )
 
-#         summary_sgs = psummary.participants[0].samples[0].sequencing_groups
-#         self.assertEqual(1, len(summary_sgs))
-#         self.assertEqual(new_sg_id, summary_sgs[0].id)
+        expected_data_two_samples_filtered = ProjectParticipantGridResponse(
+            participants=[],  # data_to_class(expected_data_list_filtered),
+            total_results=2,
+            family_keys=[('external_id', 'Family ID')],
+            participant_keys=[('external_id', 'Participant ID')],
+            sample_keys=[
+                ('id', 'Sample ID'),
+                ('external_id', 'External Sample ID'),
+                ('created_date', 'Created date'),
+            ],
+            sequencing_group_keys=[
+                ('id', 'Sequencing Group ID'),
+                ('platform', 'Platform'),
+                ('technology', 'Technology'),
+                ('type', 'Type'),
+            ],
+            assay_keys=[
+                ('type', 'type'),
+                ('meta.batch', 'batch'),
+                ('meta.field with spaces', 'field with spaces'),
+                ('meta.reads_type', 'reads_type'),
+            ],
+        )
+
+        pfilter = ProjectParticipantGridFilter(
+            sample=ProjectParticipantGridFilter.ParticipantGridSampleFilter(
+                external_id=GenericFilter[str](contains='_id002')
+            )
+        )
+
+        nested_participants = await self.webl.query_participants(
+            pfilter.to_internal(project=self.project_id), limit=None
+        )
+
+        self.assertEqual(1, len(nested_participants))
+        result = ProjectParticipantGridResponse.from_params(
+            nested_participants,
+            total_results=2,
+        )
+        result.participants = []
+
+        self.assertEqual(expected_data_two_samples_filtered, result)
+
+    @run_as_sync
+    async def test_field_with_space(self):
+        """Test filtering on a meta field with spaces"""
+        await self.partl.upsert_participants(
+            participants=[get_test_participant(), get_test_participant_2()]
+        )
+
+        pfilter = ProjectParticipantGridFilter(
+            assay=ProjectParticipantGridFilter.ParticipantGridAssayFilter(
+                meta={'field with spaces': GenericFilter[Any](contains='field wi')}
+            )
+        )
+        nested_participants = await self.webl.query_participants(
+            pfilter.to_internal(project=self.project_id), limit=None
+        )
+
+        self.assertEqual(1, len(nested_participants))
+
+    @run_as_sync
+    async def test_project_summary_inactive_sequencing_group(self):
+        """
+        Insert a sequencing-group, archive it, then check that the summary
+        doesn't return that sequencing group
+        """
+        participants = await self.partl.upsert_participants(
+            participants=[get_test_participant()]
+        )
+        assert (
+            isinstance(participants, list)
+            and isinstance(participants[0].samples, list)
+            and isinstance(participants[0].samples[0].sequencing_groups, list)
+        )
+        sg = participants[0].samples[0].sequencing_groups[0]
+        assert isinstance(sg.assays, list)
+        assay_ids = [a.id for a in sg.assays if a.id]
+        sglayer = SequencingGroupLayer(self.connection)
+        assert sg.id
+        new_sg_id = await sglayer.recreate_sequencing_group_with_new_assays(
+            sequencing_group_id=sg.id,
+            assays=assay_ids,
+            meta={'new-meta': 'value'},
+        )
+
+        participants = await self.webl.query_participants(
+            ParticipantFilter(), limit=None
+        )
+        summary_sgs = participants[0].samples[0].sequencing_groups
+        self.assertEqual(1, len(summary_sgs))
+        self.assertEqual(new_sg_id, summary_sgs[0].id)
+
+
+class WebNonDBTests(unittest.TestCase):
+    """Handy place to put tests that don't require a database"""
+
+    def test_nested_participant_to_rows(self):
+        """Test nested participant to flat rows with a projection"""
+        participant = NestedParticipant(
+            id=1,
+            external_id='pex1',
+            meta={'pkey': 'value'},
+            families=[FamilySimple(id=-2, external_id='fex1')],
+            samples=[
+                NestedSample(
+                    id='xpgA',
+                    external_id='sex1',
+                    meta={'skey': 'svalue'},
+                    type='blood',
+                    created_date='2021-01-01',
+                    non_sequencing_assays=[],
+                    sequencing_groups=[
+                        NestedSequencingGroup(
+                            id='cpgA',
+                            type='genome',
+                            external_ids={'sgex1': 'sgex1'},
+                            technology='short-read',
+                            platform='illumina',
+                            meta={'sgkey': 'sgvalue'},
+                            assays=[
+                                Assay(
+                                    id=-1,
+                                    type='sequencing',
+                                    external_ids={'ex1': 'ex1'},
+                                    sample_id='xpgA',
+                                    meta={'akey': 'avalue'},
+                                ),
+                                Assay(
+                                    id=-2,
+                                    type='sequencing',
+                                    external_ids={'ex1': 'ex2'},
+                                    sample_id='xpgA',
+                                    meta={'akey': 'avalue2'},
+                                ),
+                            ],
+                        )
+                    ],
+                )
+            ],
+        )
+        fields = ExportProjectParticipantFields(
+            family_keys=['external_id'],
+            participant_keys=['external_id', 'meta.pkey'],
+            sample_keys=['meta.skey', 'external_id'],
+            sequencing_group_keys=['type', 'meta.sgkey'],
+            assay_keys=['type', 'meta.akey'],
+        )
+
+        i = prepare_participants_for_export([participant], fields)
+        headers = next(i)
+        rows = list(i)
+        self.assertTupleEqual(
+            headers,
+            (
+                'family.external_id',
+                'participant.external_id',
+                'participant.meta.pkey',
+                'sample.meta.skey',
+                'sample.external_id',
+                'sequencing_group.type',
+                'sequencing_group.meta.sgkey',
+                'assay.type',
+                'assay.meta.akey',
+            ),
+        )
+        non_sg_keys = ('fex1', 'pex1', 'value', 'svalue', 'sex1', 'genome', 'sgvalue')
+        expected = [
+            (*non_sg_keys, 'sequencing', 'avalue'),
+            (*non_sg_keys, 'sequencing', 'avalue2'),
+        ]
+
+        self.assertEqual(2, len(rows))
+
+        self.assertListEqual(expected, rows)
+
+    def test_project_participant_grid_filter(self):
+        """
+        Test every filter, and make sure it's being converted
+        to the internal model correctly
+        """
+        f_id = 1
+        p_id = 2
+        s_id = 3
+        s_id_ext = sample_id_format(s_id)
+        sg_id = 4
+        sg_id_ext = sequencing_group_id_format(sg_id)
+        big_filter = ProjectParticipantGridFilter(
+            family=ProjectParticipantGridFilter.ParticipantGridFamilyFilter(
+                id=GenericFilter[int](contains=f_id)
+            ),
+            participant=ProjectParticipantGridFilter.ParticipantGridParticipantFilter(
+                id=GenericFilter[int](contains=p_id),
+                meta={'pmeta': GenericFilter[Any](contains='pm')},
+                external_id=GenericFilter[str](contains='e'),
+            ),
+            sample=ProjectParticipantGridFilter.ParticipantGridSampleFilter(
+                id=GenericFilter[str](contains=s_id_ext),
+                type=GenericFilter[str](contains='t'),
+                external_id=GenericFilter[str](contains='e'),
+                meta={'smeta': GenericFilter[Any](contains='sm')},
+            ),
+            sequencing_group=ProjectParticipantGridFilter.ParticipantGridSequencingGroupFilter(
+                id=GenericFilter[str](contains=sg_id_ext),
+                type=GenericFilter[str](contains='t'),
+                external_id=GenericFilter[str](contains='e'),
+                meta={'sgmeta': GenericFilter[Any](contains='sg')},
+                technology=GenericFilter[str](contains='t'),
+                platform=GenericFilter[str](contains='p'),
+            ),
+            assay=ProjectParticipantGridFilter.ParticipantGridAssayFilter(
+                id=GenericFilter[int](contains=5),
+                type=GenericFilter[str](contains='t'),
+                external_id=GenericFilter[str](contains='e'),
+                meta={'ameta': GenericFilter[Any](contains='a')},
+            ),
+        )
+
+        internal_filter = big_filter.to_internal(project=1)
+
+        # participant internal
+        self.assertEqual(internal_filter.id.contains, p_id)
+        self.assertEqual(internal_filter.meta['pmeta'].contains, 'pm')
+        self.assertEqual(internal_filter.external_id.contains, 'e')
+
+        # family internal
+        self.assertEqual(internal_filter.family.id.contains, f_id)
+
+        # sample internal
+        self.assertEqual(internal_filter.sample.id.contains, s_id)
+        self.assertEqual(internal_filter.sample.type.contains, 't')
+        self.assertEqual(internal_filter.sample.external_id.contains, 'e')
+        self.assertEqual(internal_filter.sample.meta['smeta'].contains, 'sm')
+
+        # sequencing group internal
+        self.assertEqual(internal_filter.sequencing_group.id.contains, sg_id)
+        self.assertEqual(internal_filter.sequencing_group.type.contains, 't')
+        self.assertEqual(internal_filter.sequencing_group.external_id.contains, 'e')
+        self.assertEqual(internal_filter.sequencing_group.meta['sgmeta'].contains, 'sg')
+        self.assertEqual(internal_filter.sequencing_group.technology.contains, 't')
+        self.assertEqual(internal_filter.sequencing_group.platform.contains, 'p')
+
+        # assay internal
+        self.assertEqual(internal_filter.assay.id.contains, 5)
+        self.assertEqual(internal_filter.assay.type.contains, 't')
+        self.assertEqual(internal_filter.assay.external_id.contains, 'e')
+        self.assertEqual(internal_filter.assay.meta['ameta'].contains, 'a')

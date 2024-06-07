@@ -6,6 +6,7 @@ from datetime import date
 from api.utils import group_by
 from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer
+from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.seqr import SeqrLayer
@@ -27,6 +28,7 @@ from models.models import (
     NestedSampleInternal,
     NestedSequencingGroupInternal,
 )
+from models.models.family import FamilyInternal
 from models.models.participant import NestedParticipantInternal, ParticipantInternal
 from models.models.sample import SampleInternal
 from models.models.sequencing_group import SequencingGroupInternal
@@ -47,13 +49,16 @@ class WebLayer(BaseLayer):
         return await webdb.get_project_summary()
 
     async def query_participants(
-        self, query: ParticipantFilter, limit: int | None
+        self,
+        query: ParticipantFilter,
+        limit: int | None,
+        skip: int | None = None,
     ) -> list[NestedParticipantInternal]:
         """
         Query participants
         """
         webdb = WebDb(self.connection)
-        return await webdb.query_participants(query, limit)
+        return await webdb.query_participants(query, limit, skip=skip)
 
     async def count_participants(self, query: ParticipantFilter) -> int:
         """Run query to count participants"""
@@ -235,15 +240,19 @@ class WebDb(DbBase):
         return await player.query_count(query)
 
     async def query_participants(
-        self, query: ParticipantFilter, limit: int | None
+        self,
+        query: ParticipantFilter,
+        limit: int | None,
+        skip: int | None = None,
     ) -> list[NestedParticipantInternal]:
         """Use query to build up nested participants"""
         player = ParticipantLayer(self._connection)
         slayer = SampleLayer(self._connection)
         sglayer = SequencingGroupLayer(self._connection)
         alayer = AssayLayer(self._connection)
+        flayer = FamilyLayer(self._connection)
 
-        participants = await player.query(query, limit=limit)
+        participants = await player.query(query, limit=limit, skip=skip)
         if not participants:
             return []
 
@@ -289,12 +298,17 @@ class WebDb(DbBase):
             sg_ids, filter_=assayfilter
         )
 
+        families = await flayer.get_families_by_participants(
+            list(set(p.id for p in participants))
+        )
+
         return self.assemble_nested_participants_from(
             participants=participants,
             samples=samples,
             sequencing_groups=sequencing_groups,
             assays_by_sg=assays_by_sgids,
             sample_created_dates=samples_created_date,
+            families_by_pid=families,
         )
 
     @staticmethod
@@ -305,6 +319,7 @@ class WebDb(DbBase):
         sequencing_groups: list[SequencingGroupInternal],
         assays_by_sg: dict[int, list[AssayInternal]],
         sample_created_dates: dict[int, date],
+        families_by_pid: dict[int, list[FamilyInternal]],
     ) -> list[NestedParticipantInternal]:
         """
         Assemble nested participants from the various components
@@ -348,13 +363,17 @@ class WebDb(DbBase):
                         active=sample.active,
                     )
                 )
-
+            families = []
+            for family in families_by_pid.get(participant.id, []):
+                families.append(
+                    FamilySimpleInternal(id=family.id, external_id=family.external_id)
+                )
             nested_participant = NestedParticipantInternal(
                 id=participant.id,
                 external_id=participant.external_id,
                 samples=nested_samples,
                 meta=participant.meta,
-                families=[],
+                families=families,
             )
 
             nested_participants.append(nested_participant)

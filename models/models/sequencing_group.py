@@ -1,6 +1,8 @@
 import json
 from typing import Any
 
+from pydantic import Field
+
 from models.base import OpenApiGenNoneType, SMBase
 from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
 from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
@@ -83,14 +85,14 @@ class SequencingGroupInternal(SMBase):
 class NestedSequencingGroupInternal(SMBase):
     """SequencingGroupInternal with nested assays"""
 
-    id: SequencingGroupInternalId | None = None
-    type: str | None = None
-    technology: str | None = None
-    platform: str | None = None
-    meta: dict[str, Any] | None = None
-    external_ids: dict[str, str] | None = None
+    id: SequencingGroupInternalId
+    type: str
+    technology: str
+    platform: str
+    meta: dict[str, Any]
+    external_ids: dict[str, str] = Field(default_factory=dict)
 
-    assays: list[AssayInternal] | None = None
+    assays: list[AssayInternal] = Field(default_factory=list)
 
     def to_external(self):
         """Convert to transport model"""
@@ -101,7 +103,7 @@ class NestedSequencingGroupInternal(SMBase):
             platform=self.platform,
             meta=self.meta,
             external_ids=self.external_ids or {},
-            assays=[a.to_external() for a in self.assays or []],
+            assays=[a.to_external() for a in self.assays],
         )
 
 

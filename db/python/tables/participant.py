@@ -168,7 +168,6 @@ class ParticipantTable(DbBase):
             swheres, svalues = filter_.sequencing_group.to_sql(
                 {
                     'id': 'sg.id',
-                    'external_id': 'sg.external_id',
                     'meta': 'sg.meta',
                     'type': 'sg.type',
                     'technology': 'sg.technology',
@@ -182,6 +181,18 @@ class ParticipantTable(DbBase):
         if filter_.assay:
             needs_sample = True
             needs_sequencing_group = True
+            needs_assay = True
+
+            awheres, avalues = filter_.assay.to_sql(
+                {
+                    'id': 'a.id',
+                    'meta': 'a.meta',
+                    'type': 'a.type',
+                }
+            )
+            values.update(avalues)
+            if awheres:
+                wheres += ' AND ' + awheres
 
         query = f"""
         SELECT
@@ -194,7 +205,10 @@ class ParticipantTable(DbBase):
         if needs_sequencing_group:
             query += 'INNER JOIN sequencing_group sg ON sg.sample_id = s.id\n'
         if needs_assay:
-            query += 'INNER JOIN assay a ON a.sequencing_group_id = sg.id\n'
+            query += (
+                'INNER JOIN sequencing_group_assay a_sg ON a_sg.sequencing_group_id = sg.id\n'
+                'INNER JOIN assay a ON a.id = a_sg.assay_id\n'
+            )
         if needs_family:
             query += 'INNER JOIN family_participant fp ON fp.participant_id = p.id\n'
             query += 'INNER JOIN family f ON f.id = fp.family_id\n'

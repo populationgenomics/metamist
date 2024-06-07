@@ -1,5 +1,6 @@
 # pylint: disable=too-many-instance-attributes
 import dataclasses
+from typing import Sequence
 
 from models.base import SMBase
 from models.models.participant import NestedParticipant, NestedParticipantInternal
@@ -96,42 +97,29 @@ class ProjectParticipantGridResponse(SMBase):
     # grid
     participants: list[NestedParticipant]
     total_results: int
+
+    family_keys: list[tuple[str, str]]
     participant_keys: list[tuple[str, str]]
     sample_keys: list[tuple[str, str]]
     sequencing_group_keys: list[tuple[str, str]]
     assay_keys: list[tuple[str, str]]
 
-    links: PagingLinks | None
-
     @staticmethod
     def from_params(
         participants: list[NestedParticipantInternal],
         total_results: int,
-        token_base_url: str,
-        current_url: str,
-        request_limit: int,
     ):
         """Convert to transport model"""
-        new_token = None
-        if len(participants) >= request_limit:
-            new_token = max(int(p.id) for p in participants)
-
-        links = PagingLinks(
-            current=current_url,
-            next=token_base_url + f'?token={new_token}' if new_token else None,
-            token=str(new_token) if new_token else None,
-        )
-
         entity_keys = ProjectParticipantGridResponse.get_entity_keys(participants)
 
         return ProjectParticipantGridResponse(
             participants=[p.to_external() for p in participants],
             total_results=total_results,
+            family_keys=entity_keys.family_keys,
             participant_keys=entity_keys.participant_keys,
             sample_keys=entity_keys.sample_keys,
             sequencing_group_keys=entity_keys.sequencing_group_keys,
             assay_keys=entity_keys.assay_keys,
-            links=links,
         )
 
     @dataclasses.dataclass
@@ -140,6 +128,7 @@ class ProjectParticipantGridResponse(SMBase):
         Tiny dataclass as returntype for get_entity_keys
         """
 
+        family_keys: list[tuple[str, str]]
         participant_keys: list[tuple[str, str]]
         sample_keys: list[tuple[str, str]]
         sequencing_group_keys: list[tuple[str, str]]
@@ -147,7 +136,7 @@ class ProjectParticipantGridResponse(SMBase):
 
     @staticmethod
     def get_entity_keys(
-        participants: list[NestedParticipantInternal],
+        participants: Sequence[NestedParticipantInternal | NestedParticipant],
     ) -> 'ParticipantGridEntityKeys':
         """
         Read through nested participants and full out the keys for the grid response
@@ -163,6 +152,7 @@ class ProjectParticipantGridResponse(SMBase):
         }
         ignore_sg_meta_keys: set[str] = set()
 
+        family_meta_keys: set[str] = set()
         participant_meta_keys: set[str] = set()
         sample_meta_keys: set[str] = set()
         sg_meta_keys: set[str] = set()
@@ -193,6 +183,8 @@ class ProjectParticipantGridResponse(SMBase):
         has_reported_gender = any(p.reported_gender is not None for p in participants)
         has_karyotype = any(p.karyotype is not None for p in participants)
 
+        family_keys: list[tuple[str, str]] = [('external_id', 'Family ID')]
+        family_keys.extend(('meta.' + k, k) for k in family_meta_keys)
         participant_keys: list[tuple[str, str]] = [('external_id', 'Participant ID')]
 
         if has_reported_sex:
@@ -230,6 +222,7 @@ class ProjectParticipantGridResponse(SMBase):
         )
 
         return ProjectParticipantGridResponse.ParticipantGridEntityKeys(
+            family_keys=family_keys,
             participant_keys=participant_keys,
             sample_keys=sample_keys,
             sequencing_group_keys=sequencing_group_keys,

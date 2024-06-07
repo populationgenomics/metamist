@@ -4,11 +4,12 @@ import logging
 import os
 import re
 from enum import Enum
-from typing import Any, Generic, Sequence, TypeVar
+from typing import Any, Callable, Generic, Sequence, TypeVar
 
 from models.base import SMBase
 
 T = TypeVar('T')
+X = TypeVar('X')
 
 levels_map = {'DEBUG': logging.DEBUG, 'INFO': logging.INFO, 'WARNING': logging.WARNING}
 
@@ -239,6 +240,22 @@ class GenericFilter(SMBase, Generic[T]):
 
         # nothing else to do at this itme
         return value
+
+    def transform(self, func: Callable[[T], X]) -> 'GenericFilter[X]':
+        """
+        Apply a function to each value in the filter
+        """
+        return GenericFilter(
+            eq=func(self.eq) if self.eq else None,
+            in_=list(map(func, self.in_)) if self.in_ else None,
+            nin=list(map(func, self.nin)) if self.nin else None,
+            gt=func(self.gt) if self.gt else None,
+            gte=func(self.gte) if self.gte else None,
+            lt=func(self.lt) if self.lt else None,
+            lte=func(self.lte) if self.lte else None,
+            contains=func(self.contains) if self.contains else None,
+            icontains=func(self.icontains) if self.icontains else None,
+        )
 
 
 def get_hashable_value(value):

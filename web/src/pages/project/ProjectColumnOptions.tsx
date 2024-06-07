@@ -1,7 +1,15 @@
 import * as _ from 'lodash'
 import * as React from 'react'
 
-import { Card, Checkbox } from 'semantic-ui-react'
+import {
+    Accordion,
+    AccordionTitle,
+    Card,
+    Checkbox,
+    Grid,
+    Message,
+    Segment,
+} from 'semantic-ui-react'
 import { ProjectParticipantGridFilter, ProjectParticipantGridResponse } from '../../sm-api'
 import { ValueFilter } from './ValueFilter'
 
@@ -27,6 +35,7 @@ export interface ProjectGridField {
 interface ProjectColumnOptionsProps {
     headerGroups: ProjectGridHeaderGroup[]
     filterValues: ProjectParticipantGridFilter
+    participantCount: number
     // participantResponse?: ProjectParticipantGridResponse
     updateFilters: (filters: Partial<ProjectParticipantGridFilter>) => void
     setHeaderGroups: (headers: ProjectGridHeaderGroup[]) => void
@@ -88,7 +97,12 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
     setHeaderGroups,
     filterValues,
     updateFilters,
+    participantCount,
 }) => {
+    const [isOpen, setIsOpen] = React.useState(false)
+    // something weird about the accordian
+    // const isOpen = _isOpen ? true : undefined
+
     const onUpdateSingleHeader = (
         category: MetaSearchEntityPrefix,
         header: ProjectGridField,
@@ -116,50 +130,69 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
     }
 
     return (
-        <Card>
-            {headerGroups.map(({ category, fields }) => {
-                return (
-                    <React.Fragment key={`project-col-option-${category}`}>
-                        <h3>{_.startCase(category.replaceAll('_', ' '))}</h3>
-                        <table
-                            style={{
-                                border: '1px solid black',
-                            }}
-                        >
-                            {fields.map((field) => {
-                                return (
-                                    <tr key={field.name}>
-                                        <td>
-                                            <Checkbox
-                                                key={`checkbox-${category}-${field.name}`}
-                                                type="checkbox"
-                                                checked={field.isVisible}
-                                                label={field.title}
-                                                onChange={(e, data) =>
-                                                    onUpdateSingleHeader(
-                                                        category,
-                                                        field,
-                                                        data.checked || !field.isVisible
-                                                    )
-                                                }
-                                            />
-                                        </td>
-                                        <td style={{ paddingLeft: '10px' }}>
-                                            <ValueFilter
-                                                category={category}
-                                                filterKey={field.name}
-                                                filterValues={filterValues}
-                                                updateFilterValues={updateFilters}
-                                                size="small"
-                                            />
-                                        </td>
-                                    </tr>
-                                )
-                            })}
-                        </table>
-                    </React.Fragment>
-                )
-            })}
+        <Card style={{ width: screen.width, padding: '20px' }}>
+            <Accordion>
+                <AccordionTitle active={isOpen} onClick={() => setIsOpen(!isOpen)}>
+                    <h3>Filter + display options</h3>
+                </AccordionTitle>
+                <Accordion.Content active={isOpen}>
+                    {participantCount > 200 && (
+                        <Message warning>
+                            There are a high number of participants ({participantCount}), showing /
+                            hiding columns may take a few seconds to process, and the UI might
+                            appear to freeze
+                        </Message>
+                    )}
+                    <Grid container columns={3} divided>
+                        {headerGroups.map(({ category, fields }) => {
+                            return (
+                                <Segment key={`project-col-option-${category}`}>
+                                    <h3>{_.startCase(category.replaceAll('_', ' '))}</h3>
+                                    <table
+                                        style={{
+                                            border: 'none', // '1px solid black',
+                                        }}
+                                    >
+                                        <tbody>
+                                            {fields.map((field) => {
+                                                return (
+                                                    <tr key={field.name}>
+                                                        <td>
+                                                            <Checkbox
+                                                                key={`checkbox-${category}-${field.name}`}
+                                                                type="checkbox"
+                                                                checked={field.isVisible}
+                                                                label={field.title}
+                                                                onChange={(e, data) =>
+                                                                    onUpdateSingleHeader(
+                                                                        category,
+                                                                        field,
+                                                                        data.checked ||
+                                                                            !field.isVisible
+                                                                    )
+                                                                }
+                                                            />
+                                                        </td>
+                                                        <td style={{ paddingLeft: '10px' }}>
+                                                            <ValueFilter
+                                                                category={category}
+                                                                filterKey={field.name}
+                                                                filterValues={filterValues}
+                                                                updateFilterValues={updateFilters}
+                                                                size="small"
+                                                            />
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </Segment>
+                            )
+                        })}
+                    </Grid>
+                </Accordion.Content>
+            </Accordion>
         </Card>
     )
 }

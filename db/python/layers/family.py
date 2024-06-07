@@ -333,6 +333,7 @@ class FamilyLayer(BaseLayer):
                 [
                     ParticipantUpsertInternal(
                         id=external_participant_ids_map[row.individual_id],
+                        external_id=row.individual_id,
                         reported_sex=row.sex,
                     )
                     for row in pedrows
