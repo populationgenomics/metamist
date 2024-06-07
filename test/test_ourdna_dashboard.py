@@ -1,4 +1,4 @@
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from datetime import datetime
 from math import ceil
 from test.testbase import DbIsolatedTest, run_as_sync
@@ -8,7 +8,6 @@ from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from models.models import (
     OurDNADashboard,
-    ParticipantUpsert,
     ParticipantUpsertInternal,
     SampleUpsert,
     SampleUpsertInternal,
@@ -145,8 +144,8 @@ class OurDNADashboardTest(DbIsolatedTest):
         dashboard = await self.odd.query(project_id=self.project_id)
 
         # Check that the dashboard is not empty and is a dict
-        assert dashboard
-        assert isinstance(dashboard, OurDNADashboard)
+        self.assertTrue(dashboard)
+        self.assertIsInstance(dashboard, OurDNADashboard)
 
     @run_as_sync
     async def test_collection_to_process_end_time(self):
@@ -155,10 +154,10 @@ class OurDNADashboardTest(DbIsolatedTest):
         collection_to_process_end_time = dashboard.collection_to_process_end_time
 
         # Check that collection_to_process_end_time is not empty and is a dict
-        assert collection_to_process_end_time
-        assert isinstance(collection_to_process_end_time, dict)
+        self.assertTrue(collection_to_process_end_time)
+        self.assertIsInstance(collection_to_process_end_time, dict)
 
-        samples_filtered: list[SampleUpsert] = []
+        samples_filtered: list[str] = []
         for sample in self.sample_external_objects:
             assert isinstance(sample.meta, dict)
             collection_time = sample.meta.get('collection-time')
@@ -170,26 +169,22 @@ class OurDNADashboardTest(DbIsolatedTest):
                 collection_time
             )
             if time_difference.total_seconds():
-                samples_filtered.append(sample)
-
                 # Check that the time difference matches
                 assert isinstance(sample.id, str)
-                assert (
-                    time_difference.total_seconds()
-                    == collection_to_process_end_time[sample.id]
+
+                samples_filtered.append(sample.id)
+
+                self.assertEqual(
+                    time_difference.total_seconds(),
+                    collection_to_process_end_time[sample.id],
                 )
 
-                # Check that the sample id is in the dict
-                assert sample.id in collection_to_process_end_time
-
         # Check the number of samples in the cohort
-        assert len(collection_to_process_end_time.keys()) == len(samples_filtered)
+        self.assertCountEqual(collection_to_process_end_time.keys(), samples_filtered)
 
         for _sample_id, time_diff in collection_to_process_end_time.items():
-            assert (
-                time_diff > 0
-            )  # NOTE: Should we actually check this explicitly in the code instead?
-            assert isinstance(time_diff, int)
+            self.assertGreater(time_diff, 0)
+            self.assertIsInstance(time_diff, int)
 
     @run_as_sync
     async def test_collection_to_process_end_time_24h(self):
@@ -200,10 +195,10 @@ class OurDNADashboardTest(DbIsolatedTest):
         )
 
         # Check that collection_to_process_end_time is not empty and is a dict
-        assert collection_to_process_end_time_24h
-        assert isinstance(collection_to_process_end_time_24h, dict)
+        self.assertTrue(collection_to_process_end_time_24h)
+        self.assertIsInstance(collection_to_process_end_time_24h, dict)
 
-        samples_filtered: list[SampleUpsert] = []
+        samples_filtered: list[str] = []
         for sample in self.sample_external_objects:
             assert isinstance(sample.meta, dict)
             collection_time = sample.meta.get('collection-time')
@@ -215,20 +210,20 @@ class OurDNADashboardTest(DbIsolatedTest):
                 collection_time
             )
             if time_difference.total_seconds() > 24 * 3600:
-                samples_filtered.append(sample)
-
                 # Check that the time difference matches
                 assert isinstance(sample.id, str)
-                assert (
-                    time_difference.total_seconds()
-                    == collection_to_process_end_time_24h[sample.id]
+
+                samples_filtered.append(sample.id)
+
+                self.assertEqual(
+                    time_difference.total_seconds(),
+                    collection_to_process_end_time_24h[sample.id],
                 )
 
-                # Check that the sample id is in the dict
-                assert sample.id in collection_to_process_end_time_24h
-
         # check that there are a correct number of matching results
-        assert len(collection_to_process_end_time_24h.keys()) == len(samples_filtered)
+        self.assertCountEqual(
+            collection_to_process_end_time_24h.keys(), samples_filtered
+        )
 
     @run_as_sync
     async def test_processing_times_per_site(self):
@@ -237,8 +232,8 @@ class OurDNADashboardTest(DbIsolatedTest):
         processing_times_by_site = dashboard.processing_times_by_site
 
         # Check that processing_times_per_site is not empty and is a dict
-        assert processing_times_by_site
-        assert isinstance(processing_times_by_site, dict)
+        self.assertTrue(processing_times_by_site)
+        self.assertIsInstance(processing_times_by_site, dict)
 
         sample_tally: dict[str, dict[int, int]] = OrderedDict()
         for sample in self.sample_external_objects:
@@ -260,7 +255,7 @@ class OurDNADashboardTest(DbIsolatedTest):
                 sample_tally[processing_site][current_bucket] = 1
 
         # Checks that we have identical dicts (by extension, keys and their values)
-        assert OrderedDict(processing_times_by_site) == sample_tally
+        self.assertDictEqual(processing_times_by_site, sample_tally)
 
     @run_as_sync
     async def test_total_samples_by_collection_event_name(self):
@@ -271,10 +266,10 @@ class OurDNADashboardTest(DbIsolatedTest):
         )
 
         # Check that total_samples_by_collection_event_name is not empty and is a dict
-        assert total_samples_by_collection_event_name
-        assert isinstance(total_samples_by_collection_event_name, dict)
+        self.assertTrue(total_samples_by_collection_event_name)
+        self.assertIsInstance(total_samples_by_collection_event_name, dict)
 
-        sample_tally: dict[str, int] = OrderedDict()
+        sample_tally: dict[str, int] = defaultdict()
         for sample in self.sample_external_objects:
             assert isinstance(sample.meta, dict)
             event_name = sample.meta.get('collection-event-name', 'Unknown')
@@ -284,7 +279,7 @@ class OurDNADashboardTest(DbIsolatedTest):
                 sample_tally[event_name] = 1
 
         # Check that the tally and the total_samples_by_collection_event_name are the same, by extension, keys and their values
-        assert OrderedDict(total_samples_by_collection_event_name) == sample_tally
+        self.assertDictEqual(total_samples_by_collection_event_name, sample_tally)
 
     @run_as_sync
     async def test_samples_lost_after_collection(self):
@@ -293,11 +288,11 @@ class OurDNADashboardTest(DbIsolatedTest):
         samples_lost_after_collection = dashboard.samples_lost_after_collection
 
         # Check that samples_lost_after_collection is not empty and is a dict
-        assert samples_lost_after_collection
-        assert isinstance(samples_lost_after_collection, list)
+        self.assertTrue(samples_lost_after_collection)
+        self.assertIsInstance(samples_lost_after_collection, list)
 
         # Check that the number of samples in the list is correct
-        samples_filtered: list[SampleUpsert] = []
+        samples_filtered: list[str] = []
         sample_ids_lost_after_collection = [
             sample.sample_id for sample in samples_lost_after_collection
         ]
@@ -312,22 +307,20 @@ class OurDNADashboardTest(DbIsolatedTest):
                 collection_time
             )
             if time_difference.total_seconds() > 72 * 3600:
-                samples_filtered.append(sample)
-
                 # Check that the time difference matches
                 assert isinstance(sample.id, str)
+
+                samples_filtered.append(sample.id)
+
                 for sample_data in samples_lost_after_collection:
                     if sample_data.sample_id == sample.id:
-                        assert (
-                            time_difference.total_seconds()
-                            == sample_data.time_to_process_start
+                        self.assertEqual(
+                            time_difference.total_seconds(),
+                            sample_data.time_to_process_start,
                         )
 
-                # Check that the sample id is in the dict
-                assert sample.id in sample_ids_lost_after_collection
-
         # check that there are a correct number of matching results
-        assert len(samples_lost_after_collection) == len(samples_filtered)
+        self.assertCountEqual(sample_ids_lost_after_collection, samples_filtered)
 
         # TODO: Add assertions VB
 
@@ -338,20 +331,19 @@ class OurDNADashboardTest(DbIsolatedTest):
         samples_more_than_1ug_dna = dashboard.samples_concentration_gt_1ug
 
         # Check that samples_concentratiom_gt_1ug is not empty and is a dict
-        assert samples_more_than_1ug_dna
-        assert isinstance(samples_more_than_1ug_dna, dict)
+        self.assertTrue(samples_more_than_1ug_dna)
+        self.assertIsInstance(samples_more_than_1ug_dna, dict)
 
         # Check that the number of samples in the list is correct
-        samples_filtered: list[SampleUpsert] = []
+        samples_filtered: list[str] = []
         for sample in self.sample_external_objects:
             assert isinstance(sample.meta, dict)
             if sample.meta['concentration'] and sample.meta['concentration'] > 1:
-                samples_filtered.append(sample)
+                assert isinstance(sample.id, str)
 
-                # Check that the sample id is in the dict
-                assert sample.id in samples_more_than_1ug_dna
+                samples_filtered.append(sample.id)
 
-        assert len(samples_more_than_1ug_dna) == len(samples_filtered)
+        self.assertCountEqual(samples_more_than_1ug_dna, samples_filtered)
 
     @run_as_sync
     async def test_participants_consented_not_collected(self):
@@ -363,11 +355,11 @@ class OurDNADashboardTest(DbIsolatedTest):
         )
 
         # Check that participants_consented_not_collected is not empty and is a dict
-        assert participants_consented_not_collected
-        assert isinstance(participants_consented_not_collected, list)
+        self.assertTrue(participants_consented_not_collected)
+        self.assertIsInstance(participants_consented_not_collected, list)
 
         # Check that the number of participants in the list is correct
-        participants_filtered: list[ParticipantUpsert] = []
+        participants_filtered: list[int] = []
         for participant in self.participants_external_objects:
             assert isinstance(participant.meta, dict)
             samples_for_participant = [
@@ -381,12 +373,12 @@ class OurDNADashboardTest(DbIsolatedTest):
                 and sample.meta.get('collection-time') is None
                 for sample in samples_for_participant
             ):
-                participants_filtered.append(participant)
+                assert isinstance(participant.id, int)
+                participants_filtered.append(participant.id)
 
-                # Check that the participant id is in the dict
-                assert participant.id in participants_consented_not_collected
-
-        assert len(participants_consented_not_collected) == len(participants_filtered)
+        self.assertCountEqual(
+            participants_consented_not_collected, participants_filtered
+        )
 
     @run_as_sync
     async def test_participants_signed_not_consented(self):
@@ -396,17 +388,15 @@ class OurDNADashboardTest(DbIsolatedTest):
         participants_signed_not_consented = dashboard.participants_signed_not_consented
 
         # Check that participants_signed_not_consented is not empty and is a dict
-        assert participants_signed_not_consented
-        assert isinstance(participants_signed_not_consented, list)
+        self.assertTrue(participants_signed_not_consented)
+        self.assertIsInstance(participants_signed_not_consented, list)
 
         # Check that the number of participants in the list is correct
-        participants_filtered: list[ParticipantUpsert] = []
+        participants_filtered: list[int] = []
         for participant in self.participants_external_objects:
             assert isinstance(participant.meta, dict)
             if not participant.meta.get('consent'):
-                participants_filtered.append(participant)
+                assert isinstance(participant.id, int)
+                participants_filtered.append(participant.id)
 
-                # Check that the participant id is in the dict
-                assert participant.id in participants_signed_not_consented
-
-        assert len(participants_signed_not_consented) == len(participants_filtered)
+        self.assertCountEqual(participants_signed_not_consented, participants_filtered)
