@@ -258,13 +258,14 @@ class TestUpsert(DbIsolatedTest):
         participant_id_map = {p['external_id']: p['participant_id'] for p in db_participants}
 
         db_samples = await self.connection.connection.fetch_all(
-            f"""
+            """
             SELECT s.participant_id, seid.external_id
             FROM sample s
             INNER JOIN sample_external_id seid ON s.id = seid.sample_id
-            WHERE seid.name = '{PRIMARY_EXTERNAL_ORG}'
+            WHERE seid.name = :PRIMARY_EXTERNAL_ORG
             ORDER BY s.id
-            """
+            """,
+            {'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG},
         )
         self.assertEqual(4, len(db_samples))
         for db_sample in db_samples:

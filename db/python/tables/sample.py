@@ -465,12 +465,12 @@ class SampleTable(DbBase):
         self, raw_internal_ids: list[int]
     ) -> tuple[Iterable[ProjectId], dict[int, str]]:
         """Get map of (primary) external sample id by internal id"""
-        _query = f"""
+        _query = """
         SELECT sample_id AS id, external_id, project
         FROM sample_external_id
-        WHERE sample_id IN :ids AND name = '{PRIMARY_EXTERNAL_ORG}'
+        WHERE sample_id IN :ids AND name = :PRIMARY_EXTERNAL_ORG
         """
-        values = {'ids': raw_internal_ids}
+        values = {'ids': raw_internal_ids, 'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG}
         rows = await self.connection.fetch_all(_query, values)
 
         sample_id_map = {el['id']: el['external_id'] for el in rows}
@@ -482,14 +482,14 @@ class SampleTable(DbBase):
         self, project: ProjectId
     ) -> dict[int, str]:
         """Get sample id map for all samples"""
-        _query = f"""
+        _query = """
         SELECT s.id, seid.external_id
         FROM sample s
         INNER JOIN sample_external_id seid ON s.id = seid.sample_id
-        WHERE s.project = :project AND name = '{PRIMARY_EXTERNAL_ORG}'
+        WHERE s.project = :project AND name = :PRIMARY_EXTERNAL_ORG
         """
         rows = await self.connection.fetch_all(
-            _query, {'project': project or self.project}
+            _query, {'project': project or self.project, 'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG}
         )
         return {el[0]: el[1] for el in rows}
 

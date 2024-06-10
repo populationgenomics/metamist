@@ -298,13 +298,13 @@ RETURNING id
         if len(internal_participant_ids) == 0:
             return {}
 
-        _query = f"""
+        _query = """
         SELECT participant_id AS id, external_id
         FROM participant_external_id
-        WHERE participant_id IN :ids AND name = '{PRIMARY_EXTERNAL_ORG}'
+        WHERE participant_id IN :ids AND name = :PRIMARY_EXTERNAL_ORG
         """
         results = await self.connection.fetch_all(
-            _query, {'ids': internal_participant_ids}
+            _query, {'ids': internal_participant_ids, 'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG}
         )
         id_map: dict[int, str] = {r['id']: r['external_id'] for r in results}
 
@@ -349,14 +349,19 @@ RETURNING id
         self, internal_to_external_id: dict[int, str]
     ):
         """Update many participant primary external_ids through the {internal: external} map"""
-        _query = f"""
+        _query = """
         UPDATE participant_external_id
         SET external_id = :external_id, audit_log_id = :audit_log_id
-        WHERE participant_id = :participant_id AND name = '{PRIMARY_EXTERNAL_ORG}'
+        WHERE participant_id = :participant_id AND name = :PRIMARY_EXTERNAL_ORG
         """
         audit_log_id = await self.audit_log_id()
         mapped_values = [
-            {'participant_id': k, 'external_id': v, 'audit_log_id': audit_log_id}
+            {
+                'participant_id': k,
+                'external_id': v,
+                'audit_log_id': audit_log_id,
+                'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG,
+            }
             for k, v in internal_to_external_id.items()
         ]
         await self.connection.execute_many(_query, mapped_values)
