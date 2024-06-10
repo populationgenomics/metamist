@@ -675,9 +675,9 @@ def get_sids_for_cohorts(
             for seq_group in seq_groups:
                 sample = seq_group.get('sample')
                 sids_for_cohort.append(sample['id'])
-        all_cohorts_sample_ids_subset.update(
-            random.sample(sids_for_cohort, cohort_samples_n)
-        )
+            all_cohorts_sample_ids_subset.update(
+                random.sample(sids_for_cohort, cohort_samples_n)
+            )
 
     return all_cohorts_sample_ids_subset
 
@@ -907,12 +907,10 @@ if __name__ == '__main__':
     parser.add_argument(
         '--project', required=True, help='The sample-metadata project ($DATASET)'
     )
-    parser.add_argument(
-        '-n', type=int, help='# Random Samples to copy', default=DEFAULT_SAMPLES_N
-    )
+    parser.add_argument('-n', type=int, help='# Random Samples to copy', default=0)
     parser.add_argument('-f', type=int, help='# Random families to copy', default=0)
     parser.add_argument(
-        '-nsamples-cohort',
+        '--nsamples-cohort',
         type=int,
         help='# Random samples to copy from each cohort',
         default=0,
