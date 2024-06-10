@@ -229,20 +229,18 @@ class SampleTable(DbBase):
             if PRIMARY_EXTERNAL_ORG in to_delete:
                 raise ValueError("Can't remove sample's primary external_id")
 
-            # "touch" all sample_external_id rows for this sample (especially those about to be deleted)
-            # except for those that are about to be updated via to_update anyway
-            _sync_query = """
-            UPDATE sample_external_id
-            SET audit_log_id = :audit_log_id
-            WHERE sample_id = :id
-            """
-            _sync_values = {'id': id_, 'audit_log_id': audit_log_id}
-            if to_update:
-                _sync_query += ' AND name NOT IN :names'
-                _sync_values['names'] = list(to_update.keys())
-            await self.connection.execute(_sync_query, _sync_values)
-
             if to_delete:
+                # Set audit_log_id to this transaction before deleting the rows
+                _audit_update_query = """
+                UPDATE sample_external_id
+                SET audit_log_id = :audit_log_id
+                WHERE sample_id = :id AND name IN :names
+                """
+                await self.connection.execute(
+                    _audit_update_query,
+                    {'id': id_, 'names': to_delete, 'audit_log_id': audit_log_id},
+                )
+
                 _delete_query = """
                 DELETE FROM sample_external_id
                 WHERE sample_id = :id AND name IN :names
@@ -270,14 +268,6 @@ class SampleTable(DbBase):
                     for name, eid in to_update.items()
                 ]
                 await self.connection.execute_many(_update_query, _eid_values)
-        else:
-            # "touch" all sample_external_id rows for this sample
-            _sync_query = """
-            UPDATE sample_external_id
-            SET audit_log_id = :audit_log_id
-            WHERE sample_id = :id
-            """
-            await self.connection.execute(_sync_query, {'id': id_, 'audit_log_id': audit_log_id})
 
         if type_:
             values['type'] = type_
@@ -521,26 +511,22 @@ class SampleTable(DbBase):
 
     async def get_history_of_sample(self, id_: int):
         """Get all versions (history) of a sample"""
+        # TODO Re-implement this for the separate sample_external_id table. Doing a join and/or aggregating
+        # the external_ids wreaks havoc with FOR SYSTEM_TIME ALL queries, collapsing the history we want to
+        # see into one aggregate record. For now, leave the query as is, with external_ids unavailable.
         keys = [
-            's.id',
-            'JSON_OBJECTAGG(seid.name, seid.external_id) AS external_ids',
-            's.participant_id',
-            's.meta',
-            's.active+1 AS active',
-            's.type',
-            's.project',
-            's.author',
-            's.audit_log_id',
+            'id',
+            """'{"(not available)": "(not available)"}' AS external_ids""",
+            'participant_id',
+            'meta',
+            'active+1 AS active',
+            'type',
+            'project',
+            'author',
+            # 'audit_log_id',  # TODO SampleInternal does not allow an audit_log_id field
         ]
         keys_str = ', '.join(keys)
-        _query = f"""
-        SELECT {keys_str}
-        FROM sample FOR SYSTEM_TIME ALL AS s
-        INNER JOIN sample_external_id FOR SYSTEM_TIME ALL AS seid
-          ON s.id = seid.sample_id AND s.audit_log_id = seid.audit_log_id
-        WHERE s.id = :id
-        GROUP BY s.id, s.audit_log_id
-        """
+        _query = f'SELECT {keys_str} FROM sample FOR SYSTEM_TIME ALL WHERE id = :id'
 
         rows = await self.connection.fetch_all(_query, {'id': id_})
         samples = [SampleInternal.from_db(dict(d)) for d in rows]
