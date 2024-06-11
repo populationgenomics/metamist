@@ -637,6 +637,8 @@ class GenericParser(
         else:
             self.prepare_detail(samples)
 
+        return result
+
     def _get_dict_reader(self, file_pointer, delimiter: str):
         """
         Return a DictReader from file_pointer
