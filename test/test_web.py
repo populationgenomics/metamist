@@ -243,7 +243,7 @@ class TestWeb(DbIsolatedTest):
         await self.partl.upsert_participants(participants=[get_test_participant()])
 
         result = await self.webl.get_project_summary()
-        self.assertEqual(SINGLE_PARTICIPANT_SUMMARY_RESULT, result)
+        self.assertDataclassEqual(SINGLE_PARTICIPANT_SUMMARY_RESULT, result)
 
     @run_as_sync
     async def test_project_summary_to_external(self):
@@ -256,52 +256,51 @@ class TestWeb(DbIsolatedTest):
             SINGLE_PARTICIPANT_SUMMARY_RESULT.to_external(),
             summary.to_external(),
         )
-        nested_participants = await self.webl.query_participants(
+        internal_participants = await self.webl.query_participants(
             ParticipantFilter(), limit=None
         )
 
-        result = ProjectParticipantGridResponse.from_params(
-            participants=nested_participants,
+        ex_result = ProjectParticipantGridResponse.from_params(
+            participants=internal_participants,
             total_results=1,
         )
 
-        # ex_result = result.to_external(links=None)
-        assert isinstance(nested_participants[0].samples, list)
-        self.assertIsInstance(nested_participants[0].samples[0].id, int)
-        self.assertIsInstance(result.participants[0].samples[0].id, str)
+        assert isinstance(internal_participants[0].samples, list)
+        self.assertIsInstance(internal_participants[0].samples[0].id, int)
+        self.assertIsInstance(ex_result.participants[0].samples[0].id, str)
         self.assertEqual(
-            result.participants[0].samples[0].id,
-            sample_id_transform_to_raw(result.participants[0].samples[0].id),
+            sample_id_transform_to_raw(ex_result.participants[0].samples[0].id),
+            internal_participants[0].samples[0].id,
         )
 
-        assert isinstance(nested_participants[0].samples[0].sequencing_groups, list)
-        assert isinstance(result.participants[0].samples[0].sequencing_groups, list)
+        assert isinstance(internal_participants[0].samples[0].sequencing_groups, list)
+        assert isinstance(ex_result.participants[0].samples[0].sequencing_groups, list)
 
         self.assertIsInstance(
-            nested_participants[0].samples[0].sequencing_groups[0].id, int
+            internal_participants[0].samples[0].sequencing_groups[0].id, int
         )
         self.assertIsInstance(
-            result.participants[0].samples[0].sequencing_groups[0].id, str
+            ex_result.participants[0].samples[0].sequencing_groups[0].id, str
         )
         self.assertEqual(
-            result.participants[0].samples[0].sequencing_groups[0].id,
             sequencing_group_id_transform_to_raw(
-                result.participants[0].samples[0].sequencing_groups[0].id
+                ex_result.participants[0].samples[0].sequencing_groups[0].id
             ),
+            internal_participants[0].samples[0].sequencing_groups[0].id,
         )
 
         assert isinstance(
-            nested_participants[0].samples[0].sequencing_groups[0].assays, list
+            internal_participants[0].samples[0].sequencing_groups[0].assays, list
         )
         assert isinstance(
-            result.participants[0].samples[0].sequencing_groups[0].assays, list
+            ex_result.participants[0].samples[0].sequencing_groups[0].assays, list
         )
         self.assertIsInstance(
-            nested_participants[0].samples[0].sequencing_groups[0].assays[0],
+            internal_participants[0].samples[0].sequencing_groups[0].assays[0],
             AssayInternal,
         )
         self.assertIsInstance(
-            result.participants[0].samples[0].sequencing_groups[0].assays[0], Assay
+            ex_result.participants[0].samples[0].sequencing_groups[0].assays[0], Assay
         )
 
     @run_as_sync

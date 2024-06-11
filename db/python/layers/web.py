@@ -193,16 +193,16 @@ class WebDb(DbBase):
         seen_seq_types: set[str] = set(cram_number_by_seq_type.keys()).union(
             set(seq_number_by_seq_type.keys())
         )
-        seq_number_by_seq_type_and_batch: dict[str, dict[str, int]] = defaultdict(dict)
+        seq_number_by_seq_type_and_batch: dict[str, dict[str, str]] = defaultdict(dict)
         for stat in assay_batch_stats:
             # batch, sequencing_type,
-            seq_number_by_seq_type_and_batch[stat.batch][stat.sequencing_type] = len(
-                stat.sequencing_group_ids
+            seq_number_by_seq_type_and_batch[stat.batch][stat.sequencing_type] = str(
+                len(stat.sequencing_group_ids)
             )
 
         seen_batches = set(a.batch for a in assay_batch_stats)
 
-        sequence_stats: dict[str, dict[str, int]] = {}
+        sequence_stats: dict[str, dict[str, str]] = {}
         cram_seqr_stats = {}
 
         for seq in seen_seq_types:
@@ -215,7 +215,7 @@ class WebDb(DbBase):
         for batch in seen_batches:
             batch_display = batch or '<no-batch>'
             sequence_stats[batch_display] = {
-                seq: seq_number_by_seq_type_and_batch[batch].get(seq, 0)
+                seq: seq_number_by_seq_type_and_batch[batch].get(seq, '0')
                 for seq in seen_seq_types
             }
 
@@ -225,8 +225,7 @@ class WebDb(DbBase):
             total_participants=total_participants,
             total_assays=total_assays,
             total_sequencing_groups=total_sequencing_groups,
-            # TODO: fix this
-            batch_sequencing_group_stats={},
+            batch_sequencing_group_stats=sequence_stats,
             cram_seqr_stats=cram_seqr_stats,
             seqr_links=seqr_links,
             seqr_sync_types=seqr_sync_types,

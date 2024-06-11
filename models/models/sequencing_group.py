@@ -103,7 +103,9 @@ class NestedSequencingGroupInternal(SMBase):
             platform=self.platform,
             meta=self.meta,
             external_ids=self.external_ids or {},
-            assays=[a.to_external() for a in self.assays],
+            assays=[
+                a.to_external() for a in self.assays  # pylint:disable=not-an-iterable
+            ],
         )
 
 

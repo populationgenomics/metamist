@@ -2,7 +2,7 @@ import * as _ from 'lodash'
 import * as React from 'react'
 
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Dropdown } from 'semantic-ui-react'
+import { Button, Dropdown, Message } from 'semantic-ui-react'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import MuckError from '../../shared/components/MuckError'
 import ErrorBoundary from '../../shared/utilities/errorBoundary'
@@ -15,62 +15,99 @@ interface IProjectGridContainerProps {
 }
 const PAGE_SIZES = [20, 40, 100, 1000]
 
+interface IPageChangeOptions {
+    pageNumber?: number
+    pageSize?: number
+    filter?: ProjectParticipantGridFilter
+}
+
 export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainerProps> = ({
     projectName,
 }) => {
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
-    const { page } = useParams()
 
-    const pageSize = searchParams.get('size') || 20
-
-    // pageSize
-    const validPages = !!(page && +page && pageSize && +pageSize && PAGE_SIZES.includes(+pageSize))
-    const [pageLimit, _setPageLimit] = React.useState<number>(
-        validPages ? +pageSize : PAGE_SIZES[0]
-    )
-    const [pageNumber, _setPageNumber] = React.useState<number>(1)
-    const [tokens, setTokens] = React.useState<(number | string | undefined)[]>([undefined])
+    const [isLoading, setIsLoading] = React.useState<boolean>(false)
+    let [error, setError] = React.useState<string | undefined>()
 
     // fetched data
-    const [numberOfEntries, setNumberOfEntries] = React.useState<number>(0)
     const [participants, setParticipants] = React.useState<
         ProjectParticipantGridResponse | undefined
     >()
-    const [filterValues, _setFilterValues] = React.useState<ProjectParticipantGridFilter>({})
 
-    const [isLoading, setIsLoading] = React.useState<boolean>(false)
-    const [error, setError] = React.useState<string | undefined>()
+    const hasOptionErrors: Partial<
+        Record<keyof IPageChangeOptions, { error: string; default: any }>
+    > = {}
 
-    const setFilterValues = (values: Partial<ProjectParticipantGridFilter>) => {
-        // nested merge
-        _setFilterValues(_.merge({}, filterValues, values))
-        // load data with new filter values
-        setPage(1, pageLimit)
+    const { page } = useParams()
+
+    // parse pageSize
+    let pageSize = parseInt(searchParams.get('size') || '20')
+    if (isNaN(pageSize)) {
+        hasOptionErrors.pageSize = {
+            error: `Invalid page size ${pageSize}`,
+            default: 20,
+        }
+    }
+    // parse pageNumber
+    let pageNumber = parseInt(page || '1')
+    if (isNaN(pageNumber)) {
+        hasOptionErrors.pageNumber = {
+            error: `Invalid page number ${pageNumber}`,
+            default: 1,
+        }
     }
 
-    const getParticipantsFor = (token: number | string | undefined, _pageLimit: number) => {
-        if (!projectName) {
-            setParticipants(undefined)
-            return
+    const setPageOptions: (options: IPageChangeOptions) => void = (options) => {
+        const qParams: Record<string, string> = {
+            size: `${options.pageSize || pageSize}`,
         }
-        const sanitisedToken = token || undefined
+        if (options.filter || filterOptions) {
+            qParams.filter = JSON.stringify(options.filter || filterOptions)
+        }
+        const q = new URLSearchParams(qParams).toString()
+
+        const pageSuffix = pageNumber ? `/${pageNumber}` : ''
+        navigate(`/project/${projectName}${pageSuffix}?${q}`)
+    }
+
+    let filterOptions: ProjectParticipantGridFilter = {}
+    const _filterOptions = searchParams.get('filter') || '{}'
+    try {
+        if (_filterOptions) {
+            filterOptions = JSON.parse(_filterOptions)
+        }
+    } catch (e) {
+        hasOptionErrors.filter = {
+            error: `Error parsing filter options: ${_filterOptions}`,
+            default: {},
+        }
+    }
+
+    const setFilterValues = (values: Partial<ProjectParticipantGridFilter>) => {
+        setPageOptions({
+            filter: _.merge({}, filterOptions, values),
+            pageNumber: 1,
+        })
+    }
+
+    const getParticipantsFor = () => {
+        if (!projectName) {
+            return Promise.reject()
+        }
+        if (Object.keys(hasOptionErrors).length) {
+            return Promise.reject()
+        }
         setError(undefined)
         setIsLoading(true)
+        const skip = pageNumber > 1 ? (pageNumber - 1) * pageSize : undefined
+        console.log('Making request')
+        // return
         return new WebApi()
-            .getProjectParticipantsGridWithLimit(
-                projectName,
-                _pageLimit,
-                filterValues,
-                !!sanitisedToken ? parseInt(sanitisedToken as string) : undefined
-            )
+            .getProjectParticipantsGridWithLimit(projectName, pageSize, filterOptions, skip)
             .then((resp) => {
                 setParticipants(resp.data)
                 setIsLoading(false)
-                const nextToken = resp.data.links?.token
-                if (nextToken) {
-                    setTokens([...(tokens || []), nextToken])
-                }
             })
             .catch((er: Error) => {
                 setError(er.message)
@@ -78,27 +115,13 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
             })
     }
 
-    const setPage = (p: number, _pageLimit: number) => {
-        // debugger
-        const q: any = { size: _pageLimit }
-        const _token = p > 1 ? tokens[p - 1] : undefined
-        if (_token) {
-            q.token = _token
-        }
-        const qq = new URLSearchParams(q).toString()
-        navigate(`/project/${projectName}/?${qq}`)
-        getParticipantsFor(_token, _pageLimit)
-    }
-
-    const setPageLimit = (pageLimit: number) => {
-        _setPageLimit(pageLimit)
-        setPage(1, pageLimit)
-    }
-
     // load every time the project name changes
-    React.useEffect(() => setPage(1, pageLimit), [projectName])
+    React.useEffect(() => {
+        getParticipantsFor()
+        // use the raw _filterOptions, otherwise it breaks
+    }, [projectName, pageSize, pageNumber, _filterOptions])
 
-    const totalPageNumbers = Math.ceil((participants?.total_results || 0) / pageLimit)
+    const totalPageNumbers = Math.ceil((participants?.total_results || 0) / pageSize)
 
     if (isLoading) {
         return <LoadingDucks />
@@ -111,7 +134,33 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
         )
     }
 
-    const handleOnClick = console.log
+    if (Object.keys(hasOptionErrors).length) {
+        const defaultOptions = Object.entries(hasOptionErrors).reduce((acc, [k, v]) => {
+            // @ts-ignore
+            acc[k] = v.default
+            return acc
+        }, {} as IPageChangeOptions)
+
+        const displayDefaults = Object.entries(hasOptionErrors).reduce((acc, [k, v]) => {
+            // @ts-ignore
+            acc.push(`${k}=${JSON.stringify(v.default)}`)
+            return acc
+        }, [] as string[])
+
+        return (
+            <Message error>
+                <Message.Header>Invalid page options</Message.Header>
+                <Message.List>
+                    {Object.entries(hasOptionErrors).map(([k, v]) => (
+                        <Message.Item key={k}>{v.error}</Message.Item>
+                    ))}
+                </Message.List>
+                <Button onClick={() => setPageOptions(defaultOptions)}>
+                    Reset to default ({displayDefaults.join(', ')})
+                </Button>
+            </Message>
+        )
+    }
 
     return (
         <ErrorBoundary title="Error rendering project grid">
@@ -126,8 +175,8 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
             >
                 <Dropdown
                     selection
-                    onChange={(_, data) => setPageLimit(data.value as number)}
-                    value={pageLimit}
+                    onChange={(_, data) => setPageOptions({ pageSize: data.value as number })}
+                    value={pageSize}
                     options={PAGE_SIZES.map((s) => ({
                         key: s,
                         text: `${s} participants`,
@@ -139,7 +188,7 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
                     totalPageNumbers={totalPageNumbers}
                     total={participants?.total_results}
                     pageNumber={pageNumber}
-                    handleOnClick={(_page) => setPage(_page, pageLimit)}
+                    handleOnClick={(_page) => setPageOptions({ pageNumber: _page })}
                     title="participants"
                 />
             </div>
@@ -147,14 +196,14 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
                 participantResponse={participants}
                 projectName={projectName}
                 updateFilters={setFilterValues}
-                filterValues={filterValues}
+                filterValues={filterOptions}
             />
             <PageOptions
                 isLoading={isLoading}
                 totalPageNumbers={totalPageNumbers}
                 total={participants?.total_results}
                 pageNumber={pageNumber}
-                handleOnClick={handleOnClick}
+                handleOnClick={(_page) => setPageOptions({ pageNumber: _page })}
                 title="participants"
             />
         </ErrorBoundary>

@@ -68,8 +68,12 @@ class NestedParticipantInternal(SMBase):
             reported_gender=self.reported_gender,
             karyotype=self.karyotype,
             meta=self.meta,
-            samples=[s.to_external() for s in self.samples],
-            families=[f.to_external() for f in self.families],
+            samples=[
+                s.to_external() for s in self.samples  # pylint:disable=not-an-iterable
+            ],
+            families=[
+                f.to_external() for f in self.families  # pylint:disable=not-an-iterable
+            ],
         )
 
 
@@ -103,7 +107,7 @@ class Participant(SMBase):
 
     id: int
     project: ProjectId
-    external_id: str = None
+    external_id: str
     reported_sex: int | None = None
     reported_gender: str | None = None
     karyotype: str | None = None

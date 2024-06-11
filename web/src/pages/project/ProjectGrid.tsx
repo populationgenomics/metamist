@@ -143,7 +143,7 @@ const ProjectGridFilterRow: React.FC<{
 }> = ({ headerGroups, filterValues, updateFilters }) => {
     return (
         // <SUITable.Header>
-        <React.Fragment>
+        <tr>
             {headerGroups.flatMap((hg) =>
                 hg.fields
                     .filter((f) => f.isVisible)
@@ -188,7 +188,7 @@ const ProjectGridFilterRow: React.FC<{
                         )
                     })
             )}
-        </React.Fragment>
+        </tr>
         // </SUITable.Header>
     )
 }

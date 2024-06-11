@@ -1,7 +1,5 @@
 import json
 
-from pydantic import Field
-
 from models.base import OpenApiGenNoneType, SMBase, parse_sql_bool
 from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
 from models.models.sequencing_group import (
@@ -66,7 +64,7 @@ class NestedSampleInternal(SMBase):
     active: bool | None
     created_date: str | None
 
-    sequencing_groups: list[NestedSequencingGroupInternal] = Field(default_factory=list)
+    sequencing_groups: list[NestedSequencingGroupInternal]
     non_sequencing_assays: list[AssayInternal]
 
     def to_external(self):
