@@ -1302,7 +1302,7 @@
 			<column name="meta" type="LONGTEXT" />
 			<column name="audit_log_id" type="INT">
 				<constraints
-					nullable="true"
+					nullable="false"
 					foreignKeyName="FK_PARTICIPANT_EXTERNAL_ID_CHANGELOG_ID"
 					references="audit_log(id)" />
 			</column>
@@ -1315,7 +1315,7 @@
 		/>
 		<addUniqueConstraint
 			tableName="participant_external_id"
-			columnNames="project,name,external_id"
+			columnNames="project,external_id"
 			constraintName="UK_PARTICIPANT_EXTERNAL_ID_UNIQUE_EIDS"
 			validate="true"
 		/>
@@ -1347,7 +1347,7 @@
 			<column name="meta" type="LONGTEXT" />
 			<column name="audit_log_id" type="INT">
 				<constraints
-					nullable="true"
+					nullable="false"
 					foreignKeyName="FK_SAMPLE_EXTERNAL_ID_CHANGELOG_ID"
 					references="audit_log(id)" />
 			</column>
@@ -1360,7 +1360,7 @@
 		/>
 		<addUniqueConstraint
 			tableName="sample_external_id"
-			columnNames="project,name,external_id"
+			columnNames="project,external_id"
 			constraintName="UK_SAMPLE_EXTERNAL_ID_UNIQUE_EIDS"
 			validate="true"
 		/>
@@ -1375,10 +1375,28 @@
 		<sql>ALTER TABLE participant_external_id ADD SYSTEM VERSIONING;</sql>
 		<sql>ALTER TABLE sample_external_id ADD SYSTEM VERSIONING;</sql>
 
-		<sql>INSERT INTO participant_external_id (project, participant_id, name, external_id)
-		       SELECT project, id, '', external_id
-		       FROM participant
+		<!-- Migrate existing external_ids to the new tables, keyed by PRIMARY_EXTERNAL_ORG, i.e. '' -->
+		<sql>INSERT INTO audit_log (author, on_behalf_of, ar_guid, comment, auth_project, meta)
+		     VALUES ('liquibase', NULL, NULL, 'participant/sample external_id migration', NULL, NULL)
+		     RETURNING @audit_log_id := id;
+
+		     INSERT INTO participant_external_id (project, participant_id, name, external_id, audit_log_id)
+		       SELECT project, id, '', external_id, @audit_log_id
+		       FROM participant;
+
+		     INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
+		       SELECT project, id, '', external_id, @audit_log_id
+		       FROM sample;
 		</sql>
+	</changeSet>
+	<changeSet id="2024-06-11-drop-old-external-id-columns" author="john.marshall">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+
+		<dropNotNullConstraint
+			tableName="participant"
+			columnName="external_id"
+			columnDataType="VARCHAR(255)"
+		/>
 		<sql>UPDATE participant SET external_id = NULL</sql>
 		<renameColumn
 			tableName="participant"
@@ -1387,10 +1405,12 @@
 			columnDataType="VARCHAR(255)"
 			remarks="Migration of external IDs to separate table"
 		/>
-		<sql>INSERT INTO sample_external_id (project, sample_id, name, external_id)
-		       SELECT project, id, '', external_id
-		       FROM sample
-		</sql>
+
+		<dropNotNullConstraint
+			tableName="sample"
+			columnName="external_id"
+			columnDataType="VARCHAR(255)"
+		/>
 		<sql>UPDATE sample SET external_id = NULL</sql>
 		<renameColumn
 			tableName="sample"

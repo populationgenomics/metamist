@@ -36,10 +36,16 @@ class TestParticipant(DbIsolatedTest):
     async def insert(self, participant_id, org, external_id):
         """Directly insert into participant_external_id table"""
         query = """
-        INSERT INTO participant_external_id (project, participant_id, name, external_id)
-        VALUES (:project, :id, :org, :external_id)
+        INSERT INTO participant_external_id (project, participant_id, name, external_id, audit_log_id)
+        VALUES (:project, :id, :org, :external_id, :audit_log_id)
         """
-        values = {'project': self.project_id, 'id': participant_id, 'org': org, 'external_id': external_id}
+        values = {
+            'project': self.project_id,
+            'id': participant_id,
+            'org': org,
+            'external_id': external_id,
+            'audit_log_id': await self.audit_log_id(),
+        }
         await self.connection.connection.execute(query, values)
 
     @run_as_sync
@@ -53,9 +59,10 @@ class TestParticipant(DbIsolatedTest):
         with self.assertRaises(IntegrityError):
             await self.insert(self.p1.id, 'CONTROL', 'Maxwell')
 
-        # Can have eids in lots of organisations, even if the eid duplicates one in a different org
+        # Can have eids in lots of organisations, but not if the eid duplicates one in a different org
         await self.insert(self.p1.id, 'OTHER1', 'Maxwell')
-        await self.insert(self.p1.id, 'OTHER2', '86')
+        with self.assertRaises(IntegrityError):
+            await self.insert(self.p1.id, 'OTHER2', '86')
 
         # Another participant can't have the same eid
         with self.assertRaises(IntegrityError):
@@ -76,11 +83,11 @@ class TestParticipant(DbIsolatedTest):
 
         result = await self.player.upsert_participant(
             ParticipantUpsertInternal(
-                external_ids={PRIMARY_EXTERNAL_ORG: 'P10', 'A': 'A1', 'B': None, 'C': 'A1'},
+                external_ids={PRIMARY_EXTERNAL_ORG: 'P10', 'A': 'A1', 'B': None, 'C': 'C1'},
                 )
             )
         participants = await self.player.get_participants_by_ids([result.id])
-        self.assertDictEqual(participants[0].external_ids, {PRIMARY_EXTERNAL_ORG: 'P10', 'a': 'A1', 'c': 'A1'})
+        self.assertDictEqual(participants[0].external_ids, {PRIMARY_EXTERNAL_ORG: 'P10', 'a': 'A1', 'c': 'C1'})
 
     @run_as_sync
     async def test_update(self):
@@ -215,10 +222,16 @@ class TestSample(DbIsolatedTest):
     async def insert(self, sample_id, org, external_id):
         """Directly insert into sample_external_id table"""
         query = """
-        INSERT INTO sample_external_id (project, sample_id, name, external_id)
-        VALUES (:project, :id, :org, :external_id)
+        INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
+        VALUES (:project, :id, :org, :external_id, :audit_log_id)
         """
-        values = {'project': self.project_id, 'id': sample_id, 'org': org, 'external_id': external_id}
+        values = {
+            'project': self.project_id,
+            'id': sample_id,
+            'org': org,
+            'external_id': external_id,
+            'audit_log_id': await self.audit_log_id(),
+        }
         await self.connection.connection.execute(query, values)
 
     @run_as_sync
@@ -232,9 +245,10 @@ class TestSample(DbIsolatedTest):
         with self.assertRaises(IntegrityError):
             await self.insert(self.s1.id, 'CONTROL', 'Maxwell')
 
-        # Can have eids in lots of organisations, even if the eid duplicates one in a different org
+        # Can have eids in lots of organisations, but not if the eid duplicates one in a different org
         await self.insert(self.s1.id, 'OTHER1', 'Maxwell')
-        await self.insert(self.s1.id, 'OTHER2', '86')
+        with self.assertRaises(IntegrityError):
+            await self.insert(self.s1.id, 'OTHER2', '86')
 
         # Another sample can't have the same eid
         with self.assertRaises(IntegrityError):
@@ -255,11 +269,11 @@ class TestSample(DbIsolatedTest):
 
         result = await self.slayer.upsert_sample(
             SampleUpsertInternal(
-                external_ids={PRIMARY_EXTERNAL_ORG: 'S10', 'A': 'A1', 'B': None, 'C': 'A1'},
+                external_ids={PRIMARY_EXTERNAL_ORG: 'S10', 'A': 'A1', 'B': None, 'C': 'C1'},
                 )
             )
         sample = await self.slayer.get_sample_by_id(result.id)
-        self.assertDictEqual(sample.external_ids, {PRIMARY_EXTERNAL_ORG: 'S10', 'a': 'A1', 'c': 'A1'})
+        self.assertDictEqual(sample.external_ids, {PRIMARY_EXTERNAL_ORG: 'S10', 'a': 'A1', 'c': 'C1'})
 
     @run_as_sync
     async def test_update(self):
