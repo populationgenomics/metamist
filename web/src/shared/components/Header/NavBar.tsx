@@ -136,6 +136,11 @@ const NavBar: React.FC<NavBarProps> = ({ fixed }) => {
             icon: <InsightsIcon />,
         },
         {
+            title: 'OurDNA',
+            url: '/ourdna',
+            icon: <InsightsIcon />,
+        },
+        {
             title: 'Swagger',
             url: '/swagger',
             icon: <SwaggerIcon height={22} style={{ marginTop: '2px' }} />,
