@@ -28,6 +28,7 @@ from models.models.family import (
     FamilySimpleInternal,
     PedRowInternal,
 )
+from models.models.ourdna import OurDNADashboard, OurDNALostSample
 from models.models.participant import (
     NestedParticipant,
     NestedParticipantInternal,

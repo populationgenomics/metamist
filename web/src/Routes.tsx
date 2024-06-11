@@ -2,6 +2,7 @@ import * as React from 'react'
 
 import SwaggerUI from 'swagger-ui-react'
 import { Routes as Switch, Route } from 'react-router-dom'
+
 import {
     BillingHome,
     BillingSeqrProp,
@@ -14,6 +15,7 @@ import {
 import DocumentationArticle from './pages/docs/Documentation'
 import SampleView from './pages/sample/SampleView'
 import FamilyView from './pages/family/FamilyView'
+import OurDnaDashboard from './pages/ourdna/OurDnaDashboard'
 import ProjectSummaryView from './pages/project/ProjectSummary'
 import ProjectsAdmin from './pages/admin/ProjectsAdmin'
 import ErrorBoundary from './shared/utilities/errorBoundary'
@@ -91,6 +93,8 @@ const Routes: React.FunctionComponent = () => (
                 </ErrorBoundary>
             }
         />
+
+        <Route path="/ourdna" element={<OurDnaDashboard />} />
 
         <Route path="/swagger" element={<SwaggerUI url="/openapi.json" tryItOutEnabled={true} />} />
 
