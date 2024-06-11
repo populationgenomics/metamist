@@ -7,19 +7,19 @@ class OurDNALostSample(BaseModel):
     """Model for OurDNA Lost Sample"""
 
     sample_id: str
-    time_to_process_start: int
+    time_to_process_start: int | None
     collection_time: str
     process_start_time: str
     process_end_time: str
     received_time: str
-    received_by: str
+    received_by: str | None
     collection_lab: str
-    courier: str
-    courier_tracking_number: str
-    courier_scheduled_pickup_time: str
-    courier_actual_pickup_time: str
-    courier_scheduled_dropoff_time: str
-    courier_actual_dropoff_time: str
+    courier: str | None
+    courier_tracking_number: str | None
+    courier_scheduled_pickup_time: str | None
+    courier_actual_pickup_time: str | None
+    courier_scheduled_dropoff_time: str | None
+    courier_actual_dropoff_time: str | None
 
 
 class OurDNADashboard(BaseModel):
