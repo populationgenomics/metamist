@@ -1,5 +1,4 @@
-import json
-
+from db.python.utils import from_db_json
 from models.base import OpenApiGenNoneType, SMBase
 from models.models.family import FamilySimple, FamilySimpleInternal
 from models.models.project import ProjectId
@@ -28,8 +27,8 @@ class ParticipantInternal(SMBase):
     def from_db(cls, data: dict):
         """Convert from db keys, mainly converting JSON-encoded fields"""
         for key in ['external_ids', 'meta']:
-            if key in data and isinstance(data[key], str):
-                data[key] = json.loads(data[key])
+            if key in data:
+                data[key] = from_db_json(data[key])
 
         return ParticipantInternal(**data)
 

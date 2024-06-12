@@ -1,6 +1,6 @@
-import json
 from typing import Any
 
+from db.python.utils import from_db_json
 from models.base import OpenApiGenNoneType, SMBase
 from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
 
@@ -26,13 +26,7 @@ class AssayInternal(SMBase):
     def from_db(d: dict):
         """Take DB mapping object, and return SampleSequencing"""
         meta = d.pop('meta', None)
-
-        if meta:
-            if isinstance(meta, bytes):
-                meta = meta.decode()
-            if isinstance(meta, str):
-                meta = json.loads(meta)
-        return AssayInternal(meta=meta, **d)
+        return AssayInternal(meta=from_db_json(meta), **d)
 
     def to_external(self):
         """Convert to transport model"""

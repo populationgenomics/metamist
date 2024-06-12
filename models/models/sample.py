@@ -1,5 +1,4 @@
-import json
-
+from db.python.utils import from_db_json
 from models.base import OpenApiGenNoneType, SMBase, parse_sql_bool
 from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
 from models.models.sequencing_group import (
@@ -30,17 +29,11 @@ class SampleInternal(SMBase):
         """
         _id = d.pop('id', None)
         type_ = d.pop('type', None)
-        meta = d.pop('meta', None)
+        meta = from_db_json(d.pop('meta', None))
         active = parse_sql_bool(d.pop('active', None))
 
-        if meta:
-            if isinstance(meta, bytes):
-                meta = meta.decode()
-            if isinstance(meta, str):
-                meta = json.loads(meta)
-
-        if 'external_ids' in d and isinstance(d['external_ids'], str):
-            d['external_ids'] = json.loads(d['external_ids'])
+        if 'external_ids' in d:
+            d['external_ids'] = from_db_json(d['external_ids'])
 
         return SampleInternal(id=_id, type=str(type_), meta=meta, active=active, **d)
 
