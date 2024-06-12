@@ -1,6 +1,8 @@
 import * as _ from 'lodash'
 import * as React from 'react'
 
+import FilterAltIcon from '@mui/icons-material/FilterAlt'
+
 import {
     Accordion,
     AccordionTitle,
@@ -11,7 +13,7 @@ import {
     Segment,
 } from 'semantic-ui-react'
 import { ProjectParticipantGridFilter, ProjectParticipantGridResponse } from '../../sm-api'
-import { JsonEditor } from './JsonEditor'
+import { DictEditor } from './DictEditor'
 
 export enum MetaSearchEntityPrefix {
     F = 'family',
@@ -39,6 +41,9 @@ interface ProjectColumnOptionsProps {
     // participantResponse?: ProjectParticipantGridResponse
     updateFilters: (filters: Partial<ProjectParticipantGridFilter>) => void
     setHeaderGroups: (headers: ProjectGridHeaderGroup[]) => void
+
+    isOpen: boolean
+    setIsOpen: (isOpen: boolean) => void
 }
 
 export const defaultHeaderGroupsFromResponse: (
@@ -98,11 +103,9 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
     filterValues,
     updateFilters,
     participantCount,
+    isOpen,
+    setIsOpen,
 }) => {
-    const [isOpen, setIsOpen] = React.useState(false)
-    // something weird about the accordian
-    // const isOpen = _isOpen ? true : undefined
-
     const onUpdateSingleHeader = (
         category: MetaSearchEntityPrefix,
         header: ProjectGridField,
@@ -149,7 +152,11 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
                             appear to freeze
                         </Message>
                     )}
-                    <JsonEditor jsonObj={filterValues} onChange={updateFilters} />
+                    <Message info>
+                        To filter the data, you can use the <FilterAltIcon /> button at the top of
+                        each column.
+                    </Message>
+                    <DictEditor obj={filterValues} onChange={updateFilters} />
                     <br />
                     <Grid container divided>
                         {headerGroups.map(({ category, fields }) => {

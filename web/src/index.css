@@ -158,11 +158,12 @@ blockquote {
     color: var(--color-text-primary);
 }
 
-.ui .card {
+.ui .card, .ui .segment {
     background: var(--color-bg-card);
     color: var(--color-text-primary);
     border: 1px solid var(--color-border-default);
 }
+
 
 textarea {
     background: var(--color-bg);
@@ -312,4 +313,8 @@ html[data-theme='dark-mode'] .ui.table {
 
 .bold-text {
     font-weight: bold;
+}
+
+.ui.checkbox label {
+    color: var(--color-text-primary);
 }

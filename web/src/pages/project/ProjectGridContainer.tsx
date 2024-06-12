@@ -35,6 +35,7 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
 
     const [isLoading, setIsLoading] = React.useState<boolean>(false)
     let [error, setError] = React.useState<React.ReactElement | undefined>()
+    const [projectColOptionsAreOpen, setProjectColOptionsAreOpen] = React.useState<boolean>(false)
     const [headerGroups, setHeaderGroups] = React.useState<ProjectGridHeaderGroup[]>([])
 
     // fetched data
@@ -147,11 +148,18 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
             filterValues={filterOptions}
             updateFilters={(values) => setFilterValues(values, true)}
             participantCount={participants?.participants?.length ?? 0}
+            isOpen={projectColOptionsAreOpen}
+            setIsOpen={setProjectColOptionsAreOpen}
         />
     )
 
     if (isLoading) {
-        return <LoadingDucks />
+        return (
+            <>
+                {projectColOptions}
+                <LoadingDucks />
+            </>
+        )
     }
     if (error) {
         return (

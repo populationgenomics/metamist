@@ -76,7 +76,7 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                 <tbody>
                     {summary.participants.map((p, pidx) => (
                         <ProjectGridParticipantRows
-                            key={`participant-row-${p.id}`}
+                            key={`pgrid-row-participant-row-${p.id}`}
                             participant={p}
                             familyFields={
                                 headerGroupByCategory[MetaSearchEntityPrefix.F]?.fields ?? []
@@ -280,25 +280,35 @@ const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProps> = ({
                 // const border = '1px solid'
                 return (
                     <tr key={`${participant.external_id}-${s.id}-${sg.id}-${assay.id}`} {...props}>
-                        {isFirstOfGroup && (
-                            <td
-                                style={{
-                                    backgroundColor,
-                                    borderRight: border,
-                                    borderBottom: border,
-                                    borderTop: border,
-                                    borderLeft: '2px solid var(--color-border-color)',
-                                }}
-                                rowSpan={participantRowSpan}
-                            >
-                                <FamilyLink
-                                    id={participant.families.map((f) => f.id).join(', ')}
-                                    projectName={projectName}
+                        {isFirstOfGroup &&
+                            familyFields.map((f) => (
+                                <td
+                                    key={`${participant.id}family.${f.name}`}
+                                    style={{
+                                        backgroundColor,
+                                        borderRight: border,
+                                        borderBottom: border,
+                                        borderTop: border,
+                                        borderLeft: '2px solid var(--color-border-color)',
+                                    }}
+                                    rowSpan={participantRowSpan}
                                 >
-                                    {participant.families.map((f) => f.external_id).join(', ')}
-                                </FamilyLink>
-                            </td>
-                        )}
+                                    {f.name == 'external_id' ? (
+                                        <FamilyLink
+                                            id={`${participant.families.map((f) => f.id)[0]}`}
+                                            projectName={projectName}
+                                        >
+                                            {participant.families
+                                                .map((f) => f.external_id)
+                                                .join(', ')}
+                                        </FamilyLink>
+                                    ) : (
+                                        participant.families
+                                            .map((fam) => sanitiseValue(_.get(fam, f.name)))
+                                            .join(', ')
+                                    )}
+                                </td>
+                            ))}
                         {isFirstOfGroup &&
                             participantFields.map((field, i) => (
                                 <td
