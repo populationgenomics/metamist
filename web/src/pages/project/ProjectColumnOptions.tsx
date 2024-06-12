@@ -11,7 +11,7 @@ import {
     Segment,
 } from 'semantic-ui-react'
 import { ProjectParticipantGridFilter, ProjectParticipantGridResponse } from '../../sm-api'
-import { ValueFilter } from './ValueFilter'
+import { JsonEditor } from './JsonEditor'
 
 export enum MetaSearchEntityPrefix {
     F = 'family',
@@ -130,7 +130,13 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
     }
 
     return (
-        <Card style={{ width: screen.width, padding: '20px' }}>
+        <Card
+            style={{
+                width: screen.width,
+                padding: '20px',
+                backgroundColor: 'var(--color-bg-card)',
+            }}
+        >
             <Accordion>
                 <AccordionTitle active={isOpen} onClick={() => setIsOpen(!isOpen)}>
                     <h3>Filter + display options</h3>
@@ -143,10 +149,15 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
                             appear to freeze
                         </Message>
                     )}
-                    <Grid container columns={3} divided>
+                    <JsonEditor jsonObj={filterValues} onChange={updateFilters} />
+                    <br />
+                    <Grid container divided>
                         {headerGroups.map(({ category, fields }) => {
                             return (
-                                <Segment key={`project-col-option-${category}`}>
+                                <Segment
+                                    key={`project-col-option-${category}`}
+                                    style={{ marginLeft: '10px' }}
+                                >
                                     <h3>{_.startCase(category.replaceAll('_', ' '))}</h3>
                                     <table
                                         style={{
@@ -173,7 +184,7 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
                                                                 }
                                                             />
                                                         </td>
-                                                        <td style={{ paddingLeft: '10px' }}>
+                                                        {/* <td style={{ paddingLeft: '10px' }}>
                                                             <ValueFilter
                                                                 category={category}
                                                                 filterKey={field.name}
@@ -181,7 +192,7 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
                                                                 updateFilterValues={updateFilters}
                                                                 size="small"
                                                             />
-                                                        </td>
+                                                        </td> */}
                                                     </tr>
                                                 )
                                             })}

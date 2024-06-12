@@ -14,9 +14,7 @@ import {
 } from '../../sm-api/api'
 import { ProjectExportButton } from './ExportProjectButton'
 import {
-    defaultHeaderGroupsFromResponse,
     MetaSearchEntityPrefix,
-    ProjectColumnOptions,
     ProjectGridField,
     ProjectGridHeaderGroup,
 } from './ProjectColumnOptions'
@@ -25,6 +23,8 @@ import { ValueFilterPopup } from './ValueFilter'
 interface ProjectGridProps {
     participantResponse?: ProjectParticipantGridResponse
     projectName: string
+
+    headerGroups: ProjectGridHeaderGroup[]
     filterValues: ProjectParticipantGridFilter
     updateFilters: (e: Partial<ProjectParticipantGridFilter>) => void
 }
@@ -32,6 +32,7 @@ interface ProjectGridProps {
 const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
     participantResponse: summary,
     projectName,
+    headerGroups,
     filterValues,
     updateFilters,
 }) => {
@@ -43,10 +44,6 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
         )
     }
 
-    const [headerGroups, setHeaderGroups] = React.useState<ProjectGridHeaderGroup[]>(
-        defaultHeaderGroupsFromResponse(summary)
-    )
-
     const headerGroupByCategory = _.keyBy(headerGroups, 'category')
 
     return (
@@ -56,13 +53,6 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                 projectName={projectName}
                 filterValues={filterValues}
                 headerGroups={headerGroups}
-            />
-            <ProjectColumnOptions
-                headerGroups={headerGroups}
-                setHeaderGroups={setHeaderGroups}
-                filterValues={filterValues}
-                updateFilters={updateFilters}
-                participantCount={summary.participants.length}
             />
 
             <Table
@@ -88,15 +78,21 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                         <ProjectGridParticipantRows
                             key={`participant-row-${p.id}`}
                             participant={p}
-                            familyFields={headerGroupByCategory[MetaSearchEntityPrefix.F].fields}
+                            familyFields={
+                                headerGroupByCategory[MetaSearchEntityPrefix.F]?.fields ?? []
+                            }
                             participantFields={
-                                headerGroupByCategory[MetaSearchEntityPrefix.P].fields
+                                headerGroupByCategory[MetaSearchEntityPrefix.P]?.fields ?? []
                             }
-                            sampleFields={headerGroupByCategory[MetaSearchEntityPrefix.S].fields}
+                            sampleFields={
+                                headerGroupByCategory[MetaSearchEntityPrefix.S]?.fields ?? []
+                            }
                             sequencingGroupFields={
-                                headerGroupByCategory[MetaSearchEntityPrefix.Sg].fields
+                                headerGroupByCategory[MetaSearchEntityPrefix.Sg]?.fields ?? []
                             }
-                            assayFields={headerGroupByCategory[MetaSearchEntityPrefix.A].fields}
+                            assayFields={
+                                headerGroupByCategory[MetaSearchEntityPrefix.A]?.fields ?? []
+                            }
                             projectName={projectName}
                             backgroundColor={
                                 pidx % 2 === 1 ? 'var(--color-bg)' : 'var(--color-bg-disabled)'
@@ -295,14 +291,12 @@ const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProps> = ({
                                 }}
                                 rowSpan={participantRowSpan}
                             >
-                                {
-                                    <FamilyLink
-                                        id={participant.families.map((f) => f.id).join(', ')}
-                                        projectName={projectName}
-                                    >
-                                        {participant.families.map((f) => f.external_id).join(', ')}
-                                    </FamilyLink>
-                                }
+                                <FamilyLink
+                                    id={participant.families.map((f) => f.id).join(', ')}
+                                    projectName={projectName}
+                                >
+                                    {participant.families.map((f) => f.external_id).join(', ')}
+                                </FamilyLink>
                             </td>
                         )}
                         {isFirstOfGroup &&

@@ -1,6 +1,7 @@
 import * as _ from 'lodash'
 import * as React from 'react'
 
+import { AxiosError } from 'axios'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Button, Dropdown, Message } from 'semantic-ui-react'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
@@ -8,6 +9,11 @@ import MuckError from '../../shared/components/MuckError'
 import ErrorBoundary from '../../shared/utilities/errorBoundary'
 import { ProjectParticipantGridFilter, ProjectParticipantGridResponse, WebApi } from '../../sm-api'
 import PageOptions from './PageOptions'
+import {
+    defaultHeaderGroupsFromResponse,
+    ProjectColumnOptions,
+    ProjectGridHeaderGroup,
+} from './ProjectColumnOptions'
 import ProjectGrid from './ProjectGrid'
 
 interface IProjectGridContainerProps {
@@ -28,7 +34,8 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
     const [searchParams] = useSearchParams()
 
     const [isLoading, setIsLoading] = React.useState<boolean>(false)
-    let [error, setError] = React.useState<string | undefined>()
+    let [error, setError] = React.useState<React.ReactElement | undefined>()
+    const [headerGroups, setHeaderGroups] = React.useState<ProjectGridHeaderGroup[]>([])
 
     // fetched data
     const [participants, setParticipants] = React.useState<
@@ -84,9 +91,12 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
         }
     }
 
-    const setFilterValues = (values: Partial<ProjectParticipantGridFilter>) => {
+    const setFilterValues = (
+        values: Partial<ProjectParticipantGridFilter>,
+        complete: boolean = false
+    ) => {
         setPageOptions({
-            filter: _.merge({}, filterOptions, values),
+            filter: complete ? values : _.merge({}, filterOptions, values),
             pageNumber: 1,
         })
     }
@@ -108,9 +118,16 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
             .then((resp) => {
                 setParticipants(resp.data)
                 setIsLoading(false)
+                setHeaderGroups(defaultHeaderGroupsFromResponse(resp.data))
             })
-            .catch((er: Error) => {
-                setError(er.message)
+            .catch((er: AxiosError) => {
+                setError(
+                    <>
+                        An error occurred when fetching participants: {er.message}
+                        <br />
+                        <pre>{JSON.stringify(er.response?.data, null, 2)}</pre>
+                    </>
+                )
                 setIsLoading(false)
             })
     }
@@ -123,14 +140,25 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
 
     const totalPageNumbers = Math.ceil((participants?.total_results || 0) / pageSize)
 
+    const projectColOptions = (
+        <ProjectColumnOptions
+            headerGroups={headerGroups}
+            setHeaderGroups={setHeaderGroups}
+            filterValues={filterOptions}
+            updateFilters={(values) => setFilterValues(values, true)}
+            participantCount={participants?.participants?.length ?? 0}
+        />
+    )
+
     if (isLoading) {
         return <LoadingDucks />
     }
     if (error) {
         return (
-            <MuckError
-                message={`Ah Muck, An error occurred when fetching project participants: ${error}`}
-            />
+            <>
+                {projectColOptions}
+                <MuckError>{error}</MuckError>
+            </>
         )
     }
 
@@ -192,9 +220,11 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
                     title="participants"
                 />
             </div>
+            {projectColOptions}
             <ProjectGrid
                 participantResponse={participants}
                 projectName={projectName}
+                headerGroups={headerGroups}
                 updateFilters={setFilterValues}
                 filterValues={filterOptions}
             />

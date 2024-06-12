@@ -11,7 +11,6 @@ from typing import Generator
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 
 from api.utils.db import (
     Connection,
@@ -26,6 +25,7 @@ from db.python.layers.web import WebLayer
 from db.python.tables.participant import ParticipantFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.utils import GenericFilter, GenericMetaFilter
+from models.base import SMBase
 from models.enums.web import SeqrDatasetType
 from models.models.participant import NestedParticipant
 from models.models.project import ProjectId
@@ -35,7 +35,7 @@ from models.utils.sample_id_format import sample_id_transform_to_raw
 from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
 
 
-class SearchResponseModel(BaseModel):
+class SearchResponseModel(SMBase):
     """Parent model class, allows flexibility later on"""
 
     responses: list[SearchResponse]
@@ -60,10 +60,10 @@ async def get_project_summary(
     return summary.to_external()
 
 
-class ProjectParticipantGridFilter(BaseModel):
+class ProjectParticipantGridFilter(SMBase):
     """filters for participant grid"""
 
-    class ParticipantGridParticipantFilter(BaseModel):
+    class ParticipantGridParticipantFilter(SMBase):
         """participant filter option for participant grid"""
 
         id: GenericFilter[int] | None = None
@@ -73,14 +73,14 @@ class ProjectParticipantGridFilter(BaseModel):
         reported_gender: GenericFilter[str] | None = None
         karyotype: GenericFilter[str] | None = None
 
-    class ParticipantGridFamilyFilter(BaseModel):
+    class ParticipantGridFamilyFilter(SMBase):
         """family filter option for participant grid"""
 
         id: GenericFilter[int] | None = None
         external_id: GenericFilter[str] | None = None
         meta: GenericMetaFilter | None = None
 
-    class ParticipantGridSampleFilter(BaseModel):
+    class ParticipantGridSampleFilter(SMBase):
         """sample filter option for participant grid"""
 
         id: GenericFilter[str] | None = None
@@ -88,7 +88,7 @@ class ProjectParticipantGridFilter(BaseModel):
         external_id: GenericFilter[str] | None = None
         meta: GenericMetaFilter | None = None
 
-    class ParticipantGridSequencingGroupFilter(BaseModel):
+    class ParticipantGridSequencingGroupFilter(SMBase):
         """sequencing group filter option for participant grid"""
 
         id: GenericFilter[str] | None = None
@@ -98,7 +98,7 @@ class ProjectParticipantGridFilter(BaseModel):
         technology: GenericFilter[str] | None = None
         platform: GenericFilter[str] | None = None
 
-    class ParticipantGridAssayFilter(BaseModel):
+    class ParticipantGridAssayFilter(SMBase):
         """assay filter option for participant grid"""
 
         id: GenericFilter[int] | None = None
@@ -211,7 +211,7 @@ async def get_project_summary_with_limit(
     )
 
 
-class ExportProjectParticipantFields(BaseModel):
+class ExportProjectParticipantFields(SMBase):
     """fields for exporting project participants"""
 
     family_keys: list[str]
