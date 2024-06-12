@@ -209,7 +209,7 @@ class TestWeb(DbIsolatedTest):
         await self.partl.upsert_participant(get_test_participant())
 
         result = await self.pil.get_project_insights_summary(
-            project_ids=[self.project_id], sequencing_types=['genome', 'exome']
+            project_names=[self.project_name], sequencing_types=['genome', 'exome']
         )
 
         expected = [

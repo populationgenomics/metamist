@@ -16,16 +16,17 @@ router = APIRouter(prefix='/project-insights', tags=['project-insights',])
     response_model=list[ProjectInsightsSummary],
 )
 async def get_project_insights_summary(
-    project_ids: list[int] = None,
-    sequencing_types: list[str] = None,
+    project_names: list[str],
+    sequencing_types: list[str],
     connection: Connection = get_projectless_db_connection,
 ):
     """
     Get summary stats for a list of projects and sequencing types
     """
+
     pilayer = ProjectInsightsLayer(connection)
     projects_insights_stats = await pilayer.get_project_insights_summary(
-        project_ids=project_ids, sequencing_types=sequencing_types
+        project_names=project_names, sequencing_types=sequencing_types
     )
 
     return [s.to_external() for s in projects_insights_stats]
@@ -37,8 +38,8 @@ async def get_project_insights_summary(
     response_model=list[ProjectInsightsDetails],
 )
 async def get_project_insights_details(
-    project_ids: list[int] = None,
-    sequencing_types: list[str] = None,
+    project_names: list[str],
+    sequencing_types: list[str],
     connection: Connection = get_projectless_db_connection,
 ):
     """
@@ -46,7 +47,7 @@ async def get_project_insights_details(
     """
     pilayer = ProjectInsightsLayer(connection)
     projects_insights_details = await pilayer.get_project_insights_details(
-        project_ids=project_ids, sequencing_types=sequencing_types
+        project_names=project_names, sequencing_types=sequencing_types
     )
 
     return [s.to_external() for s in projects_insights_details]

@@ -1,9 +1,8 @@
 # pylint: disable=too-many-instance-attributes
 from dataclasses import dataclass
-
-
 from datetime import datetime
 from typing import Any, Optional
+
 from models.base import SMBase
 from models.utils import sample_id_format, sequencing_group_id_format
 
@@ -40,7 +39,7 @@ class AnalysisStats(SMBase):
 
 @dataclass
 class ProjectInsightsDetailsInternal:
-    """Return class for the seqr projects insights details endpoint"""
+    """Return class for the projects insights details endpoint"""
 
     project: int
     dataset: str
@@ -121,9 +120,9 @@ class ProjectInsightsSummaryInternal:
     total_samples: int = 0
     total_sequencing_groups: int = 0
     total_crams: int = 0
-    latest_annotate_dataset: AnalysisStats | None = None
-    latest_snv_es_index: AnalysisStats | None = None
-    latest_sv_es_index: AnalysisStats | None = None
+    latest_annotate_dataset: AnalysisStatsInternal | None = None
+    latest_snv_es_index: AnalysisStatsInternal | None = None
+    latest_sv_es_index: AnalysisStatsInternal | None = None
 
     def to_external(self):
         """Convert to transport model"""
