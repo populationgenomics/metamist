@@ -60,7 +60,7 @@ class ProjectParticipantGridFilter(SMBase):
     sequencing_group: ParticipantGridSequencingGroupFilter | None = None
     assay: ParticipantGridAssayFilter | None = None
 
-    def to_participant_internal(self, project: ProjectId) -> ParticipantFilter:
+    def to_internal(self, project: ProjectId) -> ParticipantFilter:
         """Convert to participant internal filter object"""
         return ParticipantFilter(
             id=self.participant.id if self.participant else None,

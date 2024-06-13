@@ -57,11 +57,12 @@ class TestSample(DbIsolatedTest):
 
     @run_as_sync
     async def test_query_sample_by_eid(self):
-        """Test getting formed sample"""
+        """Test querying samples by an external ID, and check it's returned"""
         meta_dict = {'meta': 'meta ;)'}
+        ex_ids = {PRIMARY_EXTERNAL_ORG: 'Test01', 'external_org': 'ex01'}
         s = await self.slayer.upsert_sample(
             SampleUpsertInternal(
-                external_ids={PRIMARY_EXTERNAL_ORG: 'Test01', 'external_org': 'ex01'},
+                external_ids=ex_ids,
                 type='blood',
                 active=True,
                 meta=meta_dict,
@@ -73,12 +74,14 @@ class TestSample(DbIsolatedTest):
         )
         self.assertEqual(1, len(samples))
         self.assertEqual(s.id, samples[0].id)
+        self.assertDictEqual(ex_ids, samples[0].external_ids)
 
         samples = await self.slayer.query(
             SampleFilter(external_id=GenericFilter(eq='ex01'))
         )
         self.assertEqual(1, len(samples))
         self.assertEqual(s.id, samples[0].id)
+        self.assertDictEqual(ex_ids, samples[0].external_ids)
 
         samples = await self.slayer.query(
             SampleFilter(external_id=GenericFilter(eq='ex02'))
