@@ -7,6 +7,7 @@ from db.python.layers.ourdna.dashboard import OurDnaDashboardLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from models.models import (
+    PRIMARY_EXTERNAL_ORG,
     OurDNADashboard,
     ParticipantUpsertInternal,
     SampleUpsert,
@@ -33,13 +34,13 @@ class OurDNADashboardTest(DbIsolatedTest):
         participants = await self.pl.upsert_participants(
             [
                 ParticipantUpsertInternal(
-                    external_id='EX01',
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'EX01'},
                     reported_sex=2,
                     karyotype='XX',
                     meta={'consent': True, 'field': 1},
                     samples=[
                         SampleUpsertInternal(
-                            external_id='Test01',
+                            external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
                             meta={
                                 'collection-time': '2022-07-03 13:28:00',
                                 'processing-site': 'Garvan',
@@ -63,13 +64,13 @@ class OurDNADashboardTest(DbIsolatedTest):
                     ],
                 ),
                 ParticipantUpsertInternal(
-                    external_id='EX02',
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'EX02'},
                     reported_sex=1,
                     karyotype='XY',
                     meta={'field': 2},
                     samples=[
                         SampleUpsertInternal(
-                            external_id='Test02',
+                            external_ids={PRIMARY_EXTERNAL_ORG: 'Test02'},
                             meta={
                                 'collection-time': '2022-07-03 13:28:00',
                                 'processing-site': 'BBV',
@@ -93,13 +94,13 @@ class OurDNADashboardTest(DbIsolatedTest):
                     ],
                 ),
                 ParticipantUpsertInternal(
-                    external_id='EX03',
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'EX03'},
                     reported_sex=2,
                     karyotype='XX',
                     meta={'consent': True, 'field': 3},
                     samples=[
                         SampleUpsertInternal(
-                            external_id='Test03',
+                            external_ids={PRIMARY_EXTERNAL_ORG: 'Test03'},
                             meta={
                                 # 'collection-time': '2022-07-03 13:28:00',
                                 'processing-site': 'Garvan',
