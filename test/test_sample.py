@@ -1,5 +1,7 @@
 from test.testbase import DbIsolatedTest, run_as_sync
 
+from db.python.db_filters.generic import GenericFilter
+from db.python.db_filters.sample import SampleFilter
 from db.python.layers.sample import SampleLayer
 from models.models import PRIMARY_EXTERNAL_ORG, SampleUpsertInternal
 
@@ -52,6 +54,36 @@ class TestSample(DbIsolatedTest):
 
         self.assertEqual('blood', sample.type)
         self.assertDictEqual(meta_dict, sample.meta)
+
+    @run_as_sync
+    async def test_query_sample_by_eid(self):
+        """Test getting formed sample"""
+        meta_dict = {'meta': 'meta ;)'}
+        s = await self.slayer.upsert_sample(
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Test01', 'external_org': 'ex01'},
+                type='blood',
+                active=True,
+                meta=meta_dict,
+            )
+        )
+
+        samples = await self.slayer.query(
+            SampleFilter(external_id=GenericFilter(eq='Test01'))
+        )
+        self.assertEqual(1, len(samples))
+        self.assertEqual(s.id, samples[0].id)
+
+        samples = await self.slayer.query(
+            SampleFilter(external_id=GenericFilter(eq='ex01'))
+        )
+        self.assertEqual(1, len(samples))
+        self.assertEqual(s.id, samples[0].id)
+
+        samples = await self.slayer.query(
+            SampleFilter(external_id=GenericFilter(eq='ex02'))
+        )
+        self.assertEqual(0, len(samples))
 
     @run_as_sync
     async def test_update_sample(self):

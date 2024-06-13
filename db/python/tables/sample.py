@@ -21,24 +21,38 @@ class SampleTable(DbBase):
     def construct_query(
         filter_: SampleFilter,
         keys: list[str],
+        sample_eid_table_alias: str | None = None,
         skip: int | None = None,
         limit: int | None = None,
     ):
         """
         Construct a nested sample query
         """
+        needs_eid = False
         needs_sequencing_group = False
         needs_assay = False
 
-        wheres, values = filter_.to_sql(
+        _wheres, values = filter_.to_sql(
             {
                 'project': 'ss.project',
                 'id': 'ss.id',
-                'external_id': 'ss.external_id',
                 'meta': 'ss.meta',
             },
-            exclude=['sequencing_group', 'assay'],
+            exclude=['sequencing_group', 'assay', 'external_id'],
         )
+        wheres = [_wheres]
+
+        if filter_.external_id:
+            needs_eid = True
+            seid_wheres, seid_values = filter_.to_sql(
+                {
+                    'external_id': 'seid.external_id',
+                },
+                only=['external_id'],
+            )
+            if seid_wheres:
+                wheres.append(seid_wheres)
+            values.update(seid_values)
 
         if filter_.sequencing_group:
             needs_sequencing_group = True
@@ -53,7 +67,7 @@ class SampleTable(DbBase):
             )
             values.update(svalues)
             if swheres:
-                wheres += ' AND ' + swheres
+                wheres.append(swheres)
 
         if filter_.assay:
             needs_sequencing_group = True
@@ -68,20 +82,24 @@ class SampleTable(DbBase):
             )
             values.update(avalues)
             if awheres:
-                wheres += ' AND ' + awheres
+                wheres.append(awheres)
 
         query_lines = [
             'SELECT DISTINCT ss.id',
             'FROM sample ss',
         ]
 
+        if needs_eid:
+            query_lines.append(
+                'INNER JOIN sample_external_id seid ON seid.sample_id = ss.id'
+            )
         if needs_sequencing_group:
             query_lines.append('INNER JOIN sequencing_group sg ON sg.sample_id = ss.id')
         if needs_assay:
             query_lines.append('INNER JOIN assay a ON a.sample_id = ss.id')
 
         if wheres:
-            query_lines.append('WHERE \n' + wheres)
+            query_lines.append('WHERE \n' + ' AND '.join(wheres))
 
         if limit or skip:
             query_lines.append('ORDER BY pp.id')
@@ -95,14 +113,18 @@ class SampleTable(DbBase):
             values['offset'] = skip
 
         query = '\n'.join('  ' + line.strip() for line in query_lines)
+        sample_eid_join = ''
+        if sample_eid_table_alias:
+            sample_eid_join = f'INNER JOIN sample_external_id {sample_eid_table_alias} ON {sample_eid_table_alias}.sample_id = s.id'
+
         outer_query = f"""
             SELECT {', '.join(keys)}
             FROM sample s
+            {sample_eid_join}
             INNER JOIN (
             {query}
             ) as inner_query ON inner_query.id = s.id
         """
-        print(outer_query)
 
         return outer_query, values
 
@@ -123,14 +145,16 @@ class SampleTable(DbBase):
         """Query samples"""
         keys = [
             's.id',
-            's.external_id',
+            'JSON_OBJECTAGG(sexid.name, sexid.external_id) AS external_ids',
             's.participant_id',
             's.meta',
             's.active',
             's.type',
             's.project',
         ]
-        _query, values = self.construct_query(filter_, keys)
+        _query, values = self.construct_query(
+            filter_, keys, sample_eid_table_alias='sexid'
+        )
         rows = await self.connection.fetch_all(_query, values)
         samples = [SampleInternal.from_db(dict(r)) for r in rows]
         projects = set(s.project for s in samples)
