@@ -315,7 +315,7 @@ class TestWeb(DbIsolatedTest):
         )
 
         nested_participants = await self.webl.query_participants(
-            pfilter.to_internal(project=self.project_id), limit=None
+            pfilter.to_participant_internal(project=self.project_id), limit=None
         )
         result = ProjectParticipantGridResponse.from_params(
             participants=nested_participants,
@@ -336,7 +336,7 @@ class TestWeb(DbIsolatedTest):
         )
 
         nested_participants = await self.webl.query_participants(
-            pfilter.to_internal(project=self.project_id), limit=None
+            pfilter.to_participant_internal(project=self.project_id), limit=None
         )
         self.assertEqual(0, len(nested_participants))
 
@@ -462,7 +462,7 @@ class TestWeb(DbIsolatedTest):
         )
 
         nested_participants = await self.webl.query_participants(
-            pfilter.to_internal(project=self.project_id), limit=None
+            pfilter.to_participant_internal(project=self.project_id), limit=None
         )
 
         self.assertEqual(1, len(nested_participants))
@@ -487,7 +487,7 @@ class TestWeb(DbIsolatedTest):
             )
         )
         nested_participants = await self.webl.query_participants(
-            pfilter.to_internal(project=self.project_id), limit=None
+            pfilter.to_participant_internal(project=self.project_id), limit=None
         )
 
         self.assertEqual(1, len(nested_participants))
@@ -649,7 +649,7 @@ class WebNonDBTests(unittest.TestCase):
             ),
         )
 
-        internal_filter = big_filter.to_internal(project=1)
+        internal_filter = big_filter.to_participant_internal(project=1)
 
         # participant internal
         self.assertEqual(internal_filter.id.contains, p_id)

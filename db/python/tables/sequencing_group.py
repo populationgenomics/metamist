@@ -3,9 +3,10 @@ from collections import defaultdict
 from datetime import date
 from typing import Any
 
+from db.python.db_filters.generic import GenericFilter
 from db.python.db_filters.sequencing_group import SequencingGroupFilter
 from db.python.tables.base import DbBase
-from db.python.utils import NoOpAenter, NotFoundError, to_db_json
+from db.python.utils import NoOpAenter, to_db_json
 from models.models.project import ProjectId
 from models.models.sequencing_group import (
     SequencingGroupInternal,
@@ -28,7 +29,9 @@ class SequencingGroupTable(DbBase):
         limit: int | None = None,
         external_id_table_alias: str | None = None,
     ) -> tuple[str, dict]:
-
+        """
+        Construct a query for sequencing_group
+        """
         sql_overrides = {
             'project': 's.project',
             'sample_id': 'sg.sample_id',
@@ -219,23 +222,10 @@ class SequencingGroupTable(DbBase):
         Get sequence groups by internal identifiers
         """
 
-        _query = f"""
-            SELECT {SequencingGroupTable.common_get_keys_str}
-            FROM sequencing_group sg
-            INNER JOIN sample s ON s.id = sg.sample_id
-            WHERE sg.id IN :sgids
-        """
+        query = SequencingGroupFilter(id=GenericFilter(in_=ids))
+        projects, sgs = await self.query(query)
 
-        rows = await self.connection.fetch_all(_query, {'sgids': ids})
-        if not rows:
-            raise NotFoundError(
-                f'Couldn\'t find sequencing groups with internal id {ids})'
-            )
-
-        sg_rows = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
-        projects = set(r.project for r in sg_rows)
-
-        return projects, sg_rows
+        return projects, sgs
 
     async def get_assay_ids_by_sequencing_group_ids(
         self, ids: list[int]
@@ -343,12 +333,25 @@ class SequencingGroupTable(DbBase):
         self, analysis_ids: list[int]
     ) -> tuple[set[ProjectId], dict[int, list[SequencingGroupInternal]]]:
         """Get map of samples by analysis_ids"""
+        keys = [
+            'sg.id',
+            's.project',
+            'JSON_OBJECTAGG(sgexid.name, sgexid.external_id) as external_ids',
+            'sg.sample_id',
+            'sg.type',
+            'sg.technology',
+            'sg.platform',
+            'sg.meta',
+            'sg.archived',
+        ]
         _query = f"""
-        SELECT {SequencingGroupTable.common_get_keys_str}, asg.analysis_id
+        SELECT {', '.join(keys)}, asg.analysis_id
         FROM analysis_sequencing_group asg
         INNER JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
         INNER JOIN sample s ON s.id = sg.sample_id
+        INNER JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id
         WHERE asg.analysis_id IN :aids
+        GROUP BY sg.id, asg.analysis_id
         """
         rows = await self.connection.fetch_all(_query, {'aids': analysis_ids})
 
@@ -379,7 +382,7 @@ class SequencingGroupTable(DbBase):
         technology: str,
         platform: str,
         assay_ids: list[int],
-        meta: dict = None,
+        meta: dict | None = None,
         open_transaction=True,
     ) -> int:
         """Create sequence group"""

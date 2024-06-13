@@ -189,7 +189,9 @@ class TestSequencingGroup(DbIsolatedTest):
         # Query for genome assay metadata
         sgs = await self.sglayer.query(
             SequencingGroupFilter(
-                assay_meta={'sequencing_type': GenericFilter(eq='genome')}
+                assay=SequencingGroupFilter.SequencingGroupAssayFilter(
+                    meta={'sequencing_type': GenericFilter(eq='genome')}
+                )
             )
         )
         self.assertEqual(len(sgs), 1)
@@ -198,7 +200,9 @@ class TestSequencingGroup(DbIsolatedTest):
         # Query for exome assay metadata
         sgs = await self.sglayer.query(
             SequencingGroupFilter(
-                assay_meta={'sequencing_type': GenericFilter(eq='exome')}
+                assay=SequencingGroupFilter.SequencingGroupAssayFilter(
+                    meta={'sequencing_type': GenericFilter(eq='exome')}
+                )
             )
         )
         self.assertEqual(len(sgs), 1)

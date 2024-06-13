@@ -1,3 +1,4 @@
+# pylint: disable=too-many-instance-attributes
 import dataclasses
 
 from db.python.db_filters.generic import (

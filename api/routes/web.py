@@ -114,7 +114,7 @@ async def export_project_participants(
         raise ValueError('No project was detected through the authentication')
 
     wlayer = WebLayer(connection)
-    pfilter = query.to_internal(project=connection.project)
+    pfilter = query.to_participant_internal(project=connection.project)
 
     participants_internal = await wlayer.query_participants(pfilter, limit=None)
     participants = [p.to_external() for p in participants_internal]

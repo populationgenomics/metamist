@@ -1,3 +1,4 @@
+# pylint: disable=too-many-instance-attributes
 import dataclasses
 from datetime import date
 

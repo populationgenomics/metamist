@@ -1193,7 +1193,11 @@ class Query:  # entry point to graphql.
                 else GenericFilter(eq=True)
             ),
             created_on=created_on.to_internal_filter() if created_on else None,
-            assay_meta=assay_meta,
+            assay=(
+                SequencingGroupFilter.SequencingGroupAssayFilter(
+                    meta=graphql_meta_filter_to_internal_filter(assay_meta),
+                )
+            ),
             has_cram=has_cram,
             has_gvcf=has_gvcf,
         )

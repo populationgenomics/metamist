@@ -17,9 +17,7 @@ from db.python.tables.assay import AssayFilter, AssayTable
 from db.python.tables.base import DbBase
 from db.python.tables.participant import ParticipantFilter
 from db.python.tables.project import ProjectPermissionsTable
-from db.python.tables.sequencing_group import (
-    SequencingGroupTable,
-)
+from db.python.tables.sequencing_group import SequencingGroupTable
 from models.models import (
     AssayInternal,
     FamilySimpleInternal,

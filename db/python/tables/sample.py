@@ -24,6 +24,9 @@ class SampleTable(DbBase):
         skip: int | None = None,
         limit: int | None = None,
     ):
+        """
+        Construct a nested sample query
+        """
         needs_sequencing_group = False
         needs_assay = False
 
