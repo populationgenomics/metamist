@@ -175,12 +175,12 @@ class BillingDailyExtendedTable(BillingBaseTable):
                 ORDER BY batch_id, job_id, cost desc
             )
             , jskuacc AS (
-                SELECT batch_id, job_id, ARRAY_AGG(STRUCT(sku, cost)) as skus
+                SELECT batch_id, CAST(job_id AS STRING) as job_id, ARRAY_AGG(STRUCT(sku, cost)) as skus
                 FROM jsku
                 GROUP BY batch_id, job_id
             )
             ,j AS (
-                SELECT d.batch_id, d.job_id, d.job_name, sum(d.cost) AS cost,
+                SELECT d.batch_id, CAST(d.job_id AS STRING) as job_id, d.job_name, sum(d.cost) AS cost,
                     MIN(usage_start_time) AS usage_start_time,
                     max(usage_end_time) AS usage_end_time
                 FROM d
