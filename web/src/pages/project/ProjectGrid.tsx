@@ -30,6 +30,12 @@ interface ProjectGridProps {
     }) => void
 }
 
+const formatExternalIds = (ids: Record<string, string>) => {
+    return Object.entries(ids)
+        .map(([k, v]) => (k.length === 0 ? sanitiseValue(v) : `${k}: ${v}`))
+        .join(', ')
+}
+
 const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
     summary,
     projectName,
@@ -343,7 +349,9 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                                     key={`${p.id}participant.${k}`}
                                                     rowSpan={participantRowSpan}
                                                 >
-                                                    {sanitiseValue(_.get(p, k))}
+                                                    {k === 'external_ids'
+                                                        ? formatExternalIds(p.external_ids)
+                                                        : sanitiseValue(_.get(p, k))}
                                                 </SUITable.Cell>
                                             ))}
                                         {sgidx === 0 &&
@@ -364,12 +372,14 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                                     key={`${s.id}sample.${k}`}
                                                     rowSpan={samplesRowSpan}
                                                 >
-                                                    {k === 'external_id' || k === 'id' ? (
+                                                    {k === 'external_ids' || k === 'id' ? (
                                                         <SampleLink
                                                             id={s.id}
                                                             projectName={projectName}
                                                         >
-                                                            {sanitiseValue(_.get(s, k))}
+                                                            {k === 'external_ids'
+                                                                ? formatExternalIds(s.external_ids)
+                                                                : sanitiseValue(s.id)}
                                                         </SampleLink>
                                                     ) : (
                                                         sanitiseValue(_.get(s, k))

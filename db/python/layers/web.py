@@ -506,7 +506,7 @@ WHERE fp.participant_id in :pids
         has_reported_gender = any(p.reported_gender for p in pmodels)
         has_karyotype = any(p.karyotype for p in pmodels)
 
-        participant_keys = [('external_id', 'Participant ID')]
+        participant_keys = [('external_ids', 'Participant ID')]
 
         if has_reported_sex:
             participant_keys.append(('reported_sex', 'Reported sex'))
@@ -518,7 +518,7 @@ WHERE fp.participant_id in :pids
         participant_keys.extend(('meta.' + k, k) for k in participant_meta_keys)
         sample_keys: list[tuple[str, str]] = [
             ('id', 'Sample ID'),
-            ('external_id', 'External Sample ID'),
+            ('external_ids', 'External Sample ID'),
             ('created_date', 'Created date'),
         ] + [('meta.' + k, k) for k in sample_meta_keys]
 
