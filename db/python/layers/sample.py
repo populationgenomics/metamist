@@ -2,13 +2,13 @@ import datetime
 from typing import Any
 
 from api.utils import group_by
+from db.python.db_filters import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer, Connection
 from db.python.layers.sequencing_group import SequencingGroupLayer
-from db.python.tables.assay import NoOpAenter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter, SampleTable
-from db.python.utils import GenericFilter, NotFoundError
+from db.python.utils import NoOpAenter, NotFoundError
 from models.models.project import ProjectId
 from models.models.sample import SampleInternal, SampleUpsertInternal
 from models.utils.sample_id_format import sample_id_format_list

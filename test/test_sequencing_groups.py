@@ -1,9 +1,9 @@
 from datetime import datetime
 from test.testbase import DbIsolatedTest, run_as_sync
 
+from db.python.db_filters import GenericFilter
 from db.python.layers import AnalysisLayer, SampleLayer, SequencingGroupLayer
 from db.python.tables.sequencing_group import SequencingGroupFilter
-from db.python.utils import GenericFilter
 from models.enums.analysis import AnalysisStatus
 from models.models import (
     AnalysisInternal,

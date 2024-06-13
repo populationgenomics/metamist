@@ -20,6 +20,7 @@ from api.graphql.filters import (
 )
 from api.graphql.loaders import LoaderKeys, get_context
 from db.python import enum_tables
+from db.python.db_filters import GenericFilter
 from db.python.layers import (
     AnalysisLayer,
     AnalysisRunnerLayer,
@@ -38,7 +39,6 @@ from db.python.tables.participant import ParticipantFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
-from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
 from models.models import (
     AnalysisInternal,

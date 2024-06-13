@@ -2,6 +2,7 @@
 
 from api.utils import group_by
 from db.python.connect import Connection
+from db.python.db_filters import GenericFilter
 from db.python.layers.base import BaseLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.tables.family import FamilyFilter, FamilyTable
@@ -11,7 +12,7 @@ from db.python.tables.family_participant import (
 )
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.sample import SampleTable
-from db.python.utils import GenericFilter, NotFoundError
+from db.python.utils import NotFoundError
 from models.models.family import FamilyInternal, PedRow, PedRowInternal
 from models.models.participant import ParticipantUpsertInternal
 from models.models.project import ProjectId

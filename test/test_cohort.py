@@ -3,9 +3,9 @@ from test.testbase import DbIsolatedTest, run_as_sync
 
 from pymysql.err import IntegrityError
 
+from db.python.db_filters import GenericFilter
 from db.python.layers import CohortLayer, SampleLayer
 from db.python.tables.cohort import CohortFilter
-from db.python.utils import GenericFilter
 from models.models import SampleUpsertInternal, SequencingGroupUpsertInternal
 from models.models.cohort import (
     CohortCriteria,

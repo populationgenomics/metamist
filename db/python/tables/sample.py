@@ -1,37 +1,13 @@
 import asyncio
-import dataclasses
 from datetime import date
 from typing import Any, Iterable
 
+from db.python.db_filters import GenericFilter
+from db.python.db_filters.sample import SampleFilter
 from db.python.tables.base import DbBase
-from db.python.utils import (
-    GenericFilter,
-    GenericFilterModel,
-    GenericMetaFilter,
-    NotFoundError,
-    escape_like_term,
-    to_db_json,
-)
+from db.python.utils import NotFoundError, escape_like_term, to_db_json
 from models.models.project import ProjectId
 from models.models.sample import SampleInternal, sample_id_format
-
-
-@dataclasses.dataclass(kw_only=True)
-class SampleFilter(GenericFilterModel):
-    """
-    Sample filter model
-    """
-
-    id: GenericFilter[int] | None = None
-    type: GenericFilter[str] | None = None
-    meta: GenericMetaFilter | None = None
-    external_id: GenericFilter[str] | None = None
-    participant_id: GenericFilter[int] | None = None
-    project: GenericFilter[ProjectId] | None = None
-    active: GenericFilter[bool] | None = None
-
-    def __hash__(self):  # pylint: disable=useless-super-delegation
-        return super().__hash__()
 
 
 class SampleTable(DbBase):
@@ -41,15 +17,91 @@ class SampleTable(DbBase):
 
     table_name = 'sample'
 
-    common_get_keys = [
-        'id',
-        'external_id',
-        'participant_id',
-        'meta',
-        'active',
-        'type',
-        'project',
-    ]
+    @staticmethod
+    def construct_query(
+        filter_: SampleFilter,
+        keys: list[str],
+        skip: int | None = None,
+        limit: int | None = None,
+    ):
+        needs_sequencing_group = False
+        needs_assay = False
+
+        wheres, values = filter_.to_sql(
+            {
+                'project': 'ss.project',
+                'id': 'ss.id',
+                'external_id': 'ss.external_id',
+                'meta': 'ss.meta',
+            },
+            exclude=['sequencing_group', 'assay'],
+        )
+
+        if filter_.sequencing_group:
+            needs_sequencing_group = True
+            swheres, svalues = filter_.sequencing_group.to_sql(
+                {
+                    'id': 'sg.id',
+                    'meta': 'sg.meta',
+                    'type': 'sg.type',
+                    'technology': 'sg.technology',
+                    'platform': 'sg.platform',
+                }
+            )
+            values.update(svalues)
+            if swheres:
+                wheres += ' AND ' + swheres
+
+        if filter_.assay:
+            needs_sequencing_group = True
+            needs_assay = True
+
+            awheres, avalues = filter_.assay.to_sql(
+                {
+                    'id': 'a.id',
+                    'meta': 'a.meta',
+                    'type': 'a.type',
+                }
+            )
+            values.update(avalues)
+            if awheres:
+                wheres += ' AND ' + awheres
+
+        query_lines = [
+            'SELECT DISTINCT ss.id',
+            'FROM sample ss',
+        ]
+
+        if needs_sequencing_group:
+            query_lines.append('INNER JOIN sequencing_group sg ON sg.sample_id = ss.id')
+        if needs_assay:
+            query_lines.append('INNER JOIN assay a ON a.sample_id = ss.id')
+
+        if wheres:
+            query_lines.append('WHERE \n' + wheres)
+
+        if limit or skip:
+            query_lines.append('ORDER BY pp.id')
+
+        if limit:
+            query_lines.append('LIMIT :limit')
+            values['limit'] = limit
+
+        if skip:
+            query_lines.append('OFFSET :offset')
+            values['offset'] = skip
+
+        query = '\n'.join('  ' + line.strip() for line in query_lines)
+        outer_query = f"""
+            SELECT {', '.join(keys)}
+            FROM sample s
+            INNER JOIN (
+            {query}
+            ) as inner_query ON inner_query.id = s.id
+        """
+        print(outer_query)
+
+        return outer_query, values
 
     # region GETS
 
@@ -66,15 +118,16 @@ class SampleTable(DbBase):
         self, filter_: SampleFilter
     ) -> tuple[set[ProjectId], list[SampleInternal]]:
         """Query samples"""
-        wheres, values = filter_.to_sql(field_overrides={})
-        if not wheres:
-            raise ValueError(f'Invalid filter: {filter_}')
-        common_get_keys_str = ', '.join(self.common_get_keys)
-        _query = f"""
-        SELECT {common_get_keys_str}
-        FROM sample
-        WHERE {wheres}
-        """
+        keys = [
+            's.id',
+            's.external_id',
+            's.participant_id',
+            's.meta',
+            's.active',
+            's.type',
+            's.project',
+        ]
+        _query, values = self.construct_query(filter_, keys)
         rows = await self.connection.fetch_all(_query, values)
         samples = [SampleInternal.from_db(dict(r)) for r in rows]
         projects = set(s.project for s in samples)

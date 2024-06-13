@@ -1,48 +1,16 @@
 # pylint: disable=too-many-instance-attributes
-import dataclasses
 from collections import defaultdict
 from datetime import date
 from typing import Any
 
+from db.python.db_filters.sequencing_group import SequencingGroupFilter
 from db.python.tables.base import DbBase
-from db.python.utils import (
-    GenericFilter,
-    GenericFilterModel,
-    GenericMetaFilter,
-    NoOpAenter,
-    NotFoundError,
-    to_db_json,
-)
+from db.python.utils import NoOpAenter, NotFoundError, to_db_json
 from models.models.project import ProjectId
 from models.models.sequencing_group import (
     SequencingGroupInternal,
     SequencingGroupInternalId,
 )
-
-
-@dataclasses.dataclass(kw_only=True)
-class SequencingGroupFilter(GenericFilterModel):
-    """Sequencing Group Filter"""
-
-    project: GenericFilter[ProjectId] | None = None
-    sample_id: GenericFilter[int] | None = None
-    external_id: GenericFilter[str] | None = None
-    id: GenericFilter[int] | None = None
-    type: GenericFilter[str] | None = None
-    technology: GenericFilter[str] | None = None
-    platform: GenericFilter[str] | None = None
-    active_only: GenericFilter[bool] | None = GenericFilter(eq=True)
-    meta: GenericMetaFilter | None = None
-
-    # These fields are manually handled in the query to speed things up, because multiple table
-    # joins and dynamic computation are required.
-    created_on: GenericFilter[date] | None = None
-    assay_meta: GenericMetaFilter | None = None
-    has_cram: bool | None = None
-    has_gvcf: bool | None = None
-
-    def __hash__(self):  # pylint: disable=useless-super-delegation
-        return super().__hash__()
 
 
 class SequencingGroupTable(DbBase):
@@ -51,24 +19,15 @@ class SequencingGroupTable(DbBase):
     """
 
     table_name = 'sequencing_group'
-    common_get_keys = [
-        'sg.id',
-        's.project',
-        'sg.sample_id',
-        'sg.type',
-        'sg.technology',
-        'sg.platform',
-        'sg.meta',
-        'sg.archived',
-    ]
-    common_get_keys_str = ', '.join(common_get_keys)
 
-    async def query(
-        self, filter_: SequencingGroupFilter
-    ) -> tuple[set[ProjectId], list[SequencingGroupInternal]]:
-        """Query samples"""
-        if filter_.is_false():
-            return set(), []
+    @staticmethod
+    def construct_query(
+        filter_: SequencingGroupFilter,
+        keys: list[str],
+        skip: int | None = None,
+        limit: int | None = None,
+        external_id_table_alias: str | None = None,
+    ) -> tuple[str, dict]:
 
         sql_overrides = {
             'project': 's.project',
@@ -79,79 +38,63 @@ class SequencingGroupTable(DbBase):
             'technology': 'sg.technology',
             'platform': 'sg.platform',
             'active_only': 'NOT sg.archived',
+            # this is on the inner query, so won't conflict with the provided alias
             'external_id': 'sgexid.external_id',
-            'created_on': 'DATE(row_start)',
-            'assay_meta': 'meta',
         }
 
-        # Progressively build up the query and query values based on the filters provided to
-        # avoid uneccessary joins and improve performance.
         _query: list[str] = []
         query_values: dict[str, Any] = {}
         # These fields are manually handled in the query
-        exclude_fields: list[str] = []
+        exclude_fields: list[str] = ['assay', 'created_on', 'has_cram', 'has_gvcf']
+        wheres: list[str] = []
 
         # Base query
         _query.append(
             """
-            SELECT
-                sg.id, s.project, sg.sample_id, sg.type,
-                sg.technology, sg.platform, sg.meta, sg.archived,
-                JSON_OBJECTAGG(sgexid.name, sgexid.external_id) AS external_ids
+            SELECT DISTINCT sg.id
             FROM sequencing_group AS sg
             LEFT JOIN sample s ON s.id = sg.sample_id
-            LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id"""
+            LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id
+            """
         )
 
-        if filter_.assay_meta is not None:
-            exclude_fields.append('assay_meta')
-            wheres, values = filter_.to_sql(sql_overrides, only=['assay_meta'])
-            query_values.update(values)
-            _query.append(
-                f"""
-            INNER JOIN (
-                SELECT DISTINCT
-                    sequencing_group_id
-                FROM
-                    sequencing_group_assay
-                    INNER JOIN (
-                        SELECT
-                            id
-                        FROM
-                            assay
-                        WHERE
-                            {wheres}
-                    ) AS assay_subquery ON sequencing_group_assay.assay_id = assay_subquery.id
-                ) AS sga_subquery ON sg.id = sga_subquery.sequencing_group_id
-            """
+        if filter_.assay is not None:
+            a_overrides = {
+                'id': 'a.id',
+                'meta': 'a.meta',
+                'type': 'a.type',
+                'external_id': 'aexid.external_id',
+            }
+            awheres, avalues = filter_.assay.to_sql(a_overrides)
+            _query.extend(
+                [
+                    'INNER JOIN sequencing_group_assay sga ON sg.id = sga.sequencing_group_id',
+                    'INNER JOIN assay a ON sga.assay_id = a.id',
+                ]
             )
 
+            wheres.append(awheres)
+            query_values.update(avalues)
+
         if filter_.created_on is not None:
-            exclude_fields.append('created_on')
-            wheres, values = filter_.to_sql(sql_overrides, only=['created_on'])
-            query_values.update(values)
+            cowheres, covalues = filter_.to_sql(sql_overrides, only=['created_on'])
+            query_values.update(covalues)
             _query.append(
                 f"""
             INNER JOIN (
-                SELECT
-                    id,
-                    TIMESTAMP(min(row_start)) AS created_on
-                FROM
-                    sequencing_group FOR SYSTEM_TIME ALL
-                WHERE
-                    {wheres}
-                GROUP BY
-                    id
+                SELECT id, TIMESTAMP(min(row_start)) AS created_on
+                FROM sequencing_group FOR SYSTEM_TIME ALL
+                WHERE {cowheres}
+                GROUP BY id
             ) AS sg_timequery ON sg.id = sg_timequery.id
             """
             )
 
         if filter_.has_cram is not None or filter_.has_gvcf is not None:
-            exclude_fields.extend(['has_cram', 'has_gvcf'])
-            wheres, values = filter_.to_sql(
+            cram_wheres, cram_values = filter_.to_sql(
                 sql_overrides, only=['has_cram', 'has_gvcf']
             )
-            query_values.update(values)
+            query_values.update(cram_values)
             _query.append(
                 f"""
             INNER JOIN (
@@ -170,25 +113,77 @@ class SequencingGroupTable(DbBase):
                 GROUP BY
                     sequencing_group_id
                 HAVING
-                    {wheres}
+                    {cram_wheres}
             ) AS sg_filequery ON sg.id = sg_filequery.sequencing_group_id
             """
             )
 
         # Add the rest of the filters
-        wheres, values = filter_.to_sql(sql_overrides, exclude=exclude_fields)
-        _query.append(
-            f"""
-            WHERE {wheres}"""
-        )
+        fwheres, values = filter_.to_sql(sql_overrides, exclude=exclude_fields)
+        wheres.append(fwheres)
+
+        _query.append(f"WHERE {' AND '.join(wheres)}")
         query_values.update(values)
 
-        _query.append(
-            'GROUP BY sg.id, s.project, sg.sample_id, sg.type, '
-            'sg.technology, sg.platform, sg.meta, sg.archived'
+        if limit:
+            _query.append('LIMIT :limit')
+            values['limit'] = limit
+
+        if skip:
+            _query.append('OFFSET :offset')
+            values['offset'] = skip
+
+        _query_str = '\n'.join(q.strip() for q in _query)
+
+        ex_id_join = (
+            f'LEFT JOIN sequencing_group_external_id {external_id_table_alias} ON sg.id = {external_id_table_alias}.sequencing_group_id'
+            if external_id_table_alias
+            else None
         )
 
-        rows = await self.connection.fetch_all('\n'.join(_query), query_values)
+        _outer_query = f"""
+            SELECT {', '.join(keys)}
+            FROM sequencing_group sg
+            LEFT JOIN sample s ON s.id = sg.sample_id
+            {ex_id_join or ''}
+            INNER JOIN (
+                {_query_str}
+            ) AS sg_query ON sg.id = sg_query.id
+            GROUP BY sg.id
+        """
+
+        print(_outer_query)
+
+        return _outer_query, query_values
+
+    async def query(
+        self, filter_: SequencingGroupFilter, limit: int | None = None, skip: int = 0
+    ) -> tuple[set[ProjectId], list[SequencingGroupInternal]]:
+        """Query samples"""
+        if filter_.is_false():
+            return set(), []
+
+        keys = [
+            'sg.id',
+            's.project',
+            'JSON_OBJECTAGG(sgexid.name, sgexid.external_id) as external_ids',
+            'sg.sample_id',
+            'sg.type',
+            'sg.technology',
+            'sg.platform',
+            'sg.meta',
+            'sg.archived',
+        ]
+
+        query, query_values = SequencingGroupTable.construct_query(
+            filter_,
+            keys=keys,
+            external_id_table_alias='sgexid',
+            limit=limit,
+            skip=skip,
+        )
+
+        rows = await self.connection.fetch_all(query, query_values)
         sgs = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
         projects = set(sg.project for sg in sgs if sg.project)
         return projects, sgs

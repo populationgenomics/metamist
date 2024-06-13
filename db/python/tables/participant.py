@@ -1,86 +1,13 @@
 # pylint: disable=too-many-instance-attributes
-import dataclasses
 from collections import defaultdict
 from typing import Any
 
+from db.python.db_filters import GenericFilter
+from db.python.db_filters.participant import ParticipantFilter
 from db.python.tables.base import DbBase
-from db.python.utils import (
-    GenericFilter,
-    GenericFilterModel,
-    GenericMetaFilter,
-    NotFoundError,
-    escape_like_term,
-    to_db_json,
-)
+from db.python.utils import NotFoundError, escape_like_term, to_db_json
 from models.models.participant import ParticipantInternal
 from models.models.project import ProjectId
-
-
-@dataclasses.dataclass(kw_only=True)
-class ParticipantFilter(GenericFilterModel):
-    """
-    Participant filter model
-    """
-
-    @dataclasses.dataclass(kw_only=True)
-    class ParticipantFamilyFilter(GenericFilterModel):
-        """
-        Participant sample filter model
-        """
-
-        id: GenericFilter[int] | None = None
-        external_id: GenericFilter[str] | None = None
-        meta: GenericMetaFilter | None = None
-
-    @dataclasses.dataclass(kw_only=True)
-    class ParticipantSampleFilter(GenericFilterModel):
-        """
-        Participant sample filter model
-        """
-
-        id: GenericFilter[int] | None = None
-        type: GenericFilter[str] | None = None
-        external_id: GenericFilter[str] | None = None
-        meta: GenericMetaFilter | None = None
-
-    @dataclasses.dataclass(kw_only=True)
-    class ParticipantSequencingGroupFilter(GenericFilterModel):
-        """
-        Participant sequencing group filter model
-        """
-
-        id: GenericFilter[int] | None = None
-        external_id: GenericFilter[str] | None = None
-        meta: GenericMetaFilter | None = None
-        type: GenericFilter[str] | None = None
-        technology: GenericFilter[str] | None = None
-        platform: GenericFilter[str] | None = None
-
-    @dataclasses.dataclass(kw_only=True)
-    class ParticipantAssayFilter(GenericFilterModel):
-        """
-        Participant assay filter model
-        """
-
-        id: GenericFilter[int] | None = None
-        external_id: GenericFilter[str] | None = None
-        meta: GenericMetaFilter | None = None
-        type: GenericFilter[str] | None = None
-        technology: GenericFilter[str] | None = None
-        platform: GenericFilter[str] | None = None
-
-    id: GenericFilter[int] | None = None
-    meta: GenericMetaFilter | None = None
-    external_id: GenericFilter[str] | None = None
-    reported_sex: GenericFilter[int] | None = None
-    reported_gender: GenericFilter[str] | None = None
-    karyotype: GenericFilter[str] | None = None
-    project: GenericFilter[ProjectId] | None = None
-
-    family: ParticipantFamilyFilter | None = None
-    sample: ParticipantSampleFilter | None = None
-    sequencing_group: ParticipantSequencingGroupFilter | None = None
-    assay: ParticipantAssayFilter | None = None
 
 
 class ParticipantTable(DbBase):
@@ -117,7 +44,10 @@ class ParticipantTable(DbBase):
 
     @staticmethod
     async def _construct_participant_query(
-        filter_: ParticipantFilter, keys: list[str]
+        filter_: ParticipantFilter,
+        keys: list[str],
+        skip: int | None = None,
+        limit: int | None = None,
     ) -> tuple[str, dict[str, Any]]:
         """Construct a participant query"""
         needs_family = False
@@ -127,10 +57,10 @@ class ParticipantTable(DbBase):
 
         wheres, values = filter_.to_sql(
             {
-                'project': 'p.project',
-                'id': 'p.id',
-                'external_id': 'p.external_id',
-                'meta': 'p.meta',
+                'project': 'pp.project',
+                'id': 'pp.id',
+                'external_id': 'pp.external_id',
+                'meta': 'pp.meta',
             },
             exclude=['family', 'sample', 'sequencing_group', 'assay'],
         )
@@ -179,8 +109,10 @@ class ParticipantTable(DbBase):
                 wheres += ' AND ' + swheres
 
         if filter_.assay:
+            # 2024-06-13 mfranklin
+            #   This is explicitly NOT searching assays through the active sequencing
+            #   group
             needs_sample = True
-            needs_sequencing_group = True
             needs_assay = True
 
             awheres, avalues = filter_.assay.to_sql(
@@ -194,29 +126,48 @@ class ParticipantTable(DbBase):
             if awheres:
                 wheres += ' AND ' + awheres
 
-        query = f"""
-        SELECT
-            {', '.join(str(k) for k in keys)}
-        FROM participant p
-        """
+        query_lines = [
+            'SELECT DISTINCT pp.id',
+            'FROM participant pp',
+        ]
 
         if needs_sample:
-            query += 'INNER JOIN sample s ON s.participant_id = p.id\n'
+            query_lines.append('INNER JOIN sample s ON s.participant_id = pp.id')
         if needs_sequencing_group:
-            query += 'INNER JOIN sequencing_group sg ON sg.sample_id = s.id\n'
+            query_lines.append('INNER JOIN sequencing_group sg ON sg.sample_id = s.id')
         if needs_assay:
-            query += (
-                'INNER JOIN sequencing_group_assay a_sg ON a_sg.sequencing_group_id = sg.id\n'
-                'INNER JOIN assay a ON a.id = a_sg.assay_id\n'
-            )
+            # see above for a quick note in assays from participant query
+            query_lines.append('INNER JOIN assay a ON a.sample_id = s.id')
         if needs_family:
-            query += 'INNER JOIN family_participant fp ON fp.participant_id = p.id\n'
-            query += 'INNER JOIN family f ON f.id = fp.family_id\n'
+            query_lines.append(
+                'INNER JOIN family_participant fp ON fp.participant_id = pp.id\n'
+                'INNER JOIN family f ON f.id = fp.family_id'
+            )
 
         if wheres:
-            query += 'WHERE \n' + wheres
+            query_lines.append('WHERE \n' + wheres)
 
-        return query, values
+        if limit or skip:
+            query_lines.append('ORDER BY pp.id')
+
+        if limit:
+            query_lines.append('LIMIT :limit')
+            values['limit'] = limit
+
+        if skip:
+            query_lines.append('OFFSET :offset')
+            values['offset'] = skip
+
+        query = '\n'.join('  ' + line.strip() for line in query_lines)
+        outer_query = f"""
+            SELECT {', '.join(keys)}
+            FROM participant p
+            INNER JOIN (
+            {query}
+            ) as inner_query ON inner_query.id = p.id
+        """
+
+        return outer_query, values
 
     async def query(
         self,
@@ -241,15 +192,9 @@ class ParticipantTable(DbBase):
             'p.meta',
             'p.project',
         ]
-        query, values = await self._construct_participant_query(filter_, keys=keys)
-
-        if limit:
-            query += '\nLIMIT :limit'
-            values['limit'] = limit
-
-        if skip:
-            query += '\nOFFSET :offset'
-            values['offset'] = skip
+        query, values = await self._construct_participant_query(
+            filter_, keys=keys, skip=skip, limit=limit
+        )
 
         rows = await self.connection.fetch_all(query, values)
         projects = set(r['project'] for r in rows)

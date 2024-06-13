@@ -4,6 +4,7 @@ from collections import defaultdict
 from enum import Enum
 from typing import Any
 
+from db.python.db_filters import GenericFilter
 from db.python.layers.base import BaseLayer
 from db.python.layers.sample import SampleLayer
 from db.python.tables.family import FamilyTable
@@ -14,12 +15,7 @@ from db.python.tables.family_participant import (
 from db.python.tables.participant import ParticipantFilter, ParticipantTable
 from db.python.tables.participant_phenotype import ParticipantPhenotypeTable
 from db.python.tables.sample import SampleTable
-from db.python.utils import (
-    GenericFilter,
-    NoOpAenter,
-    NotFoundError,
-    split_generic_terms,
-)
+from db.python.utils import NoOpAenter, NotFoundError, split_generic_terms
 from models.models.family import PedRowInternal
 from models.models.participant import ParticipantInternal, ParticipantUpsertInternal
 from models.models.project import ProjectId

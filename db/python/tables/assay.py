@@ -4,15 +4,9 @@ import re
 from collections import defaultdict
 from typing import Any, NamedTuple
 
+from db.python.db_filters import GenericFilter, GenericFilterModel, GenericMetaFilter
 from db.python.tables.base import DbBase
-from db.python.utils import (
-    GenericFilter,
-    GenericFilterModel,
-    GenericMetaFilter,
-    NoOpAenter,
-    NotFoundError,
-    to_db_json,
-)
+from db.python.utils import NoOpAenter, NotFoundError, to_db_json
 from models.models.assay import AssayId, AssayInternal
 from models.models.project import ProjectId
 from models.models.sequencing_group import SequencingGroupInternalId

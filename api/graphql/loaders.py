@@ -10,6 +10,7 @@ from fastapi import Request
 from strawberry.dataloader import DataLoader
 
 from api.utils import get_projectless_db_connection, group_by
+from db.python.db_filters import GenericFilter, get_hashable_value
 from db.python.layers import (
     AnalysisLayer,
     AssayLayer,
@@ -26,7 +27,7 @@ from db.python.tables.participant import ParticipantFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
-from db.python.utils import GenericFilter, NotFoundError, get_hashable_value
+from db.python.utils import NotFoundError
 from models.models import (
     AnalysisInternal,
     AssayInternal,

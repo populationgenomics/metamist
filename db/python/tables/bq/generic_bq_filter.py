@@ -1,10 +1,12 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, TypeVar
 
 from google.cloud import bigquery
 
-from db.python.utils import GenericFilter, T
+from db.python.db_filters import GenericFilter
+
+T = TypeVar('T')
 
 
 class GenericBQFilter(GenericFilter[T]):
