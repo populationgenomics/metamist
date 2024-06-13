@@ -71,6 +71,8 @@ class WebDb(DbBase):
                 # protect against SQL injection attacks
                 raise ValueError('Invalid characters in field')
             if not query.is_meta:
+                if field == 'external_id':
+                    prefix += 'eid'  # this field is in its own table
                 q = f'{prefix}.{field} LIKE :{key}'
             else:
                 # double double quote field to allow white space
@@ -84,8 +86,10 @@ class WebDb(DbBase):
         # the query to determine the total count, then take the selection of samples
         # for the current page. This is more efficient than doing 2 queries separately.
         sample_query = f"""
-        SELECT s.id, s.external_id, s.type, s.meta, s.participant_id, s.active
+        SELECT s.id, JSON_OBJECTAGG(seid.name, seid.external_id) AS external_ids,
+               s.type, s.meta, s.participant_id, s.active
         FROM sample s
+        LEFT JOIN sample_external_id seid ON s.id = seid.sample_id
         LEFT JOIN assay a ON s.id = a.sample_id
         LEFT JOIN participant p ON p.id = s.participant_id
         LEFT JOIN family_participant fp on s.participant_id = fp.participant_id
@@ -185,7 +189,7 @@ class WebDb(DbBase):
         smodels = [
             NestedSampleInternal(
                 id=s['id'],
-                external_id=s['external_id'],
+                external_ids=json.loads(s['external_ids']),
                 type=s['type'],
                 meta=json.loads(s['meta']) or {},
                 created_date=str(sample_id_start_times.get(s['id'], '')),
@@ -337,9 +341,12 @@ class WebDb(DbBase):
 
         # participant
         p_query = """
-            SELECT id, external_id, meta, reported_sex, reported_gender, karyotype
-            FROM participant
-            WHERE id in :pids
+            SELECT p.id, JSON_OBJECTAGG(peid.name, peid.external_id) AS external_ids,
+                   p.meta, p.reported_sex, p.reported_gender, p.karyotype
+            FROM participant p
+            INNER JOIN participant_external_id peid ON p.id = peid.participant_id
+            WHERE p.id in :pids
+            GROUP BY p.id
         """
         participant_promise = self.connection.fetch_all(p_query, {'pids': pids})
 
@@ -427,7 +434,7 @@ WHERE fp.participant_id in :pids
                 pmodels.append(
                     NestedParticipantInternal(
                         id=None,
-                        external_id=None,
+                        external_ids=None,
                         meta=None,
                         families=[],
                         samples=[s],
@@ -443,7 +450,7 @@ WHERE fp.participant_id in :pids
                 pmodels.append(
                     NestedParticipantInternal(
                         id=p['id'],
-                        external_id=p['external_id'],
+                        external_ids=json.loads(p['external_ids']),
                         meta=json.loads(p['meta']),
                         families=pid_to_families.get(p['id'], []),
                         samples=list(smodels_by_pid.get(p['id'])),

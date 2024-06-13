@@ -45,6 +45,8 @@ papi = ParticipantApi()
 
 DEFAULT_SAMPLES_N = 10
 
+PRIMARY_EXTERNAL_ORG = ''
+
 QUERY_ALL_DATA = gql(
     """
     query getAllData($project: String!, $sids: [String!]) {
@@ -297,7 +299,7 @@ def transfer_samples_sgs_assays(
             existing_pid = upserted_participant_map[s['participant']['externalId']]
 
         sample_upsert = SampleUpsert(
-            external_id=s['externalId'],
+            external_ids={PRIMARY_EXTERNAL_ORG: s['externalId']},
             type=sample_type or None,
             meta=(copy_files_in_dict(s['meta'], project) or {}),
             participant_id=existing_pid,

@@ -1281,4 +1281,143 @@
 		<sql>ALTER TABLE cohort_sequencing_group ADD SYSTEM VERSIONING;</sql>
 		<sql>ALTER TABLE analysis_cohort ADD SYSTEM VERSIONING;</sql>
 	</changeSet>
+	<changeSet id="2024-05-03-multiple-external-ids" author="john.marshall">
+		<createTable tableName="participant_external_id">
+			<column name="project" type="INT">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_PROJECT_PARTICIPANT_EXTERNAL_ID"
+					references="project(id)" />
+			</column>
+			<column name="participant_id" type="INT">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_PARTICIPANT_PARTICIPANT_EXTERNAL_ID"
+					references="participant(id)" />
+			</column>
+			<column name="name" type="VARCHAR(255)" />
+			<column name="external_id" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="meta" type="LONGTEXT" />
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_PARTICIPANT_EXTERNAL_ID_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+		<addPrimaryKey
+			tableName="participant_external_id"
+			columnNames="participant_id,name"
+			constraintName="PK_PARTICIPANT_EXTERNAL_ID"
+			validate="true"
+		/>
+		<addUniqueConstraint
+			tableName="participant_external_id"
+			columnNames="project,external_id"
+			constraintName="UK_PARTICIPANT_EXTERNAL_ID_UNIQUE_EIDS"
+			validate="true"
+		/>
+		<createIndex tableName="participant" indexName="fk_project_participant">
+			<column name="project" />
+		</createIndex>
+		<dropUniqueConstraint
+			tableName="participant"
+			constraintName="UK_PARTICIPANT_SAMPLE_EXTERNALID"
+		/>
+
+		<createTable tableName="sample_external_id">
+			<column name="project" type="INT">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_PROJECT_SAMPLE_EXTERNAL_ID"
+					references="project(id)" />
+			</column>
+			<column name="sample_id" type="INT">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_SAMPLE_SAMPLE_EXTERNAL_ID"
+					references="sample(id)" />
+			</column>
+			<column name="name" type="VARCHAR(255)" />
+			<column name="external_id" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="meta" type="LONGTEXT" />
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_SAMPLE_EXTERNAL_ID_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+		<addPrimaryKey
+			tableName="sample_external_id"
+			columnNames="sample_id,name"
+			constraintName="PK_SAMPLE_EXTERNAL_ID"
+			validate="true"
+		/>
+		<addUniqueConstraint
+			tableName="sample_external_id"
+			columnNames="project,external_id"
+			constraintName="UK_SAMPLE_EXTERNAL_ID_UNIQUE_EIDS"
+			validate="true"
+		/>
+		<createIndex tableName="sample" indexName="fk_project_sample">
+			<column name="project" />
+		</createIndex>
+		<dropUniqueConstraint
+			tableName="sample"
+			constraintName="UK_SAMPLE_PROJECT_EXTERNALID"
+		/>
+
+		<sql>ALTER TABLE participant_external_id ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE sample_external_id ADD SYSTEM VERSIONING;</sql>
+
+		<!-- Migrate existing external_ids to the new tables, keyed by PRIMARY_EXTERNAL_ORG, i.e. '' -->
+		<sql>INSERT INTO audit_log (author, on_behalf_of, ar_guid, comment, auth_project, meta)
+		     VALUES ('liquibase', NULL, NULL, 'participant/sample external_id migration', NULL, NULL)
+		     RETURNING @audit_log_id := id;
+
+		     INSERT INTO participant_external_id (project, participant_id, name, external_id, audit_log_id)
+		       SELECT project, id, '', external_id, @audit_log_id
+		       FROM participant;
+
+		     INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
+		       SELECT project, id, '', external_id, @audit_log_id
+		       FROM sample;
+		</sql>
+	</changeSet>
+	<changeSet id="2024-06-11-drop-old-external-id-columns" author="john.marshall">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+
+		<dropNotNullConstraint
+			tableName="participant"
+			columnName="external_id"
+			columnDataType="VARCHAR(255)"
+		/>
+		<sql>UPDATE participant SET external_id = NULL</sql>
+		<renameColumn
+			tableName="participant"
+			oldColumnName="external_id"
+			newColumnName="_external_id_unused"
+			columnDataType="VARCHAR(255)"
+			remarks="Migration of external IDs to separate table"
+		/>
+
+		<dropNotNullConstraint
+			tableName="sample"
+			columnName="external_id"
+			columnDataType="VARCHAR(255)"
+		/>
+		<sql>UPDATE sample SET external_id = NULL</sql>
+		<renameColumn
+			tableName="sample"
+			oldColumnName="external_id"
+			newColumnName="_external_id_unused"
+			columnDataType="VARCHAR(255)"
+			remarks="Migration of external IDs to separate table"
+		/>
+	</changeSet>
 </databaseChangeLog>

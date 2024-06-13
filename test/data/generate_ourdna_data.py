@@ -13,15 +13,17 @@ import asyncio
 from metamist.apis import ParticipantApi
 from metamist.models import ParticipantUpsert, SampleUpsert
 
+PRIMARY_EXTERNAL_ORG = ''
+
 PARTICIPANTS = [
     ParticipantUpsert(
-        external_id='EX01',
+        external_ids={PRIMARY_EXTERNAL_ORG: 'EX01'},
         reported_sex=2,
         karyotype='XX',
         meta={'consent': True, 'field': 1},
         samples=[
             SampleUpsert(
-                external_id='Test01',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
                 type='blood',
                 active=True,
                 meta={
@@ -45,13 +47,13 @@ PARTICIPANTS = [
         ],
     ),
     ParticipantUpsert(
-        external_id='EX02',
+        external_ids={PRIMARY_EXTERNAL_ORG: 'EX02'},
         reported_sex=1,
         karyotype='XY',
         meta={'field': 2},
         samples=[
             SampleUpsert(
-                external_id='Test02',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Test02'},
                 type='blood',
                 active=True,
                 meta={
@@ -75,13 +77,13 @@ PARTICIPANTS = [
         ],
     ),
     ParticipantUpsert(
-        external_id='EX03',
+        external_ids={PRIMARY_EXTERNAL_ORG: 'EX03'},
         reported_sex=2,
         karyotype='XX',
         meta={'consent': True, 'field': 3},
         samples=[
             SampleUpsert(
-                external_id='Test03',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Test03'},
                 type='blood',
                 active=True,
                 meta={
