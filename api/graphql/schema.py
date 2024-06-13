@@ -41,6 +41,7 @@ from db.python.tables.sequencing_group import SequencingGroupFilter
 from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
 from models.models import (
+    PRIMARY_EXTERNAL_ORG,
     AnalysisInternal,
     AssayInternal,
     AuditLogInternal,
@@ -636,7 +637,7 @@ class GraphQLParticipant:
     def from_internal(internal: ParticipantInternal) -> 'GraphQLParticipant':
         return GraphQLParticipant(
             id=internal.id,
-            external_id=internal.external_id,
+            external_id=internal.external_ids[PRIMARY_EXTERNAL_ORG],
             meta=internal.meta,
             reported_sex=internal.reported_sex,
             reported_gender=internal.reported_gender,
@@ -725,7 +726,7 @@ class GraphQLSample:
     def from_internal(sample: SampleInternal) -> 'GraphQLSample':
         return GraphQLSample(
             id=sample_id_format(sample.id),
-            external_id=sample.external_id,
+            external_id=sample.external_ids[PRIMARY_EXTERNAL_ORG],
             active=sample.active,
             meta=sample.meta,
             type=sample.type,

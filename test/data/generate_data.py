@@ -22,6 +22,8 @@ from metamist.model.analysis_status import AnalysisStatus
 from metamist.models import AssayUpsert, SampleUpsert, SequencingGroupUpsert
 from metamist.parser.generic_parser import chunk
 
+PRIMARY_EXTERNAL_ORG = ''
+
 EMOJIS = [':)', ':(', ':/', ':\'(']
 
 default_ped_location = str(Path(__file__).parent / 'greek-myth-forgeneration.ped')
@@ -114,7 +116,7 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
         nsamples = generate_random_number_within_distribution()
         for _ in range(nsamples):
             sample = SampleUpsert(
-                external_id=f'GRK{sample_id_index}',
+                external_ids={PRIMARY_EXTERNAL_ORG: f'GRK{sample_id_index}'},
                 type=random.choice(sample_types),
                 meta={
                     'collection_date': datetime.datetime.now()
