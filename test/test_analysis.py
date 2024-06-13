@@ -9,6 +9,7 @@ from db.python.tables.analysis import AnalysisFilter
 from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
 from models.models import (
+    PRIMARY_EXTERNAL_ORG,
     AnalysisInternal,
     AssayUpsertInternal,
     SampleUpsertInternal,
@@ -30,7 +31,7 @@ class TestAnalysis(DbIsolatedTest):
 
         sample = await self.sl.upsert_sample(
             SampleUpsertInternal(
-                external_id='Test01',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
                 type='blood',
                 meta={'meta': 'meta ;)'},
                 active=True,

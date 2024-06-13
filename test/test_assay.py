@@ -8,8 +8,11 @@ from db.python.layers.assay import AssayLayer
 from db.python.layers.sample import SampleLayer
 from db.python.tables.assay import AssayFilter, AssayTable
 from db.python.utils import GenericFilter, NotFoundError
-from models.models.assay import AssayUpsertInternal
-from models.models.sample import SampleUpsertInternal
+from models.models import (
+    PRIMARY_EXTERNAL_ORG,
+    AssayUpsertInternal,
+    SampleUpsertInternal,
+)
 from models.models.sequencing_group import SequencingGroupUpsertInternal
 
 default_sequencing_meta = {
@@ -36,7 +39,7 @@ class TestAssay(DbIsolatedTest):
         self.sample_id_raw = (
             await self.slayer.upsert_sample(
                 SampleUpsertInternal(
-                    external_id=self.external_sample_id,
+                    external_ids={PRIMARY_EXTERNAL_ORG: self.external_sample_id},
                     type='blood',
                     active=True,
                     meta={'Testing': 'test_assay'},
@@ -223,7 +226,7 @@ class TestAssay(DbIsolatedTest):
         """Test query_assays in different combinations"""
         sample = await self.slayer.upsert_sample(
             SampleUpsertInternal(
-                external_id='SAM_TEST_QUERY',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'SAM_TEST_QUERY'},
                 type='blood',
                 active=True,
                 meta={'collection-year': '2022'},

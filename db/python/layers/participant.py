@@ -20,9 +20,9 @@ from db.python.utils import (
     NotFoundError,
     split_generic_terms,
 )
+from models.models import PRIMARY_EXTERNAL_ORG, ProjectId
 from models.models.family import PedRowInternal
 from models.models.participant import ParticipantInternal, ParticipantUpsertInternal
-from models.models.project import ProjectId
 
 HPO_REGEX_MATCHER = re.compile(r'HP\:\d+$')
 
@@ -292,6 +292,7 @@ class ParticipantLayer(BaseLayer):
     ) -> list[ParticipantInternal]:
         """
         Get participants by IDs
+        (note that the list returned need not be ordered as per the pids argument)
         """
         projects, participants = await self.pttable.get_participants_by_ids(pids)
 
@@ -343,7 +344,10 @@ class ParticipantLayer(BaseLayer):
             )
         )
         external_sample_map_with_no_pid = {
-            sample.external_id: sample.id for sample in samples_with_no_pid
+            sample.external_ids[PRIMARY_EXTERNAL_ORG]: sample.id for sample in samples_with_no_pid
+        }
+        external_ids_by_primary = {
+            sample.external_ids[PRIMARY_EXTERNAL_ORG]: sample.external_ids for sample in samples_with_no_pid
         }
         ext_sample_id_to_pid = {}
 
@@ -370,7 +374,7 @@ class ParticipantLayer(BaseLayer):
             for external_id in external_participant_ids_to_add:
                 sample_id = external_sample_map_with_no_pid[external_id]
                 participant_id = await self.pttable.create_participant(
-                    external_id=external_id,
+                    external_ids=external_ids_by_primary[external_id],
                     reported_sex=None,
                     reported_gender=None,
                     karyotype=None,
@@ -452,7 +456,7 @@ class ParticipantLayer(BaseLayer):
                 )
                 for ex_pid in missing_participant_eids:
                     external_pid_map[ex_pid] = await self.pttable.create_participant(
-                        external_id=ex_pid,
+                        external_ids={PRIMARY_EXTERNAL_ORG: ex_pid},
                         reported_sex=None,
                         reported_gender=None,
                         karyotype=None,
@@ -647,7 +651,7 @@ class ParticipantLayer(BaseLayer):
                     )
                 await self.pttable.update_participant(
                     participant_id=participant.id,
-                    external_id=participant.external_id,
+                    external_ids=participant.external_ids,
                     reported_sex=participant.reported_sex,
                     reported_gender=participant.reported_gender,
                     meta=participant.meta,
@@ -656,7 +660,7 @@ class ParticipantLayer(BaseLayer):
 
             else:
                 participant.id = await self.pttable.create_participant(
-                    external_id=participant.external_id,
+                    external_ids=participant.external_ids,
                     reported_sex=participant.reported_sex,
                     reported_gender=participant.reported_gender,
                     karyotype=participant.karyotype,

@@ -18,7 +18,7 @@ class ParticipantInternal(SMBase):
 
     id: int
     project: ProjectId
-    external_id: str = None
+    external_ids: dict[str, str]
     reported_sex: int | None = None
     reported_gender: str | None = None
     karyotype: str | None = None
@@ -28,9 +28,10 @@ class ParticipantInternal(SMBase):
 
     @classmethod
     def from_db(cls, data: dict):
-        """Convert from db keys, mainly converting parsing meta"""
-        if 'meta' in data and isinstance(data['meta'], str):
-            data['meta'] = json.loads(data['meta'])
+        """Convert from db keys, mainly converting JSON-encoded fields"""
+        for key in ['external_ids', 'meta']:
+            if key in data and isinstance(data[key], str):
+                data[key] = json.loads(data[key])
 
         return ParticipantInternal(**data)
 
@@ -39,7 +40,7 @@ class ParticipantInternal(SMBase):
         return Participant(
             id=self.id,
             project=self.project,
-            external_id=self.external_id,
+            external_ids=self.external_ids,
             reported_sex=self.reported_sex,
             reported_gender=self.reported_gender,
             karyotype=self.karyotype,
@@ -51,7 +52,7 @@ class NestedParticipantInternal(SMBase):
     """ParticipantInternal with nested samples"""
 
     id: int
-    external_id: str
+    external_ids: dict[str, str]
     reported_sex: int | None = None
     reported_gender: str | None = None
     karyotype: str | None = None
@@ -63,7 +64,7 @@ class NestedParticipantInternal(SMBase):
         """Convert to transport model"""
         return NestedParticipant(
             id=self.id,
-            external_id=self.external_id,
+            external_ids=self.external_ids,
             reported_sex=self.reported_sex,
             reported_gender=self.reported_gender,
             karyotype=self.karyotype,
@@ -82,6 +83,7 @@ class ParticipantUpsertInternal(SMBase):
 
     external_id: str
     id: int | None = None
+    external_ids: dict[str, str | None] | None = None
     reported_sex: int | None = None
     reported_gender: str | None = None
     karyotype: str | None = None
@@ -93,7 +95,7 @@ class ParticipantUpsertInternal(SMBase):
         """Convert to transport model"""
         return ParticipantUpsert(
             id=self.id,
-            external_id=self.external_id,
+            external_ids=self.external_ids,  # type: ignore
             reported_sex=self.reported_sex,
             reported_gender=self.reported_gender,
             karyotype=self.karyotype,
@@ -107,7 +109,7 @@ class Participant(SMBase):
 
     id: int
     project: ProjectId
-    external_id: str
+    external_ids: dict[str, str]
     reported_sex: int | None = None
     reported_gender: str | None = None
     karyotype: str | None = None
@@ -118,7 +120,7 @@ class NestedParticipant(SMBase):
     """External participant model with nested samples"""
 
     id: int
-    external_id: str = None
+    external_ids: dict[str, str]
     reported_sex: int | None = None
     reported_gender: str | None = None
     karyotype: str | None = None
@@ -132,7 +134,7 @@ class ParticipantUpsert(SMBase):
     """External upsert model for participant"""
 
     id: int | OpenApiGenNoneType = None
-    external_id: str | OpenApiGenNoneType = None
+    external_ids: dict[str, str | OpenApiGenNoneType] | OpenApiGenNoneType = None
     reported_sex: int | OpenApiGenNoneType = None
     reported_gender: str | OpenApiGenNoneType = None
     karyotype: str | OpenApiGenNoneType = None
@@ -144,7 +146,7 @@ class ParticipantUpsert(SMBase):
         """Convert to internal model, doesn't really do much"""
         p = ParticipantUpsertInternal(
             id=self.id,  # type: ignore
-            external_id=self.external_id,  # type: ignore
+            external_ids=self.external_ids,  # type: ignore
             reported_sex=self.reported_sex,  # type: ignore
             reported_gender=self.reported_gender,  # type: ignore
             karyotype=self.karyotype,  # type: ignore

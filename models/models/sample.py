@@ -15,7 +15,7 @@ class SampleInternal(SMBase):
     """Internal model for a Sample"""
 
     id: int
-    external_id: str
+    external_ids: dict[str, str]
     meta: dict
     project: int
     type: str | None
@@ -39,13 +39,16 @@ class SampleInternal(SMBase):
             if isinstance(meta, str):
                 meta = json.loads(meta)
 
+        if 'external_ids' in d and isinstance(d['external_ids'], str):
+            d['external_ids'] = json.loads(d['external_ids'])
+
         return SampleInternal(id=_id, type=str(type_), meta=meta, active=active, **d)
 
     def to_external(self):
         """Convert to transport model"""
         return Sample(
             id=sample_id_format(self.id),
-            external_id=self.external_id,
+            external_ids=self.external_ids,
             meta=self.meta,
             project=self.project,
             type=self.type,
@@ -58,7 +61,7 @@ class NestedSampleInternal(SMBase):
     """SampleInternal with nested sequencing groups and assays"""
 
     id: int
-    external_id: str
+    external_ids: dict[str, str]
     meta: dict
     type: str | None
     active: bool | None
@@ -71,7 +74,7 @@ class NestedSampleInternal(SMBase):
         """Convert to transport model"""
         return NestedSample(
             id=sample_id_format(self.id),
-            external_id=self.external_id,
+            external_ids=self.external_ids,
             meta=self.meta,
             type=self.type,
             created_date=self.created_date,
@@ -84,7 +87,7 @@ class SampleUpsertInternal(SMBase):
     """Internal upsert model for sample"""
 
     id: int | None = None
-    external_id: str | None = None
+    external_ids: dict[str, str | None] | None = None
     meta: dict | None = None
     project: int | None = None
     type: str | None = None
@@ -102,7 +105,7 @@ class SampleUpsertInternal(SMBase):
 
         return SampleUpsert(
             id=_id,
-            external_id=self.external_id,
+            external_ids=self.external_ids,  # type: ignore
             meta=self.meta,
             project=self.project,
             type=self.type,
@@ -119,7 +122,7 @@ class Sample(SMBase):
     """Model for a Sample"""
 
     id: str
-    external_id: str
+    external_ids: dict[str, str]
     meta: dict
     project: int
     type: str | None
@@ -131,7 +134,7 @@ class Sample(SMBase):
         """Convert to internal model"""
         return SampleInternal(
             id=sample_id_transform_to_raw(self.id),
-            external_id=self.external_id,
+            external_ids=self.external_ids,
             meta=self.meta,
             project=self.project,
             type=self.type,
@@ -145,7 +148,7 @@ class NestedSample(SMBase):
     """External sample model with nested sequencing groups and assays"""
 
     id: str
-    external_id: str
+    external_ids: dict[str, str]
     meta: dict
     type: str | None
     created_date: str | None
@@ -157,7 +160,7 @@ class SampleUpsert(SMBase):
     """Upsert model for a Sample"""
 
     id: str | OpenApiGenNoneType = None
-    external_id: str | OpenApiGenNoneType = None
+    external_ids: dict[str, str | OpenApiGenNoneType] | OpenApiGenNoneType = None
     meta: dict | OpenApiGenNoneType = None
     project: int | OpenApiGenNoneType = None
     type: str | OpenApiGenNoneType = None
@@ -175,7 +178,7 @@ class SampleUpsert(SMBase):
 
         sample_upsert = SampleUpsertInternal(
             id=_id,
-            external_id=self.external_id,  # type: ignore
+            external_ids=self.external_ids,  # type: ignore
             meta=self.meta,  # type: ignore
             project=self.project,  # type: ignore
             type=self.type,  # type: ignore

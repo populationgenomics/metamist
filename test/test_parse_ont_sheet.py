@@ -4,7 +4,11 @@ from unittest.mock import patch
 
 from db.python.layers import ParticipantLayer
 from metamist.parser.generic_parser import ParsedParticipant
-from models.models import ParticipantUpsertInternal, SampleUpsertInternal
+from models.models import (
+    PRIMARY_EXTERNAL_ORG,
+    ParticipantUpsertInternal,
+    SampleUpsertInternal,
+)
 from scripts.parse_ont_sheet import OntParser
 
 
@@ -26,10 +30,10 @@ class TestOntSampleSheetParser(DbIsolatedTest):
         await player.upsert_participants(
             [
                 ParticipantUpsertInternal(
-                    external_id='Sample01',
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'Sample01'},
                     samples=[
                         SampleUpsertInternal(
-                            external_id='Sample01',
+                            external_ids={PRIMARY_EXTERNAL_ORG: 'Sample01'},
                         )
                     ],
                 )

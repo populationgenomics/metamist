@@ -69,6 +69,157 @@ class WebLayer(BaseLayer):
 class WebDb(DbBase):
     """Db layer for web related routes,"""
 
+    def _project_summary_sample_query(self, grid_filter: list[SearchItem]):
+        """
+        Get query for getting list of samples
+        """
+        wheres = ['s.project = :project', 's.active']
+        values = {'project': self.project}
+        where_str = ''
+        for query in grid_filter:
+            value = query.query
+            field = query.field
+            prefix = query.type.value
+            key = (
+                f'{query.type}_{field}_{value}'.replace('-', '_')
+                .replace('.', '_')
+                .replace(':', '_')
+                .replace(' ', '_')
+            )
+            if bool(re.search(r'\W', field)) and not query.is_meta:
+                # protect against SQL injection attacks
+                raise ValueError('Invalid characters in field')
+            if not query.is_meta:
+                if field == 'external_id':
+                    prefix += 'eid'  # this field is in its own table
+                q = f'{prefix}.{field} LIKE :{key}'
+            else:
+                # double double quote field to allow white space
+                q = f'JSON_VALUE({prefix}.meta, "$.""{field}""") LIKE :{key}'  # noqa: B028
+            wheres.append(q)
+            values[key] = escape_like_term(value) + '%'
+        if wheres:
+            where_str = 'WHERE ' + ' AND '.join(wheres)
+
+        # Skip 'limit' and 'after' SQL commands so we can get all samples that match
+        # the query to determine the total count, then take the selection of samples
+        # for the current page. This is more efficient than doing 2 queries separately.
+        sample_query = f"""
+        SELECT s.id, JSON_OBJECTAGG(seid.name, seid.external_id) AS external_ids,
+               s.type, s.meta, s.participant_id, s.active
+        FROM sample s
+        LEFT JOIN sample_external_id seid ON s.id = seid.sample_id
+        LEFT JOIN assay a ON s.id = a.sample_id
+        LEFT JOIN participant p ON p.id = s.participant_id
+        LEFT JOIN family_participant fp on s.participant_id = fp.participant_id
+        LEFT JOIN family f ON f.id = fp.family_id
+        LEFT JOIN sequencing_group sg ON s.id = sg.sample_id
+        {where_str}
+        GROUP BY id
+        ORDER BY id
+        """
+        return sample_query, values
+
+    @staticmethod
+    def _project_summary_process_assay_rows_by_sample_id(
+        assay_rows,
+    ) -> dict[int, list[AssayInternal]]:
+        """
+        Get sequences for samples for project summary
+        """
+
+        seq_id_to_sample_id_map = {seq['id']: seq['sample_id'] for seq in assay_rows}
+        seq_models = [
+            AssayInternal(
+                id=seq['id'],
+                type=seq['type'],
+                meta=json.loads(seq['meta']),
+                sample_id=seq['sample_id'],
+            )
+            for seq in assay_rows
+        ]
+        seq_models_by_sample_id = group_by(
+            seq_models, lambda s: seq_id_to_sample_id_map[s.id]
+        )
+
+        return seq_models_by_sample_id
+
+    @staticmethod
+    def _project_summary_process_sequencing_group_rows_by_sample_id(
+        sequencing_group_rows,
+        sequencing_eid_rows: list,
+        seq_models_by_sample_id: dict[int, list[AssayInternal]],
+    ) -> dict[int, list[NestedSequencingGroupInternal]]:
+        assay_models_by_id = {
+            assay.id: assay
+            for assay in itertools.chain(*seq_models_by_sample_id.values())
+        }
+
+        sequencing_group_eid_map: dict[int, dict[str, str]] = defaultdict(dict)
+        for row in sequencing_eid_rows:
+            sgid = row['sequencing_group_id']
+            sequencing_group_eid_map[sgid][row['name']] = row['name']
+
+        sg_by_id: dict[int, NestedSequencingGroupInternal] = {}
+        sg_id_to_sample_id: dict[int, int] = {}
+        for row in sequencing_group_rows:
+            sg_id = row['id']
+            assay = assay_models_by_id.get(row['assay_id'])
+            if sg_id in sg_by_id:
+                if assay:
+                    sg_by_id[sg_id].assays.append(assay)
+                continue
+            sg_id_to_sample_id[sg_id] = row['sample_id']
+            sg_by_id[sg_id] = NestedSequencingGroupInternal(
+                id=sg_id,
+                meta=json.loads(row['meta']),
+                type=row['type'],
+                technology=row['technology'],
+                platform=row['platform'],
+                assays=[assay] if assay else [],
+                external_ids=sequencing_group_eid_map.get(sg_id, {}),
+            )
+
+        return group_by(sg_by_id.values(), lambda sg: sg_id_to_sample_id[sg.id])
+
+    @staticmethod
+    def _project_summary_process_sample_rows(
+        sample_rows,
+        assay_models_by_sample_id: dict[int, list[AssayInternal]],
+        sg_models_by_sample_id: dict[int, list[NestedSequencingGroupInternal]],
+        sample_id_start_times: dict[int, date],
+    ) -> list[NestedSampleInternal]:
+        """
+        Process the returned sample rows into nested samples + sequences
+        """
+        assays_in_sgs = set(
+            assay.id
+            for sgs in sg_models_by_sample_id.values()
+            for sg in sgs
+            for assay in sg.assays
+        )
+        # filter assays to only those not in sequencing groups
+        filtered_assay_models_by_sid = {}
+        for sample_id, assays in assay_models_by_sample_id.items():
+            filtered_assays = [a for a in assays if a.id not in assays_in_sgs]
+            if len(filtered_assays) > 0:
+                filtered_assay_models_by_sid[sample_id] = filtered_assays
+
+        smodels = [
+            NestedSampleInternal(
+                id=s['id'],
+                external_ids=json.loads(s['external_ids']),
+                type=s['type'],
+                meta=json.loads(s['meta']) or {},
+                created_date=str(sample_id_start_times.get(s['id'], '')),
+                sequencing_groups=sg_models_by_sample_id.get(s['id'], []),
+                non_sequencing_assays=filtered_assay_models_by_sid.get(s['id'], []),
+                active=parse_sql_bool(s['active']),
+            )
+            for s in sample_rows
+        ]
+        return smodels
+
     async def get_total_number_of_samples(self):
         """Get total number of active samples within a project"""
         _query = 'SELECT COUNT(*) FROM sample WHERE project = :project AND active'
