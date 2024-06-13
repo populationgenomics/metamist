@@ -307,7 +307,7 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                 // debugger
                                 return (
                                     <SUITable.Row
-                                        key={`${p.external_id}-${s.id}-${sg.id}-${assay.id}`}
+                                        key={`${p.id}-${s.id}-${sg.id}-${assay.id}`}
                                     >
                                         {isFirstOfGroup && (
                                             <SUITable.Cell
