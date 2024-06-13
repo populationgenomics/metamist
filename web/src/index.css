@@ -158,18 +158,17 @@ blockquote {
     color: var(--color-text-primary);
 }
 
-.ui .card, .ui .segment {
+.ui .card,
+.ui .segment {
     background: var(--color-bg-card);
     color: var(--color-text-primary);
     border: 1px solid var(--color-border-default);
 }
 
-
 textarea {
     background: var(--color-bg);
     color: var(--color-text-primary);
     border: 1px solid var(--color-border-default);
-
 }
 
 /* https://alexandergottlieb.com/2018/02/22/overflow-scroll-and-the-right-padding-problem-a-css-only-solution/ */
