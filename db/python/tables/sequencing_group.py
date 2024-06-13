@@ -80,15 +80,17 @@ class SequencingGroupTable(DbBase):
             query_values.update(avalues)
 
         if filter_.created_on is not None:
-            cowheres, covalues = filter_.to_sql(sql_overrides, only=['created_on'])
-            query_values.update(covalues)
+            created_on_condition, created_on_vals = filter_.to_sql(
+                {'created_on': 'DATE(created_on)'}, only=['created_on']
+            )
+            query_values.update(created_on_vals)
             _query.append(
                 f"""
             INNER JOIN (
                 SELECT id, TIMESTAMP(min(row_start)) AS created_on
                 FROM sequencing_group FOR SYSTEM_TIME ALL
-                WHERE {cowheres}
                 GROUP BY id
+                HAVING {created_on_condition}
             ) AS sg_timequery ON sg.id = sg_timequery.id
             """
             )
@@ -155,8 +157,6 @@ class SequencingGroupTable(DbBase):
             GROUP BY sg.id
         """
 
-        print(_outer_query)
-
         return _outer_query, query_values
 
     async def query(
@@ -222,7 +222,7 @@ class SequencingGroupTable(DbBase):
         Get sequence groups by internal identifiers
         """
 
-        query = SequencingGroupFilter(id=GenericFilter(in_=ids))
+        query = SequencingGroupFilter(id=GenericFilter(in_=ids), active_only=None)
         projects, sgs = await self.query(query)
 
         return projects, sgs
