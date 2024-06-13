@@ -81,6 +81,9 @@ class TestParticipant(DbIsolatedTest):
                     )
                 )
 
+        with self.assertRaises(ValueError):
+            _ = await self.player.upsert_participant(ParticipantUpsertInternal(external_ids={'OTHER': 'P1'}))
+
         result = await self.player.upsert_participant(
             ParticipantUpsertInternal(
                 external_ids={PRIMARY_EXTERNAL_ORG: 'P10', 'A': 'A1', 'B': None, 'C': 'C1'},
@@ -266,6 +269,9 @@ class TestSample(DbIsolatedTest):
                     external_ids={PRIMARY_EXTERNAL_ORG: None},
                     )
                 )
+
+        with self.assertRaises(ValueError):
+            _ = await self.slayer.upsert_sample(SampleUpsertInternal(external_ids={'OTHER': 'S1'}))
 
         result = await self.slayer.upsert_sample(
             SampleUpsertInternal(
