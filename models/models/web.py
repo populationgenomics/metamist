@@ -185,7 +185,7 @@ class ProjectParticipantGridResponse(SMBase):
 
         family_keys: list[tuple[str, str]] = [('external_id', 'Family ID')]
         family_keys.extend(('meta.' + k, k) for k in family_meta_keys)
-        participant_keys: list[tuple[str, str]] = [('external_id', 'Participant ID')]
+        participant_keys: list[tuple[str, str]] = [('external_ids', 'Participant ID')]
 
         if has_reported_sex:
             participant_keys.append(('reported_sex', 'Reported sex'))
@@ -197,7 +197,7 @@ class ProjectParticipantGridResponse(SMBase):
         participant_keys.extend(('meta.' + k, k) for k in participant_meta_keys)
         sample_keys: list[tuple[str, str]] = [
             ('id', 'Sample ID'),
-            ('external_id', 'External Sample ID'),
+            ('external_ids', 'External Sample ID'),
             ('created_date', 'Created date'),
         ] + [
             ('meta.' + k, k)

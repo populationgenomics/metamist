@@ -186,10 +186,10 @@ SINGLE_PARTICIPANT_QUERY_RESULT = ProjectParticipantGridResponse(
     participants=[],
     total_results=1,
     family_keys=[('external_id', 'Family ID')],
-    participant_keys=[('external_id', 'Participant ID')],
+    participant_keys=[('external_ids', 'Participant ID')],
     sample_keys=[
         ('id', 'Sample ID'),
-        ('external_id', 'External Sample ID'),
+        ('external_ids', 'External Sample ID'),
         ('created_date', 'Created date'),
     ],
     sequencing_group_keys=[
@@ -389,10 +389,10 @@ class TestWeb(DbIsolatedTest):
             participants=[],  # data_to_class(expected_data_list),
             total_results=2,
             family_keys=[('external_id', 'Family ID')],
-            participant_keys=[('external_id', 'Participant ID')],
+            participant_keys=[('external_ids', 'Participant ID')],
             sample_keys=[
                 ('id', 'Sample ID'),
-                ('external_id', 'External Sample ID'),
+                ('external_ids', 'External Sample ID'),
                 ('created_date', 'Created date'),
             ],
             sequencing_group_keys=[
@@ -436,10 +436,10 @@ class TestWeb(DbIsolatedTest):
             participants=[],  # data_to_class(expected_data_list_filtered),
             total_results=2,
             family_keys=[('external_id', 'Family ID')],
-            participant_keys=[('external_id', 'Participant ID')],
+            participant_keys=[('external_ids', 'Participant ID')],
             sample_keys=[
                 ('id', 'Sample ID'),
-                ('external_id', 'External Sample ID'),
+                ('external_ids', 'External Sample ID'),
                 ('created_date', 'Created date'),
             ],
             sequencing_group_keys=[
@@ -533,13 +533,13 @@ class WebNonDBTests(unittest.TestCase):
         """Test nested participant to flat rows with a projection"""
         participant = NestedParticipant(
             id=1,
-            external_id='pex1',
+            external_ids={PRIMARY_EXTERNAL_ORG: 'pex1'},
             meta={'pkey': 'value'},
             families=[FamilySimple(id=-2, external_id='fex1')],
             samples=[
                 NestedSample(
                     id='xpgA',
-                    external_id='sex1',
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'sex1', 'external_org': 'ex02'},
                     meta={'skey': 'svalue'},
                     type='blood',
                     created_date='2021-01-01',
@@ -575,8 +575,8 @@ class WebNonDBTests(unittest.TestCase):
         )
         fields = ExportProjectParticipantFields(
             family_keys=['external_id'],
-            participant_keys=['external_id', 'meta.pkey'],
-            sample_keys=['meta.skey', 'external_id'],
+            participant_keys=['external_ids', 'meta.pkey'],
+            sample_keys=['meta.skey', 'external_ids'],
             sequencing_group_keys=['type', 'meta.sgkey'],
             assay_keys=['type', 'meta.akey'],
         )
@@ -588,17 +588,25 @@ class WebNonDBTests(unittest.TestCase):
             headers,
             (
                 'family.external_id',
-                'participant.external_id',
+                'participant.external_ids',
                 'participant.meta.pkey',
                 'sample.meta.skey',
-                'sample.external_id',
+                'sample.external_ids',
                 'sequencing_group.type',
                 'sequencing_group.meta.sgkey',
                 'assay.type',
                 'assay.meta.akey',
             ),
         )
-        non_sg_keys = ('fex1', 'pex1', 'value', 'svalue', 'sex1', 'genome', 'sgvalue')
+        non_sg_keys = (
+            'fex1',
+            'pex1',
+            'value',
+            'svalue',
+            'sex1, external_org: ex02',
+            'genome',
+            'sgvalue',
+        )
         expected = [
             (*non_sg_keys, 'sequencing', 'avalue'),
             (*non_sg_keys, 'sequencing', 'avalue2'),

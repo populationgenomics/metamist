@@ -1,4 +1,4 @@
-# pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-instance-attributes,too-many-locals,too-many-branches
 import dataclasses
 from collections import defaultdict
 from typing import Any
@@ -117,23 +117,41 @@ class ParticipantTable(DbBase):
 
     @staticmethod
     async def _construct_participant_query(
-        filter_: ParticipantFilter, keys: list[str]
+        filter_: ParticipantFilter,
+        keys: list[str],
+        skip: int | None = None,
+        limit: int | None = None,
+        participant_eid_table_alias: str | None = None,
     ) -> tuple[str, dict[str, Any]]:
         """Construct a participant query"""
         needs_family = False
+        needs_participant_eid = False
         needs_sample = False
+        needs_sample_eid = False
         needs_sequencing_group = False
         needs_assay = False
 
-        wheres, values = filter_.to_sql(
+        _wheres, values = filter_.to_sql(
             {
-                'project': 'p.project',
-                'id': 'p.id',
-                'external_id': 'p.external_id',
-                'meta': 'p.meta',
+                'project': 'pp.project',
+                'id': 'pp.id',
+                'meta': 'pp.meta',
             },
-            exclude=['family', 'sample', 'sequencing_group', 'assay'],
+            exclude=['family', 'sample', 'sequencing_group', 'assay', 'external_id'],
         )
+        wheres = [_wheres]
+
+        if filter_.external_id:
+            needs_participant_eid = True
+            peid_wheres, peid_values = filter_.to_sql(
+                {
+                    'external_id': 'peid.external_id',
+                },
+                only=['external_id'],
+            )
+            values.update(peid_values)
+            if peid_wheres:
+                wheres.append(peid_wheres)
 
         if filter_.family:
             needs_family = True
@@ -146,7 +164,7 @@ class ParticipantTable(DbBase):
             )
             values.update(fvalues)
             if fwheres:
-                wheres += ' AND ' + fwheres
+                wheres.append(fwheres)
 
         if filter_.sample:
             needs_sample = True
@@ -154,13 +172,22 @@ class ParticipantTable(DbBase):
                 {
                     'id': 's.id',
                     'type': 's.type',
-                    'external_id': 's.external_id',
                     'meta': 's.meta',
-                }
+                },
+                exclude=['external_id'],
             )
+            if filter_.sample.external_id:
+                needs_sample_eid = True
+                seid_wheres, seid_values = filter_.sample.to_sql(
+                    {'external_id': 'seid.external_id'}, only=['external_id']
+                )
+
+                wheres.append(seid_wheres)
+                svalues.update(seid_values)
+
             values.update(svalues)
             if swheres:
-                wheres += ' AND ' + swheres
+                wheres.append(swheres)
 
         if filter_.sequencing_group:
             needs_sample = True
@@ -176,11 +203,14 @@ class ParticipantTable(DbBase):
             )
             values.update(svalues)
             if swheres:
-                wheres += ' AND ' + swheres
+                wheres.append(swheres)
 
         if filter_.assay:
+            # 2024-06-13 mfranklin
+            #   This is explicitly NOT searching assays through the active sequencing
+            #   group, so it could return a result here, but not in the web, as the web
+            #   doesn't show non-sequencing-assays as of writing
             needs_sample = True
-            needs_sequencing_group = True
             needs_assay = True
 
             awheres, avalues = filter_.assay.to_sql(
@@ -192,31 +222,67 @@ class ParticipantTable(DbBase):
             )
             values.update(avalues)
             if awheres:
-                wheres += ' AND ' + awheres
+                wheres.append(awheres)
 
-        query = f"""
-        SELECT
-            {', '.join(str(k) for k in keys)}
-        FROM participant p
-        """
+        query_lines = [
+            'SELECT DISTINCT pp.id',
+            'FROM participant pp',
+        ]
+
+        if needs_participant_eid:
+            query_lines.append(
+                'INNER JOIN participant_external_id peid ON pp.id = peid.participant_id'
+            )
 
         if needs_sample:
-            query += 'INNER JOIN sample s ON s.participant_id = p.id\n'
-        if needs_sequencing_group:
-            query += 'INNER JOIN sequencing_group sg ON sg.sample_id = s.id\n'
-        if needs_assay:
-            query += (
-                'INNER JOIN sequencing_group_assay a_sg ON a_sg.sequencing_group_id = sg.id\n'
-                'INNER JOIN assay a ON a.id = a_sg.assay_id\n'
+            query_lines.append('INNER JOIN sample s ON s.participant_id = pp.id')
+        if needs_sample_eid:
+            query_lines.append(
+                'INNER JOIN sample_external_id seid ON seid.sample_id = s.id'
             )
+        if needs_sequencing_group:
+            query_lines.append('INNER JOIN sequencing_group sg ON sg.sample_id = s.id')
+        if needs_assay:
+            # see above for a quick note in assays from participant query
+            query_lines.append('INNER JOIN assay a ON a.sample_id = s.id')
         if needs_family:
-            query += 'INNER JOIN family_participant fp ON fp.participant_id = p.id\n'
-            query += 'INNER JOIN family f ON f.id = fp.family_id\n'
+            query_lines.append(
+                'INNER JOIN family_participant fp ON fp.participant_id = pp.id\n'
+                'INNER JOIN family f ON f.id = fp.family_id'
+            )
 
         if wheres:
-            query += 'WHERE \n' + wheres
+            query_lines.append('WHERE \n' + ' AND '.join(wheres))
 
-        return query, values
+        if limit or skip:
+            query_lines.append('ORDER BY pp.id')
+
+        if limit:
+            query_lines.append('LIMIT :limit')
+            values['limit'] = limit
+
+        if skip:
+            query_lines.append('OFFSET :offset')
+            values['offset'] = skip
+
+        query = '\n'.join('  ' + line.strip() for line in query_lines)
+        ex_table_join = ''
+        if participant_eid_table_alias:
+            ex_table_join = f"""
+            LEFT JOIN participant_external_id {participant_eid_table_alias}
+                ON p.id = {participant_eid_table_alias}.participant_id
+            """
+        outer_query = f"""
+            SELECT {', '.join(keys)}
+            FROM participant p
+            {ex_table_join}
+            INNER JOIN (
+            {query}
+            ) as inner_query ON inner_query.id = p.id
+            GROUP BY p.id
+        """
+
+        return outer_query, values
 
     async def query(
         self,
@@ -234,23 +300,20 @@ class ParticipantTable(DbBase):
         """
         keys = [
             'p.id',
-            'p.external_id',
+            'JSON_OBJECTAGG(pexid.name, pexid.external_id) as external_ids',
             'p.reported_sex',
             'p.reported_gender',
             'p.karyotype',
             'p.meta',
             'p.project',
         ]
-        query, values = await self._construct_participant_query(filter_, keys=keys)
-
-        if limit:
-            query += '\nLIMIT :limit'
-            values['limit'] = limit
-
-        if skip:
-            query += '\nOFFSET :offset'
-            values['offset'] = skip
-
+        query, values = await self._construct_participant_query(
+            filter_,
+            keys=keys,
+            skip=skip,
+            limit=limit,
+            participant_eid_table_alias='pexid',
+        )
         rows = await self.connection.fetch_all(query, values)
         projects = set(r['project'] for r in rows)
         return projects, [ParticipantInternal.from_db(dict(r)) for r in rows]

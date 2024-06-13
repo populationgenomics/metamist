@@ -359,7 +359,7 @@ class TestAssay(DbIsolatedTest):
         """Test query_assays in different combinations"""
         sample = await self.slayer.upsert_sample(
             SampleUpsertInternal(
-                external_id='SAM_TEST_QUERY',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'SAM_TEST_QUERY'},
                 type='blood',
                 active=True,
                 meta={'collection-year': '2022'},
@@ -521,7 +521,7 @@ class TestAssay(DbIsolatedTest):
         """
         samples_to_insert = [
             SampleUpsertInternal(
-                external_id='SAMPLE_1',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'SAMPLE_1'},
                 type='blood',
                 active=True,
                 meta={'collection-year': '2022'},
@@ -587,7 +587,7 @@ class TestAssay(DbIsolatedTest):
                 ],
             ),
             SampleUpsertInternal(
-                external_id='SAMPLE_2',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'SAMPLE_2'},
                 type='blood',
                 active=True,
                 meta={'collection-year': '2022'},

@@ -81,7 +81,6 @@ class NestedParticipantInternal(SMBase):
 class ParticipantUpsertInternal(SMBase):
     """Internal upsert model for participant"""
 
-    external_id: str
     id: int | None = None
     external_ids: dict[str, str | None] | None = None
     reported_sex: int | None = None

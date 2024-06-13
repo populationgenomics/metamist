@@ -7,7 +7,7 @@ import asyncio
 import csv
 import io
 from datetime import date
-from typing import Generator
+from typing import Any, Generator
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
@@ -276,6 +276,20 @@ def get_field_from_obj(obj, field: str) -> str | None:
     return getattr(obj, field, None)
 
 
+def prepare_field_for_export(field_value: Any) -> str:
+    """Prepare field for export"""
+    if isinstance(field_value, (list, tuple)):
+        return ', '.join(prepare_field_for_export(f) for f in field_value)
+    if isinstance(field_value, dict):
+        # special case if the key is empty, then just return the value
+        return ', '.join(
+            f'{k}: {prepare_field_for_export(v)}' if k else v
+            for k, v in field_value.items()
+        )
+
+    return str(field_value)
+
+
 def prepare_participants_for_export(
     participants: list[NestedParticipant], fields: ExportProjectParticipantFields | None
 ) -> Generator[tuple[str, ...], None, None]:
@@ -303,26 +317,33 @@ def prepare_participants_for_export(
         for field in fields.family_keys:
             prow.append(
                 ', '.join(
-                    str(get_field_from_obj(f, field)) for f in participant.families
+                    prepare_field_for_export(get_field_from_obj(f, field))
+                    for f in participant.families
                 )
             )
         for field in fields.participant_keys:
-            prow.append(get_field_from_obj(participant, field))
+            prow.append(
+                prepare_field_for_export(get_field_from_obj(participant, field))
+            )
 
         for sample in participant.samples:
             srow = []
             for field in fields.sample_keys:
-                srow.append(get_field_from_obj(sample, field))
+                srow.append(prepare_field_for_export(get_field_from_obj(sample, field)))
 
             for sg in sample.sequencing_groups or []:
                 sgrow = []
                 for field in fields.sequencing_group_keys:
-                    sgrow.append(get_field_from_obj(sg, field))
+                    sgrow.append(
+                        prepare_field_for_export(get_field_from_obj(sg, field))
+                    )
 
                 for assay in sg.assays or []:
                     arow = []
                     for field in fields.assay_keys:
-                        arow.append(get_field_from_obj(assay, field))
+                        arow.append(
+                            prepare_field_for_export(get_field_from_obj(assay, field))
+                        )
 
                     yield (
                         *prow,

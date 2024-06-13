@@ -37,6 +37,14 @@ const nRowsForSample = (sample: NestedSample) => {
     return maxOr1(res)
 }
 
+const prepareExternalIds = (ids: Record<string, string>) => {
+    return Object.entries(ids)
+        .map(([key, value]) =>
+            key.length === 0 ? sanitiseValue(value) : `${key}: ${sanitiseValue(value)}`
+        )
+        .join(', ')
+}
+
 const border = '1px solid #dee2e6'
 
 const FamilyCells: React.FC<{
@@ -101,7 +109,9 @@ const ParticipantCells: React.FC<{
                 key={`${participant.id}participant.${field.name}`}
                 rowSpan={participantRowSpan}
             >
-                {sanitiseValue(_.get(participant, field.name))}
+                {field.name == 'external_ids'
+                    ? prepareExternalIds(participant.external_ids || {})
+                    : sanitiseValue(_.get(participant, field.name))}
             </td>
         ))}
     </>
@@ -178,9 +188,11 @@ export const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProp
                                     key={`${s.id}sample.${field.name}`}
                                     rowSpan={samplesRowSpan}
                                 >
-                                    {field.name === 'external_id' || field.name === 'id' ? (
+                                    {field.name === 'external_ids' || field.name === 'id' ? (
                                         <SampleLink id={s.id} projectName={projectName}>
-                                            {sanitiseValue(_.get(s, field.name))}
+                                            {field.name === 'external_ids'
+                                                ? prepareExternalIds(s.external_ids || {})
+                                                : s.id}
                                         </SampleLink>
                                     ) : (
                                         sanitiseValue(_.get(s, field.name))
