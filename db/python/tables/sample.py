@@ -90,8 +90,10 @@ class SampleTable(DbBase):
         ]
 
         if needs_eid:
+            # 2024-06-15 mfranklin: left join, inner join, doesn't matter as there
+            #       should always be an external_id
             query_lines.append(
-                'INNER JOIN sample_external_id seid ON seid.sample_id = ss.id'
+                'LEFT JOIN sample_external_id seid ON seid.sample_id = ss.id'
             )
         if needs_sequencing_group:
             query_lines.append('INNER JOIN sequencing_group sg ON sg.sample_id = ss.id')
@@ -124,6 +126,7 @@ class SampleTable(DbBase):
             INNER JOIN (
             {query}
             ) as inner_query ON inner_query.id = s.id
+            GROUP BY s.id
         """
 
         return outer_query, values
