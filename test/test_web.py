@@ -165,10 +165,10 @@ SINGLE_PARTICIPANT_RESULT = ProjectSummaryInternal(
     },
     batch_sequencing_group_stats={'M001': {'genome': '1'}},
     participants=[],
-    participant_keys=[('external_id', 'Participant ID')],
+    participant_keys=[('external_ids', 'Participant ID')],
     sample_keys=[
         ('id', 'Sample ID'),
-        ('external_id', 'External Sample ID'),
+        ('external_ids', 'External Sample ID'),
         ('created_date', 'Created date'),
     ],
     sequencing_group_keys=[
@@ -349,10 +349,10 @@ class TestWeb(DbIsolatedTest):
             },
             batch_sequencing_group_stats={'M001': {'genome': '2'}},
             participants=[],  # data_to_class(expected_data_list),
-            participant_keys=[('external_id', 'Participant ID')],
+            participant_keys=[('external_ids', 'Participant ID')],
             sample_keys=[
                 ('id', 'Sample ID'),
-                ('external_id', 'External Sample ID'),
+                ('external_ids', 'External Sample ID'),
                 ('created_date', 'Created date'),
             ],
             sequencing_group_keys=[
@@ -402,10 +402,10 @@ class TestWeb(DbIsolatedTest):
             },
             batch_sequencing_group_stats={'M001': {'genome': '2'}},
             participants=[],  # data_to_class(expected_data_list_filtered),
-            participant_keys=[('external_id', 'Participant ID')],
+            participant_keys=[('external_ids', 'Participant ID')],
             sample_keys=[
                 ('id', 'Sample ID'),
-                ('external_id', 'External Sample ID'),
+                ('external_ids', 'External Sample ID'),
                 ('created_date', 'Created date'),
             ],
             sequencing_group_keys=[
@@ -478,10 +478,10 @@ class TestWeb(DbIsolatedTest):
             },
             batch_sequencing_group_stats={'M001': {'genome': '2'}},
             participants=[],
-            participant_keys=[('external_id', 'Participant ID')],
+            participant_keys=[('external_ids', 'Participant ID')],
             sample_keys=[
                 ('id', 'Sample ID'),
-                ('external_id', 'External Sample ID'),
+                ('external_ids', 'External Sample ID'),
                 ('created_date', 'Created date'),
             ],
             sequencing_group_keys=[
