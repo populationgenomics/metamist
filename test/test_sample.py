@@ -1,7 +1,7 @@
 from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.layers.sample import SampleLayer
-from models.models.sample import SampleUpsertInternal
+from models.models import PRIMARY_EXTERNAL_ORG, SampleUpsertInternal
 
 
 class TestSample(DbIsolatedTest):
@@ -19,7 +19,7 @@ class TestSample(DbIsolatedTest):
         """Test inserting a sample"""
         sample = await self.slayer.upsert_sample(
             SampleUpsertInternal(
-                external_id='Test01',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
                 type='blood',
                 active=True,
                 meta={'meta': 'meta ;)'},
@@ -32,13 +32,16 @@ class TestSample(DbIsolatedTest):
         self.assertEqual(1, len(samples))
         self.assertEqual(sample.id, samples[0]['id'])
 
+        mapping = await self.slayer.get_sample_id_map_by_external_ids(['Test01'])
+        self.assertDictEqual({'Test01': sample.id}, mapping)
+
     @run_as_sync
     async def test_get_sample(self):
         """Test getting formed sample"""
         meta_dict = {'meta': 'meta ;)'}
         s = await self.slayer.upsert_sample(
             SampleUpsertInternal(
-                external_id='Test01',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
                 type='blood',
                 active=True,
                 meta=meta_dict,
@@ -56,21 +59,21 @@ class TestSample(DbIsolatedTest):
         meta_dict = {'meta': 'meta ;)'}
         s = await self.slayer.upsert_sample(
             SampleUpsertInternal(
-                external_id='Test01',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
                 type='blood',
                 active=True,
                 meta=meta_dict,
             )
         )
 
-        new_external_id = 'Test02'
+        new_external_id_dict = {PRIMARY_EXTERNAL_ORG: 'Test02'}
         await self.slayer.upsert_sample(
-            SampleUpsertInternal(id=s.id, external_id=new_external_id)
+            SampleUpsertInternal(id=s.id, external_ids=new_external_id_dict)
         )
 
         sample = await self.slayer.get_by_id(s.id, check_project_id=False)
 
-        self.assertEqual(new_external_id, sample.external_id)
+        self.assertDictEqual(new_external_id_dict, sample.external_ids)
 
     # @run_as_sync
     # async def test_update_sample(self):

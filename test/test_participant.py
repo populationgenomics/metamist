@@ -3,6 +3,7 @@ from test.testbase import DbIsolatedTest, run_as_sync
 from db.python.db_filters import GenericFilter
 from db.python.layers.participant import ParticipantLayer
 from db.python.tables.participant import ParticipantFilter
+from models.base import PRIMARY_EXTERNAL_ORG
 from models.models.assay import AssayUpsertInternal
 from models.models.participant import ParticipantUpsertInternal
 from models.models.sample import SampleUpsertInternal
@@ -12,14 +13,14 @@ from models.models.sequencing_group import SequencingGroupUpsertInternal
 def get_participant_to_insert(id_suffix='1'):
     """Helper function to create a participant object for insertion into the database"""
     return ParticipantUpsertInternal(
-        external_id='P0' + id_suffix,
+        external_ids={PRIMARY_EXTERNAL_ORG: 'P0' + id_suffix},
         meta={'pmeta': 'pvalue'},
         reported_sex=2,
         reported_gender='FEMALE',
         karyotype='XX',
         samples=[
             SampleUpsertInternal(
-                external_id='S0' + id_suffix,
+                external_ids={PRIMARY_EXTERNAL_ORG: 'S0' + id_suffix},
                 type='blood',
                 meta={'smeta': 'svalue'},
                 sequencing_groups=[
@@ -69,6 +70,36 @@ class TestParticipant(DbIsolatedTest):
         self.assertEqual(ps[0].id, p.id)
 
         ps = await self.player.query(ParticipantFilter(id=GenericFilter(in_=[-1])))
+        self.assertEqual(len(ps), 0)
+
+    @run_as_sync
+    async def test_query_by_exids(self):
+        """Test query"""
+
+        p = get_participant_to_insert()
+        p.external_ids = {
+            PRIMARY_EXTERNAL_ORG: 'P01',
+            'external_org': 'ex01',
+        }
+
+        p = await self.player.upsert_participant(p)
+
+        ps = await self.player.query(
+            ParticipantFilter(external_id=GenericFilter(eq='P01'))
+        )
+
+        self.assertEqual(len(ps), 1)
+        self.assertEqual(ps[0].id, p.id)
+
+        ps = await self.player.query(
+            ParticipantFilter(external_id=GenericFilter(in_=['ex01']))
+        )
+        self.assertEqual(len(ps), 1)
+        self.assertEqual(ps[0].id, p.id)
+
+        ps = await self.player.query(
+            ParticipantFilter(external_id=GenericFilter(in_=['ex02']))
+        )
         self.assertEqual(len(ps), 0)
 
     @run_as_sync

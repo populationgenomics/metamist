@@ -8,6 +8,7 @@ import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import MuckError from '../../shared/components/MuckError'
 import ErrorBoundary from '../../shared/utilities/errorBoundary'
 import { ProjectParticipantGridFilter, ProjectParticipantGridResponse, WebApi } from '../../sm-api'
+import { DictEditor } from './DictEditor'
 import PageOptions from './PageOptions'
 import {
     defaultHeaderGroupsFromResponse,
@@ -44,7 +45,7 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
     >()
 
     const hasOptionErrors: Partial<
-        Record<keyof IPageChangeOptions, { error: string; default: any }>
+        Record<keyof IPageChangeOptions, { error: string; default: any; value: any }>
     > = {}
 
     const { page } = useParams()
@@ -55,6 +56,7 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
         hasOptionErrors.pageSize = {
             error: `Invalid page size ${pageSize}`,
             default: 20,
+            value: pageSize,
         }
     }
     // parse pageNumber
@@ -63,6 +65,7 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
         hasOptionErrors.pageNumber = {
             error: `Invalid page number ${pageNumber}`,
             default: 1,
+            value: pageNumber,
         }
     }
 
@@ -89,6 +92,7 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
         hasOptionErrors.filter = {
             error: `Error parsing filter options: ${_filterOptions}`,
             default: {},
+            value: _filterOptions,
         }
     }
 
@@ -191,6 +195,13 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
                         <Message.Item key={k}>{v.error}</Message.Item>
                     ))}
                 </Message.List>
+                {hasOptionErrors.filter && (
+                    <DictEditor
+                        jsonStr={hasOptionErrors.filter.value}
+                        onChange={(v) => setFilterValues(v, true)}
+                    />
+                )}
+
                 <Button onClick={() => setPageOptions(defaultOptions)}>
                     Reset to default ({displayDefaults.join(', ')})
                 </Button>

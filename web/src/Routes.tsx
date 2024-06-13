@@ -1,23 +1,25 @@
 import * as React from 'react'
 
+import { Route, Routes as Switch } from 'react-router-dom'
 import SwaggerUI from 'swagger-ui-react'
-import { Routes as Switch, Route } from 'react-router-dom'
+
+import ProjectsAdmin from './pages/admin/ProjectsAdmin'
 import {
-    BillingHome,
-    BillingSeqrProp,
-    BillingCostByTime,
     BillingCostByAnalysis,
-    BillingInvoiceMonthCost,
     BillingCostByCategory,
     BillingCostByMonth,
+    BillingCostByTime,
+    BillingHome,
+    BillingInvoiceMonthCost,
+    BillingSeqrProp,
 } from './pages/billing'
 import DocumentationArticle from './pages/docs/Documentation'
-import SampleView from './pages/sample/SampleView'
 import FamilyView from './pages/family/FamilyView'
-import ProjectOverview from './pages/project/ProjectOverview'
-import ProjectsAdmin from './pages/admin/ProjectsAdmin'
-import ErrorBoundary from './shared/utilities/errorBoundary'
+import OurDnaDashboard from './pages/ourdna/OurDnaDashboard'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
+import ProjectOverview from './pages/project/ProjectOverview'
+import SampleView from './pages/sample/SampleView'
+import ErrorBoundary from './shared/utilities/errorBoundary'
 
 const Routes: React.FunctionComponent = () => (
     <Switch>
@@ -91,6 +93,8 @@ const Routes: React.FunctionComponent = () => (
                 </ErrorBoundary>
             }
         />
+
+        <Route path="/ourdna" element={<OurDnaDashboard />} />
 
         <Route path="/swagger" element={<SwaggerUI url="/openapi.json" tryItOutEnabled={true} />} />
 

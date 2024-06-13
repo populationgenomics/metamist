@@ -17,6 +17,8 @@ from metamist.model.analysis_status import AnalysisStatus
 from metamist.models import AssayUpsert, SampleUpsert, SequencingGroupUpsert
 from metamist.parser.generic_parser import chunk
 
+PRIMARY_EXTERNAL_ORG = ''
+
 NAMES = [
     'SOLAR',
     'LUNAR',
@@ -275,7 +277,7 @@ async def generate_sample_entries(
         nsamples = generate_random_number_within_distribution(default_count_probabilities)
         for i in range(nsamples):
             sample = SampleUpsert(
-                external_id=f'{participant_eid}_{i+1}',
+                external_ids={PRIMARY_EXTERNAL_ORG: f'{participant_eid}_{i+1}'},
                 type=random.choice(sample_types),
                 meta={
                     'collection_date': datetime.datetime.now()

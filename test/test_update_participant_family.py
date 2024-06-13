@@ -4,7 +4,7 @@ from pymysql.err import IntegrityError
 
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
-from models.models import ParticipantUpsertInternal
+from models.models import PRIMARY_EXTERNAL_ORG, ParticipantUpsertInternal
 
 
 class TestParticipantFamily(DbIsolatedTest):
@@ -22,17 +22,17 @@ class TestParticipantFamily(DbIsolatedTest):
         pl = ParticipantLayer(self.connection)
         self.pid = (
             await pl.upsert_participant(
-                ParticipantUpsertInternal(external_id='EX01', reported_sex=2)
+                ParticipantUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'EX01'}, reported_sex=2)
             )
         ).id
         self.pat_pid = (
             await pl.upsert_participant(
-                ParticipantUpsertInternal(external_id='EX01_pat', reported_sex=1)
+                ParticipantUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'EX01_pat'}, reported_sex=1)
             )
         ).id
         self.mat_pid = (
             await pl.upsert_participant(
-                ParticipantUpsertInternal(external_id='EX01_mat', reported_sex=2)
+                ParticipantUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'EX01_mat'}, reported_sex=2)
             )
         ).id
 

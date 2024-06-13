@@ -6,6 +6,7 @@ from db.python.layers import AnalysisLayer, SampleLayer, SequencingGroupLayer
 from db.python.tables.sequencing_group import SequencingGroupFilter
 from models.enums.analysis import AnalysisStatus
 from models.models import (
+    PRIMARY_EXTERNAL_ORG,
     AnalysisInternal,
     AssayUpsertInternal,
     SampleUpsertInternal,
@@ -20,7 +21,7 @@ def get_sample_model():
     """
     return SampleUpsertInternal(
         meta={},
-        external_id='EX_ID',
+        external_ids={PRIMARY_EXTERNAL_ORG: 'EX_ID'},
         sequencing_groups=[
             SequencingGroupUpsertInternal(
                 type='genome',

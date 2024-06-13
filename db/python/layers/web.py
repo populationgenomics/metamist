@@ -93,30 +93,6 @@ class WebDb(DbBase):
         WHERE s.project = :project"""
         return await self.connection.fetch_val(_query, {'project': self.project})
 
-    @staticmethod
-    def _project_summary_process_family_rows_by_pid(
-        family_rows,
-    ) -> dict[int, list[FamilySimpleInternal]]:
-        """
-        Process the family rows into NestedFamily objects
-        """
-        pid_to_fids = defaultdict(list)
-        for frow in family_rows:
-            pid_to_fids[frow['participant_id']].append(frow['family_id'])
-
-        res_families = {}
-        for f in family_rows:
-            if f['family_id'] in family_rows:
-                continue
-            res_families[f['family_id']] = FamilySimpleInternal(
-                id=f['family_id'], external_id=f['external_family_id']
-            )
-        pid_to_families = {
-            pid: [res_families[fid] for fid in fids]
-            for pid, fids in pid_to_fids.items()
-        }
-        return pid_to_families
-
     def get_seqr_links_from_project(self, project: WebProject) -> dict[str, str]:
         """
         From project.meta, select our project guids and form seqr links
@@ -351,7 +327,7 @@ class WebDb(DbBase):
                 nested_samples.append(
                     NestedSampleInternal(
                         id=sample.id,
-                        external_id=sample.external_id,
+                        external_ids=sample.external_ids,
                         type=sample.type,
                         meta=sample.meta,
                         created_date=screate,
@@ -367,7 +343,7 @@ class WebDb(DbBase):
                 )
             nested_participant = NestedParticipantInternal(
                 id=participant.id,
-                external_id=participant.external_id,
+                external_ids=participant.external_ids,
                 samples=nested_samples,
                 meta=participant.meta,
                 families=families,

@@ -108,6 +108,11 @@ def get_logger():
     return _logger
 
 
+def from_db_json(text):
+    """Convert DB's JSON text to Python object"""
+    return json.loads(text)
+
+
 def to_db_json(val):
     """Convert val to json for DB"""
     # return psycopg2.extras.Json(val)

@@ -27,6 +27,7 @@ from db.python.layers import (
     AssayLayer,
     CohortLayer,
     FamilyLayer,
+    OurDnaDashboardLayer,
     SampleLayer,
     SequencingGroupLayer,
 )
@@ -41,6 +42,7 @@ from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
 from models.enums import AnalysisStatus
 from models.models import (
+    PRIMARY_EXTERNAL_ORG,
     AnalysisInternal,
     AssayInternal,
     AuditLogInternal,
@@ -54,6 +56,7 @@ from models.models import (
 )
 from models.models.analysis_runner import AnalysisRunnerInternal
 from models.models.family import PedRowInternal
+from models.models.ourdna import OurDNADashboard, OurDNALostSample
 from models.models.project import ProjectId
 from models.models.sample import sample_id_transform_to_raw
 from models.utils.cohort_id_format import cohort_id_format, cohort_id_transform_to_raw
@@ -88,6 +91,28 @@ for enum in enum_tables.__dict__.values():
 GraphQLEnum = strawberry.type(type('GraphQLEnum', (object,), enum_methods))
 
 GraphQLAnalysisStatus = strawberry.enum(AnalysisStatus)
+
+
+@strawberry.experimental.pydantic.type(model=OurDNALostSample, all_fields=True)  # type: ignore
+class GraphQLOurDNALostSample:
+    """OurDNA Lost Sample GraphQL model to be used in OurDNA Dashboard"""
+
+    pass  # pylint: disable=unnecessary-pass
+
+
+@strawberry.experimental.pydantic.type(model=OurDNADashboard)  # type: ignore
+class GraphQLOurDNADashboard:
+    """OurDNA Dashboard model"""
+
+    collection_to_process_end_time: strawberry.scalars.JSON
+    collection_to_process_end_time_statistics: strawberry.scalars.JSON
+    collection_to_process_end_time_24h: strawberry.scalars.JSON
+    processing_times_by_site: strawberry.scalars.JSON
+    total_samples_by_collection_event_name: strawberry.scalars.JSON
+    samples_lost_after_collection: list[GraphQLOurDNALostSample]
+    samples_concentration_gt_1ug: strawberry.scalars.JSON
+    participants_consented_not_collected: list[int]
+    participants_signed_not_consented: list[int]
 
 
 # Create cohort GraphQL model
@@ -244,6 +269,18 @@ class GraphQLProject:
         )
         analysis_runners = await alayer.query(filter_)
         return [GraphQLAnalysisRunner.from_internal(ar) for ar in analysis_runners]
+
+    @strawberry.field
+    async def ourdna_dashboard(
+        self, info: Info, root: 'Project'
+    ) -> 'GraphQLOurDNADashboard':
+        connection = info.context['connection']
+        ourdna_layer = OurDnaDashboardLayer(connection)
+        if not root.id:
+            raise ValueError('Project must have an id')
+        ourdna_dashboard = await ourdna_layer.query(project_id=root.id)
+        # pylint: disable=no-member
+        return GraphQLOurDNADashboard.from_pydantic(ourdna_dashboard)
 
     @strawberry.field()
     async def pedigree(
@@ -630,7 +667,7 @@ class GraphQLParticipant:
     def from_internal(internal: ParticipantInternal) -> 'GraphQLParticipant':
         return GraphQLParticipant(
             id=internal.id,
-            external_id=internal.external_id,
+            external_id=internal.external_ids[PRIMARY_EXTERNAL_ORG],
             meta=internal.meta,
             reported_sex=internal.reported_sex,
             reported_gender=internal.reported_gender,
@@ -719,7 +756,7 @@ class GraphQLSample:
     def from_internal(sample: SampleInternal) -> 'GraphQLSample':
         return GraphQLSample(
             id=sample_id_format(sample.id),
-            external_id=sample.external_id,
+            external_id=sample.external_ids[PRIMARY_EXTERNAL_ORG],
             active=sample.active,
             meta=sample.meta,
             type=sample.type,
