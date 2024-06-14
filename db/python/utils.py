@@ -3,7 +3,8 @@ import json
 import logging
 import os
 import re
-from typing import Any, Generic, TypeVar
+from enum import Enum
+from typing import Any, Generic, Sequence, TypeVar
 
 from models.base import SMBase
 
@@ -71,10 +72,10 @@ class NoProjectAccess(Forbidden):
         project_names_str = (
             ', '.join(repr(p) for p in project_names) if project_names else ''
         )
-        allowed_roles_str = ' or '.join([r.name for r in allowed_roles])
+        required_roles_str = ' or '.join(allowed_roles)
 
         super().__init__(
-            f'{author} does not have {allowed_roles_str} access to resources from the '
+            f'{author} does not have {required_roles_str} access to resources from the '
             f'following project(s), or they may not exist: {project_names_str}',
             *args,
         )
