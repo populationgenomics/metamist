@@ -154,7 +154,7 @@ class SampleTable(DbBase):
             ('type', sample_type),
             ('active', active),
             ('audit_log_id', await self.audit_log_id()),
-            ('project', project or self.project),
+            ('project', project or self.project_id),
         ]
 
         keys = [k for k, _ in kv_pairs]
@@ -381,7 +381,8 @@ class SampleTable(DbBase):
             WHERE external_id in :external_ids AND project = :project
         """
         rows = await self.connection.fetch_all(
-            _query, {'external_ids': external_ids, 'project': project or self.project}
+            _query,
+            {'external_ids': external_ids, 'project': project or self.project_id},
         )
         sample_id_map = {el[1]: el[0] for el in rows}
 
@@ -406,7 +407,7 @@ class SampleTable(DbBase):
         """Get sample id map for all samples"""
         _query = 'SELECT id, external_id FROM sample WHERE project = :project'
         rows = await self.connection.fetch_all(
-            _query, {'project': project or self.project}
+            _query, {'project': project or self.project_id}
         )
         return {el[0]: el[1] for el in rows}
 
@@ -468,6 +469,6 @@ class SampleTable(DbBase):
             WHERE participant_id IS NULL AND project = :project
         """
         rows = await self.connection.fetch_all(
-            _query, {'project': project or self.project}
+            _query, {'project': project or self.project_id}
         )
         return [SampleInternal.from_db(dict(d)) for d in rows]

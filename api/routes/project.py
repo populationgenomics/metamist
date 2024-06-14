@@ -1,30 +1,26 @@
-from typing import List
-
 from fastapi import APIRouter
 
-from api.utils.db import Connection, get_projectless_db_connection
-from db.python.tables.project import ProjectPermissionsTable
-from models.models.group import FullWriteAccessRoles, GroupProjectRole, ReadAccessRoles
-from models.models.project import Project
+from api.utils.db import (
+    Connection,
+    get_project_db_connection,
+    get_projectless_db_connection,
+)
+from db.python.tables.project import ProjectMemberWithRole, ProjectPermissionsTable
+from models.models.project import FullWriteAccessRoles, Project, ProjectMemberRole
 
 router = APIRouter(prefix='/project', tags=['project'])
 
 
-@router.get('/all', operation_id='getAllProjects', response_model=List[Project])
-async def get_all_projects(connection=get_projectless_db_connection):
+@router.get('/all', operation_id='getAllProjects', response_model=list[Project])
+async def get_all_projects(connection: Connection = get_projectless_db_connection):
     """Get list of projects"""
-    ptable = ProjectPermissionsTable(connection)
-    return await ptable.get_all_projects(author=connection.author)
+    return connection.all_projects()
 
 
-@router.get('/', operation_id='getMyProjects', response_model=List[str])
-async def get_my_projects(connection=get_projectless_db_connection):
+@router.get('/', operation_id='getMyProjects', response_model=list[str])
+async def get_my_projects(connection: Connection = get_projectless_db_connection):
     """Get projects I have access to"""
-    ptable = ProjectPermissionsTable(connection)
-    projects = await ptable.get_projects_accessible_by_user(
-        user=connection.author, allowed_roles=ReadAccessRoles
-    )
-    return [p.name for p in projects]
+    return [p.name for p in connection.all_projects()]
 
 
 @router.put('/', operation_id='createProject')
@@ -38,6 +34,10 @@ async def create_project(
     Create a new project
     """
     ptable = ProjectPermissionsTable(connection)
+
+    # Creating a project requires the project creator permission
+    await ptable.check_project_creator_permissions(author=connection.author)
+
     pid = await ptable.create_project(
         project_name=name,
         dataset_name=dataset,
@@ -57,28 +57,32 @@ async def create_project(
 @router.get('/seqr/all', operation_id='getSeqrProjects')
 async def get_seqr_projects(connection: Connection = get_projectless_db_connection):
     """Get SM projects that should sync to seqr"""
-    ptable = ProjectPermissionsTable(connection)
-    return await ptable.get_seqr_projects()
+    projects = connection.all_projects()
+    return [p for p in projects if p.meta and p.meta.get('is_seqr')]
 
 
 @router.post('/{project}/update', operation_id='updateProject')
 async def update_project(
-    project: str,
     project_update_model: dict,
-    connection: Connection = get_projectless_db_connection,
+    connection: Connection = get_project_db_connection(FullWriteAccessRoles),
 ):
     """Update a project by project name"""
     ptable = ProjectPermissionsTable(connection)
+    # Updating a project additionally requires the project creator permission
+    await ptable.check_project_creator_permissions(author=connection.author)
+    project = connection.project
+    assert project
     return await ptable.update_project(
-        project_name=project, update=project_update_model, author=connection.author
+        project_name=project.name, update=project_update_model, author=connection.author
     )
 
 
 @router.delete('/{project}', operation_id='deleteProjectData')
 async def delete_project_data(
-    project: str,
     delete_project: bool = False,
-    connection: Connection = get_projectless_db_connection,
+    connection: Connection = get_project_db_connection(
+        {ProjectMemberRole.writer, ProjectMemberRole.data_manager}
+    ),
 ):
     """
     Delete all data in a project by project name.
@@ -86,11 +90,22 @@ async def delete_project_data(
     Requires READ access + project-creator permissions
     """
     ptable = ProjectPermissionsTable(connection)
-    p_obj = await ptable.get_and_check_access_to_project_for_name(
-        user=connection.author, project_name=project, allowed_roles=FullWriteAccessRoles
+
+    assert connection.project
+
+    # Allow data manager role to delete test projects
+    data_manager_deleting_test = (
+        connection.project.is_test
+        and connection.project.roles & {ProjectMemberRole.data_manager}
     )
+    if not data_manager_deleting_test:
+        # Otherwise, deleting a project additionally requires the project creator permission
+        await ptable.check_project_creator_permissions(author=connection.author)
+
     success = await ptable.delete_project_data(
-        project_id=p_obj.id, delete_project=delete_project, author=connection.author
+        project_id=connection.project.id,
+        delete_project=delete_project,
+        author=connection.author,
     )
 
     return {'success': success}
@@ -98,21 +113,17 @@ async def delete_project_data(
 
 @router.patch('/{project}/members', operation_id='updateProjectMembers')
 async def update_project_members(
-    project: str,
-    members: list[str],
-    # @TODO change this to accept a role
-    role: str,
-    connection: Connection = get_projectless_db_connection,
+    members: list[ProjectMemberWithRole],
+    connection: Connection = get_project_db_connection(FullWriteAccessRoles),
 ):
     """
     Update project members for specific read / write group.
     Not that this is protected by access to a specific access group
     """
     ptable = ProjectPermissionsTable(connection)
-    await ptable.set_group_members(
-        group_name=ptable.get_project_group_name(project, role=GroupProjectRole(role)),
-        members=members,
-        author=connection.author,
-    )
+
+    await ptable.check_member_admin_permissions(author=connection.author)
+    assert connection.project
+    await ptable.set_project_members(project=connection.project, members=members)
 
     return {'success': True}

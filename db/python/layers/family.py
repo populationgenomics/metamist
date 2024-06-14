@@ -13,9 +13,8 @@ from db.python.tables.participant import ParticipantTable
 from db.python.tables.sample import SampleTable
 from db.python.utils import GenericFilter, NotFoundError
 from models.models.family import FamilyInternal, PedRow, PedRowInternal
-from models.models.group import FullWriteAccessRoles, ReadAccessRoles
 from models.models.participant import ParticipantUpsertInternal
-from models.models.project import ProjectId
+from models.models.project import ProjectId, ReadAccessRoles
 
 
 class FamilyLayer(BaseLayer):
@@ -37,9 +36,7 @@ class FamilyLayer(BaseLayer):
             coded_phenotype=coded_phenotype,
         )
 
-    async def get_family_by_internal_id(
-        self, family_id: int, check_project_id: bool = True
-    ) -> FamilyInternal:
+    async def get_family_by_internal_id(self, family_id: int) -> FamilyInternal:
         """Get family by internal ID"""
         projects, families = await self.ftable.query(
             FamilyFilter(id=GenericFilter(eq=family_id))
@@ -47,10 +44,10 @@ class FamilyLayer(BaseLayer):
         if not families:
             raise NotFoundError(f'Family with ID {family_id} not found')
         family = families[0]
-        if check_project_id:
-            await self.ptable.check_access_to_project_ids(
-                self.author, [project], allowed_roles=ReadAccessRoles
-            )
+
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=ReadAccessRoles
+        )
 
         return family
 
@@ -61,7 +58,7 @@ class FamilyLayer(BaseLayer):
         families = await self.ftable.query(
             FamilyFilter(
                 external_id=GenericFilter(eq=external_id),
-                project=GenericFilter(eq=project or self.connection.project),
+                project=GenericFilter(eq=project or self.connection.project_id),
             )
         )
         if not families:
@@ -72,7 +69,6 @@ class FamilyLayer(BaseLayer):
     async def query(
         self,
         filter_: FamilyFilter,
-        check_project_ids: bool = True,
     ) -> list[FamilyInternal]:
         """Get all families for a project"""
 
@@ -80,10 +76,9 @@ class FamilyLayer(BaseLayer):
 
         projects, families = await self.ftable.query(filter_)
 
-        if check_project_ids:
-            await self.ptable.check_access_to_project_ids(
-                self.connection.author, projects, readonly=True
-            )
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=ReadAccessRoles
+        )
 
         return families
 
@@ -91,7 +86,6 @@ class FamilyLayer(BaseLayer):
         self,
         family_ids: list[int],
         check_missing: bool = True,
-        check_project_ids: bool = True,
     ) -> list[FamilyInternal]:
         """Get families by internal IDs"""
         projects, families = await self.ftable.query(
@@ -100,10 +94,9 @@ class FamilyLayer(BaseLayer):
         if not families:
             return []
 
-        if check_project_ids:
-            await self.ptable.check_access_to_project_ids(
-                self.connection.author, projects, allowed_roles=ReadAccessRoles
-            )
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=ReadAccessRoles
+        )
 
         if check_missing and len(family_ids) != len(families):
             missing_ids = set(family_ids) - set(f.id for f in families)
@@ -112,7 +105,7 @@ class FamilyLayer(BaseLayer):
         return families
 
     async def get_families_by_participants(
-        self, participant_ids: list[int], check_project_ids: bool = True
+        self, participant_ids: list[int]
     ) -> dict[int, list[FamilyInternal]]:
         """
         Get families keyed by participant_ids, this will duplicate families
@@ -123,10 +116,9 @@ class FamilyLayer(BaseLayer):
         if not participant_map:
             return {}
 
-        if check_project_ids:
-            await self.ptable.check_access_to_project_ids(
-                self.connection.author, projects, allowed_roles=ReadAccessRoles
-            )
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=ReadAccessRoles
+        )
 
         return participant_map
 
@@ -136,14 +128,13 @@ class FamilyLayer(BaseLayer):
         external_id: str = None,
         description: str = None,
         coded_phenotype: str = None,
-        check_project_ids: bool = True,
     ) -> bool:
         """Update fields on some family"""
-        if check_project_ids:
-            project_ids = await self.ftable.get_projects_by_family_ids([id_])
-            await self.ptable.check_access_to_project_ids(
-                self.author, project_ids, allowed_roles=FullWriteAccessRoles
-            )
+        project_ids = await self.ftable.get_projects_by_family_ids([id_])
+
+        self.connection.check_access_to_projects_for_ids(
+            project_ids, allowed_roles=ReadAccessRoles
+        )
 
         return await self.ftable.update_family(
             id_=id_,
@@ -214,9 +205,7 @@ class FamilyLayer(BaseLayer):
 
         return mapped_rows
 
-    async def get_participant_family_map(
-        self, participant_ids: list[int], check_project_ids=False
-    ):
+    async def get_participant_family_map(self, participant_ids: list[int]):
         """Get participant family map"""
 
         fptable = FamilyParticipantTable(self.connection)
@@ -224,8 +213,9 @@ class FamilyLayer(BaseLayer):
             participant_ids=participant_ids
         )
 
-        if check_project_ids:
-            raise NotImplementedError(f'Must check specified projects: {projects}')
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=ReadAccessRoles
+        )
 
         return family_map
 
@@ -277,7 +267,7 @@ class FamilyLayer(BaseLayer):
 
         external_family_id_map = await self.ftable.get_id_map_by_external_ids(
             list(external_family_ids),
-            project=self.connection.project,
+            project=self.connection.project_id,
             allow_missing=True,
         )
         missing_external_family_ids = [
@@ -285,7 +275,7 @@ class FamilyLayer(BaseLayer):
         ]
         external_participant_ids_map = await participant_table.get_id_map_by_external_ids(
             list(external_participant_ids),
-            project=self.connection.project,
+            project=self.connection.project_id,
             # Allow missing participants if we're creating them
             allow_missing=create_missing_participants,
         )
@@ -418,7 +408,7 @@ class FamilyLayer(BaseLayer):
         return True
 
     async def get_family_participants_by_family_ids(
-        self, family_ids: list[int], check_project_ids: bool = True
+        self, family_ids: list[int]
     ) -> dict[int, list[PedRowInternal]]:
         """Get family participants for family IDs"""
         projects, fps = await self.fptable.query(
@@ -428,15 +418,14 @@ class FamilyLayer(BaseLayer):
         if not fps:
             return {}
 
-        if check_project_ids:
-            await self.ptable.check_access_to_project_ids(
-                self.connection.author, projects, readonly=True
-            )
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=ReadAccessRoles
+        )
 
         return group_by(fps, lambda r: r.family_id)
 
     async def get_family_participants_for_participants(
-        self, participant_ids: list[int], check_project_ids: bool = True
+        self, participant_ids: list[int]
     ) -> list[PedRowInternal]:
         """Get family participants for participant IDs"""
         projects, fps = await self.fptable.query(
@@ -446,9 +435,8 @@ class FamilyLayer(BaseLayer):
         if not fps:
             return []
 
-        if check_project_ids:
-            await self.ptable.check_access_to_project_ids(
-                self.connection.author, projects, readonly=True
-            )
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=ReadAccessRoles
+        )
 
         return fps

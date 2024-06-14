@@ -76,7 +76,7 @@ class AnalysisTable(DbBase):
                 ('meta', to_db_json(meta or {})),
                 ('output', output),
                 ('audit_log_id', await self.audit_log_id()),
-                ('project', project or self.project),
+                ('project', project or self.project_id),
                 ('active', active if active is not None else True),
             ]
 
@@ -337,7 +337,7 @@ WHERE s.project = :project AND
 
         rows = await self.connection.fetch_all(
             _query,
-            {'analysis_type': analysis_type, 'project': project or self.project},
+            {'analysis_type': analysis_type, 'project': project or self.project_id},
         )
         return [row[0] for row in rows]
 
@@ -452,10 +452,10 @@ ORDER BY a.timestamp_completed DESC;
 
     async def get_analysis_runner_log(
         self,
-        project_ids: List[int] = None,
+        project_ids: List[int],
         # author: str = None,
-        output_dir: str = None,
-        ar_guid: str = None,
+        output_dir: str | None = None,
+        ar_guid: str | None = None,
     ) -> List[AnalysisInternal]:
         """
         Get log for the analysis-runner, useful for checking this history of analysis
@@ -465,9 +465,9 @@ ORDER BY a.timestamp_completed DESC;
             "type = 'analysis-runner'",
             'active',
         ]
-        if project_ids:
-            wheres.append('project in :project_ids')
-            values['project_ids'] = project_ids
+
+        wheres.append('project in :project_ids')
+        values['project_ids'] = project_ids
 
         if output_dir:
             wheres.append('(output = :output OR output LIKE :output_like)')

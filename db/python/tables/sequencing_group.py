@@ -265,7 +265,7 @@ class SequencingGroupTable(DbBase):
         INNER JOIN sequencing_group sg ON s.id = sg.sample_id
         WHERE project = :project
         """
-        rows = await self.connection.fetch_all(_query, {'project': self.project})
+        rows = await self.connection.fetch_all(_query, {'project': self.project_id})
         sequencing_group_ids_by_sample_ids_by_type: dict[int, dict[str, list[int]]] = (
             defaultdict(lambda: defaultdict(list))
         )
@@ -293,7 +293,7 @@ class SequencingGroupTable(DbBase):
 
         rows = list(
             await self.connection.fetch_all(
-                _query, {'seqtype': sequencing_type, 'project': self.project}
+                _query, {'seqtype': sequencing_type, 'project': self.project_id}
             )
         )
 

@@ -2,14 +2,12 @@ from fastapi import APIRouter
 
 from api.utils.db import (
     Connection,
-    get_project_read_connection,
-    get_project_write_connection,
+    get_project_db_connection,
     get_projectless_db_connection,
 )
 from db.python.layers.sample import SampleLayer
-from db.python.tables.project import ProjectPermissionsTable
 from models.base import SMBase
-from models.models.group import ReadAccessRoles
+from models.models.project import FullWriteAccessRoles, ReadAccessRoles
 from models.models.sample import SampleUpsert
 from models.utils.sample_id_format import (  # Sample,
     sample_id_format,
@@ -24,7 +22,8 @@ router = APIRouter(prefix='/sample', tags=['sample'])
 
 @router.put('/{project}/', response_model=str, operation_id='createSample')
 async def create_sample(
-    sample: SampleUpsert, connection: Connection = get_project_write_connection
+    sample: SampleUpsert,
+    connection: Connection = get_project_db_connection(FullWriteAccessRoles),
 ) -> str:
     """Creates a new sample, and returns the internal sample ID"""
     st = SampleLayer(connection)
@@ -38,7 +37,7 @@ async def create_sample(
 )
 async def upsert_samples(
     samples: list[SampleUpsert],
-    connection: Connection = get_project_write_connection,
+    connection: Connection = get_project_db_connection(FullWriteAccessRoles),
 ):
     """
     Upserts a list of samples with sequencing-groups,
@@ -63,7 +62,7 @@ async def upsert_samples(
 async def get_sample_id_map_by_external(
     external_ids: list[str],
     allow_missing: bool = False,
-    connection: Connection = get_project_read_connection,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """Get map of sample IDs, { [externalId]: internal_sample_id }"""
     st = SampleLayer(connection)
@@ -92,12 +91,14 @@ async def get_sample_id_map_by_internal(
     '/{project}/id-map/internal/all', operation_id='getAllSampleIdMapByInternal'
 )
 async def get_all_sample_id_map_by_internal(
-    connection: Connection = get_project_read_connection,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """Get map of ALL sample IDs, { [internal_id]: external_sample_id }"""
     st = SampleLayer(connection)
-    assert connection.project
-    result = await st.get_all_sample_id_map_by_internal_ids(project=connection.project)
+    assert connection.project_id
+    result = await st.get_all_sample_id_map_by_internal_ids(
+        project=connection.project_id
+    )
     return {sample_id_format(k): v for k, v in result.items()}
 
 
@@ -108,12 +109,15 @@ async def get_all_sample_id_map_by_internal(
     operation_id='getSampleByExternalId',
 )
 async def get_sample_by_external_id(
-    external_id: str, connection: Connection = get_project_read_connection
+    external_id: str,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """Get sample by external ID"""
     st = SampleLayer(connection)
-    assert connection.project
-    result = await st.get_single_by_external_id(external_id, project=connection.project)
+    assert connection.project_id
+    result = await st.get_single_by_external_id(
+        external_id, project=connection.project_id
+    )
     return result.to_external()
 
 
@@ -130,11 +134,6 @@ class GetSamplesCriteria(SMBase):
 @router.post('/', operation_id='getSamples')
 async def get_samples(
     criteria: GetSamplesCriteria,
-    meta: dict = None,
-    participant_ids: list[int] = None,
-    # project_ids is inaccurately named, it should be `project_names`
-    project_ids: list[str] = None,
-    active: bool = Body(default=True),
     connection: Connection = get_projectless_db_connection,
 ):
     """
@@ -142,11 +141,10 @@ async def get_samples(
     """
     st = SampleLayer(connection)
 
-    pt = ProjectPermissionsTable(connection)
     pids: list[int] | None = None
     if criteria.project_ids:
-        projects = await pt.get_and_check_access_to_projects_for_names(
-            connection.author, criteria.project_ids, allowed_roles=ReadAccessRoles
+        projects = connection.get_and_check_access_to_projects_for_names(
+            criteria.project_ids, allowed_roles=ReadAccessRoles
         )
         pids = [p.id for p in projects]
 
@@ -162,7 +160,6 @@ async def get_samples(
         participant_ids=criteria.participant_ids,
         project_ids=pids,
         active=criteria.active,
-        check_project_ids=True,
     )
 
     return [r.to_external() for r in result]

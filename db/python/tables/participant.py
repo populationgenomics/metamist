@@ -82,7 +82,7 @@ class ParticipantTable(DbBase):
         """
         Create a new sample, and add it to database
         """
-        if not (project or self.project):
+        if not (project or self.project_id):
             raise ValueError('Must provide project to create participant')
 
         _query = """
@@ -102,7 +102,7 @@ RETURNING id
                 'karyotype': karyotype,
                 'meta': to_db_json(meta or {}),
                 'audit_log_id': await self.audit_log_id(),
-                'project': project or self.project,
+                'project': project or self.project_id,
             },
         )
 
@@ -194,7 +194,7 @@ RETURNING id
         project: ProjectId | None,
     ) -> dict[str, int]:
         """Get map of {external_id: internal_participant_id}"""
-        _project = project or self.project
+        _project = project or self.project_id
         if not _project:
             raise ValueError(
                 'Must provide project to get participant id map by external'

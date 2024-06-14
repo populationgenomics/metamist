@@ -208,7 +208,7 @@ WHERE id = :id
             'description': description,
             'coded_phenotype': coded_phenotype,
             'audit_log_id': await self.audit_log_id(),
-            'project': project or self.project,
+            'project': project or self.project_id,
         }
         keys = list(updater.keys())
         str_keys = ', '.join(keys)
@@ -237,7 +237,7 @@ RETURNING id
                 'description': descr,
                 'coded_phenotype': cph,
                 'audit_log_id': await self.audit_log_id(),
-                'project': project or self.project,
+                'project': project or self.project_id,
             }
             for eid, descr, cph in zip(external_ids, descriptions, coded_phenotypes)
         ]
@@ -271,7 +271,7 @@ ON DUPLICATE KEY UPDATE
 
         _query = 'SELECT external_id, id FROM family WHERE external_id in :external_ids AND project = :project'
         results = await self.connection.fetch_all(
-            _query, {'external_ids': family_ids, 'project': project or self.project}
+            _query, {'external_ids': family_ids, 'project': project or self.project_id}
         )
         id_map = {r['external_id']: r['id'] for r in results}
 

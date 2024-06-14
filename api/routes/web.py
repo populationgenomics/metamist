@@ -10,16 +10,14 @@ from pydantic import BaseModel
 
 from api.utils.db import (
     Connection,
-    get_project_read_connection,
-    get_project_write_connection,
+    get_project_db_connection,
     get_projectless_db_connection,
 )
 from db.python.layers.search import SearchLayer
 from db.python.layers.seqr import SeqrLayer
 from db.python.layers.web import SearchItem, WebLayer
-from db.python.tables.project import ProjectPermissionsTable
 from models.enums.web import SeqrDatasetType
-from models.models.group import ReadAccessRoles
+from models.models.project import FullWriteAccessRoles, ReadAccessRoles
 from models.models.search import SearchResponse
 from models.models.web import PagingLinks, ProjectSummary
 
@@ -43,7 +41,7 @@ async def get_project_summary(
     grid_filter: list[SearchItem],
     limit: int = 20,
     token: Optional[int] = 0,
-    connection: Connection = get_project_read_connection,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ) -> ProjectSummary:
     """Creates a new sample, and returns the internal sample ID"""
     st = WebLayer(connection)
@@ -75,16 +73,15 @@ async def get_project_summary(
 @router.get(
     '/search', response_model=SearchResponseModel, operation_id='searchByKeyword'
 )
-async def search_by_keyword(keyword: str, connection=get_projectless_db_connection):
+async def search_by_keyword(
+    keyword: str, connection: Connection = get_projectless_db_connection
+):
     """
     This searches the keyword, in families, participants + samples in the projects
     that you are a part of (automatically).
     """
     # raise ValueError("Test")
-    pt = ProjectPermissionsTable(connection)
-    projects = await pt.get_projects_accessible_by_user(
-        connection.author, allowed_roles=ReadAccessRoles
-    )
+    projects = connection.all_projects()
     pmap = {p.id: p for p in projects}
     responses = await SearchLayer(connection).search(
         keyword, project_ids=list(pmap.keys())
@@ -114,7 +111,7 @@ async def sync_seqr_project(
     sync_saved_variants: bool = True,
     sync_cram_map: bool = True,
     post_slack_notification: bool = True,
-    connection=get_project_write_connection,
+    connection: Connection = get_project_db_connection(FullWriteAccessRoles),
 ):
     """
     Sync a metamist project with its seqr project (for a specific sequence type)

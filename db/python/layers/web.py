@@ -13,7 +13,6 @@ from db.python.layers.seqr import SeqrLayer
 from db.python.tables.analysis import AnalysisTable
 from db.python.tables.assay import AssayTable
 from db.python.tables.base import DbBase
-from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sequencing_group import SequencingGroupTable
 from db.python.utils import escape_like_term
 from models.models import (
@@ -25,7 +24,6 @@ from models.models import (
     SearchItem,
     parse_sql_bool,
 )
-from models.models.group import ReadAccessRoles
 from models.models.web import ProjectSummaryInternal, WebProject
 
 
@@ -56,7 +54,7 @@ class WebDb(DbBase):
         Get query for getting list of samples
         """
         wheres = ['s.project = :project', 's.active']
-        values = {'project': self.project}
+        values = {'project': self.project_id}
         where_str = ''
         for query in grid_filter:
             value = query.query
@@ -201,12 +199,12 @@ class WebDb(DbBase):
     async def get_total_number_of_samples(self):
         """Get total number of active samples within a project"""
         _query = 'SELECT COUNT(*) FROM sample WHERE project = :project AND active'
-        return await self.connection.fetch_val(_query, {'project': self.project})
+        return await self.connection.fetch_val(_query, {'project': self.project_id})
 
     async def get_total_number_of_participants(self):
         """Get total number of participants within a project"""
         _query = 'SELECT COUNT(*) FROM participant WHERE project = :project'
-        return await self.connection.fetch_val(_query, {'project': self.project})
+        return await self.connection.fetch_val(_query, {'project': self.project_id})
 
     async def get_total_number_of_sequencing_groups(self):
         """Get total number of sequencing groups within a project"""
@@ -215,7 +213,7 @@ class WebDb(DbBase):
         FROM sequencing_group sg
         INNER JOIN sample s ON s.id = sg.sample_id
         WHERE project = :project AND NOT sg.archived"""
-        return await self.connection.fetch_val(_query, {'project': self.project})
+        return await self.connection.fetch_val(_query, {'project': self.project_id})
 
     async def get_total_number_of_assays(self):
         """Get total number of sequences within a project"""
@@ -224,7 +222,7 @@ class WebDb(DbBase):
         FROM assay sq
         INNER JOIN sample s ON s.id = sq.sample_id
         WHERE s.project = :project"""
-        return await self.connection.fetch_val(_query, {'project': self.project})
+        return await self.connection.fetch_val(_query, {'project': self.project_id})
 
     @staticmethod
     def _project_summary_process_family_rows_by_pid(
@@ -281,10 +279,10 @@ class WebDb(DbBase):
         # do initial query to get sample info
         sampl = SampleLayer(self._connection)
         sample_query, values = self._project_summary_sample_query(grid_filter)
-        ptable = ProjectPermissionsTable(self._connection)
-        project_db = await ptable.get_and_check_access_to_project_for_id(
-            self.author, self.project, allowed_roles=ReadAccessRoles
-        )
+
+        project_db = self.project
+        assert project_db
+
         project = WebProject(
             id=project_db.id,
             name=project_db.name,
@@ -384,10 +382,12 @@ WHERE fp.participant_id in :pids
             self.get_total_number_of_participants(),
             self.get_total_number_of_sequencing_groups(),
             self.get_total_number_of_assays(),
-            atable.get_number_of_crams_by_sequencing_type(project=self.project),
-            sgtable.get_type_numbers_for_project(project=self.project),
-            seqtable.get_assay_type_numbers_by_batch_for_project(project=self.project),
-            atable.get_seqr_stats_by_sequencing_type(project=self.project),
+            atable.get_number_of_crams_by_sequencing_type(project=self.project_id),
+            sgtable.get_type_numbers_for_project(project=self.project_id),
+            seqtable.get_assay_type_numbers_by_batch_for_project(
+                project=self.project_id
+            ),
+            atable.get_seqr_stats_by_sequencing_type(project=self.project_id),
             SeqrLayer(self._connection).get_synchronisable_types(project_db),
         )
 
@@ -435,7 +435,6 @@ WHERE fp.participant_id in :pids
                         reported_sex=None,
                         reported_gender=None,
                         karyotype=None,
-                        # project=self.project,
                     )
                 )
             elif pid not in pid_seen:
@@ -451,7 +450,6 @@ WHERE fp.participant_id in :pids
                         reported_sex=p['reported_sex'],
                         reported_gender=p['reported_gender'],
                         karyotype=p['karyotype'],
-                        # project=self.project,
                     )
                 )
 
