@@ -4,13 +4,14 @@ import copy
 import dataclasses
 import enum
 from collections import defaultdict
-from typing import Any
+from typing import Any, TypedDict
 
 from fastapi import Request
 from strawberry.dataloader import DataLoader
 
 from api.utils import group_by
 from api.utils.db import get_projectless_db_connection
+from db.python.connect import Connection
 from db.python.layers import (
     AnalysisLayer,
     AssayLayer,
@@ -23,7 +24,6 @@ from db.python.layers import (
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.assay import AssayFilter
 from db.python.tables.family import FamilyFilter
-from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
 from db.python.utils import GenericFilter, NotFoundError, get_hashable_value
@@ -39,7 +39,6 @@ from models.models import (
 )
 from models.models.audit_log import AuditLogInternal
 from models.models.family import PedRowInternal
-from models.models.group import ReadAccessRoles
 
 
 class LoaderKeys(enum.Enum):
@@ -79,14 +78,14 @@ class LoaderKeys(enum.Enum):
     SEQUENCING_GROUPS_FOR_ANALYSIS = 'sequencing_groups_for_analysis'
 
 
-loaders = {}
+loaders: dict[LoaderKeys, Any] = {}
 
 
-def connected_data_loader(id_: LoaderKeys, cache=True):
+def connected_data_loader(id_: LoaderKeys, cache: bool = True):
     """Provide connection to a data loader"""
 
     def connected_data_loader_caller(fn):
-        def inner(connection):
+        def inner(connection: Connection):
             async def wrapped(*args, **kwargs):
                 return await fn(*args, **kwargs, connection=connection)
 
@@ -110,7 +109,7 @@ def connected_data_loader_with_params(
     """
 
     def connected_data_loader_caller(fn):
-        def inner(connection):
+        def inner(connection: Connection):
             async def wrapped(query: list[dict[str, Any]]) -> list[Any]:
                 by_key: dict[tuple, Any] = {}
 
@@ -159,7 +158,7 @@ def connected_data_loader_with_params(
 
 @connected_data_loader(LoaderKeys.AUDIT_LOGS_BY_IDS)
 async def load_audit_logs_by_ids(
-    audit_log_ids: list[int], connection
+    audit_log_ids: list[int], connection: Connection
 ) -> list[AuditLogInternal | None]:
     """
     DataLoader: get_audit_logs_by_ids
@@ -172,7 +171,7 @@ async def load_audit_logs_by_ids(
 
 @connected_data_loader(LoaderKeys.AUDIT_LOGS_BY_ANALYSIS_IDS)
 async def load_audit_logs_by_analysis_ids(
-    analysis_ids: list[int], connection
+    analysis_ids: list[int], connection: Connection
 ) -> list[list[AuditLogInternal]]:
     """
     DataLoader: get_audit_logs_by_analysis_ids
@@ -184,7 +183,7 @@ async def load_audit_logs_by_analysis_ids(
 
 @connected_data_loader_with_params(LoaderKeys.ASSAYS_FOR_SAMPLES, default_factory=list)
 async def load_assays_by_samples(
-    connection, ids, filter: AssayFilter
+    connection: Connection, ids, filter: AssayFilter
 ) -> dict[int, list[AssayInternal]]:
     """
     DataLoader: get_assays_for_sample_ids
@@ -200,7 +199,7 @@ async def load_assays_by_samples(
 
 @connected_data_loader(LoaderKeys.ASSAYS_FOR_SEQUENCING_GROUPS)
 async def load_assays_by_sequencing_groups(
-    sequencing_group_ids: list[int], connection
+    sequencing_group_ids: list[int], connection: Connection
 ) -> list[list[AssayInternal]]:
     """
     Get all assays belong to the sequencing groups
@@ -209,7 +208,7 @@ async def load_assays_by_sequencing_groups(
 
     # group by all last fields, in case we add more
     assays = await assaylayer.get_assays_for_sequencing_group_ids(
-        sequencing_group_ids=sequencing_group_ids, check_project_ids=False
+        sequencing_group_ids=sequencing_group_ids
     )
 
     return [assays.get(sg, []) for sg in sequencing_group_ids]
@@ -219,7 +218,7 @@ async def load_assays_by_sequencing_groups(
     LoaderKeys.SAMPLES_FOR_PARTICIPANTS, default_factory=list
 )
 async def load_samples_for_participant_ids(
-    ids: list[int], filter: SampleFilter, connection
+    ids: list[int], filter: SampleFilter, connection: Connection
 ) -> dict[int, list[SampleInternal]]:
     """
     DataLoader: get_samples_for_participant_ids
@@ -232,7 +231,7 @@ async def load_samples_for_participant_ids(
 
 @connected_data_loader(LoaderKeys.SEQUENCING_GROUPS_FOR_IDS)
 async def load_sequencing_groups_for_ids(
-    sequencing_group_ids: list[int], connection
+    sequencing_group_ids: list[int], connection: Connection
 ) -> list[SequencingGroupInternal]:
     """
     DataLoader: get_sequencing_groups_by_ids
@@ -249,7 +248,7 @@ async def load_sequencing_groups_for_ids(
     LoaderKeys.SEQUENCING_GROUPS_FOR_SAMPLES, default_factory=list
 )
 async def load_sequencing_groups_for_samples(
-    connection, ids: list[int], filter: SequencingGroupFilter
+    connection: Connection, ids: list[int], filter: SequencingGroupFilter
 ) -> dict[int, list[SequencingGroupInternal]]:
     """
     Has format [(sample_id: int, sequencing_type?: string)]
@@ -265,7 +264,7 @@ async def load_sequencing_groups_for_samples(
 
 @connected_data_loader(LoaderKeys.SAMPLES_FOR_IDS)
 async def load_samples_for_ids(
-    sample_ids: list[int], connection
+    sample_ids: list[int], connection: Connection
 ) -> list[SampleInternal]:
     """
     DataLoader: get_samples_for_ids
@@ -281,7 +280,7 @@ async def load_samples_for_ids(
     LoaderKeys.SAMPLES_FOR_PROJECTS, default_factory=list
 )
 async def load_samples_for_projects(
-    connection, ids: list[ProjectId], filter: SampleFilter
+    connection: Connection, ids: list[ProjectId], filter: SampleFilter
 ):
     """
     DataLoader: get_samples_for_project_ids
@@ -295,7 +294,7 @@ async def load_samples_for_projects(
 
 @connected_data_loader(LoaderKeys.PARTICIPANTS_FOR_IDS)
 async def load_participants_for_ids(
-    participant_ids: list[int], connection
+    participant_ids: list[int], connection: Connection
 ) -> list[ParticipantInternal]:
     """
     DataLoader: get_participants_by_ids
@@ -313,7 +312,7 @@ async def load_participants_for_ids(
 
 @connected_data_loader(LoaderKeys.SEQUENCING_GROUPS_FOR_ANALYSIS)
 async def load_sequencing_groups_for_analysis_ids(
-    analysis_ids: list[int], connection
+    analysis_ids: list[int], connection: Connection
 ) -> list[list[SequencingGroupInternal]]:
     """
     DataLoader: get_samples_for_analysis_ids
@@ -328,7 +327,7 @@ async def load_sequencing_groups_for_analysis_ids(
     LoaderKeys.SEQUENCING_GROUPS_FOR_PROJECTS, default_factory=list
 )
 async def load_sequencing_groups_for_project_ids(
-    ids: list[int], filter: SequencingGroupFilter, connection
+    ids: list[int], filter: SequencingGroupFilter, connection: Connection
 ) -> dict[int, list[SequencingGroupInternal]]:
     """
     DataLoader: get_sequencing_groups_for_project_ids
@@ -342,39 +341,33 @@ async def load_sequencing_groups_for_project_ids(
 
 
 @connected_data_loader(LoaderKeys.PROJECTS_FOR_IDS)
-async def load_projects_for_ids(project_ids: list[int], connection) -> list[Project]:
+async def load_projects_for_ids(
+    project_ids: list[int], connection: Connection
+) -> list[Project]:
     """
     Get projects by IDs
     """
-    pttable = ProjectPermissionsTable(connection)
-    projects = await pttable.get_and_check_access_to_projects_for_ids(
-        user=connection.user, project_ids=project_ids, allowed_roles=ReadAccessRoles
-    )
-
-    p_by_id = {p.id: p for p in projects}
-    projects = [p_by_id.get(p) for p in project_ids]
+    projects = [connection.project_id_map.get(p) for p in project_ids]
 
     return [p for p in projects if p is not None]
 
 
 @connected_data_loader(LoaderKeys.FAMILIES_FOR_PARTICIPANTS)
 async def load_families_for_participants(
-    participant_ids: list[int], connection
+    participant_ids: list[int], connection: Connection
 ) -> list[list[FamilyInternal]]:
     """
     Get families of participants, noting a participant can be in multiple families
     """
     flayer = FamilyLayer(connection)
 
-    fam_map = await flayer.get_families_by_participants(
-        participant_ids=participant_ids, check_project_ids=False
-    )
+    fam_map = await flayer.get_families_by_participants(participant_ids=participant_ids)
     return [fam_map.get(p, []) for p in participant_ids]
 
 
 @connected_data_loader(LoaderKeys.PARTICIPANTS_FOR_FAMILIES)
 async def load_participants_for_families(
-    family_ids: list[int], connection
+    family_ids: list[int], connection: Connection
 ) -> list[list[ParticipantInternal]]:
     """Get all participants in a family, doesn't include affected statuses"""
     player = ParticipantLayer(connection)
@@ -384,7 +377,7 @@ async def load_participants_for_families(
 
 @connected_data_loader(LoaderKeys.PARTICIPANTS_FOR_PROJECTS)
 async def load_participants_for_projects(
-    project_ids: list[ProjectId], connection
+    project_ids: list[ProjectId], connection: Connection
 ) -> list[list[ParticipantInternal]]:
     """
     Get all participants in a project
@@ -406,7 +399,7 @@ async def load_participants_for_projects(
 async def load_analyses_for_sequencing_groups(
     ids: list[int],
     filter_: AnalysisFilter,
-    connection,
+    connection: Connection,
 ) -> dict[int, list[AnalysisInternal]]:
     """
     Type: (sequencing_group_id: int, status?: AnalysisStatus, type?: str)
@@ -424,7 +417,7 @@ async def load_analyses_for_sequencing_groups(
 
 @connected_data_loader(LoaderKeys.PHENOTYPES_FOR_PARTICIPANTS)
 async def load_phenotypes_for_participants(
-    participant_ids: list[int], connection
+    participant_ids: list[int], connection: Connection
 ) -> list[dict]:
     """
     Data loader for phenotypes for participants
@@ -438,7 +431,7 @@ async def load_phenotypes_for_participants(
 
 @connected_data_loader(LoaderKeys.FAMILIES_FOR_IDS)
 async def load_families_for_ids(
-    family_ids: list[int], connection
+    family_ids: list[int], connection: Connection
 ) -> list[FamilyInternal]:
     """
     DataLoader: get_families_for_ids
@@ -451,7 +444,7 @@ async def load_families_for_ids(
 
 @connected_data_loader(LoaderKeys.FAMILY_PARTICIPANTS_FOR_FAMILIES)
 async def load_family_participants_for_families(
-    family_ids: list[int], connection
+    family_ids: list[int], connection: Connection
 ) -> list[list[PedRowInternal]]:
     """
     DataLoader: get_family_participants_for_families
@@ -464,7 +457,7 @@ async def load_family_participants_for_families(
 
 @connected_data_loader(LoaderKeys.FAMILY_PARTICIPANTS_FOR_PARTICIPANTS)
 async def load_family_participants_for_participants(
-    participant_ids: list[int], connection
+    participant_ids: list[int], connection: Connection
 ) -> list[list[PedRowInternal]]:
     """data loader for family participants for participants
 
@@ -485,12 +478,21 @@ async def load_family_participants_for_participants(
     return [fp_map.get(pid, []) for pid in participant_ids]
 
 
+class GraphQLContext(TypedDict):
+    """Basic dict type for GraphQL context to be passed to resolvers"""
+
+    loaders: dict[LoaderKeys, Any]
+    connection: Connection
+
+
 async def get_context(
-    request: Request, connection=get_projectless_db_connection
-):  # pylint: disable=unused-argument
+    request: Request,  # pylint: disable=unused-argument
+    connection: Connection = get_projectless_db_connection,
+) -> GraphQLContext:
     """Get loaders / cache context for strawberyy GraphQL"""
     mapped_loaders = {k: fn(connection) for k, fn in loaders.items()}
+
     return {
         'connection': connection,
-        **mapped_loaders,
+        'loaders': mapped_loaders,
     }
