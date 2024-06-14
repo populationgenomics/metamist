@@ -1,86 +1,12 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,too-many-branches
-import dataclasses
 from collections import defaultdict
 from typing import Any
 
+from db.python.filters import GenericFilter
+from db.python.filters.participant import ParticipantFilter
 from db.python.tables.base import DbBase
-from db.python.utils import (
-    GenericFilter,
-    GenericFilterModel,
-    GenericMetaFilter,
-    NotFoundError,
-    escape_like_term,
-    from_db_json,
-    to_db_json,
-)
+from db.python.utils import NotFoundError, escape_like_term, from_db_json, to_db_json
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantInternal, ProjectId
-
-
-@dataclasses.dataclass(kw_only=True)
-class ParticipantFilter(GenericFilterModel):
-    """
-    Participant filter model
-    """
-
-    @dataclasses.dataclass(kw_only=True)
-    class ParticipantFamilyFilter(GenericFilterModel):
-        """
-        Participant sample filter model
-        """
-
-        id: GenericFilter[int] | None = None
-        external_id: GenericFilter[str] | None = None
-        meta: GenericMetaFilter | None = None
-
-    @dataclasses.dataclass(kw_only=True)
-    class ParticipantSampleFilter(GenericFilterModel):
-        """
-        Participant sample filter model
-        """
-
-        id: GenericFilter[int] | None = None
-        type: GenericFilter[str] | None = None
-        external_id: GenericFilter[str] | None = None
-        meta: GenericMetaFilter | None = None
-
-    @dataclasses.dataclass(kw_only=True)
-    class ParticipantSequencingGroupFilter(GenericFilterModel):
-        """
-        Participant sequencing group filter model
-        """
-
-        id: GenericFilter[int] | None = None
-        external_id: GenericFilter[str] | None = None
-        meta: GenericMetaFilter | None = None
-        type: GenericFilter[str] | None = None
-        technology: GenericFilter[str] | None = None
-        platform: GenericFilter[str] | None = None
-
-    @dataclasses.dataclass(kw_only=True)
-    class ParticipantAssayFilter(GenericFilterModel):
-        """
-        Participant assay filter model
-        """
-
-        id: GenericFilter[int] | None = None
-        external_id: GenericFilter[str] | None = None
-        meta: GenericMetaFilter | None = None
-        type: GenericFilter[str] | None = None
-        technology: GenericFilter[str] | None = None
-        platform: GenericFilter[str] | None = None
-
-    id: GenericFilter[int] | None = None
-    meta: GenericMetaFilter | None = None
-    external_id: GenericFilter[str] | None = None
-    reported_sex: GenericFilter[int] | None = None
-    reported_gender: GenericFilter[str] | None = None
-    karyotype: GenericFilter[str] | None = None
-    project: GenericFilter[ProjectId] | None = None
-
-    family: ParticipantFamilyFilter | None = None
-    sample: ParticipantSampleFilter | None = None
-    sequencing_group: ParticipantSequencingGroupFilter | None = None
-    assay: ParticipantAssayFilter | None = None
 
 
 class ParticipantTable(DbBase):
@@ -125,7 +51,7 @@ class ParticipantTable(DbBase):
     ) -> tuple[str, dict[str, Any]]:
         """Construct a participant query"""
         needs_family = False
-        needs_participant_eid = False
+        needs_participant_eid = True  # always join, query optimiser can figure it out
         needs_sample = False
         needs_sample_eid = False
         needs_sequencing_group = False
@@ -136,22 +62,11 @@ class ParticipantTable(DbBase):
                 'project': 'pp.project',
                 'id': 'pp.id',
                 'meta': 'pp.meta',
+                'external_id': 'peid.external_id',
             },
-            exclude=['family', 'sample', 'sequencing_group', 'assay', 'external_id'],
+            exclude=['family', 'sample', 'sequencing_group', 'assay'],
         )
         wheres = [_wheres]
-
-        if filter_.external_id:
-            needs_participant_eid = True
-            peid_wheres, peid_values = filter_.to_sql(
-                {
-                    'external_id': 'peid.external_id',
-                },
-                only=['external_id'],
-            )
-            values.update(peid_values)
-            if peid_wheres:
-                wheres.append(peid_wheres)
 
         if filter_.family:
             needs_family = True

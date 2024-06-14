@@ -4,6 +4,7 @@ from collections import defaultdict
 from datetime import date
 
 from api.utils import group_by
+from db.python.filters import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer
 from db.python.layers.family import FamilyLayer
@@ -16,12 +17,7 @@ from db.python.tables.assay import AssayFilter, AssayTable
 from db.python.tables.base import DbBase
 from db.python.tables.participant import ParticipantFilter
 from db.python.tables.project import ProjectPermissionsTable
-from db.python.tables.sample import SampleFilter
-from db.python.tables.sequencing_group import (
-    SequencingGroupFilter,
-    SequencingGroupTable,
-)
-from db.python.utils import GenericFilter
+from db.python.tables.sequencing_group import SequencingGroupTable
 from models.models import (
     AssayInternal,
     FamilySimpleInternal,
@@ -231,27 +227,29 @@ class WebDb(DbBase):
         if not participants:
             return []
 
-        sfilter = SampleFilter(
-            participant_id=GenericFilter(in_=[p.id for p in participants]),
-        )
-        if query.sample:
-            sfilter.id = query.sample.id
-            sfilter.type = query.sample.type
-            sfilter.meta = query.sample.meta
-            sfilter.external_id = query.sample.external_id
-            # sfilter.active = query.sample.active
+        sfilter = query.get_sample_filter()
+        if not sfilter.participant_id:
+            sfilter.participant_id = GenericFilter()
+        if sfilter.participant_id.in_:
+            # take the intersection of the participants, because we're not showing
+            # participants that aren't returned by other criteria
+            sfilter.participant_id.in_ = list(
+                set(sfilter.participant_id.in_) & {p.id for p in participants}
+            )
+        else:
+            sfilter.participant_id.in_ = [p.id for p in participants]
 
         samples = await slayer.query(sfilter)
 
-        sgfilter = SequencingGroupFilter(
-            sample_id=GenericFilter(in_=[s.id for s in samples])
-        )
-        if query.sequencing_group:
-            sgfilter.id = query.sequencing_group.id
-            sgfilter.type = query.sequencing_group.type
-            sgfilter.technology = query.sequencing_group.technology
-            sgfilter.platform = query.sequencing_group.platform
-            sgfilter.meta = query.sequencing_group.meta
+        sgfilter = sfilter.get_sg_filter()
+        if not sgfilter.sample_id:
+            sgfilter.sample_id = GenericFilter()
+        if sgfilter.sample_id.in_:
+            sgfilter.sample_id.in_ = list(
+                set(sgfilter.sample_id.in_) & {s.id for s in samples}
+            )
+        else:
+            sgfilter.sample_id.in_ = [s.id for s in samples]
 
         sequencing_groups = await sglayer.query(sgfilter)
 

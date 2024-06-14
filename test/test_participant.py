@@ -1,8 +1,8 @@
 from test.testbase import DbIsolatedTest, run_as_sync
 
+from db.python.filters import GenericFilter
 from db.python.layers.participant import ParticipantLayer
 from db.python.tables.participant import ParticipantFilter
-from db.python.utils import GenericFilter
 from models.base import PRIMARY_EXTERNAL_ORG
 from models.models.assay import AssayUpsertInternal
 from models.models.participant import ParticipantUpsertInternal

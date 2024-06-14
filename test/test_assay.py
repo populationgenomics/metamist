@@ -4,10 +4,11 @@ from test.testbase import DbIsolatedTest, run_as_sync
 from pymysql.err import IntegrityError
 
 from db.python.enum_tables import AssayTypeTable
+from db.python.filters import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.layers.sample import SampleLayer
 from db.python.tables.assay import AssayFilter, AssayTable
-from db.python.utils import GenericFilter, NotFoundError
+from db.python.utils import NotFoundError
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
     AssayUpsertInternal,

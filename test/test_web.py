@@ -7,6 +7,7 @@ from api.routes.web import (
     ProjectParticipantGridFilter,
     prepare_participants_for_export,
 )
+from db.python.filters import GenericFilter
 from db.python.layers import (
     AssayLayer,
     ParticipantLayer,
@@ -15,7 +16,6 @@ from db.python.layers import (
     WebLayer,
 )
 from db.python.tables.participant import ParticipantFilter
-from db.python.utils import GenericFilter
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
     Assay,

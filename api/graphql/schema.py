@@ -20,6 +20,7 @@ from api.graphql.filters import (
 )
 from api.graphql.loaders import LoaderKeys, get_context
 from db.python import enum_tables
+from db.python.filters import GenericFilter
 from db.python.layers import (
     AnalysisLayer,
     AnalysisRunnerLayer,
@@ -39,7 +40,6 @@ from db.python.tables.participant import ParticipantFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
-from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
@@ -1230,7 +1230,11 @@ class Query:  # entry point to graphql.
                 else GenericFilter(eq=True)
             ),
             created_on=created_on.to_internal_filter() if created_on else None,
-            assay_meta=assay_meta,
+            assay=(
+                SequencingGroupFilter.SequencingGroupAssayFilter(
+                    meta=graphql_meta_filter_to_internal_filter(assay_meta),
+                )
+            ),
             has_cram=has_cram,
             has_gvcf=has_gvcf,
         )

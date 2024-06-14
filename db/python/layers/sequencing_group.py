@@ -52,6 +52,9 @@ class SequencingGroupLayer(BaseLayer):
             sequencing_group_ids
         )
 
+        if not groups:
+            return []
+
         if check_project_ids:
             await self.ptable.check_access_to_project_ids(
                 self.author, projects, readonly=True
