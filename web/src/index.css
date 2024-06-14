@@ -18,6 +18,8 @@
 
     --color-divider: rgba(0, 0, 0, 0.3);
 
+    --color-bg-card-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;
+
     /* From: https://material.io/design/color/text-legibility.html#text-backgrounds */
 
     --color-text-primary: rgba(0, 0, 0, 0.87);
@@ -32,6 +34,18 @@
     --color-bg-under-budget: rgba(0, 128, 0, 0.2);
 
     --color-text-href: rgb(65, 131, 196);
+
+    --ourdna-blue-transparent: rgba(113, 172, 225, 0.5);
+    --ourdna-red-transparent: rgba(191, 0, 59, 0.5);
+    --ourdna-yellow-transparent: rgba(232, 199, 29, 0.5);
+    --ourdna-green-transparent: rgba(159, 201, 54, 0.5);
+    --ourdna-charcoal-transparent: rgba(85, 85, 85, 0.5);
+
+    --ourdna-blue: rgba(113, 172, 225);
+    --ourdna-red: rgba(191, 0, 59);
+    --ourdna-yellow: rgba(232, 199, 29);
+    --ourdna-green: rgba(159, 201, 54);
+    --ourdna-charcoal: rgba(85, 85, 85);
 
     --color-header-row: #f9f9f9;
     --color-exome-row: #ededa1;
@@ -309,6 +323,17 @@ html[data-theme='dark-mode'] .ui.table {
 
 .bold-text {
     font-weight: bold;
+}
+
+.dashboard-tile {
+    color: var(--color-text-primary) !important;
+}
+
+.ourdna-logo-responsive {
+    width: 50%;
+    height: auto;
+    max-width: 200px;
+    max-height: 100px;
 }
 
 /* Project Insights dashboard */

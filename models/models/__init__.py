@@ -1,4 +1,4 @@
-from models.base import parse_sql_bool
+from models.base import PRIMARY_EXTERNAL_ORG, parse_sql_bool
 from models.models.analysis import (
     Analysis,
     AnalysisInternal,
@@ -28,6 +28,7 @@ from models.models.family import (
     FamilySimpleInternal,
     PedRowInternal,
 )
+from models.models.ourdna import OurDNADashboard, OurDNALostSample
 from models.models.participant import (
     NestedParticipant,
     NestedParticipantInternal,

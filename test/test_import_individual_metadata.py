@@ -3,7 +3,7 @@ from test.testbase import DbIsolatedTest, run_as_sync
 from databases.interfaces import Record
 
 from db.python.layers.participant import ParticipantLayer
-from models.models.participant import ParticipantUpsertInternal
+from models.models import PRIMARY_EXTERNAL_ORG, ParticipantUpsertInternal
 
 
 class TestImportIndividualMetadata(DbIsolatedTest):
@@ -14,7 +14,7 @@ class TestImportIndividualMetadata(DbIsolatedTest):
         """Test import hpo terms from many columns"""
         pl = ParticipantLayer(self.connection)
 
-        await pl.upsert_participant(ParticipantUpsertInternal(external_id='TP01'))
+        await pl.upsert_participant(ParticipantUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'TP01'}))
 
         headers = [
             'Individual ID',
@@ -48,8 +48,8 @@ class TestImportIndividualMetadata(DbIsolatedTest):
 
         await pl.upsert_participants(
             [
-                ParticipantUpsertInternal(external_id='TP01'),
-                ParticipantUpsertInternal(external_id='TP02'),
+                ParticipantUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'TP01'}),
+                ParticipantUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'TP02'}),
             ]
         )
 

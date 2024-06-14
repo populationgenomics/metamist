@@ -8,6 +8,7 @@ from db.python.layers.family import FamilyLayer
 from metamist.graphql import configure_sync_client, gql, validate
 from models.enums import AnalysisStatus
 from models.models import (
+    PRIMARY_EXTERNAL_ORG,
     AnalysisInternal,
     AssayUpsertInternal,
     ParticipantUpsertInternal,
@@ -25,11 +26,11 @@ default_assay_meta = {
 
 def _get_single_participant_upsert():
     return ParticipantUpsertInternal(
-        external_id='Demeter',
+        external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'},
         meta={},
         samples=[
             SampleUpsertInternal(
-                external_id='sample_id001',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'sample_id001'},
                 meta={},
                 type='blood',
                 sequencing_groups=[
@@ -197,10 +198,10 @@ query MyQuery($project: String!) {
         await self.player.upsert_participant(
             ParticipantUpsertInternal(
                 meta={},
-                external_id='Demeter',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'},
                 samples=[
                     SampleUpsertInternal(
-                        external_id='sample_id001',
+                        external_ids={PRIMARY_EXTERNAL_ORG: 'sample_id001'},
                         meta={'thisKey': 'value'},
                     )
                 ],
@@ -278,7 +279,7 @@ query MyQuery($sg_id: String!, $project: String!) {
         """
         # insert participant
         p = await self.player.upsert_participant(
-            ParticipantUpsertInternal(external_id='Demeter', meta={}, samples=[])
+            ParticipantUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'}, meta={}, samples=[])
         )
 
         phenotypes = {'phenotype1': 'value1', 'phenotype2': {'number': 123}}

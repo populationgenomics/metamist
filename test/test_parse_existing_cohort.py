@@ -5,7 +5,11 @@ from unittest.mock import patch
 
 from db.python.layers import ParticipantLayer
 from metamist.parser.generic_parser import ParsedParticipant
-from models.models import ParticipantUpsertInternal, SampleUpsertInternal
+from models.models import (
+    PRIMARY_EXTERNAL_ORG,
+    ParticipantUpsertInternal,
+    SampleUpsertInternal,
+)
 from scripts.parse_existing_cohort import Columns, ExistingCohortParser
 
 
@@ -193,10 +197,10 @@ class TestExistingCohortParser(DbIsolatedTest):
         await player.upsert_participants(
             [
                 ParticipantUpsertInternal(
-                    external_id='EXTID1234',
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'EXTID1234'},
                     samples=[
                         SampleUpsertInternal(
-                            external_id='EXTID1234',
+                            external_ids={PRIMARY_EXTERNAL_ORG: 'EXTID1234'},
                         )
                     ],
                 )
