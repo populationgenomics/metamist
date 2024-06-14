@@ -196,7 +196,9 @@ SINGLE_PARTICIPANT_QUERY_RESULT = ProjectParticipantGridResponse(
             )
         ],
         MetaSearchEntityPrefix.PARTICIPANT: [
-            ProjectParticipantGridField(key='external_ids', label='Participant ID', is_visible=True),
+            ProjectParticipantGridField(
+                key='external_ids', label='Participant ID', is_visible=True
+            ),
         ],
         MetaSearchEntityPrefix.SAMPLE: [
             ProjectParticipantGridField(key='meta.skey', label='', is_visible=True),
@@ -290,6 +292,7 @@ class TestWeb(DbIsolatedTest):
         ex_result = ProjectParticipantGridResponse.from_params(
             participants=internal_participants,
             total_results=1,
+            filter_fields=ProjectParticipantGridFilter(),
         )
 
         assert isinstance(internal_participants[0].samples, list)
@@ -377,9 +380,7 @@ class TestWeb(DbIsolatedTest):
         self.assertEqual(SINGLE_PARTICIPANT_QUERY_RESULT, result)
 
         empty_result = ProjectParticipantGridResponse(
-            total_results=0,
-            participants=[],
-            fields={}
+            total_results=0, participants=[], fields={}
         )
 
         self.assertEqual(empty_result, result)
@@ -412,7 +413,7 @@ class TestWeb(DbIsolatedTest):
         expected_result = ProjectParticipantGridResponse(
             participants=[],  # data_to_class(expected_data_list),
             total_results=2,
-            fields={}
+            fields={},
             # family_keys=[('external_id', 'Family ID')],
             # participant_keys=[('external_ids', 'Participant ID')],
             # sample_keys=[

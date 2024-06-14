@@ -93,6 +93,8 @@ class ProjectSummary(SMBase):
 
 
 class ProjectParticipantGridFilterType(Enum):
+    """Filter types for grid response"""
+
     eq = 'eq'
     neq = 'neq'
     startswith = 'startswith'
@@ -148,7 +150,7 @@ class ProjectParticipantGridResponse(SMBase):
         """
         Read through nested participants and full out the keys for the grid response
         """
-        hidden_participant_meta_keys = set()
+        hidden_participant_meta_keys: set[str] = set()
         hidden_sample_meta_keys = {'reads', 'vcfs', 'gvcf'}
         hidden_assay_meta_keys = {
             'reads',

@@ -66,7 +66,7 @@ async def get_project_summary(
     operation_id='getProjectParticipantsFilterSchema',
 )
 async def get_project_project_participants_filter_schema(
-    connection=get_project_readonly_connection,
+    _=get_project_readonly_connection,
 ):
     """Get project summary (from query) with some limit"""
     return ProjectParticipantGridFilter.model_json_schema()
