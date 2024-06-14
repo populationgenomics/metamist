@@ -25,10 +25,14 @@ from db.python.layers.seqr import SeqrLayer
 from db.python.layers.web import WebLayer
 from db.python.tables.project import ProjectPermissionsTable
 from models.base import SMBase
-from models.enums.web import SeqrDatasetType
+from models.enums.web import MetaSearchEntityPrefix, SeqrDatasetType
 from models.models.participant import NestedParticipant
 from models.models.search import SearchResponse
-from models.models.web import ProjectParticipantGridResponse, ProjectSummary
+from models.models.web import (
+    ProjectParticipantGridField,
+    ProjectParticipantGridResponse,
+    ProjectSummary,
+)
 
 
 class SearchResponseModel(SMBase):
@@ -57,11 +61,23 @@ async def get_project_summary(
 
 
 @router.post(
+    '/{project}/participants/schema',
+    # response_model=,
+    operation_id='getProjectParticipantsFilterSchema',
+)
+async def get_project_project_participants_filter_schema(
+    connection=get_project_readonly_connection,
+):
+    """Get project summary (from query) with some limit"""
+    return ProjectParticipantGridFilter.model_json_schema()
+
+
+@router.post(
     '/{project}/participants',
     response_model=ProjectParticipantGridResponse,
     operation_id='getProjectParticipantsGridWithLimit',
 )
-async def get_project_summary_with_limit(
+async def get_project_participants_grid_with_limit(
     limit: int,
     query: ProjectParticipantGridFilter,
     skip: int = 0,
@@ -85,17 +101,14 @@ async def get_project_summary_with_limit(
     return ProjectParticipantGridResponse.from_params(
         participants=participants,
         total_results=pcount,
+        filter_fields=query,
     )
 
 
 class ExportProjectParticipantFields(SMBase):
     """fields for exporting project participants"""
 
-    family_keys: list[str]
-    participant_keys: list[str]
-    sample_keys: list[str]
-    sequencing_group_keys: list[str]
-    assay_keys: list[str]
+    fields: dict[MetaSearchEntityPrefix, list[ProjectParticipantGridField]]
 
 
 @router.post(
@@ -140,17 +153,17 @@ async def export_project_participants(
     )
 
 
-def get_field_from_obj(obj, field: str) -> str | None:
+def get_field_from_obj(obj, field: ProjectParticipantGridField) -> str | None:
     """Get field from object"""
-    if field.startswith('meta.'):
+    if field.key.startswith('meta.'):
         if not hasattr(obj, 'meta'):
             raise ValueError(f'Object {type(obj)} does not have meta field: {obj}')
 
-        return obj.meta.get(field.removeprefix('meta.'), None)
-    if not hasattr(obj, field):
+        return obj.meta.get(field.key.removeprefix('meta.'), None)
+    if not hasattr(obj, field.key):
         raise ValueError(f'Object {type(obj)} does not have field: {field}')
 
-    return getattr(obj, field, None)
+    return getattr(obj, field.key, None)
 
 
 def prepare_field_for_export(field_value: Any) -> str:
@@ -171,53 +184,60 @@ def prepare_participants_for_export(
     participants: list[NestedParticipant], fields: ExportProjectParticipantFields | None
 ) -> Generator[tuple[str, ...], None, None]:
     """Prepare participants for export"""
-    if not fields:
-        new_fields = ProjectParticipantGridResponse.get_entity_keys(participants)
-        fields = ExportProjectParticipantFields(
-            family_keys=[t[0] for t in new_fields.family_keys],
-            participant_keys=[t[0] for t in new_fields.participant_keys],
-            sample_keys=[t[0] for t in new_fields.sample_keys],
-            sequencing_group_keys=[t[0] for t in new_fields.sequencing_group_keys],
-            assay_keys=[t[0] for t in new_fields.assay_keys],
+    _fields = fields.fields if fields else None
+    if not _fields:
+        # empty field, because we don't really care about the fields
+        _fields = ProjectParticipantGridResponse.get_entity_keys(
+            participants, ProjectParticipantGridFilter()
         )
 
+    def get_visible_fields(key: MetaSearchEntityPrefix):
+        fs = _fields.get(key, [])
+        return [f for f in fs if f.is_visible]
+
+    family_keys = get_visible_fields(MetaSearchEntityPrefix.FAMILY)
+    participant_keys = get_visible_fields(MetaSearchEntityPrefix.PARTICIPANT)
+    sample_keys = get_visible_fields(MetaSearchEntityPrefix.SAMPLE)
+    sequencing_group_keys = get_visible_fields(MetaSearchEntityPrefix.SEQUENCING_GROUP)
+    assay_keys = get_visible_fields(MetaSearchEntityPrefix.ASSAY)
+
     header = (
-        *('family.' + fk for fk in fields.family_keys),
-        *('participant.' + pk for pk in fields.participant_keys),
-        *('sample.' + sk for sk in fields.sample_keys),
-        *('sequencing_group.' + sgk for sgk in fields.sequencing_group_keys),
-        *('assay.' + ak for ak in fields.assay_keys),
+        *('family.' + fk.key for fk in family_keys),
+        *('participant.' + pk.key for pk in participant_keys),
+        *('sample.' + sk.key for sk in sample_keys),
+        *('sequencing_group.' + sgk.key for sgk in sequencing_group_keys),
+        *('assay.' + ak.key for ak in assay_keys),
     )
     yield header
     for participant in participants:
         prow = []
-        for field in fields.family_keys:
+        for field in family_keys:
             prow.append(
                 ', '.join(
                     prepare_field_for_export(get_field_from_obj(f, field))
                     for f in participant.families
                 )
             )
-        for field in fields.participant_keys:
+        for field in participant_keys:
             prow.append(
                 prepare_field_for_export(get_field_from_obj(participant, field))
             )
 
         for sample in participant.samples:
             srow = []
-            for field in fields.sample_keys:
+            for field in sample_keys:
                 srow.append(prepare_field_for_export(get_field_from_obj(sample, field)))
 
             for sg in sample.sequencing_groups or []:
                 sgrow = []
-                for field in fields.sequencing_group_keys:
+                for field in sequencing_group_keys:
                     sgrow.append(
                         prepare_field_for_export(get_field_from_obj(sg, field))
                     )
 
                 for assay in sg.assays or []:
                     arow = []
-                    for field in fields.assay_keys:
+                    for field in assay_keys:
                         arow.append(
                             prepare_field_for_export(get_field_from_obj(assay, field))
                         )

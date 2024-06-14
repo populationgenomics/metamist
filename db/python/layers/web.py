@@ -5,6 +5,7 @@ from datetime import date
 
 from api.utils import group_by
 from db.python.filters import GenericFilter
+from db.python.filters.sequencing_group import SequencingGroupFilter
 from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer
 from db.python.layers.family import FamilyLayer
@@ -242,14 +243,17 @@ class WebDb(DbBase):
         samples = await slayer.query(sfilter)
 
         sgfilter = sfilter.get_sg_filter()
-        if not sgfilter.sample_id:
-            sgfilter.sample_id = GenericFilter()
-        if sgfilter.sample_id.in_:
-            sgfilter.sample_id.in_ = list(
-                set(sgfilter.sample_id.in_) & {s.id for s in samples}
-            )
-        else:
-            sgfilter.sample_id.in_ = [s.id for s in samples]
+        if not sgfilter.sample:
+            sgfilter.sample = SequencingGroupFilter.SequencingGroupSampleFilter()
+        if sgfilter.sample:
+            if not sgfilter.sample.id:
+                sgfilter.sample.id = GenericFilter()
+            if sgfilter.sample.id and sgfilter.sample.id.in_:
+                sgfilter.sample.id.in_ = list(
+                    set(sgfilter.sample.id.in_) & {s.id for s in samples}
+                )
+            else:
+                sgfilter.sample.id.in_ = [s.id for s in samples]
 
         sequencing_groups = await sglayer.query(sgfilter)
 

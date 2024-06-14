@@ -1,14 +1,13 @@
 import * as React from 'react'
 import { Button, ButtonGroup, Dropdown, Message } from 'semantic-ui-react'
 
-import _ from 'lodash'
 import {
-    ExportProjectParticipantFields,
     ExportType,
+    MetaSearchEntityPrefix,
+    ProjectParticipantGridField,
     ProjectParticipantGridFilter,
     WebApi,
 } from '../../sm-api/api'
-import { MetaSearchEntityPrefix, ProjectGridHeaderGroup } from './ProjectColumnOptions'
 
 const extensionFromExportType = (exportType: ExportType) => {
     switch (exportType) {
@@ -28,7 +27,7 @@ export const ProjectExportButton: React.FunctionComponent<{
     projectName: string
 
     filterValues: ProjectParticipantGridFilter
-    headerGroups: ProjectGridHeaderGroup[]
+    headerGroups: Record<MetaSearchEntityPrefix, ProjectParticipantGridField[]>
 }> = ({ filterValues, projectName, headerGroups, participants_in_query }) => {
     const [exportType, setExportType] = React.useState<ExportType>(ExportType.Csv)
     const [isDownloading, setIsDownloading] = React.useState(false)
@@ -39,30 +38,10 @@ export const ProjectExportButton: React.FunctionComponent<{
         if (!_exportType) return
         setIsDownloading(true)
         setDownloadError(undefined)
-
-        const hgByCategory = _.keyBy(headerGroups, (hg) => hg.category)
-
-        const fields: ExportProjectParticipantFields = {
-            family_keys: hgByCategory[MetaSearchEntityPrefix.F].fields
-                .filter((f) => f.isVisible)
-                .map((f) => f.name),
-            participant_keys: hgByCategory[MetaSearchEntityPrefix.P].fields
-                .filter((f) => f.isVisible)
-                .map((f) => f.name),
-            sample_keys: hgByCategory[MetaSearchEntityPrefix.S].fields
-                .filter((f) => f.isVisible)
-                .map((f) => f.name),
-            sequencing_group_keys: hgByCategory[MetaSearchEntityPrefix.Sg].fields
-                .filter((f) => f.isVisible)
-                .map((f) => f.name),
-            assay_keys: hgByCategory[MetaSearchEntityPrefix.A].fields
-                .filter((f) => f.isVisible)
-                .map((f) => f.name),
-        }
         new WebApi()
             .exportProjectParticipants(_exportType, projectName, {
                 query: filterValues,
-                fields: fields,
+                fields: { fields: headerGroups },
             })
             .then((resp) => {
                 setIsDownloading(false)
@@ -116,7 +95,6 @@ export const ProjectExportButton: React.FunctionComponent<{
                     floating
                     value={exportType}
                     onChange={(e, data) => {
-                        debugger
                         setExportType(data.value as ExportType)
                         download(data.value as ExportType)
                     }}

@@ -44,6 +44,7 @@ class GenericFilter(SMBase, Generic[T]):
     """
 
     eq: T | None = None
+    neq: T | None = None
     in_: Sequence[T] | None = None
     nin: Sequence[T] | None = None
     gt: T | None = None
@@ -55,7 +56,19 @@ class GenericFilter(SMBase, Generic[T]):
     startswith: T | None = None
 
     def __repr__(self):
-        keys = ['eq', 'in_', 'nin', 'gt', 'gte', 'lt', 'lte', 'contains', 'icontains']
+        keys = [
+            'eq',
+            'neq',
+            'in_',
+            'nin',
+            'gt',
+            'gte',
+            'lt',
+            'lte',
+            'contains',
+            'icontains',
+            'startswith',
+        ]
         inner_values = ', '.join(
             f'{k}={getattr(self, k)!r}' for k in keys if getattr(self, k) is not None
         )
@@ -67,6 +80,7 @@ class GenericFilter(SMBase, Generic[T]):
             (
                 self.__class__.__name__,
                 self.eq,
+                self.neq,
                 tuple(self.in_) if self.in_ is not None else None,
                 tuple(self.nin) if self.nin is not None else None,
                 self.gt,
@@ -127,6 +141,10 @@ class GenericFilter(SMBase, Generic[T]):
             k = self.generate_field_name(_column_name + '_eq')
             conditionals.append(f'{column} = :{k}')
             values[k] = self._sql_value_prep(self.eq)
+        if self.neq is not None:
+            k = self.generate_field_name(_column_name + '_neq')
+            conditionals.append(f'{column} != :{k}')
+            values[k] = self._sql_value_prep(self.neq)
         if self.in_ is not None:
             if len(self.in_) == 0:
                 # in an empty list is always false

@@ -1211,8 +1211,10 @@ class Query:  # entry point to graphql.
 
         filter_ = SequencingGroupFilter(
             project=_project_filter,
-            sample_id=(
-                sample_id.to_internal_filter_mapped(sample_id_transform_to_raw)
+            sample=(
+                SequencingGroupFilter.SequencingGroupSampleFilter(
+                    id=sample_id.to_internal_filter_mapped(sample_id_transform_to_raw)
+                )
                 if sample_id
                 else None
             ),

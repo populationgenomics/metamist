@@ -48,6 +48,7 @@ class ParticipantTable(DbBase):
         skip: int | None = None,
         limit: int | None = None,
         participant_eid_table_alias: str | None = None,
+        group_result_by_id: bool = True
     ) -> tuple[str, dict[str, Any]]:
         """Construct a participant query"""
         needs_family = False
@@ -194,7 +195,7 @@ class ParticipantTable(DbBase):
             INNER JOIN (
             {query}
             ) as inner_query ON inner_query.id = p.id
-            GROUP BY p.id
+            {"GROUP BY p.id" if group_result_by_id else ""}
         """
 
         return outer_query, values
@@ -236,7 +237,7 @@ class ParticipantTable(DbBase):
     async def query_count(self, filter_: ParticipantFilter) -> int:
         """Query for participants count"""
         query, values = await self._construct_participant_query(
-            filter_, keys=['COUNT(*) as cnt']
+            filter_, keys=['COUNT(*) as cnt'], group_result_by_id=False
         )
         row = await self.connection.fetch_one(query, values)
         if not row:

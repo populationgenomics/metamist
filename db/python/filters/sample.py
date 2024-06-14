@@ -62,7 +62,12 @@ class SampleFilter(GenericFilterModel):
 
         return SequencingGroupFilter(
             id=self.sequencing_group.id if self.sequencing_group else None,
-            sample_id=self.id,
+            sample=SequencingGroupFilter.SequencingGroupSampleFilter(
+                id=self.id,
+                type=self.type,
+                meta=self.meta,
+                external_id=self.external_id,
+            ),
             external_id=(
                 self.sequencing_group.external_id if self.sequencing_group else None
             ),

@@ -1,4 +1,3 @@
-import * as _ from 'lodash'
 import * as React from 'react'
 
 import { AxiosError } from 'axios'
@@ -7,14 +6,16 @@ import { Button, Dropdown, Message } from 'semantic-ui-react'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import MuckError from '../../shared/components/MuckError'
 import ErrorBoundary from '../../shared/utilities/errorBoundary'
-import { ProjectParticipantGridFilter, ProjectParticipantGridResponse, WebApi } from '../../sm-api'
+import {
+    MetaSearchEntityPrefix,
+    ProjectParticipantGridField,
+    ProjectParticipantGridFilter,
+    ProjectParticipantGridResponse,
+    WebApi,
+} from '../../sm-api'
 import { DictEditor } from './DictEditor'
 import PageOptions from './PageOptions'
-import {
-    defaultHeaderGroupsFromResponse,
-    ProjectColumnOptions,
-    ProjectGridHeaderGroup,
-} from './ProjectColumnOptions'
+import { defaultHeaderGroupsFromResponse, ProjectColumnOptions } from './ProjectColumnOptions'
 import ProjectGrid from './ProjectGrid'
 
 interface IProjectGridContainerProps {
@@ -37,7 +38,9 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
     const [isLoading, setIsLoading] = React.useState<boolean>(false)
     let [error, setError] = React.useState<React.ReactElement | undefined>()
     const [projectColOptionsAreOpen, setProjectColOptionsAreOpen] = React.useState<boolean>(false)
-    const [headerGroups, setHeaderGroups] = React.useState<ProjectGridHeaderGroup[]>([])
+    const [headerGroups, setHeaderGroups] = React.useState<
+        Record<MetaSearchEntityPrefix, ProjectParticipantGridField[]>
+    >({} as Record<MetaSearchEntityPrefix, ProjectParticipantGridField[]>)
 
     // fetched data
     const [participants, setParticipants] = React.useState<
@@ -96,14 +99,8 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
         }
     }
 
-    const setFilterValues = (
-        values: Partial<ProjectParticipantGridFilter>,
-        complete: boolean = false
-    ) => {
-        setPageOptions({
-            filter: complete ? values : _.merge({}, filterOptions, values),
-            pageNumber: 1,
-        })
+    const setFilterValues = (values: ProjectParticipantGridFilter) => {
+        setPageOptions({ filter: values, pageNumber: 1 })
     }
 
     const getParticipantsFor = () => {
@@ -131,6 +128,14 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
                         An error occurred when fetching participants: {er.message}
                         <br />
                         <pre>{JSON.stringify(er.response?.data, null, 2)}</pre>
+                        <Button
+                            color="red"
+                            onClick={() => {
+                                getParticipantsFor()
+                            }}
+                        >
+                            Retry
+                        </Button>
                     </>
                 )
                 setIsLoading(false)

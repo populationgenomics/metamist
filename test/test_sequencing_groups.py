@@ -148,7 +148,11 @@ class TestSequencingGroup(DbIsolatedTest):
 
         # check that the "active" sequencing group is the new one
         active_sgs = await self.sglayer.query(
-            SequencingGroupFilter(sample_id=GenericFilter(eq=sample.id))
+            SequencingGroupFilter(
+                sample=SequencingGroupFilter.SequencingGroupSampleFilter(
+                    id=GenericFilter(eq=sample.id)
+                )
+            )
         )
 
         self.assertTrue(all(not sg.archived for sg in active_sgs))

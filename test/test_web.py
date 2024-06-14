@@ -16,6 +16,7 @@ from db.python.layers import (
     WebLayer,
 )
 from db.python.tables.participant import ParticipantFilter
+from models.enums.web import MetaSearchEntityPrefix
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
     Assay,
@@ -31,7 +32,10 @@ from models.models import (
     WebProject,
 )
 from models.models.sequencing_group import NestedSequencingGroup
-from models.models.web import ProjectParticipantGridResponse
+from models.models.web import (
+    ProjectParticipantGridField,
+    ProjectParticipantGridResponse,
+)
 from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
@@ -185,24 +189,46 @@ SINGLE_PARTICIPANT_SUMMARY_RESULT = ProjectSummaryInternal(
 SINGLE_PARTICIPANT_QUERY_RESULT = ProjectParticipantGridResponse(
     participants=[],
     total_results=1,
-    family_keys=[('external_id', 'Family ID')],
-    participant_keys=[('external_ids', 'Participant ID')],
-    sample_keys=[
-        ('id', 'Sample ID'),
-        ('external_ids', 'External Sample ID'),
-        ('created_date', 'Created date'),
-    ],
-    sequencing_group_keys=[
-        ('id', 'Sequencing Group ID'),
-        ('platform', 'Platform'),
-        ('technology', 'Technology'),
-        ('type', 'Type'),
-    ],
-    assay_keys=[
-        ('type', 'type'),
-        ('meta.batch', 'batch'),
-        ('meta.reads_type', 'reads_type'),
-    ],
+    fields={
+        MetaSearchEntityPrefix.FAMILY: [
+            ProjectParticipantGridField(
+                key='external_id', label='Family ID', is_visible=True
+            )
+        ],
+        MetaSearchEntityPrefix.PARTICIPANT: [
+            ProjectParticipantGridField(key='external_ids', label='Participant ID', is_visible=True),
+        ],
+        MetaSearchEntityPrefix.SAMPLE: [
+            ProjectParticipantGridField(key='meta.skey', label='', is_visible=True),
+            ProjectParticipantGridField(key='external_ids', label='', is_visible=True),
+        ],
+        MetaSearchEntityPrefix.SEQUENCING_GROUP: [
+            ProjectParticipantGridField(key='type', label='', is_visible=True),
+            ProjectParticipantGridField(key='meta.sgkey', label='', is_visible=True),
+        ],
+        MetaSearchEntityPrefix.ASSAY: [
+            ProjectParticipantGridField(key='type', label='', is_visible=True),
+            ProjectParticipantGridField(key='meta.akey', label='', is_visible=True),
+        ],
+    },
+    # family_keys=[('external_id', 'Family ID')],
+    # participant_keys=[('external_ids', 'Participant ID')],
+    # sample_keys=[
+    #     ('id', 'Sample ID'),
+    #     ('external_ids', 'External Sample ID'),
+    #     ('created_date', 'Created date'),
+    # ],
+    # sequencing_group_keys=[
+    #     ('id', 'Sequencing Group ID'),
+    #     ('platform', 'Platform'),
+    #     ('technology', 'Technology'),
+    #     ('type', 'Type'),
+    # ],
+    # assay_keys=[
+    #     ('type', 'type'),
+    #     ('meta.batch', 'batch'),
+    #     ('meta.reads_type', 'reads_type'),
+    # ],
 )
 
 
@@ -321,6 +347,7 @@ class TestWeb(DbIsolatedTest):
         result = ProjectParticipantGridResponse.from_params(
             participants=nested_participants,
             total_results=1,
+            filter_fields=pfilter,
         )
         self.assertEqual(1, len(nested_participants))
         result.participants = []
@@ -344,6 +371,7 @@ class TestWeb(DbIsolatedTest):
         result = ProjectParticipantGridResponse.from_params(
             participants=nested_participants,
             total_results=0,
+            filter_fields=pfilter,
         )
         result.participants = []
         self.assertEqual(SINGLE_PARTICIPANT_QUERY_RESULT, result)
@@ -351,11 +379,7 @@ class TestWeb(DbIsolatedTest):
         empty_result = ProjectParticipantGridResponse(
             total_results=0,
             participants=[],
-            family_keys=[],
-            participant_keys=[],
-            sample_keys=[],
-            sequencing_group_keys=[],
-            assay_keys=[],
+            fields={}
         )
 
         self.assertEqual(empty_result, result)
@@ -388,25 +412,26 @@ class TestWeb(DbIsolatedTest):
         expected_result = ProjectParticipantGridResponse(
             participants=[],  # data_to_class(expected_data_list),
             total_results=2,
-            family_keys=[('external_id', 'Family ID')],
-            participant_keys=[('external_ids', 'Participant ID')],
-            sample_keys=[
-                ('id', 'Sample ID'),
-                ('external_ids', 'External Sample ID'),
-                ('created_date', 'Created date'),
-            ],
-            sequencing_group_keys=[
-                ('id', 'Sequencing Group ID'),
-                ('platform', 'Platform'),
-                ('technology', 'Technology'),
-                ('type', 'Type'),
-            ],
-            assay_keys=[
-                ('type', 'type'),
-                ('meta.batch', 'batch'),
-                ('meta.field with spaces', 'field with spaces'),
-                ('meta.reads_type', 'reads_type'),
-            ],
+            fields={}
+            # family_keys=[('external_id', 'Family ID')],
+            # participant_keys=[('external_ids', 'Participant ID')],
+            # sample_keys=[
+            #     ('id', 'Sample ID'),
+            #     ('external_ids', 'External Sample ID'),
+            #     ('created_date', 'Created date'),
+            # ],
+            # sequencing_group_keys=[
+            #     ('id', 'Sequencing Group ID'),
+            #     ('platform', 'Platform'),
+            #     ('technology', 'Technology'),
+            #     ('type', 'Type'),
+            # ],
+            # assay_keys=[
+            #     ('type', 'type'),
+            #     ('meta.batch', 'batch'),
+            #     ('meta.field with spaces', 'field with spaces'),
+            #     ('meta.reads_type', 'reads_type'),
+            # ],
         )
 
         summary = await self.webl.get_project_summary()
@@ -420,6 +445,7 @@ class TestWeb(DbIsolatedTest):
         result = ProjectParticipantGridResponse.from_params(
             participants=nested_participants,
             total_results=2,
+            filter_fields=ProjectParticipantGridFilter(),
         )
         # make it easier to test
         result.participants = []
@@ -435,25 +461,26 @@ class TestWeb(DbIsolatedTest):
         expected_data_two_samples_filtered = ProjectParticipantGridResponse(
             participants=[],  # data_to_class(expected_data_list_filtered),
             total_results=2,
-            family_keys=[('external_id', 'Family ID')],
-            participant_keys=[('external_ids', 'Participant ID')],
-            sample_keys=[
-                ('id', 'Sample ID'),
-                ('external_ids', 'External Sample ID'),
-                ('created_date', 'Created date'),
-            ],
-            sequencing_group_keys=[
-                ('id', 'Sequencing Group ID'),
-                ('platform', 'Platform'),
-                ('technology', 'Technology'),
-                ('type', 'Type'),
-            ],
-            assay_keys=[
-                ('type', 'type'),
-                ('meta.batch', 'batch'),
-                ('meta.field with spaces', 'field with spaces'),
-                ('meta.reads_type', 'reads_type'),
-            ],
+            fields={},
+            # family_keys=[('external_id', 'Family ID')],
+            # participant_keys=[('external_ids', 'Participant ID')],
+            # sample_keys=[
+            #     ('id', 'Sample ID'),
+            #     ('external_ids', 'External Sample ID'),
+            #     ('created_date', 'Created date'),
+            # ],
+            # sequencing_group_keys=[
+            #     ('id', 'Sequencing Group ID'),
+            #     ('platform', 'Platform'),
+            #     ('technology', 'Technology'),
+            #     ('type', 'Type'),
+            # ],
+            # assay_keys=[
+            #     ('type', 'type'),
+            #     ('meta.batch', 'batch'),
+            #     ('meta.field with spaces', 'field with spaces'),
+            #     ('meta.reads_type', 'reads_type'),
+            # ],
         )
 
         pfilter = ProjectParticipantGridFilter(
@@ -469,6 +496,7 @@ class TestWeb(DbIsolatedTest):
         self.assertEqual(1, len(nested_participants))
         result = ProjectParticipantGridResponse.from_params(
             nested_participants,
+            filter_fields=pfilter,
             total_results=2,
         )
         result.participants = []
@@ -574,11 +602,41 @@ class WebNonDBTests(unittest.TestCase):
             ],
         )
         fields = ExportProjectParticipantFields(
-            family_keys=['external_id'],
-            participant_keys=['external_ids', 'meta.pkey'],
-            sample_keys=['meta.skey', 'external_ids'],
-            sequencing_group_keys=['type', 'meta.sgkey'],
-            assay_keys=['type', 'meta.akey'],
+            fields={
+                MetaSearchEntityPrefix.FAMILY: [
+                    ProjectParticipantGridField(
+                        key='external_id', label='', is_visible=True
+                    )
+                ],
+                MetaSearchEntityPrefix.PARTICIPANT: [
+                    ProjectParticipantGridField(
+                        key='external_ids', label='', is_visible=True
+                    ),
+                    ProjectParticipantGridField(
+                        key='meta.pkey', label='', is_visible=True
+                    ),
+                ],
+                MetaSearchEntityPrefix.SAMPLE: [
+                    ProjectParticipantGridField(
+                        key='meta.skey', label='', is_visible=True
+                    ),
+                    ProjectParticipantGridField(
+                        key='external_ids', label='', is_visible=True
+                    ),
+                ],
+                MetaSearchEntityPrefix.SEQUENCING_GROUP: [
+                    ProjectParticipantGridField(key='type', label='', is_visible=True),
+                    ProjectParticipantGridField(
+                        key='meta.sgkey', label='', is_visible=True
+                    ),
+                ],
+                MetaSearchEntityPrefix.ASSAY: [
+                    ProjectParticipantGridField(key='type', label='', is_visible=True),
+                    ProjectParticipantGridField(
+                        key='meta.akey', label='', is_visible=True
+                    ),
+                ],
+            }
         )
 
         i = prepare_participants_for_export([participant], fields)

@@ -1,8 +1,11 @@
 # pylint: disable=too-many-instance-attributes
 import dataclasses
+from enum import Enum
 from typing import Sequence
 
+from db.python.filters.web import ProjectParticipantGridFilter
 from models.base import SMBase
+from models.enums.web import MetaSearchEntityPrefix
 from models.models.participant import NestedParticipant, NestedParticipantInternal
 
 
@@ -89,6 +92,25 @@ class ProjectSummary(SMBase):
     seqr_sync_types: list[str]
 
 
+class ProjectParticipantGridFilterType(Enum):
+    eq = 'eq'
+    neq = 'neq'
+    startswith = 'startswith'
+    icontains = 'icontains'
+
+
+class ProjectParticipantGridField(SMBase):
+    """Field for grid response"""
+
+    key: str
+    label: str
+    is_visible: bool
+    # use this key when you want to filter
+    filter_key: str | None = None
+    # assume all if filter_key provided and is None
+    filter_types: list[ProjectParticipantGridFilterType] | None = None
+
+
 class ProjectParticipantGridResponse(SMBase):
     """
     Web GridResponse including keys
@@ -98,51 +120,37 @@ class ProjectParticipantGridResponse(SMBase):
     participants: list[NestedParticipant]
     total_results: int
 
-    family_keys: list[tuple[str, str]]
-    participant_keys: list[tuple[str, str]]
-    sample_keys: list[tuple[str, str]]
-    sequencing_group_keys: list[tuple[str, str]]
-    assay_keys: list[tuple[str, str]]
+    fields: dict[MetaSearchEntityPrefix, list[ProjectParticipantGridField]]
 
     @staticmethod
     def from_params(
         participants: list[NestedParticipantInternal],
+        filter_fields: ProjectParticipantGridFilter,
         total_results: int,
     ):
         """Convert to transport model"""
-        entity_keys = ProjectParticipantGridResponse.get_entity_keys(participants)
+        fields = ProjectParticipantGridResponse.get_entity_keys(
+            participants, filter_fields=filter_fields
+        )
 
         return ProjectParticipantGridResponse(
             participants=[p.to_external() for p in participants],
             total_results=total_results,
-            family_keys=entity_keys.family_keys,
-            participant_keys=entity_keys.participant_keys,
-            sample_keys=entity_keys.sample_keys,
-            sequencing_group_keys=entity_keys.sequencing_group_keys,
-            assay_keys=entity_keys.assay_keys,
+            fields=fields,
         )
-
-    @dataclasses.dataclass
-    class ParticipantGridEntityKeys:
-        """
-        Tiny dataclass as returntype for get_entity_keys
-        """
-
-        family_keys: list[tuple[str, str]]
-        participant_keys: list[tuple[str, str]]
-        sample_keys: list[tuple[str, str]]
-        sequencing_group_keys: list[tuple[str, str]]
-        assay_keys: list[tuple[str, str]]
 
     @staticmethod
     def get_entity_keys(
         participants: Sequence[NestedParticipantInternal | NestedParticipant],
-    ) -> 'ParticipantGridEntityKeys':
+        # useful for showing fields that are not in the response, but in the filter
+        filter_fields: ProjectParticipantGridFilter,
+    ) -> dict[MetaSearchEntityPrefix, list[ProjectParticipantGridField]]:
         """
         Read through nested participants and full out the keys for the grid response
         """
-        ignore_sample_meta_keys = {'reads', 'vcfs', 'gvcf'}
-        ignore_assay_meta_keys = {
+        hidden_participant_meta_keys = set()
+        hidden_sample_meta_keys = {'reads', 'vcfs', 'gvcf'}
+        hidden_assay_meta_keys = {
             'reads',
             'vcfs',
             'gvcf',
@@ -150,13 +158,28 @@ class ProjectParticipantGridResponse(SMBase):
             'sequencing_technology',
             'sequencing_type',
         }
-        ignore_sg_meta_keys: set[str] = set()
+        hidden_sg_meta_keys: set[str] = set()
 
         family_meta_keys: set[str] = set()
         participant_meta_keys: set[str] = set()
         sample_meta_keys: set[str] = set()
         sg_meta_keys: set[str] = set()
         assay_meta_keys: set[str] = set()
+
+        if filter_fields.family and filter_fields.family.meta:
+            family_meta_keys.update(filter_fields.family.meta.keys())
+        if filter_fields.participant and filter_fields.participant.meta:
+            participant_meta_keys.update(filter_fields.participant.meta.keys())
+            hidden_participant_meta_keys -= set(filter_fields.participant.meta.keys())
+        if filter_fields.sample and filter_fields.sample.meta:
+            sample_meta_keys.update(filter_fields.sample.meta.keys())
+            hidden_participant_meta_keys -= set(filter_fields.sample.meta.keys())
+        if filter_fields.sequencing_group and filter_fields.sequencing_group.meta:
+            sg_meta_keys.update(filter_fields.sequencing_group.meta.keys())
+            hidden_sg_meta_keys -= set(filter_fields.sequencing_group.meta.keys())
+        if filter_fields.assay and filter_fields.assay.meta:
+            assay_meta_keys.update(filter_fields.assay.meta.keys())
+            hidden_assay_meta_keys -= set(filter_fields.assay.meta.keys())
 
         for p in participants:
             if p.meta:
@@ -183,48 +206,153 @@ class ProjectParticipantGridResponse(SMBase):
         has_reported_gender = any(p.reported_gender is not None for p in participants)
         has_karyotype = any(p.karyotype is not None for p in participants)
 
-        family_keys: list[tuple[str, str]] = [('external_id', 'Family ID')]
-        family_keys.extend(('meta.' + k, k) for k in family_meta_keys)
-        participant_keys: list[tuple[str, str]] = [('external_ids', 'Participant ID')]
+        # dumb alias
+        Field = ProjectParticipantGridField
 
-        if has_reported_sex:
-            participant_keys.append(('reported_sex', 'Reported sex'))
-        if has_reported_gender:
-            participant_keys.append(('reported_gender', 'Reported gender'))
-        if has_karyotype:
-            participant_keys.append(('karyotype', 'Karyotype'))
+        family_fields: list[ProjectParticipantGridField] = [
+            Field(
+                key='external_id',
+                label='Family ID',
+                is_visible=True,
+                filter_key='external_id',
+            )
+        ]
+        family_fields.extend(
+            Field(key='meta.' + k, label=k, is_visible=True, filter_key='meta.' + k)
+            for k in family_meta_keys
+        )
+        participant_fields = [
+            Field(
+                key='external_ids',
+                label='Participant ID',
+                is_visible=True,
+                filter_key='external_id',
+            ),
+            Field(
+                key='reported_sex',
+                label='Reported sex',
+                is_visible=has_reported_sex,
+                filter_key='reported_sex',
+            ),
+            Field(
+                key='reported_gender',
+                label='Reported gender',
+                is_visible=has_reported_gender,
+                filter_key='reported_gender',
+            ),
+            Field(
+                key='karyotype',
+                label='Karyotype',
+                is_visible=has_karyotype,
+                filter_key='karyotype',
+            ),
+        ]
+        participant_fields.extend(
+            Field(
+                key='meta.' + k,
+                label=k,
+                is_visible=k not in hidden_participant_meta_keys,
+                filter_key='meta.' + k,
+            )
+            for k in participant_meta_keys
+        )
 
-        participant_keys.extend(('meta.' + k, k) for k in participant_meta_keys)
-        sample_keys: list[tuple[str, str]] = [
-            ('id', 'Sample ID'),
-            ('external_ids', 'External Sample ID'),
-            ('created_date', 'Created date'),
-        ] + [
-            ('meta.' + k, k)
+        sample_fields = [
+            Field(
+                key='id',
+                label='Sample ID',
+                is_visible=True,
+                filter_key='id',
+                filter_types=[
+                    ProjectParticipantGridFilterType.eq,
+                    ProjectParticipantGridFilterType.neq,
+                ],
+            ),
+            Field(
+                key='external_ids',
+                label='External Sample ID',
+                is_visible=True,
+                filter_key='external_id',
+            ),
+            Field(
+                key='created_date',
+                label='Created date',
+                is_visible=True,
+                # filter_key='created_date',
+            ),
+        ]
+        sample_fields.extend(
+            Field(
+                key='meta.' + k,
+                label=k,
+                is_visible=k not in hidden_sample_meta_keys,
+                filter_key='meta.' + k,
+            )
             for k in sample_meta_keys
-            if k not in ignore_sample_meta_keys
+        )
+        assay_fields = [
+            Field(
+                key='type',
+                label='Type',
+                is_visible=True,
+                filter_key='type',
+            )
+        ]
+        assay_fields.extend(
+            Field(
+                key='meta.' + k,
+                label=k,
+                is_visible=k not in hidden_assay_meta_keys,
+                filter_key='meta.' + k,
+            )
+            for k in assay_meta_keys
+        )
+
+        sequencing_group_fields = [
+            Field(
+                key='id',
+                label='Sequencing Group ID',
+                is_visible=True,
+                filter_key='id',
+                filter_types=[
+                    ProjectParticipantGridFilterType.eq,
+                    ProjectParticipantGridFilterType.neq,
+                ],
+            ),
+            Field(
+                key='platform',
+                label='Platform',
+                is_visible=True,
+                filter_key='platform',
+            ),
+            Field(
+                key='technology',
+                label='Technology',
+                is_visible=True,
+                filter_key='technology',
+            ),
+            Field(
+                key='type',
+                label='Type',
+                is_visible=True,
+                filter_key='type',
+            ),
         ]
 
-        assay_keys = [('type', 'type')] + sorted(
-            [
-                ('meta.' + k, k)
-                for k in assay_meta_keys
-                if k not in ignore_assay_meta_keys
-            ]
-        )
-        sequencing_group_keys = [
-            ('id', 'Sequencing Group ID'),
-            ('platform', 'Platform'),
-            ('technology', 'Technology'),
-            ('type', 'Type'),
-        ] + sorted(
-            [('meta.' + k, k) for k in sg_meta_keys if k not in ignore_sg_meta_keys]
+        sequencing_group_fields.extend(
+            Field(
+                key='meta.' + k,
+                label=k,
+                is_visible=k not in hidden_sg_meta_keys,
+                filter_key='meta.' + k,
+            )
+            for k in sg_meta_keys
         )
 
-        return ProjectParticipantGridResponse.ParticipantGridEntityKeys(
-            family_keys=family_keys,
-            participant_keys=participant_keys,
-            sample_keys=sample_keys,
-            sequencing_group_keys=sequencing_group_keys,
-            assay_keys=assay_keys,
-        )
+        return {
+            MetaSearchEntityPrefix.FAMILY: family_fields,
+            MetaSearchEntityPrefix.PARTICIPANT: participant_fields,
+            MetaSearchEntityPrefix.SAMPLE: sample_fields,
+            MetaSearchEntityPrefix.SEQUENCING_GROUP: sequencing_group_fields,
+            MetaSearchEntityPrefix.ASSAY: assay_fields,
+        }

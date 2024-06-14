@@ -13,6 +13,7 @@ import slack_sdk
 import slack_sdk.errors
 from backoff import expo, on_exception
 from cloudpathlib import AnyPath
+
 from cpg_utils.cloud import get_google_identity_token
 
 from api.settings import (

@@ -84,6 +84,10 @@ class ParticipantFilter(GenericFilterModel):
         """Get sample filter"""
 
         return SampleFilter(
+            id=self.sample.id if self.sample else None,
+            external_id=self.sample.external_id if self.sample else None,
+            type=self.sample.type if self.sample else None,
+            meta=self.sample.meta if self.sample else None,
             project=self.project,
             participant_id=self.id,
             sequencing_group=(

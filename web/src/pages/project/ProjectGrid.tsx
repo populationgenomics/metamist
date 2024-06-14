@@ -3,17 +3,26 @@ import * as React from 'react'
 
 import { TableHeader } from 'semantic-ui-react'
 import Table from '../../shared/components/Table'
-import { ProjectParticipantGridFilter, ProjectParticipantGridResponse } from '../../sm-api/api'
+import {
+    MetaSearchEntityPrefix,
+    ProjectParticipantGridField,
+    ProjectParticipantGridFilter,
+    ProjectParticipantGridResponse,
+} from '../../sm-api/api'
 import { ProjectExportButton } from './ExportProjectButton'
 import { ProjectGridParticipantRows } from './ParticipantGridRow'
-import { MetaSearchEntityPrefix, ProjectGridHeaderGroup } from './ProjectColumnOptions'
+import {
+    headerGroupOrder,
+    metaSeachEntityPrefixToFilterKey,
+    metaSearchEntityToTitle,
+} from './ProjectGridHeaderGroup'
 import { ValueFilterPopup } from './ValueFilter'
 
 interface ProjectGridProps {
     participantResponse?: ProjectParticipantGridResponse
     projectName: string
 
-    headerGroups: ProjectGridHeaderGroup[]
+    headerGroups: Record<MetaSearchEntityPrefix, ProjectParticipantGridField[]>
     filterValues: ProjectParticipantGridFilter
     updateFilters: (e: Partial<ProjectParticipantGridFilter>) => void
 }
@@ -33,7 +42,24 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
         )
     }
 
-    const headerGroupByCategory = _.keyBy(headerGroups, 'category')
+    const filteredFamilyFields =
+        headerGroups[MetaSearchEntityPrefix.F]?.filter((f) => f.is_visible) ?? []
+    const filteredParticipantFields =
+        headerGroups[MetaSearchEntityPrefix.P]?.filter((f) => f.is_visible) ?? []
+    const filteredSampleFields =
+        headerGroups[MetaSearchEntityPrefix.S]?.filter((f) => f.is_visible) ?? []
+    const filteredSequencingGroupFields =
+        headerGroups[MetaSearchEntityPrefix.Sg]?.filter((f) => f.is_visible) ?? []
+    const filteredAssayFields =
+        headerGroups[MetaSearchEntityPrefix.A]?.filter((f) => f.is_visible) ?? []
+
+    const visibleHeaderGroups = {
+        [MetaSearchEntityPrefix.F]: filteredFamilyFields,
+        [MetaSearchEntityPrefix.P]: filteredParticipantFields,
+        [MetaSearchEntityPrefix.S]: filteredSampleFields,
+        [MetaSearchEntityPrefix.Sg]: filteredSequencingGroupFields,
+        [MetaSearchEntityPrefix.A]: filteredAssayFields,
+    }
 
     return (
         <>
@@ -54,34 +80,24 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                 }}
             >
                 <TableHeader>
-                    <ProjectGridCategoryHeader headerGroups={headerGroups} />
+                    <ProjectGridCategoryHeader headerGroups={visibleHeaderGroups} />
                     <ProjectGridFilterRow
-                        headerGroups={headerGroups}
+                        headerGroups={visibleHeaderGroups}
                         filterValues={filterValues}
                         updateFilters={updateFilters}
                     />
-                    <ProjectGridFieldHeaderRow headerGroups={headerGroups} />
+                    <ProjectGridFieldHeaderRow headerGroups={visibleHeaderGroups} />
                 </TableHeader>
                 <tbody>
                     {summary.participants.map((p, pidx) => (
                         <ProjectGridParticipantRows
                             key={`pgrid-row-participant-row-${p.id}`}
                             participant={p}
-                            familyFields={
-                                headerGroupByCategory[MetaSearchEntityPrefix.F]?.fields ?? []
-                            }
-                            participantFields={
-                                headerGroupByCategory[MetaSearchEntityPrefix.P]?.fields ?? []
-                            }
-                            sampleFields={
-                                headerGroupByCategory[MetaSearchEntityPrefix.S]?.fields ?? []
-                            }
-                            sequencingGroupFields={
-                                headerGroupByCategory[MetaSearchEntityPrefix.Sg]?.fields ?? []
-                            }
-                            assayFields={
-                                headerGroupByCategory[MetaSearchEntityPrefix.A]?.fields ?? []
-                            }
+                            familyFields={filteredFamilyFields}
+                            participantFields={filteredParticipantFields}
+                            sampleFields={filteredSampleFields}
+                            sequencingGroupFields={filteredSequencingGroupFields}
+                            assayFields={filteredAssayFields}
                             projectName={projectName}
                             backgroundColor={
                                 pidx % 2 === 1 ? 'var(--color-bg)' : 'var(--color-bg-disabled)'
@@ -94,18 +110,22 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
     )
 }
 
-const ProjectGridCategoryHeader: React.FC<{ headerGroups: ProjectGridHeaderGroup[] }> = ({
-    headerGroups,
-}) => {
+const ProjectGridCategoryHeader: React.FC<{
+    headerGroups: Record<MetaSearchEntityPrefix, ProjectParticipantGridField[]>
+}> = ({ headerGroups }) => {
     return (
         <tr>
-            {headerGroups.map(({ category, fields }) => {
-                const visible = fields.filter((f) => f.isVisible).length
-                if (visible === 0) return <React.Fragment />
+            {headerGroupOrder.map((category) => {
+                const fields = headerGroups[category]
+                if (fields === undefined) {
+                    debugger
+                }
+                const visible = fields.length // .filter((f) => f.is_visible).length
+                if (visible === 0) return <React.Fragment key={`category-header-${category}`} />
                 return (
                     <th
                         key={`category-header-${category}`}
-                        colSpan={fields.filter((f) => f.isVisible).length}
+                        colSpan={visible}
                         style={{
                             textAlign: 'center',
                             borderLeft: '2px solid var(--color-border-color)',
@@ -113,7 +133,7 @@ const ProjectGridCategoryHeader: React.FC<{ headerGroups: ProjectGridHeaderGroup
                             backgroundColor: 'var(--color-table-header)',
                         }}
                     >
-                        {_.startCase(category.replaceAll('_', ' '))}
+                        {_.startCase(metaSearchEntityToTitle(category))}
                     </th>
                 )
             })}
@@ -122,25 +142,21 @@ const ProjectGridCategoryHeader: React.FC<{ headerGroups: ProjectGridHeaderGroup
 }
 
 const ProjectGridFilterRow: React.FC<{
-    headerGroups: ProjectGridHeaderGroup[]
+    headerGroups: Record<MetaSearchEntityPrefix, ProjectParticipantGridField[]>
     filterValues: ProjectParticipantGridFilter
     updateFilters: (e: Partial<ProjectParticipantGridFilter>) => void
 }> = ({ headerGroups, filterValues, updateFilters }) => {
     return (
         // <SUITable.Header>
         <tr>
-            {headerGroups.flatMap((hg) =>
-                hg.fields
-                    .filter((f) => f.isVisible)
+            {headerGroupOrder.flatMap((category) =>
+                headerGroups[category]
+                    .filter((f) => f.is_visible)
                     .map((field, idx) => {
-                        if (
-                            field.title === 'Sample ID' ||
-                            field.title === 'Created date' ||
-                            field.title === 'Sequencing Group ID'
-                        ) {
+                        if (!field.filter_key) {
                             return (
                                 <th
-                                    key={`${hg.category}-${field.name}-${idx}`}
+                                    key={`${category}-${field.key}-${idx}`}
                                     style={{
                                         borderBottom: 'none',
                                         borderLeft:
@@ -154,7 +170,7 @@ const ProjectGridFilterRow: React.FC<{
                         // debugger
                         return (
                             <th
-                                key={`filter-${hg.category}-${field.name}-${idx}`}
+                                key={`filter-${category}-${field.key}-${idx}`}
                                 style={{
                                     borderBottom: 'none',
                                     borderLeft:
@@ -166,8 +182,8 @@ const ProjectGridFilterRow: React.FC<{
                                 <ValueFilterPopup
                                     filterValues={filterValues}
                                     updateFilterValues={updateFilters}
-                                    category={hg.category}
-                                    filterKey={field.name}
+                                    category={metaSeachEntityPrefixToFilterKey(category)}
+                                    field={field}
                                 />
                             </th>
                         )
@@ -178,18 +194,18 @@ const ProjectGridFilterRow: React.FC<{
     )
 }
 
-const ProjectGridFieldHeaderRow: React.FC<{ headerGroups: ProjectGridHeaderGroup[] }> = ({
-    headerGroups,
-}) => {
+const ProjectGridFieldHeaderRow: React.FC<{
+    headerGroups: Record<MetaSearchEntityPrefix, ProjectParticipantGridField[]>
+}> = ({ headerGroups }) => {
     return (
         // <SUITable.Header>
         <tr>
-            {headerGroups.flatMap((hg) =>
-                hg.fields
-                    .filter((f) => f.isVisible)
+            {headerGroupOrder.flatMap((hg) =>
+                headerGroups[hg]
+                    ?.filter((f) => f.is_visible)
                     .map((field, idx) => (
                         <th
-                            key={`field-header-row-${hg.category}-${field.name}-${idx}`}
+                            key={`field-header-row-${hg}-${field.key}-${idx}`}
                             style={{
                                 borderLeft:
                                     idx === 0
@@ -198,7 +214,7 @@ const ProjectGridFieldHeaderRow: React.FC<{ headerGroups: ProjectGridHeaderGroup
                                 borderBottom: '2px solid var(--color-border-default)',
                             }}
                         >
-                            {field.title.includes(' ') ? field.title : capitalize(field.title)}
+                            {field.label.includes(' ') ? field.label : capitalize(field.label)}
                         </th>
                     ))
             )}

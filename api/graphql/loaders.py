@@ -256,7 +256,12 @@ async def load_sequencing_groups_for_samples(
     """
     sglayer = SequencingGroupLayer(connection)
     _filter = dataclasses.replace(filter) if filter else SequencingGroupFilter()
-    _filter.sample_id = GenericFilter(in_=ids)
+    if not _filter.sample:
+        _filter.sample = SequencingGroupFilter.SequencingGroupSampleFilter(
+            id=GenericFilter(in_=ids)
+        )
+    else:
+        _filter.sample.id = GenericFilter(in_=ids)
 
     sequencing_groups = await sglayer.query(_filter)
     sg_map = group_by(sequencing_groups, lambda sg: sg.sample_id)

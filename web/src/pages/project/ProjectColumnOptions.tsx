@@ -12,89 +12,39 @@ import {
     Message,
     Segment,
 } from 'semantic-ui-react'
-import { ProjectParticipantGridFilter, ProjectParticipantGridResponse } from '../../sm-api'
+import {
+    MetaSearchEntityPrefix,
+    ProjectParticipantGridField,
+    ProjectParticipantGridFilter,
+    ProjectParticipantGridResponse,
+} from '../../sm-api'
 import { DictEditor } from './DictEditor'
-
-export enum MetaSearchEntityPrefix {
-    F = 'family',
-    P = 'participant',
-    S = 'sample',
-    Sg = 'sequencing_group',
-    A = 'assay',
-}
-
-export interface ProjectGridHeaderGroup {
-    category: MetaSearchEntityPrefix
-    fields: ProjectGridField[]
-}
-
-export interface ProjectGridField {
-    name: string // key
-    title: string // display name
-    isVisible?: boolean
-}
+import {
+    headerGroupOrder,
+    metaSeachEntityPrefixToFilterKey,
+    metaSearchEntityToTitle,
+} from './ProjectGridHeaderGroup'
+import { ValueFilter } from './ValueFilter'
 
 interface ProjectColumnOptionsProps {
-    headerGroups: ProjectGridHeaderGroup[]
+    headerGroups: Record<MetaSearchEntityPrefix, ProjectParticipantGridField[]>
     filterValues: ProjectParticipantGridFilter
     participantCount: number
     // participantResponse?: ProjectParticipantGridResponse
     updateFilters: (filters: Partial<ProjectParticipantGridFilter>) => void
-    setHeaderGroups: (headers: ProjectGridHeaderGroup[]) => void
+    setHeaderGroups: (
+        headers: Record<MetaSearchEntityPrefix, ProjectParticipantGridField[]>
+    ) => void
 
     isOpen: boolean
     setIsOpen: (isOpen: boolean) => void
 }
 
+// @ts-ignore
 export const defaultHeaderGroupsFromResponse: (
     summary: ProjectParticipantGridResponse
-) => ProjectGridHeaderGroup[] = (summary) => {
-    let headerGroups: ProjectGridHeaderGroup[] = [
-        {
-            category: MetaSearchEntityPrefix.F,
-            fields: [
-                {
-                    name: 'external_id',
-                    title: 'Family ID',
-                    isVisible: true,
-                },
-            ],
-        },
-        {
-            category: MetaSearchEntityPrefix.P,
-            fields: summary.participant_keys.map((field, i) => ({
-                name: field[0],
-                title: field[1],
-                isVisible: true,
-            })),
-        },
-        {
-            category: MetaSearchEntityPrefix.S,
-            fields: summary.sample_keys.map((field, i) => ({
-                name: field[0],
-                title: field[1],
-                isVisible: true,
-            })),
-        },
-        {
-            category: MetaSearchEntityPrefix.Sg,
-            fields: summary.sequencing_group_keys.map((field, i) => ({
-                name: field[0],
-                title: `${field[1]}`,
-                isVisible: true,
-            })),
-        },
-        {
-            category: MetaSearchEntityPrefix.A,
-            fields: summary.assay_keys.map((field, i) => ({
-                name: field[0],
-                title: `${field[1]}`,
-                isVisible: true,
-            })),
-        },
-    ]
-
-    return headerGroups
+) => Record<MetaSearchEntityPrefix, ProjectParticipantGridField[]> = (summary) => {
+    return summary.fields
 }
 
 export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
@@ -108,28 +58,23 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
 }) => {
     const onUpdateSingleHeader = (
         category: MetaSearchEntityPrefix,
-        header: ProjectGridField,
+        header: ProjectParticipantGridField,
         isChecked: boolean
     ) => {
-        const newHeaders = headerGroups.map((group) => {
-            if (group.category !== category) {
-                return group
-            }
+        const newGroups: Record<MetaSearchEntityPrefix, ProjectParticipantGridField[]> = {
+            ...headerGroups,
+        }
+        newGroups[category] = newGroups[category].map((field) => {
             // find the specific field, and set isVisible to isChecked
+            if (field.key !== header.key) {
+                return field
+            }
             return {
-                ...group,
-                fields: group.fields.map((field) => {
-                    if (field.name !== header.name) {
-                        return field
-                    }
-                    return {
-                        ...field,
-                        isVisible: isChecked,
-                    }
-                }),
+                ...field,
+                is_visible: isChecked,
             }
         })
-        setHeaderGroups(newHeaders)
+        setHeaderGroups(newGroups)
     }
 
     return (
@@ -159,47 +104,49 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
                     <DictEditor obj={filterValues} onChange={updateFilters} />
                     <br />
                     <Grid container divided>
-                        {headerGroups.map(({ category, fields }) => {
+                        {headerGroupOrder.map((headerGroup) => {
                             return (
                                 <Segment
-                                    key={`project-col-option-${category}`}
+                                    key={`project-col-option-${headerGroup}`}
                                     style={{ marginLeft: '10px' }}
                                 >
-                                    <h3>{_.startCase(category.replaceAll('_', ' '))}</h3>
+                                    <h3>{_.startCase(metaSearchEntityToTitle(headerGroup))}</h3>
                                     <table
                                         style={{
                                             border: 'none', // '1px solid black',
                                         }}
                                     >
                                         <tbody>
-                                            {fields.map((field) => {
+                                            {headerGroups[headerGroup]?.map((field) => {
                                                 return (
-                                                    <tr key={field.name}>
+                                                    <tr key={field.key}>
                                                         <td>
                                                             <Checkbox
-                                                                key={`checkbox-${category}-${field.name}`}
+                                                                // key={`checkbox-${headerGroup}-${field.key}`}
                                                                 type="checkbox"
-                                                                checked={field.isVisible}
-                                                                label={field.title}
+                                                                checked={field.is_visible}
+                                                                label={field.label}
                                                                 onChange={(e, data) =>
                                                                     onUpdateSingleHeader(
-                                                                        category,
+                                                                        headerGroup,
                                                                         field,
                                                                         data.checked ||
-                                                                            !field.isVisible
+                                                                            !field.is_visible
                                                                     )
                                                                 }
                                                             />
                                                         </td>
-                                                        {/* <td style={{ paddingLeft: '10px' }}>
+                                                        <td style={{ paddingLeft: '10px' }}>
                                                             <ValueFilter
-                                                                category={category}
-                                                                filterKey={field.name}
+                                                                category={metaSeachEntityPrefixToFilterKey(
+                                                                    headerGroup
+                                                                )}
+                                                                field={field}
                                                                 filterValues={filterValues}
                                                                 updateFilterValues={updateFilters}
                                                                 size="small"
                                                             />
-                                                        </td> */}
+                                                        </td>
                                                     </tr>
                                                 )
                                             })}

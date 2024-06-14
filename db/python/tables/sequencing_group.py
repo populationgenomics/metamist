@@ -34,7 +34,6 @@ class SequencingGroupTable(DbBase):
         """
         sql_overrides = {
             'project': 's.project',
-            'sample_id': 'sg.sample_id',
             'id': 'sg.id',
             'meta': 'sg.meta',
             'type': 'sg.type',
@@ -47,8 +46,6 @@ class SequencingGroupTable(DbBase):
 
         _query: list[str] = []
         query_values: dict[str, Any] = {}
-        # These fields are manually handled in the query
-        exclude_fields: list[str] = ['assay', 'created_on', 'has_cram', 'has_gvcf']
         wheres: list[str] = []
 
         # Base query
@@ -63,8 +60,18 @@ class SequencingGroupTable(DbBase):
 
         if filter_.sample:
             swheres, svalues = filter_.sample.to_sql(
-                {'project': 's.project', 'id': 'sg.sample_id'}
+                {
+                    'id': 's.id',
+                    'meta': 's.meta',
+                    'type': 's.type',
+                    'external_id': 'sexid.external_id',
+                }
             )
+            if filter_.sample.external_id:
+                _query.append(
+                    'LEFT JOIN sample_external_id sexid ON s.id = sexid.sample_id'
+                )
+
             wheres.append(swheres)
             query_values.update(svalues)
 
@@ -131,7 +138,16 @@ class SequencingGroupTable(DbBase):
             )
 
         # Add the rest of the filters
-        fwheres, values = filter_.to_sql(sql_overrides, exclude=exclude_fields)
+        fwheres, values = filter_.to_sql(
+            sql_overrides,
+            exclude=[
+                'assay',
+                'created_on',
+                'has_cram',
+                'has_gvcf',
+                'sample',
+            ],
+        )
         wheres.append(fwheres)
 
         _query.append(f"WHERE {' AND '.join(wheres)}")
