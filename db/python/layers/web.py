@@ -4,7 +4,7 @@ from collections import defaultdict
 from datetime import date
 
 from api.utils import group_by
-from db.python.db_filters import GenericFilter
+from db.python.filters import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer
 from db.python.layers.family import FamilyLayer

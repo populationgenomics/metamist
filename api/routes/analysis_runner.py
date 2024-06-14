@@ -7,7 +7,7 @@ from api.utils.db import (
     get_project_readonly_connection,
     get_project_write_connection,
 )
-from db.python.db_filters import GenericFilter
+from db.python.filters import GenericFilter
 from db.python.layers.analysis_runner import AnalysisRunnerLayer
 from db.python.tables.analysis_runner import AnalysisRunnerFilter
 from models.models.analysis_runner import AnalysisRunner, AnalysisRunnerInternal

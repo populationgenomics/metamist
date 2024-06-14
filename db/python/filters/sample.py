@@ -1,12 +1,12 @@
 # pylint: disable=too-many-instance-attributes
 import dataclasses
 
-from db.python.db_filters.generic import (
+from db.python.filters.generic import (
     GenericFilter,
     GenericFilterModel,
     GenericMetaFilter,
 )
-from db.python.db_filters.sequencing_group import SequencingGroupFilter
+from db.python.filters.sequencing_group import SequencingGroupFilter
 from models.models.project import ProjectId
 
 

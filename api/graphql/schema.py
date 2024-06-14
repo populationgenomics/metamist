@@ -20,7 +20,7 @@ from api.graphql.filters import (
 )
 from api.graphql.loaders import LoaderKeys, get_context
 from db.python import enum_tables
-from db.python.db_filters import GenericFilter
+from db.python.filters import GenericFilter
 from db.python.layers import (
     AnalysisLayer,
     AnalysisRunnerLayer,

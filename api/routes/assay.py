@@ -4,7 +4,7 @@ from fastapi import APIRouter
 
 from api.utils import get_project_readonly_connection
 from api.utils.db import Connection, get_projectless_db_connection
-from db.python.db_filters import GenericFilter
+from db.python.filters import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.tables.assay import AssayFilter
 from db.python.tables.project import ProjectPermissionsTable

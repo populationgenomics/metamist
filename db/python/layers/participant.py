@@ -4,7 +4,7 @@ from collections import defaultdict
 from enum import Enum
 from typing import Any
 
-from db.python.db_filters import GenericFilter
+from db.python.filters import GenericFilter
 from db.python.layers.base import BaseLayer
 from db.python.layers.sample import SampleLayer
 from db.python.tables.family import FamilyTable

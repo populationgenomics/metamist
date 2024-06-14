@@ -1,5 +1,5 @@
-from db.python.db_filters.generic import GenericFilter, GenericMetaFilter
-from db.python.db_filters.participant import ParticipantFilter
+from db.python.filters.generic import GenericFilter, GenericMetaFilter
+from db.python.filters.participant import ParticipantFilter
 from models.base import SMBase
 from models.models.project import ProjectId
 from models.utils.sample_id_format import sample_id_transform_to_raw

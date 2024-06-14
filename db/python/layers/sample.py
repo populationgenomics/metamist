@@ -2,7 +2,7 @@ import datetime
 from typing import Any
 
 from api.utils import group_by
-from db.python.db_filters import GenericFilter
+from db.python.filters import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer, Connection
 from db.python.layers.sequencing_group import SequencingGroupLayer

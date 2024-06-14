@@ -2,7 +2,7 @@
 import dataclasses
 from datetime import date
 
-from db.python.db_filters.generic import (
+from db.python.filters.generic import (
     GenericFilter,
     GenericFilterModel,
     GenericMetaFilter,

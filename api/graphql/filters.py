@@ -2,7 +2,7 @@ from typing import Callable, Generic, TypeVar
 
 import strawberry
 
-from db.python.db_filters import GenericFilter, GenericMetaFilter
+from db.python.filters import GenericFilter, GenericMetaFilter
 
 T = TypeVar('T')
 Y = TypeVar('Y')

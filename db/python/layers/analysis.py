@@ -4,7 +4,7 @@ from typing import Any
 
 from api.utils import group_by
 from db.python.connect import Connection
-from db.python.db_filters import GenericFilter
+from db.python.filters import GenericFilter
 from db.python.layers.base import BaseLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter, AnalysisTable

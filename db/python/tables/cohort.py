@@ -2,7 +2,7 @@
 import dataclasses
 import datetime
 
-from db.python.db_filters import GenericFilter, GenericFilterModel
+from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectId
 from db.python.utils import NotFoundError, to_db_json

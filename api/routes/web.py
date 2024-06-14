@@ -19,7 +19,7 @@ from api.utils.db import (
     get_projectless_db_connection,
 )
 from api.utils.export import ExportType
-from db.python.db_filters.web import ProjectParticipantGridFilter
+from db.python.filters.web import ProjectParticipantGridFilter
 from db.python.layers.search import SearchLayer
 from db.python.layers.seqr import SeqrLayer
 from db.python.layers.web import WebLayer

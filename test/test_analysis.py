@@ -1,7 +1,7 @@
 # pylint: disable=invalid-overridden-method
 from test.testbase import DbIsolatedTest, run_as_sync
 
-from db.python.db_filters import GenericFilter
+from db.python.filters import GenericFilter
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.assay import AssayLayer
 from db.python.layers.sample import SampleLayer

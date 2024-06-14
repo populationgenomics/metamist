@@ -2,8 +2,8 @@ import asyncio
 from datetime import date
 from typing import Any, Iterable
 
-from db.python.db_filters import GenericFilter
-from db.python.db_filters.sample import SampleFilter
+from db.python.filters import GenericFilter
+from db.python.filters.sample import SampleFilter
 from db.python.tables.base import DbBase
 from db.python.utils import NotFoundError, escape_like_term, to_db_json
 from models.models import PRIMARY_EXTERNAL_ORG, ProjectId

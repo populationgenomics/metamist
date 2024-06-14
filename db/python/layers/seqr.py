@@ -13,7 +13,6 @@ import slack_sdk
 import slack_sdk.errors
 from backoff import expo, on_exception
 from cloudpathlib import AnyPath
-
 from cpg_utils.cloud import get_google_identity_token
 
 from api.settings import (
@@ -24,8 +23,8 @@ from api.settings import (
     get_slack_token,
 )
 from db.python.connect import Connection
-from db.python.db_filters import GenericFilter
 from db.python.enum_tables import SequencingTypeTable
+from db.python.filters import GenericFilter
 from db.python.layers.analysis import AnalysisInternal, AnalysisLayer
 from db.python.layers.base import BaseLayer
 from db.python.layers.family import FamilyLayer

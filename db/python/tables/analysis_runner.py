@@ -1,7 +1,7 @@
 import dataclasses
 import datetime
 
-from db.python.db_filters import GenericFilter, GenericFilterModel
+from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
 from db.python.utils import to_db_json
 from models.models.analysis_runner import AnalysisRunnerInternal

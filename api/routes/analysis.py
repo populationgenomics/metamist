@@ -16,7 +16,7 @@ from api.utils.db import (
     get_projectless_db_connection,
 )
 from api.utils.export import ExportType
-from db.python.db_filters import GenericFilter
+from db.python.filters import GenericFilter
 from db.python.layers.analysis import AnalysisLayer
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.project import ProjectPermissionsTable

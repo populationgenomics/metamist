@@ -1,7 +1,7 @@
 import dataclasses
 from typing import Any
 
-from db.python.db_filters import GenericFilterModel
+from db.python.filters import GenericFilterModel
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
 
 

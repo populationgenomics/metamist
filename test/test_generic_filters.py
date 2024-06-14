@@ -1,7 +1,7 @@
 import dataclasses
 import unittest
 
-from db.python.db_filters import GenericFilter, GenericFilterModel
+from db.python.filters import GenericFilter, GenericFilterModel
 
 
 @dataclasses.dataclass(kw_only=True)

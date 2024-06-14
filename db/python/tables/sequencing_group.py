@@ -3,8 +3,8 @@ from collections import defaultdict
 from datetime import date
 from typing import Any
 
-from db.python.db_filters.generic import GenericFilter
-from db.python.db_filters.sequencing_group import SequencingGroupFilter
+from db.python.filters.generic import GenericFilter
+from db.python.filters.sequencing_group import SequencingGroupFilter
 from db.python.tables.base import DbBase
 from db.python.utils import NoOpAenter, to_db_json
 from models.models.project import ProjectId

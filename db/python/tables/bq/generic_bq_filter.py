@@ -4,7 +4,7 @@ from typing import Any, TypeVar
 
 from google.cloud import bigquery
 
-from db.python.db_filters import GenericFilter
+from db.python.filters import GenericFilter
 
 T = TypeVar('T')
 

@@ -2,8 +2,8 @@
 from collections import defaultdict
 from typing import Any
 
-from db.python.db_filters import GenericFilter
-from db.python.db_filters.participant import ParticipantFilter
+from db.python.filters import GenericFilter
+from db.python.filters.participant import ParticipantFilter
 from db.python.tables.base import DbBase
 from db.python.utils import NotFoundError, escape_like_term, from_db_json, to_db_json
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantInternal, ProjectId
