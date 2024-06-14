@@ -51,7 +51,7 @@ class ParticipantTable(DbBase):
     ) -> tuple[str, dict[str, Any]]:
         """Construct a participant query"""
         needs_family = False
-        needs_participant_eid = False
+        needs_participant_eid = True  # always join, query optimiser can figure it out
         needs_sample = False
         needs_sample_eid = False
         needs_sequencing_group = False
@@ -62,22 +62,11 @@ class ParticipantTable(DbBase):
                 'project': 'pp.project',
                 'id': 'pp.id',
                 'meta': 'pp.meta',
+                'external_id': 'peid.external_id',
             },
-            exclude=['family', 'sample', 'sequencing_group', 'assay', 'external_id'],
+            exclude=['family', 'sample', 'sequencing_group', 'assay'],
         )
         wheres = [_wheres]
-
-        if filter_.external_id:
-            needs_participant_eid = True
-            peid_wheres, peid_values = filter_.to_sql(
-                {
-                    'external_id': 'peid.external_id',
-                },
-                only=['external_id'],
-            )
-            values.update(peid_values)
-            if peid_wheres:
-                wheres.append(peid_wheres)
 
         if filter_.family:
             needs_family = True

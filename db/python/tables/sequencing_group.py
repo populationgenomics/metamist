@@ -61,6 +61,13 @@ class SequencingGroupTable(DbBase):
             """
         )
 
+        if filter_.sample:
+            swheres, svalues = filter_.sample.to_sql(
+                {'project': 's.project', 'id': 'sg.sample_id'}
+            )
+            wheres.append(swheres)
+            query_values.update(svalues)
+
         if filter_.assay is not None:
             a_overrides = {
                 'id': 'a.id',
@@ -140,11 +147,9 @@ class SequencingGroupTable(DbBase):
 
         _query_str = '\n'.join(q.strip() for q in _query)
 
-        ex_id_join = (
-            f'LEFT JOIN sequencing_group_external_id {external_id_table_alias} ON sg.id = {external_id_table_alias}.sequencing_group_id'
-            if external_id_table_alias
-            else None
-        )
+        ex_id_join = ''
+        if external_id_table_alias:
+            ex_id_join = f'LEFT JOIN sequencing_group_external_id {external_id_table_alias} ON sg.id = {external_id_table_alias}.sequencing_group_id'
 
         _outer_query = f"""
             SELECT {', '.join(keys)}

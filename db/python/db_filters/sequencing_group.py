@@ -23,16 +23,25 @@ class SequencingGroupFilter(GenericFilterModel):
         meta: GenericMetaFilter | None = None
         type: GenericFilter[str] | None = None
 
-    project: GenericFilter[ProjectId] | None = None
-    sample_id: GenericFilter[int] | None = None
-    external_id: GenericFilter[str] | None = None
+    @dataclasses.dataclass(kw_only=True)
+    class SequencingGroupSampleFilter(GenericFilterModel):
+        """Sequencing Group Sample Filter"""
+
+        id: GenericFilter[int] | None = None
+        external_id: GenericFilter[str] | None = None
+        meta: GenericMetaFilter | None = None
+        type: GenericFilter[str] | None = None
+
     id: GenericFilter[int] | None = None
+    external_id: GenericFilter[str] | None = None
     type: GenericFilter[str] | None = None
     technology: GenericFilter[str] | None = None
     platform: GenericFilter[str] | None = None
     active_only: GenericFilter[bool] | None = GenericFilter(eq=True)
     meta: GenericMetaFilter | None = None
 
+    project: GenericFilter[ProjectId] | None = None
+    sample: SequencingGroupSampleFilter | None = None
     assay: SequencingGroupAssayFilter | None = None
 
     # These fields are manually handled in the query to speed things up, because multiple table
