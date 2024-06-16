@@ -1,5 +1,7 @@
 import strawberry
 
+from api.graphql.mutations.participant import ParticipantMutations
+from api.graphql.mutations.project import ProjectMutations
 from api.graphql.mutations.sample import SampleMutations
 from api.graphql.mutations.sequencing_groups import SequencingGroupsMutations
 
@@ -7,6 +9,18 @@ from api.graphql.mutations.sequencing_groups import SequencingGroupsMutations
 @strawberry.type
 class Mutation:
     """Mutation class"""
+
+    # Project
+    @strawberry.field
+    def project(self) -> ProjectMutations:
+        """Project mutations"""
+        return ProjectMutations()
+
+    # Participant
+    @strawberry.field
+    def participant(self) -> ParticipantMutations:
+        """Participant mutations"""
+        return ParticipantMutations()
 
     # Sample
     @strawberry.field

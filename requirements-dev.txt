@@ -99,9 +99,7 @@ docker==7.1.0
 email-validator==2.1.1
     # via fastapi
 fastapi[all]==0.110.2
-    # via
-    #   -r requirements.in
-    #   strawberry-graphql
+    # via -r requirements.in
 filelock==3.14.0
     # via virtualenv
 flake8==7.0.0
@@ -389,7 +387,7 @@ starlette==0.37.2
     # via
     #   fastapi
     #   strawberry-graphql
-strawberry-graphql[debug-server,fastapi]==0.229.0
+strawberry-graphql[debug-server]==0.235.0
     # via
     #   -r requirements-dev.in
     #   -r requirements.in
