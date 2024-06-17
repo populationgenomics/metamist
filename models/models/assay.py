@@ -11,6 +11,7 @@ class AssayInternal(SMBase):
     id: int | None
     sample_id: int
     meta: dict[str, Any] | None
+    meta_slices: dict[str, Any] | None
     type: str
     external_ids: dict[str, str] | None = {}
 
@@ -23,16 +24,18 @@ class AssayInternal(SMBase):
         return False
 
     @staticmethod
-    def from_db(d: dict):
+    def from_db(d: dict[str, Any]):
         """Take DB mapping object, and return SampleSequencing"""
         meta = d.pop('meta', None)
+        keys = [k for k in d]
+        meta_slices = {k: d.pop(k) for k in keys if k.startswith('_meta')}
 
         if meta:
             if isinstance(meta, bytes):
                 meta = meta.decode()
             if isinstance(meta, str):
                 meta = json.loads(meta)
-        return AssayInternal(meta=meta, **d)
+        return AssayInternal(meta=meta, meta_slices=meta_slices, **d)
 
     def to_external(self):
         """Convert to transport model"""
@@ -72,6 +75,7 @@ class Assay(SMBase):
     external_ids: dict[str, str]
     sample_id: str
     meta: dict[str, Any]
+
     type: str
 
     def to_internal(self):
@@ -79,6 +83,7 @@ class Assay(SMBase):
         return AssayInternal(
             id=self.id,
             type=self.type,
+            meta_slices=None,
             external_ids=self.external_ids,
             sample_id=sample_id_transform_to_raw(self.sample_id),
             meta=self.meta,

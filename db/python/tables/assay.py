@@ -67,7 +67,10 @@ class AssayTable(DbBase):
     # region GETS
 
     async def query(
-        self, filter_: AssayFilter
+        self,
+        filter_: AssayFilter,
+        include_meta: bool = True,
+        meta_slices: list[dict[str, Any]] | None = None,
     ) -> tuple[set[ProjectId], list[AssayInternal]]:
         """Query assays"""
         sql_overides = {
@@ -83,15 +86,30 @@ class AssayTable(DbBase):
             raise ValueError('Must provide a project if filtering by external_id')
 
         conditions, values = filter_.to_sql(sql_overides)
-        keys = ', '.join(self.COMMON_GET_KEYS)
+        keys = ', '.join(
+            [k for k in self.COMMON_GET_KEYS if include_meta or k != 'a.meta']
+        )
+        meta_slice_keys = (
+            ','.join(
+                [
+                    f'JSON_VALUE(a.meta, \'{m["path"]}\') as _meta_{m["alias"]}'
+                    for m in meta_slices
+                ]
+            )
+            if meta_slices
+            else None
+        )
+
+        if meta_slice_keys:
+            meta_slice_keys = ',' + meta_slice_keys
+
         _query = f"""
-            SELECT {keys}
+            SELECT {keys} {meta_slice_keys}
             FROM assay a
             LEFT JOIN sample s ON s.id = a.sample_id
             LEFT JOIN assay_external_id aeid ON aeid.assay_id = a.id
             WHERE {conditions}
         """
-
         assay_rows = await self.connection.fetch_all(_query, values)
 
         # this will unique on the id, which we want due to joining on 1:many eid table

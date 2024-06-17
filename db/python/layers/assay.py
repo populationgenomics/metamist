@@ -17,10 +17,18 @@ class AssayLayer(BaseLayer):
         self.sampt: SampleTable = SampleTable(connection)
 
     # GET
-    async def query(self, filter_: AssayFilter = None, check_project_id=True):
+    async def query(
+        self,
+        filter_: AssayFilter = None,
+        check_project_id=True,
+        include_meta: bool = True,
+        meta_slices: list[dict[str, Any]] | None = None,
+    ):
         """Query for samples"""
 
-        projects, assays = await self.seqt.query(filter_)
+        projects, assays = await self.seqt.query(
+            filter_, include_meta=include_meta, meta_slices=meta_slices
+        )
 
         if not assays:
             return []
