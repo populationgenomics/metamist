@@ -1,11 +1,16 @@
 from test.testbase import DbIsolatedTest, run_as_sync
 
-from db.python.layers.sample import SampleLayer
+from db.python.layers import AuditLogLayer, SampleLayer
 from models.models import PRIMARY_EXTERNAL_ORG, SampleUpsertInternal
 
 
 class TestChangelog(DbIsolatedTest):
     """Test audit_log"""
+
+    @run_as_sync
+    async def setUp(self):
+        super().setUp()
+        self.allayer = AuditLogLayer(self.connection)
 
     @run_as_sync
     async def test_insert_sample(self):
@@ -28,3 +33,7 @@ class TestChangelog(DbIsolatedTest):
         )
 
         self.assertEqual(await self.audit_log_id(), sample_cl_id)
+
+        result = await self.allayer.get_for_ids([sample_cl_id])
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].id, sample_cl_id)
