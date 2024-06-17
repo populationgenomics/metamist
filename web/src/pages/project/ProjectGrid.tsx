@@ -219,7 +219,6 @@ const ProjectGridFieldHeaderRow: React.FC<{
                     ))
             )}
         </tr>
-        // </SUITable.Header>
     )
 }
 
