@@ -144,6 +144,12 @@ class ProjectInsightsDb(DbBase):
             output=row['output'],
             timestamp_completed=row['timestamp_completed'],
         )
+        
+    def convert_to_external_ids(self, external_ids_value: str | list[str]) -> list[str]:
+        """Converts a string or list of strings to a list of strings"""
+        if isinstance(external_ids_value, str):
+            return [external_ids_value]
+        return external_ids_value
 
     def parse_project_seqtype_technology_keyed_rows(self, rows: list[Record], value_field: str) -> dict[ProjectSeqTypeTechnologyKey, Any]:
         """
@@ -233,7 +239,7 @@ GROUP BY
 
         if stripy_report := sequencing_group_stripy_reports.get(report_key):
             report_links['stripy'] = {
-                'stripy_url': self.get_report_url(project.name, sequencing_group_id, stripy_report.output, 'Stripy'),
+                'url': self.get_report_url(project.name, sequencing_group_id, stripy_report.output, 'Stripy'),
                 'outliers_detected': stripy_report.outliers_detected,
                 'outlier_loci': json.loads(stripy_report.outlier_loci) if stripy_report.outlier_loci else None,
                 'timestamp_completed': stripy_report.timestamp_completed.isoformat(),
@@ -241,7 +247,7 @@ GROUP BY
 
         if mito_report := sequencing_group_mito_reports.get(report_key):
             report_links['mito'] = {
-                'mito_url': self.get_report_url(project.name, sequencing_group_id, mito_report.output, 'MitoReport'),
+                'url': self.get_report_url(project.name, sequencing_group_id, mito_report.output, 'MitoReport'),
                 'timestamp_completed': mito_report.timestamp_completed.isoformat(),
             }
 
@@ -300,8 +306,8 @@ GROUP BY
         self,
         project: Project,
         sequencing_type: SequencingType,
-        sequencing_technology: SequencingTechnology,
         sequencing_platform: SequencingPlatform,
+        sequencing_technology: SequencingTechnology,
         sequencing_group_details: SequencingGroupDetailRow,
         sequencing_groups_with_crams: list[SequencingGroupInternalId],
         analysis_sequencing_groups: dict[AnalysisId, list[SequencingGroupInternalId]],
@@ -321,7 +327,9 @@ GROUP BY
         sgs_in_latest_annotate_dataset = analysis_sequencing_groups.get(latest_annotate_dataset_id, [])
         sgs_in_latest_snv_es_index = analysis_sequencing_groups.get(latest_snv_es_index_id, [])
         sgs_in_latest_sv_es_index = analysis_sequencing_groups.get(latest_sv_es_index_id, [])
-        sample_ext_ids = sequencing_group_details.sample_external_ids if isinstance(sequencing_group_details.sample_external_ids, list) else [sequencing_group_details.sample_external_ids]
+
+        # participant_ext_ids = self.convert_to_external_ids(sequencing_group_details.participant_external_id)
+        sample_ext_ids = self.convert_to_external_ids(sequencing_group_details.sample_external_ids)
         return ProjectInsightsDetailsInternal(
             project=project.id,
             dataset=project.name,
@@ -332,7 +340,7 @@ GROUP BY
             family_id=sequencing_group_details.family_id,
             family_ext_id=sequencing_group_details.family_external_id,
             participant_id=sequencing_group_details.participant_id,
-            participant_ext_id=sequencing_group_details.participant_external_id,
+            participant_ext_ids=sequencing_group_details.participant_external_id,
             sample_id=sequencing_group_details.sample_id,
             sample_ext_ids=sample_ext_ids,
             sequencing_group_id=sequencing_group_details.sequencing_group_id,
@@ -600,15 +608,16 @@ SELECT
     f.id as family_id,
     f.external_id as family_external_id,
     fp.participant_id as participant_id,
-    p.external_id as participant_external_id,
+    pext.external_id as participant_external_id,
     s.id as sample_id,
-    s.external_id as sample_external_ids,
+    sext.external_id as sample_external_ids,
     sg.id as sequencing_group_id
 FROM
     family f
     LEFT JOIN family_participant fp ON f.id = fp.family_id
-    LEFT JOIN participant p ON fp.participant_id = p.id
-    LEFT JOIN sample s ON p.id = s.participant_id
+    LEFT JOIN participant_external_id pext ON fp.participant_id = pext.participant_id
+    LEFT JOIN sample s ON fp.participant_id = s.participant_id
+    LEFT JOIN sample_external_id sext ON s.id = sext.sample_id
     LEFT JOIN sequencing_group sg on sg.sample_id = s.id
 WHERE
     f.project IN :projects
@@ -817,18 +826,27 @@ INNER JOIN (
         )
 
         response = []
-        for project, sequencing_type, sequencing_technology in combinations:
+        for project, seq_type, seq_tech in combinations:
             rowkey = ProjectSeqTypeTechnologyKey(
-                project.id, sequencing_type, sequencing_technology
+                project.id, seq_type, seq_tech
             )
 
             total_sequencing_groups = total_sequencing_groups_by_project_id_and_seq_fields.get(rowkey, 0)
             if total_sequencing_groups == 0:
                 continue
 
-            crams_in_project_with_sequencing_fields = crams_by_project_id_and_seq_fields[rowkey]
-
-            latest_annotate_dataset_row, latest_snv_es_index_row, latest_sv_es_index_row = self.get_latest_grouped_analyses(project, sequencing_type, sequencing_technology, latest_annotate_dataset_by_project_id_and_seq_type, latest_es_indices_by_project_id_and_seq_type_and_stage)
+            crams_in_project_with_sequencing_fields = crams_by_project_id_and_seq_fields.get(rowkey, [])
+            (
+                latest_annotate_dataset_row,
+                latest_snv_es_index_row,
+                latest_sv_es_index_row,
+            ) = self.get_latest_grouped_analyses(
+                project,
+                seq_type,
+                seq_tech,
+                latest_annotate_dataset_by_project_id_and_seq_type,
+                latest_es_indices_by_project_id_and_seq_type_and_stage,
+            )
 
             response.append(
                 self.get_insights_summary_internal_row(
@@ -898,18 +916,26 @@ INNER JOIN (
         response = []
         for (
             project,
-            sequencing_type,
-            sequencing_platform,
-            sequencing_technology,
+            seq_type,
+            seq_platform,
+            seq_tech,
         ) in combinations:
             details_rows: list[SequencingGroupDetailRow]
-            if not (details_rows := sequencing_group_details_by_project_id_and_seq_fields.get((project.id, sequencing_type, sequencing_platform, sequencing_technology))):
+            if not (details_rows := sequencing_group_details_by_project_id_and_seq_fields.get((project.id, seq_type, seq_platform, seq_tech))):
                 continue
 
-            sequencing_groups_with_crams = crams_by_project_id_and_seq_fields[
-                (project.id, sequencing_type, sequencing_technology)
-            ]
-            latest_annotate_dataset_row, latest_snv_es_index_row, latest_sv_es_index_row = self.get_latest_grouped_analyses(project, sequencing_type, sequencing_technology, latest_annotate_dataset_by_project_id_and_seq_type, latest_es_indices_by_project_id_and_seq_type_and_stage)
+            sequencing_groups_with_crams = crams_by_project_id_and_seq_fields.get((project.id, seq_type, seq_tech), [])
+            (
+                latest_annotate_dataset_row,
+                latest_snv_es_index_row,
+                latest_sv_es_index_row
+            ) = self.get_latest_grouped_analyses(
+                project,
+                seq_type,
+                seq_tech,
+                latest_annotate_dataset_by_project_id_and_seq_type,
+                latest_es_indices_by_project_id_and_seq_type_and_stage
+            )
 
             for details_row in details_rows:
                 if not details_row:
@@ -917,9 +943,9 @@ INNER JOIN (
                 response.append(
                     self.get_insights_details_internal_row(
                         project=project,
-                        sequencing_type=sequencing_type,
-                        sequencing_technology=sequencing_technology,
-                        sequencing_platform=sequencing_platform,
+                        sequencing_type=seq_type,
+                        sequencing_platform=seq_platform,
+                        sequencing_technology=seq_tech,
                         sequencing_group_details=details_row,
                         sequencing_groups_with_crams=sequencing_groups_with_crams,
                         analysis_sequencing_groups=analysis_sequencing_groups,

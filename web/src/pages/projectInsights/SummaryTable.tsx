@@ -1,9 +1,10 @@
 // projectInsights/SummaryTable.tsx
-import React, { useState } from 'react'
-import { ProjectInsightsSummary } from '../../sm-api'
-import { Icon, Table } from 'semantic-ui-react'
 import Tooltip, { TooltipProps } from '@mui/material/Tooltip'
+import React, { useState } from 'react'
+import { Icon, Table as SUITable } from 'semantic-ui-react'
+import Table from '../../shared/components/Table'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
+import { ProjectInsightsSummary } from '../../sm-api'
 import FilterButton from './FilterButton'
 
 interface SummaryTableProps {
@@ -63,21 +64,26 @@ const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summar
     const rowClassName = getRowClassName(summary.sequencing_type)
 
     return (
-        <Table.Row key={`${summary.project}-${summary.sequencing_type}`} className={rowClassName}>
-            <Table.Cell data-cell className="category-cell">
+        <SUITable.Row
+            key={`${summary.project}-${summary.sequencing_type}`}
+            className={rowClassName}
+        >
+            <SUITable.Cell data-cell className="category-cell">
                 {summary.dataset}
-            </Table.Cell>
-            <Table.Cell data-cell className="category-cell">
+            </SUITable.Cell>
+            <SUITable.Cell data-cell className="category-cell">
                 {summary.sequencing_type}
-            </Table.Cell>
-            <Table.Cell className="table-cell">{summary.sequencing_technology}</Table.Cell>
-            <Table.Cell className="table-cell">{summary.total_families}</Table.Cell>
-            <Table.Cell className="table-cell">{summary.total_participants}</Table.Cell>
-            <Table.Cell className="table-cell">{summary.total_samples}</Table.Cell>
-            <Table.Cell className="table-cell">{summary.total_sequencing_groups}</Table.Cell>
-            <Table.Cell className="table-cell">{summary.total_crams}</Table.Cell>
-            <Table.Cell
-                className="table-cell"
+            </SUITable.Cell>
+            <SUITable.Cell className="SUITable-cell">{summary.sequencing_technology}</SUITable.Cell>
+            <SUITable.Cell className="SUITable-cell">{summary.total_families}</SUITable.Cell>
+            <SUITable.Cell className="SUITable-cell">{summary.total_participants}</SUITable.Cell>
+            <SUITable.Cell className="SUITable-cell">{summary.total_samples}</SUITable.Cell>
+            <SUITable.Cell className="SUITable-cell">
+                {summary.total_sequencing_groups}
+            </SUITable.Cell>
+            <SUITable.Cell className="SUITable-cell">{summary.total_crams}</SUITable.Cell>
+            <SUITable.Cell
+                className="SUITable-cell"
                 style={{
                     textAlign: 'center',
                     backgroundColor: getPercentageColor(percentageAligned, isDarkMode),
@@ -95,9 +101,9 @@ const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summar
                         <div>{percentageAligned.toFixed(2)}%</div>
                     </HtmlTooltip>
                 </div>
-            </Table.Cell>
-            <Table.Cell
-                className="table-cell"
+            </SUITable.Cell>
+            <SUITable.Cell
+                className="SUITable-cell"
                 style={{
                     textAlign: 'center',
                     backgroundColor: getPercentageColor(percentageInJointCall, isDarkMode),
@@ -122,9 +128,9 @@ const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summar
                         <div>{percentageInJointCall.toFixed(2)}%</div>
                     </HtmlTooltip>
                 </div>
-            </Table.Cell>
-            <Table.Cell
-                className="table-cell"
+            </SUITable.Cell>
+            <SUITable.Cell
+                className="SUITable-cell"
                 style={{
                     textAlign: 'center',
                     backgroundColor: getPercentageColor(percentageInSnvIndex, isDarkMode),
@@ -152,9 +158,9 @@ const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summar
                         <div>{percentageInSnvIndex.toFixed(2)}%</div>
                     </HtmlTooltip>
                 </div>
-            </Table.Cell>
-            <Table.Cell
-                className="table-cell"
+            </SUITable.Cell>
+            <SUITable.Cell
+                className="SUITable-cell"
                 style={{
                     textAlign: 'center',
                     backgroundColor: getPercentageColor(percentageInSvIndex, isDarkMode),
@@ -182,8 +188,8 @@ const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summar
                         <div>{percentageInSvIndex.toFixed(2)}%</div>
                     </HtmlTooltip>
                 </div>
-            </Table.Cell>
-        </Table.Row>
+            </SUITable.Cell>
+        </SUITable.Row>
     )
 }
 
@@ -283,9 +289,9 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
     return (
         <div>
             <Table sortable>
-                <Table.Header>
-                    <Table.Row>
-                        <Table.HeaderCell
+                <SUITable.Header>
+                    <SUITable.Row>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             sorted={
                                 sortColumns.find((column) => column.column === 'dataset')?.direction
@@ -295,8 +301,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                             }
                         >
                             Dataset
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             sorted={
                                 sortColumns.find((column) => column.column === 'sequencing_type')
@@ -307,8 +313,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                             }
                         >
                             Seq Type
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('sequencing_technology', event.shiftKey)
@@ -342,8 +348,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                                 />
                             )}
                             <div className="header-text">Technology</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('total_families', event.shiftKey)
@@ -362,8 +368,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                                 />
                             )}
                             <div className="header-text">Families</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('total_participants', event.shiftKey)
@@ -384,8 +390,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                                 />
                             )}
                             <div className="header-text">Participants</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('total_samples', event.shiftKey)
@@ -404,8 +410,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                                 />
                             )}
                             <div className="header-text">Samples</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('total_sequencing_groups', event.shiftKey)
@@ -426,8 +432,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                                 />
                             )}
                             <div className="header-text">Sequencing Groups</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('total_crams', event.shiftKey)
@@ -446,8 +452,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                                 />
                             )}
                             <div className="header-text">CRAMs</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell collapsible-header"
                             onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
                                 event.currentTarget.classList.add('expanded')
@@ -468,8 +474,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                                     <div className="header-text">% Aligned</div>
                                 </HtmlTooltip>
                             </div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell collapsible-header"
                             onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
                                 event.currentTarget.classList.add('more-expanded')
@@ -490,8 +496,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                                     <div className="header-text">% in Annotated Dataset</div>
                                 </HtmlTooltip>
                             </div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell collapsible-header"
                             onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
                                 event.currentTarget.classList.add('more-expanded')
@@ -512,8 +518,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                                     <div className="header-text">% in SNV ES-Index</div>
                                 </HtmlTooltip>
                             </div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell collapsible-header"
                             onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
                                 event.currentTarget.classList.add('more-expanded')
@@ -534,41 +540,43 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                                     <div className="header-text">% in SV ES-Index</div>
                                 </HtmlTooltip>
                             </div>
-                        </Table.HeaderCell>
-                    </Table.Row>
-                </Table.Header>
-                <Table.Body>
+                        </SUITable.HeaderCell>
+                    </SUITable.Row>
+                </SUITable.Header>
+                <SUITable.Body>
                     {sortedData.map((summary) => (
                         <SummaryTableRow
                             key={`${summary.dataset}-${summary.sequencing_type}-${summary.sequencing_technology}`}
                             summary={summary}
                         />
                     ))}
-                </Table.Body>
-                <Table.Footer>
-                    <Table.Row className="grand-total-row" key="grandTotals">
-                        <Table.Cell className="table-cell">Grand Total</Table.Cell>
-                        <Table.Cell className="table-cell">{sortedData.length} entries</Table.Cell>
-                        <Table.Cell className="table-cell"></Table.Cell>
-                        <Table.Cell className="table-cell">
+                </SUITable.Body>
+                <SUITable.Footer>
+                    <SUITable.Row className="grand-total-row" key="grandTotals">
+                        <SUITable.Cell className="SUITable-cell">Grand Total</SUITable.Cell>
+                        <SUITable.Cell className="SUITable-cell">
+                            {sortedData.length} entries
+                        </SUITable.Cell>
+                        <SUITable.Cell className="SUITable-cell"></SUITable.Cell>
+                        <SUITable.Cell className="SUITable-cell">
                             {filteredData.reduce((acc, curr) => acc + curr.total_families, 0)}
-                        </Table.Cell>
-                        <Table.Cell className="table-cell">
+                        </SUITable.Cell>
+                        <SUITable.Cell className="SUITable-cell">
                             {filteredData.reduce((acc, curr) => acc + curr.total_participants, 0)}
-                        </Table.Cell>
-                        <Table.Cell className="table-cell">
+                        </SUITable.Cell>
+                        <SUITable.Cell className="SUITable-cell">
                             {filteredData.reduce((acc, curr) => acc + curr.total_samples, 0)}
-                        </Table.Cell>
-                        <Table.Cell className="table-cell">
+                        </SUITable.Cell>
+                        <SUITable.Cell className="SUITable-cell">
                             {filteredData.reduce(
                                 (acc, curr) => acc + curr.total_sequencing_groups,
                                 0
                             )}
-                        </Table.Cell>
-                        <Table.Cell className="table-cell">
+                        </SUITable.Cell>
+                        <SUITable.Cell className="SUITable-cell">
                             {filteredData.reduce((acc, curr) => acc + curr.total_crams, 0)}
-                        </Table.Cell>
-                        <Table.Cell className="table-cell">
+                        </SUITable.Cell>
+                        <SUITable.Cell className="SUITable-cell">
                             <div style={{ display: 'flex', justifyContent: 'center' }}>
                                 <HtmlTooltip
                                     title={
@@ -603,8 +611,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                                     </div>
                                 </HtmlTooltip>
                             </div>
-                        </Table.Cell>
-                        <Table.Cell className="table-cell">
+                        </SUITable.Cell>
+                        <SUITable.Cell className="SUITable-cell">
                             <div style={{ display: 'flex', justifyContent: 'center' }}>
                                 <HtmlTooltip
                                     title={
@@ -644,8 +652,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                                     </div>
                                 </HtmlTooltip>
                             </div>
-                        </Table.Cell>
-                        <Table.Cell className="table-cell">
+                        </SUITable.Cell>
+                        <SUITable.Cell className="SUITable-cell">
                             <div style={{ display: 'flex', justifyContent: 'center' }}>
                                 <HtmlTooltip
                                     title={
@@ -683,8 +691,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                                     </div>
                                 </HtmlTooltip>
                             </div>
-                        </Table.Cell>
-                        <Table.Cell className="table-cell">
+                        </SUITable.Cell>
+                        <SUITable.Cell className="SUITable-cell">
                             <div style={{ display: 'flex', justifyContent: 'center' }}>
                                 <HtmlTooltip
                                     title={
@@ -722,9 +730,9 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                                     </div>
                                 </HtmlTooltip>
                             </div>
-                        </Table.Cell>
-                    </Table.Row>
-                </Table.Footer>
+                        </SUITable.Cell>
+                    </SUITable.Row>
+                </SUITable.Footer>
             </Table>
         </div>
     )

@@ -1,8 +1,9 @@
 // DetailsTable.tsx
 import React, { useState } from 'react'
-import { ProjectInsightsDetails } from '../../sm-api'
-import { Button, Table, Icon } from 'semantic-ui-react'
+import { Button, Icon, Table as SUITable } from 'semantic-ui-react'
+import Table from '../../shared/components/Table'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
+import { ProjectInsightsDetails } from '../../sm-api'
 import FilterButton from './FilterButton'
 
 interface DetailsTableProps {
@@ -46,74 +47,66 @@ const DetailsTableRow: React.FC<{ details: ProjectInsightsDetails }> = ({ detail
     const rowClassName = getRowClassName(details.sequencing_type)
 
     return (
-        <Table.Row key={`${details.sequencing_group_id}`} className={rowClassName}>
-            <Table.Cell data-cell className="category-cell">
+        <SUITable.Row key={`${details.sequencing_group_id}`} className={rowClassName}>
+            <SUITable.Cell data-cell className="category-cell">
                 {details.dataset}
-            </Table.Cell>
-            <Table.Cell data-cell className="category-cell">
+            </SUITable.Cell>
+            <SUITable.Cell data-cell className="category-cell">
                 {details.sequencing_type}
-            </Table.Cell>
-            <Table.Cell data-cell className="table-cell">
+            </SUITable.Cell>
+            <SUITable.Cell data-cell className="SUITable-cell">
                 {details.sequencing_platform}
-            </Table.Cell>
-            <Table.Cell data-cell className="table-cell">
+            </SUITable.Cell>
+            <SUITable.Cell data-cell className="SUITable-cell">
                 {details.sequencing_technology}
-            </Table.Cell>
-            <Table.Cell data-cell className="table-cell">
+            </SUITable.Cell>
+            <SUITable.Cell data-cell className="SUITable-cell">
                 {details.sample_type}
-            </Table.Cell>
-            <Table.Cell data-cell className="table-cell">
+            </SUITable.Cell>
+            <SUITable.Cell data-cell className="SUITable-cell">
                 {details.sequencing_group_id}
-            </Table.Cell>
-            <Table.Cell data-cell className="table-cell">
+            </SUITable.Cell>
+            <SUITable.Cell data-cell className="SUITable-cell">
                 {details.family_id}
-            </Table.Cell>
-            <Table.Cell data-cell className="table-cell">
+            </SUITable.Cell>
+            <SUITable.Cell data-cell className="SUITable-cell">
                 {details.family_ext_id}
-            </Table.Cell>
-            <Table.Cell data-cell className="table-cell">
+            </SUITable.Cell>
+            <SUITable.Cell data-cell className="SUITable-cell">
                 {details.participant_id}
-            </Table.Cell>
-            <Table.Cell data-cell className="table-cell">
+            </SUITable.Cell>
+            <SUITable.Cell data-cell className="SUITable-cell">
                 {details.participant_ext_id}
-            </Table.Cell>
-            <Table.Cell data-cell className="table-cell">
+            </SUITable.Cell>
+            <SUITable.Cell data-cell className="SUITable-cell">
                 {details.sample_id}
-            </Table.Cell>
-            <Table.Cell data-cell className="table-cell">
+            </SUITable.Cell>
+            <SUITable.Cell data-cell className="SUITable-cell">
                 {details.sample_ext_ids}
-            </Table.Cell>
-            <Table.Cell data-cell className="table-cell">
+            </SUITable.Cell>
+            <SUITable.Cell data-cell className="SUITable-cell">
                 {details.completed_cram ? '✅' : '❌'}
-            </Table.Cell>
-            <Table.Cell className="table-cell">
+            </SUITable.Cell>
+            <SUITable.Cell className="SUITable-cell">
                 {details.in_latest_annotate_dataset ? '✅' : '❌'}
-            </Table.Cell>
-            <Table.Cell className="table-cell">
+            </SUITable.Cell>
+            <SUITable.Cell className="SUITable-cell">
                 {details.in_latest_snv_es_index ? '✅' : '❌'}
-            </Table.Cell>
-            <Table.Cell className="table-cell">
+            </SUITable.Cell>
+            <SUITable.Cell className="SUITable-cell">
                 {details.in_latest_sv_es_index ? '✅' : '❌'}
-            </Table.Cell>
-            <Table.Cell data-cell className="table-cell">
-                {details.sequencing_group_report_links?.stripy ? (
-                    <a
-                        href={`https://main-web.populationgenomics.org.au/${details.dataset}/stripy/${details.sequencing_group_id}.html`}
-                    >
-                        Link
-                    </a>
+            </SUITable.Cell>
+            <SUITable.Cell data-cell className="SUITable-cell">
+                {details.web_reports?.stripy ? (
+                    <a href={(details.web_reports.stripy as { url: string }).url}>Link</a>
                 ) : null}
-            </Table.Cell>
-            <Table.Cell data-cell className="table-cell">
-                {details.sequencing_group_report_links?.mito ? (
-                    <a
-                        href={`https://main-web.populationgenomics.org.au/${details.dataset}/mito/mitoreport-${details.sequencing_group_id}/index.html`}
-                    >
-                        Link
-                    </a>
+            </SUITable.Cell>
+            <SUITable.Cell data-cell className="SUITable-cell">
+                {details.web_reports?.mito ? (
+                    <a href={(details.web_reports.mito as { url: string }).url}>Link</a>
                 ) : null}
-            </Table.Cell>
-        </Table.Row>
+            </SUITable.Cell>
+        </SUITable.Row>
     )
 }
 
@@ -251,10 +244,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                     )) &&
                 (columnName === 'stripy' ||
                     selectedStripy.length === 0 ||
-                    item.sequencing_group_report_links?.stripy) &&
-                (columnName === 'mito' ||
-                    selectedMito.length === 0 ||
-                    item.sequencing_group_report_links?.mito)
+                    item.web_reports?.stripy) &&
+                (columnName === 'mito' || selectedMito.length === 0 || item.web_reports?.mito)
             )
         })
 
@@ -265,7 +256,7 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                 uniqueOptions = Array.from(
                     new Set(
                         filteredDataExcludingCurrentColumn.map((item) =>
-                            item.sequencing_group_report_links?.[columnName] ? 'Yes' : 'No'
+                            item.web_reports?.[columnName] ? 'Yes' : 'No'
                         )
                     )
                 )
@@ -299,9 +290,9 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
     }
 
     const exportToFile = (format: 'csv' | 'tsv') => {
-        const headerCells = document.querySelectorAll('.ui.table thead tr th')
+        const headerCells = document.querySelectorAll('.ui.SUITable thead tr th')
         const headerData = Array.from(headerCells).map((cell) => cell.textContent)
-        const rows = document.querySelectorAll('.ui.table tbody tr')
+        const rows = document.querySelectorAll('.ui.SUITable tbody tr')
         const rowData = Array.from(rows).map((row) => {
             const cells = row.querySelectorAll('td')
             return Array.from(cells).map((cell) => {
@@ -340,9 +331,9 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                 <Button onClick={() => exportToFile('tsv')}>Export to TSV</Button>
             </div>
             <Table sortable>
-                <Table.Header>
-                    <Table.Row>
-                        <Table.HeaderCell
+                <SUITable.Header>
+                    <SUITable.Row>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             sorted={
                                 sortColumns.find((column) => column.column === 'dataset')?.direction
@@ -352,8 +343,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                             }
                         >
                             Dataset
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             sorted={
                                 sortColumns.find((column) => column.column === 'sequencing_type')
@@ -364,8 +355,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                             }
                         >
                             Seq Type
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('sequencing_platform', event.shiftKey)
@@ -399,8 +390,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 />
                             )}
                             <div className="header-text">Platform</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('sequencing_technology', event.shiftKey)
@@ -434,8 +425,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 />
                             )}
                             <div className="header-text">Technology</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('sample_type', event.shiftKey)
@@ -464,8 +455,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 />
                             )}
                             <div className="header-text">Sample Type</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('sequencing_group_id', event.shiftKey)
@@ -499,8 +490,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 />
                             )}
                             <div className="header-text">SG ID</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('family_id', event.shiftKey)
@@ -528,8 +519,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 />
                             )}
                             <div className="header-text">Family ID</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('family_ext_id', event.shiftKey)
@@ -558,8 +549,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 />
                             )}
                             <div className="header-text">Family Ext. ID</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('participant_id', event.shiftKey)
@@ -588,8 +579,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 />
                             )}
                             <div className="header-text">Participant ID</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('participant_ext_id', event.shiftKey)
@@ -620,8 +611,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 />
                             )}
                             <div className="header-text">Participant Ext. ID</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('sample_id', event.shiftKey)
@@ -649,8 +640,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 />
                             )}
                             <div className="header-text">Sample ID</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('sample_ext_ids', event.shiftKey)
@@ -679,8 +670,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 />
                             )}
                             <div className="header-text">Sample Ext. ID(s)</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('completed_cram', event.shiftKey)
@@ -715,8 +706,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 />
                             )}
                             <div className="header-text">CRAM</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell collapsible-header"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('in_latest_annotate_dataset', event.shiftKey)
@@ -759,8 +750,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 />
                             )}
                             <div className="header-text">Joint Callset</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell collapsible-header"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('in_latest_snv_es_index', event.shiftKey)
@@ -800,8 +791,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 />
                             )}
                             <div className="header-text">SNV ES-Index</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell collapsible-header"
                             onClick={(event: React.MouseEvent<HTMLElement>) =>
                                 handleSort('in_latest_sv_es_index', event.shiftKey)
@@ -841,8 +832,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 />
                             )}
                             <div className="header-text">SV ES-Index</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
                                 event.currentTarget.classList.add('expanded')
@@ -862,8 +853,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 />
                             </div>
                             <div className="header-text">STRipy</div>
-                        </Table.HeaderCell>
-                        <Table.HeaderCell
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
                             className="header-cell"
                             onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
                                 event.currentTarget.classList.add('expanded')
@@ -883,10 +874,10 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                                 />
                             </div>
                             <div className="header-text">Mito</div>
-                        </Table.HeaderCell>
-                    </Table.Row>
-                </Table.Header>
-                <Table.Body>
+                        </SUITable.HeaderCell>
+                    </SUITable.Row>
+                </SUITable.Header>
+                <SUITable.Body>
                     {sortedData.map((details) => (
                         <DetailsTableRow
                             data-row
@@ -894,7 +885,7 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                             details={details}
                         />
                     ))}
-                </Table.Body>
+                </SUITable.Body>
             </Table>
         </div>
     )

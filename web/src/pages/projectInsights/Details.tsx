@@ -1,9 +1,9 @@
 // Details.tsx
-import React, { useState, useEffect } from 'react'
-import { ProjectInsightsDetails, ProjectApi, ProjectInsightsApi, EnumsApi } from '../../sm-api'
+import React, { useEffect, useState } from 'react'
 import { Button } from 'semantic-ui-react'
-import ProjectAndSeqTypeSelector from './ProjectAndSeqTypeSelector'
+import { EnumsApi, ProjectApi, ProjectInsightsApi, ProjectInsightsDetails } from '../../sm-api'
 import DetailsTable from './DetailsTable'
+import ProjectAndSeqTypeSelector from './ProjectAndSeqTypeSelector'
 
 interface SelectedProject {
     id: number
@@ -79,11 +79,11 @@ const Details: React.FC = () => {
     }
 
     const fetchSelectedData = async () => {
-        const selectedProjectIds = selectedProjects.map((project) => project.id)
+        const selectedProjectNames = selectedProjects.map((project) => project.name)
 
         try {
             const detailsResp = await new ProjectInsightsApi().getProjectInsightsDetails({
-                project_ids: selectedProjectIds,
+                project_names: selectedProjectNames,
                 sequencing_types: selectedSeqTypes,
             })
             setAllData(detailsResp.data)
@@ -127,11 +127,11 @@ const Details: React.FC = () => {
             (selectedInLatestSvEsIndex.length === 0 ||
                 selectedInLatestSvEsIndex.includes(item.in_latest_sv_es_index ? 'Yes' : 'No')) &&
             (selectedStripy.length === 0 ||
-                (selectedStripy.includes('Yes') && item.sequencing_group_report_links?.stripy) ||
-                (selectedStripy.includes('No') && !item.sequencing_group_report_links?.stripy)) &&
+                (selectedStripy.includes('Yes') && item.web_reports?.stripy) ||
+                (selectedStripy.includes('No') && !item.web_reports?.stripy)) &&
             (selectedMito.length === 0 ||
-                (selectedMito.includes('Yes') && item.sequencing_group_report_links?.mito) ||
-                (selectedMito.includes('No') && !item.sequencing_group_report_links?.mito))
+                (selectedMito.includes('Yes') && item.web_reports?.mito) ||
+                (selectedMito.includes('No') && !item.web_reports?.mito))
     )
     const handleSelectionChange = (columnName: string, selectedOptions: string[]) => {
         // Update the selected options for the given column based on the state variable

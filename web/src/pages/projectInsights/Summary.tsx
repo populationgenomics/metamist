@@ -1,6 +1,6 @@
 // projectInsights/Summary.tsx
-import React, { useState, useEffect } from 'react'
-import { ProjectInsightsSummary, ProjectApi, ProjectInsightsApi, EnumsApi } from '../../sm-api'
+import React, { useEffect, useState } from 'react'
+import { EnumsApi, ProjectApi, ProjectInsightsApi, ProjectInsightsSummary } from '../../sm-api'
 import ProjectAndSeqTypeSelector from './ProjectAndSeqTypeSelector'
 import SummaryTable from './SummaryTable'
 
@@ -32,7 +32,7 @@ const Summary: React.FC = () => {
 
                 // Call getProjectInsightsSummary with the project IDs and sequencing types
                 return new ProjectInsightsApi().getProjectInsightsSummary({
-                    project_ids: projects.map((project) => project.id),
+                    project_names: projects.map((project) => project.name),
                     sequencing_types: sequencingTypes,
                 })
             })
