@@ -1,50 +1,13 @@
-from typing import TYPE_CHECKING
-
 import strawberry
 from strawberry.types import Info
-from typing_extensions import Annotated
 
 from api.graphql.types import CustomJSON
 from db.python.tables.project import ProjectPermissionsTable
-
-if TYPE_CHECKING:
-    from ..schema import GraphQLProject
 
 
 @strawberry.type
 class ProjectMutations:
     """Project mutations"""
-
-    @strawberry.mutation
-    async def get_all_projects(
-        self,
-        info: Info,
-    ) -> Annotated['GraphQLProject', strawberry.lazy('..schema')]:
-        """Get list of projects"""
-        # TODO: Reconfigure connection permissions as per `routes``
-        connection = info.context['connection']
-        ptable = ProjectPermissionsTable(connection)
-
-        #  pylint: disable=no-member
-        return Annotated[
-            'GraphQLProject', strawberry.lazy('..schema')
-        ].from_internal(  # type: ignore [attr-defined]
-            await ptable.get_all_projects(author=connection.author)
-        )
-
-    @strawberry.mutation
-    async def get_my_projects(
-        self,
-        info: Info,
-    ) -> list[str | None]:
-        """Get projects I have access to"""
-        # TODO: Reconfigure connection permissions as per `routes``
-        connection = info.context['connection']
-        ptable = ProjectPermissionsTable(connection)
-        projects = await ptable.get_projects_accessible_by_user(
-            author=connection.author, readonly=True
-        )
-        return [p.name for p in projects]
 
     @strawberry.mutation
     async def create_project(
@@ -74,17 +37,6 @@ class ProjectMutations:
             )
 
         return pid
-
-    @strawberry.mutation
-    async def get_seqr_projects(
-        self,
-        info: Info,
-    ) -> list[CustomJSON]:
-        """Get SM projects that should sync to seqr"""
-        # TODO: Reconfigure connection permissions as per `routes``
-        connection = info.context['connection']
-        ptable = ProjectPermissionsTable(connection)
-        return [CustomJSON(project) for project in await ptable.get_seqr_projects()]
 
     @strawberry.mutation
     async def update_project(
