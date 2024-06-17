@@ -1,5 +1,6 @@
 import strawberry
 
+from api.graphql.mutations.family import FamilyMutations
 from api.graphql.mutations.participant import ParticipantMutations
 from api.graphql.mutations.project import ProjectMutations
 from api.graphql.mutations.sample import SampleMutations
@@ -21,6 +22,12 @@ class Mutation:
     def participant(self) -> ParticipantMutations:
         """Participant mutations"""
         return ParticipantMutations()
+
+    # Family
+    @strawberry.field
+    def family(self) -> FamilyMutations:
+        """Family mutations"""
+        return FamilyMutations()
 
     # Sample
     @strawberry.field
