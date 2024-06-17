@@ -4,7 +4,7 @@ import strawberry
 
 from models.models.assay import AssayUpsert, AssayUpsertInternal
 from models.models.participant import ParticipantUpsertInternal
-from models.models.sample import SampleUpsert, SampleUpsertInternal
+from models.models.sample import SampleUpsertInternal
 from models.models.sequencing_group import (
     SequencingGroupUpsert,
     SequencingGroupUpsertInternal,
@@ -235,3 +235,24 @@ class ParticipantUpsertType:
                 SampleUpsertType.from_upsert_internal(s) for s in internal.samples or []
             ],
         )
+
+
+@strawberry.input
+class QueryParticipantCriteria:
+    """Query criteria for participants"""
+
+    external_participant_ids: list[str] | None = None
+    internal_participant_ids: list[int] | None = None
+
+
+@strawberry.type
+class UpdateParticipantFamilyType:
+    """Update participant family type"""
+
+    family_id: int
+    participant_id: int
+
+    @staticmethod
+    def from_tuple(t: tuple[int, int]) -> 'UpdateParticipantFamilyType':
+        """Returns graphql model from tuple"""
+        return UpdateParticipantFamilyType(family_id=t[0], participant_id=t[1])
