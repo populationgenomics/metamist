@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from api.utils.db import (
     Connection,
@@ -6,7 +6,12 @@ from api.utils.db import (
     get_projectless_db_connection,
 )
 from db.python.tables.project import ProjectMemberWithRole, ProjectPermissionsTable
-from models.models.project import FullWriteAccessRoles, Project, ProjectMemberRole
+from models.models.project import (
+    FullWriteAccessRoles,
+    Project,
+    ProjectMemberRole,
+    project_member_role_names,
+)
 
 router = APIRouter(prefix='/project', tags=['project'])
 
@@ -105,7 +110,6 @@ async def delete_project_data(
     success = await ptable.delete_project_data(
         project_id=connection.project.id,
         delete_project=delete_project,
-        author=connection.author,
     )
 
     return {'success': success}
@@ -124,6 +128,13 @@ async def update_project_members(
 
     await ptable.check_member_admin_permissions(author=connection.author)
     assert connection.project
+
+    for member in members:
+        if member['role'] not in project_member_role_names:
+            raise HTTPException(
+                400, f'Role {member["role"]} is not valid for member {member["member"]}'
+            )
+
     await ptable.set_project_members(project=connection.project, members=members)
 
     return {'success': True}

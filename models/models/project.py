@@ -45,7 +45,7 @@ class Project(SMBase):
         """
         return self.name == f'{self.dataset}-test'
 
-    @field_serializer("roles")
+    @field_serializer('roles')
     def serialize_roles(self, roles: set[ProjectMemberRole], _info):
         return [r.name for r in roles]
 

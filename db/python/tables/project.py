@@ -1,12 +1,12 @@
 # pylint: disable=global-statement
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Tuple
 
 from databases import Database
 from typing_extensions import TypedDict
 
 from api.settings import is_all_access
 from db.python.utils import Forbidden, NotFoundError, get_logger, to_db_json
-from models.models.project import Project, ProjectMemberRole
+from models.models.project import Project, project_member_role_names
 
 # Avoid circular import for type definition
 if TYPE_CHECKING:
@@ -188,7 +188,6 @@ class ProjectPermissionsTable:
     async def delete_project_data(self, project_id: int, delete_project: bool) -> bool:
         """
         Delete data in metamist project, requires project_creator_permissions
-        Can optionally delete the project also.
         """
         if delete_project:
             # stop allowing delete project with analysis-runner entries
@@ -239,16 +238,58 @@ DELETE FROM analysis WHERE project = :project;
         return True
 
     async def set_project_members(
-        self, project: Project, members: list[ProjectMemberRole]
+        self, project: Project, members: list[ProjectMemberWithRole]
     ):
         """
         Set group members for a group (by name)
         """
-        print('@TODO')
-        # group_id = await self.gtable.get_group_name_from_id(group_name)
-        # await self.gtable.set_group_members(
-        #     group_id, members, audit_log_id=await self.audit_log_id()
-        # )
+
+        async with self.connection.transaction():
+
+            # Get existing rows so that we can keep the existing audit log ids
+            existing_rows = await self.connection.fetch_all(
+                """
+                select project_id, member, role, audit_log_id
+                from project_member
+                where project_id = :project_id
+            """,
+                {'project_id': project.id},
+            )
+
+            audit_log_id_map: dict[Tuple[str, str], int | None] = {
+                (r['member'], r['role']): r['audit_log_id'] for r in existing_rows
+            }
+
+            # delete existing rows for project
+            await self.connection.execute(
+                """
+                DELETE FROM project_member
+                WHERE project_id = :project_id
+            """,
+                {'project_id': project.id},
+            )
+
+            new_audit_log_id = await self.audit_log_id()
+
+            await self.connection.execute_many(
+                """
+                    INSERT INTO project_member
+                        (project_id, member, role, audit_log_id)
+                    VALUES (:project_id, :member, :role, :audit_log_id);
+                """,
+                [
+                    {
+                        'project_id': project.id,
+                        'member': m['member'],
+                        'role': m['role'],
+                        'audit_log_id': audit_log_id_map.get(
+                            (m['member'], m['role']), new_audit_log_id
+                        ),
+                    }
+                    for m in members
+                    if m['role'] in project_member_role_names
+                ],
+            )
 
     # endregion CREATE / UPDATE
 
