@@ -216,6 +216,8 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
 
     return (
         <ErrorBoundary title="Error rendering project grid">
+            {projectColOptions}
+
             <div
                 style={{
                     marginBottom: '10px',
@@ -244,7 +246,6 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
                     title="participants"
                 />
             </div>
-            {projectColOptions}
             <ProjectGrid
                 participantResponse={participants}
                 projectName={projectName}

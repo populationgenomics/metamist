@@ -1,5 +1,5 @@
 import React from 'react'
-import { Dropdown, Form, Input, Popup } from 'semantic-ui-react'
+import { Dropdown, Form, Input, Label, Popup } from 'semantic-ui-react'
 import {
     GenericFilterAny,
     ProjectParticipantGridField,
@@ -144,7 +144,14 @@ export const ValueFilter: React.FC<IValueFilter> = ({
 
         // deep copy
         const newFilter = JSON.parse(JSON.stringify(props.filterValues))
-        newFilter[category] = !isMeta ? { [name]: f } : { meta: { [name]: f } }
+
+        const base = newFilter[category] || {}
+        if (isMeta) {
+            const oldMeta = base.meta || {}
+            newFilter[category] = { ...base, meta: { ...oldMeta, [name]: f } }
+        } else {
+            newFilter[category] = { ...base, [name]: f }
+        }
 
         updateFilterValues(newFilter)
     }
@@ -159,14 +166,17 @@ export const ValueFilter: React.FC<IValueFilter> = ({
     if (!disabled) {
         input = (
             <Input
-                action={{ icon: 'search' }}
+                icon="search"
                 placeholder={`Filter ${name}...`}
                 name={name}
                 value={tempValue}
                 onChange={(e) => setTempValue(e.target.value)}
                 size={props.size}
                 labelPosition="left"
-                label={
+                onSubmit={onSubmit}
+            >
+                {/* label={ */}
+                <Label>
                     <Dropdown
                         value={queryType || ''}
                         onChange={(_, { value }) =>
@@ -178,8 +188,24 @@ export const ValueFilter: React.FC<IValueFilter> = ({
                             value: q,
                         }))}
                     />
-                }
-            />
+                </Label>
+                <input />
+                {isHighlighted && (
+                    <Label style={{}}>
+                        <IconButton
+                            style={{ padding: '0', height: '12px', width: '12px' }}
+                            onClick={() => {
+                                postValue(operator, undefined)
+                                setTempValue('')
+                            }}
+                        >
+                            <CloseIcon style={{ padding: '0', margin: '0' }} />
+                        </IconButton>
+                    </Label>
+                )}
+
+                {/* } */}
+            </Input>
         )
     }
     // debugger
@@ -189,19 +215,7 @@ export const ValueFilter: React.FC<IValueFilter> = ({
             <Form.Group inline style={{ padding: 0, margin: 0 }}>
                 <Form.Field style={{ padding: 0, margin: 0 }}></Form.Field>
                 {input}
-                {isHighlighted && (
-                    <Form.Field style={{ padding: 0 }}>
-                        <IconButton
-                            onClick={() => {
-                                postValue(operator, undefined)
-                                setTempValue('')
-                            }}
-                            style={{ padding: '10px' }}
-                        >
-                            <CloseIcon />
-                        </IconButton>
-                    </Form.Field>
-                )}
+                {isHighlighted && <Form.Field style={{ padding: 0 }}></Form.Field>}
             </Form.Group>
         </Form>
     )

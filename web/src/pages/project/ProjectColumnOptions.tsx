@@ -1,6 +1,7 @@
 import * as _ from 'lodash'
 import * as React from 'react'
 
+import DragHandle from '@mui/icons-material/DragHandle'
 import FilterAltIcon from '@mui/icons-material/FilterAlt'
 
 import {
@@ -56,27 +57,6 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
     isOpen,
     setIsOpen,
 }) => {
-    const onUpdateSingleHeader = (
-        category: MetaSearchEntityPrefix,
-        header: ProjectParticipantGridField,
-        isChecked: boolean
-    ) => {
-        const newGroups: Record<MetaSearchEntityPrefix, ProjectParticipantGridField[]> = {
-            ...headerGroups,
-        }
-        newGroups[category] = newGroups[category].map((field) => {
-            // find the specific field, and set isVisible to isChecked
-            if (field.key !== header.key) {
-                return field
-            }
-            return {
-                ...field,
-                is_visible: isChecked,
-            }
-        })
-        setHeaderGroups(newGroups)
-    }
-
     return (
         <Card
             style={{
@@ -110,48 +90,18 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
                                     key={`project-col-option-${headerGroup}`}
                                     style={{ marginLeft: '10px' }}
                                 >
-                                    <h3>{_.startCase(metaSearchEntityToTitle(headerGroup))}</h3>
-                                    <table
-                                        style={{
-                                            border: 'none', // '1px solid black',
+                                    <CategoryColumnOptions
+                                        category={headerGroup}
+                                        fields={headerGroups[headerGroup]}
+                                        filterValues={filterValues}
+                                        updateFilters={updateFilters}
+                                        updateFields={(fields) => {
+                                            setHeaderGroups({
+                                                ...headerGroups,
+                                                [headerGroup]: fields,
+                                            })
                                         }}
-                                    >
-                                        <tbody>
-                                            {headerGroups[headerGroup]?.map((field) => {
-                                                return (
-                                                    <tr key={field.key}>
-                                                        <td>
-                                                            <Checkbox
-                                                                // key={`checkbox-${headerGroup}-${field.key}`}
-                                                                type="checkbox"
-                                                                checked={field.is_visible}
-                                                                label={field.label}
-                                                                onChange={(e, data) =>
-                                                                    onUpdateSingleHeader(
-                                                                        headerGroup,
-                                                                        field,
-                                                                        data.checked ||
-                                                                            !field.is_visible
-                                                                    )
-                                                                }
-                                                            />
-                                                        </td>
-                                                        <td style={{ paddingLeft: '10px' }}>
-                                                            <ValueFilter
-                                                                category={metaSeachEntityPrefixToFilterKey(
-                                                                    headerGroup
-                                                                )}
-                                                                field={field}
-                                                                filterValues={filterValues}
-                                                                updateFilterValues={updateFilters}
-                                                                size="small"
-                                                            />
-                                                        </td>
-                                                    </tr>
-                                                )
-                                            })}
-                                        </tbody>
-                                    </table>
+                                    />
                                 </Segment>
                             )
                         })}
@@ -159,5 +109,107 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
                 </Accordion.Content>
             </Accordion>
         </Card>
+    )
+}
+
+const CategoryColumnOptions: React.FC<{
+    category: MetaSearchEntityPrefix
+    fields: ProjectParticipantGridField[]
+    filterValues: ProjectParticipantGridFilter
+    updateFilters: (filters: Partial<ProjectParticipantGridFilter>) => void
+    updateFields: (fields: ProjectParticipantGridField[]) => void
+}> = ({ category, fields, filterValues, updateFilters, updateFields }) => {
+    const [tempFields, setTempFields] = React.useState<ProjectParticipantGridField[] | null>(null)
+    const [draggedToIndex, setDraggedToIndex] = React.useState<number | null>(null)
+    const [draggedRowIndex, setDraggedRowIndex] = React.useState<number | null>(null)
+
+    const updateChecked = (header: ProjectParticipantGridField, isChecked: boolean) => {
+        const newFields = fields.map((field) => {
+            // find the specific field, and set isVisible to isChecked
+            if (field.key !== header.key) {
+                return field
+            }
+            return {
+                ...field,
+                is_visible: isChecked,
+            }
+        })
+        updateFields(newFields)
+    }
+
+    const start = (e: React.DragEvent<HTMLTableRowElement>) => {
+        console.log('start', e.target)
+        setDraggedRowIndex(e.currentTarget.rowIndex)
+    }
+    const dragEnd = (e: React.DragEvent<HTMLTableRowElement>) => {
+        console.log('end', e.target)
+        setDraggedRowIndex(null)
+        if (tempFields === null) return
+        updateFields(tempFields)
+        setTempFields(null)
+    }
+    const dragover = (e: React.DragEvent<HTMLTableRowElement>) => {
+        if (draggedRowIndex === null) return
+        e.preventDefault()
+
+        const to = e.currentTarget.rowIndex
+        if (to === draggedToIndex) return
+
+        // update setTempFields with new order
+        const newFields = fields.filter((_, idx) => idx !== draggedRowIndex)
+        // insert fields[draggedRowIndex] at e.currentTarget.rowIndex
+        newFields.splice(to, 0, fields[draggedRowIndex])
+
+        setDraggedToIndex(to)
+        setTempFields(newFields)
+    }
+
+    const _fields = tempFields || fields
+    return (
+        <>
+            <h3>{_.startCase(metaSearchEntityToTitle(category))}</h3>
+            <table
+                style={{
+                    border: 'none', // '1px solid black',
+                }}
+            >
+                <tbody>
+                    {_fields?.map((field) => {
+                        return (
+                            <tr
+                                key={field.key}
+                                onDragStart={start}
+                                onDragOver={dragover}
+                                onDragEnd={dragEnd}
+                            >
+                                <td draggable>
+                                    <DragHandle />
+                                </td>
+                                <td>
+                                    <Checkbox
+                                        // key={`checkbox-${headerGroup}-${field.key}`}
+                                        type="checkbox"
+                                        checked={field.is_visible}
+                                        label={field.label}
+                                        onChange={(e, data) =>
+                                            updateChecked(field, data.checked || !field.is_visible)
+                                        }
+                                    />
+                                </td>
+                                <td style={{ paddingLeft: '10px' }}>
+                                    <ValueFilter
+                                        category={metaSeachEntityPrefixToFilterKey(category)}
+                                        field={field}
+                                        filterValues={filterValues}
+                                        updateFilterValues={updateFilters}
+                                        size="small"
+                                    />
+                                </td>
+                            </tr>
+                        )
+                    })}
+                </tbody>
+            </table>
+        </>
     )
 }

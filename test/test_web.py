@@ -34,6 +34,7 @@ from models.models import (
 from models.models.sequencing_group import NestedSequencingGroup
 from models.models.web import (
     ProjectParticipantGridField,
+    ProjectParticipantGridFilterType,
     ProjectParticipantGridResponse,
 )
 from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
@@ -47,6 +48,135 @@ default_assay_meta = {
     'sequencing_technology': 'short-read',
     'sequencing_platform': 'illumina',
 }
+
+DEFAULT_FAMILY_FIELDS = [
+    ProjectParticipantGridField(
+        key='external_id',
+        label='Family ID',
+        is_visible=True,
+        filter_key='external_id',
+    )
+]
+
+DEFAULT_PARTICIPANT_FIELDS = [
+    ProjectParticipantGridField(
+        key='external_ids',
+        label='Participant ID',
+        is_visible=True,
+        filter_key='external_id',
+    ),
+    ProjectParticipantGridField(
+        key='reported_sex',
+        label='Reported sex',
+        is_visible=False,
+        filter_key='reported_sex',
+    ),
+    ProjectParticipantGridField(
+        key='reported_gender',
+        label='Reported gender',
+        is_visible=False,
+        filter_key='reported_gender',
+        filter_types=None,
+    ),
+    ProjectParticipantGridField(
+        key='karyotype',
+        label='Karyotype',
+        is_visible=False,
+        filter_key='karyotype',
+        filter_types=None,
+    ),
+]
+
+DEFAULT_SAMPLE_FIELDS = [
+    ProjectParticipantGridField(
+        key='id',
+        label='Sample ID',
+        is_visible=True,
+        filter_key='id',
+        filter_types=[
+            ProjectParticipantGridFilterType.eq,
+            ProjectParticipantGridFilterType.neq,
+        ],
+    ),
+    ProjectParticipantGridField(
+        key='external_ids',
+        label='External Sample ID',
+        is_visible=True,
+        filter_key='external_id',
+    ),
+    ProjectParticipantGridField(
+        key='created_date',
+        label='Created date',
+        is_visible=True,
+        filter_key=None,
+        filter_types=None,
+    ),
+]
+
+DEFAULT_SEQ_GROUP_FIELDS = [
+    ProjectParticipantGridField(
+        key='id',
+        label='Sequencing Group ID',
+        is_visible=True,
+        filter_key='id',
+        filter_types=[
+            ProjectParticipantGridFilterType.eq,
+            ProjectParticipantGridFilterType.neq,
+        ],
+    ),
+    ProjectParticipantGridField(
+        key='type',
+        label='Type',
+        is_visible=True,
+        filter_key='type',
+    ),
+    ProjectParticipantGridField(
+        key='technology',
+        label='Technology',
+        is_visible=True,
+        filter_key='technology',
+    ),
+    ProjectParticipantGridField(
+        key='platform',
+        label='Platform',
+        is_visible=True,
+        filter_key='platform',
+    ),
+]
+
+DEFAULT_ASSAY_TYPES = [
+    ProjectParticipantGridField(
+        key='type', label='Type', is_visible=True, filter_key='type', filter_types=None
+    ),
+    ProjectParticipantGridField(
+        key='meta.sequencing_type',
+        label='sequencing_type',
+        is_visible=False,
+        filter_key='meta.sequencing_type',
+        filter_types=None,
+    ),
+    ProjectParticipantGridField(
+        key='meta.sequencing_platform',
+        label='sequencing_platform',
+        is_visible=False,
+        filter_key='meta.sequencing_platform',
+        filter_types=None,
+    ),
+    ProjectParticipantGridField(
+        key='meta.sequencing_technology',
+        label='sequencing_technology',
+        is_visible=False,
+        filter_key='meta.sequencing_technology',
+        filter_types=None,
+    ),
+    ProjectParticipantGridField(
+        key='meta.batch',
+        label='batch',
+        is_visible=True,
+        filter_key='meta.batch',
+        filter_types=None,
+    ),
+]
 
 
 def data_to_class(data: dict | list) -> dict | list:
@@ -410,30 +540,36 @@ class TestWeb(DbIsolatedTest):
             seqr_sync_types=[],
         )
 
-        expected_result = ProjectParticipantGridResponse(
-            participants=[],  # data_to_class(expected_data_list),
-            total_results=2,
-            fields={},
-            # family_keys=[('external_id', 'Family ID')],
-            # participant_keys=[('external_ids', 'Participant ID')],
-            # sample_keys=[
-            #     ('id', 'Sample ID'),
-            #     ('external_ids', 'External Sample ID'),
-            #     ('created_date', 'Created date'),
-            # ],
-            # sequencing_group_keys=[
-            #     ('id', 'Sequencing Group ID'),
-            #     ('platform', 'Platform'),
-            #     ('technology', 'Technology'),
-            #     ('type', 'Type'),
-            # ],
-            # assay_keys=[
-            #     ('type', 'type'),
-            #     ('meta.batch', 'batch'),
-            #     ('meta.field with spaces', 'field with spaces'),
-            #     ('meta.reads_type', 'reads_type'),
-            # ],
-        )
+        expected_fields = {
+            MetaSearchEntityPrefix.FAMILY: DEFAULT_FAMILY_FIELDS,
+            MetaSearchEntityPrefix.PARTICIPANT: DEFAULT_PARTICIPANT_FIELDS,
+            MetaSearchEntityPrefix.SAMPLE: DEFAULT_SAMPLE_FIELDS,
+            MetaSearchEntityPrefix.SEQUENCING_GROUP: DEFAULT_SEQ_GROUP_FIELDS,
+            MetaSearchEntityPrefix.ASSAY: [
+                *DEFAULT_ASSAY_TYPES,
+                ProjectParticipantGridField(
+                    key='meta.reads_type',
+                    label='reads_type',
+                    is_visible=True,
+                    filter_key='meta.reads_type',
+                    filter_types=None,
+                ),
+                ProjectParticipantGridField(
+                    key='meta.reads',
+                    label='reads',
+                    is_visible=False,
+                    filter_key='meta.reads',
+                    filter_types=None,
+                ),
+                ProjectParticipantGridField(
+                    key='meta.field with spaces',
+                    label='field with spaces',
+                    is_visible=True,
+                    filter_key='meta.field with spaces',
+                    filter_types=None,
+                ),
+            ],
+        }
 
         summary = await self.webl.get_project_summary()
 
@@ -450,7 +586,21 @@ class TestWeb(DbIsolatedTest):
         )
         # make it easier to test
         result.participants = []
-        self.assertEqual(expected_result, result)
+
+        self.maxDiff = None
+        # comparison
+        for k, expected_field in expected_fields.items():
+            sorted_expected_fields = sorted(
+                expected_field, key=lambda x: x.key
+            )  # sort by key
+            sorted_result_fields = sorted(
+                result.fields[k], key=lambda x: x.key
+            )  # sort by key
+            self.assertEqual(
+                sorted_expected_fields,
+                sorted_result_fields,
+                msg=f'Fields for category {k} did not match',
+            )
 
     @run_as_sync
     async def test_project_summary_multiple_participants_and_filter(self):
@@ -459,30 +609,36 @@ class TestWeb(DbIsolatedTest):
             participants=[get_test_participant(), get_test_participant_2()]
         )
 
-        expected_data_two_samples_filtered = ProjectParticipantGridResponse(
-            participants=[],  # data_to_class(expected_data_list_filtered),
-            total_results=2,
-            fields={},
-            # family_keys=[('external_id', 'Family ID')],
-            # participant_keys=[('external_ids', 'Participant ID')],
-            # sample_keys=[
-            #     ('id', 'Sample ID'),
-            #     ('external_ids', 'External Sample ID'),
-            #     ('created_date', 'Created date'),
-            # ],
-            # sequencing_group_keys=[
-            #     ('id', 'Sequencing Group ID'),
-            #     ('platform', 'Platform'),
-            #     ('technology', 'Technology'),
-            #     ('type', 'Type'),
-            # ],
-            # assay_keys=[
-            #     ('type', 'type'),
-            #     ('meta.batch', 'batch'),
-            #     ('meta.field with spaces', 'field with spaces'),
-            #     ('meta.reads_type', 'reads_type'),
-            # ],
-        )
+        expected_fields = {
+            MetaSearchEntityPrefix.FAMILY: DEFAULT_FAMILY_FIELDS,
+            MetaSearchEntityPrefix.PARTICIPANT: DEFAULT_PARTICIPANT_FIELDS,
+            MetaSearchEntityPrefix.SAMPLE: DEFAULT_SAMPLE_FIELDS,
+            MetaSearchEntityPrefix.SEQUENCING_GROUP: DEFAULT_SEQ_GROUP_FIELDS,
+            MetaSearchEntityPrefix.ASSAY: [
+                *DEFAULT_ASSAY_TYPES,
+                ProjectParticipantGridField(
+                    key='meta.reads_type',
+                    label='reads_type',
+                    is_visible=True,
+                    filter_key='meta.reads_type',
+                    filter_types=None,
+                ),
+                ProjectParticipantGridField(
+                    key='meta.reads',
+                    label='reads',
+                    is_visible=False,
+                    filter_key='meta.reads',
+                    filter_types=None,
+                ),
+                ProjectParticipantGridField(
+                    key='meta.field with spaces',
+                    label='field with spaces',
+                    is_visible=True,
+                    filter_key='meta.field with spaces',
+                    filter_types=None,
+                ),
+            ],
+        }
 
         pfilter = ProjectParticipantGridFilter(
             sample=ProjectParticipantGridFilter.ParticipantGridSampleFilter(
@@ -502,7 +658,18 @@ class TestWeb(DbIsolatedTest):
         )
         result.participants = []
 
-        self.assertEqual(expected_data_two_samples_filtered, result)
+        for k, expected_field in expected_fields.items():
+            sorted_expected_fields = sorted(
+                expected_field, key=lambda x: x.key
+            )  # sort by key
+            sorted_result_fields = sorted(
+                result.fields[k], key=lambda x: x.key
+            )  # sort by key
+            self.assertEqual(
+                sorted_expected_fields,
+                sorted_result_fields,
+                msg=f'Fields for category {k} did not match',
+            )
 
     @run_as_sync
     async def test_field_with_space(self):

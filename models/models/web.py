@@ -322,10 +322,10 @@ class ProjectParticipantGridResponse(SMBase):
                 ],
             ),
             Field(
-                key='platform',
-                label='Platform',
+                key='type',
+                label='Type',
                 is_visible=True,
-                filter_key='platform',
+                filter_key='type',
             ),
             Field(
                 key='technology',
@@ -334,10 +334,10 @@ class ProjectParticipantGridResponse(SMBase):
                 filter_key='technology',
             ),
             Field(
-                key='type',
-                label='Type',
+                key='platform',
+                label='Platform',
                 is_visible=True,
-                filter_key='type',
+                filter_key='platform',
             ),
         ]
 
