@@ -703,8 +703,9 @@ def transfer_participants(
     )
 
     target_project_pid_map = {
-        participant['external_id']: participant['id']
+        external_id: participant['id']
         for participant in existing_participants
+        for external_id in participant['external_ids'].values()
     }
 
     participants_to_transfer = []
@@ -715,7 +716,7 @@ def transfer_participants(
         else:
             del participant['id']
         transfer_participant = {
-            'external_id': participant['externalId'],
+            'external_ids': {PRIMARY_EXTERNAL_ORG: participant['externalId']},
             'meta': participant.get('meta') or {},
             'karyotype': participant.get('karyotype'),
             'reported_gender': participant.get('reportedGender'),
@@ -733,9 +734,9 @@ def transfer_participants(
     external_to_internal_participant_id_map: dict[str, int] = {}
 
     for participant in upserted_participants:
-        external_to_internal_participant_id_map[participant['external_id']] = (
-            participant['id']
-        )
+        for external_id in participant['external_ids'].values():
+            external_to_internal_participant_id_map[external_id] = participant['id']
+
     return external_to_internal_participant_id_map
 
 
