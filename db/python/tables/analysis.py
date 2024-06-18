@@ -419,8 +419,8 @@ WHERE a.id = :analysis_id
             'a.active',
             'a.type = "cram"',
             'a.status = "completed"',
-            'p.project = :project',
-            'p.name = :PRIMARY_EXTERNAL_ORG',
+            'peid.project = :project',
+            'peid.name = :PRIMARY_EXTERNAL_ORG',
         ]
         if sequencing_types:
             if len(sequencing_types) == 1:
@@ -433,16 +433,16 @@ WHERE a.id = :analysis_id
             filters.append('JSON_VALUE(a.meta, "$.sequencing_type") ' + seq_check)
 
         if participant_ids:
-            filters.append('p.participant_id IN :pids')
+            filters.append('peid.participant_id IN :pids')
             values['pids'] = list(participant_ids)
 
         _query = f"""
-SELECT p.external_id as participant_id, a.output as output, sg.id as sequencing_group_id
+SELECT peid.external_id as participant_id, a.output as output, sg.id as sequencing_group_id
 FROM analysis a
 INNER JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
 INNER JOIN sequencing_group sg ON a_sg.sequencing_group_id = sg.id
 INNER JOIN sample s ON sg.sample_id = s.id
-INNER JOIN participant_external_id p ON s.participant_id = p.participant_id
+INNER JOIN participant_external_id peid ON s.participant_id = peid.participant_id
 WHERE
     {' AND '.join(filters)}
 ORDER BY a.timestamp_completed DESC;
