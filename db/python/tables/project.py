@@ -2,11 +2,13 @@
 from typing import TYPE_CHECKING, Any, Tuple
 
 from databases import Database
-from typing_extensions import TypedDict
 
-from api.settings import is_all_access
-from db.python.utils import Forbidden, NotFoundError, get_logger, to_db_json
-from models.models.project import Project, project_member_role_names
+from db.python.utils import Forbidden, get_logger, to_db_json
+from models.models.project import (
+    Project,
+    ProjectMemberUpdate,
+    project_member_role_names,
+)
 
 # Avoid circular import for type definition
 if TYPE_CHECKING:
@@ -20,13 +22,6 @@ GROUP_NAME_PROJECT_CREATORS = 'project-creators'
 GROUP_NAME_MEMBERS_ADMIN = 'members-admin'
 
 
-class ProjectMemberWithRole(TypedDict):
-    """Dict passed to the update project member endpoint to specify roles for members"""
-
-    member: str
-    role: str
-
-
 class ProjectPermissionsTable:
     """
     Capture project operations and queries
@@ -37,7 +32,6 @@ class ProjectPermissionsTable:
     def __init__(
         self,
         connection: Connection | None,
-        allow_full_access: bool | None = None,
         database_connection: Database | None = None,
     ):
         self._connection = connection
@@ -51,8 +45,6 @@ class ProjectPermissionsTable:
         else:
             self.connection = database_connection
 
-        self.gtable = GroupTable(self.connection, allow_full_access=allow_full_access)
-
     async def audit_log_id(self):
         """
         Generate (or return) a audit_log_id by inserting a row into the database
@@ -65,33 +57,54 @@ class ProjectPermissionsTable:
 
     # region AUTH
     async def get_projects_accessible_by_user(
-        self, user: str, return_all_projects: bool = False
+        self, user: str
     ) -> tuple[dict[int, Project], dict[str, Project]]:
         """
         Get projects that are accessible by the specified user
         """
         parameters: dict[str, str] = {
             'user': user,
+            'project_creators_group_name': GROUP_NAME_PROJECT_CREATORS,
+            'members_admin_group_name': GROUP_NAME_MEMBERS_ADMIN,
         }
 
-        # In most cases we want to exclude projects that the user doesn't explicitly
-        # have access to. If the user is in the project creators group it may be
-        # necessary to return all projects whether the user has explict access to them
-        # or not.
-        where_cond = 'WHERE pm.member = :user' if return_all_projects is False else ''
-
-        _query = f"""
+        _query = """
+            -- Check what admin groups the user belongs to, if they belong
+            -- to project-creators then a project_admin role will be added to
+            -- all projects, if they belong to members-admin then a `project_member_admin`
+            -- role will be appended to all projects.
+            WITH admin_roles AS (
+                SELECT
+                    CASE (g.name)
+                        WHEN :project_creators_group_name THEN 'project_admin'
+                        WHEN :members_admin_group_name THEN 'project_member_admin'
+                    END
+                as role
+                FROM `group` g
+                JOIN group_member gm
+                ON gm.group_id = g.id
+                WHERE gm.member = :user
+                AND g.name in (:project_creators_group_name, :members_admin_group_name)
+            ),
+            -- Combine together the project roles and the admin roles
+            project_roles AS (
+                SELECT pm.project_id, pm.member, pm.role
+                FROM project_member pm
+                WHERE pm.member = :user
+                UNION ALL
+                SELECT p.id as project_id, :user as member, ar.role
+                FROM project p
+                JOIN admin_roles ar ON TRUE
+            )
             SELECT
                 p.id,
                 p.name,
                 p.meta,
                 p.dataset,
-                GROUP_CONCAT(pm.role) as roles
+                GROUP_CONCAT(pr.role) as roles
             FROM project p
-            LEFT JOIN project_member pm
-            ON p.id = pm.project_id
-            AND pm.member = :user
-            {where_cond}
+            JOIN project_roles pr
+            ON p.id = pr.project_id
             GROUP BY p.id
         """
 
@@ -107,22 +120,40 @@ class ProjectPermissionsTable:
 
         return project_id_map, project_name_map
 
+    async def check_if_member_in_group_by_name(self, group_name: str, member: str):
+        """Check if a user exists in the group"""
+
+        _query = """
+            SELECT COUNT(*) > 0
+            FROM group_member gm
+            INNER JOIN `group` g ON g.id = gm.group_id
+            WHERE g.name = :group_name
+            AND gm.member = :member
+        """
+        value = await self.connection.fetch_val(
+            _query, {'group_name': group_name, 'member': member}
+        )
+        if value not in (0, 1):
+            raise ValueError(
+                f'Unexpected value {value!r} when determining access to {group_name} '
+                f'for {member}'
+            )
+
+        return bool(value)
+
     async def check_project_creator_permissions(self, author: str):
         """Check author has project_creator permissions"""
-        # check permissions in here
-        is_in_group = await self.gtable.check_if_member_in_group_name(
+        is_in_group = await self.check_if_member_in_group_by_name(
             group_name=GROUP_NAME_PROJECT_CREATORS, member=author
         )
-
         if not is_in_group:
-            raise Forbidden(f'{author} does not have access to creating project')
+            raise Forbidden(f'{author} does not have access to create a project')
 
         return True
 
     async def check_member_admin_permissions(self, author: str):
         """Check author has member_admin permissions"""
-        # check permissions in here
-        is_in_group = await self.gtable.check_if_member_in_group_name(
+        is_in_group = await self.check_if_member_in_group_by_name(
             GROUP_NAME_MEMBERS_ADMIN, author
         )
         if not is_in_group:
@@ -141,16 +172,14 @@ class ProjectPermissionsTable:
         project_name: str,
         dataset_name: str,
         author: str,
-        check_permissions: bool = True,
     ):
         """Create project row"""
-        if check_permissions:
-            await self.check_project_creator_permissions(author)
+        await self.check_project_creator_permissions(author)
 
         async with self.connection.transaction():
             _query = """\
-    INSERT INTO project (name, dataset, audit_log_id, read_group_id, write_group_id)
-    VALUES (:name, :dataset, :audit_log_id, :read_group_id, :write_group_id)
+    INSERT INTO project (name, dataset, audit_log_id)
+    VALUES (:name, :dataset, :audit_log_id)
     RETURNING ID"""
             values = {
                 'name': project_name,
@@ -159,6 +188,9 @@ class ProjectPermissionsTable:
             }
 
             project_id = await self.connection.fetch_val(_query, values)
+
+        if self._connection:
+            await self._connection.refresh_projects()
 
         return project_id
 
@@ -238,7 +270,7 @@ DELETE FROM analysis WHERE project = :project;
         return True
 
     async def set_project_members(
-        self, project: Project, members: list[ProjectMemberWithRole]
+        self, project: Project, members: list[ProjectMemberUpdate]
     ):
         """
         Set group members for a group (by name)
@@ -271,6 +303,11 @@ DELETE FROM analysis WHERE project = :project;
 
             new_audit_log_id = await self.audit_log_id()
 
+            db_members: list[dict[str, str]] = []
+
+            for m in members:
+                db_members.extend([{'member': m.member, 'role': r} for r in m.roles])
+
             await self.connection.execute_many(
                 """
                     INSERT INTO project_member
@@ -286,163 +323,12 @@ DELETE FROM analysis WHERE project = :project;
                             (m['member'], m['role']), new_audit_log_id
                         ),
                     }
-                    for m in members
+                    for m in db_members
                     if m['role'] in project_member_role_names
                 ],
             )
 
+        if self._connection:
+            await self._connection.refresh_projects()
+
     # endregion CREATE / UPDATE
-
-
-class GroupTable:
-    """
-    Capture Group table operations and queries
-    """
-
-    table_name = 'group'
-
-    def __init__(self, connection: Database, allow_full_access: bool | None = None):
-        if not isinstance(connection, Database):
-            raise ValueError(
-                f'Invalid type connection, expected Database, got {type(connection)}, '
-                'did you forget to call connection.connection?'
-            )
-        self.connection: Database = connection
-        self.allow_full_access = (
-            allow_full_access if allow_full_access is not None else is_all_access()
-        )
-
-    async def get_group_members(self, group_id: int) -> set[str]:
-        """Get project IDs for sampleIds (mostly for checking auth)"""
-        _query = """
-            SELECT member
-            FROM `group`
-            WHERE id = :group_id
-        """
-        rows = await self.connection.fetch_all(_query, {'group_id': group_id})
-        members = set(r['member'] for r in rows)
-        return members
-
-    async def get_group_name_from_id(self, name: str) -> int:
-        """Get group name to group id"""
-        _query = """
-            SELECT id, name
-            FROM `group`
-            WHERE name = :name
-        """
-        row = await self.connection.fetch_one(_query, {'name': name})
-        if not row:
-            raise NotFoundError(f'Could not find group {name}')
-        return row['id']
-
-    async def get_group_name_to_ids(self, names: list[str]) -> dict[str, int]:
-        """Get group name to group id"""
-        _query = """
-            SELECT id, name
-            FROM `group`
-            WHERE name IN :names
-        """
-        rows = await self.connection.fetch_all(_query, {'names': names})
-        return {r['name']: r['id'] for r in rows}
-
-    async def check_if_member_in_group(self, group_id: int, member: str) -> bool:
-        """Check if a member is in a group"""
-        if self.allow_full_access:
-            return True
-
-        _query = """
-            SELECT COUNT(*) > 0
-            FROM group_member gm
-            WHERE gm.group_id = :group_id
-            AND gm.member = :member
-        """
-        value = await self.connection.fetch_val(
-            _query, {'group_id': group_id, 'member': member}
-        )
-        if value not in (0, 1):
-            raise ValueError(
-                f'Unexpected value {value!r} when determining access to group with ID '
-                f'{group_id} for {member}'
-            )
-        return bool(value)
-
-    async def check_if_member_in_group_name(self, group_name: str, member: str) -> bool:
-        """Check if a member is in a group"""
-        if self.allow_full_access:
-            return True
-
-        _query = """
-            SELECT COUNT(*) > 0
-            FROM group_member gm
-            INNER JOIN `group` g ON g.id = gm.group_id
-            WHERE g.name = :group_name
-            AND gm.member = :member
-        """
-        value = await self.connection.fetch_val(
-            _query, {'group_name': group_name, 'member': member}
-        )
-        if value not in (0, 1):
-            raise ValueError(
-                f'Unexpected value {value!r} when determining access to {group_name} '
-                f'for {member}'
-            )
-
-        return bool(value)
-
-    async def check_which_groups_member_has(
-        self, group_ids: set[int], member: str
-    ) -> set[int]:
-        """
-        Check which groups a member has
-        """
-        if self.allow_full_access:
-            return group_ids
-
-        _query = """
-            SELECT gm.group_id as gid
-            FROM group_member gm
-            WHERE gm.member = :member AND gm.group_id IN :group_ids
-        """
-        results = await self.connection.fetch_all(
-            _query, {'group_ids': group_ids, 'member': member}
-        )
-        return set(r['gid'] for r in results)
-
-    async def create_group(self, name: str, audit_log_id: int) -> int:
-        """Create a new group"""
-        _query = """
-            INSERT INTO `group` (name, audit_log_id)
-            VALUES (:name, :audit_log_id)
-            RETURNING id
-        """
-        return await self.connection.fetch_val(
-            _query, {'name': name, 'audit_log_id': audit_log_id}
-        )
-
-    async def set_group_members(
-        self, group_id: int, members: list[str], audit_log_id: int
-    ):
-        """
-        Set group members for a group (by id)
-        """
-        await self.connection.execute(
-            """
-            DELETE FROM group_member
-            WHERE group_id = :group_id
-            """,
-            {'group_id': group_id},
-        )
-        await self.connection.execute_many(
-            """
-            INSERT INTO group_member (group_id, member, audit_log_id)
-            VALUES (:group_id, :member, :audit_log_id)
-            """,
-            [
-                {
-                    'group_id': group_id,
-                    'member': member,
-                    'audit_log_id': audit_log_id,
-                }
-                for member in members
-            ],
-        )

@@ -9,11 +9,19 @@ from models.base import SMBase
 ProjectId = int
 
 ProjectMemberRole = Enum(
-    'ProjectMemberRole', ['reader', 'contributor', 'writer', 'data_manager']
+    'ProjectMemberRole',
+    [
+        'reader',
+        'contributor',
+        'writer',
+        'data_manager',
+        'project_admin',
+        'project_member_admin',
+    ],
 )
 
-project_member_role_names = [r.name for r in ProjectMemberRole]
 
+AdminRoles = {ProjectMemberRole.project_admin, ProjectMemberRole.project_member_admin}
 # These roles have read access to a project
 ReadAccessRoles = {
     ProjectMemberRole.reader,
@@ -24,6 +32,11 @@ ReadAccessRoles = {
 
 # Only write has full write access
 FullWriteAccessRoles = {ProjectMemberRole.writer}
+
+project_member_role_names = [r.name for r in ProjectMemberRole]
+updatable_project_member_role_names = [
+    r.name for r in ProjectMemberRole if r not in AdminRoles
+]
 
 
 class Project(SMBase):
@@ -46,7 +59,8 @@ class Project(SMBase):
         return self.name == f'{self.dataset}-test'
 
     @field_serializer('roles')
-    def serialize_roles(self, roles: set[ProjectMemberRole], _info):
+    def serialize_roles(self, roles: set[ProjectMemberRole]):
+        """convert roles into a form that can be returned from the API"""
         return [r.name for r in roles]
 
     @staticmethod
@@ -61,3 +75,10 @@ class Project(SMBase):
             ProjectMemberRole[r] for r in role_list if r in project_member_role_names
         }
         return Project(**kwargs)
+
+
+class ProjectMemberUpdate(SMBase):
+    """Item included in list of project member updates"""
+
+    member: str
+    roles: list[str]

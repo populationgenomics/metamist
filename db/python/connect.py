@@ -85,6 +85,10 @@ class Connection:
         """Return all projects that the current user has access to"""
         return list(self.project_id_map.values())
 
+    def projects_with_role(self, allowed_roles: set[ProjectMemberRole]):
+        """Return all projects that the current user has access to"""
+        return [p for p in self.project_id_map.values() if p.roles & allowed_roles]
+
     def get_and_check_access_to_projects(
         self, projects: Iterable[Project], allowed_roles: set[ProjectMemberRole]
     ):
@@ -220,6 +224,25 @@ class Connection:
                 )
 
         return self._audit_log_id
+
+    async def refresh_projects(self):
+        """
+        Re-fetch the projects for the current user and update the connection.
+        This only really needs to be run after project member updates or project
+        creation, and really only for tests. The API fetches projects on each request
+        so subsequent requests after updates will already have up-to-date data
+        """
+        conn = self.connection
+        pt = ProjectPermissionsTable(connection=None, database_connection=conn)
+
+        project_id_map, project_name_map = await pt.get_projects_accessible_by_user(
+            user=self.author
+        )
+        self.project_id_map = project_id_map
+        self.project_name_map = project_name_map
+
+        if self.project_id:
+            self.project = self.project_id_map.get(self.project_id)
 
 
 class DatabaseConfiguration(abc.ABC):

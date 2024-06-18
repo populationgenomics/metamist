@@ -5,12 +5,14 @@ from api.utils.db import (
     get_project_db_connection,
     get_projectless_db_connection,
 )
-from db.python.tables.project import ProjectMemberWithRole, ProjectPermissionsTable
+from db.python.tables.project import ProjectPermissionsTable
 from models.models.project import (
     FullWriteAccessRoles,
     Project,
     ProjectMemberRole,
-    project_member_role_names,
+    ProjectMemberUpdate,
+    ReadAccessRoles,
+    updatable_project_member_role_names,
 )
 
 router = APIRouter(prefix='/project', tags=['project'])
@@ -25,7 +27,12 @@ async def get_all_projects(connection: Connection = get_projectless_db_connectio
 @router.get('/', operation_id='getMyProjects', response_model=list[str])
 async def get_my_projects(connection: Connection = get_projectless_db_connection):
     """Get projects I have access to"""
-    return [p.name for p in connection.all_projects()]
+    return [
+        p.name
+        for p in connection.projects_with_role(
+            ReadAccessRoles.union(FullWriteAccessRoles)
+        )
+    ]
 
 
 @router.put('/', operation_id='createProject')
@@ -69,12 +76,16 @@ async def get_seqr_projects(connection: Connection = get_projectless_db_connecti
 @router.post('/{project}/update', operation_id='updateProject')
 async def update_project(
     project_update_model: dict,
-    connection: Connection = get_project_db_connection(FullWriteAccessRoles),
+    connection: Connection = get_project_db_connection(
+        {ProjectMemberRole.project_admin}
+    ),
 ):
     """Update a project by project name"""
     ptable = ProjectPermissionsTable(connection)
+
     # Updating a project additionally requires the project creator permission
     await ptable.check_project_creator_permissions(author=connection.author)
+
     project = connection.project
     assert project
     return await ptable.update_project(
@@ -86,7 +97,7 @@ async def update_project(
 async def delete_project_data(
     delete_project: bool = False,
     connection: Connection = get_project_db_connection(
-        {ProjectMemberRole.writer, ProjectMemberRole.data_manager}
+        {ProjectMemberRole.project_admin}
     ),
 ):
     """
@@ -117,8 +128,10 @@ async def delete_project_data(
 
 @router.patch('/{project}/members', operation_id='updateProjectMembers')
 async def update_project_members(
-    members: list[ProjectMemberWithRole],
-    connection: Connection = get_project_db_connection(FullWriteAccessRoles),
+    members: list[ProjectMemberUpdate],
+    connection: Connection = get_project_db_connection(
+        {ProjectMemberRole.project_member_admin}
+    ),
 ):
     """
     Update project members for specific read / write group.
@@ -127,14 +140,14 @@ async def update_project_members(
     ptable = ProjectPermissionsTable(connection)
 
     await ptable.check_member_admin_permissions(author=connection.author)
-    assert connection.project
 
     for member in members:
-        if member['role'] not in project_member_role_names:
-            raise HTTPException(
-                400, f'Role {member["role"]} is not valid for member {member["member"]}'
-            )
-
+        for role in member.roles:
+            if role not in updatable_project_member_role_names:
+                raise HTTPException(
+                    400, f'Role {role} is not valid for member {member.member}'
+                )
+    assert connection.project
     await ptable.set_project_members(project=connection.project, members=members)
 
     return {'success': True}
