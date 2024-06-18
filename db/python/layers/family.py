@@ -12,7 +12,7 @@ from db.python.tables.family_participant import (
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.sample import SampleTable
 from db.python.utils import GenericFilter, NotFoundError
-from models.models import PRIMARY_EXTERNAL_ORG, ProjectId
+from models.models import PRIMARY_EXTERNAL_ORG
 from models.models.family import FamilyInternal, PedRow, PedRowInternal
 from models.models.participant import ParticipantUpsertInternal
 from models.models.project import ProjectId, ReadAccessRoles

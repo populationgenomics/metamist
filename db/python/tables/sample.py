@@ -190,7 +190,7 @@ class SampleTable(DbBase):
         """
         _eid_values = [
             {
-                'project': project or self.project,
+                'project': project or self.project_id,
                 'id': id_of_new_sample,
                 'name': name.lower(),
                 'external_id': eid,

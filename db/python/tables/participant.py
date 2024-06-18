@@ -122,7 +122,7 @@ RETURNING id
         """
         _eid_values = [
             {
-                'project': project or self.project,
+                'project': project or self.project_id,
                 'pid': new_id,
                 'name': name.lower(),
                 'external_id': eid,
