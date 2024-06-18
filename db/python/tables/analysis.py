@@ -440,7 +440,7 @@ FROM analysis a
 INNER JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
 INNER JOIN sequencing_group sg ON a_sg.sequencing_group_id = sg.id
 INNER JOIN sample s ON sg.sample_id = s.id
-INNER JOIN participant p ON s.participant_id = p.id
+INNER JOIN participant_external_id p ON s.participant_id = p.participant_id
 WHERE
     {' AND '.join(filters)}
 ORDER BY a.timestamp_completed DESC;
