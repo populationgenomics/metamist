@@ -52,7 +52,7 @@ from models.models import (
 )
 from models.models.analysis_runner import AnalysisRunnerInternal
 from models.models.family import PedRowInternal
-from models.models.project import ProjectId, ReadAccessRoles
+from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
 from models.models.sample import sample_id_transform_to_raw
 from models.utils.cohort_id_format import cohort_id_format, cohort_id_transform_to_raw
 from models.utils.cohort_template_id_format import (
@@ -1213,7 +1213,9 @@ class Query:  # entry point to graphql.
         self, info: Info[GraphQLContext, 'Query']
     ) -> list[GraphQLProject]:
         connection = info.context['connection']
-        projects = connection.all_projects()
+        projects = connection.projects_with_role(
+            ReadAccessRoles.union(FullWriteAccessRoles)
+        )
         return [GraphQLProject.from_internal(p) for p in projects]
 
     @strawberry.field
