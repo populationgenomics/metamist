@@ -13,6 +13,7 @@ from db.python.utils import (
     to_db_json,
 )
 from models.enums import AnalysisStatus
+from models.models import PRIMARY_EXTERNAL_ORG
 from models.models.analysis import AnalysisInternal
 from models.models.audit_log import AuditLogInternal
 from models.models.project import ProjectId
@@ -413,12 +414,13 @@ WHERE a.id = :analysis_id
     ) -> List[dict[str, str]]:
         """Get (ext_sample_id, cram_path, internal_id) map"""
 
-        values: dict[str, Any] = {'project': project}
+        values: dict[str, Any] = {'project': project, 'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG}
         filters = [
             'a.active',
             'a.type = "cram"',
             'a.status = "completed"',
             'p.project = :project',
+            'p.name = :PRIMARY_EXTERNAL_ORG',
         ]
         if sequencing_types:
             if len(sequencing_types) == 1:
@@ -431,7 +433,7 @@ WHERE a.id = :analysis_id
             filters.append('JSON_VALUE(a.meta, "$.sequencing_type") ' + seq_check)
 
         if participant_ids:
-            filters.append('p.id IN :pids')
+            filters.append('p.participant_id IN :pids')
             values['pids'] = list(participant_ids)
 
         _query = f"""
