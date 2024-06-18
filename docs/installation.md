@@ -288,7 +288,7 @@ export SM_DEV_DB_PORT=3306 # or 3307
 
 You'll want to set the following environment variables (permanently) in your local development environment.
 
-The `SM_ENVIRONMENT`, `SM_LOCALONLY_DEFAULTUSER` and `SM_ALLOWALLACCESS` environment variables allow access to a local metamist server without providing a bearer token.
+The `SM_ENVIRONMENT` and `SM_LOCALONLY_DEFAULTUSER` environment variables allow access to a local metamist server without providing a bearer token.
 
 This will allow you to test the front-end components that access data. This happens automatically on the production instance through the Google identity-aware-proxy.
 
@@ -296,10 +296,17 @@ This will allow you to test the front-end components that access data. This happ
 # ensures the SWAGGER page points to your local: (localhost:8000/docs)
 # and ensures if you use the PythonAPI, it also points to your local
 export SM_ENVIRONMENT=LOCAL
-# skips permission checks in your local environment
-export SM_ALLOWALLACCESS=true
 # uses your username as the "author" in requests
 export SM_LOCALONLY_DEFAULTUSER=$(whoami)
+```
+
+To allow the sytem to be bootstrapped and create the initial project, you'll need to add yourself to the two admin groups that allow creating projects and updating project members:
+
+```sql
+INSERT INTO group_member(group_id, member)
+SELECT id, '<your local username>'
+FROM `group` WHERE name IN('project-creators', 'members-admin')
+
 ```
 
 With those variables set, it is a good time to populate some test data if this is your first time running this server:
@@ -335,7 +342,6 @@ The following `launch.json` is a good base to debug the web server in VS Code:
             "module": "api.server",
             "justMyCode": false,
             "env": {
-                "SM_ALLOWALLACCESS": "true",
                 "SM_LOCALONLY_DEFAULTUSER": "<user>-local",
                 "SM_ENVIRONMENT": "local",
                 "SM_DEV_DB_USER": "sm_api",
