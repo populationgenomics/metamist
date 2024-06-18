@@ -12,11 +12,10 @@ from starlette.responses import FileResponse
 
 from api import routes
 from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
-from api.settings import PROFILE_REQUESTS, SKIP_DATABASE_CONNECTION
+from api.settings import PROFILE_REQUESTS, SKIP_DATABASE_CONNECTION, SM_ENVIRONMENT
 from api.utils.exceptions import determine_code_from_error
 from api.utils.openapi import get_openapi_schema_func
 from db.python.connect import SMConnections
-from db.python.tables.project import is_all_access
 from db.python.utils import get_logger
 
 # This tag is automatically updated by bump2version
@@ -55,7 +54,7 @@ if PROFILE_REQUESTS:
 
     app.add_middleware(PyInstrumentProfilerMiddleware)  # type: ignore
 
-if is_all_access():
+if SM_ENVIRONMENT == 'local':
     app.add_middleware(
         CORSMiddleware,
         allow_origins=['*'],

@@ -60,6 +60,12 @@ def authenticate(
     If a token (OR Google IAP auth jwt) is provided,
     return the email, else raise an Exception
     """
+
+    if default_user := get_default_user():
+        # this should only happen in LOCAL environments
+        logging.info(f'Using {default_user} as authenticated user')
+        return default_user
+
     if x_goog_iap_jwt_assertion:
         # We have to PREFER the IAP's identity, otherwise you could have a case where
         # the JWT is forged, but IAP lets it through and authenticates, but then we take
@@ -70,11 +76,6 @@ def authenticate(
 
     if token:
         return email_from_id_token(token.credentials)
-
-    if default_user := get_default_user():
-        # this should only happen in LOCAL environments
-        logging.info(f'Using {default_user} as authenticated user')
-        return default_user
 
     raise HTTPException(status_code=401, detail='Not authenticated :(')
 
