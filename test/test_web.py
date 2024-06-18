@@ -9,6 +9,7 @@ from db.python.layers import (
 )
 from models.enums import MetaSearchEntityPrefix
 from models.models import (
+    PRIMARY_EXTERNAL_ORG,
     Assay,
     AssayInternal,
     AssayUpsertInternal,
@@ -54,11 +55,11 @@ def merge(d1: dict, d2: dict):
 def get_test_participant():
     """Do it like this to avoid an upsert writing the test value"""
     return ParticipantUpsertInternal(
-        external_id='Demeter',
+        external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'},
         meta={},
         samples=[
             SampleUpsertInternal(
-                external_id='sample_id001',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'sample_id001'},
                 meta={},
                 type='blood',
                 sequencing_groups=[
@@ -102,11 +103,11 @@ def get_test_participant():
 def get_test_participant_2():
     """Do it like this to avoid an upsert writing the test value"""
     return ParticipantUpsertInternal(
-        external_id='Meter',
+        external_ids={PRIMARY_EXTERNAL_ORG: 'Meter'},
         meta={},
         samples=[
             SampleUpsertInternal(
-                external_id='sample_id002',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'sample_id002'},
                 meta={},
                 type='blood',
                 sequencing_groups=[
@@ -164,10 +165,10 @@ SINGLE_PARTICIPANT_RESULT = ProjectSummaryInternal(
     },
     batch_sequencing_group_stats={'M001': {'genome': '1'}},
     participants=[],
-    participant_keys=[('external_id', 'Participant ID')],
+    participant_keys=[('external_ids', 'Participant ID')],
     sample_keys=[
         ('id', 'Sample ID'),
-        ('external_id', 'External Sample ID'),
+        ('external_ids', 'External Sample ID'),
         ('created_date', 'Created date'),
     ],
     sequencing_group_keys=[
@@ -348,10 +349,10 @@ class TestWeb(DbIsolatedTest):
             },
             batch_sequencing_group_stats={'M001': {'genome': '2'}},
             participants=[],  # data_to_class(expected_data_list),
-            participant_keys=[('external_id', 'Participant ID')],
+            participant_keys=[('external_ids', 'Participant ID')],
             sample_keys=[
                 ('id', 'Sample ID'),
-                ('external_id', 'External Sample ID'),
+                ('external_ids', 'External Sample ID'),
                 ('created_date', 'Created date'),
             ],
             sequencing_group_keys=[
@@ -401,10 +402,10 @@ class TestWeb(DbIsolatedTest):
             },
             batch_sequencing_group_stats={'M001': {'genome': '2'}},
             participants=[],  # data_to_class(expected_data_list_filtered),
-            participant_keys=[('external_id', 'Participant ID')],
+            participant_keys=[('external_ids', 'Participant ID')],
             sample_keys=[
                 ('id', 'Sample ID'),
-                ('external_id', 'External Sample ID'),
+                ('external_ids', 'External Sample ID'),
                 ('created_date', 'Created date'),
             ],
             sequencing_group_keys=[
@@ -477,10 +478,10 @@ class TestWeb(DbIsolatedTest):
             },
             batch_sequencing_group_stats={'M001': {'genome': '2'}},
             participants=[],
-            participant_keys=[('external_id', 'Participant ID')],
+            participant_keys=[('external_ids', 'Participant ID')],
             sample_keys=[
                 ('id', 'Sample ID'),
-                ('external_id', 'External Sample ID'),
+                ('external_ids', 'External Sample ID'),
                 ('created_date', 'Created date'),
             ],
             sequencing_group_keys=[

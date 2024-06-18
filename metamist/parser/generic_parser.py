@@ -52,6 +52,8 @@ logging.basicConfig()
 logger = logging.getLogger(__file__)
 logger.setLevel(logging.INFO)
 
+PRIMARY_EXTERNAL_ORG = ''
+
 FASTQ_EXTENSIONS = ('.fq.gz', '.fastq.gz', '.fq', '.fastq')
 BAM_EXTENSIONS = ('.bam',)
 CRAM_EXTENSIONS = ('.cram',)
@@ -217,7 +219,7 @@ class ParsedParticipant:
         samples = [s.to_sm() for s in self.samples]
         return ParticipantUpsert(
             id=self.internal_pid,
-            external_id=self.external_pid,
+            external_ids={PRIMARY_EXTERNAL_ORG: self.external_pid},
             reported_sex=self.reported_sex,
             reported_gender=self.reported_gender,
             karyotype=self.karyotype,
@@ -252,7 +254,7 @@ class ParsedSample:
         """Convert to SM upsert model"""
         return SampleUpsert(
             id=self.internal_sid,
-            external_id=self.external_sid,
+            external_ids={PRIMARY_EXTERNAL_ORG: self.external_sid},
             type=self.sample_type,
             meta=self.meta,
             active=True,
@@ -636,6 +638,8 @@ class GenericParser(
             logger.info(json.dumps(result, indent=2))
         else:
             self.prepare_detail(samples)
+
+        return result
 
     def _get_dict_reader(self, file_pointer, delimiter: str):
         """

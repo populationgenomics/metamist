@@ -45,6 +45,8 @@ papi = ParticipantApi()
 
 DEFAULT_SAMPLES_N = 10
 
+PRIMARY_EXTERNAL_ORG = ''
+
 QUERY_ALL_DATA = gql(
     """
     query getAllData($project: String!, $sids: [String!]) {
@@ -278,7 +280,7 @@ def transfer_samples_sgs_assays(
     sample_to_sg_attribute_map: dict[Tuple[str, str], SequencingGroupAttributes] = {}
     old_sid_to_new_sid: dict[str, str] = {}
     for s in samples:
-        exid_old_sid = (s['participant']['externalId'], s['id'])
+        exid_old_sid = (s['externalId'], s['id'])
         if exid_old_sid not in sample_to_sg_attribute_map:
             sample_to_sg_attribute_map[exid_old_sid] = {}
         for sg in s['sequencingGroups']:
@@ -297,7 +299,7 @@ def transfer_samples_sgs_assays(
             existing_pid = upserted_participant_map[s['participant']['externalId']]
 
         sample_upsert = SampleUpsert(
-            external_id=s['externalId'],
+            external_ids={PRIMARY_EXTERNAL_ORG: s['externalId']},
             type=sample_type or None,
             meta=(copy_files_in_dict(s['meta'], project) or {}),
             participant_id=existing_pid,
@@ -384,7 +386,7 @@ def get_new_sg_id(
         sid (str): The sample id to search for.
         new_sg_attributes (tuple[str, str, str]): The attributes of the sequencing group to search for.
         old_sid_to_new_sid (dict[str, str]): A map from old sample ids to new sample ids.
-        sample_to_sg_attribute_map (dict[tuple, dict[tuple, str]]): A map from (peid, sid) keys to a map of sequencing group attribute keys to old sequencing group ids.
+        sample_to_sg_attribute_map (dict[tuple, dict[tuple, str]]): A map from (seid, sid) keys to a map of sequencing group attribute keys to old sequencing group ids.
         new_sg_data (dict[dict, Any]): The data containing the new samples and their sequencing groups.
 
 
@@ -415,14 +417,14 @@ def get_new_sg_id(
                 new_sample['id'] == old_sid_to_new_sid[old_sid]
             ):  # If new sample maps to old sample
                 for new_sg in new_sample['sequencingGroups']:
-                    peid_sid_key = (new_sample['externalId'], old_sid)
+                    seid_sid_key = (new_sample['externalId'], old_sid)
                     sg_attribute_key = (
                         new_sg['type'],
                         new_sg['platform'],
                         new_sg['technology'],
                     )
                     if (
-                        sample_to_sg_attribute_map[peid_sid_key].get(new_sg_attributes)
+                        sample_to_sg_attribute_map[seid_sid_key].get(new_sg_attributes)
                         and new_sg_attributes == sg_attribute_key
                     ):
                         new_sg_id = new_sg['id']
@@ -701,8 +703,9 @@ def transfer_participants(
     )
 
     target_project_pid_map = {
-        participant['external_id']: participant['id']
+        external_id: participant['id']
         for participant in existing_participants
+        for external_id in participant['external_ids'].values()
     }
 
     participants_to_transfer = []
@@ -713,7 +716,7 @@ def transfer_participants(
         else:
             del participant['id']
         transfer_participant = {
-            'external_id': participant['externalId'],
+            'external_ids': {PRIMARY_EXTERNAL_ORG: participant['externalId']},
             'meta': participant.get('meta') or {},
             'karyotype': participant.get('karyotype'),
             'reported_gender': participant.get('reportedGender'),
@@ -731,9 +734,9 @@ def transfer_participants(
     external_to_internal_participant_id_map: dict[str, int] = {}
 
     for participant in upserted_participants:
-        external_to_internal_participant_id_map[participant['external_id']] = (
-            participant['id']
-        )
+        for external_id in participant['external_ids'].values():
+            external_to_internal_participant_id_map[external_id] = participant['id']
+
     return external_to_internal_participant_id_map
 
 

@@ -12,6 +12,7 @@ from db.python.tables.family_participant import (
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.sample import SampleTable
 from db.python.utils import GenericFilter, NotFoundError
+from models.models import PRIMARY_EXTERNAL_ORG, ProjectId
 from models.models.family import FamilyInternal, PedRow, PedRowInternal
 from models.models.participant import ParticipantUpsertInternal
 from models.models.project import ProjectId, ReadAccessRoles
@@ -290,7 +291,7 @@ class FamilyLayer(BaseLayer):
                         continue
                     upserted_participant = await participant_table.upsert_participant(
                         ParticipantUpsertInternal(
-                            external_id=row.individual_id,
+                            external_ids={PRIMARY_EXTERNAL_ORG: row.individual_id},
                             reported_sex=row.sex,
                         )
                     )

@@ -21,6 +21,7 @@ from metamist.parser.generic_parser import (
     ParsedSequencingGroup,
 )
 from models.models import (
+    PRIMARY_EXTERNAL_ORG,
     AssayUpsertInternal,
     ParticipantUpsertInternal,
     SampleUpsertInternal,
@@ -38,11 +39,11 @@ def _get_basic_participant_to_upsert():
     }
 
     return ParticipantUpsertInternal(
-        external_id='Demeter',
+        external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'},
         meta={},
         samples=[
             SampleUpsertInternal(
-                external_id='sample_id001',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'sample_id001'},
                 meta={},
                 type='blood',
                 sequencing_groups=[

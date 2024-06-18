@@ -64,7 +64,7 @@ class SearchLayer(BaseLayer):
         except NotFoundError:
             return None
 
-        sample_eids = [sample.external_id]
+        sample_eids = list(sample.external_ids.values())
         participant_id = int(sample.participant_id) if sample.participant_id else None
         participant_eids: list[str] = []
         family_eids: list[str] = []
