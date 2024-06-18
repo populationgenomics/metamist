@@ -2,6 +2,7 @@ from typing import NewType
 
 import strawberry
 
+from models.enums.analysis import AnalysisStatus
 from models.models.assay import AssayUpsert, AssayUpsertInternal
 from models.models.cohort import NewCohortInternal
 from models.models.participant import ParticipantUpsertInternal
@@ -24,8 +25,37 @@ CustomJSON = strawberry.scalar(
     parse_value=lambda v: v,
 )
 
+AnalysisStatusType = strawberry.enum(AnalysisStatus)
 
-@strawberry.experimental.pydantic.input(model=AssayUpsert)  # type: ignore [misc]
+
+@strawberry.input
+class AnalysisInput:
+    """Analysis input"""
+
+    type: str
+    status: AnalysisStatusType
+    id: int | None
+    output: str | None
+    sequencing_group_ids: list[str] | None
+    cohort_ids: list[str] | None
+    author: str | None
+    timestamp_completed: str | None
+    project: int | None
+    active: bool | None
+    meta: strawberry.scalars.JSON
+
+
+@strawberry.input
+class AnalysisUpdateInput:
+    """Analysis update input"""
+
+    status: AnalysisStatusType
+    output: str | None
+    meta: strawberry.scalars.JSON | None
+    active: bool | None
+
+
+@strawberry.input  # type: ignore [misc]
 class AssayUpsertInput:
     """Assay upsert input"""
 
