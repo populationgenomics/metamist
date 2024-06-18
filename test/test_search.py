@@ -223,7 +223,7 @@ class TestSample(DbIsolatedTest):
         )
 
         all_results = await self.schlay.search(
-            query='X:', project_ids=[self.connection.project]
+            query='X:', project_ids=[self.connection.project_id]
         )
         self.assertEqual(3, len(all_results))
 
