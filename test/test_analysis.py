@@ -184,7 +184,7 @@ class TestAnalysis(DbIsolatedTest):
                 ParticipantUpsertInternal(
                     external_ids={PRIMARY_EXTERNAL_ORG: 'PEXT1'},
                     meta={},
-                    samples=[SampleUpsertInternal(id=self.sample_id)]
+                    samples=[SampleUpsertInternal(id=self.sample_id)],
                 ),
             ],
         )
