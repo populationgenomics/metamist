@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 import datetime
+import os
 import random
 from pathlib import Path
 from pprint import pprint
@@ -73,6 +74,14 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
     if project not in existing_projects:
         await papi.create_project_async(
             name=project, dataset=project, create_test_project=False
+        )
+        default_user = os.getenv('SM_LOCALONLY_DEFAULTUSER')
+
+        await papi.update_project_members_async(
+            project=project,
+            project_member_update=[
+                {'member': default_user, 'roles': ['reader', 'writer']}
+            ],
         )
 
     with open(ped_path, encoding='utf-8') as f:
