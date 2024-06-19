@@ -19,7 +19,7 @@ import {
     ProjectParticipantGridFilter,
     ProjectParticipantGridResponse,
 } from '../../sm-api'
-import { DictEditor } from './DictEditor'
+import { DictEditor, DictEditorInput } from './DictEditor'
 import {
     headerGroupOrder,
     metaSeachEntityPrefixToFilterKey,
@@ -81,7 +81,7 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
                         To filter the data, you can use the <FilterAltIcon /> button at the top of
                         each column.
                     </Message>
-                    <DictEditor input={filterValues} onChange={updateFilters} />
+                    <DictEditor input={filterValues as DictEditorInput} onChange={updateFilters} />
                     <br />
                     <Grid container divided>
                         {headerGroupOrder.map((headerGroup) => {

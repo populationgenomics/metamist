@@ -5,14 +5,14 @@ import { Button } from 'semantic-ui-react'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
 
 type InputValue = null | string | number | boolean | InputValue[] | { [key: string]: InputValue }
-type Input = { [key: string]: InputValue } | string
+export type DictEditorInput = { [key: string]: InputValue } | string
 
 interface DictEditorProps {
-    input: Input
+    input: DictEditorInput
     onChange: (json: object) => void
 }
 
-const getStringFromValue = (input: Input) => {
+const getStringFromValue = (input: DictEditorInput) => {
     // if it's a string, return it
     if (typeof input === 'string') {
         return input
