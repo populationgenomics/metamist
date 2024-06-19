@@ -4,6 +4,7 @@ from test.testbase import DbIsolatedTest, run_as_sync
 from db.python.filters import GenericFilter
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.assay import AssayLayer
+from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter
@@ -12,6 +13,7 @@ from models.models import (
     PRIMARY_EXTERNAL_ORG,
     AnalysisInternal,
     AssayUpsertInternal,
+    ParticipantUpsertInternal,
     SampleUpsertInternal,
     SequencingGroupUpsertInternal,
 )
@@ -19,6 +21,8 @@ from models.models import (
 
 class TestAnalysis(DbIsolatedTest):
     """Test sample class"""
+
+    # pylint: disable=too-many-instance-attributes
 
     @run_as_sync
     async def setUp(self) -> None:
@@ -28,6 +32,7 @@ class TestAnalysis(DbIsolatedTest):
         self.sgl = SequencingGroupLayer(self.connection)
         self.asl = AssayLayer(self.connection)
         self.al = AnalysisLayer(self.connection)
+        self.pl = ParticipantLayer(self.connection)
 
         sample = await self.sl.upsert_sample(
             SampleUpsertInternal(
@@ -167,3 +172,22 @@ class TestAnalysis(DbIsolatedTest):
         ]
 
         self.assertEqual(analyses, expected)
+
+    @run_as_sync
+    async def test_get_sample_cram_path_map_for_seqr(self):
+        """
+        Exercise get_sample_cram_path_map_for_seqr()
+        """
+
+        part = await self.pl.upsert_participants(
+            [
+                ParticipantUpsertInternal(
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'PEXT1'},
+                    meta={},
+                    samples=[SampleUpsertInternal(id=self.sample_id)],
+                ),
+            ],
+        )
+
+        id_map = await self.al.get_sample_cram_path_map_for_seqr(self.project_id, ['blood'], [part[0].id])
+        self.assertIsInstance(id_map, list)
