@@ -88,7 +88,7 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
                             return (
                                 <Segment
                                     key={`project-col-option-${headerGroup}`}
-                                    style={{ marginLeft: '10px' }}
+                                    style={{ width: '50%' }}
                                 >
                                     <CategoryColumnOptions
                                         category={headerGroup}
@@ -169,6 +169,7 @@ const CategoryColumnOptions: React.FC<{
             <table
                 style={{
                     border: 'none', // '1px solid black',
+                    width: '100%'
                 }}
             >
                 <tbody>

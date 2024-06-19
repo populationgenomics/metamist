@@ -188,7 +188,7 @@ export const ValueFilter: React.FC<IValueFilter> = ({
                         }))}
                     />
                 </Label>
-                <input />
+                <input style={{ width: 'auto' }} />
                 {isHighlighted && (
                     <Label style={{}}>
                         <IconButton
