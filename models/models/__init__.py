@@ -64,9 +64,4 @@ from models.models.sequencing_group import (
     SequencingGroupUpsert,
     SequencingGroupUpsertInternal,
 )
-from models.models.web import (
-    PagingLinks,
-    ProjectSummary,
-    ProjectSummaryInternal,
-    WebProject,
-)
+from models.models.web import ProjectSummary, ProjectSummaryInternal, WebProject

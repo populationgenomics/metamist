@@ -32,7 +32,6 @@ export const ProjectExportButton: React.FunctionComponent<{
     const [exportType, setExportType] = React.useState<ExportType>(ExportType.Csv)
     const [isDownloading, setIsDownloading] = React.useState(false)
     const [downloadError, setDownloadError] = React.useState<string | undefined>(undefined)
-    // const keys = Object.keys(headerGroups).reduce((prev, k) => ({...prev, k}), {})
 
     const download = (_exportType: ExportType) => {
         if (!_exportType) return
@@ -61,7 +60,10 @@ export const ProjectExportButton: React.FunctionComponent<{
                 document.body.appendChild(link)
                 link.click()
             })
-            .catch((er) => setDownloadError(er.message))
+            .catch((er) => {
+                setIsDownloading(false)
+                setDownloadError(er.message)
+            })
     }
 
     // onClick={() => download(ExportType.Csv)

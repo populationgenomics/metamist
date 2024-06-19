@@ -18,14 +18,6 @@ class WebProject(SMBase):
     meta: dict
 
 
-class PagingLinks(SMBase):
-    """Model for PAGING"""
-
-    current: str
-    next: str | None
-    token: str | None
-
-
 @dataclasses.dataclass
 class ProjectSummaryInternal:
     """Return class for the project summary endpoint"""

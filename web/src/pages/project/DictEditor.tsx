@@ -4,18 +4,22 @@ import * as React from 'react'
 import { Button } from 'semantic-ui-react'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
 
+type InputValue = null | string | number | boolean | InputValue[] | { [key: string]: InputValue }
+type Input = { [key: string]: InputValue } | string
+
 interface DictEditorProps {
-    jsonStr?: string
-    yamlStr?: string
-    obj?: any
+    input: Input
     onChange: (json: object) => void
 }
 
-const getStringFromValues = (obj?: any, jsonStr?: string, yamlString?: string) => {
-    if (obj) {
-        return yaml.dump(obj, { indent: 2 })
+const getStringFromValue = (input: Input) => {
+    // if it's a string, return it
+    if (typeof input === 'string') {
+        return input
     }
-    return jsonStr || yamlString || '\n'
+
+    // otherwise try to convert it to a string
+    return yaml.dump(input)
 }
 
 const parseString = (str: string) => {
@@ -34,22 +38,15 @@ const parseString = (str: string) => {
     }
 }
 
-export const DictEditor: React.FunctionComponent<DictEditorProps> = ({
-    jsonStr,
-    yamlStr,
-    obj,
-    onChange,
-}) => {
-    const [textValue, setInnerTextValue] = React.useState<string>(
-        getStringFromValues(obj, jsonStr, yamlStr)
-    )
+export const DictEditor: React.FunctionComponent<DictEditorProps> = ({ input, onChange }) => {
+    const [textValue, setInnerTextValue] = React.useState<string>(getStringFromValue(input))
     const theme = React.useContext(ThemeContext)
 
     const [error, setError] = React.useState<string | undefined>(undefined)
 
     React.useEffect(() => {
-        setInnerTextValue(getStringFromValues(obj, jsonStr, yamlStr))
-    }, [obj, jsonStr, yamlStr])
+        setInnerTextValue(getStringFromValue(input))
+    }, [input])
 
     const handleChange = (value: string) => {
         setInnerTextValue(value)
@@ -86,15 +83,6 @@ export const DictEditor: React.FunctionComponent<DictEditorProps> = ({
                     minimap: { enabled: false },
                     automaticLayout: true,
                 }}
-
-                // style={{
-                //     width: '100%',
-                //     height: '400px',
-                //     border: !!error ? '3px solid var(--color-border-red)' : '1px solid #ccc',
-                //     padding: '10px',
-                //     fontFamily:
-                //         'Consolas,Monaco,Lucida Console,Liberation Mono,DejaVu Sans Mono,Bitstream Vera Sans Mono,Courier New, monospace',
-                // }}
             />
             {error && (
                 <p>

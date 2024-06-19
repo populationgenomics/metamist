@@ -74,14 +74,14 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
                         <Message warning>
                             There are a high number of participants ({participantCount}), showing /
                             hiding columns may take a few seconds to process, and the UI might
-                            appear to freeze
+                            appear to freeze.
                         </Message>
                     )}
                     <Message info>
                         To filter the data, you can use the <FilterAltIcon /> button at the top of
                         each column.
                     </Message>
-                    <DictEditor obj={filterValues} onChange={updateFilters} />
+                    <DictEditor input={filterValues} onChange={updateFilters} />
                     <br />
                     <Grid container divided>
                         {headerGroupOrder.map((headerGroup) => {
@@ -138,11 +138,9 @@ const CategoryColumnOptions: React.FC<{
     }
 
     const start = (e: React.DragEvent<HTMLTableRowElement>) => {
-        console.log('start', e.target)
         setDraggedRowIndex(e.currentTarget.rowIndex)
     }
     const dragEnd = (e: React.DragEvent<HTMLTableRowElement>) => {
-        console.log('end', e.target)
         setDraggedRowIndex(null)
         if (tempFields === null) return
         updateFields(tempFields)

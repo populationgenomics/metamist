@@ -96,8 +96,6 @@ async def get_project_participants_grid_with_limit(
         wlayer.count_participants(pfilter),
     )
 
-    # then have to get all nested objects
-
     return ProjectParticipantGridResponse.from_params(
         participants=participants,
         total_results=pcount,
@@ -258,7 +256,6 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
     This searches the keyword, in families, participants + samples in the projects
     that you are a part of (automatically).
     """
-    # raise ValueError('Test')
     pt = ProjectPermissionsTable(connection)
     projects = await pt.get_projects_accessible_by_user(
         connection.author, readonly=True

@@ -64,7 +64,7 @@ export const ValueFilter: React.FC<IValueFilter> = ({
 }) => {
     // Use the combination of category and filterKey to turn that into the correct value
     // Note filterValues is a ParticipantGridFilter object, which has nested keys for each
-    // category (except participant).
+    // category.
     //
     // Nb: The server tells us the filterKey here, and for meta keys it is prefixed with 'meta.'
     //  So check if the filterKey starts with 'meta.' to determine if it is a meta key, and
@@ -80,7 +80,6 @@ export const ValueFilter: React.FC<IValueFilter> = ({
     // set name to the filterKey without the .meta prefix
     const name = field.filter_key.replace(/^meta\./, '')
 
-    // if we are filtering on the participant level, check the filterValues directly
     let optionsToCheck = props?.filterValues?.[category] || {}
 
     if (isMeta) {
@@ -213,9 +212,7 @@ export const ValueFilter: React.FC<IValueFilter> = ({
     return (
         <Form onSubmit={onSubmit}>
             <Form.Group inline style={{ padding: 0, margin: 0 }}>
-                <Form.Field style={{ padding: 0, margin: 0 }}></Form.Field>
                 {input}
-                {isHighlighted && <Form.Field style={{ padding: 0 }}></Form.Field>}
             </Form.Group>
         </Form>
     )

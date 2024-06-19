@@ -1,12 +1,26 @@
 import * as React from 'react'
 
-import _ from 'lodash'
-
+import { TableCell, TableRow } from 'semantic-ui-react'
 import FamilyLink from '../../shared/components/links/FamilyLink'
 import SampleLink from '../../shared/components/links/SampleLink'
 import SequencingGroupLink from '../../shared/components/links/SequencingGroupLink'
 import sanitiseValue from '../../shared/utilities/sanitiseValue'
-import { Assay, NestedParticipant, NestedSample, NestedSequencingGroup } from '../../sm-api/api'
+import {
+    Assay,
+    FamilySimple,
+    NestedParticipant,
+    NestedSample,
+    NestedSequencingGroup,
+    ProjectParticipantGridField,
+} from '../../sm-api/api'
+import { firstColBorder, otherColBorder } from './ProjectGridHeaderGroup'
+
+const getBorderStyles = (idx: number) => {
+    return {
+        borderBottom: otherColBorder,
+        borderLeft: idx === 0 ? firstColBorder : otherColBorder,
+    }
+}
 
 interface IProjectGridParticipantRowProps {
     projectName: string
@@ -44,8 +58,6 @@ const prepareExternalIds = (ids: Record<string, string>) => {
         .join(', ')
 }
 
-const border = '1px solid #dee2e6'
-
 const FamilyCells: React.FC<{
     fields: ProjectParticipantGridField[]
     participant: NestedParticipant
@@ -55,15 +67,11 @@ const FamilyCells: React.FC<{
 }> = ({ fields, participant, backgroundColor, projectName, participantRowSpan }) => (
     <>
         {fields.map((field) => (
-            <td
+            <TableCell
                 key={`${participant.id}family.${field.key}`}
                 style={{
-                    // display: field.is_visible ? 'table-cell' : 'none',
                     backgroundColor,
-                    borderRight: border,
-                    borderBottom: border,
-                    borderTop: border,
-                    borderLeft: '2px solid var(--color-border-color)',
+                    ...getBorderStyles(0),
                 }}
                 rowSpan={participantRowSpan}
             >
@@ -76,10 +84,10 @@ const FamilyCells: React.FC<{
                     </FamilyLink>
                 ) : (
                     participant.families
-                        .map((fam) => sanitiseValue(_.get(fam, field.key)))
+                        .map((fam) => sanitiseValue(fam[field.key as keyof FamilySimple]))
                         .join(', ')
                 )}
-            </td>
+            </TableCell>
         ))}
     </>
 )
@@ -93,25 +101,18 @@ const ParticipantCells: React.FC<{
 }> = ({ fields, participant, backgroundColor, projectName, participantRowSpan }) => (
     <>
         {fields.map((field, i) => (
-            <td
+            <TableCell
                 style={{
-                    // display: field.is_visible ? 'table-cell' : 'none',
                     backgroundColor,
-                    borderRight: border,
-                    borderBottom: border,
-                    borderTop: border,
-                    borderLeft:
-                        i === 0
-                            ? '2px solid var(--color-border-color)'
-                            : '1px solid var(--color-border-default)',
+                    ...getBorderStyles(i),
                 }}
                 key={`${participant.id}participant.${field.key}`}
                 rowSpan={participantRowSpan}
             >
                 {field.key == 'external_ids'
                     ? prepareExternalIds(participant.external_ids || {})
-                    : sanitiseValue(_.get(participant, field.key))}
-            </td>
+                    : sanitiseValue(participant[field.key as keyof NestedParticipant])}
+            </TableCell>
         ))}
     </>
 )
@@ -130,8 +131,6 @@ export const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProp
     const lengthOfParticipant = nRowsForParticipant(participant)
     // debugger
     const rows = participant.samples.flatMap((s, sidx) => {
-        // const border = '1px solid #dee2e6'
-
         const lengthOfSample = nRowsForSample(s)
 
         const participantRowSpan = lengthOfParticipant > 0 ? lengthOfParticipant : undefined
@@ -150,7 +149,7 @@ export const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProp
             return assays.map((assay, assayidx) => {
                 const isFirstOfGroup = sidx === 0 && sgidx === 0 && assayidx === 0
                 return (
-                    <tr key={`${participant.id}-${s.id}-${sg.id}-${assay.id}`} {...props}>
+                    <TableRow key={`${participant.id}-${s.id}-${sg.id}-${assay.id}`} {...props}>
                         {isFirstOfGroup && (
                             <>
                                 <FamilyCells
@@ -172,18 +171,10 @@ export const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProp
                         {sgidx === 0 &&
                             assayidx === 0 &&
                             sampleFields.map((field, i) => (
-                                <td
+                                <TableCell
                                     style={{
-                                        display: field.is_visible ? 'table-cell' : 'none',
                                         backgroundColor,
-                                        borderRight: border,
-                                        borderBottom: border,
-                                        borderTop: border,
-                                        borderLeft:
-                                            i === 0
-                                                ? '2px solid var(--color-border-color)'
-                                                : '1px solid var(--color-border-default)',
-                                        // border,
+                                        ...getBorderStyles(i),
                                     }}
                                     key={`${s.id}sample.${field.key}`}
                                     rowSpan={samplesRowSpan}
@@ -195,64 +186,45 @@ export const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProp
                                                 : s.id}
                                         </SampleLink>
                                     ) : (
-                                        sanitiseValue(_.get(s, field.key))
+                                        sanitiseValue(s[field.key as keyof NestedSample])
                                     )}
-                                </td>
+                                </TableCell>
                             ))}
                         {assayidx === 0 &&
                             sequencingGroupFields.map((field, i) => (
-                                <td
+                                <TableCell
                                     style={{
-                                        // display: field.is_visible ? 'table-cell' : 'none',
-                                        borderRight: border,
-                                        borderBottom: border,
-                                        borderTop: border,
-                                        borderLeft:
-                                            i === 0
-                                                ? '2px solid var(--color-border-color)'
-                                                : '1px solid var(--color-border-default)',
+                                        ...getBorderStyles(i),
                                         backgroundColor,
                                     }}
                                     key={`${s.id}sequencing_group.${field.key}`}
-                                    rowSpan={
-                                        (sg.assays ?? []).length > 0
-                                            ? (sg.assays ?? []).length
-                                            : undefined
-                                    }
+                                    rowSpan={sg.assays?.length || undefined}
                                 >
                                     {field.key === 'id' ? (
                                         <SequencingGroupLink
                                             projectName={projectName}
                                             id={s.id}
-                                            sg_id={_.get(sg, 'id')?.toString()}
+                                            sg_id={sg.id?.toString()}
                                         >
-                                            {sanitiseValue(_.get(sg, field.key))}
+                                            {sanitiseValue(sg.id)}
                                         </SequencingGroupLink>
                                     ) : (
-                                        sanitiseValue(_.get(sg, field.key))
+                                        sanitiseValue(sg[field.key as keyof NestedSequencingGroup])
                                     )}
-                                </td>
+                                </TableCell>
                             ))}
                         {assayFields.map((field, i) => (
-                            <td
+                            <TableCell
                                 style={{
-                                    // display: field.is_visible ? 'table-cell' : 'none',
                                     backgroundColor,
-                                    borderRight: border,
-                                    borderBottom: border,
-                                    borderTop: border,
-                                    borderLeft:
-                                        i === 0
-                                            ? '2px solid var(--color-border-color)'
-                                            : '1px solid var(--color-border-default)',
-                                    // border,
+                                    ...getBorderStyles(i),
                                 }}
                                 key={`${s.id}-assay.${field.key || field.label}`}
                             >
-                                {sanitiseValue(_.get(assay, field.key))}
-                            </td>
+                                {sanitiseValue(assay[field.key as keyof Assay])}
+                            </TableCell>
                         ))}
-                    </tr>
+                    </TableRow>
                 )
             })
         })

@@ -1,5 +1,10 @@
 import { MetaSearchEntityPrefix, ProjectParticipantGridFilter } from '../../sm-api'
 
+export const firstColBorderWidth = '2px'
+export const otherColBorderWidth = '1px'
+export const firstColBorder = `${firstColBorderWidth} solid var(--color-border-color)`
+export const otherColBorder = `${otherColBorderWidth} solid var(--color-border-default)`
+
 export const headerGroupOrder = [
     MetaSearchEntityPrefix.F,
     MetaSearchEntityPrefix.P,

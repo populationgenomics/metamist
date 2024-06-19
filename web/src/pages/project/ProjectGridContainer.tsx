@@ -54,10 +54,11 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
     const { page } = useParams()
 
     // parse pageSize
-    let pageSize = parseInt(searchParams.get('size') || '20')
+    const _pageSizeFromSearch = searchParams.get('size')
+    let pageSize = parseInt(_pageSizeFromSearch || '20')
     if (isNaN(pageSize)) {
         hasOptionErrors.pageSize = {
-            error: `Invalid page size ${pageSize}`,
+            error: `Invalid page size ${_pageSizeFromSearch}`,
             default: 20,
             value: pageSize,
         }
@@ -88,9 +89,7 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
     let filterOptions: ProjectParticipantGridFilter = {}
     const _filterOptions = searchParams.get('filter') || '{}'
     try {
-        if (_filterOptions) {
-            filterOptions = JSON.parse(_filterOptions)
-        }
+        filterOptions = JSON.parse(_filterOptions)
     } catch (e) {
         hasOptionErrors.filter = {
             error: `Error parsing filter options: ${_filterOptions}`,
@@ -113,7 +112,6 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
         setError(undefined)
         setIsLoading(true)
         const skip = pageNumber > 1 ? (pageNumber - 1) * pageSize : undefined
-        console.log('Making request')
         // return
         return new WebApi()
             .getProjectParticipantsGridWithLimit(projectName, pageSize, filterOptions, skip)
@@ -155,7 +153,7 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
             headerGroups={headerGroups}
             setHeaderGroups={setHeaderGroups}
             filterValues={filterOptions}
-            updateFilters={(values) => setFilterValues(values, true)}
+            updateFilters={(values) => setFilterValues(values)}
             participantCount={participants?.participants?.length ?? 0}
             isOpen={projectColOptionsAreOpen}
             setIsOpen={setProjectColOptionsAreOpen}
@@ -202,8 +200,8 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
                 </Message.List>
                 {hasOptionErrors.filter && (
                     <DictEditor
-                        jsonStr={hasOptionErrors.filter.value}
-                        onChange={(v) => setFilterValues(v, true)}
+                        input={hasOptionErrors.filter.value}
+                        onChange={(v) => setFilterValues(v)}
                     />
                 )}
 
