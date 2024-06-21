@@ -17,10 +17,10 @@ class AssayMutations:
         """Create new assay, attached to a sample"""
         # TODO: Reconfigure connection permissions as per `routes`
         connection = info.context['connection']
-        seq_table = AssayLayer(connection)
+        assay_layer = AssayLayer(connection)
         return AssayUpsertType.from_upsert_internal(
-            await seq_table.upsert_assay(
-                AssayUpsertInternal.from_dict(strawberry.asdict(assay))
+            await assay_layer.upsert_assay(
+                AssayUpsertInternal.from_db(strawberry.asdict(assay))
             )
         )
 
@@ -38,7 +38,7 @@ class AssayMutations:
         connection = info.context['connection']
         assay_layer = AssayLayer(connection)
         await assay_layer.upsert_assay(
-            AssayUpsertInternal.from_dict(strawberry.asdict(assay))
+            AssayUpsertInternal.from_db(strawberry.asdict(assay))
         )
 
         return assay.id

@@ -1,7 +1,7 @@
 import strawberry
 from strawberry.types import Info
 
-from api.graphql.types import CustomJSON, FamilyUpdateInput
+from api.graphql.types import FamilyUpdateInput
 from db.python.layers.family import FamilyLayer
 
 
@@ -14,18 +14,14 @@ class FamilyMutations:
         self,
         family: FamilyUpdateInput,
         info: Info,
-    ) -> CustomJSON:
+    ) -> bool:
         """Update information for a single family"""
         # TODO: Reconfigure connection permissions as per `routes`
         connection = info.context['connection']
         family_layer = FamilyLayer(connection)
-        return CustomJSON(
-            {
-                'success': await family_layer.update_family(
-                    id_=family.id,
-                    external_id=family.external_id,
-                    description=family.description,
-                    coded_phenotype=family.coded_phenotype,
-                )
-            }
+        return await family_layer.update_family(
+            id_=family.id,
+            external_id=family.external_id,
+            description=family.description,
+            coded_phenotype=family.coded_phenotype,
         )

@@ -29,7 +29,7 @@ class AnalysisMutations:
             raise ValueError('Must specify "sequencing_group_ids" or "cohort_ids"')
 
         analysis_id = await atable.create_analysis(
-            AnalysisInternal.from_dict(strawberry.asdict(analysis)),
+            AnalysisInternal.from_db(**strawberry.asdict(analysis)),
         )
 
         return analysis_id

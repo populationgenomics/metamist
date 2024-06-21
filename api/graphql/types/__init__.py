@@ -351,7 +351,7 @@ class NewCohortType:
         )
 
 
-@strawberry.type
+@strawberry.input
 class CohortTemplateInput:
     """Cohort template input"""
 

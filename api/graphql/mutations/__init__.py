@@ -3,6 +3,7 @@ import strawberry
 from api.graphql.mutations.analysis import AnalysisMutations
 from api.graphql.mutations.analysis_runner import AnalysisRunnerMutations
 from api.graphql.mutations.assay import AssayMutations
+from api.graphql.mutations.cohort import CohortMutations
 from api.graphql.mutations.family import FamilyMutations
 from api.graphql.mutations.participant import ParticipantMutations
 from api.graphql.mutations.project import ProjectMutations
@@ -61,3 +62,9 @@ class Mutation:
     def analysis_runner(self) -> AnalysisRunnerMutations:
         """Analysis Runner mutations"""
         return AnalysisRunnerMutations()
+
+    # Cohort
+    @strawberry.field
+    def cohort(self) -> CohortMutations:
+        """Cohort mutations"""
+        return CohortMutations()

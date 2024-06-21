@@ -54,6 +54,24 @@ class AssayUpsertInternal(SMBase):
     sample_id: int | None = None
     meta: dict | None = None
 
+    @staticmethod
+    def from_db(d: dict):
+        """Take dictionary and return AssayUpsertInternal"""
+
+        # Sample ID may be left blank + passed in during the parsers
+        _sample_id = None
+        if d.get('sample_id'):
+            # but may be provided directly when inserting directly
+            _sample_id = sample_id_transform_to_raw(d.get('sample_id'))  # type: ignore
+
+        return AssayUpsertInternal(
+            id=d.get('id'),  # type: ignore
+            type=d.get('type'),  # type: ignore
+            external_ids=d.get('external_ids'),  # type: ignore
+            sample_id=_sample_id,  # type: ignore
+            meta=d.get('meta'),  # type: ignore
+        )
+
     def to_external(self):
         """Convert to external model"""
         return AssayUpsert(
