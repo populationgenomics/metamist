@@ -169,7 +169,7 @@ const CategoryColumnOptions: React.FC<{
             <table
                 style={{
                     border: 'none', // '1px solid black',
-                    width: '100%'
+                    width: '100%',
                 }}
             >
                 <tbody>
