@@ -7,10 +7,10 @@ from api.graphql.types import (
     CohortTemplateInput,
     NewCohortType,
 )
+from db.python.connect import Connection
 from db.python.layers.cohort import CohortLayer
-from db.python.tables.project import ProjectPermissionsTable
 from models.models.cohort import CohortCriteria, CohortTemplate
-from models.models.project import ProjectId
+from models.models.project import ProjectId, ProjectMemberRole, ReadAccessRoles
 from models.utils.cohort_template_id_format import (
     cohort_template_id_format,
     cohort_template_id_transform_to_raw,
@@ -32,8 +32,10 @@ class CohortMutations:
         """
         Create a cohort with the given name and sample/sequencing group IDs.
         """
-        # TODO: Reconfigure connection permissions as per `routes`
-        connection = info.context['connection']
+        connection: Connection = info.context['connection']
+        connection.check_access(
+            {ProjectMemberRole.writer, ProjectMemberRole.contributor}
+        )
         cohort_layer = CohortLayer(connection)
 
         if not connection.project:
@@ -46,24 +48,21 @@ class CohortMutations:
 
         internal_project_ids: list[ProjectId] = []
 
-        if cohort_criteria:
-            if cohort_criteria.projects:
-                pt = ProjectPermissionsTable(connection)
-                projects = await pt.get_and_check_access_to_projects_for_names(
-                    user=connection.author,
-                    project_names=cohort_criteria.projects,
-                    readonly=True,
-                )
-                if projects:
-                    internal_project_ids = [p.id for p in projects if p.id]
+        if cohort_criteria and cohort_criteria.projects:
+            projects = connection.get_and_check_access_to_projects_for_names(
+                project_names=cohort_criteria.projects, allowed_roles=ReadAccessRoles
+            )
+
+            internal_project_ids = [p.id for p in projects if p.id]
 
         template_id_raw = (
             cohort_template_id_transform_to_raw(cohort_spec.template_id)
             if cohort_spec.template_id
             else None
         )
+        assert connection.project_id
         cohort_output = await cohort_layer.create_cohort_from_criteria(
-            project_to_write=connection.project,
+            project_to_write=connection.project_id,
             description=cohort_spec.description,
             cohort_name=cohort_spec.name,
             dry_run=dry_run,
@@ -88,8 +87,10 @@ class CohortMutations:
         """
         Create a cohort template with the given name and sample/sequencing group IDs.
         """
-        # TODO: Reconfigure connection permissions as per `routes`
-        connection = info.context['connection']
+        connection: Connection = info.context['connection']
+        connection.check_access(
+            {ProjectMemberRole.writer, ProjectMemberRole.contributor}
+        )
         cohort_layer = CohortLayer(connection)
 
         if not connection.project:
@@ -98,23 +99,23 @@ class CohortMutations:
         criteria_project_ids: list[ProjectId] = []
 
         if template.criteria.projects:
-            pt = ProjectPermissionsTable(connection)
-            projects_for_criteria = await pt.get_and_check_access_to_projects_for_names(
-                user=connection.author,
-                project_names=template.criteria.projects,
-                readonly=False,
+            projects_for_criteria = (
+                connection.get_and_check_access_to_projects_for_names(
+                    project_names=template.criteria.projects,
+                    allowed_roles=ReadAccessRoles,
+                )
             )
-            if projects_for_criteria:
-                criteria_project_ids = [p.id for p in projects_for_criteria if p.id]
+            criteria_project_ids = [p.id for p in projects_for_criteria if p.id]
 
+        assert connection.project_id
         cohort_raw_id = await cohort_layer.create_cohort_template(
             cohort_template=CohortTemplate.from_dict(
                 strawberry.asdict(template)
             ).to_internal(
                 criteria_projects=criteria_project_ids,
-                template_project=connection.project,
+                template_project=connection.project_id,
             ),
-            project=connection.project,
+            project=connection.project_id,
         )
 
         return cohort_template_id_format(cohort_raw_id)

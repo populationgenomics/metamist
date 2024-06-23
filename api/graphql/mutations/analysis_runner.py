@@ -3,6 +3,7 @@ import datetime
 import strawberry
 from strawberry.types import Info
 
+from db.python.connect import Connection
 from db.python.layers.analysis_runner import AnalysisRunnerLayer
 from models.models.analysis_runner import AnalysisRunnerInternal
 
@@ -33,7 +34,7 @@ class AnalysisRunnerMutations:
     ) -> str:
         """Create a new analysis runner log"""
         # TODO Reconfigure connection permissions as per `routes`
-        connection = info.context['connection']
+        connection: Connection = info.context['connection']
         alayer = AnalysisRunnerLayer(connection)
 
         if not connection.project:
@@ -56,7 +57,7 @@ class AnalysisRunnerMutations:
                 batch_url=batch_url,
                 submitting_user=submitting_user,
                 meta=meta,
-                project=connection.project,
+                project=connection.project.id,
                 audit_log_id=None,
                 output_path=output_path,
             )

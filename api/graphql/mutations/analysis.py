@@ -2,8 +2,10 @@ import strawberry
 from strawberry.types import Info
 
 from api.graphql.types import AnalysisInput, AnalysisUpdateInput
+from db.python.connect import Connection
 from db.python.layers.analysis import AnalysisLayer
-from models.models.analysis import AnalysisInternal
+from models.models import AnalysisInternal
+from models.models.project import FullWriteAccessRoles
 
 
 @strawberry.type
@@ -17,8 +19,10 @@ class AnalysisMutations:
         info: Info,
     ) -> int:
         """Create a new analysis"""
-        # TODO: Reconfigure connection permissions as per `routes`
-        connection = info.context['connection']
+        connection: Connection = info.context['connection']
+        connection.get_and_check_access_to_projects_for_ids(
+            project_ids=[analysis.project], allowed_roles=FullWriteAccessRoles
+        )
         atable = AnalysisLayer(connection)
 
         if analysis.author:
@@ -42,7 +46,6 @@ class AnalysisMutations:
         info: Info,
     ) -> bool:
         """Update status of analysis"""
-        # TODO: Reconfigure connection permissions as per `routes`
         connection = info.context['connection']
         atable = AnalysisLayer(connection)
         await atable.update_analysis(

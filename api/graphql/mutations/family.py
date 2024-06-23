@@ -16,7 +16,6 @@ class FamilyMutations:
         info: Info,
     ) -> bool:
         """Update information for a single family"""
-        # TODO: Reconfigure connection permissions as per `routes`
         connection = info.context['connection']
         family_layer = FamilyLayer(connection)
         return await family_layer.update_family(

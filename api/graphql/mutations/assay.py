@@ -15,7 +15,6 @@ class AssayMutations:
         self, assay: AssayUpsertInput, info: Info
     ) -> AssayUpsertType:
         """Create new assay, attached to a sample"""
-        # TODO: Reconfigure connection permissions as per `routes`
         connection = info.context['connection']
         assay_layer = AssayLayer(connection)
         return AssayUpsertType.from_upsert_internal(
@@ -31,8 +30,6 @@ class AssayMutations:
         info: Info,
     ) -> int:
         """Update assay for ID"""
-        # TODO: Reconfigure connection permissions as per `routes`
-
         if not assay.id:
             raise ValueError('Assay must have an ID to update')
         connection = info.context['connection']

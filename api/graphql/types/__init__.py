@@ -29,6 +29,14 @@ AnalysisStatusType = strawberry.enum(AnalysisStatus)
 
 
 @strawberry.input
+class ProjectMemberUpdateInput:
+    """Project member update input"""
+
+    member: str
+    roles: list[str]
+
+
+@strawberry.input
 class AnalysisInput:
     """Analysis input"""
 
@@ -40,7 +48,7 @@ class AnalysisInput:
     cohort_ids: list[str] | None
     author: str | None
     timestamp_completed: str | None
-    project: int | None
+    project: int
     active: bool | None
     meta: strawberry.scalars.JSON
 
@@ -164,13 +172,13 @@ class SequencingGroupUpsertType:
 class SampleUpsertInput:
     """Sample upsert input"""
 
-    id: str | None
-    external_id: str | None
-    meta: strawberry.scalars.JSON | None
-    project: int | None
-    type: str | None
-    participant_id: int | None
-    active: bool | None
+    id: str | None = None
+    external_ids: strawberry.scalars.JSON | None = None
+    meta: strawberry.scalars.JSON | None = None
+    project: int | None = None
+    type: str | None = None
+    participant_id: int | None = None
+    active: bool | None = None
     sequencing_groups: list[SequencingGroupUpsertInput] | None = None
     non_sequencing_assays: list[AssayUpsertInput] | None = None
 
@@ -180,7 +188,7 @@ class SampleUpsertType:
     """Sample upsert type"""
 
     id: str | None
-    external_id: str | None
+    external_ids: strawberry.scalars.JSON | None
     meta: strawberry.scalars.JSON | None
     project: int | None
     type: str | None
@@ -198,7 +206,7 @@ class SampleUpsertType:
 
         return SampleUpsertType(
             id=_id,
-            external_id=sample.external_id,
+            external_ids=sample.external_ids,
             meta=sample.meta,
             project=sample.project,
             type=sample.type,
@@ -232,7 +240,7 @@ class ParticipantUpsertInput:
     """Participant upsert input"""
 
     id: int | None = None
-    external_id: str = None
+    external_ids: strawberry.scalars.JSON | None = None
     reported_sex: int | None = None
     reported_gender: str | None = None
     karyotype: str | None = None
@@ -246,7 +254,7 @@ class ParticipantUpsertType:
     """Participant upsert input"""
 
     id: int | None = None
-    external_id: str = None
+    external_ids: strawberry.scalars.JSON | None = None
     reported_sex: int | None = None
     reported_gender: str | None = None
     karyotype: str | None = None
@@ -261,7 +269,7 @@ class ParticipantUpsertType:
         """Returns graphql model from upsert internal model"""
         return ParticipantUpsertType(
             id=internal.id,
-            external_id=internal.external_id,
+            external_ids=internal.external_ids,
             meta=internal.meta,
             reported_sex=internal.reported_sex,
             reported_gender=internal.reported_gender,

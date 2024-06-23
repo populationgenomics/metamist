@@ -7,8 +7,10 @@ from api.graphql.types import (
     ParticipantUpsertType,
     UpdateParticipantFamilyType,
 )
+from db.python.connect import Connection
 from db.python.layers.participant import ParticipantLayer
 from models.models.participant import ParticipantUpsertInternal
+from models.models.project import FullWriteAccessRoles
 
 
 @strawberry.type
@@ -25,7 +27,8 @@ class ParticipantMutations:
         for each sample within a project, useful for then importing a pedigree
         """
         # TODO: Reconfigure connection permissions as per `routes``
-        connection = info.context['connection']
+        connection: Connection = info.context['connection']
+        connection.check_access(FullWriteAccessRoles)
         participant_layer = ParticipantLayer(connection)
 
         return CustomJSON(
@@ -39,7 +42,6 @@ class ParticipantMutations:
         info: Info,
     ) -> bool:
         """Update external_ids of participants by providing an update map"""
-        # TODO: Reconfigure connection permissions as per `routes``
         connection = info.context['connection']
         player = ParticipantLayer(connection)
         return await player.update_many_participant_external_ids(
@@ -54,7 +56,6 @@ class ParticipantMutations:
         info: Info,
     ) -> ParticipantUpsertType:
         """Update Participant Data"""
-        # TODO: Reconfigure connection permissions as per `routes``
         connection = info.context['connection']
         participant_layer = ParticipantLayer(connection)
 
@@ -76,8 +77,9 @@ class ParticipantMutations:
         Upserts a list of participants with samples and sequences
         Returns the list of internal sample IDs
         """
-        # TODO: Reconfigure connection permissions as per `routes`
-        connection = info.context['connection']
+        # TODO Reconfigure connection permissions as per `routes`
+        connection: Connection = info.context['connection']
+        connection.check_access(FullWriteAccessRoles)
         pt = ParticipantLayer(connection)
         results = await pt.upsert_participants(
             [
@@ -100,7 +102,6 @@ class ParticipantMutations:
         to new_family_id, maintaining all other fields.
         The new_family_id must already exist.
         """
-        # TODO: Reconfigure connection permissions as per `routes`
         connection = info.context['connection']
         player = ParticipantLayer(connection)
 

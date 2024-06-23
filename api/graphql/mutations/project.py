@@ -1,8 +1,15 @@
 import strawberry
+from graphql import GraphQLError
 from strawberry.types import Info
 
-from api.graphql.types import CustomJSON
+from api.graphql.types import CustomJSON, ProjectMemberUpdateInput
+from db.python.connect import Connection
 from db.python.tables.project import ProjectPermissionsTable
+from models.models.project import (
+    ProjectMemberRole,
+    ProjectMemberUpdate,
+    updatable_project_member_role_names,
+)
 
 
 @strawberry.type
@@ -21,8 +28,11 @@ class ProjectMutations:
         Create a new project
         """
         # TODO: Reconfigure connection permissions as per `routes``
-        connection = info.context['connection']
+        connection: Connection = info.context['connection']
         ptable = ProjectPermissionsTable(connection)
+
+        await ptable.check_project_creator_permissions(author=connection.author)
+
         pid = await ptable.create_project(
             project_name=name,
             dataset_name=dataset,
@@ -58,7 +68,6 @@ class ProjectMutations:
     @strawberry.mutation
     async def delete_project_data(
         self,
-        project: str,
         delete_project: bool,
         info: Info,
     ) -> CustomJSON:
@@ -66,13 +75,22 @@ class ProjectMutations:
         Delete all data in a project by project name.
         """
         # TODO: Reconfigure connection permissions as per `routes``
-        connection = info.context['connection']
+        connection: Connection = info.context['connection']
         ptable = ProjectPermissionsTable(connection)
-        p_obj = await ptable.get_and_check_access_to_project_for_name(
-            user=connection.author, project_name=project, readonly=False
+        assert connection.project
+
+        # Allow data manager role to delete test projects
+        data_manager_deleting_test = (
+            connection.project.is_test
+            and connection.project.roles & {ProjectMemberRole.data_manager}
         )
+        if not data_manager_deleting_test:
+            # Otherwise, deleting a project additionally requires the project creator permission
+            await ptable.check_project_creator_permissions(author=connection.author)
+
         success = await ptable.delete_project_data(
-            project_id=p_obj.id, delete_project=delete_project, author=connection.author
+            project_id=connection.project.id,
+            delete_project=delete_project,
         )
 
         return CustomJSON({'success': success})
@@ -80,9 +98,7 @@ class ProjectMutations:
     @strawberry.mutation
     async def update_project_members(
         self,
-        project: str,
-        members: list[str],
-        readonly: bool,
+        members: list[ProjectMemberUpdateInput],
         info: Info,
     ) -> CustomJSON:
         """
@@ -90,12 +106,25 @@ class ProjectMutations:
         Not that this is protected by access to a specific access group
         """
         # TODO: Reconfigure connection permissions as per `routes``
-        connection = info.context['connection']
+        connection: Connection = info.context['connection']
+        connection.check_access({ProjectMemberRole.project_member_admin})
         ptable = ProjectPermissionsTable(connection)
-        await ptable.set_group_members(
-            group_name=ptable.get_project_group_name(project, readonly=readonly),
-            members=members,
-            author=connection.author,
+
+        await ptable.check_member_admin_permissions(author=connection.author)
+
+        for member in members:
+            for role in member.roles:
+                if role not in updatable_project_member_role_names:
+                    raise GraphQLError(
+                        f'Role {role} is not valid for member {member.member}'
+                    )
+        member_objs = [
+            ProjectMemberUpdate.from_dict(strawberry.asdict(member))
+            for member in members
+        ]
+        assert connection.project
+        await ptable.set_project_members(
+            project=connection.project, members=member_objs
         )
 
         return CustomJSON({'success': True})
