@@ -794,20 +794,18 @@ class GraphQLMutationsTest(DbIsolatedTest):
 
         query = gql(
             """
-        mutation UpdateProjectMembers($project: String!, $members: [ProjectMemberUpdateInput!]!, $readonly: Boolean!) {
+        mutation UpdateProjectMembers($members: [ProjectMemberUpdateInput!]!) {
           project {
-            updateProjectMembers(project: $project, members: $members, readonly: $readonly)
+            updateProjectMembers(members: $members)
           }
         }
         """
         )
         variables = {
-            'project': 'Test Project',
             'members': [
                 {'member': 'member1', 'roles': ['reader', 'writer']},
                 {'member': 'member2', 'roles': ['contributor']},
             ],
-            'readonly': True,
         }
         response = await self.run_graphql_query_async(query, variables=variables)
         assert response
