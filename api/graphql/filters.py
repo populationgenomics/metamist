@@ -82,9 +82,6 @@ class GraphQLFilter(Generic[T]):
         )
 
 
-GraphQLAnalysisStatus = strawberry.enum(AnalysisStatus)
-
-
 # The below concrete types are specified individually because there is a performance
 # issue in strawberry graphql where the usage of generics in input types causes major
 # slowdowns.
@@ -134,8 +131,11 @@ class GraphQLFilterBool(GraphQLFilter[bool]):
     icontains: bool | None = None
 
 
+GraphQLAnalysisStatus = strawberry.enum(AnalysisStatus)
+
+
 @strawberry.input(description='Analysis status filter for GraphQL queries')
-class GraphQLFilterAnalysisStatus(GraphQLFilter[AnalysisStatus]):
+class GraphQLFilterAnalysisStatus(GraphQLFilter[GraphQLAnalysisStatus]):
     """Analysis status filter for GraphQL queries"""
 
     eq: AnalysisStatus | None = None
