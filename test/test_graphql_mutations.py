@@ -1,16 +1,20 @@
+# pylint: disable=too-many-lines
 from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
+from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.project import (
     GROUP_NAME_MEMBERS_ADMIN,
     GROUP_NAME_PROJECT_CREATORS,
 )
 from metamist.graphql import gql
 from models.base import PRIMARY_EXTERNAL_ORG
+from models.models.assay import AssayUpsertInternal
 from models.models.participant import ParticipantUpsertInternal
 from models.models.sample import SampleUpsertInternal
+from models.models.sequencing_group import SequencingGroupUpsertInternal
 
 default_sequencing_meta = {
     'sequencing_type': 'genome',
@@ -29,6 +33,7 @@ class GraphQLMutationsTest(DbIsolatedTest):
         self.slayer = SampleLayer(self.connection)
         self.flayer = FamilyLayer(self.connection)
         self.player = ParticipantLayer(self.connection)
+        self.sglayer = SequencingGroupLayer(self.connection)
 
     # AnalysisRunnerMutations
     @run_as_sync
@@ -811,3 +816,295 @@ class GraphQLMutationsTest(DbIsolatedTest):
         assert response
         updated_members = response['project']['updateProjectMembers']
         self.assertEqual(updated_members['success'], True)
+
+    # SampleMutations
+    @run_as_sync
+    async def test_create_sample(self):
+        """Test createSample mutation"""
+        query = gql(
+            """
+        mutation CreateSample($sample: SampleUpsertInput!) {
+          sample {
+            createSample(sample: $sample) {
+              id
+              externalIds
+              type
+              meta
+            }
+          }
+        }
+        """
+        )
+        variables = {
+            'sample': {
+                'id': None,
+                'externalIds': {
+                    PRIMARY_EXTERNAL_ORG: 'P1',
+                    'CONTROL': '86',
+                    'KAOS': 'shoe',
+                },
+                'type': 'blood',
+                'meta': {**default_sequencing_meta},
+            }
+        }
+        response = await self.run_graphql_query_async(query, variables=variables)
+        assert response
+        created_sample = response['sample']['createSample']
+        self.assertIsInstance(created_sample['id'], str)
+        self.assertEqual(
+            created_sample['externalIds'],
+            {
+                PRIMARY_EXTERNAL_ORG: 'P1',
+                'CONTROL': '86',
+                'KAOS': 'shoe',
+            },
+        )
+        self.assertEqual(created_sample['type'], 'blood')
+        self.assertDictEqual(created_sample['meta'], default_sequencing_meta)
+
+    @run_as_sync
+    async def test_upsert_samples(self):
+        """Test upsertSamples mutation"""
+        query = gql(
+            """
+        mutation UpsertSamples($samples: [SampleUpsertInput!]!) {
+          sample {
+            upsertSamples(samples: $samples) {
+              id
+              externalIds
+              type
+              meta
+            }
+          }
+        }
+        """
+        )
+        variables = {
+            'samples': [
+                {
+                    'id': None,
+                    'externalIds': {
+                        PRIMARY_EXTERNAL_ORG: 'P1',
+                        'CONTROL': '86',
+                        'KAOS': 'shoe',
+                    },
+                    'type': 'blood',
+                    'meta': {**default_sequencing_meta},
+                },
+                {
+                    'id': None,
+                    'externalIds': {
+                        PRIMARY_EXTERNAL_ORG: 'P2',
+                        'CONTROL': '90',
+                        'KAOS': 'fish',
+                    },
+                    'type': 'saliva',
+                    'meta': {**default_sequencing_meta},
+                },
+            ]
+        }
+        response = await self.run_graphql_query_async(query, variables=variables)
+        assert response
+        upserted_samples = response['sample']['upsertSamples']
+        self.assertEqual(len(upserted_samples), 2)
+
+        # Validate first sample
+        sample_1 = upserted_samples[0]
+        self.assertIsInstance(sample_1['id'], str)
+        self.assertEqual(
+            sample_1['externalIds'],
+            {
+                PRIMARY_EXTERNAL_ORG: 'P1',
+                'CONTROL': '86',
+                'KAOS': 'shoe',
+            },
+        )
+        self.assertEqual(sample_1['type'], 'blood')
+        self.assertDictEqual(sample_1['meta'], default_sequencing_meta)
+
+        # Validate second sample
+        sample_2 = upserted_samples[1]
+        self.assertIsInstance(sample_2['id'], str)
+        self.assertEqual(
+            sample_2['externalIds'],
+            {
+                PRIMARY_EXTERNAL_ORG: 'P2',
+                'CONTROL': '90',
+                'KAOS': 'fish',
+            },
+        )
+        self.assertEqual(sample_2['type'], 'saliva')
+        self.assertDictEqual(sample_2['meta'], default_sequencing_meta)
+
+    @run_as_sync
+    async def test_update_sample(self):
+        """Test updateSample mutation"""
+        sample = await self.slayer.upsert_sample(
+            SampleUpsertInternal(
+                external_ids={
+                    PRIMARY_EXTERNAL_ORG: 'P1',
+                    'CONTROL': '86',
+                    'KAOS': 'shoe',
+                },
+                type='blood',
+                meta={'sampleKey': 'sampleValue'},
+            )
+        )
+
+        query = gql(
+            """
+        mutation UpdateSample($sampleId: Int!, $sample: SampleUpsertInput!) {
+          sample {
+            updateSample(sampleId: $sampleId, sample: $sample) {
+              id
+              externalIds
+              type
+              meta
+            }
+          }
+        }
+        """
+        )
+        variables = {
+            'sampleId': sample.id,
+            'sample': {
+                'externalIds': {
+                    PRIMARY_EXTERNAL_ORG: 'P1B',
+                    'CONTROL': '90',
+                    'KAOS': 'kiwi',
+                },
+                'type': 'saliva',
+                'meta': {'sampleKey': 'sampleValue'},
+            },
+        }
+        response = await self.run_graphql_query_async(query, variables=variables)
+        assert response
+        updated_sample = response['sample']['updateSample']
+        self.assertEqual(updated_sample['id'], sample.to_external().id)
+        self.assertEqual(
+            updated_sample['externalIds'],
+            {
+                PRIMARY_EXTERNAL_ORG: 'P1B',
+                'CONTROL': '90',
+                'KAOS': 'kiwi',
+            },
+        )
+        self.assertEqual(updated_sample['type'], 'saliva')
+        self.assertDictEqual(updated_sample['meta'], {'sampleKey': 'sampleValue'})
+
+    # @run_as_sync
+    # async def test_merge_samples(self):
+    #     """Test mergeSamples mutation"""
+    #     sample1 = (
+    #         await self.slayer.upsert_sample(
+    #             SampleUpsertInternal(
+    #                 external_ids={
+    #                     PRIMARY_EXTERNAL_ORG: 'P1',
+    #                     'CONTROL': '86',
+    #                     'KAOS': 'shoe',
+    #                 },
+    #                 type='blood',
+    #                 meta={'sampleKey': 'sampleValue'},
+    #             )
+    #         )
+    #     ).to_external()
+    #     sample2 = (
+    #         await self.slayer.upsert_sample(
+    #             SampleUpsertInternal(
+    #                 external_ids={
+    #                     PRIMARY_EXTERNAL_ORG: 'P2',
+    #                     'CONTROL': '90',
+    #                     'KAOS': 'fish',
+    #                 },
+    #                 type='saliva',
+    #                 meta={'sampleKey': 'sampleValue2'},
+    #             )
+    #         )
+    #     ).to_external()
+
+    #     query = gql(
+    #         '''
+    #     mutation MergeSamples($idKeep: String!, $idMerge: String!) {
+    #       sample {
+    #         mergeSamples(idKeep: $idKeep, idMerge: $idMerge) {
+    #           id
+    #           externalId
+    #           meta
+    #           type
+    #         }
+    #       }
+    #     }
+    #     '''
+    #     )
+    #     variables = {
+    #         'idKeep': sample1.id,
+    #         'idMerge': sample2.id,
+    #     }
+    #     response = await self.run_graphql_query_async(query, variables=variables)
+    #     assert response
+    #     merged_sample = response['sample']['mergeSamples']
+    #     self.assertEqual(merged_sample['id'], sample1.id)
+    #     self.assertEqual(merged_sample['externalId'], 'P2')
+    #     self.assertEqual(merged_sample['meta'], {'sampleKey': 'sampleValue2'})
+    #     self.assertEqual(merged_sample['type'], 'saliva')
+
+    # SequencingGroupMutations
+    @run_as_sync
+    async def test_update_sequencing_group(self):
+        """Test updateSequencingGroup mutation"""
+        sample = (
+            await self.slayer.upsert_sample(
+                SampleUpsertInternal(
+                    external_ids={
+                        PRIMARY_EXTERNAL_ORG: 'P1',
+                        'CONTROL': '86',
+                        'KAOS': 'shoe',
+                    },
+                    type='blood',
+                    meta={'sampleKey': 'sampleValue'},
+                    sequencing_groups=[
+                        SequencingGroupUpsertInternal(
+                            type='genome',
+                            technology='short-read',
+                            platform='ILLUMINA',
+                            meta={
+                                'meta-key': 'meta-value',
+                            },
+                            external_ids={},
+                            assays=[
+                                AssayUpsertInternal(
+                                    type='sequencing',
+                                    external_ids={},
+                                    meta={
+                                        **default_sequencing_meta,
+                                    },
+                                )
+                            ],
+                        )
+                    ],
+                )
+            )
+        ).to_external()
+        query = gql(
+            """
+        mutation UpdateSequencingGroup($sequencingGroupId: String!, $sequencingGroup: JSON!) {
+          sequencingGroups {
+            updateSequencingGroup(sequencingGroupId: $sequencingGroupId, sequencingGroup: $sequencingGroup)
+          }
+        }
+        """
+        )
+
+        assert sample.sequencing_groups
+        variables = {
+            'sequencingGroupId': sample.sequencing_groups[0].id,
+            'sequencingGroup': {
+                'type': 'genome',
+                'technology': 'short-read',
+                'platform': 'pacbio',
+            },
+        }
+        response = await self.run_graphql_query_async(query, variables=variables)
+        assert response
+        updated_sequencing_group = response['sequencingGroups']['updateSequencingGroup']
+        self.assertEqual(updated_sequencing_group, True)

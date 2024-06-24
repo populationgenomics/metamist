@@ -7,7 +7,7 @@ from typing_extensions import Annotated
 from api.graphql.types import SampleUpsertInput, SampleUpsertType
 from db.python.layers.sample import SampleLayer
 from models.models.sample import SampleUpsertInternal
-from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
+from models.utils.sample_id_format import sample_id_transform_to_raw
 
 if TYPE_CHECKING:
     from ..schema import GraphQLSample
@@ -24,14 +24,14 @@ class SampleMutations:
         self,
         sample: SampleUpsertInput,
         info: Info,
-    ) -> str | None:
+    ) -> SampleUpsertType | None:
         """Creates a new sample, and returns the internal sample ID"""
         connection = info.context['connection']
         st = SampleLayer(connection)
         sample_upsert = SampleUpsertInternal.from_dict(strawberry.asdict(sample))
         internal_sid = await st.upsert_sample(sample_upsert)
         if internal_sid.id:
-            return sample_id_format(internal_sid.id)
+            return SampleUpsertType.from_upsert_internal(internal_sid)
         return None
 
     @strawberry.mutation
@@ -60,7 +60,7 @@ class SampleMutations:
     @strawberry.mutation
     async def update_sample(
         self,
-        id_: str,
+        sample_id: int,
         sample: SampleUpsertInput,
         info: Info,
     ) -> SampleUpsertType | None:
@@ -68,7 +68,7 @@ class SampleMutations:
         # TODO: Reconfigure connection permissions as per `routes`
         connection = info.context['connection']
         st = SampleLayer(connection)
-        sample.id = id_
+        sample.id = sample_id
         upserted = await st.upsert_sample(
             SampleUpsertInternal.from_dict(strawberry.asdict(sample))
         )

@@ -172,7 +172,7 @@ class SequencingGroupUpsertType:
 class SampleUpsertInput:
     """Sample upsert input"""
 
-    id: str | None = None
+    id: int | None = None
     external_ids: strawberry.scalars.JSON | None = None
     meta: strawberry.scalars.JSON | None = None
     project: int | None = None
