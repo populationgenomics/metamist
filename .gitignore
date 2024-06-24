@@ -61,3 +61,6 @@ web/src/__generated__
 
 # pulumi config files
 Pulumi*.yaml
+
+# performance profile files
+profiles

@@ -421,3 +421,12 @@ The deploy github action builds the container, and is deployed.
 Additionally you can access metamist through the identity-aware proxy (IAP),
 which handles the authentication through OAuth, allowing you to access the
 front-end.
+
+
+## Performance Profiling
+
+If you are working on performance issues it can be handy to generate a report that shows which bits of code are taking most of the time. The api server has pyinstrument profiling support that can be turned on by setting  the environment variable `SM_PROFILE_REQUESTS` to `true`.
+
+There are a few different options for outputting profiles which can be specified in the `SM_PROFILE_REQUESTS_OUTPUT` environment variable. The possible values are `text` which will print the profiling results to stdout, `html` which will generate an interactive pyinstrument report, or `json` which will generate a json profiling report which can be dropped into [speedscope](https://www.speedscope.app/) to explore the profile.
+
+You can output multiple report types by specifying the types in a list like: `export SM_PROFILE_REQUESTS_OUTPUT=json,text,html` 
