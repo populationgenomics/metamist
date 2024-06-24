@@ -1,8 +1,10 @@
+import datetime
 from typing import Callable, Generic, TypeVar
 
 import strawberry
 
 from db.python.utils import GenericFilter, GenericMetaFilter
+from models.enums.analysis import AnalysisStatus
 
 T = TypeVar('T')
 Y = TypeVar('Y')
@@ -26,7 +28,7 @@ class GraphQLFilter(Generic[T]):
         """
         Get all values used anywhere in a filter, useful for getting values to map later
         """
-        v = []
+        v: list[T] = []
         if self.eq:
             v.append(self.eq)
         if self.in_:
@@ -78,6 +80,91 @@ class GraphQLFilter(Generic[T]):
             contains=f(self.contains) if self.contains else None,
             icontains=f(self.icontains) if self.icontains else None,
         )
+
+
+GraphQLAnalysisStatus = strawberry.enum(AnalysisStatus)
+
+
+# The below concrete types are specified individually because there is a performance
+# issue in strawberry graphql where the usage of generics in input types causes major
+# slowdowns.
+# @see https://github.com/strawberry-graphql/strawberry/issues/3544
+@strawberry.input(description='Filter for GraphQL queries')
+class GraphQLFilterStr(GraphQLFilter[str]):
+    eq: str | None = None
+    in_: list[str] | None = None
+    nin: list[str] | None = None
+    gt: str | None = None
+    gte: str | None = None
+    lt: str | None = None
+    lte: str | None = None
+    contains: str | None = None
+    icontains: str | None = None
+
+
+@strawberry.input(description='Filter for GraphQL queries')
+class GraphQLFilterInt(GraphQLFilter[int]):
+    eq: int | None = None
+    in_: list[int] | None = None
+    nin: list[int] | None = None
+    gt: int | None = None
+    gte: int | None = None
+    lt: int | None = None
+    lte: int | None = None
+    contains: int | None = None
+    icontains: int | None = None
+
+
+@strawberry.input(description='Filter for GraphQL queries')
+class GraphQLFilterBool(GraphQLFilter[bool]):
+    eq: bool | None = None
+    in_: list[bool] | None = None
+    nin: list[bool] | None = None
+    gt: bool | None = None
+    gte: bool | None = None
+    lt: bool | None = None
+    lte: bool | None = None
+    contains: bool | None = None
+    icontains: bool | None = None
+
+
+@strawberry.input(description='Filter for GraphQL queries')
+class GraphQLFilterAnalysisStatus(GraphQLFilter[AnalysisStatus]):
+    eq: AnalysisStatus | None = None
+    in_: list[AnalysisStatus] | None = None
+    nin: list[AnalysisStatus] | None = None
+    gt: AnalysisStatus | None = None
+    gte: AnalysisStatus | None = None
+    lt: AnalysisStatus | None = None
+    lte: AnalysisStatus | None = None
+    contains: AnalysisStatus | None = None
+    icontains: AnalysisStatus | None = None
+
+
+@strawberry.input(description='Filter for GraphQL queries')
+class GraphQLFilterDatetime(GraphQLFilter[datetime.datetime]):
+    eq: datetime.datetime | None = None
+    in_: list[datetime.datetime] | None = None
+    nin: list[datetime.datetime] | None = None
+    gt: datetime.datetime | None = None
+    gte: datetime.datetime | None = None
+    lt: datetime.datetime | None = None
+    lte: datetime.datetime | None = None
+    contains: datetime.datetime | None = None
+    icontains: datetime.datetime | None = None
+
+
+@strawberry.input(description='Filter for GraphQL queries')
+class GraphQLFilterDate(GraphQLFilter[datetime.date]):
+    eq: datetime.date | None = None
+    in_: list[datetime.date] | None = None
+    nin: list[datetime.date] | None = None
+    gt: datetime.date | None = None
+    gte: datetime.date | None = None
+    lt: datetime.date | None = None
+    lte: datetime.date | None = None
+    contains: datetime.date | None = None
+    icontains: datetime.date | None = None
 
 
 GraphQLMetaFilter = strawberry.scalars.JSON

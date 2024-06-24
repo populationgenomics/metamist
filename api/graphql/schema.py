@@ -14,7 +14,12 @@ from strawberry.fastapi import GraphQLRouter
 from strawberry.types import Info
 
 from api.graphql.filters import (
-    GraphQLFilter,
+    GraphQLFilterAnalysisStatus,
+    GraphQLFilterBool,
+    GraphQLFilterDate,
+    GraphQLFilterDatetime,
+    GraphQLFilterInt,
+    GraphQLFilterStr,
     GraphQLMetaFilter,
     graphql_meta_filter_to_internal_filter,
 )
@@ -88,8 +93,6 @@ for enum in enum_tables.__dict__.values():
 
 
 GraphQLEnum = strawberry.type(type('GraphQLEnum', (object,), enum_methods))
-
-GraphQLAnalysisStatus = strawberry.enum(AnalysisStatus)
 
 
 @strawberry.experimental.pydantic.type(model=OurDNALostSample, all_fields=True)  # type: ignore
@@ -250,11 +253,11 @@ class GraphQLProject:
         self,
         info: Info,
         root: 'Project',
-        ar_guid: GraphQLFilter[str] | None = None,
-        author: GraphQLFilter[str] | None = None,
-        repository: GraphQLFilter[str] | None = None,
-        access_level: GraphQLFilter[str] | None = None,
-        environment: GraphQLFilter[str] | None = None,
+        ar_guid: GraphQLFilterStr | None = None,
+        author: GraphQLFilterStr | None = None,
+        repository: GraphQLFilterStr | None = None,
+        access_level: GraphQLFilterStr | None = None,
+        environment: GraphQLFilterStr | None = None,
     ) -> list['GraphQLAnalysisRunner']:
         connection = info.context['connection']
         alayer = AnalysisRunnerLayer(connection)
@@ -314,8 +317,8 @@ class GraphQLProject:
         self,
         info: Info,
         root: 'GraphQLProject',
-        id: GraphQLFilter[int] | None = None,
-        external_id: GraphQLFilter[str] | None = None,
+        id: GraphQLFilterInt | None = None,
+        external_id: GraphQLFilterStr | None = None,
     ) -> list['GraphQLFamily']:
         # don't need a data loader here as we're presuming we're not often running
         # the "families" method for many projects at once. If so, we might need to fix that
@@ -342,9 +345,9 @@ class GraphQLProject:
         self,
         info: Info,
         root: 'GraphQLProject',
-        type: GraphQLFilter[str] | None = None,
-        external_id: GraphQLFilter[str] | None = None,
-        id: GraphQLFilter[str] | None = None,
+        type: GraphQLFilterStr | None = None,
+        external_id: GraphQLFilterStr | None = None,
+        id: GraphQLFilterStr | None = None,
         meta: GraphQLMetaFilter | None = None,
     ) -> list['GraphQLSample']:
         loader = info.context[LoaderKeys.SAMPLES_FOR_PROJECTS]
@@ -362,12 +365,12 @@ class GraphQLProject:
         self,
         info: Info,
         root: 'GraphQLProject',
-        id: GraphQLFilter[str] | None = None,
-        external_id: GraphQLFilter[str] | None = None,
-        type: GraphQLFilter[str] | None = None,
-        technology: GraphQLFilter[str] | None = None,
-        platform: GraphQLFilter[str] | None = None,
-        active_only: GraphQLFilter[bool] | None = None,
+        id: GraphQLFilterStr | None = None,
+        external_id: GraphQLFilterStr | None = None,
+        type: GraphQLFilterStr | None = None,
+        technology: GraphQLFilterStr | None = None,
+        platform: GraphQLFilterStr | None = None,
+        active_only: GraphQLFilterBool | None = None,
     ) -> list['GraphQLSequencingGroup']:
         loader = info.context[LoaderKeys.SEQUENCING_GROUPS_FOR_PROJECTS]
         filter_ = SequencingGroupFilter(
@@ -394,12 +397,12 @@ class GraphQLProject:
         self,
         info: Info,
         root: 'Project',
-        type: GraphQLFilter[str] | None = None,
-        status: GraphQLFilter[GraphQLAnalysisStatus] | None = None,
-        active: GraphQLFilter[bool] | None = None,
+        type: GraphQLFilterStr | None = None,
+        status: GraphQLFilterAnalysisStatus | None = None,
+        active: GraphQLFilterBool | None = None,
         meta: GraphQLMetaFilter | None = None,
-        timestamp_completed: GraphQLFilter[datetime.datetime] | None = None,
-        ids: GraphQLFilter[int] | None = None,
+        timestamp_completed: GraphQLFilterDatetime | None = None,
+        ids: GraphQLFilterInt | None = None,
     ) -> list['GraphQLAnalysis']:
         connection = info.context['connection']
         connection.project = root.id
@@ -429,11 +432,11 @@ class GraphQLProject:
         self,
         info: Info,
         root: 'Project',
-        id: GraphQLFilter[str] | None = None,
-        name: GraphQLFilter[str] | None = None,
-        author: GraphQLFilter[str] | None = None,
-        template_id: GraphQLFilter[str] | None = None,
-        timestamp: GraphQLFilter[datetime.datetime] | None = None,
+        id: GraphQLFilterStr | None = None,
+        name: GraphQLFilterStr | None = None,
+        author: GraphQLFilterStr | None = None,
+        template_id: GraphQLFilterStr | None = None,
+        timestamp: GraphQLFilterDatetime | None = None,
     ) -> list['GraphQLCohort']:
         connection = info.context['connection']
         connection.project = root.id
@@ -651,9 +654,9 @@ class GraphQLParticipant:
         self,
         info: Info,
         root: 'GraphQLParticipant',
-        type: GraphQLFilter[str] | None = None,
+        type: GraphQLFilterStr | None = None,
         meta: GraphQLMetaFilter | None = None,
-        active: GraphQLFilter[bool] | None = None,
+        active: GraphQLFilterBool | None = None,
     ) -> list['GraphQLSample']:
         filter_ = SampleFilter(
             type=type.to_internal_filter() if type else None,
@@ -751,7 +754,7 @@ class GraphQLSample:
         self,
         info: Info,
         root: 'GraphQLSample',
-        type: GraphQLFilter[str] | None = None,
+        type: GraphQLFilterStr | None = None,
         meta: GraphQLMetaFilter | None = None,
     ) -> list['GraphQLAssay']:
         loader_assays_for_sample_ids = info.context[LoaderKeys.ASSAYS_FOR_SAMPLES]
@@ -774,12 +777,12 @@ class GraphQLSample:
         self,
         info: Info,
         root: 'GraphQLSample',
-        id: GraphQLFilter[str] | None = None,
-        type: GraphQLFilter[str] | None = None,
-        technology: GraphQLFilter[str] | None = None,
-        platform: GraphQLFilter[str] | None = None,
+        id: GraphQLFilterStr | None = None,
+        type: GraphQLFilterStr | None = None,
+        technology: GraphQLFilterStr | None = None,
+        platform: GraphQLFilterStr | None = None,
         meta: GraphQLMetaFilter | None = None,
-        active_only: GraphQLFilter[bool] | None = None,
+        active_only: GraphQLFilterBool | None = None,
     ) -> list['GraphQLSequencingGroup']:
         loader = info.context[LoaderKeys.SEQUENCING_GROUPS_FOR_SAMPLES]
 
@@ -847,11 +850,11 @@ class GraphQLSequencingGroup:
         self,
         info: Info,
         root: 'GraphQLSequencingGroup',
-        status: GraphQLFilter[GraphQLAnalysisStatus] | None = None,
-        type: GraphQLFilter[str] | None = None,
+        status: GraphQLFilterAnalysisStatus | None = None,
+        type: GraphQLFilterStr | None = None,
         meta: GraphQLMetaFilter | None = None,
-        active: GraphQLFilter[bool] | None = None,
-        project: GraphQLFilter[str] | None = None,
+        active: GraphQLFilterBool | None = None,
+        project: GraphQLFilterStr | None = None,
     ) -> list[GraphQLAnalysis]:
         connection = info.context['connection']
         loader = info.context[LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS]
@@ -997,8 +1000,8 @@ class Query:  # entry point to graphql.
     async def cohort_templates(
         self,
         info: Info,
-        id: GraphQLFilter[str] | None = None,
-        project: GraphQLFilter[str] | None = None,
+        id: GraphQLFilterStr | None = None,
+        project: GraphQLFilterStr | None = None,
     ) -> list[GraphQLCohortTemplate]:
         connection = info.context['connection']
         cohort_layer = CohortLayer(connection)
@@ -1046,11 +1049,11 @@ class Query:  # entry point to graphql.
     async def cohorts(
         self,
         info: Info,
-        id: GraphQLFilter[str] | None = None,
-        project: GraphQLFilter[str] | None = None,
-        name: GraphQLFilter[str] | None = None,
-        author: GraphQLFilter[str] | None = None,
-        template_id: GraphQLFilter[str] | None = None,
+        id: GraphQLFilterStr | None = None,
+        project: GraphQLFilterStr | None = None,
+        name: GraphQLFilterStr | None = None,
+        author: GraphQLFilterStr | None = None,
+        template_id: GraphQLFilterStr | None = None,
     ) -> list[GraphQLCohort]:
         connection = info.context['connection']
         cohort_layer = CohortLayer(connection)
@@ -1098,13 +1101,13 @@ class Query:  # entry point to graphql.
     async def sample(
         self,
         info: Info,
-        id: GraphQLFilter[str] | None = None,
-        project: GraphQLFilter[str] | None = None,
-        type: GraphQLFilter[str] | None = None,
+        id: GraphQLFilterStr | None = None,
+        project: GraphQLFilterStr | None = None,
+        type: GraphQLFilterStr | None = None,
         meta: GraphQLMetaFilter | None = None,
-        external_id: GraphQLFilter[str] | None = None,
-        participant_id: GraphQLFilter[int] | None = None,
-        active: GraphQLFilter[bool] | None = None,
+        external_id: GraphQLFilterStr | None = None,
+        participant_id: GraphQLFilterInt | None = None,
+        active: GraphQLFilterBool | None = None,
     ) -> list[GraphQLSample]:
         connection = info.context['connection']
         ptable = ProjectPermissionsTable(connection)
@@ -1148,14 +1151,14 @@ class Query:  # entry point to graphql.
     async def sequencing_groups(
         self,
         info: Info,
-        id: GraphQLFilter[str] | None = None,
-        project: GraphQLFilter[str] | None = None,
-        sample_id: GraphQLFilter[str] | None = None,
-        type: GraphQLFilter[str] | None = None,
-        technology: GraphQLFilter[str] | None = None,
-        platform: GraphQLFilter[str] | None = None,
-        active_only: GraphQLFilter[bool] | None = None,
-        created_on: GraphQLFilter[datetime.date] | None = None,
+        id: GraphQLFilterStr | None = None,
+        project: GraphQLFilterStr | None = None,
+        sample_id: GraphQLFilterStr | None = None,
+        type: GraphQLFilterStr | None = None,
+        technology: GraphQLFilterStr | None = None,
+        platform: GraphQLFilterStr | None = None,
+        active_only: GraphQLFilterBool | None = None,
+        created_on: GraphQLFilterDate | None = None,
         assay_meta: GraphQLMetaFilter | None = None,
         has_cram: bool | None = None,
         has_gvcf: bool | None = None,
@@ -1254,7 +1257,9 @@ class Query:  # entry point to graphql.
 
 
 schema = strawberry.Schema(
-    query=Query, mutation=None, extensions=[QueryDepthLimiter(max_depth=10)]
+    query=Query,
+    mutation=None,
+    extensions=[QueryDepthLimiter(max_depth=10)],
 )
 MetamistGraphQLRouter: GraphQLRouter = GraphQLRouter(
     schema, graphiql=True, context_getter=get_context
