@@ -89,8 +89,10 @@ GraphQLAnalysisStatus = strawberry.enum(AnalysisStatus)
 # issue in strawberry graphql where the usage of generics in input types causes major
 # slowdowns.
 # @see https://github.com/strawberry-graphql/strawberry/issues/3544
-@strawberry.input(description='Filter for GraphQL queries')
+@strawberry.input(description='String filter for GraphQL queries')
 class GraphQLFilterStr(GraphQLFilter[str]):
+    """String filter for GraphQL queries"""
+
     eq: str | None = None
     in_: list[str] | None = None
     nin: list[str] | None = None
@@ -102,8 +104,10 @@ class GraphQLFilterStr(GraphQLFilter[str]):
     icontains: str | None = None
 
 
-@strawberry.input(description='Filter for GraphQL queries')
+@strawberry.input(description='Int filter for GraphQL queries')
 class GraphQLFilterInt(GraphQLFilter[int]):
+    """Int filter for GraphQL queries"""
+
     eq: int | None = None
     in_: list[int] | None = None
     nin: list[int] | None = None
@@ -115,8 +119,10 @@ class GraphQLFilterInt(GraphQLFilter[int]):
     icontains: int | None = None
 
 
-@strawberry.input(description='Filter for GraphQL queries')
+@strawberry.input(description='Bool filter for GraphQL queries')
 class GraphQLFilterBool(GraphQLFilter[bool]):
+    """Bool filter for GraphQL queries"""
+
     eq: bool | None = None
     in_: list[bool] | None = None
     nin: list[bool] | None = None
@@ -128,8 +134,10 @@ class GraphQLFilterBool(GraphQLFilter[bool]):
     icontains: bool | None = None
 
 
-@strawberry.input(description='Filter for GraphQL queries')
+@strawberry.input(description='Analysis status filter for GraphQL queries')
 class GraphQLFilterAnalysisStatus(GraphQLFilter[AnalysisStatus]):
+    """Analysis status filter for GraphQL queries"""
+
     eq: AnalysisStatus | None = None
     in_: list[AnalysisStatus] | None = None
     nin: list[AnalysisStatus] | None = None
@@ -141,8 +149,10 @@ class GraphQLFilterAnalysisStatus(GraphQLFilter[AnalysisStatus]):
     icontains: AnalysisStatus | None = None
 
 
-@strawberry.input(description='Filter for GraphQL queries')
+@strawberry.input(description='Datetime filter for GraphQL queries')
 class GraphQLFilterDatetime(GraphQLFilter[datetime.datetime]):
+    """Datetime filter for GraphQL queries"""
+
     eq: datetime.datetime | None = None
     in_: list[datetime.datetime] | None = None
     nin: list[datetime.datetime] | None = None
@@ -154,8 +164,10 @@ class GraphQLFilterDatetime(GraphQLFilter[datetime.datetime]):
     icontains: datetime.datetime | None = None
 
 
-@strawberry.input(description='Filter for GraphQL queries')
+@strawberry.input(description='Date filter for GraphQL queries')
 class GraphQLFilterDate(GraphQLFilter[datetime.date]):
+    """Date filter for GraphQL queries"""
+
     eq: datetime.date | None = None
     in_: list[datetime.date] | None = None
     nin: list[datetime.date] | None = None

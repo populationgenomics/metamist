@@ -59,15 +59,16 @@ if PROFILE_REQUESTS:
     from pyinstrument import Profiler
     from pyinstrument.renderers.speedscope import SpeedscopeRenderer
 
-    @app.middleware("http")
+    @app.middleware('http')
     async def profile_request(request: Request, call_next):
-        profiler = Profiler(async_mode="enabled")
+        """Middleware to allow profiling of requests to the api"""
+        profiler = Profiler(async_mode='enabled')
         profiler.start()
         resp = await call_next(request)
         profiler.stop()
 
-        text_output = profiler.output_text()
         if 'text' in PROFILE_REQUESTS_OUTPUT:
+            text_output = profiler.output_text()
             print(text_output)
 
         timestamp = datetime.datetime.now().replace(microsecond=0).isoformat()
