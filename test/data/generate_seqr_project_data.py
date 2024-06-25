@@ -458,9 +458,9 @@ async def main():
             default_user = os.getenv('SM_LOCALONLY_DEFAULTUSER')
             if not default_user:
                 print(
-                    "SM_LOCALONLY_DEFAULTUSER env var is not set, please set it before generating data"
+                    'SM_LOCALONLY_DEFAULTUSER env var is not set, please set it before generating data'
                 )
-                exit(1)
+                sys.exit(1)
 
             await papi.update_project_members_async(
                 project=project,
