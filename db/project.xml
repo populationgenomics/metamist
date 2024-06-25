@@ -1429,7 +1429,7 @@
 					references="project(id)" />
 			</column>
 			<column name="member" type="VARCHAR(255)"></column>
-			<column name="role" type="ENUM('reader', 'writer', 'contributor', 'data_manager')">
+			<column name="role" type="ENUM('reader', 'writer', 'contributor', 'project_admin', 'project_member_admin')">
 				<constraints nullable="false" />
 			</column>
 			<column name="audit_log_id" type="INT">

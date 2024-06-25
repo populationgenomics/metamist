@@ -14,29 +14,22 @@ ProjectMemberRole = Enum(
         'reader',
         'contributor',
         'writer',
-        'data_manager',
         'project_admin',
         'project_member_admin',
     ],
 )
 
 
-AdminRoles = {ProjectMemberRole.project_admin, ProjectMemberRole.project_member_admin}
 # These roles have read access to a project
 ReadAccessRoles = {
     ProjectMemberRole.reader,
     ProjectMemberRole.contributor,
     ProjectMemberRole.writer,
-    ProjectMemberRole.data_manager,
 }
 
 # Only write has full write access
 FullWriteAccessRoles = {ProjectMemberRole.writer}
-
 project_member_role_names = [r.name for r in ProjectMemberRole]
-updatable_project_member_role_names = [
-    r.name for r in ProjectMemberRole if r not in AdminRoles
-]
 
 
 class Project(SMBase):
@@ -48,15 +41,6 @@ class Project(SMBase):
     meta: Optional[dict[str, Any]] = None
     roles: set[ProjectMemberRole]
     """The roles that the current user has within the project"""
-
-    @property
-    def is_test(self):
-        """
-        Checks whether this is a test project. Comparing to the dataset is safer than
-        just checking whether the name ends with -test, just in case we have a non-test
-        project that happens to end with -test
-        """
-        return self.name == f'{self.dataset}-test'
 
     @field_serializer('roles')
     def serialize_roles(self, roles: set[ProjectMemberRole]):

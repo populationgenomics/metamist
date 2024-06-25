@@ -12,7 +12,7 @@ from models.models.project import (
     ProjectMemberRole,
     ProjectMemberUpdate,
     ReadAccessRoles,
-    updatable_project_member_role_names,
+    project_member_role_names,
 )
 
 router = APIRouter(prefix='/project', tags=['project'])
@@ -94,7 +94,7 @@ async def update_project(
 async def delete_project_data(
     delete_project: bool = False,
     connection: Connection = get_project_db_connection(
-        {ProjectMemberRole.project_admin, ProjectMemberRole.data_manager}
+        {ProjectMemberRole.project_admin}
     ),
 ):
     """
@@ -105,17 +105,6 @@ async def delete_project_data(
     ptable = ProjectPermissionsTable(connection)
 
     assert connection.project
-
-    # Allow data manager role to delete test projects
-    data_manager_deleting_test = (
-        connection.project.is_test
-        and connection.project.roles & {ProjectMemberRole.data_manager}
-    )
-    if not data_manager_deleting_test:
-        # Otherwise, deleting a project additionally requires the project creator permission
-        connection.check_access_to_projects_for_ids(
-            [connection.project.id], allowed_roles={ProjectMemberRole.project_admin}
-        )
 
     success = await ptable.delete_project_data(
         project_id=connection.project.id,
@@ -140,7 +129,7 @@ async def update_project_members(
 
     for member in members:
         for role in member.roles:
-            if role not in updatable_project_member_role_names:
+            if role not in project_member_role_names:
                 raise HTTPException(
                     400, f'Role {role} is not valid for member {member.member}'
                 )
