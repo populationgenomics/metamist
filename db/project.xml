@@ -1432,6 +1432,7 @@
 					nullable="true"
 					foreignKeyName="FK_SAMPLE_ROOT_SAMPLE"
 					references="sample(id)"
+					onDelete="SET NULL"
 				/>
 			</column>
 			<column
@@ -1442,6 +1443,7 @@
 					nullable="true"
 					foreignKeyName="FK_SAMPLE_PARENT_SAMPLE"
 					references="sample(id)"
+					onDelete="SET NULL"
 				/>
 			</column>
 
