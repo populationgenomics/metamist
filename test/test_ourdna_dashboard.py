@@ -64,6 +64,17 @@ class OurDNADashboardTest(DbIsolatedTest):
                             },
                             type='ebld',
                             active=True,
+                            nested_samples=[
+                                # add a random sample here to test it's not collected
+                                SampleUpsertInternal(
+                                    external_ids={PRIMARY_EXTERNAL_ORG: 'Test01-01'},
+                                    type="blood",
+                                    meta={
+                                        # something wild
+                                        'collection-time': '1999-01-01 12:34:56',
+                                    },
+                                )
+                            ],
                         )
                     ],
                 ),

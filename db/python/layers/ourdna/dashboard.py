@@ -169,9 +169,9 @@ class OurDnaDashboardLayer(BaseLayer):
         s, participants = await asyncio.gather(
             self.sample_layer.query(
                 filter_=SampleFilter(
-                    # Added `ebld` filtering temporarily to prevent duplicate rows
                     project=GenericFilter(eq=project_id),
-                    type=GenericFilter(eq='ebld'),
+                    # Get the top level samples only
+                    sample_root_id=GenericFilter(isnull=True),
                 )
             ),
             self.participant_layer.get_participants(project=project_id),
