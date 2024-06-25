@@ -54,6 +54,7 @@ class GenericFilter(SMBase, Generic[T]):
     contains: T | None = None
     icontains: T | None = None
     startswith: T | None = None
+    isnull: bool | None = None
 
     def __repr__(self):
         keys = [
@@ -68,6 +69,7 @@ class GenericFilter(SMBase, Generic[T]):
             'contains',
             'icontains',
             'startswith',
+            'isnull',
         ]
         inner_values = ', '.join(
             f'{k}={getattr(self, k)!r}' for k in keys if getattr(self, k) is not None
@@ -90,6 +92,7 @@ class GenericFilter(SMBase, Generic[T]):
                 self.contains,
                 self.icontains,
                 self.startswith,
+                self.isnull,
             )
         )
 
@@ -196,7 +199,12 @@ class GenericFilter(SMBase, Generic[T]):
             search_term = escape_like_term(str(self.startswith))
             k = self.generate_field_name(column + '_startswith')
             conditionals.append(f'{column} LIKE :{k}')
-            values[k] = self._sql_value_prep(search_term + '%')
+            values[k] = self._sql_value_prep(escape_like_term(search_term) + '%')
+        if self.isnull is not None:
+            if self.isnull:
+                conditionals.append(f'{column} IS NULL')
+            else:
+                conditionals.append(f'{column} IS NOT NULL')
 
         return ' AND '.join(conditionals), values
 

@@ -1,5 +1,5 @@
 import datetime
-from typing import Any
+from typing import Any, NamedTuple
 
 from api.utils import group_by
 from db.python.filters import GenericFilter
@@ -218,7 +218,9 @@ class SampleLayer(BaseLayer):
     async def upsert_sample(
         self,
         sample: SampleUpsertInternal,
-        project: ProjectId = None,
+        sample_parent_id: int | None = None,
+        sample_root_id: int | None = None,
+        project: ProjectId | None = None,
         process_sequencing_groups: bool = True,
         process_assays: bool = True,
         open_transaction: bool = True,
@@ -227,7 +229,7 @@ class SampleLayer(BaseLayer):
         with_function = (
             self.connection.connection.transaction if open_transaction else NoOpAenter
         )
-
+        # safely ignore nested samples here
         async with with_function():
             if not sample.id:
                 sample.id = await self.st.insert_sample(
@@ -237,6 +239,8 @@ class SampleLayer(BaseLayer):
                     meta=sample.meta,
                     participant_id=sample.participant_id,
                     project=project,
+                    sample_parent_id=sample_parent_id,
+                    sample_root_id=sample_root_id,
                 )
             else:
                 # Otherwise update
@@ -247,6 +251,9 @@ class SampleLayer(BaseLayer):
                     participant_id=sample.participant_id,
                     type_=sample.type,
                     active=sample.active,
+                    # think about these more carefully
+                    # sample_parent_id=sample_parent_id,
+                    # sample_root_id=sample_root_id,
                 )
 
             if sample.sequencing_groups:
@@ -292,9 +299,11 @@ class SampleLayer(BaseLayer):
 
         async with with_function():
             # Create or update samples
-            for sample in samples:
+            for r in self.unwrap_nested_samples(samples):
                 await self.upsert_sample(
-                    sample,
+                    r.sample,
+                    sample_root_id=r.root.id if r.root else None,
+                    sample_parent_id=r.parent.id if r.parent else None,
                     project=project,
                     process_sequencing_groups=False,
                     process_assays=False,
@@ -318,6 +327,83 @@ class SampleLayer(BaseLayer):
                 await alayer.upsert_assays(assays, open_transaction=False)
 
         return samples
+
+    class UnwrappedSample(NamedTuple):
+        """
+        When we unwrap the nested samples, we store the root and parent to insert later
+        """
+
+        root: SampleUpsertInternal | None
+        parent: SampleUpsertInternal | None
+        sample: SampleUpsertInternal
+
+    class SampleUnwrapMaxDepthError(Exception):
+        """Error for when we exceed the user-set max-depth"""
+
+    @staticmethod
+    def unwrap_nested_samples(
+        samples: list[SampleUpsertInternal], max_depth=10
+    ) -> list[UnwrappedSample]:
+        """
+        We only insert one by one, so we don't need to do anything too crazy, just pull
+        out the insert order, keeping reference to the root, and parent.
+
+        Just keep a soft limit on the depth, as we don't want to go too deep.
+
+        NB: Opting for a non-recursive approach here, as I'm a bit afraid of recursive
+            Python after a weird Hail Batch thing, and sounded like a nightmare to debug
+        """
+
+        retval: list[SampleLayer.UnwrappedSample] = []
+
+        seen_samples = {id(s) for s in samples}
+
+        rounds: list[
+            list[
+                tuple[
+                    SampleUpsertInternal | None,
+                    SampleUpsertInternal | None,
+                    list[SampleUpsertInternal],
+                ]
+            ]
+        ] = [[(None, None, samples)]]
+
+        round_idx = 0
+        while round_idx < len(rounds):
+            prev_round = rounds[round_idx]
+            new_round = []
+            round_idx += 1
+            print(f'Round idx is now {round_idx}')
+            for root, parent, nested_samples in prev_round:
+
+                for sample in nested_samples:
+                    retval.append(
+                        SampleLayer.UnwrappedSample(
+                            root=root, parent=parent, sample=sample
+                        )
+                    )
+                    if not sample.nested_samples:
+                        continue
+
+                    # do the seen check
+                    for s in sample.nested_samples:
+                        if id(s) in seen_samples:
+                            raise ValueError(
+                                f'Sample sample was seen in the list ({s})'
+                            )
+                        seen_samples.add(id(s))
+                    new_round.append((root or sample, sample, sample.nested_samples))
+
+            if new_round:
+                if round_idx >= max_depth:
+                    parents = ', '.join(str(s) for _, s, _ in new_round)
+                    raise SampleLayer.SampleUnwrapMaxDepthError(
+                        f'Exceeded max depth of {max_depth} for nested samples. '
+                        f'Parents: {parents}'
+                    )
+                rounds.append(new_round)
+
+        return retval
 
     async def merge_samples(
         self,

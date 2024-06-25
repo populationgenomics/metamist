@@ -159,6 +159,7 @@ class ProjectParticipantGridResponse(SMBase):
         sample_meta_keys: set[str] = set()
         sg_meta_keys: set[str] = set()
         assay_meta_keys: set[str] = set()
+        has_nested_samples = False
 
         if filter_fields.family and filter_fields.family.meta:
             family_meta_keys.update(filter_fields.family.meta.keys())
@@ -185,6 +186,8 @@ class ProjectParticipantGridResponse(SMBase):
                     sample_meta_keys.update(s.meta.keys())
                 if not s.sequencing_groups:
                     continue
+                if s.sample_parent_id is not None:
+                    has_nested_samples = True
 
                 for sg in s.sequencing_groups or []:
                     if sg.meta:
@@ -267,6 +270,18 @@ class ProjectParticipantGridResponse(SMBase):
                 label='External Sample ID',
                 is_visible=True,
                 filter_key='external_id',
+            ),
+            Field(
+                key='sample_root_id',
+                label='Root Sample ID',
+                is_visible=False,
+                filter_key='sample_root_id',
+            ),
+            Field(
+                key='sample_parent_id',
+                label='Parent Sample ID',
+                is_visible=has_nested_samples,
+                filter_key='sample_root_id',
             ),
             Field(
                 key='created_date',

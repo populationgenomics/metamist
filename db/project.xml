@@ -1420,4 +1420,31 @@
 			remarks="Migration of external IDs to separate table"
 		/>
 	</changeSet>
+	<changeSet id="2024-06-25_nested-samples" author="michael.franklin">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<addColumn tableName="sample">
+			<!-- and root sample id -->
+			<column
+				name="sample_root_id"
+				type="INT"
+			>
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_SAMPLE_ROOT_SAMPLE"
+					references="sample(id)"
+				/>
+			</column>
+			<column
+				name="sample_parent_id"
+				type="INT"
+			>
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_SAMPLE_PARENT_SAMPLE"
+					references="sample(id)"
+				/>
+			</column>
+
+		</addColumn>
+	</changeSet>
 </databaseChangeLog>

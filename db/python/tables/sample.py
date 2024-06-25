@@ -37,6 +37,8 @@ class SampleTable(DbBase):
                 'project': 'ss.project',
                 'id': 'ss.id',
                 'meta': 'ss.meta',
+                'sample_root_id': 'ss.sample_root_id',
+                'sample_parent_id': 'ss.sample_parent_id',
             },
             exclude=['sequencing_group', 'assay', 'external_id'],
         )
@@ -154,6 +156,8 @@ class SampleTable(DbBase):
             's.active',
             's.type',
             's.project',
+            's.sample_root_id',
+            's.sample_parent_id',
         ]
         _query, values = self.construct_query(
             filter_, keys, sample_eid_table_alias='sexid'
@@ -224,6 +228,8 @@ class SampleTable(DbBase):
         active: bool,
         meta: dict | None,
         participant_id: int | None,
+        sample_parent_id: int | None,
+        sample_root_id: int | None,
         project=None,
     ) -> int:
         """
@@ -239,6 +245,8 @@ class SampleTable(DbBase):
             ('type', sample_type),
             ('active', active),
             ('audit_log_id', audit_log_id),
+            ('sample_parent_id', sample_parent_id),
+            ('sample_root_id', sample_root_id),
             ('project', project or self.project),
         ]
 

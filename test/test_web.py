@@ -722,6 +722,8 @@ class WebNonDBTests(unittest.TestCase):
                     type='blood',
                     created_date='2021-01-01',
                     non_sequencing_assays=[],
+                    sample_root_id=None,
+                    sample_parent_id=None,
                     sequencing_groups=[
                         NestedSequencingGroup(
                             id='cpgA',
