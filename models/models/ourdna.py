@@ -7,11 +7,11 @@ class OurDNALostSample(BaseModel):
     """Model for OurDNA Lost Sample"""
 
     sample_id: str
-    time_to_process_start: int | None
+    time_since_collection: int
     collection_time: str
-    process_start_time: str
-    process_end_time: str
-    received_time: str
+    process_start_time: str | None
+    process_end_time: str | None
+    received_time: str | None
     received_by: str | None
     collection_lab: str
     courier: str | None
