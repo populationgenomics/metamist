@@ -59,7 +59,7 @@ BILLING_CACHE_RESPONSE_TTL = 3600  # 1 Hour
 
 def get_default_user() -> str | None:
     """Determine if a default user is available"""
-    if SM_ENVIRONMENT == 'local' and _DEFAULT_USER:
+    if SM_ENVIRONMENT in ('local', 'test') and _DEFAULT_USER:
         return _DEFAULT_USER
     return None
 

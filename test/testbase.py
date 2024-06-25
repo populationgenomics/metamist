@@ -95,6 +95,8 @@ class DbTest(unittest.TestCase):
 
             Then you can destroy the database within tearDownClass as all tests have been completed.
             """
+            # Set environment to test
+            os.environ['SM_ENVIRONMENT'] = 'test'
             logger = logging.getLogger()
             try:
                 db = MySqlContainer('mariadb:11.2.2')
