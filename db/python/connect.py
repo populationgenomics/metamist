@@ -66,10 +66,10 @@ class Connection:
         ar_guid: str | None,
         meta: dict[str, str] | None = None,
     ):
-        self.connection: databases.Database = connection
-        self.project: Project | None = project
-        self.project_id_map = project_id_map
-        self.project_name_map = project_name_map
+        self.__connection: databases.Database = connection
+        self.__project: Project | None = project
+        self.__project_id_map = project_id_map
+        self.__project_name_map = project_name_map
         self.author: str = author
         self.on_behalf_of: str | None = on_behalf_of
         self.ar_guid: str | None = ar_guid
@@ -77,6 +77,26 @@ class Connection:
 
         self._audit_log_id: int | None = None
         self._audit_log_lock = asyncio.Lock()
+
+    @property
+    def connection(self):
+        """Public getter for private project class variable"""
+        return self.__connection
+
+    @property
+    def project(self):
+        """Public getter for private project class variable"""
+        return self.__project
+
+    @property
+    def project_id_map(self):
+        """Public getter for private project_id_map class variable"""
+        return self.__project_id_map
+
+    @property
+    def project_name_map(self):
+        """Public getter for private project_name_map class variable"""
+        return self.__project_name_map
 
     @property
     def project_id(self):
@@ -240,11 +260,11 @@ class Connection:
         project_id_map, project_name_map = await pt.get_projects_accessible_by_user(
             user=self.author
         )
-        self.project_id_map = project_id_map
-        self.project_name_map = project_name_map
+        self.__project_id_map = project_id_map
+        self.__project_name_map = project_name_map
 
         if self.project_id:
-            self.project = self.project_id_map.get(self.project_id)
+            self.__project = self.project_id_map.get(self.project_id)
 
 
 class DatabaseConfiguration(abc.ABC):
