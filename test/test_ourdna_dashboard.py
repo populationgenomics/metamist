@@ -3,6 +3,7 @@ from datetime import datetime
 from math import ceil
 from test.testbase import DbIsolatedTest, run_as_sync
 
+from db.python.enum_tables.sample_type import SampleTypeTable
 from db.python.layers.ourdna.dashboard import OurDnaDashboardLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
@@ -31,6 +32,9 @@ class OurDNADashboardTest(DbIsolatedTest):
         self.sl = SampleLayer(self.connection)
         self.pl = ParticipantLayer(self.connection)
 
+        self.stt = SampleTypeTable(self.connection)
+        await self.stt.insert('ebld')
+
         participants = await self.pl.upsert_participants(
             [
                 ParticipantUpsertInternal(
@@ -58,7 +62,7 @@ class OurDNADashboardTest(DbIsolatedTest):
                                 'courier-actual-dropoff-time': '2022-07-03 13:28:00',
                                 'concentration': 1.45,
                             },
-                            type='blood',
+                            type='ebld',
                             active=True,
                         )
                     ],
@@ -88,7 +92,7 @@ class OurDNADashboardTest(DbIsolatedTest):
                                 'courier-actual-dropoff-time': '2022-07-03 13:28:00',
                                 'concentration': 0.98,
                             },
-                            type='blood',
+                            type='ebld',
                             active=True,
                         )
                     ],
@@ -117,7 +121,7 @@ class OurDNADashboardTest(DbIsolatedTest):
                                 'courier-actual-dropoff-time': '2022-07-03 13:28:00',
                                 'concentration': 1.66,
                             },
-                            type='blood',
+                            type='ebld',
                             active=True,
                         )
                     ],
