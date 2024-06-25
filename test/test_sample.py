@@ -183,6 +183,7 @@ class TestSample(DbIsolatedTest):
 
     @run_as_sync
     async def test_deleting_root_sample(self):
+        """Test that deleting the root sample cascade deletes the nested samples"""
         nested_sample = SampleUpsertInternal(
             external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
             type='blood',
