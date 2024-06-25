@@ -373,7 +373,6 @@ class SampleLayer(BaseLayer):
             prev_round = rounds[round_idx]
             new_round = []
             round_idx += 1
-            print(f'Round idx is now {round_idx}')
             for root, parent, nested_samples in prev_round:
 
                 for sample in nested_samples:

@@ -181,6 +181,42 @@ class TestSample(DbIsolatedTest):
         self.assertEqual(1, len(first_child_res))
         self.assertEqual(first_child.id, first_child_res[0].id)
 
+    @run_as_sync
+    async def test_deleting_root_sample(self):
+        nested_sample = SampleUpsertInternal(
+            external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
+            type='blood',
+            nested_samples=[
+                SampleUpsertInternal(
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'Test02'},
+                    type='blood',
+                    nested_samples=[
+                        SampleUpsertInternal(
+                            external_ids={PRIMARY_EXTERNAL_ORG: 'Test03'},
+                            type='blood',
+                        )
+                    ],
+                )
+            ],
+        )
+        inserted = (await self.slayer.upsert_samples([nested_sample]))[0]
+        pre_delete_samples = await self.slayer.query(
+            SampleFilter(project=GenericFilter(eq=self.project_id))
+        )
+        self.assertEqual(3, len(pre_delete_samples))
+
+        # external ids do not have a cascade delete, so we need to delete them first
+        await self._connection.execute('DELETE FROM sample_external_id')
+        # but nested samples have cascade delete
+        await self._connection.execute(
+            'DELETE FROM sample WHERE id = :id', {'id': inserted.id}
+        )
+
+        post_delete_samples = await self.slayer.query(
+            SampleFilter(project=GenericFilter(eq=self.project_id))
+        )
+        self.assertEqual(0, len(post_delete_samples))
+
 
 class TestSampleUnwrapping(unittest.TestCase):
     """Test unwrapping nested samples into an ordered list of rows"""
