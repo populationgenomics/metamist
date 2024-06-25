@@ -83,9 +83,6 @@ async def update_project(
     """Update a project by project name"""
     ptable = ProjectPermissionsTable(connection)
 
-    # Updating a project additionally requires the project creator permission
-    await ptable.check_project_creator_permissions(author=connection.author)
-
     project = connection.project
     assert project
     return await ptable.update_project(
@@ -97,7 +94,7 @@ async def update_project(
 async def delete_project_data(
     delete_project: bool = False,
     connection: Connection = get_project_db_connection(
-        {ProjectMemberRole.project_admin}
+        {ProjectMemberRole.project_admin, ProjectMemberRole.data_manager}
     ),
 ):
     """
@@ -116,7 +113,9 @@ async def delete_project_data(
     )
     if not data_manager_deleting_test:
         # Otherwise, deleting a project additionally requires the project creator permission
-        await ptable.check_project_creator_permissions(author=connection.author)
+        connection.check_access_to_projects_for_ids(
+            [connection.project.id], allowed_roles={ProjectMemberRole.project_admin}
+        )
 
     success = await ptable.delete_project_data(
         project_id=connection.project.id,
@@ -138,8 +137,6 @@ async def update_project_members(
     Not that this is protected by access to a specific access group
     """
     ptable = ProjectPermissionsTable(connection)
-
-    await ptable.check_member_admin_permissions(author=connection.author)
 
     for member in members:
         for role in member.roles:
