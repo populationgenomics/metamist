@@ -300,7 +300,7 @@ export SM_ENVIRONMENT=LOCAL
 export SM_LOCALONLY_DEFAULTUSER=$(whoami)
 ```
 
-To allow the sytem to be bootstrapped and create the initial project, you'll need to add yourself to the two admin groups that allow creating projects and updating project members:
+To allow the system to be bootstrapped and create the initial project, you'll need to add yourself to the two admin groups that allow creating projects and updating project members:
 
 ```sql
 INSERT INTO group_member(group_id, member)

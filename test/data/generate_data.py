@@ -78,6 +78,11 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
             name=project, dataset=project, create_test_project=False
         )
         default_user = os.getenv('SM_LOCALONLY_DEFAULTUSER')
+        if not default_user:
+            print(
+                "SM_LOCALONLY_DEFAULTUSER env var is not set, please set it before generating data"
+            )
+            exit(1)
 
         await papi.update_project_members_async(
             project=project,
