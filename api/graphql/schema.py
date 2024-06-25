@@ -19,6 +19,7 @@ from api.graphql.filters import (
     graphql_meta_filter_to_internal_filter,
 )
 from api.graphql.loaders import GraphQLContext, LoaderKeys, get_context
+from api.graphql.mutations import Mutation
 from db.python import enum_tables
 from db.python.layers import (
     AnalysisLayer,
@@ -1275,7 +1276,7 @@ class Query:  # entry point to graphql.
 
 
 schema = strawberry.Schema(
-    query=Query, mutation=None, extensions=[QueryDepthLimiter(max_depth=10)]
+    query=Query, mutation=Mutation, extensions=[QueryDepthLimiter(max_depth=10)]
 )
 MetamistGraphQLRouter: GraphQLRouter = GraphQLRouter(
     schema, graphiql=True, context_getter=get_context
