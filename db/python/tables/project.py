@@ -283,9 +283,9 @@ DELETE FROM analysis WHERE project = :project;
             # Get existing rows so that we can keep the existing audit log ids
             existing_rows = await self.connection.fetch_all(
                 """
-                select project_id, member, role, audit_log_id
-                from project_member
-                where project_id = :project_id
+                SELECT project_id, member, role, audit_log_id
+                FROM project_member
+                WHERE project_id = :project_id
             """,
                 {'project_id': project.id},
             )
