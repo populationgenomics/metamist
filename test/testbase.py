@@ -251,7 +251,17 @@ class DbIsolatedTest(DbTest):
     @run_as_sync
     async def setUp(self) -> None:
         super().setUp()
+        # make sure it's clear, for whatever reason
+        await self.clear_database()
 
+    @run_as_sync
+    async def tearDown(self) -> None:
+        super().tearDown()
+        # tear down on end to test any issues with deleting THAT test data
+        await self.clear_database()
+
+    async def clear_database(self):
+        """Clear the database of all data, except for project + group tables"""
         ignore = {'DATABASECHANGELOG', 'DATABASECHANGELOGLOCK', 'project', 'group'}
         await self.connection.connection.execute('SET FOREIGN_KEY_CHECKS=0')
         for table in TABLES_ORDERED_BY_FK_DEPS:
