@@ -1,9 +1,10 @@
 from datetime import date
 
 from db.python.connect import Connection
+from db.python.filters.generic import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer
-from db.python.tables.assay import AssayTable, NoOpAenter
+from db.python.tables.assay import AssayFilter, AssayTable, NoOpAenter
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import (
     SequencingGroupFilter,
@@ -180,7 +181,9 @@ class SequencingGroupLayer(BaseLayer):
 
         # let's check the sequences first
         slayer = AssayTable(self.connection)
-        projects, assays = await slayer.get_assays_by(assay_ids=assay_ids)
+        projects, assays = await slayer.query(
+            AssayFilter(id=GenericFilter(in_=assay_ids))
+        )
 
         if len(assay_ids) != len(assays):
             missing_seq_ids = set(assay_ids) - set(s.id for s in assays)

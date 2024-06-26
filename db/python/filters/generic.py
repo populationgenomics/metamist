@@ -196,7 +196,7 @@ class GenericFilter(SMBase, Generic[T]):
             search_term = escape_like_term(str(self.startswith))
             k = self.generate_field_name(column + '_startswith')
             conditionals.append(f'{column} LIKE :{k}')
-            values[k] = self._sql_value_prep(escape_like_term(search_term) + '%')
+            values[k] = self._sql_value_prep(search_term + '%')
 
         return ' AND '.join(conditionals), values
 
@@ -218,6 +218,7 @@ class GenericFilter(SMBase, Generic[T]):
         """
         return GenericFilter(
             eq=func(self.eq) if self.eq else None,
+            neq=func(self.neq) if self.neq else None,
             in_=list(map(func, self.in_)) if self.in_ else None,
             nin=list(map(func, self.nin)) if self.nin else None,
             gt=func(self.gt) if self.gt else None,
@@ -226,6 +227,7 @@ class GenericFilter(SMBase, Generic[T]):
             lte=func(self.lte) if self.lte else None,
             contains=func(self.contains) if self.contains else None,
             icontains=func(self.icontains) if self.icontains else None,
+            startswith=func(self.startswith) if self.startswith else None,
         )
 
 

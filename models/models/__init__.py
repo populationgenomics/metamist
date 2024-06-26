@@ -1,4 +1,4 @@
-from models.base import PRIMARY_EXTERNAL_ORG, parse_sql_bool
+from models.base import PRIMARY_EXTERNAL_ORG, parse_sql_bool, parse_sql_dict
 from models.models.analysis import (
     Analysis,
     AnalysisInternal,

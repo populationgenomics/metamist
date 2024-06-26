@@ -343,24 +343,6 @@ SINGLE_PARTICIPANT_QUERY_RESULT = ProjectParticipantGridResponse(
             ProjectParticipantGridField(key='meta.akey', label='', is_visible=True),
         ],
     },
-    # family_keys=[('external_id', 'Family ID')],
-    # participant_keys=[('external_ids', 'Participant ID')],
-    # sample_keys=[
-    #     ('id', 'Sample ID'),
-    #     ('external_ids', 'External Sample ID'),
-    #     ('created_date', 'Created date'),
-    # ],
-    # sequencing_group_keys=[
-    #     ('id', 'Sequencing Group ID'),
-    #     ('platform', 'Platform'),
-    #     ('technology', 'Technology'),
-    #     ('type', 'Type'),
-    # ],
-    # assay_keys=[
-    #     ('type', 'type'),
-    #     ('meta.batch', 'batch'),
-    #     ('meta.reads_type', 'reads_type'),
-    # ],
 )
 
 

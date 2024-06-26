@@ -321,6 +321,7 @@ class WebDb(DbBase):
                             technology=sg.technology,
                             platform=sg.platform,
                             assays=assays_by_sg.get(sg.id, []),
+                            external_ids=sg.external_ids,
                         )
                     )
 

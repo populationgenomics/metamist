@@ -5,7 +5,8 @@ from typing import Any
 from db.python.filters import GenericFilter
 from db.python.filters.participant import ParticipantFilter
 from db.python.tables.base import DbBase
-from db.python.utils import NotFoundError, escape_like_term, from_db_json, to_db_json
+from db.python.utils import NotFoundError, escape_like_term, to_db_json
+from models.base import parse_sql_dict
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantInternal, ProjectId
 
 
@@ -48,7 +49,7 @@ class ParticipantTable(DbBase):
         skip: int | None = None,
         limit: int | None = None,
         participant_eid_table_alias: str | None = None,
-        group_result_by_id: bool = True
+        group_result_by_id: bool = True,
     ) -> tuple[str, dict[str, Any]]:
         """Construct a participant query"""
         needs_family = False
@@ -586,7 +587,11 @@ RETURNING id
         GROUP BY participant_id
         """
         rows = await self.connection.fetch_all(_query, {'pids': participant_ids})
-        return {r['id']: from_db_json(r['external_ids']) for r in rows}
+        retval: dict[int, list[str]] = {}
+        for row in rows:
+            external_ids = parse_sql_dict(row['external_ids'])
+            retval[row['id']] = list(external_ids.values()) if external_ids else []
+        return retval
 
     async def get_external_participant_id_to_internal_sequencing_group_id_map(
         self, project: ProjectId, sequencing_type: str | None = None

@@ -1,9 +1,6 @@
-import json
 from typing import Any
 
-from pydantic import Field
-
-from models.base import OpenApiGenNoneType, SMBase
+from models.base import OpenApiGenNoneType, SMBase, parse_sql_bool, parse_sql_dict
 from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
 from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
 from models.utils.sequencing_group_id_format import (
@@ -49,21 +46,9 @@ class SequencingGroupInternal(SMBase):
     @classmethod
     def from_db(cls, **kwargs):
         """From database model"""
-        meta = kwargs.pop('meta')
-        if meta and isinstance(meta, str):
-            meta = json.loads(meta)
+        meta = parse_sql_dict(kwargs.pop('meta'))
 
-        _archived = kwargs.pop('archived', None)
-        if _archived is not None:
-            if isinstance(_archived, int):
-                _archived = _archived != 0
-            elif isinstance(_archived, bytes):
-                _archived = _archived != b'\x00'
-            else:
-                raise TypeError(
-                    f"Received type '{type(_archived)}' for SequencingGroup column 'archived'. "
-                    + "Allowed types are either 'int' or 'bytes'."
-                )
+        _archived = parse_sql_bool(kwargs.pop('archived', None))
 
         return SequencingGroupInternal(**kwargs, archived=_archived, meta=meta)
 
@@ -90,9 +75,9 @@ class NestedSequencingGroupInternal(SMBase):
     technology: str
     platform: str
     meta: dict[str, Any]
-    external_ids: dict[str, str] = Field(default_factory=dict)
+    external_ids: dict[str, str]
 
-    assays: list[AssayInternal] = Field(default_factory=list)
+    assays: list[AssayInternal]
 
     def to_external(self):
         """Convert to transport model"""
@@ -103,9 +88,7 @@ class NestedSequencingGroupInternal(SMBase):
             platform=self.platform,
             meta=self.meta,
             external_ids=self.external_ids or {},
-            assays=[
-                a.to_external() for a in self.assays  # pylint:disable=not-an-iterable
-            ],
+            assays=[a.to_external() for a in self.assays or []],
         )
 
 

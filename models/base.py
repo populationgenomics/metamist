@@ -30,9 +30,7 @@ def parse_sql_dict(val: str | bytes | dict | None) -> dict | None:
         return None
     if isinstance(val, dict):
         return val
-    if isinstance(val, bytes):
-        val = val.decode()
-    if isinstance(val, str):
+    if isinstance(val, (str, bytes)):
         return json.loads(val)
 
     raise ValueError(f'Unknown type for meta: {type(val)}')
