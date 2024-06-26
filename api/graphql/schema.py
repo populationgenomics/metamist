@@ -657,6 +657,7 @@ class GraphQLParticipant:
 
     id: int
     external_id: str
+    external_ids: strawberry.scalars.JSON
     meta: strawberry.scalars.JSON
 
     reported_sex: int | None
@@ -671,6 +672,7 @@ class GraphQLParticipant:
         return GraphQLParticipant(
             id=internal.id,
             external_id=internal.external_ids[PRIMARY_EXTERNAL_ORG],
+            external_ids=internal.external_ids or {},
             meta=internal.meta,
             reported_sex=internal.reported_sex,
             reported_gender=internal.reported_gender,
@@ -752,6 +754,7 @@ class GraphQLSample:
 
     id: str
     external_id: str
+    external_ids: strawberry.scalars.JSON
     active: bool
     meta: strawberry.scalars.JSON
     type: str
@@ -766,6 +769,7 @@ class GraphQLSample:
         return GraphQLSample(
             id=sample_id_format(sample.id),
             external_id=sample.external_ids[PRIMARY_EXTERNAL_ORG],
+            external_ids=sample.external_ids or {},
             active=sample.active,
             meta=sample.meta,
             type=sample.type,
