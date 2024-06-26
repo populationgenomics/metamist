@@ -7,6 +7,7 @@ and defaults to decide the GraphQL schema, so it might not necessarily look corr
 """
 import datetime
 from inspect import isclass
+from typing import Any
 
 import strawberry
 from strawberry.extensions import QueryDepthLimiter
@@ -754,13 +755,28 @@ class GraphQLSample:
         type: GraphQLFilter[str] | None = None,
         meta: GraphQLMetaFilter | None = None,
     ) -> list['GraphQLAssay']:
+        selected_fields = info.selected_fields[0].selections
+        has_meta_selected = any(f.name == 'meta' for f in selected_fields)
+
+        # Find if there are any slices of meta selected, we can load these as part of the same query
+        meta_slices = [
+            {'path': f.arguments['path'], 'alias': f.alias}
+            for f in selected_fields
+            if f.name == 'metaValue'
+        ]
+
         loader_assays_for_sample_ids = info.context[LoaderKeys.ASSAYS_FOR_SAMPLES]
         filter_ = AssayFilter(
             type=type.to_internal_filter() if type else None,
             meta=meta,
         )
         assays = await loader_assays_for_sample_ids.load(
-            {'id': root.internal_id, 'filter': filter_}
+            {
+                'id': root.internal_id,
+                'filter': filter_,
+                'include_meta': has_meta_selected,
+                'meta_slices': meta_slices,
+            }
         )
         return [GraphQLAssay.from_internal(assay) for assay in assays]
 
@@ -907,6 +923,7 @@ class GraphQLAssay:
     external_ids: strawberry.scalars.JSON
 
     sample_id: strawberry.Private[int]
+    meta_slices: strawberry.Private[dict[str, Any] | None]
 
     @staticmethod
     def from_internal(internal: AssayInternal) -> 'GraphQLAssay':
@@ -917,6 +934,7 @@ class GraphQLAssay:
             id=internal.id,
             type=internal.type,
             meta=internal.meta,
+            meta_slices=internal.meta_slices,
             external_ids=internal.external_ids or {},
             # internal
             sample_id=internal.sample_id,
@@ -927,6 +945,13 @@ class GraphQLAssay:
         loader = info.context[LoaderKeys.SAMPLES_FOR_IDS]
         sample = await loader.load(root.sample_id)
         return GraphQLSample.from_internal(sample)
+
+    @strawberry.field
+    async def metaValue(
+        self, info: Info, root: 'GraphQLAssay', path: str
+    ) -> strawberry.scalars.JSON:
+        alias = info.selected_fields[0].alias
+        return root.meta_slices.get('_meta_' + alias) if root.meta_slices else None
 
 
 @strawberry.type

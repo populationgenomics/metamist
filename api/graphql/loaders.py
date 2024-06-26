@@ -182,7 +182,11 @@ async def load_audit_logs_by_analysis_ids(
 
 @connected_data_loader_with_params(LoaderKeys.ASSAYS_FOR_SAMPLES, default_factory=list)
 async def load_assays_by_samples(
-    connection, ids, filter: AssayFilter
+    connection,
+    ids,
+    filter: AssayFilter,
+    include_meta: bool,
+    meta_slices: list[dict[str, Any]] | None,
 ) -> dict[int, list[AssayInternal]]:
     """
     DataLoader: get_assays_for_sample_ids
@@ -191,7 +195,9 @@ async def load_assays_by_samples(
     assaylayer = AssayLayer(connection)
     # maybe this is dangerous, but I don't think it should matter
     filter.sample_id = GenericFilter(in_=ids)
-    assays = await assaylayer.query(filter)
+    assays = await assaylayer.query(
+        filter, include_meta=include_meta, meta_slices=meta_slices
+    )
     assay_map = group_by(assays, lambda a: a.sample_id)
     return assay_map
 
