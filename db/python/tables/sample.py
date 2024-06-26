@@ -610,8 +610,8 @@ class SampleTable(DbBase):
             'type',
             'project',
             'author',
-            "sample_root_id",
-            "sample_parent_id",
+            'sample_root_id',
+            'sample_parent_id',
             # 'audit_log_id',  # TODO SampleInternal does not allow an audit_log_id field
         ]
         keys_str = ', '.join(keys)

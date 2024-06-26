@@ -236,6 +236,7 @@ class GenericFilter(SMBase, Generic[T]):
             contains=func(self.contains) if self.contains else None,
             icontains=func(self.icontains) if self.icontains else None,
             startswith=func(self.startswith) if self.startswith else None,
+            isnull=self.isnull,
         )
 
 
