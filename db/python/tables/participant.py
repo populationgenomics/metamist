@@ -587,7 +587,7 @@ RETURNING id
         GROUP BY participant_id
         """
         rows = await self.connection.fetch_all(_query, {'pids': participant_ids})
-        return {r['id']: json.load(r['external_ids_list']) for r in rows}
+        return {r['id']: json.loads(r['external_ids_list']) for r in rows}
 
     async def get_external_participant_id_to_internal_sequencing_group_id_map(
         self, project: ProjectId, sequencing_type: str | None = None
