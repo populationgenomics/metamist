@@ -1,4 +1,4 @@
-// SummaryTableHeaderCell.tsx
+// HeaderCell.tsx
 import React from 'react'
 import { Table as SUITable } from 'semantic-ui-react'
 import HtmlTooltip from '../../shared/utilities/htmlTooltip'
@@ -80,7 +80,7 @@ export const HeaderCell: React.FC<HeaderCellProps> = ({
     )
 }
 
-export const headerCellConfigs: HeaderCellConfig[] = [
+export const summaryTableHeaderCellConfigs: HeaderCellConfig[] = [
     { key: 'dataset', label: 'Dataset', sortable: true },
     { key: 'sequencing_type', label: 'Seq Type', sortable: true },
     { key: 'sequencing_technology', label: 'Technology', sortable: true, filterable: true },
@@ -118,4 +118,30 @@ export const headerCellConfigs: HeaderCellConfig[] = [
             'Percentage of Sequencing Groups in the latest SV (genome) or gCNV (exome) ES-Index Analysis',
         className: 'collapsible-header',
     },
+]
+
+export const detailsTableHeaderCellConfigs: HeaderCellConfig[] = [
+    { key: 'dataset', label: 'Dataset', sortable: true },
+    { key: 'sequencing_type', label: 'Seq Type', sortable: true },
+    { key: 'sequencing_technology', label: 'Technology', sortable: true, filterable: true },
+    { key: 'sequencing_platform', label: 'Platform', sortable: true, filterable: true },
+    { key: 'sample_type', label: 'Sample Type', sortable: true, filterable: true },
+    { key: 'sequencing_group_id', label: 'SG ID', sortable: true, filterable: true },
+    { key: 'family_id', label: 'Family ID', sortable: true, filterable: true },
+    { key: 'family_ext_id', label: 'Family Ext ID', sortable: true, filterable: true },
+    { key: 'participant_id', label: 'Participant ID', sortable: true, filterable: true },
+    { key: 'participant_ext_id', label: 'Participant Ext ID', sortable: true, filterable: true },
+    { key: 'sample_id', label: 'Sample ID', sortable: true, filterable: true },
+    { key: 'sample_ext_ids', label: 'Sample Ext ID(s)', sortable: true, filterable: true },
+    { key: 'completed_cram', label: 'Completed CRAM', sortable: true, filterable: true },
+    {
+        key: 'in_latest_annotate_dataset',
+        label: 'In Annotated Dataset',
+        sortable: true,
+        filterable: true,
+    },
+    { key: 'in_latest_snv_index', label: 'In SNV ES-Index', sortable: true, filterable: true },
+    { key: 'in_latest_sv_index', label: 'In SV ES-Index', sortable: true, filterable: true },
+    { key: 'stripy', label: 'Stripy', sortable: true, filterable: true },
+    { key: 'mito', label: 'Mito', sortable: true, filterable: true },
 ]

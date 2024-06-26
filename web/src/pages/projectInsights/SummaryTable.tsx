@@ -5,8 +5,8 @@ import Table from '../../shared/components/Table'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
 import HtmlTooltip from '../../shared/utilities/htmlTooltip'
 import { ProjectInsightsSummary } from '../../sm-api'
+import { ColumnKey, HeaderCell, summaryTableHeaderCellConfigs } from './HeaderCell'
 import { FooterCell, footerCellConfigs } from './SummaryTableFooterCell'
-import { ColumnKey, HeaderCell, headerCellConfigs } from './SummaryTableHeaderCell'
 
 interface SummaryTableProps {
     allData: ProjectInsightsSummary[]
@@ -285,7 +285,7 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
             <Table sortable>
                 <SUITable.Header>
                     <SUITable.Row>
-                        {headerCellConfigs.map((config) => (
+                        {summaryTableHeaderCellConfigs.map((config) => (
                             <HeaderCell
                                 key={config.key}
                                 config={config}
