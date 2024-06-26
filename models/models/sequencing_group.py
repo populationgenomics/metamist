@@ -1,6 +1,6 @@
-import json
 from typing import Any
 
+from db.python.utils import from_db_json
 from models.base import OpenApiGenNoneType, SMBase
 from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
 from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
@@ -47,9 +47,7 @@ class SequencingGroupInternal(SMBase):
     @classmethod
     def from_db(cls, **kwargs):
         """From database model"""
-        meta = kwargs.pop('meta')
-        if meta and isinstance(meta, str):
-            meta = json.loads(meta)
+        meta = from_db_json(kwargs.pop('meta', None))
 
         _archived = kwargs.pop('archived', None)
         if _archived is not None:

@@ -1,7 +1,6 @@
 # pylint: disable=too-many-locals, too-many-instance-attributes
 import asyncio
 import itertools
-import json
 import re
 from collections import defaultdict
 from datetime import date
@@ -15,7 +14,7 @@ from db.python.tables.assay import AssayTable
 from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sequencing_group import SequencingGroupTable
-from db.python.utils import escape_like_term
+from db.python.utils import escape_like_term, from_db_json
 from models.models import (
     AssayInternal,
     FamilySimpleInternal,
@@ -114,7 +113,7 @@ class WebDb(DbBase):
             AssayInternal(
                 id=seq['id'],
                 type=seq['type'],
-                meta=json.loads(seq['meta']),
+                meta=from_db_json(seq['meta']),
                 sample_id=seq['sample_id'],
             )
             for seq in assay_rows
@@ -153,7 +152,7 @@ class WebDb(DbBase):
             sg_id_to_sample_id[sg_id] = row['sample_id']
             sg_by_id[sg_id] = NestedSequencingGroupInternal(
                 id=sg_id,
-                meta=json.loads(row['meta']),
+                meta=from_db_json(row['meta']),
                 type=row['type'],
                 technology=row['technology'],
                 platform=row['platform'],
@@ -189,9 +188,9 @@ class WebDb(DbBase):
         smodels = [
             NestedSampleInternal(
                 id=s['id'],
-                external_ids=json.loads(s['external_ids']),
+                external_ids=from_db_json(s['external_ids']),
                 type=s['type'],
-                meta=json.loads(s['meta']) or {},
+                meta=from_db_json(s['meta']) or {},
                 created_date=str(sample_id_start_times.get(s['id'], '')),
                 sequencing_groups=sg_models_by_sample_id.get(s['id'], []),
                 non_sequencing_assays=filtered_assay_models_by_sid.get(s['id'], []),
@@ -450,8 +449,8 @@ WHERE fp.participant_id in :pids
                 pmodels.append(
                     NestedParticipantInternal(
                         id=p['id'],
-                        external_ids=json.loads(p['external_ids']),
-                        meta=json.loads(p['meta']),
+                        external_ids=from_db_json(p['external_ids']),
+                        meta=from_db_json(p['meta']),
                         families=pid_to_families.get(p['id'], []),
                         samples=list(smodels_by_pid.get(p['id'])),
                         reported_sex=p['reported_sex'],

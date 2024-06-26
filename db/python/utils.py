@@ -431,8 +431,10 @@ def get_logger():
     return _logger
 
 
-def from_db_json(text):
-    """Convert DB's JSON text to Python object"""
+def from_db_json(text: str | bytes | None):
+    """Convert database's JSON text to Python object"""
+    if text is None:
+        return None
     return json.loads(text)
 
 

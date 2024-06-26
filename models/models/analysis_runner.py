@@ -1,6 +1,6 @@
 import datetime
-import json
 
+from db.python.utils import from_db_json
 from models.base import SMBase
 from models.models.project import ProjectId
 
@@ -34,10 +34,6 @@ class AnalysisRunnerInternal(SMBase):
     @staticmethod
     def from_db(**kwargs):
         """Convert from db Record"""
-        meta = kwargs.pop('meta')
-        if meta:
-            meta = json.loads(meta)
-
         _timestamp = kwargs.pop('timestamp')
         # if _timestamp:
         #     _timestamp = datetime.datetime.fromisoformat(_timestamp)
@@ -58,7 +54,7 @@ class AnalysisRunnerInternal(SMBase):
             hail_version=kwargs.pop('hail_version'),
             batch_url=kwargs.pop('batch_url'),
             submitting_user=kwargs.pop('submitting_user'),
-            meta=meta,
+            meta=from_db_json(kwargs.pop('meta')),
             audit_log_id=kwargs.pop('audit_log_id'),
             output_path=kwargs.pop('output_path'),
         )

@@ -1,8 +1,8 @@
-import json
 from collections import defaultdict
 from typing import Any, Dict, List, Tuple
 
 from db.python.tables.base import DbBase
+from db.python.utils import from_db_json, to_db_json
 
 
 class ParticipantPhenotypeTable(DbBase):
@@ -32,7 +32,7 @@ ON DUPLICATE KEY UPDATE
             {
                 'participant_id': r[0],
                 'description': r[1],
-                'value': json.dumps(r[2]),
+                'value': to_db_json(r[2]),
                 'audit_log_id': audit_log_id,
             }
             for r in rows
@@ -67,7 +67,7 @@ WHERE participant_id in :participant_ids AND value IS NOT NULL
             pid = row['participant_id']
             key = row['description']
             value = row['value']
-            formed_key_value_pairs[pid][key] = json.loads(value)
+            formed_key_value_pairs[pid][key] = from_db_json(value)
 
         return formed_key_value_pairs
 
@@ -91,6 +91,6 @@ WHERE p.project = :project AND pp.value IS NOT NULL
             pid = row['participant_id']
             key = row['description']
             value = row['value']
-            formed_key_value_pairs[pid][key] = json.loads(value)
+            formed_key_value_pairs[pid][key] = from_db_json(value)
 
         return formed_key_value_pairs

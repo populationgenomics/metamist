@@ -57,3 +57,13 @@ class TestParticipant(DbIsolatedTest):
         self.assertEqual(self.ex02, ps[0].external_ids)
         self.assertEqual(2, ps[0].meta['field'])
         self.assertEqual('XY', ps[0].karyotype)
+
+    @run_as_sync
+    async def test_get_seqr_individual_template(self):
+        """Test get_seqr_individual_template() method"""
+        pl = ParticipantLayer(self.connection)
+        template = await pl.get_seqr_individual_template(project=1)
+
+        self.assertIn('headers', template)
+        self.assertIn('header_map', template)
+        self.assertIn('rows', template)

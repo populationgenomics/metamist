@@ -1,5 +1,4 @@
-import json
-
+from db.python.utils import from_db_json
 from models.base import SMBase
 from models.models.project import ProjectId
 from models.utils.cohort_id_format import cohort_id_format
@@ -92,9 +91,7 @@ class CohortTemplateInternal(SMBase):
         _id = d.pop('id', None)
         name = d.pop('name', None)
         description = d.pop('description', None)
-        criteria = d.pop('criteria', None)
-        if criteria and isinstance(criteria, str):
-            criteria = json.loads(criteria)
+        criteria = from_db_json(d.pop('criteria', None))
         project = d.pop('project', None)
 
         return CohortTemplateInternal(
