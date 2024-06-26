@@ -4,14 +4,9 @@ import datetime
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from db.python.filters import GenericFilter, GenericFilterModel, GenericMetaFilter
 from db.python.tables.base import DbBase
-from db.python.utils import (
-    GenericFilter,
-    GenericFilterModel,
-    GenericMetaFilter,
-    NotFoundError,
-    to_db_json,
-)
+from db.python.utils import NotFoundError, to_db_json
 from models.enums import AnalysisStatus
 from models.models import PRIMARY_EXTERNAL_ORG
 from models.models.analysis import AnalysisInternal

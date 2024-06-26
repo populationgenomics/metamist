@@ -197,7 +197,7 @@ class DbTest(unittest.TestCase):
         """Run SYNC graphql query on internal database"""
         return await self.run_graphql_query_async(query, variables=variables)
 
-    async def run_graphql_query_async(self, query, variables=None):
+    async def run_graphql_query_async(self, query, variables=None) -> dict:
         """Run ASYNC graphql query on internal database"""
         if not isinstance(query, str):
             # if the query was wrapped in a gql() call, unwrap it
@@ -219,6 +219,10 @@ class DbTest(unittest.TestCase):
         )
         if value.errors:
             raise value.errors[0]
+
+        if value.data is None:
+            raise ValueError(f'No data returned from query: {query}')
+
         return value.data
 
     async def audit_log_id(self):

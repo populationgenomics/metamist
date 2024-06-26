@@ -1,8 +1,12 @@
+# pylint: disable=too-many-instance-attributes,too-many-locals,too-many-branches
+import json
 from collections import defaultdict
 from typing import Any
 
+from db.python.filters import GenericFilter
+from db.python.filters.participant import ParticipantFilter
 from db.python.tables.base import DbBase
-from db.python.utils import NotFoundError, escape_like_term, from_db_json, to_db_json
+from db.python.utils import NotFoundError, escape_like_term, to_db_json
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantInternal, ProjectId
 
 
@@ -38,43 +42,232 @@ class ParticipantTable(DbBase):
         )
         return set(r['project'] for r in rows)
 
+    @staticmethod
+    async def _construct_participant_query(
+        filter_: ParticipantFilter,
+        keys: list[str],
+        skip: int | None = None,
+        limit: int | None = None,
+        participant_eid_table_alias: str | None = None,
+        group_result_by_id: bool = True,
+    ) -> tuple[str, dict[str, Any]]:
+        """Construct a participant query"""
+        needs_family = False
+        needs_participant_eid = True  # always join, query optimiser can figure it out
+        needs_sample = False
+        needs_sample_eid = False
+        needs_sequencing_group = False
+        needs_assay = False
+
+        _wheres, values = filter_.to_sql(
+            {
+                'project': 'pp.project',
+                'id': 'pp.id',
+                'meta': 'pp.meta',
+                'external_id': 'peid.external_id',
+            },
+            exclude=['family', 'sample', 'sequencing_group', 'assay'],
+        )
+        wheres = [_wheres]
+
+        if filter_.family:
+            needs_family = True
+            fwheres, fvalues = filter_.family.to_sql(
+                {
+                    'id': 'f.id',
+                    'external_id': 'f.external_id',
+                    'meta': 'f.meta',
+                }
+            )
+            values.update(fvalues)
+            if fwheres:
+                wheres.append(fwheres)
+
+        if filter_.sample:
+            needs_sample = True
+            swheres, svalues = filter_.sample.to_sql(
+                {
+                    'id': 's.id',
+                    'type': 's.type',
+                    'meta': 's.meta',
+                },
+                exclude=['external_id'],
+            )
+            if filter_.sample.external_id:
+                needs_sample_eid = True
+                seid_wheres, seid_values = filter_.sample.to_sql(
+                    {'external_id': 'seid.external_id'}, only=['external_id']
+                )
+
+                wheres.append(seid_wheres)
+                svalues.update(seid_values)
+
+            values.update(svalues)
+            if swheres:
+                wheres.append(swheres)
+
+        if filter_.sequencing_group:
+            needs_sample = True
+            needs_sequencing_group = True
+            swheres, svalues = filter_.sequencing_group.to_sql(
+                {
+                    'id': 'sg.id',
+                    'meta': 'sg.meta',
+                    'type': 'sg.type',
+                    'technology': 'sg.technology',
+                    'platform': 'sg.platform',
+                }
+            )
+            values.update(svalues)
+            if swheres:
+                wheres.append(swheres)
+
+        if filter_.assay:
+            # 2024-06-13 mfranklin
+            #   This is explicitly NOT searching assays through the active sequencing
+            #   group, so it could return a result here, but not in the web, as the web
+            #   doesn't show non-sequencing-assays as of writing
+            needs_sample = True
+            needs_assay = True
+
+            awheres, avalues = filter_.assay.to_sql(
+                {
+                    'id': 'a.id',
+                    'meta': 'a.meta',
+                    'type': 'a.type',
+                }
+            )
+            values.update(avalues)
+            if awheres:
+                wheres.append(awheres)
+
+        query_lines = [
+            'SELECT DISTINCT pp.id',
+            'FROM participant pp',
+        ]
+
+        if needs_participant_eid:
+            query_lines.append(
+                'INNER JOIN participant_external_id peid ON pp.id = peid.participant_id'
+            )
+
+        if needs_sample:
+            query_lines.append('INNER JOIN sample s ON s.participant_id = pp.id')
+        if needs_sample_eid:
+            query_lines.append(
+                'INNER JOIN sample_external_id seid ON seid.sample_id = s.id'
+            )
+        if needs_sequencing_group:
+            query_lines.append('INNER JOIN sequencing_group sg ON sg.sample_id = s.id')
+        if needs_assay:
+            # see above for a quick note in assays from participant query
+            query_lines.append('INNER JOIN assay a ON a.sample_id = s.id')
+        if needs_family:
+            query_lines.append(
+                'INNER JOIN family_participant fp ON fp.participant_id = pp.id\n'
+                'INNER JOIN family f ON f.id = fp.family_id'
+            )
+
+        if wheres:
+            query_lines.append('WHERE \n' + ' AND '.join(wheres))
+
+        if limit or skip:
+            query_lines.append('ORDER BY pp.id')
+
+        if limit:
+            query_lines.append('LIMIT :limit')
+            values['limit'] = limit
+
+        if skip:
+            query_lines.append('OFFSET :offset')
+            values['offset'] = skip
+
+        query = '\n'.join('  ' + line.strip() for line in query_lines)
+        ex_table_join = ''
+        if participant_eid_table_alias:
+            ex_table_join = f"""
+            LEFT JOIN participant_external_id {participant_eid_table_alias}
+                ON p.id = {participant_eid_table_alias}.participant_id
+            """
+        outer_query = f"""
+            SELECT {', '.join(keys)}
+            FROM participant p
+            {ex_table_join}
+            INNER JOIN (
+            {query}
+            ) as inner_query ON inner_query.id = p.id
+            {"GROUP BY p.id" if group_result_by_id else ""}
+        """
+
+        return outer_query, values
+
+    async def query(
+        self,
+        filter_: ParticipantFilter,
+        limit: int | None = None,
+        skip: int | None = None,
+    ) -> tuple[set[ProjectId], list[ParticipantInternal]]:
+        """Query for participants
+
+        Args:
+            filter_ (ParticipantFilter): _description_
+
+        Returns:
+            list[ParticipantInternal]: _description_
+        """
+        keys = [
+            'p.id',
+            'JSON_OBJECTAGG(pexid.name, pexid.external_id) as external_ids',
+            'p.reported_sex',
+            'p.reported_gender',
+            'p.karyotype',
+            'p.meta',
+            'p.project',
+        ]
+        query, values = await self._construct_participant_query(
+            filter_,
+            keys=keys,
+            skip=skip,
+            limit=limit,
+            participant_eid_table_alias='pexid',
+        )
+        rows = await self.connection.fetch_all(query, values)
+        projects = set(r['project'] for r in rows)
+        return projects, [ParticipantInternal.from_db(dict(r)) for r in rows]
+
+    async def query_count(self, filter_: ParticipantFilter) -> int:
+        """Query for participants count"""
+        query, values = await self._construct_participant_query(
+            filter_, keys=['COUNT(*) as cnt'], group_result_by_id=False
+        )
+        row = await self.connection.fetch_one(query, values)
+        if not row:
+            return 0
+        return row['cnt']
+
     async def get_participants_by_ids(
         self, ids: list[int]
     ) -> tuple[set[ProjectId], list[ParticipantInternal]]:
         """Get participants by IDs"""
-        _query = f"""
-        SELECT {self.keys_str}
-        FROM participant p
-        INNER JOIN participant_external_id peid ON p.id = peid.participant_id
-        WHERE p.id IN :ids
-        GROUP BY p.id
-        """
-        rows = await self.connection.fetch_all(_query, {'ids': ids})
-        ds = [dict(r) for r in rows]
-        projects = set(d.get('project') for d in ds)
-        return projects, [ParticipantInternal.from_db(dict(d)) for d in ds]
+        return await self.query(ParticipantFilter(id=GenericFilter(in_=ids)))
 
     async def get_participants(
-        self, project: int, internal_participant_ids: list[int] = None
+        self, project: int, internal_participant_ids: list[int] | None = None
     ) -> list[ParticipantInternal]:
         """
         Get participants for a project
         """
-        values: dict[str, Any] = {'project': project}
-        if internal_participant_ids:
-            wheres = 'p.project = :project AND p.id IN :ids'
-            values['ids'] = internal_participant_ids
-        else:
-            wheres = 'p.project = :project'
-        _query = f"""
-        SELECT {self.keys_str}
-        FROM participant p
-        INNER JOIN participant_external_id peid ON p.id = peid.participant_id
-        WHERE {wheres}
-        GROUP BY p.id
-        """
-        rows = await self.connection.fetch_all(_query, values)
-        return [ParticipantInternal.from_db(dict(r)) for r in rows]
+        _, particicpants = await self.query(
+            ParticipantFilter(
+                project=GenericFilter(in_=[project]),
+                id=(
+                    GenericFilter(in_=internal_participant_ids)
+                    if internal_participant_ids
+                    else None
+                ),
+            )
+        )
+        return particicpants
 
     async def create_participant(
         self,
@@ -128,7 +321,8 @@ RETURNING id
                 'external_id': eid,
                 'audit_log_id': audit_log_id,
             }
-            for name, eid in external_ids.items() if eid is not None
+            for name, eid in external_ids.items()
+            if eid is not None
         ]
         await self.connection.execute_many(_eid_query, _eid_values)
 
@@ -208,14 +402,20 @@ RETURNING id
                 """
                 await self.connection.execute(
                     _audit_update_query,
-                    {'pid': participant_id, 'names': to_delete, 'audit_log_id': audit_log_id},
+                    {
+                        'pid': participant_id,
+                        'names': to_delete,
+                        'audit_log_id': audit_log_id,
+                    },
                 )
 
                 _delete_query = """
                 DELETE FROM participant_external_id
                 WHERE participant_id = :pid AND name IN :names
                 """
-                await self.connection.execute(_delete_query, {'pid': participant_id, 'names': to_delete})
+                await self.connection.execute(
+                    _delete_query, {'pid': participant_id, 'names': to_delete}
+                )
 
             if to_update:
                 _query = 'SELECT project FROM participant WHERE id = :pid'
@@ -304,7 +504,11 @@ RETURNING id
         WHERE participant_id IN :ids AND name = :PRIMARY_EXTERNAL_ORG
         """
         results = await self.connection.fetch_all(
-            _query, {'ids': internal_participant_ids, 'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG}
+            _query,
+            {
+                'ids': internal_participant_ids,
+                'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG,
+            },
         )
         id_map: dict[int, str] = {r['id']: r['external_id'] for r in results}
 
@@ -377,13 +581,13 @@ RETURNING id
             return {}
 
         _query = """
-        SELECT participant_id AS id, JSON_ARRAYAGG(external_id) AS external_ids
+        SELECT participant_id AS id, JSON_ARRAYAGG(external_id) AS external_ids_list
         FROM participant_external_id
         WHERE participant_id IN :pids
         GROUP BY participant_id
         """
         rows = await self.connection.fetch_all(_query, {'pids': participant_ids})
-        return {r['id']: from_db_json(r['external_ids']) for r in rows}
+        return {r['id']: json.loads(r['external_ids_list']) for r in rows}
 
     async def get_external_participant_id_to_internal_sequencing_group_id_map(
         self, project: ProjectId, sequencing_type: str | None = None

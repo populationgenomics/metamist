@@ -1,11 +1,10 @@
 import enum
-import json
 from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel
 
-from models.base import SMBase
+from models.base import SMBase, parse_sql_dict
 from models.enums import AnalysisStatus
 from models.utils.cohort_id_format import (
     cohort_id_format_list,
@@ -40,10 +39,7 @@ class AnalysisInternal(SMBase):
         analysis_type = kwargs.pop('type', None)
         status = kwargs.pop('status', None)
         timestamp_completed = kwargs.pop('timestamp_completed', None)
-        meta = kwargs.get('meta')
-
-        if meta and isinstance(meta, str):
-            meta = json.loads(meta)
+        meta = parse_sql_dict(kwargs.get('meta'))
 
         if timestamp_completed and isinstance(timestamp_completed, str):
             timestamp_completed = datetime.fromisoformat(timestamp_completed)

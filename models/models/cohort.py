@@ -1,6 +1,4 @@
-import json
-
-from models.base import SMBase
+from models.base import SMBase, parse_sql_dict
 from models.models.project import ProjectId
 from models.utils.cohort_id_format import cohort_id_format
 from models.utils.sequencing_group_id_format import (
@@ -92,16 +90,14 @@ class CohortTemplateInternal(SMBase):
         _id = d.pop('id', None)
         name = d.pop('name', None)
         description = d.pop('description', None)
-        criteria = d.pop('criteria', None)
-        if criteria and isinstance(criteria, str):
-            criteria = json.loads(criteria)
+        criteria = parse_sql_dict(d.pop('criteria', None)) or {}
         project = d.pop('project', None)
 
         return CohortTemplateInternal(
             id=_id,
             name=name,
             description=description,
-            criteria=criteria,
+            criteria=CohortCriteriaInternal(**criteria),
             project=project,
         )
 

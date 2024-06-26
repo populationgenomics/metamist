@@ -7,11 +7,11 @@ from math import ceil
 from typing import Any
 
 from db.python.connect import Connection
+from db.python.filters import GenericFilter
 from db.python.layers.base import BaseLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from db.python.tables.sample import SampleFilter
-from db.python.utils import GenericFilter
 from models.models import OurDNADashboard, OurDNALostSample, ProjectId, Sample
 from models.models.participant import ParticipantInternal
 
