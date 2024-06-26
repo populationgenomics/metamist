@@ -1,4 +1,5 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,too-many-branches
+import json
 from collections import defaultdict
 from typing import Any
 
@@ -6,7 +7,6 @@ from db.python.filters import GenericFilter
 from db.python.filters.participant import ParticipantFilter
 from db.python.tables.base import DbBase
 from db.python.utils import NotFoundError, escape_like_term, to_db_json
-from models.base import parse_sql_dict
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantInternal, ProjectId
 
 
@@ -581,17 +581,13 @@ RETURNING id
             return {}
 
         _query = """
-        SELECT participant_id AS id, JSON_ARRAYAGG(external_id) AS external_ids
+        SELECT participant_id AS id, JSON_ARRAYAGG(external_id) AS external_ids_list
         FROM participant_external_id
         WHERE participant_id IN :pids
         GROUP BY participant_id
         """
         rows = await self.connection.fetch_all(_query, {'pids': participant_ids})
-        retval: dict[int, list[str]] = {}
-        for row in rows:
-            external_ids = parse_sql_dict(row['external_ids'])
-            retval[row['id']] = list(external_ids.values()) if external_ids else []
-        return retval
+        return {r['id']: json.load(r['external_ids_list']) for r in rows}
 
     async def get_external_participant_id_to_internal_sequencing_group_id_map(
         self, project: ProjectId, sequencing_type: str | None = None
