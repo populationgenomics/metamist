@@ -258,10 +258,7 @@ class DbIsolatedTest(DbTest):
                 continue
             try:
                 await self.connection.connection.execute(
-                    f'DELETE FROM `{table}` WHERE 1;'
-                )
-                await self.connection.connection.execute(
-                    f'DELETE HISTORY FROM `{table}`'
+                    f'TRUNCATE `{table}`;'
                 )
             except IntegrityError as e:
                 raise IntegrityError(f'Could not delete {table}') from e
