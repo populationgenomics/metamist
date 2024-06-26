@@ -73,7 +73,9 @@ const ProjectAndSeqTypeSelector: React.FC<ProjectAndSeqTypeSelectorProps> = ({
                         }
                     />
                 </div>
-                <div style={{ maxHeight: '200px', overflowY: 'auto', columns: 2 }}>
+                <div
+                    style={{ maxHeight: '200px', overflowY: 'auto', columns: 4, maxWidth: '400px' }}
+                >
                     {projects.map((project) => (
                         <div key={project}>
                             <Checkbox
