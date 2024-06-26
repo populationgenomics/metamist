@@ -263,7 +263,6 @@ class DbIsolatedTest(DbTest):
     async def clear_database(self):
         """Clear the database of all data, except for project + group tables"""
         ignore = {'DATABASECHANGELOG', 'DATABASECHANGELOGLOCK', 'project', 'group'}
-        await self.connection.connection.execute('SET FOREIGN_KEY_CHECKS=0')
         for table in TABLES_ORDERED_BY_FK_DEPS:
             if table in ignore:
                 continue
@@ -275,12 +274,14 @@ class DbIsolatedTest(DbTest):
                 #
                 # so disable FK checks earlier to more easily delete all rows
                 await self.connection.connection.execute(
-                    f'DELETE FROM `{table}` WHERE 1;'
+                    f"""
+                    SET GLOBAL FOREIGN_KEY_CHECKS = 0;
+                    DELETE FROM `{table}` WHERE 1;
+                    SET GLOBAL FOREIGN_KEY_CHECKS = 1;
+                    """
                 )
                 await self.connection.connection.execute(
                     f'DELETE HISTORY FROM `{table}`'
                 )
             except IntegrityError as e:
                 raise IntegrityError(f'Could not delete {table}') from e
-
-        await self.connection.connection.execute('SET FOREIGN_KEY_CHECKS=1')
