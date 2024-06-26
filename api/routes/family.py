@@ -17,9 +17,9 @@ from api.utils.db import (
 )
 from api.utils.export import ExportType
 from api.utils.extensions import guess_delimiter_by_upload_file_obj
+from db.python.filters import GenericFilter
 from db.python.layers.family import FamilyLayer, PedRow
 from db.python.tables.family import FamilyFilter
-from db.python.utils import GenericFilter
 from models.models.family import Family
 from models.utils.sample_id_format import sample_id_transform_to_raw_list
 

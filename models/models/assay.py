@@ -1,14 +1,15 @@
-import json
 from typing import Any
 
-from models.base import OpenApiGenNoneType, SMBase
+from models.base import OpenApiGenNoneType, SMBase, parse_sql_dict
 from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
+
+AssayId = int
 
 
 class AssayInternal(SMBase):
     """Internal model for Assay"""
 
-    id: int | None
+    id: AssayId | None
     sample_id: int
     meta: dict[str, Any] | None
     type: str
@@ -25,14 +26,10 @@ class AssayInternal(SMBase):
     @staticmethod
     def from_db(d: dict):
         """Take DB mapping object, and return SampleSequencing"""
-        meta = d.pop('meta', None)
+        meta = parse_sql_dict(d.pop('meta', None))
+        external_ids = parse_sql_dict(d.pop('external_ids', None)) or {}
 
-        if meta:
-            if isinstance(meta, bytes):
-                meta = meta.decode()
-            if isinstance(meta, str):
-                meta = json.loads(meta)
-        return AssayInternal(meta=meta, **d)
+        return AssayInternal(meta=meta, external_ids=external_ids, **d)
 
     def to_external(self):
         """Convert to transport model"""
@@ -48,7 +45,7 @@ class AssayInternal(SMBase):
 class AssayUpsertInternal(SMBase):
     """Internal upsert model for assay"""
 
-    id: int | None = None
+    id: AssayId | None = None
     type: str | None = None
     external_ids: dict[str, str | None] | None = None
     sample_id: int | None = None

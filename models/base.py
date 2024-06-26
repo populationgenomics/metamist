@@ -1,3 +1,5 @@
+import json
+
 from pydantic import ConfigDict
 from pydantic.main import BaseModel
 
@@ -20,6 +22,18 @@ class SMBase(BaseModel):
     def from_dict(cls, d: dict):
         """Create an object from a dictionary"""
         return cls(**d)
+
+
+def parse_sql_dict(val: str | bytes | dict | None) -> dict | None:
+    """Parse a string from a sql dict"""
+    if val is None:
+        return None
+    if isinstance(val, dict):
+        return val
+    if isinstance(val, (str, bytes)):
+        return json.loads(val)
+
+    raise ValueError(f'Unknown type for meta: {type(val)}')
 
 
 def parse_sql_bool(val: str | int | bytes) -> bool | None:

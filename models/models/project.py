@@ -1,7 +1,6 @@
-import json
 from typing import Optional
 
-from models.base import SMBase
+from models.base import SMBase, parse_sql_dict
 
 ProjectId = int
 
@@ -20,5 +19,5 @@ class Project(SMBase):
     def from_db(kwargs):
         """From DB row, with db keys"""
         kwargs = dict(kwargs)
-        kwargs['meta'] = json.loads(kwargs['meta']) if kwargs.get('meta') else {}
+        kwargs['meta'] = parse_sql_dict(kwargs.get('meta')) or {}
         return Project(**kwargs)

@@ -2,9 +2,9 @@
 import datetime
 from test.testbase import DbIsolatedTest, run_as_sync
 
+from db.python.filters import GenericFilter
 from db.python.layers.analysis_runner import AnalysisRunnerLayer
 from db.python.tables.analysis_runner import AnalysisRunnerFilter
-from db.python.utils import GenericFilter
 from models.models.analysis_runner import AnalysisRunnerInternal
 
 

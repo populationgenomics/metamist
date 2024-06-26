@@ -2,19 +2,14 @@
 import dataclasses
 import re
 from collections import defaultdict
-from typing import Any
+from typing import Any, NamedTuple
 
+from db.python.filters import GenericFilter, GenericFilterModel, GenericMetaFilter
 from db.python.tables.base import DbBase
-from db.python.utils import (
-    GenericFilter,
-    GenericFilterModel,
-    GenericMetaFilter,
-    NoOpAenter,
-    NotFoundError,
-    to_db_json,
-)
-from models.models.assay import AssayInternal
+from db.python.utils import NoOpAenter, NotFoundError, to_db_json
+from models.models.assay import AssayId, AssayInternal
 from models.models.project import ProjectId
+from models.models.sequencing_group import SequencingGroupInternalId
 
 REPLACEMENT_KEY_INVALID_CHARS = re.compile(r'[^\w\d_]')
 
@@ -35,7 +30,7 @@ class AssayFilter(GenericFilterModel):
     Filter for Assay model
     """
 
-    id: GenericFilter[int] | None = None
+    id: GenericFilter[AssayId] | None = None
     sample_id: GenericFilter[int] | None = None
     external_id: GenericFilter[str] | None = None
     meta: GenericMetaFilter | None = None
@@ -49,20 +44,22 @@ class AssayFilter(GenericFilterModel):
         )
 
 
+class BatchStatisticsRow(NamedTuple):
+    """
+    Tiny namedtuple for batch statistics
+    """
+
+    batch: str | None
+    sequencing_type: str
+    sequencing_group_ids: list[tuple[SequencingGroupInternalId, int]]
+
+
 class AssayTable(DbBase):
     """
     Capture Sample table operations and queries
     """
 
     table_name = 'assay'
-
-    COMMON_GET_KEYS = [
-        'a.id',
-        'a.sample_id',
-        'a.meta',
-        'a.type',
-        's.project',
-    ]
 
     # region GETS
 
@@ -82,29 +79,29 @@ class AssayTable(DbBase):
         if filter_.external_id is not None and filter_.project is None:
             raise ValueError('Must provide a project if filtering by external_id')
 
-        conditions, values = filter_.to_sql(sql_overides)
-        keys = ', '.join(self.COMMON_GET_KEYS)
+        conditions, values = filter_.to_sql(
+            sql_overides, exclude=['sequencing_group_id']
+        )
+
         _query = f"""
-            SELECT {keys}
+            SELECT
+                a.id, a.meta, s.project, a.type, a.sample_id,
+                JSON_OBJECTAGG(aeid.name, aeid.external_id) as external_ids
             FROM assay a
             LEFT JOIN sample s ON s.id = a.sample_id
             LEFT JOIN assay_external_id aeid ON aeid.assay_id = a.id
             WHERE {conditions}
+            GROUP BY a.id, a.meta, s.project, a.type
         """
 
         assay_rows = await self.connection.fetch_all(_query, values)
-
-        # this will unique on the id, which we want due to joining on 1:many eid table
-        assay_ids = [a['id'] for a in assay_rows]
-        seq_eids = await self._get_assays_eids(assay_ids)
-        assays = []
-
+        assays: list[AssayInternal] = []
         project_ids: set[ProjectId] = set()
         for row in assay_rows:
             drow = dict(row)
             project_ids.add(drow.pop('project'))
             assay = AssayInternal.from_db(drow)
-            assay.external_ids = seq_eids.get(assay.id, {}) if assay.id else {}
+
             assays.append(assay)
 
         return project_ids, assays
@@ -179,7 +176,9 @@ class AssayTable(DbBase):
 
         return {r['type']: r['n'] for r in rows}
 
-    async def get_assay_type_numbers_by_batch_for_project(self, project: ProjectId):
+    async def get_assay_type_numbers_by_batch_for_project(
+        self, project: ProjectId
+    ) -> list[BatchStatisticsRow]:
         """
         Grouped by the meta.batch field on an assay
         """
@@ -188,25 +187,90 @@ class AssayTable(DbBase):
         # treats a SQL NULL and JSON NULL (selected from the meta.batch) differently.
         _query = """
             SELECT
-                IFNULL(JSON_EXTRACT(a.meta, '$.batch'), 'null') as batch,
-                sg.type,
-                COUNT(*) AS n
+                sg.id as sg_id,
+                JSON_VALUE(a.meta, '$.sequencing_type') as sequencing_type,
+                JSON_VALUE(a.meta, '$.batch') as batch,
+                COUNT(*) as n
             FROM assay a
-            INNER JOIN sample s ON s.id = a.sample_id
-            LEFT JOIN sequencing_group sg ON sg.sample_id = s.id
-            WHERE s.project = :project
-            GROUP BY batch, sg.type
+            LEFT JOIN sequencing_group_assay sga ON sga.assay_id = a.id
+            LEFT JOIN sample s ON s.id = a.sample_id
+            LEFT JOIN sequencing_group sg ON sg.id = sga.sequencing_group_id
+            WHERE s.project = :project AND NOT sg.archived
+            GROUP BY sg_id, batch, sequencing_type
         """
         rows = await self.connection.fetch_all(_query, {'project': project})
-        batch_result: dict[str, dict[str, str]] = defaultdict(dict)
+        batch_result: defaultdict[
+            str, defaultdict[str, list[tuple[SequencingGroupInternalId, int]]]
+        ] = defaultdict(lambda: defaultdict(list))
         for row in rows:
-            batch, seqType, count = row['batch'], row['type'], row['n']
-            batch = str(batch).strip('\"') if batch != 'null' else 'no-batch'
-            batch_result[batch][seqType] = str(count)
-        if len(batch_result) == 1 and 'no-batch' in batch_result:
-            # if there are no batches, ignore the no-batch option
-            return {}
-        return batch_result
+            batch = row['batch']
+            sequencing_type = row['sequencing_type']
+            batch_result[batch][sequencing_type].append((row['sg_id'], row['n']))
+
+        retval = []
+        for batch, batch_data in batch_result.items():
+            for sequencing_type, sequencing_group_ids in batch_data.items():
+                retval.append(
+                    BatchStatisticsRow(
+                        batch=batch,
+                        sequencing_type=sequencing_type,
+                        sequencing_group_ids=sequencing_group_ids,
+                    )
+                )
+
+        return retval
+
+    async def get_assays_for_sequencing_group_ids(
+        self,
+        sequencing_group_ids: list[int],
+        filter_: AssayFilter | None = None,
+    ) -> tuple[set[ProjectId], dict[int, list[AssayInternal]]]:
+        """Get all assays for sequencing group ids"""
+
+        values = {'sequencing_group_ids': sequencing_group_ids}
+        wheres = [
+            'sga.sequencing_group_id IN :sequencing_group_ids',
+        ]
+        if filter_:
+            _filter, _values = filter_.to_sql(
+                {
+                    'id': 'a.id',
+                    'sample_id': 'a.sample_id',
+                    'external_id': 'ae.external_id',
+                    'meta': 'a.meta',
+                    'project': 's.project',
+                    'type': 'a.type',
+                }
+            )
+            wheres.append(_filter)
+            values.update(_values)
+
+        _query = f"""
+            SELECT
+                a.id, a.sample_id, a.type, a.meta, s.project,
+                JSON_OBJECTAGG(ae.name, ae.external_id) as external_ids,
+                sga.sequencing_group_id
+            FROM sequencing_group_assay sga
+            INNER JOIN assay a ON sga.assay_id = a.id
+            LEFT JOIN sample s ON a.sample_id = s.id
+            LEFT JOIN assay_external_id ae ON a.id = ae.assay_id
+            WHERE {' AND '.join(wheres)}
+            GROUP BY
+                a.id, a.sample_id, a.type, a.meta,
+                s.project, sga.sequencing_group_id
+        """
+
+        rows = await self.connection.fetch_all(_query, values)
+        by_sequencing_group_id: dict[int, list[AssayInternal]] = defaultdict(list)
+        projects: set[ProjectId] = set()
+        for row in rows:
+            drow = dict(row)
+            sequencing_group_id = drow.pop('sequencing_group_id')
+            projects.add(drow.pop('project'))
+            assay = AssayInternal.from_db(drow)
+            by_sequencing_group_id[sequencing_group_id].append(assay)
+
+        return projects, by_sequencing_group_id
 
     # endregion GETS
 
@@ -415,171 +479,3 @@ class AssayTable(DbBase):
                     await self.connection.execute_many(_update_query, values)
 
             return True
-
-    async def get_assays_by(
-        self,
-        assay_ids: list[int] | None = None,
-        sample_ids: list[int] | None = None,
-        assay_types: list[str] | None = None,
-        assay_meta: dict[str, Any] | None = None,
-        sample_meta: dict[str, Any] | None = None,
-        external_assay_ids: list[str] | None = None,
-        project_ids: list[int] | None = None,
-        active: bool = True,
-    ) -> tuple[list[ProjectId], list[AssayInternal]]:
-        """Get sequences by some criteria"""
-        keys = [
-            'a.id',
-            'a.sample_id',
-            'a.type',
-            'a.meta',
-            's.project',
-        ]
-        keys_str = ', '.join(keys)
-
-        where = []
-        replacements: dict[str, Any] = {}
-
-        if project_ids:
-            where.append('s.project in :project_ids')
-            replacements['project_ids'] = project_ids
-
-        if sample_ids:
-            where.append('s.id in :sample_ids')
-            replacements['sample_ids'] = sample_ids
-
-        if assay_meta:
-            for k, v in assay_meta.items():
-                k_replacer = fix_replacement_key(f'assay_meta_{k}')
-                while k_replacer in replacements:
-                    k_replacer += '_breaker'
-                where.append(f"JSON_EXTRACT(a.meta, '$.{k}') = :{k_replacer}")
-                replacements[k_replacer] = v
-
-        if sample_meta:
-            for k, v in sample_meta.items():
-                k_replacer = fix_replacement_key(f'sample_meta_{k}')
-                while k_replacer in replacements:
-                    k_replacer += '_breaker'
-                where.append(f"JSON_EXTRACT(s.meta, '$.{k}') = :{k_replacer}")
-                replacements[k_replacer] = v
-
-        if assay_ids:
-            where.append('a.id in :assay_ids')
-            replacements['assay_ids'] = assay_ids
-
-        if external_assay_ids:
-            if not project_ids:
-                raise ValueError(
-                    'To search assays by external_ids, you MUST supply a list of projects.'
-                )
-            where.append(
-                'aeid.external_id in :external_ids AND aeid.project in :project_ids'
-            )
-            replacements['external_ids'] = external_assay_ids
-
-        if assay_types:
-            where.append('a.type in :types')
-            replacements['types'] = assay_types
-
-        if active is True:
-            where.append('s.active')
-        elif active is False:
-            where.append('NOT active')
-
-        _query = f"""\
-            SELECT {keys_str}
-            FROM assay a
-            INNER JOIN sample s ON a.sample_id = s.id
-            LEFT OUTER JOIN assay_external_id aeid ON a.id = aeid.assay_id
-        """
-        if where:
-            _query += f' WHERE {" AND ".join(where)};'
-
-        rows = await self.connection.fetch_all(_query, replacements)
-
-        assay_rows = [dict(s) for s in rows]
-
-        # this will unique on the id, which we want due to joining on 1:many eid table
-        assays = {s['id']: AssayInternal.from_db(s) for s in assay_rows}
-        seq_eids = await self._get_assays_eids(list(assays.keys()))
-        for assay_id, assay in assays.items():
-            assay.external_ids = seq_eids.get(assay_id, {})
-
-        projs = list(set([s['project'] for s in assay_rows]))
-
-        return projs, list(assays.values())
-
-    async def get_assays_for_sequencing_group_ids(
-        self, sequencing_group_ids: list[int]
-    ) -> tuple[set[ProjectId], dict[int, list[AssayInternal]]]:
-        """Get all assays for sequencing group ids"""
-        keys = [
-            'a.id',
-            'a.sample_id',
-            'a.type',
-            'a.meta',
-            's.project',
-            'ae.name',
-            'ae.external_id',
-        ]
-        wheres = [
-            'sga.sequencing_group_id IN :sequencing_group_ids',
-        ]
-
-        _query = f"""
-            SELECT {', '.join(keys)}, sga.sequencing_group_id
-            FROM sequencing_group_assay sga
-            INNER JOIN assay a ON sga.assay_id = a.id
-            INNER JOIN sample s ON a.sample_id = s.id
-            LEFT JOIN assay_external_id ae ON a.id = ae.assay_id
-            WHERE {' AND '.join(wheres)}
-        """
-
-        rows = await self.connection.fetch_all(
-            _query, {'sequencing_group_ids': sequencing_group_ids}
-        )
-        by_sequencing_group_id: dict[int, list[AssayInternal]] = defaultdict(list)
-        projects: set[ProjectId] = set()
-        for row in rows:
-            drow = dict(row)
-
-            external_id = drow.pop('external_id', None)
-            if external_id:
-                drow['external_ids'] = {drow.pop('name'): external_id}
-            else:
-                drow['external_ids'] = {}
-                del drow['name']
-
-            sequencing_group_id = drow.pop('sequencing_group_id')
-            projects.add(drow.pop('project'))
-            assay = AssayInternal.from_db(drow)
-            by_sequencing_group_id[sequencing_group_id].append(assay)
-
-        return projects, by_sequencing_group_id
-
-    # region EIDs
-
-    async def _get_assay_external_ids(self, assay_id):
-        return (await self._get_assays_eids([assay_id])).get(assay_id, {})
-
-    async def _get_assays_eids(self, assay_ids: list[int]) -> dict[int, dict[str, str]]:
-        if len(assay_ids) == 0:
-            return {}
-
-        _query = """\
-            SELECT assay_id, name, external_id
-            FROM assay_external_id
-            WHERE assay_id IN :assay_ids
-        """
-
-        rows = await self.connection.fetch_all(_query, {'assay_ids': assay_ids})
-        by_assay_id: dict[int, dict[str, str]] = defaultdict(dict)
-        for row in rows:
-            seq_id = row['assay_id']
-            eid_name = row['name']
-            by_assay_id[seq_id][eid_name] = row['external_id']
-
-        return by_assay_id
-
-    # endregion EIDs
