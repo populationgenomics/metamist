@@ -21,7 +21,7 @@ from api.settings import set_all_access
 from db.python.connect import (
     TABLES_ORDERED_BY_FK_DEPS,
     Connection,
-    ConnectionStringDatabaseConfiguration,
+    CredentialedDatabaseConfiguration,
     SMConnections,
 )
 from db.python.tables.project import ProjectPermissionsTable
@@ -97,7 +97,7 @@ class DbTest(unittest.TestCase):
             logger = logging.getLogger()
             try:
                 set_all_access(True)
-                db = MySqlContainer('mariadb:11.2.2')
+                db = MySqlContainer('mariadb:11.2.2', password='test')
                 port_to_expose = find_free_port()
                 # override the default port to map the container to
                 db.with_bind_ports(db.port, port_to_expose)
@@ -110,8 +110,8 @@ class DbTest(unittest.TestCase):
                 if am_i_in_test_environment:
                     db_prefix = '../db'
 
-                con_string = db.get_connection_url()
-                con_string = 'mysql://' + con_string.split('://', maxsplit=1)[1]
+                # con_string = db.get_connection_url()
+                # con_string = 'mysql://' + con_string.split('://', maxsplit=1)[1]
                 lcon_string = f'jdbc:mariadb://{db.get_container_host_ip()}:{port_to_expose}/{db.dbname}'
                 # apply the liquibase schema
                 command = [
@@ -128,7 +128,13 @@ class DbTest(unittest.TestCase):
                 subprocess.check_output(command, stderr=subprocess.STDOUT)
 
                 sm_db = SMConnections.make_connection(
-                    ConnectionStringDatabaseConfiguration(con_string)
+                    CredentialedDatabaseConfiguration(
+                        host=db.get_container_host_ip(),
+                        port=port_to_expose,
+                        username='root',
+                        password=db.password,
+                        dbname=db.dbname,
+                    )
                 )
                 await sm_db.connect()
                 cls.author = 'testuser'
