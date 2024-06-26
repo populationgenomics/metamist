@@ -610,6 +610,8 @@ class SampleTable(DbBase):
             'type',
             'project',
             'author',
+            "sample_root_id",
+            "sample_parent_id",
             # 'audit_log_id',  # TODO SampleInternal does not allow an audit_log_id field
         ]
         keys_str = ', '.join(keys)
@@ -626,23 +628,10 @@ class SampleTable(DbBase):
         self, project: ProjectId
     ) -> list[SampleInternal]:
         """Get samples with missing participants"""
-        keys = [
-            's.id',
-            'JSON_OBJECTAGG(seid.name, seid.external_id) AS external_ids',
-            's.participant_id',
-            's.meta',
-            's.active',
-            's.type',
-            's.project',
-        ]
-        _query = f"""
-            SELECT {', '.join(keys)}
-            FROM sample s
-            INNER JOIN sample_external_id seid ON s.id = seid.sample_id
-            WHERE s.participant_id IS NULL AND s.project = :project
-            GROUP BY s.id
-        """
-        rows = await self.connection.fetch_all(
-            _query, {'project': project or self.project}
+        _, samples = await self.query(
+            SampleFilter(
+                participant_id=GenericFilter(isnull=True),
+                project=GenericFilter(eq=project or self.project),
+            )
         )
-        return [SampleInternal.from_db(dict(d)) for d in rows]
+        return samples
