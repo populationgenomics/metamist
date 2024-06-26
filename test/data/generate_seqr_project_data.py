@@ -61,6 +61,12 @@ PROJECTS = [
     'OMEGA',
 ]
 
+LOCI = [
+    'ABCD',
+    'EFGH',
+    'IJKL',
+]
+
 QUERY_PROJECT_SGS = gql(
     """
     query MyQuery($project: String!) {
@@ -248,7 +254,7 @@ async def generate_project_pedigree(project: str):
     project_pedigree = generate_pedigree_rows(num_families=random.randint(1, 100))
     participant_eids = [row.individual_id for row in project_pedigree]
 
-    pedfile = tempfile.NamedTemporaryFile(mode='w')
+    pedfile = tempfile.NamedTemporaryFile(mode='w')  # pylint: disable=consider-using-with
     ped_writer = csv.writer(pedfile, delimiter='\t')
     for row in project_pedigree:
         ped_writer.writerow(row)
@@ -399,9 +405,27 @@ async def generate_web_report_analyses(project: str,
     """
     Queries the list of sequencing groups for a project and generates web analysis (STRipy
     and MITO report) entries for those with completed a CRAM analysis.
+    Stripy analyses have a random chance of having outliers detected, and a random number
+    of loci flagged as outliers.
     """
+    def get_stripy_outliers():
+        """
+        Generate a the outliers_detected bool, and then the outlier_loci dict
+        """
+        outlier_loci = {}
+        outliers_detected = random.choice([True, False])
+        if outliers_detected:
+            for loci in random.sample(LOCI, k=random.randint(1, len(LOCI))):
+                outlier_loci[loci] = random.choice(['1', '2', '3'])
+
+        return {
+            'outliers_detected': outliers_detected,
+            'outlier_loci': outlier_loci
+        }
+
     # Insert completed web analyses for the aligned sequencing groups
     for sg in aligned_sequencing_groups:
+        stripy_outliers = get_stripy_outliers()
         analyses_to_insert.extend(
             [
                 Analysis(
@@ -417,6 +441,8 @@ async def generate_web_report_analyses(project: str,
                         'sequencing_type': sg['type'],
                         # random size between 5, 50 MB
                         'size': random.randint(5 * 1024, 25 * 1024) * 1024,
+                        'outliers_detected': stripy_outliers['outliers_detected'],
+                        'outlier_loci': stripy_outliers['outlier_loci']
                     },
                 ),
                 Analysis(

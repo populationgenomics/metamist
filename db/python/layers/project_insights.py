@@ -1,4 +1,5 @@
-# pylint: disable=too-many-locals, too-many-instance-attributes, too-many-arguments, missing-class-docstring
+# mypy: disable-error-code="attr-defined,arg-type,index,call-overload"
+# pylint: disable=too-many-arguments,too-many-locals,missing-class-docstring
 import asyncio
 import itertools
 import json
@@ -144,7 +145,7 @@ class ProjectInsightsDb(DbBase):
             output=row['output'],
             timestamp_completed=row['timestamp_completed'],
         )
-        
+
     def convert_to_external_ids(self, external_ids_value: str | list[str]) -> list[str]:
         """Converts a string or list of strings to a list of strings"""
         if isinstance(external_ids_value, str):
@@ -340,7 +341,7 @@ GROUP BY
             family_id=sequencing_group_details.family_id,
             family_ext_id=sequencing_group_details.family_external_id,
             participant_id=sequencing_group_details.participant_id,
-            participant_ext_ids=sequencing_group_details.participant_external_id,
+            participant_ext_id=sequencing_group_details.participant_external_id,
             sample_id=sequencing_group_details.sample_id,
             sample_ext_ids=sample_ext_ids,
             sequencing_group_id=sequencing_group_details.sequencing_group_id,

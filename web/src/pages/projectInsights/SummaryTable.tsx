@@ -1,11 +1,12 @@
 // projectInsights/SummaryTable.tsx
-import Tooltip, { TooltipProps } from '@mui/material/Tooltip'
-import React, { useState } from 'react'
-import { Icon, Table as SUITable } from 'semantic-ui-react'
+import React, { ReactNode, useState } from 'react'
+import { Table as SUITable } from 'semantic-ui-react'
 import Table from '../../shared/components/Table'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
+import HtmlTooltip from '../../shared/utilities/htmlTooltip'
 import { ProjectInsightsSummary } from '../../sm-api'
-import FilterButton from './FilterButton'
+import { FooterCell, footerCellConfigs } from './SummaryTableFooterCell'
+import { ColumnKey, HeaderCell, headerCellConfigs } from './SummaryTableHeaderCell'
 
 interface SummaryTableProps {
     allData: ProjectInsightsSummary[]
@@ -16,6 +17,36 @@ interface SummaryTableProps {
     handleSelectionChange: (columnName: string, selectedOptions: string[]) => void
 }
 
+interface PercentageCellProps {
+    percentage: number
+    tooltipContent: ReactNode
+    isDarkMode: boolean
+    getPercentageColor: (percentage: number, isDarkMode: boolean) => string
+}
+
+const PercentageCell: React.FC<PercentageCellProps> = ({
+    percentage,
+    tooltipContent,
+    isDarkMode,
+    getPercentageColor,
+}) => (
+    <SUITable.Cell
+        className="SUITable-cell"
+        style={{
+            textAlign: 'center',
+            backgroundColor: getPercentageColor(percentage, isDarkMode),
+        }}
+    >
+        <HtmlTooltip title={tooltipContent}>
+            <div>{percentage.toFixed(2)}%</div>
+        </HtmlTooltip>
+    </SUITable.Cell>
+)
+
+function calculatePercentage(count: number, total: number): number {
+    return count > 0 ? (count / total) * 100 : 0
+}
+
 function getPercentageColor(percentage: number, isDarkMode: boolean) {
     const hue = (percentage / 100) * 120 // Convert percentage to hue value (0-120)
     const saturation = isDarkMode ? '100%' : '90%' // Set saturation based on mode
@@ -23,10 +54,6 @@ function getPercentageColor(percentage: number, isDarkMode: boolean) {
 
     return `hsl(${hue}, ${saturation}, ${lightness})`
 }
-
-const HtmlTooltip = (props: TooltipProps) => (
-    <Tooltip {...props} classes={{ popper: 'html-tooltip' }} />
-)
 
 const getRowClassName = (sequencingType: string) => {
     switch (sequencingType) {
@@ -39,27 +66,74 @@ const getRowClassName = (sequencingType: string) => {
     }
 }
 
+function isKeyOfProjectInsightsSummary(key: string): key is keyof ProjectInsightsSummary {
+    return key in ({} as ProjectInsightsSummary)
+}
+
 const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summary }) => {
     const theme = React.useContext(ThemeContext)
     const isDarkMode = theme.theme === 'dark-mode'
+
     const percentageAligned =
         summary.total_sequencing_groups > 0
             ? (summary.total_crams / summary.total_sequencing_groups) * 100
             : 0
+    const alignedCellTooltip = (
+        <p>
+            {summary.total_crams} / {summary.total_sequencing_groups} Total Sequencing Groups with a
+            Completed CRAM Analysis
+        </p>
+    )
 
-    const percentageInJointCall =
-        summary.latest_annotate_dataset?.sg_count ?? 0 > 0
-            ? ((summary.latest_annotate_dataset?.sg_count ?? 0) / summary.total_sequencing_groups) *
-              100
-            : 0
-    const percentageInSnvIndex =
-        summary.latest_snv_es_index?.sg_count ?? 0 > 0
-            ? ((summary.latest_snv_es_index?.sg_count ?? 0) / summary.total_sequencing_groups) * 100
-            : 0
-    const percentageInSvIndex =
-        summary.latest_sv_es_index?.sg_count ?? 0 > 0
-            ? ((summary.latest_sv_es_index?.sg_count ?? 0) / summary.total_sequencing_groups) * 100
-            : 0
+    const latestAnnotateSgCount = summary.latest_annotate_dataset?.sg_count ?? 0
+    const percentageInJointCall = calculatePercentage(
+        latestAnnotateSgCount,
+        summary.total_sequencing_groups
+    )
+    const inJointCallTooltip = (
+        <p>
+            {latestAnnotateSgCount} / {summary.total_sequencing_groups} Sequencing Groups
+            <br />
+            {summary.latest_annotate_dataset?.timestamp}
+            <br />
+            Latest {summary.sequencing_type} AnnotateDataset <br />
+            Analysis ID: {summary.latest_annotate_dataset?.id}
+        </p>
+    )
+
+    const latestSnvIndexSgCount = summary.latest_snv_es_index?.sg_count ?? 0
+    const percentageInSnvIndex = calculatePercentage(
+        latestSnvIndexSgCount,
+        summary.total_sequencing_groups
+    )
+    const inSnvIndexTooltip = (
+        <p>
+            {latestSnvIndexSgCount} / {summary.total_sequencing_groups} Sequencing Groups
+            <br />
+            Latest {summary.sequencing_type} SNV Index <br />
+            {summary.latest_snv_es_index?.timestamp}
+            <br />
+            Analysis ID: {summary.latest_snv_es_index?.id} <br />
+            {summary.latest_snv_es_index?.name}
+        </p>
+    )
+
+    const latestSvIndexSgCount = summary.latest_sv_es_index?.sg_count ?? 0
+    const percentageInSvIndex = calculatePercentage(
+        latestSvIndexSgCount,
+        summary.total_sequencing_groups
+    )
+    const inSvIndexTooltip = (
+        <p>
+            {latestSvIndexSgCount} / {summary.total_sequencing_groups} Sequencing Groups
+            <br />
+            Latest {summary.sequencing_type} SV Index <br />
+            {summary.latest_sv_es_index?.timestamp}
+            <br />
+            Analysis ID: {summary.latest_sv_es_index?.id} <br />
+            {summary.latest_sv_es_index?.name} <br />
+        </p>
+    )
 
     const rowClassName = getRowClassName(summary.sequencing_type)
 
@@ -82,113 +156,30 @@ const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summar
                 {summary.total_sequencing_groups}
             </SUITable.Cell>
             <SUITable.Cell className="SUITable-cell">{summary.total_crams}</SUITable.Cell>
-            <SUITable.Cell
-                className="SUITable-cell"
-                style={{
-                    textAlign: 'center',
-                    backgroundColor: getPercentageColor(percentageAligned, isDarkMode),
-                }}
-            >
-                <div style={{ display: 'flex', justifyContent: 'center' }}>
-                    <HtmlTooltip
-                        title={
-                            <p>
-                                {summary.total_crams} / {summary.total_sequencing_groups} <br />
-                                Sequencing Groups Aligned
-                            </p>
-                        }
-                    >
-                        <div>{percentageAligned.toFixed(2)}%</div>
-                    </HtmlTooltip>
-                </div>
-            </SUITable.Cell>
-            <SUITable.Cell
-                className="SUITable-cell"
-                style={{
-                    textAlign: 'center',
-                    backgroundColor: getPercentageColor(percentageInJointCall, isDarkMode),
-                }}
-            >
-                <div style={{ display: 'flex', justifyContent: 'center' }}>
-                    <HtmlTooltip
-                        title={
-                            <div>
-                                <p>
-                                    {summary.latest_annotate_dataset?.sg_count} /{' '}
-                                    {summary.total_sequencing_groups} Sequencing Groups
-                                </p>
-                                <p>{summary.latest_annotate_dataset?.timestamp}</p>
-                                <p>
-                                    Latest <em>{summary.sequencing_type}</em> AnnotateDataset <br />
-                                    Analysis ID: {summary.latest_annotate_dataset?.id}
-                                </p>
-                            </div>
-                        }
-                    >
-                        <div>{percentageInJointCall.toFixed(2)}%</div>
-                    </HtmlTooltip>
-                </div>
-            </SUITable.Cell>
-            <SUITable.Cell
-                className="SUITable-cell"
-                style={{
-                    textAlign: 'center',
-                    backgroundColor: getPercentageColor(percentageInSnvIndex, isDarkMode),
-                }}
-            >
-                <div style={{ display: 'flex', justifyContent: 'center' }}>
-                    <HtmlTooltip
-                        title={
-                            <div>
-                                <p>
-                                    {summary.latest_snv_es_index?.sg_count} /{' '}
-                                    {summary.total_sequencing_groups} Sequencing Groups
-                                </p>
-                                <p>
-                                    Latest <em>{summary.sequencing_type}</em> SNV Index <br />
-                                    {summary.latest_snv_es_index?.timestamp}
-                                </p>
-                                <p>
-                                    Analysis ID: {summary.latest_snv_es_index?.id} <br />
-                                    {summary.latest_snv_es_index?.name}
-                                </p>
-                            </div>
-                        }
-                    >
-                        <div>{percentageInSnvIndex.toFixed(2)}%</div>
-                    </HtmlTooltip>
-                </div>
-            </SUITable.Cell>
-            <SUITable.Cell
-                className="SUITable-cell"
-                style={{
-                    textAlign: 'center',
-                    backgroundColor: getPercentageColor(percentageInSvIndex, isDarkMode),
-                }}
-            >
-                <div style={{ display: 'flex', justifyContent: 'center' }}>
-                    <HtmlTooltip
-                        title={
-                            <div>
-                                <p>
-                                    {summary.latest_sv_es_index?.sg_count} /{' '}
-                                    {summary.total_sequencing_groups} Sequencing Groups
-                                </p>
-                                <p>
-                                    Latest <em>{summary.sequencing_type}</em> SV Index <br />
-                                    {summary.latest_sv_es_index?.timestamp}
-                                </p>
-                                <p>
-                                    Analysis ID: {summary.latest_sv_es_index?.id} <br />
-                                    {summary.latest_sv_es_index?.name} <br />
-                                </p>
-                            </div>
-                        }
-                    >
-                        <div>{percentageInSvIndex.toFixed(2)}%</div>
-                    </HtmlTooltip>
-                </div>
-            </SUITable.Cell>
+            <PercentageCell
+                percentage={percentageAligned}
+                tooltipContent={alignedCellTooltip}
+                isDarkMode={isDarkMode}
+                getPercentageColor={getPercentageColor}
+            ></PercentageCell>
+            <PercentageCell
+                percentage={percentageInJointCall}
+                tooltipContent={inJointCallTooltip}
+                isDarkMode={isDarkMode}
+                getPercentageColor={getPercentageColor}
+            ></PercentageCell>
+            <PercentageCell
+                percentage={percentageInSnvIndex}
+                tooltipContent={inSnvIndexTooltip}
+                isDarkMode={isDarkMode}
+                getPercentageColor={getPercentageColor}
+            ></PercentageCell>
+            <PercentageCell
+                percentage={percentageInSvIndex}
+                tooltipContent={inSvIndexTooltip}
+                isDarkMode={isDarkMode}
+                getPercentageColor={getPercentageColor}
+            ></PercentageCell>
         </SUITable.Row>
     )
 }
@@ -202,9 +193,9 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
     handleSelectionChange,
 }) => {
     const [sortColumns, setSortColumns] = useState<
-        Array<{ column: keyof ProjectInsightsSummary; direction: 'ascending' | 'descending' }>
+        Array<{ column: ColumnKey; direction: 'ascending' | 'descending' }>
     >([])
-    const handleSort = (column: keyof ProjectInsightsSummary, isMultiSort: boolean) => {
+    const handleSort = (column: ColumnKey, isMultiSort: boolean) => {
         if (isMultiSort) {
             const existingColumnIndex = sortColumns.findIndex(
                 (sortColumn) => sortColumn.column === column
@@ -239,8 +230,13 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
         const data = [...filteredData]
         data.sort((a, b) => {
             for (const { column, direction } of sortColumns) {
-                const valueA = a[column]
-                const valueB = b[column]
+                const valueA = isKeyOfProjectInsightsSummary(column)
+                    ? a[column]
+                    : (a as any)[column]
+                const valueB = isKeyOfProjectInsightsSummary(column)
+                    ? b[column]
+                    : (b as any)[column]
+
                 if (valueA === valueB) continue
                 if (typeof valueA === 'number' && typeof valueB === 'number') {
                     return direction === 'ascending' ? valueA - valueB : valueB - valueA
@@ -255,7 +251,7 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
         return data
     }, [filteredData, sortColumns])
 
-    const getUniqueOptionsForColumn = (columnName: keyof ProjectInsightsSummary) => {
+    const getUniqueOptionsForColumn = (columnName: ColumnKey) => {
         const filteredDataExcludingCurrentColumn = allData.filter((item) => {
             return (
                 selectedProjects.some((p) => p.name === item.dataset) &&
@@ -267,20 +263,18 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
         })
 
         let uniqueOptions: string[] = []
-        switch (columnName) {
-            case 'sequencing_technology':
-                uniqueOptions = Array.from(
-                    new Set(
-                        filteredDataExcludingCurrentColumn.map(
-                            (item) => item[columnName]?.toString() || ''
-                        )
+        if (isKeyOfProjectInsightsSummary(columnName)) {
+            uniqueOptions = Array.from(
+                new Set(
+                    filteredDataExcludingCurrentColumn.map(
+                        (item) => item[columnName]?.toString() || ''
                     )
                 )
-                break
-            default:
-                uniqueOptions = Array.from(
-                    new Set(filteredDataExcludingCurrentColumn.map((item) => item[columnName]))
-                ).map((option) => option?.toString() || '')
+            )
+        } else {
+            uniqueOptions = Array.from(
+                new Set(filteredDataExcludingCurrentColumn.map((item) => (item as any)[columnName]))
+            ).map((option) => option?.toString() || '')
         }
 
         return uniqueOptions
@@ -291,256 +285,25 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
             <Table sortable>
                 <SUITable.Header>
                     <SUITable.Row>
-                        <SUITable.HeaderCell
-                            className="header-cell"
-                            sorted={
-                                sortColumns.find((column) => column.column === 'dataset')?.direction
-                            }
-                            onClick={(event: React.MouseEvent<HTMLElement>) =>
-                                handleSort('dataset', event.shiftKey)
-                            }
-                        >
-                            Dataset
-                        </SUITable.HeaderCell>
-                        <SUITable.HeaderCell
-                            className="header-cell"
-                            sorted={
-                                sortColumns.find((column) => column.column === 'sequencing_type')
-                                    ?.direction
-                            }
-                            onClick={(event: React.MouseEvent<HTMLElement>) =>
-                                handleSort('sequencing_type', event.shiftKey)
-                            }
-                        >
-                            Seq Type
-                        </SUITable.HeaderCell>
-                        <SUITable.HeaderCell
-                            className="header-cell"
-                            onClick={(event: React.MouseEvent<HTMLElement>) =>
-                                handleSort('sequencing_technology', event.shiftKey)
-                            }
-                        >
-                            <div className="filter-button">
-                                <FilterButton
-                                    columnName="Technology"
-                                    options={getUniqueOptionsForColumn('sequencing_technology')}
-                                    selectedOptions={selectedSeqTechnologies}
-                                    onSelectionChange={(selectedOptions) =>
-                                        handleSelectionChange(
-                                            'sequencing_technology',
-                                            selectedOptions
-                                        )
-                                    }
-                                />
-                            </div>
-                            {sortColumns.find(
-                                (column) => column.column === 'sequencing_technology'
-                            ) && (
-                                <Icon
-                                    name={
-                                        sortColumns.find(
-                                            (column) => column.column === 'sequencing_technology'
-                                        )?.direction === 'ascending'
-                                            ? 'caret up'
-                                            : 'caret down'
-                                    }
-                                    className="sort-icon"
-                                />
-                            )}
-                            <div className="header-text">Technology</div>
-                        </SUITable.HeaderCell>
-                        <SUITable.HeaderCell
-                            className="header-cell"
-                            onClick={(event: React.MouseEvent<HTMLElement>) =>
-                                handleSort('total_families', event.shiftKey)
-                            }
-                        >
-                            {sortColumns.find((column) => column.column === 'total_families') && (
-                                <Icon
-                                    name={
-                                        sortColumns.find(
-                                            (column) => column.column === 'total_families'
-                                        )?.direction === 'ascending'
-                                            ? 'caret up'
-                                            : 'caret down'
-                                    }
-                                    className="sort-icon"
-                                />
-                            )}
-                            <div className="header-text">Families</div>
-                        </SUITable.HeaderCell>
-                        <SUITable.HeaderCell
-                            className="header-cell"
-                            onClick={(event: React.MouseEvent<HTMLElement>) =>
-                                handleSort('total_participants', event.shiftKey)
-                            }
-                        >
-                            {sortColumns.find(
-                                (column) => column.column === 'total_participants'
-                            ) && (
-                                <Icon
-                                    name={
-                                        sortColumns.find(
-                                            (column) => column.column === 'total_participants'
-                                        )?.direction === 'ascending'
-                                            ? 'caret up'
-                                            : 'caret down'
-                                    }
-                                    className="sort-icon"
-                                />
-                            )}
-                            <div className="header-text">Participants</div>
-                        </SUITable.HeaderCell>
-                        <SUITable.HeaderCell
-                            className="header-cell"
-                            onClick={(event: React.MouseEvent<HTMLElement>) =>
-                                handleSort('total_samples', event.shiftKey)
-                            }
-                        >
-                            {sortColumns.find((column) => column.column === 'total_samples') && (
-                                <Icon
-                                    name={
-                                        sortColumns.find(
-                                            (column) => column.column === 'total_samples'
-                                        )?.direction === 'ascending'
-                                            ? 'caret up'
-                                            : 'caret down'
-                                    }
-                                    className="sort-icon"
-                                />
-                            )}
-                            <div className="header-text">Samples</div>
-                        </SUITable.HeaderCell>
-                        <SUITable.HeaderCell
-                            className="header-cell"
-                            onClick={(event: React.MouseEvent<HTMLElement>) =>
-                                handleSort('total_sequencing_groups', event.shiftKey)
-                            }
-                        >
-                            {sortColumns.find(
-                                (column) => column.column === 'total_sequencing_groups'
-                            ) && (
-                                <Icon
-                                    name={
-                                        sortColumns.find(
-                                            (column) => column.column === 'total_sequencing_groups'
-                                        )?.direction === 'ascending'
-                                            ? 'caret up'
-                                            : 'caret down'
-                                    }
-                                    className="sort-icon"
-                                />
-                            )}
-                            <div className="header-text">Sequencing Groups</div>
-                        </SUITable.HeaderCell>
-                        <SUITable.HeaderCell
-                            className="header-cell"
-                            onClick={(event: React.MouseEvent<HTMLElement>) =>
-                                handleSort('total_crams', event.shiftKey)
-                            }
-                        >
-                            {sortColumns.find((column) => column.column === 'total_crams') && (
-                                <Icon
-                                    name={
-                                        sortColumns.find(
-                                            (column) => column.column === 'total_crams'
-                                        )?.direction === 'ascending'
-                                            ? 'caret up'
-                                            : 'caret down'
-                                    }
-                                    className="sort-icon"
-                                />
-                            )}
-                            <div className="header-text">CRAMs</div>
-                        </SUITable.HeaderCell>
-                        <SUITable.HeaderCell
-                            className="header-cell collapsible-header"
-                            onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
-                                event.currentTarget.classList.add('expanded')
-                            }}
-                            onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
-                                event.currentTarget.classList.remove('expanded')
-                            }}
-                        >
-                            <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                <HtmlTooltip
-                                    title={
-                                        <p>
-                                            Percentage of Sequencing Groups with a Completed CRAM
-                                            Analysis
-                                        </p>
-                                    }
-                                >
-                                    <div className="header-text">% Aligned</div>
-                                </HtmlTooltip>
-                            </div>
-                        </SUITable.HeaderCell>
-                        <SUITable.HeaderCell
-                            className="header-cell collapsible-header"
-                            onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
-                                event.currentTarget.classList.add('more-expanded')
-                            }}
-                            onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
-                                event.currentTarget.classList.remove('more-expanded')
-                            }}
-                        >
-                            <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                <HtmlTooltip
-                                    title={
-                                        <p>
-                                            Percentage of Sequencing Groups in the latest
-                                            AnnotateDataset Analysis
-                                        </p>
-                                    }
-                                >
-                                    <div className="header-text">% in Annotated Dataset</div>
-                                </HtmlTooltip>
-                            </div>
-                        </SUITable.HeaderCell>
-                        <SUITable.HeaderCell
-                            className="header-cell collapsible-header"
-                            onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
-                                event.currentTarget.classList.add('more-expanded')
-                            }}
-                            onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
-                                event.currentTarget.classList.remove('more-expanded')
-                            }}
-                        >
-                            <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                <HtmlTooltip
-                                    title={
-                                        <p>
-                                            Percentage of Sequencing Groups in the latest SNV
-                                            ES-Index Analysis
-                                        </p>
-                                    }
-                                >
-                                    <div className="header-text">% in SNV ES-Index</div>
-                                </HtmlTooltip>
-                            </div>
-                        </SUITable.HeaderCell>
-                        <SUITable.HeaderCell
-                            className="header-cell collapsible-header"
-                            onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
-                                event.currentTarget.classList.add('more-expanded')
-                            }}
-                            onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
-                                event.currentTarget.classList.remove('more-expanded')
-                            }}
-                        >
-                            <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                <HtmlTooltip
-                                    title={
-                                        <p>
-                                            Percentage of Sequencing Groups in the latest SV
-                                            (genome) or gCNV (exome) ES-Index Analysis
-                                        </p>
-                                    }
-                                >
-                                    <div className="header-text">% in SV ES-Index</div>
-                                </HtmlTooltip>
-                            </div>
-                        </SUITable.HeaderCell>
+                        {headerCellConfigs.map((config) => (
+                            <HeaderCell
+                                key={config.key}
+                                config={config}
+                                sortDirection={
+                                    sortColumns.find((col) => col.column === config.key)?.direction
+                                }
+                                onSort={handleSort}
+                                onFilter={handleSelectionChange}
+                                getUniqueOptionsForColumn={getUniqueOptionsForColumn}
+                                selectedOptions={
+                                    config.key === 'sequencing_technology'
+                                        ? selectedSeqTechnologies
+                                        : config.key === 'sequencing_type'
+                                        ? selectedSeqTypes
+                                        : []
+                                }
+                            />
+                        ))}
                     </SUITable.Row>
                 </SUITable.Header>
                 <SUITable.Body>
@@ -553,184 +316,9 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                 </SUITable.Body>
                 <SUITable.Footer>
                     <SUITable.Row className="grand-total-row" key="grandTotals">
-                        <SUITable.Cell className="SUITable-cell">Grand Total</SUITable.Cell>
-                        <SUITable.Cell className="SUITable-cell">
-                            {sortedData.length} entries
-                        </SUITable.Cell>
-                        <SUITable.Cell className="SUITable-cell"></SUITable.Cell>
-                        <SUITable.Cell className="SUITable-cell">
-                            {filteredData.reduce((acc, curr) => acc + curr.total_families, 0)}
-                        </SUITable.Cell>
-                        <SUITable.Cell className="SUITable-cell">
-                            {filteredData.reduce((acc, curr) => acc + curr.total_participants, 0)}
-                        </SUITable.Cell>
-                        <SUITable.Cell className="SUITable-cell">
-                            {filteredData.reduce((acc, curr) => acc + curr.total_samples, 0)}
-                        </SUITable.Cell>
-                        <SUITable.Cell className="SUITable-cell">
-                            {filteredData.reduce(
-                                (acc, curr) => acc + curr.total_sequencing_groups,
-                                0
-                            )}
-                        </SUITable.Cell>
-                        <SUITable.Cell className="SUITable-cell">
-                            {filteredData.reduce((acc, curr) => acc + curr.total_crams, 0)}
-                        </SUITable.Cell>
-                        <SUITable.Cell className="SUITable-cell">
-                            <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                <HtmlTooltip
-                                    title={
-                                        <p>
-                                            {filteredData.reduce(
-                                                (acc, curr) => acc + curr.total_crams,
-                                                0
-                                            )}{' '}
-                                            /{' '}
-                                            {filteredData.reduce(
-                                                (acc, curr) => acc + curr.total_sequencing_groups,
-                                                0
-                                            )}{' '}
-                                            Total Sequencing Groups with a Completed CRAM Analysis
-                                        </p>
-                                    }
-                                >
-                                    <div>
-                                        {(
-                                            (filteredData.reduce(
-                                                (acc, curr) => acc + curr.total_crams,
-                                                0
-                                            ) /
-                                                filteredData.reduce(
-                                                    (acc, curr) =>
-                                                        acc + curr.total_sequencing_groups,
-                                                    0
-                                                )) *
-                                                100 || 0
-                                        ).toFixed(2)}
-                                        %
-                                    </div>
-                                </HtmlTooltip>
-                            </div>
-                        </SUITable.Cell>
-                        <SUITable.Cell className="SUITable-cell">
-                            <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                <HtmlTooltip
-                                    title={
-                                        <p>
-                                            {filteredData.reduce(
-                                                (acc, curr) =>
-                                                    acc +
-                                                    (curr.latest_annotate_dataset?.sg_count ?? 0),
-                                                0
-                                            )}{' '}
-                                            /{' '}
-                                            {filteredData.reduce(
-                                                (acc, curr) => acc + curr.total_sequencing_groups,
-                                                0
-                                            )}{' '}
-                                            Total Sequencing Groups in the latest AnnotateDataset
-                                            analysis
-                                        </p>
-                                    }
-                                >
-                                    <div>
-                                        {(
-                                            (filteredData.reduce(
-                                                (acc, curr) =>
-                                                    acc +
-                                                    (curr.latest_annotate_dataset?.sg_count ?? 0),
-                                                0
-                                            ) /
-                                                filteredData.reduce(
-                                                    (acc, curr) =>
-                                                        acc + curr.total_sequencing_groups,
-                                                    0
-                                                )) *
-                                                100 || 0
-                                        ).toFixed(2)}
-                                        %
-                                    </div>
-                                </HtmlTooltip>
-                            </div>
-                        </SUITable.Cell>
-                        <SUITable.Cell className="SUITable-cell">
-                            <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                <HtmlTooltip
-                                    title={
-                                        <p>
-                                            {filteredData.reduce(
-                                                (acc, curr) =>
-                                                    acc + (curr.latest_snv_es_index?.sg_count ?? 0),
-                                                0
-                                            )}{' '}
-                                            /{' '}
-                                            {filteredData.reduce(
-                                                (acc, curr) => acc + curr.total_sequencing_groups,
-                                                0
-                                            )}{' '}
-                                            Total Sequencing Groups in the latest SNV Elasticsearch
-                                            Index
-                                        </p>
-                                    }
-                                >
-                                    <div>
-                                        {(
-                                            (filteredData.reduce(
-                                                (acc, curr) =>
-                                                    acc + (curr.latest_snv_es_index?.sg_count ?? 0),
-                                                0
-                                            ) /
-                                                filteredData.reduce(
-                                                    (acc, curr) =>
-                                                        acc + curr.total_sequencing_groups,
-                                                    0
-                                                )) *
-                                                100 || 0
-                                        ).toFixed(2)}
-                                        %
-                                    </div>
-                                </HtmlTooltip>
-                            </div>
-                        </SUITable.Cell>
-                        <SUITable.Cell className="SUITable-cell">
-                            <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                <HtmlTooltip
-                                    title={
-                                        <p>
-                                            {filteredData.reduce(
-                                                (acc, curr) =>
-                                                    acc + (curr.latest_sv_es_index?.sg_count ?? 0),
-                                                0
-                                            )}{' '}
-                                            /{' '}
-                                            {filteredData.reduce(
-                                                (acc, curr) => acc + curr.total_sequencing_groups,
-                                                0
-                                            )}{' '}
-                                            Total Sequencing Groups in the latest SV Elasticsearch
-                                            Index
-                                        </p>
-                                    }
-                                >
-                                    <div>
-                                        {(
-                                            (filteredData.reduce(
-                                                (acc, curr) =>
-                                                    acc + (curr.latest_sv_es_index?.sg_count ?? 0),
-                                                0
-                                            ) /
-                                                filteredData.reduce(
-                                                    (acc, curr) =>
-                                                        acc + curr.total_sequencing_groups,
-                                                    0
-                                                )) *
-                                                100 || 0
-                                        ).toFixed(2)}
-                                        %
-                                    </div>
-                                </HtmlTooltip>
-                            </div>
-                        </SUITable.Cell>
+                        {footerCellConfigs.map((config) => (
+                            <FooterCell key={config.key} config={config} data={filteredData} />
+                        ))}
                     </SUITable.Row>
                 </SUITable.Footer>
             </Table>
