@@ -11,7 +11,7 @@ pylint
 testcontainers[mysql]>=4.5.0
 types-PyMySQL
 # some strawberry dependency
-strawberry-graphql[debug-server]==0.229.0
+strawberry-graphql[debug-server]==0.235.1.dev.1719337273
 # following required to unit test etl functions
 functions_framework
 google-cloud-bigquery

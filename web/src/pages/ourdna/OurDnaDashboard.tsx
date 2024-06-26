@@ -48,7 +48,7 @@ const GET_OURDNA_DASHBOARD = gql(`
                     receivedBy
                     receivedTime
                     sampleId
-                    timeToProcessStart
+                    timeSinceCollection
                 }
                 totalSamplesByCollectionEventName
             }
@@ -74,7 +74,7 @@ const Dashboard = () => {
     const samplesLostAfterCollections =
         data.project.ourdnaDashboard.samplesLostAfterCollection.reduce(
             (rr: Record<string, any>, sample) => {
-                rr[sample.sampleId] = sample.timeToProcessStart / 3600
+                rr[sample.sampleId] = sample.timeSinceCollection / 3600
                 return rr
             },
             {}
@@ -224,7 +224,7 @@ const Dashboard = () => {
                             </GridColumn>
                             <GridColumn>
                                 <TableTile
-                                    header="Processed > 24h"
+                                    header="Lost Samples"
                                     data={samplesLostAfterCollections}
                                     columns={['Sample ID', 'Time (h)']}
                                     icon={

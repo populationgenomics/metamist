@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Table as SUITable, Popup, Checkbox } from 'semantic-ui-react'
+import { Table as SUITable, Popup, Checkbox, Button, Label, Icon } from 'semantic-ui-react'
 import _, { Dictionary } from 'lodash'
 import Table from '../../../shared/components/Table'
 import sanitiseValue from '../../../shared/utilities/sanitiseValue'
@@ -56,13 +56,24 @@ const MAIN_FIELDS: IMainField[] = [
                             cursor: 'pointer',
                         }}
                     >
-                        {log.arGuid.substring(0, 7)}
+                        <a
+                            href={`${`/billing/costByAnalysis?searchType=0&searchTxt=${log.arGuid}`}`}
+                            rel="noopener noreferrer"
+                            target="_blank"
+                        >
+                            {log.arGuid.substring(0, 7)}
+                        </a>
                     </span>
                 }
                 hoverable
                 position="bottom center"
             >
-                {log.arGuid}
+                <Button as="div" labelPosition="left">
+                    <Label basic>{log.arGuid}</Label>
+                    <Button icon onClick={() => navigator.clipboard.writeText(log.arGuid)}>
+                        <Icon name="copy" />
+                    </Button>
+                </Button>
             </Popup>
         ),
     },

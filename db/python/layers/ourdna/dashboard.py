@@ -106,6 +106,13 @@ class SampleProcessMeta:
         return None
 
     @cached_property
+    def time_since_collection(self) -> int | None:
+        """Get the time since the sample was collected."""
+        if self.collection_time:
+            return int((datetime.now() - self.collection_time).total_seconds())
+        return None
+
+    @cached_property
     def get_lost_sample_properties(self) -> OurDNALostSample:
         """Returns the normalised properties to report for a sample that has been lost"""
         return OurDNALostSample(
@@ -128,15 +135,17 @@ class SampleProcessMeta:
             courier_actual_dropoff_time=self.get_property(
                 'courier-actual-dropoff-time'
             ),
-            time_to_process_start=self.collection_to_process_start_time,
+            time_since_collection=self.time_since_collection,
         )
 
     @cached_property
     def is_lost(self) -> bool:
         """Returns True if the sample is considered lost, otherwise False."""
-        time_to_process_start = self.collection_to_process_start_time
-        if time_to_process_start and time_to_process_start > 72 * 60 * 60:
-            return True
+        # if time since collection time is > 72 hours and process_start_time is None, return True else False
+        if self.collection_time:
+            return (
+                datetime.now() - self.collection_time
+            ).total_seconds() > 72 * 60 * 60 and self.process_start_time is None
         return False
 
 
@@ -159,7 +168,11 @@ class OurDnaDashboardLayer(BaseLayer):
 
         s, participants = await asyncio.gather(
             self.sample_layer.query(
-                filter_=SampleFilter(project=GenericFilter(eq=project_id))
+                filter_=SampleFilter(
+                    # Added `ebld` filtering temporarily to prevent duplicate rows
+                    project=GenericFilter(eq=project_id),
+                    type=GenericFilter(eq='ebld'),
+                )
             ),
             self.participant_layer.get_participants(project=project_id),
         )
