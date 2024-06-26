@@ -359,7 +359,7 @@ html[data-theme='dark-mode'] .ui.table {
 
 .ui.table .header-cell {
     text-align: center;
-    font-size: 1.1em;
+    font-size: 1em;
     padding: 30px 5px 10px !important;
     min-width: 100px !important;
     max-width: 350px !important;
@@ -374,6 +374,14 @@ html[data-theme='dark-mode'] .ui.table {
     justify-content: center;
 }
 
+.ui.table .percentage-cell {
+    text-align: center;
+    vertical-align: middle;
+    color: var(--color-text-primary) !important;
+    word-wrap: normal !important;
+    overflow-wrap: normal !important;
+}
+
 .header-cell .header-text {
     margin-top: 20px;
 }
@@ -381,14 +389,6 @@ html[data-theme='dark-mode'] .ui.table {
 .header-cell .filter-button {
     position: absolute;
     top: 5px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1;
-}
-
-.header-cell .sort-icon {
-    position: absolute;
-    top: 30px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 1;
@@ -418,7 +418,7 @@ html[data-theme='dark-mode'] .ui.table {
     text-align: center;
     vertical-align: middle;
     color: var(--color-text-primary);
-    font-size: 1.25em;
+    font-size: 1.1em;
     font-weight: bold;
 }
 
@@ -435,12 +435,6 @@ html[data-theme='dark-mode'] .ui.table {
 .rna-row {
     background-color: var(--color-rna-row);
     border-color: var(--color-border-default);
-}
-
-.page-total-row {
-    background-color: var(--color-page-total-row);
-    border-color: var(--color-border-default);
-    font-weight: bold;
 }
 
 .grand-total-row {

@@ -98,7 +98,7 @@ export const summaryTableHeaderCellConfigs: HeaderCellConfig[] = [
     },
     {
         key: 'annotated_dataset_percentage',
-        label: '% in Annotated Dataset',
+        label: '% in Joint Callset',
         sortable: false,
         tooltip: 'Percentage of Sequencing Groups in the latest AnnotateDataset Analysis',
         className: 'collapsible-header',
@@ -136,12 +136,12 @@ export const detailsTableHeaderCellConfigs: HeaderCellConfig[] = [
     { key: 'completed_cram', label: 'Completed CRAM', sortable: true, filterable: true },
     {
         key: 'in_latest_annotate_dataset',
-        label: 'In Annotated Dataset',
+        label: 'In Joint Callset',
         sortable: true,
         filterable: true,
     },
-    { key: 'in_latest_snv_index', label: 'In SNV ES-Index', sortable: true, filterable: true },
-    { key: 'in_latest_sv_index', label: 'In SV ES-Index', sortable: true, filterable: true },
+    { key: 'in_latest_snv_es_index', label: 'In SNV ES-Index', sortable: true, filterable: true },
+    { key: 'in_latest_sv_es_index', label: 'In SV ES-Index', sortable: true, filterable: true },
     { key: 'stripy', label: 'Stripy', sortable: true, filterable: true },
     { key: 'mito', label: 'Mito', sortable: true, filterable: true },
 ]

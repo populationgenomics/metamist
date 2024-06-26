@@ -1,6 +1,6 @@
 // DetailsTable.tsx
 import React, { useState } from 'react'
-import { Button, Table as SUITable } from 'semantic-ui-react'
+import { Dropdown, Table as SUITable } from 'semantic-ui-react'
 import Table from '../../shared/components/Table'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
 import { ProjectInsightsDetails } from '../../sm-api'
@@ -9,7 +9,7 @@ import { ColumnKey, HeaderCell, detailsTableHeaderCellConfigs } from './HeaderCe
 interface DetailsTableProps {
     allData: ProjectInsightsDetails[]
     filteredData: ProjectInsightsDetails[]
-    selectedProjects: { name: string }[]
+    selectedProjects: string[]
     selectedSeqTypes: string[]
     selectedSeqPlatforms: string[]
     selectedSeqTechnologies: string[]
@@ -57,54 +57,54 @@ const DetailsTableRow: React.FC<{ details: ProjectInsightsDetails }> = ({ detail
             <SUITable.Cell data-cell className="category-cell">
                 {details.sequencing_type}
             </SUITable.Cell>
-            <SUITable.Cell data-cell className="SUITable-cell">
+            <SUITable.Cell data-cell className="table-cell">
                 {details.sequencing_technology}
             </SUITable.Cell>
-            <SUITable.Cell data-cell className="SUITable-cell">
+            <SUITable.Cell data-cell className="table-cell">
                 {details.sequencing_platform}
             </SUITable.Cell>
-            <SUITable.Cell data-cell className="SUITable-cell">
+            <SUITable.Cell data-cell className="table-cell">
                 {details.sample_type}
             </SUITable.Cell>
-            <SUITable.Cell data-cell className="SUITable-cell">
+            <SUITable.Cell data-cell className="table-cell">
                 {details.sequencing_group_id}
             </SUITable.Cell>
-            <SUITable.Cell data-cell className="SUITable-cell">
+            <SUITable.Cell data-cell className="table-cell">
                 {details.family_id}
             </SUITable.Cell>
-            <SUITable.Cell data-cell className="SUITable-cell">
+            <SUITable.Cell data-cell className="table-cell">
                 {details.family_ext_id}
             </SUITable.Cell>
-            <SUITable.Cell data-cell className="SUITable-cell">
+            <SUITable.Cell data-cell className="table-cell">
                 {details.participant_id}
             </SUITable.Cell>
-            <SUITable.Cell data-cell className="SUITable-cell">
+            <SUITable.Cell data-cell className="table-cell">
                 {details.participant_ext_id}
             </SUITable.Cell>
-            <SUITable.Cell data-cell className="SUITable-cell">
+            <SUITable.Cell data-cell className="table-cell">
                 {details.sample_id}
             </SUITable.Cell>
-            <SUITable.Cell data-cell className="SUITable-cell">
+            <SUITable.Cell data-cell className="table-cell">
                 {details.sample_ext_ids}
             </SUITable.Cell>
-            <SUITable.Cell data-cell className="SUITable-cell">
+            <SUITable.Cell data-cell className="table-cell">
                 {details.completed_cram ? '✅' : '❌'}
             </SUITable.Cell>
-            <SUITable.Cell className="SUITable-cell">
+            <SUITable.Cell className="table-cell">
                 {details.in_latest_annotate_dataset ? '✅' : '❌'}
             </SUITable.Cell>
-            <SUITable.Cell className="SUITable-cell">
+            <SUITable.Cell className="table-cell">
                 {details.in_latest_snv_es_index ? '✅' : '❌'}
             </SUITable.Cell>
-            <SUITable.Cell className="SUITable-cell">
+            <SUITable.Cell className="table-cell">
                 {details.in_latest_sv_es_index ? '✅' : '❌'}
             </SUITable.Cell>
-            <SUITable.Cell data-cell className="SUITable-cell">
+            <SUITable.Cell data-cell className="table-cell">
                 {details.web_reports?.stripy ? (
                     <a href={(details.web_reports.stripy as { url: string }).url}>Link</a>
                 ) : null}
             </SUITable.Cell>
-            <SUITable.Cell data-cell className="SUITable-cell">
+            <SUITable.Cell data-cell className="table-cell">
                 {details.web_reports?.mito ? (
                     <a href={(details.web_reports.mito as { url: string }).url}>Link</a>
                 ) : null}
@@ -197,7 +197,7 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
     const getUniqueOptionsForColumn = (columnName: ColumnKey) => {
         const filteredDataExcludingCurrentColumn = allData.filter((item) => {
             return (
-                selectedProjects.some((p) => p.name === item.dataset) &&
+                selectedProjects.some((p) => p === item.dataset) &&
                 selectedSeqTypes.includes(item.sequencing_type) &&
                 (columnName === 'sample_type' ||
                     selectedSampleTypes.length === 0 ||
@@ -311,9 +311,9 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
     }
 
     const exportToFile = (format: 'csv' | 'tsv') => {
-        const headerCells = document.querySelectorAll('.ui.SUITable thead tr th')
+        const headerCells = document.querySelectorAll('#project-insights-details-table thead tr th')
         const headerData = Array.from(headerCells).map((cell) => cell.textContent)
-        const rows = document.querySelectorAll('.ui.SUITable tbody tr')
+        const rows = document.querySelectorAll('#project-insights-details-table tbody tr')
         const rowData = Array.from(rows).map((row) => {
             const cells = row.querySelectorAll('td')
             return Array.from(cells).map((cell) => {
@@ -345,13 +345,26 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
         document.body.removeChild(link)
     }
 
+    const exportOptions = [
+        { key: 'csv', text: 'Export to CSV', value: 'csv' },
+        { key: 'tsv', text: 'Export to TSV', value: 'tsv' },
+    ]
+
     return (
         <div>
             <div style={{ textAlign: 'right' }}>
-                <Button onClick={() => exportToFile('csv')}>Export to CSV</Button>
-                <Button onClick={() => exportToFile('tsv')}>Export to TSV</Button>
+                <Dropdown
+                    button
+                    className="icon"
+                    floating
+                    labeled
+                    icon="download"
+                    options={exportOptions}
+                    text="Export"
+                    onChange={(_, data) => exportToFile(data.value as 'csv' | 'tsv')}
+                />
             </div>
-            <Table sortable>
+            <Table sortable id="project-insights-details-table">
                 <SUITable.Header>
                     <SUITable.Row>
                         {detailsTableHeaderCellConfigs.map((config) => (

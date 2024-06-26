@@ -5,18 +5,13 @@ import { EnumsApi, ProjectApi, ProjectInsightsApi, ProjectInsightsDetails } from
 import DetailsTable from './DetailsTable'
 import ProjectAndSeqTypeSelector from './ProjectAndSeqTypeSelector'
 
-interface SelectedProject {
-    id: number
-    name: string
-}
-
 const Details: React.FC = () => {
     // Get the list of  projects from the project API
     const [allData, setAllData] = useState<ProjectInsightsDetails[]>([])
     const [projectNames, setProjectNames] = React.useState<string[]>([])
     const [projectIds, setProjectIds] = React.useState<number[]>([])
-    const [selectedProjects, setSelectedProjects] = React.useState<SelectedProject[]>([])
-    const [fetchedProjects, setFetchedProjects] = React.useState<SelectedProject[]>([])
+    const [selectedProjects, setSelectedProjects] = React.useState<string[]>([])
+    const [fetchedProjects, setFetchedProjects] = React.useState<string[]>([])
     // New state for sequencing types
     const [seqTypes, setSeqTypes] = React.useState<string[]>([])
     const [selectedSeqTypes, setSelectedSeqTypes] = React.useState<string[]>([])
@@ -57,7 +52,7 @@ const Details: React.FC = () => {
             })
     }, [])
 
-    const handleProjectChange = (selectedProjects: { id: number; name: string }[]) => {
+    const handleProjectChange = (selectedProjects: string[]) => {
         setSelectedProjects(selectedProjects)
     }
 
@@ -79,11 +74,9 @@ const Details: React.FC = () => {
     }
 
     const fetchSelectedData = async () => {
-        const selectedProjectNames = selectedProjects.map((project) => project.name)
-
         try {
             const detailsResp = await new ProjectInsightsApi().getProjectInsightsDetails({
-                project_names: selectedProjectNames,
+                project_names: selectedProjects,
                 sequencing_types: selectedSeqTypes,
             })
             setAllData(detailsResp.data)
@@ -96,7 +89,7 @@ const Details: React.FC = () => {
 
     const filteredData = allData.filter(
         (item) =>
-            fetchedProjects.some((p) => p.name === item.dataset) &&
+            fetchedProjects.some((p) => p === item.dataset) &&
             fetchedSeqTypes.includes(item.sequencing_type) &&
             (selectedSeqPlatforms.length === 0 ||
                 selectedSeqPlatforms.includes(item.sequencing_platform)) &&
@@ -190,12 +183,9 @@ const Details: React.FC = () => {
     }
 
     return (
-        <div>
+        <>
             <ProjectAndSeqTypeSelector
-                projects={projectNames.map((name, index) => ({
-                    id: projectIds[index],
-                    name,
-                }))}
+                projects={projectNames}
                 seqTypes={seqTypes}
                 selectedProjects={selectedProjects}
                 selectedSeqTypes={selectedSeqTypes}
@@ -232,7 +222,7 @@ const Details: React.FC = () => {
                 selectedMito={selectedMito}
                 handleSelectionChange={handleSelectionChange}
             ></DetailsTable>
-        </div>
+        </>
     )
 }
 

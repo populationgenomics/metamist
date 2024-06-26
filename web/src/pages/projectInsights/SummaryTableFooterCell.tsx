@@ -42,7 +42,7 @@ export const FooterCell: React.FC<FooterCellProps> = ({ config, data }) => {
         value
     )
 
-    return <SUITable.Cell className="SUITable-cell">{cellContent}</SUITable.Cell>
+    return <SUITable.Cell className="table-cell">{cellContent}</SUITable.Cell>
 }
 
 export const footerCellConfigs: FooterCellConfig[] = [

@@ -11,7 +11,7 @@ import { FooterCell, footerCellConfigs } from './SummaryTableFooterCell'
 interface SummaryTableProps {
     allData: ProjectInsightsSummary[]
     filteredData: ProjectInsightsSummary[]
-    selectedProjects: { name: string }[]
+    selectedProjects: string[]
     selectedSeqTypes: string[]
     selectedSeqTechnologies: string[]
     handleSelectionChange: (columnName: string, selectedOptions: string[]) => void
@@ -31,11 +31,8 @@ const PercentageCell: React.FC<PercentageCellProps> = ({
     getPercentageColor,
 }) => (
     <SUITable.Cell
-        className="SUITable-cell"
-        style={{
-            textAlign: 'center',
-            backgroundColor: getPercentageColor(percentage, isDarkMode),
-        }}
+        className="percentage-cell"
+        style={{ backgroundColor: getPercentageColor(percentage, isDarkMode) }}
     >
         <HtmlTooltip title={tooltipContent}>
             <div>{percentage.toFixed(2)}%</div>
@@ -148,14 +145,12 @@ const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summar
             <SUITable.Cell data-cell className="category-cell">
                 {summary.sequencing_type}
             </SUITable.Cell>
-            <SUITable.Cell className="SUITable-cell">{summary.sequencing_technology}</SUITable.Cell>
-            <SUITable.Cell className="SUITable-cell">{summary.total_families}</SUITable.Cell>
-            <SUITable.Cell className="SUITable-cell">{summary.total_participants}</SUITable.Cell>
-            <SUITable.Cell className="SUITable-cell">{summary.total_samples}</SUITable.Cell>
-            <SUITable.Cell className="SUITable-cell">
-                {summary.total_sequencing_groups}
-            </SUITable.Cell>
-            <SUITable.Cell className="SUITable-cell">{summary.total_crams}</SUITable.Cell>
+            <SUITable.Cell className="table-cell">{summary.sequencing_technology}</SUITable.Cell>
+            <SUITable.Cell className="table-cell">{summary.total_families}</SUITable.Cell>
+            <SUITable.Cell className="table-cell">{summary.total_participants}</SUITable.Cell>
+            <SUITable.Cell className="table-cell">{summary.total_samples}</SUITable.Cell>
+            <SUITable.Cell className="table-cell">{summary.total_sequencing_groups}</SUITable.Cell>
+            <SUITable.Cell className="table-cell">{summary.total_crams}</SUITable.Cell>
             <PercentageCell
                 percentage={percentageAligned}
                 tooltipContent={alignedCellTooltip}
@@ -254,7 +249,7 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
     const getUniqueOptionsForColumn = (columnName: ColumnKey) => {
         const filteredDataExcludingCurrentColumn = allData.filter((item) => {
             return (
-                selectedProjects.some((p) => p.name === item.dataset) &&
+                selectedProjects.some((p) => p === item.dataset) &&
                 selectedSeqTypes.includes(item.sequencing_type) &&
                 (columnName === 'sequencing_technology' ||
                     selectedSeqTechnologies.length === 0 ||
