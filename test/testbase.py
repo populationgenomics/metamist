@@ -253,12 +253,24 @@ class DbIsolatedTest(DbTest):
         super().setUp()
 
         ignore = {'DATABASECHANGELOG', 'DATABASECHANGELOGLOCK', 'project', 'group'}
+        await self.connection.connection.execute('SET FOREIGN_KEY_CHECKS=0')
         for table in TABLES_ORDERED_BY_FK_DEPS:
             if table in ignore:
                 continue
             try:
+                # mfranklin: Can't use truncate, despite what the docs say
+                #   docs: https://mariadb.com/kb/en/truncate-table/
+                #   error: System-versioned tables do not support TRUNCATE TABLE'
+                #   ticket: https://jira.mariadb.org/browse/MDEV-28439
+                #
+                # so disable FK checks earlier to more easily delete all rows
                 await self.connection.connection.execute(
-                    f'TRUNCATE `{table}`;'
+                    f'DELETE FROM `{table}` WHERE 1;'
+                )
+                await self.connection.connection.execute(
+                    f'DELETE HISTORY FROM `{table}`'
                 )
             except IntegrityError as e:
                 raise IntegrityError(f'Could not delete {table}') from e
+
+        await self.connection.connection.execute('SET FOREIGN_KEY_CHECKS=1')
