@@ -30,7 +30,7 @@ def get_sample_model():
                 meta={
                     'meta-key': 'meta-value',
                 },
-                external_ids={},
+                external_ids={'ext': 'some-ext-id'},
                 assays=[
                     AssayUpsertInternal(
                         type='sequencing',
