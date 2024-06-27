@@ -173,7 +173,6 @@ class ProjectParticipantGridResponse(SMBase):
         sample_meta_keys: dict[str, bool] = {}
         sg_meta_keys: dict[str, bool] = {}
         assay_meta_keys: dict[str, bool] = {}
-        has_nested_samples = False
 
         if filter_fields.family and filter_fields.family.meta:
             family_meta_keys.update({k: True for k in filter_fields.family.meta.keys()})
