@@ -87,7 +87,7 @@ export const summaryTableHeaderCellConfigs: HeaderCellConfig[] = [
     { key: 'total_families', label: 'Families', sortable: true },
     { key: 'total_participants', label: 'Participants', sortable: true },
     { key: 'total_samples', label: 'Samples', sortable: true },
-    { key: 'total_sequencing_groups', label: 'Sequencing Groups', sortable: true },
+    { key: 'total_sequencing_groups', label: 'SGs', sortable: true },
     { key: 'total_crams', label: 'CRAMs', sortable: true },
     {
         key: 'aligned_percentage',

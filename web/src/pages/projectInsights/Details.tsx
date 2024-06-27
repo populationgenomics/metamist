@@ -9,7 +9,6 @@ const Details: React.FC = () => {
     // Get the list of  projects from the project API
     const [allData, setAllData] = useState<ProjectInsightsDetails[]>([])
     const [projectNames, setProjectNames] = React.useState<string[]>([])
-    const [projectIds, setProjectIds] = React.useState<number[]>([])
     const [selectedProjects, setSelectedProjects] = React.useState<string[]>([])
     const [fetchedProjects, setFetchedProjects] = React.useState<string[]>([])
     // New state for sequencing types
@@ -44,7 +43,6 @@ const Details: React.FC = () => {
 
                 const projects: { id: number; name: string }[] = projectsResp.data
                 setProjectNames(projects.map((project) => project.name))
-                setProjectIds(projects.map((project) => project.id))
             })
             .catch((error) => {
                 // Handle any errors that occur during the API calls

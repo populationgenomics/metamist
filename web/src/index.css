@@ -401,7 +401,7 @@ html[data-theme='dark-mode'] .ui.table {
 }
 
 .ui.table .header-cell.collapsible-header.expanded {
-    width: 100px !important;
+    width: 150px !important;
 }
 .ui.table .header-cell.collapsible-header:not(.expanded) {
     width: 70px !important;
@@ -409,7 +409,6 @@ html[data-theme='dark-mode'] .ui.table {
 
 .ui.table .header-cell.collapsible-header:not(.expanded) .header-text {
     overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
     max-width: 100%;
 }
