@@ -82,7 +82,8 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
         }
         const q = new URLSearchParams(qParams).toString()
 
-        const pageSuffix = pageNumber ? `/${pageNumber}` : ''
+        const newPageNumber = options.pageNumber || pageNumber
+        const pageSuffix = newPageNumber ? `/${newPageNumber}` : ''
         navigate(`/project/${projectName}${pageSuffix}?${q}`)
     }
 
@@ -227,7 +228,9 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
             >
                 <Dropdown
                     selection
-                    onChange={(_, data) => setPageOptions({ pageSize: data.value as number })}
+                    onChange={(_, data) =>
+                        setPageOptions({ pageSize: data.value as number, pageNumber: 1 })
+                    }
                     value={pageSize}
                     options={PAGE_SIZES.map((s) => ({
                         key: s,
