@@ -77,7 +77,11 @@ const FamilyCells: React.FC<{
             >
                 {field.key == 'external_id'
                     ? participant.families.map((f) => (
-                          <FamilyLink id={`${f.id ?? ''}`} projectName={projectName}>
+                          <FamilyLink
+                              key={`family-${participant.id}-${f.id}`}
+                              id={`${f.id ?? ''}`}
+                              projectName={projectName}
+                          >
                               {f.external_id}
                           </FamilyLink>
                       ))
