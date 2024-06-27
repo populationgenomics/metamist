@@ -133,6 +133,7 @@ class SampleUpsertInternal(SMBase):
             non_sequencing_assays=[
                 a.to_external() for a in self.non_sequencing_assays or []
             ],
+            nested_samples=[ns.to_external() for ns in self.nested_samples or []],
         )
 
 
@@ -210,6 +211,7 @@ class SampleUpsert(SMBase):
             type=self.type,  # type: ignore
             participant_id=self.participant_id,  # type: ignore
             active=self.active,  # type: ignore
+            nested_samples=[ns.to_internal() for ns in (self.nested_samples or [])],
         )
 
         if self.sequencing_groups:

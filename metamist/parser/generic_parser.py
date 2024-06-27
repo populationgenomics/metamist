@@ -238,7 +238,7 @@ class ParsedSample:
         internal_sid: str | None,
         external_sid: str,
         sample_type: str,
-        meta: Dict[str, Any] = None,
+        meta: Dict[str, Any] | None = None,
     ):
         self.participant = participant
         self.rows = rows
@@ -248,6 +248,7 @@ class ParsedSample:
         self.sample_type = sample_type
         self.meta = meta
 
+        self.samples: list[ParsedSample] = []
         self.sequencing_groups: list[ParsedSequencingGroup] = []
 
     def to_sm(self) -> SampleUpsert:
@@ -259,7 +260,19 @@ class ParsedSample:
             meta=self.meta,
             active=True,
             sequencing_groups=[sg.to_sm() for sg in self.sequencing_groups],
+            nested_samples=[s.to_sm() for s in (self.samples or [])],
         )
+
+    def all_nested_samples(self) -> list['ParsedSample']:
+        if not self.samples:
+            return []
+
+        nested_samples = []
+        for sample in self.samples:
+            nested_samples.append(sample)
+            nested_samples.extend(sample.all_nested_samples())
+
+        return nested_samples
 
 
 class ParsedSequencingGroup:
@@ -1091,7 +1104,13 @@ class GenericParser(
             elif assay.meta.get('sequencing_technology') == 'long-read':
                 # lift all assay meta into the sequencing group meta for long-read
                 # except for assay reads, and keys that are already top-level sequencing group fields
-                keys_to_avoid = ('reads', 'reads_type', 'sequencing_type', 'sequencing_technology', 'sequencing_platform')
+                keys_to_avoid = (
+                    'reads',
+                    'reads_type',
+                    'sequencing_type',
+                    'sequencing_technology',
+                    'sequencing_platform',
+                )
                 keys = [k for k in assay.meta.keys() if k not in keys_to_avoid]
             else:
                 continue
