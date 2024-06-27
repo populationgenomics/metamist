@@ -1,5 +1,6 @@
 import * as React from 'react'
 
+import _ from 'lodash'
 import { TableCell, TableRow } from 'semantic-ui-react'
 import FamilyLink from '../../shared/components/links/FamilyLink'
 import SampleLink from '../../shared/components/links/SampleLink'
@@ -7,7 +8,6 @@ import SequencingGroupLink from '../../shared/components/links/SequencingGroupLi
 import sanitiseValue from '../../shared/utilities/sanitiseValue'
 import {
     Assay,
-    FamilySimple,
     NestedParticipant,
     NestedSample,
     NestedSequencingGroup,
@@ -75,18 +75,19 @@ const FamilyCells: React.FC<{
                 }}
                 rowSpan={participantRowSpan}
             >
-                {field.key == 'external_id' ? (
-                    <FamilyLink
-                        id={`${participant.families.map((f) => f.id)[0]}`}
-                        projectName={projectName}
-                    >
-                        {participant.families.map((f) => f.external_id).join(', ')}
-                    </FamilyLink>
-                ) : (
-                    participant.families
-                        .map((fam) => sanitiseValue(fam[field.key as keyof FamilySimple]))
-                        .join(', ')
-                )}
+                {field.key == 'external_id'
+                    ? participant.families.map((f) => (
+                          <FamilyLink
+                              key={`family-${participant.id}-${f.id}`}
+                              id={`${f.id ?? ''}`}
+                              projectName={projectName}
+                          >
+                              {f.external_id}
+                          </FamilyLink>
+                      ))
+                    : participant.families
+                          .map((fam) => sanitiseValue(_.get(fam, field.key)))
+                          .join(', ')}
             </TableCell>
         ))}
     </>
@@ -111,7 +112,7 @@ const ParticipantCells: React.FC<{
             >
                 {field.key == 'external_ids'
                     ? prepareExternalIds(participant.external_ids || {})
-                    : sanitiseValue(participant[field.key as keyof NestedParticipant])}
+                    : sanitiseValue(_.get(participant, field.key))}
             </TableCell>
         ))}
     </>
@@ -186,7 +187,7 @@ export const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProp
                                                 : s.id}
                                         </SampleLink>
                                     ) : (
-                                        sanitiseValue(s[field.key as keyof NestedSample])
+                                        sanitiseValue(_.get(s, field.key))
                                     )}
                                 </TableCell>
                             ))}
@@ -197,7 +198,7 @@ export const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProp
                                         ...getBorderStyles(i),
                                         backgroundColor,
                                     }}
-                                    key={`${s.id}sequencing_group.${field.key}`}
+                                    key={`${sg.id}-sequencing_group.${field.key}`}
                                     rowSpan={sg.assays?.length || undefined}
                                 >
                                     {field.key === 'id' ? (
@@ -209,7 +210,7 @@ export const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProp
                                             {sanitiseValue(sg.id)}
                                         </SequencingGroupLink>
                                     ) : (
-                                        sanitiseValue(sg[field.key as keyof NestedSequencingGroup])
+                                        sanitiseValue(_.get(sg, field.key))
                                     )}
                                 </TableCell>
                             ))}
@@ -221,7 +222,7 @@ export const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProp
                                 }}
                                 key={`${s.id}-assay.${field.key || field.label}`}
                             >
-                                {sanitiseValue(assay[field.key as keyof Assay])}
+                                {sanitiseValue(_.get(assay, field.key))}
                             </TableCell>
                         ))}
                     </TableRow>
