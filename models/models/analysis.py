@@ -25,6 +25,7 @@ class AnalysisInternal(SMBase):
     status: AnalysisStatus
     active: bool | None = None
     output: str | None = None
+    outputs: str | dict | None = {}
     sequencing_group_ids: list[int] | None = None
     cohort_ids: list[int] | None = None
     timestamp_completed: datetime | None = None
@@ -63,6 +64,7 @@ class AnalysisInternal(SMBase):
             sequencing_group_ids=sequencing_group_ids or [],
             cohort_ids=cohort_ids,
             output=kwargs.pop('output', []),
+            outputs=kwargs.pop('outputs', {}),
             timestamp_completed=timestamp_completed,
             project=kwargs.get('project'),
             meta=meta,
@@ -83,6 +85,7 @@ class AnalysisInternal(SMBase):
             ),
             cohort_ids=cohort_id_format_list(self.cohort_ids),
             output=self.output,
+            outputs=self.outputs,
             timestamp_completed=(
                 self.timestamp_completed.isoformat()
                 if self.timestamp_completed
@@ -102,6 +105,7 @@ class Analysis(BaseModel):
     status: AnalysisStatus
     id: int | None = None
     output: str | None = None
+    outputs: str | dict | None = {}
     sequencing_group_ids: list[str] | None = None
     cohort_ids: list[str] | None = None
     author: str | None = None
@@ -131,6 +135,7 @@ class Analysis(BaseModel):
             sequencing_group_ids=sequencing_group_ids,
             cohort_ids=cohort_ids,
             output=self.output,
+            outputs=self.outputs,
             # don't allow this to be set
             timestamp_completed=None,
             project=self.project,
