@@ -290,7 +290,9 @@ class SampleTable(DbBase):
         participant_id: int | None,
         external_ids: dict[str, str | None] | None,
         type_: str | None,
-        active: bool = None,
+        active: bool | None = None,
+        sample_parent_id: int | None = None,
+        sample_root_id: int | None = None,
     ):
         """Update a single sample"""
 
@@ -363,6 +365,14 @@ class SampleTable(DbBase):
         if active is not None:
             values['active'] = 1 if active else 0
             fields.append('active = :active')
+
+        if sample_parent_id is not None:
+            values['sample_parent_id'] = sample_parent_id
+            fields.append('sample_parent_id = :sample_parent_id')
+
+        if sample_root_id is not None:
+            values['sample_root_id'] = sample_root_id
+            fields.append('sample_root_id = :sample_root_id')
 
         # means you can't set to null
         fields_str = ', '.join(fields)

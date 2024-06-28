@@ -231,47 +231,48 @@ class SampleLayer(BaseLayer):
         )
         # safely ignore nested samples here
         async with with_function():
-            if not sample.id:
-                sample.id = await self.st.insert_sample(
-                    external_ids=sample.external_ids,
-                    sample_type=sample.type,
-                    active=True,
-                    meta=sample.meta,
-                    participant_id=sample.participant_id,
-                    project=project,
-                    sample_parent_id=sample_parent_id,
-                    sample_root_id=sample_root_id,
-                )
-            else:
-                # Otherwise update
-                await self.st.update_sample(
-                    id_=sample.id,  # type: ignore
-                    external_ids=sample.external_ids,
-                    meta=sample.meta,
-                    participant_id=sample.participant_id,
-                    type_=sample.type,
-                    active=sample.active,
-                    # think about these more carefully
-                    # sample_parent_id=sample_parent_id,
-                    # sample_root_id=sample_root_id,
-                )
-
-            if sample.sequencing_groups:
-                sglayer = SequencingGroupLayer(self.connection)
-                for seqg in sample.sequencing_groups:
-                    seqg.sample_id = sample.id
-
-                if process_sequencing_groups:
-                    await sglayer.upsert_sequencing_groups(sample.sequencing_groups)
-
-            if sample.non_sequencing_assays:
-                alayer = AssayLayer(self.connection)
-                for assay in sample.non_sequencing_assays:
-                    assay.sample_id = sample.id
-                if process_assays:
-                    await alayer.upsert_assays(
-                        sample.non_sequencing_assays, open_transaction=False
+            for r in self.unwrap_nested_samples([sample]):
+                s = r.sample
+                if not s.id:
+                    s.id = await self.st.insert_sample(
+                        external_ids=s.external_ids,
+                        sample_type=s.type,
+                        active=True,
+                        meta=s.meta,
+                        participant_id=s.participant_id,
+                        project=project,
+                        sample_parent_id=r.parent.id if r.parent else sample_parent_id,
+                        sample_root_id=r.root.id if r.root else sample_root_id,
                     )
+                else:
+                    # Otherwise update
+                    await self.st.update_sample(
+                        id_=s.id,  # type: ignore
+                        external_ids=s.external_ids,
+                        meta=s.meta,
+                        participant_id=s.participant_id,
+                        type_=s.type,
+                        active=s.active,
+                        sample_parent_id=sample_parent_id,
+                        sample_root_id=sample_root_id,
+                    )
+
+                if sample.sequencing_groups:
+                    sglayer = SequencingGroupLayer(self.connection)
+                    for seqg in sample.sequencing_groups:
+                        seqg.sample_id = sample.id
+
+                    if process_sequencing_groups:
+                        await sglayer.upsert_sequencing_groups(sample.sequencing_groups)
+
+                if sample.non_sequencing_assays:
+                    alayer = AssayLayer(self.connection)
+                    for assay in sample.non_sequencing_assays:
+                        assay.sample_id = sample.id
+                    if process_assays:
+                        await alayer.upsert_assays(
+                            sample.non_sequencing_assays, open_transaction=False
+                        )
 
         return sample
 
@@ -299,11 +300,9 @@ class SampleLayer(BaseLayer):
 
         async with with_function():
             # Create or update samples
-            for r in self.unwrap_nested_samples(samples):
+            for sample in samples:
                 await self.upsert_sample(
-                    r.sample,
-                    sample_root_id=r.root.id if r.root else None,
-                    sample_parent_id=r.parent.id if r.parent else None,
+                    sample,
                     project=project,
                     process_sequencing_groups=False,
                     process_assays=False,
