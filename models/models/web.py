@@ -1,7 +1,7 @@
-# pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-instance-attributes,too-many-locals
 import dataclasses
 from enum import Enum
-from typing import Sequence
+from typing import Any, Sequence
 
 from db.python.filters.web import ProjectParticipantGridFilter
 from models.base import SMBase
@@ -105,6 +105,18 @@ class ProjectParticipantGridField(SMBase):
     filter_types: list[ProjectParticipantGridFilterType] | None = None
 
 
+def has_value_worth_displaying(value: Any) -> bool:
+    """
+    Check if the value is worth displaying on the UI, otherwise hide the column
+    """
+    if value is None:
+        return False
+    if isinstance(value, (bool, int)):
+        return True
+
+    return bool(value)
+
+
 class ProjectParticipantGridResponse(SMBase):
     """
     Web GridResponse including keys
@@ -154,36 +166,51 @@ class ProjectParticipantGridResponse(SMBase):
         }
         hidden_sg_meta_keys: set[str] = set()
 
-        family_meta_keys: set[str] = set()
-        participant_meta_keys: set[str] = set()
-        sample_meta_keys: set[str] = set()
-        sg_meta_keys: set[str] = set()
-        assay_meta_keys: set[str] = set()
+        # we should put the field in the list, but hide it if there's no actual value
+        # dict[key, has_any_value]
+        family_meta_keys: dict[str, bool] = {}
+        participant_meta_keys: dict[str, bool] = {}
+        sample_meta_keys: dict[str, bool] = {}
+        sg_meta_keys: dict[str, bool] = {}
+        assay_meta_keys: dict[str, bool] = {}
         has_nested_samples = False
 
         if filter_fields.family and filter_fields.family.meta:
-            family_meta_keys.update(filter_fields.family.meta.keys())
+            family_meta_keys.update({k: True for k in filter_fields.family.meta.keys()})
         if filter_fields.participant and filter_fields.participant.meta:
-            participant_meta_keys.update(filter_fields.participant.meta.keys())
+            participant_meta_keys.update(
+                {k: True for k in filter_fields.participant.meta.keys()}
+            )
             hidden_participant_meta_keys -= set(filter_fields.participant.meta.keys())
         if filter_fields.sample and filter_fields.sample.meta:
-            sample_meta_keys.update(filter_fields.sample.meta.keys())
+            sample_meta_keys.update({k: True for k in filter_fields.sample.meta.keys()})
             hidden_participant_meta_keys -= set(filter_fields.sample.meta.keys())
         if filter_fields.sequencing_group and filter_fields.sequencing_group.meta:
-            sg_meta_keys.update(filter_fields.sequencing_group.meta.keys())
+            # sg_meta_keys.update(filter_fields.sequencing_group.meta.keys())
+            sg_meta_keys.update(
+                {k: True for k in filter_fields.sequencing_group.meta.keys()}
+            )
             hidden_sg_meta_keys -= set(filter_fields.sequencing_group.meta.keys())
         if filter_fields.assay and filter_fields.assay.meta:
-            assay_meta_keys.update(filter_fields.assay.meta.keys())
+            assay_meta_keys.update({k: True for k in filter_fields.assay.meta.keys()})
             hidden_assay_meta_keys -= set(filter_fields.assay.meta.keys())
+
+        def update_d_from_meta(d: dict[str, bool], meta: dict[str, Any]):
+            for k, v in meta.items():
+                worth_displaying = has_value_worth_displaying(v)
+                if k in d:
+                    d[k] |= worth_displaying
+                else:
+                    d[k] = worth_displaying
 
         for p in participants:
             if p.meta:
-                participant_meta_keys.update(p.meta.keys())
+                update_d_from_meta(participant_meta_keys, p.meta)
             if not p.samples:
                 continue
             for s in p.samples:
                 if s.meta:
-                    sample_meta_keys.update(s.meta.keys())
+                    update_d_from_meta(sample_meta_keys, s.meta)
                 if not s.sequencing_groups:
                     continue
                 if s.sample_parent_id is not None:
@@ -191,13 +218,13 @@ class ProjectParticipantGridResponse(SMBase):
 
                 for sg in s.sequencing_groups or []:
                     if sg.meta:
-                        sg_meta_keys.update(sg.meta.keys())
+                        update_d_from_meta(sg_meta_keys, sg.meta)
 
                     if not sg.assays:
                         continue
                     for a in sg.assays:
                         if a.meta:
-                            assay_meta_keys.update(a.meta.keys())
+                            update_d_from_meta(assay_meta_keys, a.meta)
 
         has_reported_sex = any(p.reported_sex is not None for p in participants)
         has_reported_gender = any(p.reported_gender is not None for p in participants)
@@ -215,8 +242,10 @@ class ProjectParticipantGridResponse(SMBase):
             )
         ]
         family_fields.extend(
-            Field(key='meta.' + k, label=k, is_visible=True, filter_key='meta.' + k)
-            for k in family_meta_keys
+            Field(
+                key='meta.' + k, label=k, is_visible=has_value, filter_key='meta.' + k
+            )
+            for k, has_value in family_meta_keys.items()
         )
         participant_fields = [
             Field(
@@ -248,10 +277,10 @@ class ProjectParticipantGridResponse(SMBase):
             Field(
                 key='meta.' + k,
                 label=k,
-                is_visible=k not in hidden_participant_meta_keys,
+                is_visible=has_value and k not in hidden_participant_meta_keys,
                 filter_key='meta.' + k,
             )
-            for k in participant_meta_keys
+            for k, has_value in participant_meta_keys.items()
         )
 
         sample_fields = [
@@ -294,10 +323,10 @@ class ProjectParticipantGridResponse(SMBase):
             Field(
                 key='meta.' + k,
                 label=k,
-                is_visible=k not in hidden_sample_meta_keys,
+                is_visible=has_value and k not in hidden_sample_meta_keys,
                 filter_key='meta.' + k,
             )
-            for k in sample_meta_keys
+            for k, has_value in sample_meta_keys.items()
         )
         assay_fields = [
             Field(
@@ -311,10 +340,10 @@ class ProjectParticipantGridResponse(SMBase):
             Field(
                 key='meta.' + k,
                 label=k,
-                is_visible=k not in hidden_assay_meta_keys,
+                is_visible=has_value and k not in hidden_assay_meta_keys,
                 filter_key='meta.' + k,
             )
-            for k in assay_meta_keys
+            for k, has_value in assay_meta_keys.items()
         )
 
         sequencing_group_fields = [
@@ -352,10 +381,10 @@ class ProjectParticipantGridResponse(SMBase):
             Field(
                 key='meta.' + k,
                 label=k,
-                is_visible=k not in hidden_sg_meta_keys,
+                is_visible=has_value and k not in hidden_sg_meta_keys,
                 filter_key='meta.' + k,
             )
-            for k in sg_meta_keys
+            for k, has_value in sg_meta_keys.items()
         )
 
         return {
