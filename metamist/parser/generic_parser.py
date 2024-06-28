@@ -343,7 +343,7 @@ class ParsedAssay:
         self.internal_id = internal_assay_id
         self.external_ids = external_assay_ids
         self.assay_type = assay_type
-        self.meta = meta
+        self.meta: dict[str, Any] = meta or {}
 
     def to_sm(self) -> AssayUpsert:
         """Convert to SM upsert model"""
@@ -818,16 +818,16 @@ class GenericParser(
                 Assays types count: {str_assay_types_count}
                 Sequencing group count: {str_seqg_count}
 
-                Adding {summary['participants']['insert']} participants
-                Adding {summary['samples']['insert']} samples
-                Adding {summary['sequencing_groups']['insert']} sequencing groups
-                Adding {summary['assays']['insert']} assays
-                Adding {summary['analyses']['insert']} analyses
+                Adding {summary.participants.insert} participants
+                Adding {summary.samples.insert} samples
+                Adding {summary.sequencing_groups.insert} sequencing groups
+                Adding {summary.assays.insert} assays
+                Adding {summary.analyses.insert} analyses
 
-                Updating {summary['participants']['update']} participants
-                Updating {summary['samples']['update']} samples
-                Updating {summary['sequencing_groups']['update']} sequencing groups
-                Updating {summary['assays']['update']} assays
+                Updating {summary.participants.update} participants
+                Updating {summary.samples.update} samples
+                Updating {summary.sequencing_groups.update} sequencing groups
+                Updating {summary.assays.update} assays
                 """
         return message
 

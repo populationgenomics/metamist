@@ -69,12 +69,12 @@ class TestOntSampleSheetParser(DbIsolatedTest):
             StringIO(file_contents), delimiter=',', dry_run=True
         )
 
-        participants_to_add = summary['participants']['insert']
-        participants_to_update = summary['participants']['update']
-        samples_to_add = summary['samples']['insert']
-        samples_to_update = summary['samples']['update']
-        sequencing_to_add = summary['assays']['insert']
-        sequencing_to_update = summary['assays']['update']
+        participants_to_add = summary.participants.insert
+        participants_to_update = summary.participants.update
+        samples_to_add = summary.samples.insert
+        samples_to_update = summary.samples.update
+        sequencing_to_add = summary.assays.insert
+        sequencing_to_update = summary.assays.update
 
         self.assertEqual(1, participants_to_add)
         self.assertEqual(1, participants_to_update)

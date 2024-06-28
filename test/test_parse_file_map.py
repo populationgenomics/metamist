@@ -36,14 +36,14 @@ class TestSampleMapParser(DbIsolatedTest):
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(1, summary['participants']['insert'])
-        self.assertEqual(0, summary['participants']['update'])
-        self.assertEqual(1, summary['samples']['insert'])
-        self.assertEqual(0, summary['samples']['update'])
-        self.assertEqual(1, summary['sequencing_groups']['insert'])
-        self.assertEqual(0, summary['sequencing_groups']['update'])
-        self.assertEqual(1, summary['assays']['insert'])
-        self.assertEqual(0, summary['assays']['update'])
+        self.assertEqual(1, summary.participants.insert)
+        self.assertEqual(0, summary.participants.update)
+        self.assertEqual(1, summary.samples.insert)
+        self.assertEqual(0, summary.samples.update)
+        self.assertEqual(1, summary.sequencing_groups.insert)
+        self.assertEqual(0, summary.sequencing_groups.update)
+        self.assertEqual(1, summary.assays.insert)
+        self.assertEqual(0, summary.assays.update)
 
         assay = participants[0].samples[0].sequencing_groups[0].assays[0]
 
@@ -139,12 +139,12 @@ class TestSampleMapParser(DbIsolatedTest):
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(2, summary['participants']['insert'])
-        self.assertEqual(0, summary['participants']['update'])
-        self.assertEqual(2, summary['samples']['insert'])
-        self.assertEqual(0, summary['samples']['update'])
-        self.assertEqual(2, summary['assays']['insert'])
-        self.assertEqual(0, summary['assays']['update'])
+        self.assertEqual(2, summary.participants.insert)
+        self.assertEqual(0, summary.participants.update)
+        self.assertEqual(2, summary.samples.insert)
+        self.assertEqual(0, summary.samples.update)
+        self.assertEqual(2, summary.assays.insert)
+        self.assertEqual(0, summary.assays.update)
         self.maxDiff = None
 
         self.assertDictEqual({}, participants[0].samples[0].meta)
@@ -230,12 +230,12 @@ class TestSampleMapParser(DbIsolatedTest):
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(0, summary['participants']['insert'])
-        self.assertEqual(0, summary['participants']['update'])
-        self.assertEqual(2, summary['samples']['insert'])
-        self.assertEqual(0, summary['samples']['update'])
-        self.assertEqual(2, summary['assays']['insert'])
-        self.assertEqual(0, summary['assays']['update'])
+        self.assertEqual(0, summary.participants.insert)
+        self.assertEqual(0, summary.participants.update)
+        self.assertEqual(2, summary.samples.insert)
+        self.assertEqual(0, summary.samples.update)
+        self.assertEqual(2, summary.assays.insert)
+        self.assertEqual(0, summary.assays.update)
         self.maxDiff = None
 
         self.assertEqual('polyarna', samples[0].sequencing_groups[0].sequencing_type)
@@ -243,7 +243,7 @@ class TestSampleMapParser(DbIsolatedTest):
             'sequencing_facility': 'VCGS',
             'sequencing_library': 'TSStrmRNA',
             'read_end_type': 'paired',
-            'read_length': 151
+            'read_length': 151,
         }
         self.assertDictEqual(
             expected_sg1_meta,
@@ -255,7 +255,7 @@ class TestSampleMapParser(DbIsolatedTest):
             'sequencing_facility': 'VCGS',
             'sequencing_library': 'TSStrtRNA',
             'read_end_type': 'paired',
-            'read_length': 151
+            'read_length': 151,
         }
         self.assertDictEqual(
             expected_sg2_meta,
@@ -273,7 +273,7 @@ class TestSampleMapParser(DbIsolatedTest):
 
         rows = [
             'Sample ID\tFilenames\tType',
-            '<sample-id>\t<sample-id>.filename-R1.fastq.gz,<sample-id>.filename-R2.fastq.gz\tpolyarna'
+            '<sample-id>\t<sample-id>.filename-R1.fastq.gz,<sample-id>.filename-R2.fastq.gz\tpolyarna',
         ]
 
         parser = SampleFileMapParser(
@@ -289,9 +289,7 @@ class TestSampleMapParser(DbIsolatedTest):
         parser.skip_checking_gcs_objects = True
 
         file_contents = '\n'.join(rows)
-        with self.assertRaises(
-                ValueError
-        ):
+        with self.assertRaises(ValueError):
             _, _ = await parser.parse_manifest(
                 StringIO(file_contents), delimiter='\t', dry_run=True
             )
@@ -307,19 +305,16 @@ class TestSampleMapParser(DbIsolatedTest):
 
         rows = [
             'Sample ID\tFilenames\tType',
-            '<sample-id>\t<sample-id>.filename-R1.fastq.gz,<sample-id>.filename-R2.fastq.gz\tpolyarna'
+            '<sample-id>\t<sample-id>.filename-R1.fastq.gz,<sample-id>.filename-R2.fastq.gz\tpolyarna',
         ]
 
         parser = SampleFileMapParser(
             search_locations=[],
             # doesn't matter, we're going to mock the call anyway
             project=self.project_name,
-            default_sequencing=DefaultSequencing(
-                facility='VCGS',
-                library='TSStrmRNA'
-            ),
+            default_sequencing=DefaultSequencing(facility='VCGS', library='TSStrmRNA'),
             default_read_end_type='paired',
-            default_read_length=151
+            default_read_length=151,
         )
         fs = [
             '<sample-id>.filename-R1.fastq.gz',
@@ -333,12 +328,12 @@ class TestSampleMapParser(DbIsolatedTest):
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(0, summary['participants']['insert'])
-        self.assertEqual(0, summary['participants']['update'])
-        self.assertEqual(1, summary['samples']['insert'])
-        self.assertEqual(0, summary['samples']['update'])
-        self.assertEqual(1, summary['assays']['insert'])
-        self.assertEqual(0, summary['assays']['update'])
+        self.assertEqual(0, summary.participants.insert)
+        self.assertEqual(0, summary.participants.update)
+        self.assertEqual(1, summary.samples.insert)
+        self.assertEqual(0, summary.samples.update)
+        self.assertEqual(1, summary.assays.insert)
+        self.assertEqual(0, summary.assays.update)
         self.maxDiff = None
 
         self.assertEqual('polyarna', samples[0].sequencing_groups[0].sequencing_type)
@@ -346,7 +341,7 @@ class TestSampleMapParser(DbIsolatedTest):
             'sequencing_facility': 'VCGS',
             'sequencing_library': 'TSStrmRNA',
             'read_end_type': 'paired',
-            'read_length': 151
+            'read_length': 151,
         }
         self.assertDictEqual(
             expected_sg1_meta,

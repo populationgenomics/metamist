@@ -63,10 +63,10 @@ class TestExistingCohortParser(DbIsolatedTest):
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(1, summary['samples']['insert'])
-        self.assertEqual(1, summary['assays']['insert'])
-        self.assertEqual(0, summary['samples']['update'])
-        self.assertEqual(0, summary['assays']['update'])
+        self.assertEqual(1, summary.samples.insert)
+        self.assertEqual(1, summary.assays.insert)
+        self.assertEqual(0, summary.samples.update)
+        self.assertEqual(0, summary.assays.update)
 
         sample_to_add = participants[0].samples[0]
         self.assertEqual('EXTID1234', sample_to_add.external_sid)
@@ -236,10 +236,10 @@ class TestExistingCohortParser(DbIsolatedTest):
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(0, summary['samples']['insert'])
-        self.assertEqual(1, summary['assays']['insert'])
-        self.assertEqual(1, summary['samples']['update'])
-        self.assertEqual(0, summary['assays']['update'])
+        self.assertEqual(0, summary.samples.insert)
+        self.assertEqual(1, summary.assays.insert)
+        self.assertEqual(1, summary.samples.update)
+        self.assertEqual(0, summary.assays.update)
 
         return
 
