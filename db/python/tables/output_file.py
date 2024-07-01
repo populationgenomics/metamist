@@ -1,4 +1,5 @@
 import os
+import warnings
 from textwrap import dedent
 
 from cloudpathlib import AnyPath, GSClient
@@ -6,7 +7,7 @@ from google.auth.credentials import AnonymousCredentials
 from google.cloud.storage import Client
 
 from db.python.tables.base import DbBase
-from models.models.output_file import OutputFileInternal
+from models.models.output_file import OutputFileInternal, RecursiveDict
 
 
 class OutputFileTable(DbBase):
@@ -16,12 +17,38 @@ class OutputFileTable(DbBase):
 
     table_name = 'output_file'
 
+    async def process_output_for_analysis(
+        self, analysis_id: int, output: str | None, outputs: str | RecursiveDict | None
+    ):
+        """
+        Process output for analysis
+        """
+        if output and outputs:
+            warnings.warn(
+                'The output field is deprecated, using outputs instead since it was passed in..',
+                PendingDeprecationWarning,
+                2,
+            )
+        if output and not outputs:
+            warnings.warn(
+                'The output field is deprecated, please use outputs instead',
+                PendingDeprecationWarning,
+                2,
+            )
+
+        output_data = outputs or output
+
+        if output_data:
+            await self.create_or_update_analysis_output_files_from_output(
+                analysis_id=analysis_id, json_dict=output_data
+            )
+
     async def create_or_update_output_file(
         self,
         path: str,
         parent_id: int | None = None,
         client: Client | None = None,
-    ) -> int:
+    ) -> int | None:
         """
         Create a new file, and add it to database
         """
@@ -35,9 +62,7 @@ class OutputFileTable(DbBase):
         )
 
         if not file_info or not file_info.get('valid'):
-            raise ValueError(
-                'Invalid file. Unable to retrieve details needed to set up file in database.'
-            )
+            return None
 
         kv_pairs = [
             ('path', path),
@@ -74,7 +99,7 @@ class OutputFileTable(DbBase):
     async def add_output_file_to_analysis(
         self,
         analysis_id: int,
-        file_id: int,
+        file_id: int | None,
         json_structure: str | None = None,
         output: str | None = None,
     ):
@@ -96,10 +121,10 @@ class OutputFileTable(DbBase):
             },
         )
 
-    async def create_or_update_analysis_output_files_from_json(
+    async def create_or_update_analysis_output_files_from_output(
         self,
         analysis_id: int,
-        json_dict: dict | str,
+        json_dict: RecursiveDict | str,
     ) -> None:
         """
         Create analysis files from JSON

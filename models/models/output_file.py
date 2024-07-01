@@ -1,11 +1,13 @@
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Optional, TypeAlias
 
 from cloudpathlib import AnyPath, CloudPath, GSPath
 from google.cloud.storage import Client
 from pydantic import BaseModel
 
 from models.base import SMBase, parse_sql_bool
+
+RecursiveDict: TypeAlias = dict[str, 'str | RecursiveDict']
 
 
 class OutputFileInternal(SMBase):
@@ -89,7 +91,7 @@ class OutputFileInternal(SMBase):
             return None
 
     @staticmethod
-    def reconstruct_json(data: list | str) -> Union[dict[str, Any], str]:
+    def reconstruct_json(data: list | str) -> str | RecursiveDict:
         """_summary_
 
         Args:

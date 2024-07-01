@@ -8,6 +8,7 @@ from db.python.layers.base import BaseLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter, AnalysisTable
 from db.python.tables.cohort import CohortTable
+from db.python.tables.output_file import OutputFileTable
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import SequencingGroupFilter
 from db.python.utils import GenericFilter, get_logger
@@ -20,6 +21,7 @@ from models.models import (
     ProportionalDateTemporalMethod,
     SequencingGroupInternal,
 )
+from models.models.output_file import RecursiveDict
 from models.models.project import ProjectId
 from models.models.sequencing_group import SequencingGroupInternalId
 
@@ -50,6 +52,7 @@ class AnalysisLayer(BaseLayer):
         self.sampt = SampleTable(connection)
         self.at = AnalysisTable(connection)
         self.ct = CohortTable(connection)
+        self.oft = OutputFileTable(connection)
 
     # GETS
 
@@ -541,16 +544,23 @@ class AnalysisLayer(BaseLayer):
                     'Cohort sequencing groups do not match analysis sequencing groups'
                 )
 
-        return await self.at.create_analysis(
+        new_analysis_id = await self.at.create_analysis(
             analysis_type=analysis.type,
             status=analysis.status,
             sequencing_group_ids=analysis.sequencing_group_ids,
             cohort_ids=analysis.cohort_ids,
             meta=analysis.meta,
-            output=analysis.output,
             active=analysis.active,
             project=project,
         )
+
+        await self.oft.process_output_for_analysis(
+            analysis_id=new_analysis_id,
+            output=analysis.output,
+            outputs=analysis.outputs,
+        )
+
+        return new_analysis_id
 
     async def add_sequencing_groups_to_analysis(
         self, analysis_id: int, sequencing_group_ids: list[int], check_project_id=True
@@ -572,6 +582,7 @@ class AnalysisLayer(BaseLayer):
         status: AnalysisStatus,
         meta: dict[str, Any] = None,
         output: str | None = None,
+        outputs: RecursiveDict | None = None,
         check_project_id=True,
     ):
         """
@@ -587,7 +598,12 @@ class AnalysisLayer(BaseLayer):
             analysis_id=analysis_id,
             status=status,
             meta=meta,
+        )
+
+        await self.oft.process_output_for_analysis(
+            analysis_id=analysis_id,
             output=output,
+            outputs=outputs,
         )
 
     async def get_analysis_runner_log(
