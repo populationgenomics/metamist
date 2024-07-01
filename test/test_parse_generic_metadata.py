@@ -306,7 +306,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
         parser = GenericMetadataParser(
             search_locations=[],
-            participant_column='Individual ID',
+            participant_name_column='Individual ID',
             sample_name_column='Sample ID',
             reads_column='Filenames',
             seq_type_column='Type',
@@ -406,7 +406,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
         parser = GenericMetadataParser(
             search_locations=[],
-            participant_column='Individual ID',
+            participant_name_column='Individual ID',
             sample_name_column='Sample ID',
             participant_meta_map={},
             sample_meta_map={},
@@ -464,7 +464,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
         parser = GenericMetadataParser(
             search_locations=[],
-            participant_column='Individual ID',
+            participant_name_column='Individual ID',
             sample_name_column='Sample ID',
             participant_meta_map={},
             sample_meta_map={},
@@ -499,7 +499,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
         ]
         parser = GenericMetadataParser(
             search_locations=[],
-            participant_column='Individual ID',
+            participant_name_column='Individual ID',
             sample_name_column='Sample ID',
             reads_column='Filename',
             assay_meta_map={
@@ -884,7 +884,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
         parser = GenericMetadataParser(
             search_locations=[],
-            participant_column='Participant ID',
+            participant_name_column='Participant ID',
             sample_name_column='Sample ID',
             reads_column='Filename',
             participant_meta_map={},

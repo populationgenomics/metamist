@@ -79,21 +79,21 @@ class GenericMetadataParser(GenericParser):
         self,
         project: str,
         search_locations: list[str],
+        # sample columns
         sample_name_column: str,
-
+        sample_external_id_column_map: dict[str, str] | None = None,
         # Participant columns
-        participant_column: str | None = None,
+        participant_name_column: str | None = None,
         reported_sex_column: str | None = None,
         reported_gender_column: str | None = None,
         karyotype_column: str | None = None,
-
+        participant_external_id_column_map: dict[str, str] | None = None,
         # Sequencing metadata columns
         seq_type_column: str | None = None,
         seq_technology_column: str | None = None,
         seq_platform_column: str | None = None,
         seq_facility_column: str | None = None,
         seq_library_column: str | None = None,
-
         # Assay columns
         assay_id_column: str | None = None,
         reads_column: str | None = None,
@@ -101,16 +101,13 @@ class GenericMetadataParser(GenericParser):
         read_end_type_column: str | None = None,
         read_length_column: str | None = None,
         reference_assembly_location_column: str | None = None,
-
         # GVCF columns
         gvcf_column: str | None = None,
-
         # Meta field key maps
         participant_meta_map: dict[str, str] | None = None,
         sample_meta_map: dict[str, str] | None = None,
         assay_meta_map: dict[str, str] | None = None,
         qc_meta_map: dict[str, str] | None = None,
-
         # Default values
         default_reference_assembly_location: str | None = None,
         default_sample_type: str | None = None,
@@ -123,6 +120,52 @@ class GenericMetadataParser(GenericParser):
         allow_extra_files_in_search_path=False,
         **kwargs,
     ):
+        """_summary_
+
+        Args:
+            project (str): The name of the project to insert into
+            search_locations (list[str]):
+                A list of locations to search for unqualified files in.
+            sample_name_column (str): The name of the column containing the sample name.
+            participant_name_column (str | None, optional):
+                The name of the column containing the participant name. Unsupplied means
+                there are no participants represented in the file.
+            reported_sex_column (str | None, optional):
+                The name of the column containing the reported sex, this will get parsed
+                into (0 = unknown, 1 = male, 2 = female), otherwise, ValueError
+            reported_gender_column (str | None, optional):
+                The name of the column containing the reported gender, no validation.
+            karyotype_column (str | None, optional):
+                The name of the column containing the karyotype, no validation.
+            participant_eid_map (str | None, optional):
+                {column: eid_name} mapping for participant external_ids
+            seq_type_column (str | None, optional): _description_. Defaults to None.
+            seq_technology_column (str | None, optional): _description_. Defaults to None.
+            seq_platform_column (str | None, optional): _description_. Defaults to None.
+            seq_facility_column (str | None, optional): _description_. Defaults to None.
+            seq_library_column (str | None, optional): _description_. Defaults to None.
+            assay_id_column (str | None, optional): _description_. Defaults to None.
+            reads_column (str | None, optional): _description_. Defaults to None.
+            checksum_column (str | None, optional): _description_. Defaults to None.
+            read_end_type_column (str | None, optional): _description_. Defaults to None.
+            read_length_column (str | None, optional): _description_. Defaults to None.
+            reference_assembly_location_column (str | None, optional): _description_. Defaults to None.
+            gvcf_column (str | None, optional): _description_. Defaults to None.
+            participant_meta_map (dict[str, str] | None, optional): _description_. Defaults to None.
+            sample_meta_map (dict[str, str] | None, optional): _description_. Defaults to None.
+            assay_meta_map (dict[str, str] | None, optional): _description_. Defaults to None.
+            qc_meta_map (dict[str, str] | None, optional): _description_. Defaults to None.
+            default_reference_assembly_location (str | None, optional): _description_. Defaults to None.
+            default_sample_type (str | None, optional): _description_. Defaults to None.
+            default_sequencing (_type_, optional): _description_. Defaults to DefaultSequencing( seq_type='genome', technology='short-read', platform='illumina' ).
+            default_read_end_type (str | None, optional): _description_. Defaults to None.
+            default_read_length (str | int | None, optional): _description_. Defaults to None.
+            batch_number (str | None, optional): _description_. Defaults to None.
+            allow_extra_files_in_search_path (bool, optional): _description_. Defaults to False.
+
+        Raises:
+            ValueError: _description_
+        """
         super().__init__(
             path_prefix=None,
             search_paths=search_locations,
@@ -141,7 +184,7 @@ class GenericMetadataParser(GenericParser):
         self.sample_name_column = sample_name_column
 
         # Participant columns
-        self.participant_column = participant_column
+        self.participant_column = participant_name_column
         self.reported_sex_column = reported_sex_column
         self.reported_gender_column = reported_gender_column
         self.karyotype_column = karyotype_column
@@ -175,7 +218,7 @@ class GenericMetadataParser(GenericParser):
         self.default_reference_assembly_location = default_reference_assembly_location
         self.allow_extra_files_in_search_path = allow_extra_files_in_search_path
 
-    def get_sample_id(self, row: SingleRow) -> str:
+    def get_primary_sample_id(self, row: SingleRow) -> str:
         """Get external sample ID from row"""
         return row[self.sample_name_column].strip()
 
@@ -198,7 +241,8 @@ class GenericMetadataParser(GenericParser):
         if isinstance(row, dict):
             return [self.get_sequencing_type(row)]
         return [
-            str(r.get(self.seq_type_column, self.default_sequencing.seq_type)) for r in row
+            str(r.get(self.seq_type_column, self.default_sequencing.seq_type))
+            for r in row
         ]
 
     def get_sequencing_technology(self, row: SingleRow) -> str:
@@ -261,17 +305,13 @@ class GenericMetadataParser(GenericParser):
 
     def get_read_end_type(self, row: SingleRow) -> str:
         """Get read end type from row"""
-        value = (
-            row.get(self.read_end_type_column, None) or self.default_read_end_type
-        )
+        value = row.get(self.read_end_type_column, None) or self.default_read_end_type
         value = str(value).lower() if value else None
         return value
 
     def get_read_length(self, row: SingleRow) -> int:
         """Get read length from row"""
-        value = (
-            row.get(self.read_length_column, None) or self.default_read_length
-        )
+        value = row.get(self.read_length_column, None) or self.default_read_length
         value = int(value) if value else None
         return value
 
@@ -280,7 +320,7 @@ class GenericMetadataParser(GenericParser):
         NOTE: To be re-thought after assay group changes are applied"""
         return None
 
-    def get_participant_id(self, row: SingleRow) -> str | None:
+    def get_primary_participant_id(self, row: SingleRow) -> str | None:
         """Get external participant ID from row"""
         if not self.participant_column or self.participant_column not in row:
             raise ValueError('Participant column does not exist')
@@ -362,7 +402,7 @@ class GenericMetadataParser(GenericParser):
         for grp in rows:
             for r in grp if isinstance(grp, list) else [grp]:
                 filename_promises.append(
-                    self.get_all_files_from_row(self.get_sample_id(r), r)
+                    self.get_all_files_from_row(self.get_primary_sample_id(r), r)
                 )
 
         files_from_rows: list[str] = sum(await asyncio.gather(*filename_promises), [])
@@ -493,12 +533,18 @@ class GenericMetadataParser(GenericParser):
         dicts = []
         for row_key, dict_key in key_map.items():
             if isinstance(row, list):
-                inner_values = [unstring_value(r[row_key]) for r in row if r.get(row_key) is not None]
+                inner_values = [
+                    unstring_value(r[row_key])
+                    for r in row
+                    if r.get(row_key) is not None
+                ]
                 if any(isinstance(inner, list) for inner in inner_values):
                     # lists are unhashable
                     value = inner_values
                 else:
-                    value = sorted(set(inner_values), key=str)  # sorted for unit test consistency
+                    value = sorted(
+                        set(inner_values), key=str
+                    )  # sorted for unit test consistency
                     if len(value) == 0:
                         continue
                     if len(value) == 1:
@@ -636,8 +682,9 @@ class GenericMetadataParser(GenericParser):
 
         return meta
 
-    async def get_read_and_ref_files_and_checksums(self, sample_id: str, rows: GroupedRow) -> (
-            tuple[list[str], list[str], set[str]]):
+    async def get_read_and_ref_files_and_checksums(
+        self, sample_id: str, rows: GroupedRow
+    ) -> tuple[list[str], list[str], set[str]]:
         """Get read filenames and checksums from rows."""
         read_filenames: list[str] = []
         read_checksums: list[str] = []
@@ -656,7 +703,9 @@ class GenericMetadataParser(GenericParser):
                     reference_assemblies.add(ref)
         return read_filenames, read_checksums, reference_assemblies
 
-    async def parse_cram_assays(self, sample: ParsedSample, reference_assemblies: set[str]) -> dict[str, Any]:
+    async def parse_cram_assays(
+        self, sample: ParsedSample, reference_assemblies: set[str]
+    ) -> dict[str, Any]:
         """Parse CRAM assays"""
         if len(reference_assemblies) > 1:
             # sorted for consistent testing
@@ -675,15 +724,13 @@ class GenericMetadataParser(GenericParser):
                 )
 
         ref_fp = self.file_path(ref)
-        secondary_files = (
-            await self.create_secondary_file_objects_by_potential_pattern(
-                ref_fp, ['.fai']
-            )
+        secondary_files = await self.create_secondary_file_objects_by_potential_pattern(
+            ref_fp, ['.fai']
         )
         cram_reference = await self.create_file_object(
             ref_fp, secondary_files=secondary_files
         )
-        return {'reference_assembly' : cram_reference}
+        return {'reference_assembly': cram_reference}
 
     async def get_assays_from_group(
         self, sequencing_group: ParsedSequencingGroup
@@ -699,8 +746,8 @@ class GenericMetadataParser(GenericParser):
 
         assays = []
 
-        read_filenames, read_checksums, reference_assemblies = await self.get_read_and_ref_files_and_checksums(
-            sample.external_sid, rows
+        read_filenames, read_checksums, reference_assemblies = (
+            await self.get_read_and_ref_files_and_checksums(sample.external_sid, rows)
         )
 
         # strip in case collaborator put "file1, file2"
@@ -736,13 +783,22 @@ class GenericMetadataParser(GenericParser):
         if self.batch_number is not None:
             collapsed_assay_meta['batch'] = self.batch_number
 
-        if sequencing_group.sequencing_type in ['exome', 'polyarna', 'totalrna', 'singlecellrna']:
+        if sequencing_group.sequencing_type in [
+            'exome',
+            'polyarna',
+            'totalrna',
+            'singlecellrna',
+        ]:
             rows = sequencing_group.rows
             # Exome / RNA should have facility and library, allow missing for exomes - for now
             if self.get_sequencing_facility(rows[0]):
-                collapsed_assay_meta['sequencing_facility'] = self.get_sequencing_facility(rows[0])
+                collapsed_assay_meta['sequencing_facility'] = (
+                    self.get_sequencing_facility(rows[0])
+                )
             if self.get_sequencing_library(rows[0]):
-                collapsed_assay_meta['sequencing_library'] = self.get_sequencing_library(rows[0])
+                collapsed_assay_meta['sequencing_library'] = (
+                    self.get_sequencing_library(rows[0])
+                )
             # RNA requires read end type and length as well
             if sequencing_group.sequencing_type != 'exome':
                 collapsed_assay_meta['read_end_type'] = self.get_read_end_type(rows[0])
@@ -938,7 +994,7 @@ async def main(
     parser = GenericMetadataParser(
         project=project,
         sample_name_column=sample_name_column,
-        participant_column=participant_column,
+        participant_name_column=participant_column,
         reported_sex_column=reported_sex_column,
         reported_gender_column=reported_gender_column,
         karyotype_column=karyotype_column,
