@@ -370,7 +370,7 @@ class SequencingGroupTable(DbBase):
         FROM analysis_sequencing_group asg
         INNER JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
         INNER JOIN sample s ON s.id = sg.sample_id
-        INNER JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id
+        LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id
         WHERE asg.analysis_id IN :aids
         GROUP BY sg.id, asg.analysis_id
         """
