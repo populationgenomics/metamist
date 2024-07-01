@@ -16,12 +16,7 @@ from db.python.tables.family_participant import (
 from db.python.tables.participant import ParticipantFilter, ParticipantTable
 from db.python.tables.participant_phenotype import ParticipantPhenotypeTable
 from db.python.tables.sample import SampleTable
-from db.python.utils import (
-    GenericFilter,
-    NoOpAenter,
-    NotFoundError,
-    split_generic_terms,
-)
+from db.python.utils import NoOpAenter, NotFoundError, split_generic_terms
 from models.models import PRIMARY_EXTERNAL_ORG
 from models.models.family import PedRowInternal
 from models.models.participant import ParticipantInternal, ParticipantUpsertInternal
@@ -250,7 +245,6 @@ class ParticipantLayer(BaseLayer):
         filter_: ParticipantFilter,
         limit: int | None = None,
         skip: int | None = None,
-        check_project_ids: bool = True,
     ) -> list[ParticipantInternal]:
         """
         Query participants from the database, heavy lifting done by the filter
@@ -262,10 +256,9 @@ class ParticipantLayer(BaseLayer):
         if not participants:
             return []
 
-        if check_project_ids:
-            await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
-            )
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=ReadAccessRoles
+        )
 
         return participants
 

@@ -270,8 +270,6 @@ class SampleTable(DbBase):
             }
             for name, eid in external_ids.items()
             if eid is not None
-            for name, eid in external_ids.items()
-            if eid is not None
         ]
         await self.connection.execute_many(_eid_query, _eid_values)
 

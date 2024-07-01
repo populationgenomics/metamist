@@ -1,4 +1,5 @@
 import uuid
+from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.tables.project import (
     GROUP_NAME_MEMBERS_ADMIN,
@@ -12,7 +13,6 @@ from models.models.project import (
     ProjectMemberUpdate,
     ReadAccessRoles,
 )
-from test.testbase import DbIsolatedTest, run_as_sync
 
 
 class TestGroupAccess(DbIsolatedTest):

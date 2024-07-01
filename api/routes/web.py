@@ -49,10 +49,6 @@ router = APIRouter(prefix='/web', tags=['web'])
     operation_id='getProjectSummary',
 )
 async def get_project_summary(
-    request: Request,
-    grid_filter: list[SearchItem],
-    limit: int = 20,
-    token: Optional[int] = 0,
     connection: Connection = get_project_db_connection(ReadAccessRoles),
 ) -> ProjectSummary:
     """Creates a new sample, and returns the internal sample ID"""
@@ -69,7 +65,7 @@ async def get_project_summary(
     operation_id='getProjectParticipantsFilterSchema',
 )
 async def get_project_project_participants_filter_schema(
-    _=get_project_readonly_connection,
+    _=get_project_db_connection(ReadAccessRoles),
 ):
     """Get project summary (from query) with some limit"""
     return ProjectParticipantGridFilter.model_json_schema()
@@ -84,15 +80,15 @@ async def get_project_participants_grid_with_limit(
     limit: int,
     query: ProjectParticipantGridFilter,
     skip: int = 0,
-    connection=get_project_readonly_connection,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """Get project summary (from query) with some limit"""
 
-    if not connection.project:
+    if not connection.project_id:
         raise ValueError('No project was detected through the authentication')
 
     wlayer = WebLayer(connection)
-    pfilter = query.to_internal(project=connection.project)
+    pfilter = query.to_internal(project=connection.project_id)
 
     participants, pcount = await asyncio.gather(
         wlayer.query_participants(pfilter, limit=limit, skip=skip),
@@ -120,15 +116,15 @@ async def export_project_participants(
     export_type: ExportType,
     query: ProjectParticipantGridFilter,
     fields: ExportProjectParticipantFields | None = None,
-    connection=get_project_readonly_connection,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """Get project summary (from query) with some limit"""
 
-    if not connection.project:
+    if not connection.project_id:
         raise ValueError('No project was detected through the authentication')
 
     wlayer = WebLayer(connection)
-    pfilter = query.to_internal(project=connection.project)
+    pfilter = query.to_internal(project=connection.project_id)
 
     participants_internal = await wlayer.query_participants(pfilter, limit=None)
     participants = [p.to_external() for p in participants_internal]

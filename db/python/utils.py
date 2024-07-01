@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import re
-from typing import TypeVar
+from typing import Any, TypeVar
 
 T = TypeVar('T')
 X = TypeVar('X')

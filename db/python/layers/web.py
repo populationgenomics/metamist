@@ -91,7 +91,7 @@ class WebDb(DbBase):
         FROM assay sq
         INNER JOIN sample s ON s.id = sq.sample_id
         WHERE s.project = :project"""
-        return await self.connection.fetch_val(_query, {'project': self.project})
+        return await self.connection.fetch_val(_query, {'project': self.project_id})
 
     def get_seqr_links_from_project(self, project: WebProject) -> dict[str, str]:
         """
