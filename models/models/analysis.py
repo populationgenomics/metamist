@@ -63,7 +63,7 @@ class AnalysisInternal(SMBase):
             status=AnalysisStatus(status),
             sequencing_group_ids=sequencing_group_ids or [],
             cohort_ids=cohort_ids,
-            output=kwargs.pop('output', []),
+            output=kwargs.pop('output', None),
             outputs=kwargs.pop('outputs', {}),
             timestamp_completed=timestamp_completed,
             project=kwargs.get('project'),

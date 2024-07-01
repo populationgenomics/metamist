@@ -252,17 +252,20 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             GROUP BY a.id
         """
         rows = await self.connection.fetch_all(_query, values)
+        result: list[AnalysisInternal] = []
+
+        if not rows:
+            return result
+
         analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(
             [r['id'] for r in rows]
         )
 
-        result: list[AnalysisInternal] = []
-
         for row in rows:
 
             analysis_data = dict(row)
-            analysis_data['output'] = analysis_outputs_by_aid.get(row['id'], [])
-            analysis_data['outputs'] = analysis_outputs_by_aid.get(row['id'], [])
+            analysis_data['output'] = analysis_outputs_by_aid.get(row['id'], None)
+            analysis_data['outputs'] = analysis_outputs_by_aid.get(row['id'], {})
 
             analysis = AnalysisInternal.from_db(**analysis_data)
 
@@ -510,8 +513,8 @@ WHERE a.id = :analysis_id
         analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(
             [analysis_data['id']]
         )
-        analysis_data['output'] = analysis_outputs_by_aid.get(analysis_data['id'], [])
-        analysis_data['outputs'] = analysis_outputs_by_aid.get(analysis_data['id'], [])
+        analysis_data['output'] = analysis_outputs_by_aid.get(analysis_data['id'], None)
+        analysis_data['outputs'] = analysis_outputs_by_aid.get(analysis_data['id'], {})
 
         analysis = AnalysisInternal.from_db(**analysis_data)
         for row in rows[1:]:
@@ -553,7 +556,7 @@ WHERE a.id = :analysis_id
             values['pids'] = list(participant_ids)
 
         _query = f"""
-SELECT id, peid.external_id as participant_id, a.output as output, sg.id as sequencing_group_id
+SELECT a.id, peid.external_id as participant_id, a.output as output, sg.id as sequencing_group_id
 FROM analysis a
 INNER JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
 INNER JOIN sequencing_group sg ON a_sg.sequencing_group_id = sg.id
@@ -565,14 +568,17 @@ ORDER BY a.timestamp_completed DESC;
 """
 
         rows = await self.connection.fetch_all(_query, values)
+        results: list[dict] = []
+        if not rows:
+            return results
+
         analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(
             [r['id'] for r in rows]
         )
-        results = []
         for row in rows:
             analysis_data = dict(row)
-            analysis_data['output'] = analysis_outputs_by_aid.get(row['id'], [])
-            analysis_data['outputs'] = analysis_outputs_by_aid.get(row['id'], [])
+            analysis_data['output'] = analysis_outputs_by_aid.get(row['id'], None)
+            analysis_data['outputs'] = analysis_outputs_by_aid.get(row['id'], {})
             analysis_data.pop('id')
             results.append(analysis_data)
         # many per analysis
