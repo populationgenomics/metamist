@@ -110,8 +110,6 @@ class DbTest(unittest.TestCase):
                 if am_i_in_test_environment:
                     db_prefix = '../db'
 
-                # con_string = db.get_connection_url()
-                # con_string = 'mysql://' + con_string.split('://', maxsplit=1)[1]
                 lcon_string = f'jdbc:mariadb://{db.get_container_host_ip()}:{port_to_expose}/{db.dbname}'
                 # apply the liquibase schema
                 command = [
