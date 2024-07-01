@@ -1,7 +1,6 @@
 import datetime
-import json
 
-from models.base import SMBase
+from models.base import SMBase, parse_sql_dict
 from models.models.project import ProjectId
 
 AuditLogId = int
@@ -24,8 +23,6 @@ class AuditLogInternal(SMBase):
     @staticmethod
     def from_db(d: dict):
         """Take DB mapping object, and return SampleSequencing"""
-        meta = {}
-        if 'meta' in d:
-            meta = json.loads(d.pop('meta'))
+        meta = parse_sql_dict(d.pop('meta', {}))
 
         return AuditLogInternal(meta=meta, **d)

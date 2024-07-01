@@ -50,7 +50,9 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
     }))
 
     const [searchByType, setSearchByType] = React.useState<SearchType>(
-        (searchParams.get('searchType') as SearchType) ?? SearchType[0]
+        (SearchType[
+            parseInt(searchParams.get('searchType') ?? '0', 10)
+        ] as unknown as SearchType) ?? SearchType[0]
     )
 
     // use navigate and update url params

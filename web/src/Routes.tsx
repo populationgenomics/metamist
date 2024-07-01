@@ -19,7 +19,7 @@ import Details from './pages/insights/Details'
 import Summary from './pages/insights/Summary'
 import OurDnaDashboard from './pages/ourdna/OurDnaDashboard'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
-import ProjectSummaryView from './pages/project/ProjectSummary'
+import ProjectOverview from './pages/project/ProjectOverview'
 import SampleView from './pages/sample/SampleView'
 import ErrorBoundary from './shared/utilities/errorBoundary'
 
@@ -32,7 +32,7 @@ const Routes: React.FunctionComponent = () => (
             path="/project/:projectName?/:page?"
             element={
                 <ErrorBoundary>
-                    <ProjectSummaryView />
+                    <ProjectOverview />
                 </ErrorBoundary>
             }
         />

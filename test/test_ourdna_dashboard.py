@@ -3,6 +3,7 @@ from datetime import datetime
 from math import ceil
 from test.testbase import DbIsolatedTest, run_as_sync
 
+from db.python.enum_tables.sample_type import SampleTypeTable
 from db.python.layers.ourdna.dashboard import OurDnaDashboardLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
@@ -31,6 +32,9 @@ class OurDNADashboardTest(DbIsolatedTest):
         self.sl = SampleLayer(self.connection)
         self.pl = ParticipantLayer(self.connection)
 
+        self.stt = SampleTypeTable(self.connection)
+        await self.stt.insert('ebld')
+
         participants = await self.pl.upsert_participants(
             [
                 ParticipantUpsertInternal(
@@ -58,7 +62,7 @@ class OurDNADashboardTest(DbIsolatedTest):
                                 'courier-actual-dropoff-time': '2022-07-03 13:28:00',
                                 'concentration': 1.45,
                             },
-                            type='blood',
+                            type='ebld',
                             active=True,
                         )
                     ],
@@ -74,8 +78,8 @@ class OurDNADashboardTest(DbIsolatedTest):
                             meta={
                                 'collection-time': '2022-07-03 13:28:00',
                                 'processing-site': 'BBV',
-                                'process-start-time': '2022-07-06 16:28:00',
-                                'process-end-time': '2022-07-06 19:28:00',
+                                # 'process-start-time': '2022-07-06 16:28:00',
+                                # 'process-end-time': '2022-07-06 19:28:00',
                                 'received-time': '2022-07-03 14:28:00',
                                 'received-by': 'YP',
                                 'collection-lab': 'XYZ LAB',
@@ -88,7 +92,7 @@ class OurDNADashboardTest(DbIsolatedTest):
                                 'courier-actual-dropoff-time': '2022-07-03 13:28:00',
                                 'concentration': 0.98,
                             },
-                            type='blood',
+                            type='ebld',
                             active=True,
                         )
                     ],
@@ -117,7 +121,7 @@ class OurDNADashboardTest(DbIsolatedTest):
                                 'courier-actual-dropoff-time': '2022-07-03 13:28:00',
                                 'concentration': 1.66,
                             },
-                            type='blood',
+                            type='ebld',
                             active=True,
                         )
                     ],
@@ -302,12 +306,10 @@ class OurDNADashboardTest(DbIsolatedTest):
             collection_time = sample.meta.get('collection-time')
             process_start_time = sample.meta.get('process-start-time')
             # Skip samples that don't have collection_time or process_end_time
-            if not collection_time or not process_start_time:
+            if not collection_time:
                 continue
-            time_difference = str_to_datetime(process_start_time) - str_to_datetime(
-                collection_time
-            )
-            if time_difference.total_seconds() > 72 * 3600:
+            time_difference = datetime.now() - str_to_datetime(collection_time)
+            if time_difference.total_seconds() > 72 * 3600 and not process_start_time:
                 # Check that the time difference matches
                 assert isinstance(sample.id, str)
 
@@ -316,8 +318,8 @@ class OurDNADashboardTest(DbIsolatedTest):
                 for sample_data in samples_lost_after_collection:
                     if sample_data.sample_id == sample.id:
                         self.assertEqual(
-                            time_difference.total_seconds(),
-                            sample_data.time_to_process_start,
+                            int(time_difference.total_seconds()),
+                            sample_data.time_since_collection,
                         )
 
         # check that there are a correct number of matching results

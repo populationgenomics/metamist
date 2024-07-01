@@ -1,6 +1,4 @@
-import json
-
-from models.base import OpenApiGenNoneType, SMBase, parse_sql_bool
+from models.base import OpenApiGenNoneType, SMBase, parse_sql_bool, parse_sql_dict
 from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
 from models.models.sequencing_group import (
     NestedSequencingGroup,
@@ -30,19 +28,22 @@ class SampleInternal(SMBase):
         """
         _id = d.pop('id', None)
         type_ = d.pop('type', None)
-        meta = d.pop('meta', None)
+        meta = parse_sql_dict(d.pop('meta', None)) or {}
         active = parse_sql_bool(d.pop('active', None))
 
-        if meta:
-            if isinstance(meta, bytes):
-                meta = meta.decode()
-            if isinstance(meta, str):
-                meta = json.loads(meta)
+        external_ids = parse_sql_dict(d.pop('external_ids', None))
 
-        if 'external_ids' in d and isinstance(d['external_ids'], str):
-            d['external_ids'] = json.loads(d['external_ids'])
+        if not external_ids:
+            raise ValueError(f'Sample {sample_id_format(_id)} has no external_ids')
 
-        return SampleInternal(id=_id, type=str(type_), meta=meta, active=active, **d)
+        return SampleInternal(
+            id=_id,
+            type=str(type_),
+            meta=meta,
+            active=active,
+            external_ids=external_ids,
+            **d,
+        )
 
     def to_external(self):
         """Convert to transport model"""
@@ -67,7 +68,7 @@ class NestedSampleInternal(SMBase):
     active: bool | None
     created_date: str | None
 
-    sequencing_groups: list[NestedSequencingGroupInternal] | None = None
+    sequencing_groups: list[NestedSequencingGroupInternal]
     non_sequencing_assays: list[AssayInternal]
 
     def to_external(self):
@@ -78,10 +79,8 @@ class NestedSampleInternal(SMBase):
             meta=self.meta,
             type=self.type,
             created_date=self.created_date,
-            sequencing_groups=[sg.to_external() for sg in self.sequencing_groups or []],
-            non_sequencing_assays=[
-                a.to_external() for a in self.non_sequencing_assays or []
-            ],
+            sequencing_groups=[sg.to_external() for sg in self.sequencing_groups],
+            non_sequencing_assays=[a.to_external() for a in self.non_sequencing_assays],
         )
 
 
