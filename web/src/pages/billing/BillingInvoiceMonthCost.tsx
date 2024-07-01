@@ -48,7 +48,8 @@ const BillingCurrentCost = () => {
     // .replace('-', '') will give you YYYYMM
     const currentDate = new Date()
     const dayOfMonth = new Date().toISOString().substring(8, 10)
-    if (parseInt(dayOfMonth, 10) === 1) {
+    if (parseInt(dayOfMonth, 10) < 3) {
+        // first 2 days of the month, show previous month as default
         currentDate.setMonth(currentDate.getMonth() - 1)
     }
     const thisMonth = currentDate.toISOString().substring(0, 7).replace('-', '')
