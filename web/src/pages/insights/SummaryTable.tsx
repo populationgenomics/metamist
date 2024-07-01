@@ -1,4 +1,3 @@
-// projectInsights/SummaryTable.tsx
 import React, { ReactNode, useState } from 'react'
 import { Table as SUITable } from 'semantic-ui-react'
 import Table from '../../shared/components/Table'

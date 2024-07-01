@@ -1,22 +1,22 @@
 import * as React from 'react'
 import { Link } from 'react-router-dom'
-import { Menu, Dropdown, Popup } from 'semantic-ui-react'
+import { Dropdown, Menu, Popup } from 'semantic-ui-react'
 
 import { BillingApi } from '../../../sm-api'
 
 // this wasn't working, so added import to HTML
 // import 'bootstrap/dist/css/bootstrap.min.css'
-import Searchbar from './Search'
-import MuckTheDuck from '../MuckTheDuck'
-import SwaggerIcon from '../SwaggerIcon'
-import HomeIcon from '@mui/icons-material/Home'
-import ExploreIcon from '@mui/icons-material/Explore'
-import InsightsIcon from '@mui/icons-material/Insights'
-import TableRowsIcon from '@mui/icons-material/TableRows'
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney'
 import DescriptionIcon from '@mui/icons-material/Description'
+import ExploreIcon from '@mui/icons-material/Explore'
+import HomeIcon from '@mui/icons-material/Home'
+import InsightsIcon from '@mui/icons-material/Insights'
+import TableRowsIcon from '@mui/icons-material/TableRows'
 import TroubleshootIcon from '@mui/icons-material/Troubleshoot'
+import MuckTheDuck from '../MuckTheDuck'
+import SwaggerIcon from '../SwaggerIcon'
 import DarkModeTriButton from './DarkModeTriButton/DarkModeTriButton'
+import Searchbar from './Search'
 
 import { ThemeContext } from '../ThemeProvider'
 
@@ -60,6 +60,24 @@ const billingPages = {
         {
             title: 'Seqr Prop Map',
             url: '/billing/seqrPropMap',
+            icon: <TableRowsIcon />,
+        },
+    ],
+}
+
+const InsightsPages = {
+    title: 'Insights',
+    url: '/insights',
+    icon: <InsightsIcon />,
+    submenu: [
+        {
+            title: 'Details',
+            url: '/insights/details',
+            icon: <TableRowsIcon />,
+        },
+        {
+            title: 'Summary',
+            url: '/insights/summary',
             icon: <TableRowsIcon />,
         },
     ],
@@ -160,7 +178,12 @@ const NavBar: React.FC<NavBarProps> = ({ fixed }) => {
     React.useEffect(() => {
         new BillingApi().isBillingEnabled().then((response) => {
             if (response.status === 200 && response.data === true) {
-                setMenuItems([...menuItems.slice(0, 2), billingPages, ...menuItems.slice(2)])
+                setMenuItems([
+                    ...menuItems.slice(0, 2),
+                    billingPages,
+                    ...menuItems.slice(2),
+                    InsightsPages,
+                ])
             }
         })
     }, [])

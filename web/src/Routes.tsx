@@ -1,27 +1,27 @@
 import * as React from 'react'
 
+import { Route, Routes as Switch } from 'react-router-dom'
 import SwaggerUI from 'swagger-ui-react'
-import { Routes as Switch, Route } from 'react-router-dom'
 
+import ProjectsAdmin from './pages/admin/ProjectsAdmin'
 import {
-    BillingHome,
-    BillingSeqrProp,
-    BillingCostByTime,
     BillingCostByAnalysis,
-    BillingInvoiceMonthCost,
     BillingCostByCategory,
     BillingCostByMonth,
+    BillingCostByTime,
+    BillingHome,
+    BillingInvoiceMonthCost,
+    BillingSeqrProp,
 } from './pages/billing'
 import DocumentationArticle from './pages/docs/Documentation'
-import SampleView from './pages/sample/SampleView'
 import FamilyView from './pages/family/FamilyView'
+import Details from './pages/insights/Details'
+import Summary from './pages/insights/Summary'
 import OurDnaDashboard from './pages/ourdna/OurDnaDashboard'
-import ProjectSummaryView from './pages/project/ProjectSummary'
-import ProjectsAdmin from './pages/admin/ProjectsAdmin'
-import ErrorBoundary from './shared/utilities/errorBoundary'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
-import Summary from './pages/projectInsights/Summary'
-import Details from './pages/projectInsights/Details'
+import ProjectSummaryView from './pages/project/ProjectSummary'
+import SampleView from './pages/sample/SampleView'
+import ErrorBoundary from './shared/utilities/errorBoundary'
 
 const Routes: React.FunctionComponent = () => (
     <Switch>
@@ -121,19 +121,19 @@ const Routes: React.FunctionComponent = () => (
         />
 
         <Route
-            path="projectInsights/summary"
+            path="insights/details"
             element={
                 <ErrorBoundary>
-                    <Summary />
+                    <Details />
                 </ErrorBoundary>
             }
         />
 
         <Route
-            path="projectInsights/details"
+            path="insights/summary"
             element={
                 <ErrorBoundary>
-                    <Details />
+                    <Summary />
                 </ErrorBoundary>
             }
         />
