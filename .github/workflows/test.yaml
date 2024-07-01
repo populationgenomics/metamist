@@ -89,7 +89,6 @@ jobs:
           echo "web_rc=$rc" >> $GITHUB_OUTPUT
           # eventually run web front-end tests
           popd
-          exit $rc
 
       - name: Fail if unit tests are not passing
         if: ${{ steps.runtests.outputs.rc != 0}}
