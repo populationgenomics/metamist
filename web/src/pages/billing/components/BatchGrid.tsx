@@ -86,7 +86,7 @@ const AnalysisRunnerRecordCard: React.FC<{ data: AnalysisCostRecord }> = ({ data
                         </CheckboxRow>
 
                         <DisplayRow label="Total cost">
-                            {formatMoney(data.total?.cost, 2)}
+                            {formatMoney(data.total?.cost ?? 0, 2)}
                         </DisplayRow>
 
                         {/* cost by categories */}
@@ -426,7 +426,7 @@ const BatchGrid: React.FunctionComponent<{
             {data.dataproc?.map((item, idx) => (
                 <GenericCard
                     key={`dataproc-${idx}`}
-                    data={item}
+                    data={item as IGenericCardData}
                     label="DATAPROC"
                     pkey={`dataproc-${idx}`}
                 />

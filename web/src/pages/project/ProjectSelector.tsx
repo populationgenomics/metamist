@@ -56,6 +56,7 @@ const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({ onProj
                 selection
                 fluid
                 onChange={(_, data) =>
+                    // @ts-ignore
                     onProjectSelect(projectsByName[data?.value] as IMetamistProject)
                 }
                 placeholder="Select a project"

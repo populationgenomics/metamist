@@ -194,6 +194,9 @@ export const ValueFilter: React.FC<IValueFilter> = ({
                         <IconButton
                             style={{ padding: '0', height: '12px', width: '12px' }}
                             onClick={() => {
+                                if (!operator) {
+                                    return alert('No operator, please report this issue.')
+                                }
                                 postValue(operator, undefined)
                                 setTempValue('')
                             }}

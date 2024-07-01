@@ -19,6 +19,8 @@ class SampleInternal(SMBase):
     type: str | None
     participant_id: int | None
     active: bool | None
+    sample_root_id: int | None
+    sample_parent_id: int | None
     author: str | None = None
 
     @staticmethod
@@ -54,6 +56,8 @@ class SampleInternal(SMBase):
             project=self.project,
             type=self.type,
             participant_id=self.participant_id,
+            sample_root_id=self.sample_root_id,
+            sample_parent_id=self.sample_parent_id,
             active=self.active,
         )
 
@@ -68,6 +72,9 @@ class NestedSampleInternal(SMBase):
     active: bool | None
     created_date: str | None
 
+    sample_root_id: int | None
+    sample_parent_id: int | None
+
     sequencing_groups: list[NestedSequencingGroupInternal]
     non_sequencing_assays: list[AssayInternal]
 
@@ -79,6 +86,14 @@ class NestedSampleInternal(SMBase):
             meta=self.meta,
             type=self.type,
             created_date=self.created_date,
+            sample_root_id=(
+                sample_id_format(self.sample_root_id) if self.sample_root_id else None
+            ),
+            sample_parent_id=(
+                sample_id_format(self.sample_parent_id)
+                if self.sample_parent_id
+                else None
+            ),
             sequencing_groups=[sg.to_external() for sg in self.sequencing_groups],
             non_sequencing_assays=[a.to_external() for a in self.non_sequencing_assays],
         )
@@ -94,6 +109,8 @@ class SampleUpsertInternal(SMBase):
     type: str | None = None
     participant_id: int | None = None
     active: bool | None = None
+
+    nested_samples: list['SampleUpsertInternal'] | None = None
 
     sequencing_groups: list[SequencingGroupUpsertInternal] | None = None
     non_sequencing_assays: list[AssayUpsertInternal] | None = None
@@ -116,6 +133,7 @@ class SampleUpsertInternal(SMBase):
             non_sequencing_assays=[
                 a.to_external() for a in self.non_sequencing_assays or []
             ],
+            nested_samples=[ns.to_external() for ns in self.nested_samples or []],
         )
 
 
@@ -129,6 +147,8 @@ class Sample(SMBase):
     type: str | None
     participant_id: int | None
     active: bool | None
+    sample_root_id: int | None
+    sample_parent_id: int | None
     author: str | None = None
 
     def to_internal(self):
@@ -141,6 +161,8 @@ class Sample(SMBase):
             type=self.type,
             participant_id=self.participant_id,
             active=self.active,
+            sample_root_id=self.sample_root_id,
+            sample_parent_id=self.sample_parent_id,
             author='<EXT-TO-INT-CONVERSION>',
         )
 
@@ -153,6 +175,9 @@ class NestedSample(SMBase):
     meta: dict
     type: str | None
     created_date: str | None
+    sample_root_id: str | None
+    sample_parent_id: str | None
+
     sequencing_groups: list[NestedSequencingGroup] | None = None
     non_sequencing_assays: list[Assay]
 
@@ -168,6 +193,7 @@ class SampleUpsert(SMBase):
     participant_id: int | OpenApiGenNoneType = None
     active: bool | OpenApiGenNoneType = None
 
+    nested_samples: list['SampleUpsert'] | None = None
     sequencing_groups: list[SequencingGroupUpsert] | None = None
     non_sequencing_assays: list[AssayUpsert] | None = None
 
@@ -185,6 +211,7 @@ class SampleUpsert(SMBase):
             type=self.type,  # type: ignore
             participant_id=self.participant_id,  # type: ignore
             active=self.active,  # type: ignore
+            nested_samples=[ns.to_internal() for ns in (self.nested_samples or [])],
         )
 
         if self.sequencing_groups:
