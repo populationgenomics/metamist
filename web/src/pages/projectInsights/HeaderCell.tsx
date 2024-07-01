@@ -2,10 +2,18 @@
 import React from 'react'
 import { Table as SUITable } from 'semantic-ui-react'
 import HtmlTooltip from '../../shared/utilities/htmlTooltip'
-import { ProjectInsightsSummary } from '../../sm-api'
+import { ProjectInsightsDetails, ProjectInsightsSummary } from '../../sm-api'
 import FilterButton from './FilterButton'
 
-export type ColumnKey = keyof ProjectInsightsSummary | string
+export type ColumnKey =
+    | keyof ProjectInsightsSummary
+    | keyof ProjectInsightsDetails
+    | 'mito'
+    | 'stripy'
+    | 'aligned_percentage'
+    | 'annotated_dataset_percentage'
+    | 'snv_index_percentage'
+    | 'sv_index_percentage'
 
 export interface HeaderCellConfig {
     key: ColumnKey
@@ -80,46 +88,6 @@ export const HeaderCell: React.FC<HeaderCellProps> = ({
     )
 }
 
-export const summaryTableHeaderCellConfigs: HeaderCellConfig[] = [
-    { key: 'dataset', label: 'Dataset', sortable: true },
-    { key: 'sequencing_type', label: 'Seq Type', sortable: true },
-    { key: 'sequencing_technology', label: 'Technology', sortable: true, filterable: true },
-    { key: 'total_families', label: 'Families', sortable: true },
-    { key: 'total_participants', label: 'Participants', sortable: true },
-    { key: 'total_samples', label: 'Samples', sortable: true },
-    { key: 'total_sequencing_groups', label: 'SGs', sortable: true },
-    { key: 'total_crams', label: 'CRAMs', sortable: true },
-    {
-        key: 'aligned_percentage',
-        label: '% Aligned',
-        sortable: false,
-        tooltip: 'Percentage of Sequencing Groups with a Completed CRAM Analysis',
-        className: 'collapsible-header',
-    },
-    {
-        key: 'annotated_dataset_percentage',
-        label: '% in Joint Callset',
-        sortable: false,
-        tooltip: 'Percentage of Sequencing Groups in the latest AnnotateDataset Analysis',
-        className: 'collapsible-header',
-    },
-    {
-        key: 'snv_index_percentage',
-        label: '% in SNV ES-Index',
-        sortable: false,
-        tooltip: 'Percentage of Sequencing Groups in the latest SNV ES-Index Analysis',
-        className: 'collapsible-header',
-    },
-    {
-        key: 'sv_index_percentage',
-        label: '% in SV ES-Index',
-        sortable: false,
-        tooltip:
-            'Percentage of Sequencing Groups in the latest SV (genome) or gCNV (exome) ES-Index Analysis',
-        className: 'collapsible-header',
-    },
-]
-
 export const detailsTableHeaderCellConfigs: HeaderCellConfig[] = [
     { key: 'dataset', label: 'Dataset', sortable: true },
     { key: 'sequencing_type', label: 'Seq Type', sortable: true },
@@ -160,7 +128,7 @@ export const detailsTableHeaderCellConfigs: HeaderCellConfig[] = [
     },
     {
         key: 'family_ext_id',
-        label: 'Family Ext ID',
+        label: 'Fam. Ext ID',
         sortable: true,
         tooltip: 'External Family ID',
         filterable: true,
@@ -188,7 +156,7 @@ export const detailsTableHeaderCellConfigs: HeaderCellConfig[] = [
     },
     {
         key: 'sample_ext_ids',
-        label: 'Sample Ext ID(s)',
+        label: 'S. Ext ID(s)',
         sortable: true,
         tooltip: 'External Sample ID(s)',
         filterable: true,
@@ -234,5 +202,45 @@ export const detailsTableHeaderCellConfigs: HeaderCellConfig[] = [
         sortable: true,
         tooltip: 'SG Mito report link',
         filterable: true,
+    },
+]
+
+export const summaryTableHeaderCellConfigs: HeaderCellConfig[] = [
+    { key: 'dataset', label: 'Dataset', sortable: true },
+    { key: 'sequencing_type', label: 'Seq Type', sortable: true },
+    { key: 'sequencing_technology', label: 'Technology', sortable: true, filterable: true },
+    { key: 'total_families', label: 'Families', sortable: true },
+    { key: 'total_participants', label: 'Participants', sortable: true },
+    { key: 'total_samples', label: 'Samples', sortable: true },
+    { key: 'total_sequencing_groups', label: 'SGs', sortable: true },
+    { key: 'total_crams', label: 'CRAMs', sortable: true },
+    {
+        key: 'aligned_percentage',
+        label: '% Aligned',
+        sortable: false,
+        tooltip: 'Percentage of Sequencing Groups with a Completed CRAM Analysis',
+        className: 'collapsible-header',
+    },
+    {
+        key: 'annotated_dataset_percentage',
+        label: '% in Joint Callset',
+        sortable: false,
+        tooltip: 'Percentage of Sequencing Groups in the latest AnnotateDataset Analysis',
+        className: 'collapsible-header',
+    },
+    {
+        key: 'snv_index_percentage',
+        label: '% in SNV ES-Index',
+        sortable: false,
+        tooltip: 'Percentage of Sequencing Groups in the latest SNV ES-Index Analysis',
+        className: 'collapsible-header',
+    },
+    {
+        key: 'sv_index_percentage',
+        label: '% in SV ES-Index',
+        sortable: false,
+        tooltip:
+            'Percentage of Sequencing Groups in the latest SV (genome) or gCNV (exome) ES-Index Analysis',
+        className: 'collapsible-header',
     },
 ]

@@ -9,12 +9,10 @@ import { ColumnKey, HeaderCell, summaryTableHeaderCellConfigs } from './HeaderCe
 import { FooterCell, footerCellConfigs } from './SummaryTableFooterCell'
 
 interface SummaryTableProps {
-    allData: ProjectInsightsSummary[]
     filteredData: ProjectInsightsSummary[]
-    selectedProjects: string[]
-    selectedSeqTypes: string[]
-    selectedSeqTechnologies: string[]
-    handleSelectionChange: (columnName: string, selectedOptions: string[]) => void
+    handleSelectionChange: (columnName: ColumnKey, selectedOptions: string[]) => void
+    getUniqueOptionsForColumn: (key: ColumnKey) => string[]
+    getSelectedOptionsForColumn: (key: ColumnKey) => string[]
 }
 
 interface PercentageCellProps {
@@ -63,14 +61,13 @@ const getRowClassName = (sequencingType: string) => {
     }
 }
 
-function isKeyOfProjectInsightsSummary(key: string): key is keyof ProjectInsightsSummary {
-    return key in ({} as ProjectInsightsSummary)
-}
-
-const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summary }) => {
-    const theme = React.useContext(ThemeContext)
-    const isDarkMode = theme.theme === 'dark-mode'
-
+const getSummaryCell = (
+    summary: ProjectInsightsSummary,
+    key: ColumnKey,
+    isDarkMode: boolean
+): React.ReactNode => {
+    // What goes into each cell of the table is determined by the column header or 'key'
+    // The percentage calculation cells are handled differently from the other cells
     const percentageAligned =
         summary.total_sequencing_groups > 0
             ? (summary.total_crams / summary.total_sequencing_groups) * 100
@@ -132,60 +129,73 @@ const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summar
         </p>
     )
 
-    const rowClassName = getRowClassName(summary.sequencing_type)
+    switch (key) {
+        case 'aligned_percentage':
+            return (
+                <PercentageCell
+                    percentage={percentageAligned}
+                    tooltipContent={alignedCellTooltip}
+                    isDarkMode={isDarkMode}
+                    getPercentageColor={getPercentageColor}
+                ></PercentageCell>
+            )
+        case 'annotated_dataset_percentage':
+            return (
+                <PercentageCell
+                    percentage={percentageInJointCall}
+                    tooltipContent={inJointCallTooltip}
+                    isDarkMode={isDarkMode}
+                    getPercentageColor={getPercentageColor}
+                ></PercentageCell>
+            )
+        case 'snv_index_percentage':
+            return (
+                <PercentageCell
+                    percentage={percentageInSnvIndex}
+                    tooltipContent={inSnvIndexTooltip}
+                    isDarkMode={isDarkMode}
+                    getPercentageColor={getPercentageColor}
+                ></PercentageCell>
+            )
+        case 'sv_index_percentage':
+            return (
+                <PercentageCell
+                    percentage={percentageInSvIndex}
+                    tooltipContent={inSvIndexTooltip}
+                    isDarkMode={isDarkMode}
+                    getPercentageColor={getPercentageColor}
+                ></PercentageCell>
+            )
+        default:
+            return (
+                <SUITable.Cell className="table-cell">
+                    {summary[key as keyof ProjectInsightsSummary]}
+                </SUITable.Cell>
+            )
+    }
+}
 
+const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summary }) => {
+    const theme = React.useContext(ThemeContext)
+    const isDarkMode = theme.theme === 'dark-mode'
+    const rowClassName = getRowClassName(summary.sequencing_type)
     return (
         <SUITable.Row
-            key={`${summary.project}-${summary.sequencing_type}`}
+            key={`${summary.dataset}-${summary.sequencing_type}-${summary.sequencing_technology}`}
             className={rowClassName}
         >
-            <SUITable.Cell data-cell className="category-cell">
-                {summary.dataset}
-            </SUITable.Cell>
-            <SUITable.Cell data-cell className="category-cell">
-                {summary.sequencing_type}
-            </SUITable.Cell>
-            <SUITable.Cell className="table-cell">{summary.sequencing_technology}</SUITable.Cell>
-            <SUITable.Cell className="table-cell">{summary.total_families}</SUITable.Cell>
-            <SUITable.Cell className="table-cell">{summary.total_participants}</SUITable.Cell>
-            <SUITable.Cell className="table-cell">{summary.total_samples}</SUITable.Cell>
-            <SUITable.Cell className="table-cell">{summary.total_sequencing_groups}</SUITable.Cell>
-            <SUITable.Cell className="table-cell">{summary.total_crams}</SUITable.Cell>
-            <PercentageCell
-                percentage={percentageAligned}
-                tooltipContent={alignedCellTooltip}
-                isDarkMode={isDarkMode}
-                getPercentageColor={getPercentageColor}
-            ></PercentageCell>
-            <PercentageCell
-                percentage={percentageInJointCall}
-                tooltipContent={inJointCallTooltip}
-                isDarkMode={isDarkMode}
-                getPercentageColor={getPercentageColor}
-            ></PercentageCell>
-            <PercentageCell
-                percentage={percentageInSnvIndex}
-                tooltipContent={inSnvIndexTooltip}
-                isDarkMode={isDarkMode}
-                getPercentageColor={getPercentageColor}
-            ></PercentageCell>
-            <PercentageCell
-                percentage={percentageInSvIndex}
-                tooltipContent={inSvIndexTooltip}
-                isDarkMode={isDarkMode}
-                getPercentageColor={getPercentageColor}
-            ></PercentageCell>
+            {summaryTableHeaderCellConfigs.map((config) =>
+                getSummaryCell(summary, config.key, isDarkMode)
+            )}
         </SUITable.Row>
     )
 }
 
 const SummaryTable: React.FC<SummaryTableProps> = ({
-    allData,
     filteredData,
-    selectedProjects,
-    selectedSeqTypes,
-    selectedSeqTechnologies,
+    getUniqueOptionsForColumn,
     handleSelectionChange,
+    getSelectedOptionsForColumn,
 }) => {
     const [sortColumns, setSortColumns] = useState<
         Array<{ column: ColumnKey; direction: 'ascending' | 'descending' }>
@@ -225,13 +235,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
         const data = [...filteredData]
         data.sort((a, b) => {
             for (const { column, direction } of sortColumns) {
-                const valueA = isKeyOfProjectInsightsSummary(column)
-                    ? a[column]
-                    : (a as any)[column]
-                const valueB = isKeyOfProjectInsightsSummary(column)
-                    ? b[column]
-                    : (b as any)[column]
-
+                const valueA = a[column as keyof ProjectInsightsSummary]
+                const valueB = b[column as keyof ProjectInsightsSummary]
                 if (valueA === valueB) continue
                 if (typeof valueA === 'number' && typeof valueB === 'number') {
                     return direction === 'ascending' ? valueA - valueB : valueB - valueA
@@ -246,35 +251,6 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
         return data
     }, [filteredData, sortColumns])
 
-    const getUniqueOptionsForColumn = (columnName: ColumnKey) => {
-        const filteredDataExcludingCurrentColumn = allData.filter((item) => {
-            return (
-                selectedProjects.some((p) => p === item.dataset) &&
-                selectedSeqTypes.includes(item.sequencing_type) &&
-                (columnName === 'sequencing_technology' ||
-                    selectedSeqTechnologies.length === 0 ||
-                    selectedSeqTechnologies.includes(item.sequencing_technology))
-            )
-        })
-
-        let uniqueOptions: string[] = []
-        if (isKeyOfProjectInsightsSummary(columnName)) {
-            uniqueOptions = Array.from(
-                new Set(
-                    filteredDataExcludingCurrentColumn.map(
-                        (item) => item[columnName]?.toString() || ''
-                    )
-                )
-            )
-        } else {
-            uniqueOptions = Array.from(
-                new Set(filteredDataExcludingCurrentColumn.map((item) => (item as any)[columnName]))
-            ).map((option) => option?.toString() || '')
-        }
-
-        return uniqueOptions
-    }
-
     return (
         <div>
             <Table sortable>
@@ -285,18 +261,13 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                                 key={config.key}
                                 config={config}
                                 sortDirection={
-                                    sortColumns.find((col) => col.column === config.key)?.direction
+                                    sortColumns.find((column) => column.column === config.key)
+                                        ?.direction
                                 }
                                 onSort={handleSort}
                                 onFilter={handleSelectionChange}
                                 getUniqueOptionsForColumn={getUniqueOptionsForColumn}
-                                selectedOptions={
-                                    config.key === 'sequencing_technology'
-                                        ? selectedSeqTechnologies
-                                        : config.key === 'sequencing_type'
-                                        ? selectedSeqTypes
-                                        : []
-                                }
+                                selectedOptions={getSelectedOptionsForColumn(config.key)}
                             />
                         ))}
                     </SUITable.Row>

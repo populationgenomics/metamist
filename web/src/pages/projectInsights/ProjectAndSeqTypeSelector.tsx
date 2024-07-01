@@ -1,50 +1,104 @@
-// ProjectAndSeqTypeSelector.tsx
 import React from 'react'
 import { Checkbox } from 'semantic-ui-react'
+
+interface SelectorProps {
+    items: string[]
+    selectedItems: string[]
+    onSelectionChange: (selectedItems: string[]) => void
+    title: string
+    specialSelectionLabel?: string
+    specialSelectionItems?: string[]
+}
 
 interface ProjectAndSeqTypeSelectorProps {
     projects: string[]
     selectedProjects: string[]
     seqTypes: string[]
     selectedSeqTypes: string[]
-    onProjectChange: (projects: string[], isSelected: boolean[]) => void
-    onSeqTypeChange: (seqTypes: string[], isSelected: boolean[]) => void
+    onProjectChange: (selectedProjects: string[]) => void
+    onSeqTypeChange: (selectedSeqTypes: string[]) => void
 }
 
-const handleSelectAllProjects = (
-    projects: string[],
-    onProjectChange: (projects: string[], isSelected: boolean[]) => void,
-    selectAll: boolean
-) => {
-    let newSelectedProjects: string[] = projects
-    let isSelected: boolean[] = newSelectedProjects.map(() => selectAll)
-    onProjectChange(newSelectedProjects, isSelected)
-}
+const Selector: React.FC<SelectorProps> = ({
+    items,
+    selectedItems,
+    onSelectionChange,
+    title,
+    specialSelectionLabel,
+    specialSelectionItems,
+}) => {
+    const handleSelectAll = (selectAll: boolean) => {
+        onSelectionChange(selectAll ? [...items] : [])
+    }
 
-const handleSelectAllSeqTypes = (
-    seqTypes: string[],
-    onSeqTypeChange: (seqTypes: string[], isSelected: boolean[]) => void,
-    selectAll: boolean
-) => {
-    let newSelectedSeqTypes: string[] = seqTypes
-    let isSelected: boolean[] = newSelectedSeqTypes.map(() => selectAll)
-    onSeqTypeChange(newSelectedSeqTypes, isSelected)
-}
+    const handleSpecialSelection = () => {
+        if (specialSelectionItems) {
+            const areAllSpecialItemsSelected = specialSelectionItems.every((item) =>
+                selectedItems.includes(item)
+            )
+            if (areAllSpecialItemsSelected) {
+                onSelectionChange(
+                    selectedItems.filter((item) => !specialSelectionItems.includes(item))
+                )
+            } else {
+                onSelectionChange([...new Set([...selectedItems, ...specialSelectionItems])])
+            }
+        }
+    }
 
-const handleSelectMultipleTypes = (
-    seqTypes: string[],
-    onSeqTypeChange: (seqTypes: string[], isSelected: boolean[]) => void,
-    selectedSeqTypes: string[],
-    selectMultiple: boolean
-) => {
-    // If not select all, then select only "selectedSeqTypes" and unselect the rest
-    let newSelectedSeqTypes: string[] = selectedSeqTypes
-    let seqTypesToUnselect: string[] = seqTypes.filter(
-        (seqType) => !selectedSeqTypes.includes(seqType)
+    const handleItemChange = (item: string, isChecked: boolean) => {
+        if (isChecked) {
+            onSelectionChange([...selectedItems, item])
+        } else {
+            onSelectionChange(selectedItems.filter((i) => i !== item))
+        }
+    }
+
+    const isSpecialSelectionChecked = specialSelectionItems
+        ? specialSelectionItems.every((item) => selectedItems.includes(item))
+        : false
+
+    return (
+        <div style={{ flex: '1', marginRight: '20px' }}>
+            <h2 style={{ fontSize: '18px', marginBottom: '10px' }}>{title}</h2>
+            <div style={{ marginBottom: '10px' }}>
+                <Checkbox
+                    className="seq-type-project-checkbox"
+                    label="Select All"
+                    checked={selectedItems.length === items.length}
+                    onChange={(_, data) => handleSelectAll(data.checked ?? false)}
+                />
+                {specialSelectionLabel && (
+                    <Checkbox
+                        className="seq-type-project-checkbox"
+                        style={{ marginLeft: '50px' }}
+                        label={specialSelectionLabel}
+                        checked={isSpecialSelectionChecked}
+                        onChange={handleSpecialSelection}
+                    />
+                )}
+            </div>
+            <div
+                style={{
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    columns: title === 'Select Projects' ? 4 : 'auto',
+                    maxWidth: title === 'Select Projects' ? '400px' : 'auto',
+                }}
+            >
+                {items.map((item) => (
+                    <div key={item}>
+                        <Checkbox
+                            className="seq-type-project-checkbox"
+                            label={item}
+                            checked={selectedItems.includes(item)}
+                            onChange={(_, data) => handleItemChange(item, data.checked ?? false)}
+                        />
+                    </div>
+                ))}
+            </div>
+        </div>
     )
-    let isSelected: boolean[] = newSelectedSeqTypes.map(() => selectMultiple)
-    isSelected = isSelected.concat(seqTypesToUnselect.map(() => false))
-    onSeqTypeChange(newSelectedSeqTypes.concat(seqTypesToUnselect), isSelected)
 }
 
 const ProjectAndSeqTypeSelector: React.FC<ProjectAndSeqTypeSelectorProps> = ({
@@ -57,98 +111,20 @@ const ProjectAndSeqTypeSelector: React.FC<ProjectAndSeqTypeSelectorProps> = ({
 }) => {
     return (
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '20px' }}>
-            <div style={{ flex: '1', marginRight: '20px' }}>
-                <h2 style={{ fontSize: '18px', marginBottom: '10px' }}>Select Projects</h2>
-                <div style={{ marginBottom: '10px' }}>
-                    <Checkbox
-                        className="seq-type-project-checkbox"
-                        label="Select All"
-                        checked={selectedProjects.length === projects.length}
-                        onChange={(_, data) =>
-                            handleSelectAllProjects(
-                                projects,
-                                onProjectChange,
-                                data.checked ?? false
-                            )
-                        }
-                    />
-                </div>
-                <div
-                    style={{ maxHeight: '200px', overflowY: 'auto', columns: 4, maxWidth: '400px' }}
-                >
-                    {projects.map((project) => (
-                        <div key={project}>
-                            <Checkbox
-                                className="seq-type-project-checkbox"
-                                label={project}
-                                checked={selectedProjects.some((p) => p === project)}
-                                onChange={(_, data) => {
-                                    const isChecked = data.checked ?? false
-                                    const updatedSelectedProjects = isChecked
-                                        ? [...selectedProjects, project]
-                                        : selectedProjects.filter((p) => p !== project)
-                                    onProjectChange(
-                                        updatedSelectedProjects,
-                                        updatedSelectedProjects.map(() => true)
-                                    )
-                                }}
-                            />
-                        </div>
-                    ))}
-                </div>
-            </div>
-            <div style={{ flex: '1' }}>
-                <h2 style={{ fontSize: '18px', marginBottom: '10px' }}>Select Sequencing Types</h2>
-                <div style={{ marginBottom: '10px' }}>
-                    <Checkbox
-                        className="seq-type-project-checkbox"
-                        style={{ marginRight: '50px' }}
-                        label="Select All"
-                        checked={selectedSeqTypes.length === seqTypes.length}
-                        onChange={(_, data) =>
-                            handleSelectAllSeqTypes(
-                                seqTypes,
-                                onSeqTypeChange,
-                                data.checked ?? false
-                            )
-                        }
-                    />
-                    <Checkbox
-                        className="seq-type-project-checkbox"
-                        style={{ marginLeft: '50px' }}
-                        label="WGS & WES Only"
-                        labelColor="blue"
-                        // When this button is clicked, the 'genome' and 'exome' checkboxes should be checked and the rest should be unchecked
-                        checked={
-                            selectedSeqTypes.includes('genome') &&
-                            selectedSeqTypes.includes('exome') &&
-                            selectedSeqTypes.length === 2
-                        }
-                        onChange={(_, data) =>
-                            handleSelectMultipleTypes(
-                                seqTypes,
-                                onSeqTypeChange,
-                                ['genome', 'exome'],
-                                data.checked ?? false
-                            )
-                        }
-                    />
-                </div>
-                <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                    {seqTypes.map((seqType) => (
-                        <div key={seqType}>
-                            <Checkbox
-                                className="seq-type-project-checkbox"
-                                label={seqType}
-                                checked={selectedSeqTypes.includes(seqType)}
-                                onChange={(_, data) =>
-                                    onSeqTypeChange([seqType], [data.checked ?? false])
-                                }
-                            />
-                        </div>
-                    ))}
-                </div>
-            </div>
+            <Selector
+                items={projects}
+                selectedItems={selectedProjects}
+                onSelectionChange={onProjectChange}
+                title="Select Projects"
+            />
+            <Selector
+                items={seqTypes}
+                selectedItems={selectedSeqTypes}
+                onSelectionChange={onSeqTypeChange}
+                title="Select Sequencing Types"
+                specialSelectionLabel="WGS & WES Only"
+                specialSelectionItems={['genome', 'exome']}
+            />
         </div>
     )
 }
