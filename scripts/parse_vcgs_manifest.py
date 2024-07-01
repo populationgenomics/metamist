@@ -96,7 +96,7 @@ class VcgsManifestParser(GenericMetadataParser):
             allow_extra_files_in_search_path=allow_extra_files_in_search_path,
         )
 
-    def get_sample_id(self, row: Dict[str, Any]) -> str:
+    def get_primary_sample_id(self, row: Dict[str, Any]) -> str:
         """Get external sample ID from row"""
         external_id = row[self.sample_name_column]
         if '-' in external_id:
@@ -107,7 +107,7 @@ class VcgsManifestParser(GenericMetadataParser):
         """
         Parse sequencing type (wgs / single-cell, etc)
         """
-        sample_id = self.get_sample_id(row)
+        sample_id = self.get_primary_sample_id(row)
 
         types = row.get(Columns.LIBRARY_STRATEGY, None)
         if isinstance(types, str):
