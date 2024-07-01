@@ -63,7 +63,7 @@ class WebLayer(BaseLayer):
         return await webdb.count_participants(query)
 
 
-class WebProjectSummaryDb(DbBase):
+class WebDb(DbBase):
     """Db layer for web related routes,"""
 
     async def get_total_number_of_samples(self):

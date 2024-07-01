@@ -1,7 +1,6 @@
-//FilterButton.tsx
 import React, { useState } from 'react'
-import { Button, Popup, Input, List, Checkbox } from 'semantic-ui-react'
 import { FaFilter } from 'react-icons/fa'
+import { Button, Checkbox, Input, List, Popup } from 'semantic-ui-react'
 
 interface FilterModalProps {
     columnName: string

@@ -1,4 +1,3 @@
-// Details.tsx
 import React, { useCallback, useEffect, useState } from 'react'
 import { Button } from 'semantic-ui-react'
 import { EnumsApi, ProjectApi, ProjectInsightsApi, ProjectInsightsDetails } from '../../sm-api'

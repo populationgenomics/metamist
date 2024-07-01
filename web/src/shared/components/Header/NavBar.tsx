@@ -173,17 +173,13 @@ const NavBar: React.FC<NavBarProps> = ({ fixed }) => {
             url: '/graphql',
             icon: <TroubleshootIcon />,
         },
+        InsightsPages,
     ])
 
     React.useEffect(() => {
         new BillingApi().isBillingEnabled().then((response) => {
             if (response.status === 200 && response.data === true) {
-                setMenuItems([
-                    ...menuItems.slice(0, 2),
-                    billingPages,
-                    ...menuItems.slice(2),
-                    InsightsPages,
-                ])
+                setMenuItems([...menuItems.slice(0, 2), billingPages, ...menuItems.slice(2)])
             }
         })
     }, [])

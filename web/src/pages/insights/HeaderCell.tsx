@@ -1,4 +1,3 @@
-// HeaderCell.tsx
 import React from 'react'
 import { Table as SUITable } from 'semantic-ui-react'
 import HtmlTooltip from '../../shared/utilities/htmlTooltip'

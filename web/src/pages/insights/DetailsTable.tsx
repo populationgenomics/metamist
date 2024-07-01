@@ -1,4 +1,3 @@
-// DetailsTable.tsx
 import React, { useState } from 'react'
 import { Dropdown, Table as SUITable } from 'semantic-ui-react'
 import Table from '../../shared/components/Table'
