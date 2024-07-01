@@ -42,7 +42,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
     const [error, setError] = React.useState<string | undefined>()
     const [message, setMessage] = React.useState<string | undefined>()
     const [months, setMonths] = React.useState<string[]>([])
-    const [data, setData] = React.useState<IStackedAreaByDateChartData[]>([])
+    const [data, setData] = React.useState<any>([])
 
     // use navigate and update url params
     const location = useLocation()
@@ -119,7 +119,16 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     if (!recTotals[_topic][day][ccat]) {
                         recTotals[_topic][day][ccat] = 0
                     }
-                    recTotals[_topic][day][ccat] += cost
+                    // Ensure recTotals[_topic] is initialized
+                    if (!recTotals[_topic]) {
+                        recTotals[_topic] = {};
+                    }
+                    // Ensure recTotals[_topic][day] is initialized
+                    if (!recTotals[_topic][day]) {
+                        recTotals[_topic][day] = {};
+                    }
+                    // Ensure recTotals[_topic][day][ccat] is initialized and add cost
+                    recTotals[_topic][day][ccat] = (recTotals[_topic][day][ccat] || 0) + cost;
                 })
 
                 setMonths(recMonths)

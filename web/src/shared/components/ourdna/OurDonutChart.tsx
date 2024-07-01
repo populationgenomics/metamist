@@ -56,6 +56,7 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
             .range(Object.values(ourdnaColours) || d3.schemeCategory10)
 
         const pie = d3.pie().value((d: any) => d[1])
+        // @ts-ignore
         const data_ready = pie(Object.entries(data))
 
         const arc = d3
@@ -79,12 +80,15 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
             .data(data_ready)
             .enter()
             .append('path')
+            // @ts-ignore
             .attr('d', arc)
+            // @ts-ignore
             .attr('fill', (d) => color(d.data[0]))
             .attr('stroke', 'white')
             .style('stroke-width', '2px')
             .style('opacity', 1)
             .on('mouseover', function (event, d) {
+                // @ts-ignore
                 tooltip.text(`${d.data[0]}: ${d.data[1]}`)
                 return tooltip.style('visibility', 'visible')
             })

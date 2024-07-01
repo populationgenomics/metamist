@@ -102,10 +102,12 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 const recTotals: { [key: string]: number } = {}
                 response.data.forEach((item: BillingTotalCostRecord) => {
                     const { cost_category, cost } = item
-                    if (!recTotals[cost_category]) {
-                        recTotals[cost_category] = 0
+                    if (cost_category !== undefined && cost_category !== null) {
+                        if (!recTotals[cost_category]) {
+                            recTotals[cost_category] = 0
+                        }
+                        recTotals[cost_category] += cost
                     }
-                    recTotals[cost_category] += cost
                 })
                 const sortedRecTotals: { [key: string]: number } = Object.fromEntries(
                     Object.entries(recTotals).sort(([, a], [, b]) => b - a)
@@ -114,7 +116,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 const records: { [key: string]: { [key: string]: number } } = {}
                 response.data.forEach((item: BillingTotalCostRecord) => {
                     const { day, cost_category, cost } = item
-                    if (day !== undefined) {
+                    if (day !== undefined && day !== null && cost_category !== undefined && cost_category !== null) {
                         if (!records[day]) {
                             // initial day structure
                             records[day] = {}

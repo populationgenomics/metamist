@@ -1,14 +1,12 @@
 import * as React from 'react'
 import _ from 'lodash'
-
 import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
-import { StackedBarChart } from '../../../shared/components/Graphs/StackedBarChart'
-import { BillingCostBudgetRecord } from '../../../sm-api'
+import { StackedBarChart, IStackedBarChartData } from '../../../shared/components/Graphs/StackedBarChart'
 
 interface ICostByTimeBarChartProps {
     accumulate: boolean
     isLoading: boolean
-    data: BillingCostBudgetRecord[]
+    data: IStackedBarChartData[]
 }
 
 const CostByTimeBarChart: React.FunctionComponent<ICostByTimeBarChartProps> = ({
@@ -29,7 +27,7 @@ const CostByTimeBarChart: React.FunctionComponent<ICostByTimeBarChartProps> = ({
 
     return (
         <>
-            <StackedBarChart data={data} accumulate={accumulate} isLoading={isLoading} />
+            <StackedBarChart data={data} accumulate={accumulate} />
         </>
     )
 }

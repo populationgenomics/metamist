@@ -25,6 +25,11 @@ interface IDonutChartPreparadData {
     endAngle: number
     data: IDonutChartData
 }
+interface DataItem {
+    label: string;
+    value: number;
+    type?: string; // Assuming 'type' is optional and a string
+}
 
 function calcTranslate(data: IDonutChartPreparadData, move = 4) {
     const moveAngle = data.startAngle + (data.endAngle - data.startAngle) / 2
@@ -57,7 +62,7 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
 
     const colorFunc: (t: number) => string | undefined = colors ?? interpolateRainbow
     const duration = 250
-    const containerDivRef = React.useRef<HTMLDivElement>()
+    const containerDivRef = React.useRef<HTMLDivElement | null>(null);
     const [graphWidth, setGraphWidth] = React.useState<number>(768)
     // to distinquished between charts on the same page we need an id
     const chartId = id ?? 'donutChart'
@@ -91,7 +96,7 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
             .attr('stroke-width', 1)
     }
 
-    function createViewBox(legSize, w) {
+    function createViewBox(legSize: number | undefined, w: number) {
         // calculate the viewbox of Legend
         const minX = 0
         const minY = 0
@@ -112,7 +117,7 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
 
     // keep order of the slices, declare custom sort function to keep order of slices as passed in
     // by default pie function starts from index 1 and sorts by value
-    const pieFnc = pie()
+    const pieFnc = pie<DataItem>()
         .value((d) => d.value)
         .sort((a) => {
             if (typeof a === 'object' && a.type === 'inc') {
@@ -163,18 +168,18 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
             .data(data_ready)
             .enter()
             .append('path')
-            .attr('d', arcData)
-            .attr('fill', (d) => colorFunc(d.index / maxSlices))
+            .attr('d', (d) => arcData(d as any) as string)
+            .attr('fill', (d) => colorFunc(d.index / maxSlices) ?? 'black')
             .attr('stroke', '#fff')
             .style('stroke-width', '2')
             .style('opacity', '0.8')
             .style('cursor', 'pointer')
             .attr('id', (d) => `${chartId}-path${d.index}`)
             .on('mouseover', (event, v) => {
-                onHoverOver(event.currentTarget, v)
+                onHoverOver(event.currentTarget, v as any)
             })
             .on('mouseout', (event, v) => {
-                onHoverOut(event.currentTarget, v)
+                onHoverOut(event.currentTarget, v as any)
             })
             .append('title')
             .text((d) => `${d.data.label} ${d.data.value}`)
@@ -189,7 +194,7 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
             .selectAll('text')
             .data(data_ready)
             .join('text')
-            .attr('transform', (d) => `translate(${arcLabel.centroid(d)})`)
+            .attr('transform', (d) => `translate(${arcLabel.centroid(d as any)})`)
             .attr('id', (d) => `${chartId}-lbl${d.index}`)
             .selectAll('tspan')
             .data((d) => {
@@ -220,24 +225,24 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
                     select(this)
                         .append('circle')
                         .attr('r', 8)
-                        .attr('fill', (d) => colorFunc(d.index / maxSlices))
+                        .attr('fill', colorFunc(d.index / maxSlices) ?? 'black')
                     select(this)
                         .append('text')
                         .attr('text-anchor', 'start')
                         .attr('x', 20)
                         .attr('y', 0)
                         .attr('dy', '0.35em')
-                        .attr('id', (d) => `${chartId}-legend${d.index}`)
+                        .attr('id', `${chartId}-legend${d.index}`)
                         .text(d.data.label)
                         .attr('font-size', '0.9em')
                     select(this)
                         .on('mouseover', (event, v) => {
                             const element = select(`#${chartId}-path${d.index}`)
-                            onHoverOver(element.node(), d)
+                            onHoverOver(element.node() as HTMLElement, d)
                         })
                         .on('mouseout', (event, v) => {
                             const element = select(`#${chartId}-path${d.index}`)
-                            onHoverOut(element.node(), d)
+                            onHoverOut(element.node() as HTMLHtmlElement, d)
                         })
                 })
         }

@@ -45,7 +45,7 @@ const ExpandableRow: React.FC<{ item: AnalysisCostRecordBatchJob }> = ({ item, .
     )
 }
 
-const TableComponents: TableComponents = {
+const TblComponents: TableComponents = {
     Scroller: React.forwardRef((props, ref) => (
         <TableContainer
             component={Paper}
@@ -95,7 +95,7 @@ export const BatchJobsTable: React.FC<{ batch: AnalysisCostRecordBatch }> = ({ b
                     <SUITable.HeaderCell>COST</SUITable.HeaderCell>
                 </SUITable.Row>
             )}
-            components={TableComponents}
+            components={TblComponents}
         />
     )
 }

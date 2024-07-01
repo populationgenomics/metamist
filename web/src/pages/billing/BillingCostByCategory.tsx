@@ -4,6 +4,7 @@ import { Button, Card, Checkbox, Grid, Input, Message } from 'semantic-ui-react'
 import {
     BillingApi,
     BillingColumn,
+    BillingCostBudgetRecord,
     BillingTimePeriods,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
@@ -178,7 +179,7 @@ const BillingCostByCategory: React.FunctionComponent = () => {
                 end_date: end,
                 filters: selFilters,
                 order_by: { day: false },
-                time_periods: selectedPeriod,
+                time_periods: selectedPeriod as BillingTimePeriods,
                 // show only records with cost > 0.01
                 min_cost: 0.01,
             })
