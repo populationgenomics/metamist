@@ -95,7 +95,7 @@ class GenericMetadataParser(GenericParser):
         seq_facility_column: str | None = None,
         seq_library_column: str | None = None,
         # Assay columns
-        assay_id_column: str | None = None,
+        assay_external_id_column: str | None = None,
         reads_column: str | None = None,
         checksum_column: str | None = None,
         read_end_type_column: str | None = None,
@@ -127,6 +127,9 @@ class GenericMetadataParser(GenericParser):
             search_locations (list[str]):
                 A list of locations to search for unqualified files in.
             sample_name_column (str): The name of the column containing the sample name.
+            sample_external_id_column_map (str | None, optional):
+                {column: eid_name} mapping for sample external_ids. This should NOT
+                include the sample_name_column.
             participant_name_column (str | None, optional):
                 The name of the column containing the participant name. Unsupplied means
                 there are no participants represented in the file.
@@ -137,24 +140,44 @@ class GenericMetadataParser(GenericParser):
                 The name of the column containing the reported gender, no validation.
             karyotype_column (str | None, optional):
                 The name of the column containing the karyotype, no validation.
-            participant_eid_map (str | None, optional):
-                {column: eid_name} mapping for participant external_ids
-            seq_type_column (str | None, optional): _description_. Defaults to None.
-            seq_technology_column (str | None, optional): _description_. Defaults to None.
-            seq_platform_column (str | None, optional): _description_. Defaults to None.
-            seq_facility_column (str | None, optional): _description_. Defaults to None.
-            seq_library_column (str | None, optional): _description_. Defaults to None.
-            assay_id_column (str | None, optional): _description_. Defaults to None.
-            reads_column (str | None, optional): _description_. Defaults to None.
-            checksum_column (str | None, optional): _description_. Defaults to None.
-            read_end_type_column (str | None, optional): _description_. Defaults to None.
-            read_length_column (str | None, optional): _description_. Defaults to None.
-            reference_assembly_location_column (str | None, optional): _description_. Defaults to None.
-            gvcf_column (str | None, optional): _description_. Defaults to None.
-            participant_meta_map (dict[str, str] | None, optional): _description_. Defaults to None.
-            sample_meta_map (dict[str, str] | None, optional): _description_. Defaults to None.
-            assay_meta_map (dict[str, str] | None, optional): _description_. Defaults to None.
-            qc_meta_map (dict[str, str] | None, optional): _description_. Defaults to None.
+            participant_external_id_column_map (str | None, optional):
+                {column: eid_name} mapping for participant external_ids.
+                This should NOT include the participant_name_column.
+            seq_type_column (str | None, optional):
+                The name of the column containing the sequencing type.
+            seq_technology_column (str | None, optional):
+                The name of the column containing the sequencing technology.
+            seq_platform_column (str | None, optional):
+                The name of the column containing the sequencing platform.
+            seq_facility_column (str | None, optional):
+                The name of the column containing the sequencing facility.
+            seq_library_column (str | None, optional):
+                The name of the column containing the sequencing library.
+            assay_id_column (str | None, optional):
+                The name of the column containing the assay ID.
+            reads_column (str | None, optional):
+                The name of the column containing the reads.
+            checksum_column (str | None, optional):
+                The name of the column containing the checksum.
+            read_end_type_column (str | None, optional):
+                The name of the column containing the read end type.
+            read_length_column (str | None, optional):
+                The name of the column containing the read length.
+            reference_assembly_location_column (str | None, optional):
+                The name of the column containing the reference assembly location.
+            gvcf_column (str | None, optional):
+                The name of the column containing the path to a gvcf
+            participant_meta_map (dict[str, str] | None, optional):
+                A mapping of column names to keys for participant.meta.
+                {[column]: [metadata_key]}
+            sample_meta_map (dict[str, str] | None, optional):
+                A mapping of column names to keys for sample.meta.
+                {[column]: [metadata_key]}
+            assay_meta_map (dict[str, str] | None, optional):
+                A mapping of column names to keys for assay.meta.
+                {[column]: [metadata_key]}
+            qc_meta_map (dict[str, str] | None, optional):
+                A mapping of column names to keys for QC analysis.meta
             default_reference_assembly_location (str | None, optional): _description_. Defaults to None.
             default_sample_type (str | None, optional): _description_. Defaults to None.
             default_sequencing (_type_, optional): _description_. Defaults to DefaultSequencing( seq_type='genome', technology='short-read', platform='illumina' ).
@@ -197,7 +220,7 @@ class GenericMetadataParser(GenericParser):
         self.seq_library_column = seq_library_column
 
         # Assay columns
-        self.assay_id_column = assay_id_column
+        self.assay_id_column = assay_external_id_column
         self.reads_column = reads_column
         self.checksum_column = checksum_column
         self.read_end_type_column = read_end_type_column
