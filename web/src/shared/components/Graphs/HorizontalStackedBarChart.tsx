@@ -11,7 +11,7 @@ interface HorizontalStackedBarChartProps {
     labels: string[]
     total_series: string
     threshold_values: number[]
-    threshold_series: string
+    threshold_series: string | undefined
     sorted_by: string
     colors?: (t: number) => string | undefined
     isLoading: boolean
@@ -43,7 +43,7 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
     const outsideHeight = 2850
     const height = outsideHeight - margin.top - margin.bottom
 
-    const containerDivRef = React.useRef<HTMLDivElement>()
+    const containerDivRef = React.useRef<HTMLDivElement | null>(null)
 
     const [clientWidth, setClientWidth] = React.useState(650)
 
@@ -78,8 +78,10 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
         }
 
         // prepare data
+        // @ts-ignore
         let maxTotalSeries = Math.max(...data.map((item) => item[total_series]))
         const typeKeys = data.map((d) => d.field)
+        // @ts-ignore
         data.sort((a, b) => b[sorted_by] - a[sorted_by])
 
         // stack the data
@@ -89,15 +91,18 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
             .order(d3.stackOrderNone)
             .offset(d3.stackOffsetNone)
 
+        // @ts-ignore
         const stackedData = stack_fnc(data)
         const indexedData = stackedData.map((innerArray, outerIdx) =>
             innerArray.map((d, innerIdx) => ({ outerIdx, innerIdx, data: d }))
         )
         const budgetData = {}
         data.forEach((d) => {
+            // @ts-ignore
             budgetData[d.field] = d.budget
         })
 
+        // @ts-ignore
         const maxBudget = Math.max(...data.map((item) => item.budget))
 
         if (showLegend) {
@@ -161,6 +166,7 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
         // Y scale and Axis
         const yScale = d3
             .scaleBand()
+            // @ts-ignore
             .domain(data.map((d) => d.field))
             .range([0, height])
             .padding(0.2)
@@ -170,8 +176,10 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
             .call(d3.axisLeft(yScale).tickSize(0).tickPadding(5))
 
         // color palette
+        // @ts-ignore
         const color = d3.scaleOrdinal().domain(typeKeys).range(['url(#pattern0)', 'url(#pattern1)'])
 
+        // @ts-ignore
         const color_fnc = (d) => {
             if (threshold_series === undefined) {
                 // if not defiend trhesholds then use the color function
@@ -191,10 +199,12 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
         }
 
         // set vertical grid line
+        // @ts-ignore
         const GridLine = () => d3.axisBottom().scale(xScale)
 
         svg.append('g')
             .attr('class', 'hb-chart-grid')
+            // @ts-ignore
             .call(GridLine().tickSize(height, 0, 0).tickFormat('').ticks(8))
             .selectAll('line')
             .style('stroke-dasharray', '5,5')
@@ -203,20 +213,18 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
         const tooltip = d3.select('body').append('div').attr('id', 'chart').attr('class', 'tooltip')
 
         // tooltip events
-        const mouseover = (d) => {
+        const mouseover = (d: any) => {
             tooltip.style('opacity', 0.8)
-            d3.select(this).style('opacity', 0.5)
         }
-        const mousemove = (event, d) => {
-            const formater = d3.format(',.2f')
+        const mousemove = (event: any, d: any) => {
+            const mformater = d3.format(',.2f')
             tooltip
-                .html(formater(d.data[1] - d.data[0]) + ' AUD')
+                .html(mformater(d.data[1] - d.data[0]) + ' AUD')
                 .style('top', event.pageY - 10 + 'px')
                 .style('left', event.pageX + 10 + 'px')
         }
-        const mouseleave = (d) => {
+        const mouseleave = (d: any) => {
             tooltip.style('opacity', 0)
-            d3.select(this).style('opacity', 1)
         }
 
         // create bars
@@ -228,20 +236,24 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
             .data((d) => d)
             .join('rect')
             .attr('x', (d) => xScale(d.data[0]))
+            // @ts-ignore
             .attr('y', (d) => yScale(d.data.data.field))
             .attr('width', (d) => xScale(d.data[1]) - xScale(d.data[0]))
             .attr('height', yScale.bandwidth())
+            // @ts-ignore
             .attr('fill', (d) => color_fnc(d))
 
         svg.append('g')
             .selectAll('g')
             .data(indexedData)
             .join('g')
+            // @ts-ignore
             .attr('fill', (d) => color(d))
             .selectAll('rect')
             .data((d) => d)
             .join('rect')
             .attr('x', (d) => xScale(d.data[0]))
+            // @ts-ignore
             .attr('y', (d) => yScale(d.data.data.field))
             .attr('width', (d) => xScale(d.data[1]) - xScale(d.data[0]))
             .attr('height', yScale.bandwidth())
@@ -250,14 +262,16 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
             .on('mouseleave', mouseleave)
 
         // create bidgetn line
-        const budgetFnc = (d) => {
+        const budgetFnc = (d: any) => {
             if (showLegend) {
+                // @ts-ignore
                 return xScale(budgetData[d.data.data.field])
             }
             return 0
         }
 
-        const budgetColor = (d) => {
+        const budgetColor = (d: any) => {
+            // @ts-ignore
             const budgetVal = budgetData[d.data.data.field]
             if (showLegend && budgetVal !== null && budgetVal !== undefined) {
                 return 'darkcyan'
@@ -273,6 +287,7 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
             .data((d) => d)
             .join('rect')
             .attr('x', (d) => budgetFnc(d))
+            // @ts-ignore
             .attr('y', (d) => yScale(d.data.data.field) - 5)
             .attr('width', (d) => 3)
             .attr('height', yScale.bandwidth() + 10)

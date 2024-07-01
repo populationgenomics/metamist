@@ -81,8 +81,8 @@ export const StackedAreaByDateChart: React.FC<IStackedAreaByDateChartProps> = ({
 
     const colorFunc: (t: number) => string | undefined = colors ?? interpolateRainbow
 
-    const tooltipRef = React.useRef()
-    const containerDivRef = React.useRef<HTMLDivElement>()
+    const tooltipRef = React.useRef<HTMLDivElement | null>(null)
+    const containerDivRef = React.useRef<HTMLDivElement | null>(null)
     const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null)
     const [graphWidth, setGraphWidth] = React.useState<number>(768)
 
@@ -124,6 +124,7 @@ export const StackedAreaByDateChart: React.FC<IStackedAreaByDateChartProps> = ({
     // d3 function that turns the data into stacked proportions
     const stackedData = stack()
         .offset(extended ? stackOffsetExpand : stackOffsetNone)
+        // @ts-ignore
         .keys(keys)(data.map((d) => ({ date: d.date, ...d.values })))
 
     // function for generating the x Axis
@@ -131,6 +132,7 @@ export const StackedAreaByDateChart: React.FC<IStackedAreaByDateChartProps> = ({
     // range refers to the min and max pixel positions on the screen
     // basically it is a mapping of pixel positions to data values
     const xScale = scaleTime()
+        // @ts-ignore
         .domain(extent(data, (d) => d.date)) // date is a string, will this take a date object? Yes :)
         .range([0, width - margin.left - margin.right])
 
@@ -155,6 +157,7 @@ export const StackedAreaByDateChart: React.FC<IStackedAreaByDateChartProps> = ({
 
     // function that takes the various stacked data info and generates an svg path element (magically)
     const areaGenerator = area()
+        // @ts-ignore
         .x((d, idx) => xScale(d.data.date))
         .y0((d) => yScale(d[0]))
         .y1((d) => yScale(d[1]))
@@ -230,35 +233,36 @@ then to draw in svg you just need to give coordinates. We've specified the width
          Calling xScale(tick) turns a tick value into a pixel position to be drawn
          eg in the domain [2000, 2010] and range[0, 200] passing 2005 would be 50% of the way across the domain so 50% of the way between min and max specified pixel positions so it would draw at 100
          */}
-                        {xScale.ticks(interval).map((tick) => (
-                            <g
-                                key={`x-tick-${tick.toString()}`}
-                                transform={`translate(${xScale(tick)}, ${innerHeight})`}
-                            >
-                                <text
-                                    y={8}
-                                    transform="translate(0, 10)rotate(-45)"
-                                    textAnchor="end"
-                                    alignmentBaseline="middle"
-                                    fontSize={14}
-                                    cursor="help"
+                        {interval &&
+                            xScale.ticks(interval).map((tick) => (
+                                <g
+                                    key={`x-tick-${tick.toString()}`}
+                                    transform={`translate(${xScale(tick)}, ${innerHeight})`}
                                 >
-                                    {/* change this for different date formats */}
-                                    {showDate
-                                        ? `${tick.toLocaleString('en-us', {
-                                              day: 'numeric',
-                                              month: 'short',
-                                              year: 'numeric',
-                                          })}`
-                                        : `${tick.toLocaleString('en-us', {
-                                              month: 'short',
-                                              year: 'numeric',
-                                          })}`}
-                                </text>
-                                {/* this is the tiny vertical tick line that getting drawn (6 pixels tall) */}
-                                <line y2={6} stroke="black" />
-                            </g>
-                        ))}
+                                    <text
+                                        y={8}
+                                        transform="translate(0, 10)rotate(-45)"
+                                        textAnchor="end"
+                                        alignmentBaseline="middle"
+                                        fontSize={14}
+                                        cursor="help"
+                                    >
+                                        {/* change this for different date formats */}
+                                        {showDate
+                                            ? `${tick.toLocaleString('en-us', {
+                                                  day: 'numeric',
+                                                  month: 'short',
+                                                  year: 'numeric',
+                                              })}`
+                                            : `${tick.toLocaleString('en-us', {
+                                                  month: 'short',
+                                                  year: 'numeric',
+                                              })}`}
+                                    </text>
+                                    {/* this is the tiny vertical tick line that getting drawn (6 pixels tall) */}
+                                    <line y2={6} stroke="black" />
+                                </g>
+                            ))}
                     </g>
 
                     {/* y-axis (same as above) */}
@@ -328,6 +332,7 @@ then to draw in svg you just need to give coordinates. We've specified the width
                                     return (
                                         <path
                                             key={`${i}-${j}`}
+                                            // @ts-ignore
                                             d={areaGenerator(areas)}
                                             style={{
                                                 fill: colour,
@@ -350,6 +355,7 @@ then to draw in svg you just need to give coordinates. We've specified the width
                                 <path
                                     key={`bigArea-${i}`}
                                     d={areaGenerator(
+                                        // @ts-ignore
                                         area.slice(
                                             // clamp at the start to avoid unintentional wraparound
                                             Math.max(0, areaStart - 1),

@@ -39,6 +39,7 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
         height: 0,
     })
 
+    // @ts-ignore
     const transformedData: TransformedData[] = Object.entries(data).flatMap(([site, hours]) =>
         Object.entries(hours).map(([hour, count]) => ({
             site,
@@ -118,6 +119,7 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
                 .data(values)
                 .enter()
                 .append('rect')
+                // @ts-ignore
                 .attr('x', (d) => {
                     const x = x1(d.site)
                     if (Number.isNaN(x)) {
