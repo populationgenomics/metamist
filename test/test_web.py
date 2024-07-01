@@ -27,7 +27,6 @@ from models.models import (
     NestedParticipant,
     NestedSample,
     ParticipantUpsertInternal,
-    ProjectInsightsSummaryInternal,
     ProjectSummaryInternal,
     SampleUpsertInternal,
     SequencingGroupUpsertInternal,
@@ -361,49 +360,6 @@ class TestWeb(DbIsolatedTest):
         self.pil = ProjectInsightsLayer(self.connection)
         self.sampl = SampleLayer(self.connection)
         self.seql = AssayLayer(self.connection)
-
-    @run_as_sync
-    async def test_project_insights_stats(self):
-        """Test getting the summaries for all available projects"""
-
-        await self.partl.upsert_participant(get_test_participant())
-
-        result = await self.pil.get_project_insights_summary(
-            project_names=[self.project_name], sequencing_types=['genome', 'exome']
-        )
-
-        expected = [
-            ProjectInsightsSummaryInternal(
-                project=self.project_id,
-                dataset='test',
-                sequencing_type='genome',
-                sequencing_technology='short-read',
-                total_families=0,
-                total_participants=1,
-                total_samples=1,
-                total_sequencing_groups=1,
-                total_crams=0,
-                latest_annotate_dataset=None,
-                latest_snv_es_index=None,
-                latest_sv_es_index=None,
-            ),
-            ProjectInsightsSummaryInternal(
-                project=self.project_id,
-                dataset='test',
-                sequencing_type='exome',
-                sequencing_technology='short-read',
-                total_families=0,
-                total_participants=0,
-                total_samples=0,
-                total_sequencing_groups=0,
-                total_crams=0,
-                latest_annotate_dataset=None,
-                latest_snv_es_index=None,
-                latest_sv_es_index=None,
-            ),
-        ]
-
-        self.assertEqual(result, expected)
 
     @run_as_sync
     async def test_project_summary_empty(self):

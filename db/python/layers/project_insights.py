@@ -166,23 +166,25 @@ class ProjectInsightsDb(DbBase):
             if value_field == 'sequencing_group_ids':
                 parsed_rows[key] = [int(sgid) for sgid in row[value_field].split(',')]
             else:
-                parsed_rows[key] = row[value_field]
+                try:
+                    parsed_rows[key] = row[value_field]
+                except KeyError:
+                    parsed_rows[key] = None
         return parsed_rows
 
     async def _get_sequencing_groups_by_analysis_ids(
-        self, analysis_ids: list[int]
+        self, analysis_ids: list[AnalysisId]
     ) -> dict[AnalysisId, list[SequencingGroupInternalId]]:
         """Get sequencing groups for a list of analysis ids"""
+        if not analysis_ids:
+            return {}
         _query = """
 SELECT
     analysis_id,
     GROUP_CONCAT(sequencing_group_id) as sequencing_group_ids
-FROM
-    analysis_sequencing_group
-WHERE
-    analysis_id IN :analysis_ids
-GROUP BY
-    analysis_id;
+FROM analysis_sequencing_group
+WHERE analysis_id IN :analysis_ids
+GROUP BY analysis_id;
         """
         _query_results = await self.connection.fetch_all(
             _query,
@@ -234,7 +236,6 @@ GROUP BY
         """
         Get the web report links for a sequencing group
         """
-        # report_links: defaultdict[str, dict[str, str]] = defaultdict(dict)
         report_links: dict[str, dict[str, Any]] = {}
         report_key = ProjectSeqGroupKey(project.id, sequencing_group_id)
 
@@ -848,6 +849,10 @@ INNER JOIN (
                 latest_annotate_dataset_by_project_id_and_seq_type,
                 latest_es_indices_by_project_id_and_seq_type_and_stage,
             )
+
+            total_families_by_project_id_and_seq_fields.setdefault(rowkey, 0)
+            total_participants_by_project_id_and_seq_fields.setdefault(rowkey, 0)
+            total_samples_by_project_id_and_seq_fields.setdefault(rowkey, 0)
 
             response.append(
                 self.get_insights_summary_internal_row(
