@@ -116,7 +116,12 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 const records: { [key: string]: { [key: string]: number } } = {}
                 response.data.forEach((item: BillingTotalCostRecord) => {
                     const { day, cost_category, cost } = item
-                    if (day !== undefined && day !== null && cost_category !== undefined && cost_category !== null) {
+                    if (
+                        day !== undefined &&
+                        day !== null &&
+                        cost_category !== undefined &&
+                        cost_category !== null
+                    ) {
                         if (!records[day]) {
                             // initial day structure
                             records[day] = {}

@@ -1,7 +1,10 @@
 import * as React from 'react'
 import _ from 'lodash'
 import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
-import { StackedBarChart, IStackedBarChartData } from '../../../shared/components/Graphs/StackedBarChart'
+import {
+    StackedBarChart,
+    IStackedBarChartData,
+} from '../../../shared/components/Graphs/StackedBarChart'
 
 interface ICostByTimeBarChartProps {
     accumulate: boolean

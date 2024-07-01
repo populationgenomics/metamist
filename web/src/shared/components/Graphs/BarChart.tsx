@@ -33,7 +33,7 @@ export const BarChart: React.FC<BarChartProps> = ({ data, maxSlices, colors, isL
     //   const width = 1000 - margin.left - margin.right;
     const height = 400 - margin.top - margin.bottom
 
-    const containerDivRef = React.useRef<HTMLDivElement | null>(null);
+    const containerDivRef = React.useRef<HTMLDivElement | null>(null)
     const [width, setWidth] = React.useState(768)
 
     const scaleX = scaleBand()

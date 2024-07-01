@@ -26,9 +26,9 @@ interface IDonutChartPreparadData {
     data: IDonutChartData
 }
 interface DataItem {
-    label: string;
-    value: number;
-    type?: string; // Assuming 'type' is optional and a string
+    label: string
+    value: number
+    type?: string // Assuming 'type' is optional and a string
 }
 
 function calcTranslate(data: IDonutChartPreparadData, move = 4) {
@@ -62,7 +62,7 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
 
     const colorFunc: (t: number) => string | undefined = colors ?? interpolateRainbow
     const duration = 250
-    const containerDivRef = React.useRef<HTMLDivElement | null>(null);
+    const containerDivRef = React.useRef<HTMLDivElement | null>(null)
     const [graphWidth, setGraphWidth] = React.useState<number>(768)
     // to distinquished between charts on the same page we need an id
     const chartId = id ?? 'donutChart'

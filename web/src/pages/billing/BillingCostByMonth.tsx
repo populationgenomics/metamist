@@ -121,14 +121,14 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     }
                     // Ensure recTotals[_topic] is initialized
                     if (!recTotals[_topic]) {
-                        recTotals[_topic] = {};
+                        recTotals[_topic] = {}
                     }
                     // Ensure recTotals[_topic][day] is initialized
                     if (!recTotals[_topic][day]) {
-                        recTotals[_topic][day] = {};
+                        recTotals[_topic][day] = {}
                     }
                     // Ensure recTotals[_topic][day][ccat] is initialized and add cost
-                    recTotals[_topic][day][ccat] = (recTotals[_topic][day][ccat] || 0) + cost;
+                    recTotals[_topic][day][ccat] = (recTotals[_topic][day][ccat] || 0) + cost
                 })
 
                 setMonths(recMonths)

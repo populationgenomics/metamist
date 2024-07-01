@@ -233,35 +233,36 @@ then to draw in svg you just need to give coordinates. We've specified the width
          Calling xScale(tick) turns a tick value into a pixel position to be drawn
          eg in the domain [2000, 2010] and range[0, 200] passing 2005 would be 50% of the way across the domain so 50% of the way between min and max specified pixel positions so it would draw at 100
          */}
-                        {interval && xScale.ticks(interval).map((tick) => (
-                            <g
-                                key={`x-tick-${tick.toString()}`}
-                                transform={`translate(${xScale(tick)}, ${innerHeight})`}
-                            >
-                                <text
-                                    y={8}
-                                    transform="translate(0, 10)rotate(-45)"
-                                    textAnchor="end"
-                                    alignmentBaseline="middle"
-                                    fontSize={14}
-                                    cursor="help"
+                        {interval &&
+                            xScale.ticks(interval).map((tick) => (
+                                <g
+                                    key={`x-tick-${tick.toString()}`}
+                                    transform={`translate(${xScale(tick)}, ${innerHeight})`}
                                 >
-                                    {/* change this for different date formats */}
-                                    {showDate
-                                        ? `${tick.toLocaleString('en-us', {
-                                              day: 'numeric',
-                                              month: 'short',
-                                              year: 'numeric',
-                                          })}`
-                                        : `${tick.toLocaleString('en-us', {
-                                              month: 'short',
-                                              year: 'numeric',
-                                          })}`}
-                                </text>
-                                {/* this is the tiny vertical tick line that getting drawn (6 pixels tall) */}
-                                <line y2={6} stroke="black" />
-                            </g>
-                        ))}
+                                    <text
+                                        y={8}
+                                        transform="translate(0, 10)rotate(-45)"
+                                        textAnchor="end"
+                                        alignmentBaseline="middle"
+                                        fontSize={14}
+                                        cursor="help"
+                                    >
+                                        {/* change this for different date formats */}
+                                        {showDate
+                                            ? `${tick.toLocaleString('en-us', {
+                                                  day: 'numeric',
+                                                  month: 'short',
+                                                  year: 'numeric',
+                                              })}`
+                                            : `${tick.toLocaleString('en-us', {
+                                                  month: 'short',
+                                                  year: 'numeric',
+                                              })}`}
+                                    </text>
+                                    {/* this is the tiny vertical tick line that getting drawn (6 pixels tall) */}
+                                    <line y2={6} stroke="black" />
+                                </g>
+                            ))}
                     </g>
 
                     {/* y-axis (same as above) */}
