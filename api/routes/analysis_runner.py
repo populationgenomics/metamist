@@ -3,9 +3,9 @@ import datetime
 from fastapi import APIRouter
 
 from api.utils.db import Connection, get_project_db_connection
+from db.python.filters import GenericFilter
 from db.python.layers.analysis_runner import AnalysisRunnerLayer
 from db.python.tables.analysis_runner import AnalysisRunnerFilter
-from db.python.utils import GenericFilter
 from models.models.analysis_runner import AnalysisRunner, AnalysisRunnerInternal
 from models.models.project import FullWriteAccessRoles, ReadAccessRoles
 

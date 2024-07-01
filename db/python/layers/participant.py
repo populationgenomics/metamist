@@ -1,10 +1,11 @@
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name,too-many-lines
 import re
 from collections import defaultdict
 from enum import Enum
 from typing import Any
 
 from db.python.connect import Connection
+from db.python.filters import GenericFilter
 from db.python.layers.base import BaseLayer
 from db.python.layers.sample import SampleLayer
 from db.python.tables.family import FamilyTable
@@ -12,7 +13,7 @@ from db.python.tables.family_participant import (
     FamilyParticipantFilter,
     FamilyParticipantTable,
 )
-from db.python.tables.participant import ParticipantTable
+from db.python.tables.participant import ParticipantFilter, ParticipantTable
 from db.python.tables.participant_phenotype import ParticipantPhenotypeTable
 from db.python.tables.sample import SampleTable
 from db.python.utils import (
@@ -243,6 +244,48 @@ class ParticipantLayer(BaseLayer):
     def __init__(self, connection: Connection):
         super().__init__(connection)
         self.pttable = ParticipantTable(connection=connection)
+
+    async def query(
+        self,
+        filter_: ParticipantFilter,
+        limit: int | None = None,
+        skip: int | None = None,
+        check_project_ids: bool = True,
+    ) -> list[ParticipantInternal]:
+        """
+        Query participants from the database, heavy lifting done by the filter
+        """
+        projects, participants = await self.pttable.query(
+            filter_, skip=skip, limit=limit
+        )
+
+        if not participants:
+            return []
+
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.author, projects, readonly=True
+            )
+
+        return participants
+
+    async def query_count(
+        self,
+        filter_: ParticipantFilter,
+    ) -> int:
+        """
+        Count the number of rows returned by the filter, the speed
+            (compared to SQL_CALC_FOUND_ROWS + FOUND_ROWS())
+        depends on whether the filter is able to use indexes (and hence just perform
+        an index scan), but we don't want it on every query participants, so keep
+        it separate.
+
+        - https://mariadb.com/kb/en/found_rows/
+        - source: https://www.percona.com/blog/to-sql_calc_found_rows-or-not-to-sql_calc_found_rows/
+        """
+        count = await self.pttable.query_count(filter_)
+
+        return count
 
     async def get_participants_by_ids(
         self,

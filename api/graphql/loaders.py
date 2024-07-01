@@ -12,6 +12,7 @@ from strawberry.dataloader import DataLoader
 from api.utils import group_by
 from api.utils.db import get_projectless_db_connection
 from db.python.connect import Connection
+from db.python.filters import GenericFilter, get_hashable_value
 from db.python.layers import (
     AnalysisLayer,
     AssayLayer,
@@ -24,9 +25,10 @@ from db.python.layers import (
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.assay import AssayFilter
 from db.python.tables.family import FamilyFilter
+from db.python.tables.participant import ParticipantFilter
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
-from db.python.utils import GenericFilter, NotFoundError, get_hashable_value
+from db.python.utils import NotFoundError
 from models.models import (
     AnalysisInternal,
     AssayInternal,
@@ -255,7 +257,12 @@ async def load_sequencing_groups_for_samples(
     """
     sglayer = SequencingGroupLayer(connection)
     _filter = dataclasses.replace(filter) if filter else SequencingGroupFilter()
-    _filter.sample_id = GenericFilter(in_=ids)
+    if not _filter.sample:
+        _filter.sample = SequencingGroupFilter.SequencingGroupSampleFilter(
+            id=GenericFilter(in_=ids)
+        )
+    else:
+        _filter.sample.id = GenericFilter(in_=ids)
 
     sequencing_groups = await sglayer.query(_filter)
     sg_map = group_by(sequencing_groups, lambda sg: sg.sample_id)
@@ -375,22 +382,22 @@ async def load_participants_for_families(
     return [pmap.get(fid, []) for fid in family_ids]
 
 
-@connected_data_loader(LoaderKeys.PARTICIPANTS_FOR_PROJECTS)
+@connected_data_loader_with_params(
+    LoaderKeys.PARTICIPANTS_FOR_PROJECTS, default_factory=list
+)
 async def load_participants_for_projects(
-    project_ids: list[ProjectId], connection: Connection
-) -> list[list[ParticipantInternal]]:
+    ids: list[ProjectId], filter_: ParticipantFilter, connection: Connection
+) -> dict[ProjectId, list[ParticipantInternal]]:
     """
     Get all participants in a project
     """
 
-    retval: list[list[ParticipantInternal]] = []
+    f = copy.copy(filter_)
+    f.project = GenericFilter(in_=ids)
+    participants = await ParticipantLayer(connection).query(f)
 
-    for project in project_ids:
-        retval.append(
-            await ParticipantLayer(connection).get_participants(project=project)
-        )
-
-    return retval
+    pmap = group_by(participants, lambda p: p.project)
+    return pmap
 
 
 @connected_data_loader_with_params(

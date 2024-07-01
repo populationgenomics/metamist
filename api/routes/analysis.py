@@ -15,9 +15,9 @@ from api.utils.db import (
     get_projectless_db_connection,
 )
 from api.utils.export import ExportType
+from db.python.filters import GenericFilter
 from db.python.layers.analysis import AnalysisLayer
 from db.python.tables.analysis import AnalysisFilter
-from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
 from models.models.analysis import Analysis, ProportionalDateTemporalMethod
 from models.models.project import FullWriteAccessRoles, ReadAccessRoles

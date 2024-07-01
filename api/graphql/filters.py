@@ -2,7 +2,7 @@ from typing import Callable, Generic, TypeVar
 
 import strawberry
 
-from db.python.utils import GenericFilter, GenericMetaFilter
+from db.python.filters import GenericFilter, GenericMetaFilter
 
 T = TypeVar('T')
 Y = TypeVar('Y')
@@ -21,6 +21,7 @@ class GraphQLFilter(Generic[T]):
     lte: T | None = None
     contains: T | None = None
     icontains: T | None = None
+    startswith: T | None = None
 
     def all_values(self) -> list[T]:
         """
@@ -45,6 +46,8 @@ class GraphQLFilter(Generic[T]):
             v.append(self.contains)
         if self.icontains:
             v.append(self.icontains)
+        if self.startswith:
+            v.append(self.startswith)
 
         return v
 
@@ -60,6 +63,7 @@ class GraphQLFilter(Generic[T]):
             lte=self.lte,
             contains=self.contains,
             icontains=self.icontains,
+            startswith=self.startswith,
         )
 
     def to_internal_filter_mapped(self, f: Callable[[T], Y]) -> GenericFilter[Y]:
@@ -77,6 +81,7 @@ class GraphQLFilter(Generic[T]):
             lte=f(self.lte) if self.lte else None,
             contains=f(self.contains) if self.contains else None,
             icontains=f(self.icontains) if self.icontains else None,
+            startswith=f(self.startswith) if self.startswith else None,
         )
 
 

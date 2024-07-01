@@ -1,10 +1,9 @@
-import json
 from enum import Enum
 from typing import Any, Optional
 
 from pydantic import field_serializer
 
-from models.base import SMBase
+from models.base import SMBase, parse_sql_dict
 
 ProjectId = int
 
@@ -51,7 +50,7 @@ class Project(SMBase):
     def from_db(kwargs):
         """From DB row, with db keys"""
         kwargs = dict(kwargs)
-        kwargs['meta'] = json.loads(kwargs['meta']) if kwargs.get('meta') else {}
+        kwargs['meta'] = parse_sql_dict(kwargs.get('meta')) or {}
 
         # Sanitise role names and convert to enum members
         role_list: list[str] = kwargs['roles'].split(',') if kwargs.get('roles') else []

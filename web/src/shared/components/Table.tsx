@@ -4,11 +4,11 @@ import * as React from 'react'
 
 import { range } from 'lodash'
 
-import { Table as SUITable, TableProps, Checkbox } from 'semantic-ui-react'
+import { Checkbox, Table as SUITable, TableProps } from 'semantic-ui-react'
 
 import { ThemeContext } from './ThemeProvider'
 
-const Table: React.FunctionComponent<TableProps> = ({ className, ...props }) => {
+const Table: React.FunctionComponent<TableProps> = ({ className, stackable, ...props }) => {
     const theme = React.useContext(ThemeContext)
 
     const isDarkMode = theme.theme === 'dark-mode'
@@ -17,7 +17,8 @@ const Table: React.FunctionComponent<TableProps> = ({ className, ...props }) => 
     if (isDarkMode) {
         classNames += ' inverted'
     }
-    return <SUITable className={classNames} {...props} />
+    // make unstackable the inverse of stackable to default to unstackable
+    return <SUITable unstackable={!stackable} className={classNames} {...props} />
 }
 
 interface ICheckboxRowProps {

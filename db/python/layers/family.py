@@ -2,6 +2,7 @@
 
 from api.utils import group_by
 from db.python.connect import Connection
+from db.python.filters import GenericFilter
 from db.python.layers.base import BaseLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.tables.family import FamilyFilter, FamilyTable
@@ -11,7 +12,7 @@ from db.python.tables.family_participant import (
 )
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.sample import SampleTable
-from db.python.utils import GenericFilter, NotFoundError
+from db.python.utils import NotFoundError
 from models.models import PRIMARY_EXTERNAL_ORG
 from models.models.family import FamilyInternal, PedRow, PedRowInternal
 from models.models.participant import ParticipantUpsertInternal
@@ -325,6 +326,7 @@ class FamilyLayer(BaseLayer):
                 [
                     ParticipantUpsertInternal(
                         id=external_participant_ids_map[row.individual_id],
+                        external_ids={PRIMARY_EXTERNAL_ORG: row.individual_id},
                         reported_sex=row.sex,
                     )
                     for row in pedrows

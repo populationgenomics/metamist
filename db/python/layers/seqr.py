@@ -25,6 +25,7 @@ from api.settings import (
 )
 from db.python.connect import Connection
 from db.python.enum_tables import SequencingTypeTable
+from db.python.filters import GenericFilter
 from db.python.layers.analysis import AnalysisInternal, AnalysisLayer
 from db.python.layers.base import BaseLayer
 from db.python.layers.family import FamilyLayer
@@ -32,7 +33,6 @@ from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.project import Project
-from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
 from models.enums.web import SeqrDatasetType
 

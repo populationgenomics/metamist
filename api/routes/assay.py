@@ -7,9 +7,9 @@ from api.utils.db import (
     get_project_db_connection,
     get_projectless_db_connection,
 )
+from db.python.filters import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.tables.assay import AssayFilter
-from db.python.utils import GenericFilter
 from models.base import SMBase
 from models.models.assay import AssayUpsert
 from models.models.project import ReadAccessRoles

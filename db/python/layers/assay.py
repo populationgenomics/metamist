@@ -1,5 +1,4 @@
 # pylint: disable=too-many-arguments
-from typing import Any
 
 from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.assay import AssayFilter, AssayTable
@@ -56,11 +55,15 @@ class AssayLayer(BaseLayer):
         return assay
 
     async def get_assays_for_sequencing_group_ids(
-        self, sequencing_group_ids: list[int]
+        self, sequencing_group_ids: list[int], filter_: AssayFilter | None = None
     ) -> dict[int, list[AssayInternal]]:
         """Get assays for a list of sequencing group IDs"""
+        if not sequencing_group_ids:
+            return {}
+
         projects, assays = await self.seqt.get_assays_for_sequencing_group_ids(
             sequencing_group_ids=sequencing_group_ids,
+            filter_=filter_,
         )
 
         if not assays:
@@ -71,40 +74,6 @@ class AssayLayer(BaseLayer):
         )
 
         return assays
-
-    async def get_assays_by(
-        self,
-        sample_ids: list[int] = None,
-        assay_ids: list[int] = None,
-        external_assay_ids: list[str] = None,
-        assay_meta: dict[str, Any] = None,
-        sample_meta: dict[str, Any] = None,
-        project_ids=None,
-        assay_types: list[str] = None,
-        active=True,
-    ):
-        """Get sequences by some criteria"""
-        if not sample_ids and not assay_ids and not project_ids:
-            raise ValueError(
-                'Must specify one of "project_ids", "sample_ids" or "assay_ids"'
-            )
-
-        projs, seqs = await self.seqt.get_assays_by(
-            assay_ids=assay_ids,
-            external_assay_ids=external_assay_ids,
-            sample_ids=sample_ids,
-            assay_types=assay_types,
-            assay_meta=assay_meta,
-            sample_meta=sample_meta,
-            project_ids=project_ids,
-            active=active,
-        )
-
-        self.connection.check_access_to_projects_for_ids(
-            projs, allowed_roles=ReadAccessRoles
-        )
-
-        return seqs
 
     # region UPSERTs
 

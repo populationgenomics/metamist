@@ -1,18 +1,18 @@
 import uuid
-from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.tables.project import (
     GROUP_NAME_MEMBERS_ADMIN,
     GROUP_NAME_PROJECT_CREATORS,
-    Forbidden,
     ProjectPermissionsTable,
 )
+from db.python.utils import Forbidden
 from models.models.project import (
     FullWriteAccessRoles,
     ProjectMemberRole,
     ProjectMemberUpdate,
     ReadAccessRoles,
 )
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 class TestGroupAccess(DbIsolatedTest):

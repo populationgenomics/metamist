@@ -4,13 +4,14 @@ from typing import Any
 
 from api.utils import group_by
 from db.python.connect import Connection
+from db.python.filters import GenericFilter
 from db.python.layers.base import BaseLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter, AnalysisTable
 from db.python.tables.cohort import CohortTable
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import SequencingGroupFilter
-from db.python.utils import GenericFilter, get_logger
+from db.python.utils import get_logger
 from models.enums import AnalysisStatus
 from models.models import (
     AnalysisInternal,

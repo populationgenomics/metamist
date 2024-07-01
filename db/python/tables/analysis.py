@@ -4,15 +4,11 @@ import datetime
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from db.python.filters import GenericFilter, GenericFilterModel, GenericMetaFilter
 from db.python.tables.base import DbBase
-from db.python.utils import (
-    GenericFilter,
-    GenericFilterModel,
-    GenericMetaFilter,
-    NotFoundError,
-    to_db_json,
-)
+from db.python.utils import NotFoundError, to_db_json
 from models.enums import AnalysisStatus
+from models.models import PRIMARY_EXTERNAL_ORG
 from models.models.analysis import AnalysisInternal
 from models.models.audit_log import AuditLogInternal
 from models.models.project import ProjectId
@@ -413,12 +409,13 @@ WHERE a.id = :analysis_id
     ) -> List[dict[str, str]]:
         """Get (ext_sample_id, cram_path, internal_id) map"""
 
-        values: dict[str, Any] = {'project': project}
+        values: dict[str, Any] = {'project': project, 'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG}
         filters = [
             'a.active',
             'a.type = "cram"',
             'a.status = "completed"',
-            'p.project = :project',
+            'peid.project = :project',
+            'peid.name = :PRIMARY_EXTERNAL_ORG',
         ]
         if sequencing_types:
             if len(sequencing_types) == 1:
@@ -431,16 +428,16 @@ WHERE a.id = :analysis_id
             filters.append('JSON_VALUE(a.meta, "$.sequencing_type") ' + seq_check)
 
         if participant_ids:
-            filters.append('p.id IN :pids')
+            filters.append('peid.participant_id IN :pids')
             values['pids'] = list(participant_ids)
 
         _query = f"""
-SELECT p.external_id as participant_id, a.output as output, sg.id as sequencing_group_id
+SELECT peid.external_id as participant_id, a.output as output, sg.id as sequencing_group_id
 FROM analysis a
 INNER JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
 INNER JOIN sequencing_group sg ON a_sg.sequencing_group_id = sg.id
 INNER JOIN sample s ON sg.sample_id = s.id
-INNER JOIN participant p ON s.participant_id = p.id
+INNER JOIN participant_external_id peid ON s.participant_id = peid.participant_id
 WHERE
     {' AND '.join(filters)}
 ORDER BY a.timestamp_completed DESC;

@@ -1,17 +1,20 @@
+from collections import defaultdict
 from test.testbase import DbIsolatedTest, run_as_sync
 
 from pymysql.err import IntegrityError
 
 from db.python.enum_tables import AssayTypeTable
+from db.python.filters import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.layers.sample import SampleLayer
-from db.python.tables.assay import AssayFilter
-from db.python.utils import GenericFilter, NotFoundError
+from db.python.tables.assay import AssayFilter, AssayTable
+from db.python.utils import NotFoundError
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
     AssayUpsertInternal,
     SampleUpsertInternal,
 )
+from models.models.sequencing_group import SequencingGroupUpsertInternal
 
 default_sequencing_meta = {
     'sequencing_type': 'genome',
@@ -231,6 +234,8 @@ class TestAssay(DbIsolatedTest):
 
         sample_id_for_test = sample.id
 
+        assert sample_id_for_test is not None, 'Sample ID is None'
+
         seqs = await self.assaylayer.upsert_assays(
             [
                 AssayUpsertInternal(
@@ -349,6 +354,96 @@ class TestAssay(DbIsolatedTest):
         # )
 
     @run_as_sync
+    async def test_query_by_sg_ids(self):
+        """Test query_assays in different combinations"""
+        sample = await self.slayer.upsert_sample(
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'SAM_TEST_QUERY'},
+                type='blood',
+                active=True,
+                meta={'collection-year': '2022'},
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={'sgmeta': 'sgvalue'},
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                external_ids={'default': 'A1_1'},
+                                meta={
+                                    'batch': 'batch-1a',
+                                    'sequencing_type': 'genome',
+                                    'sequencing_platform': 'illumina',
+                                    'sequencing_technology': 'short-read',
+                                },
+                            ),
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                external_ids={'default': 'A1_2'},
+                                meta={
+                                    'batch': 'batch-1b',
+                                    'sequencing_type': 'genome',
+                                    'sequencing_platform': 'illumina',
+                                    'sequencing_technology': 'short-read',
+                                },
+                            ),
+                        ],
+                    ),
+                    SequencingGroupUpsertInternal(
+                        type='exome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={'sgmeta': 'sgvalue'},
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                external_ids={'default': 'sg2_1'},
+                                meta={
+                                    'batch': 'batch-2',
+                                    'sequencing_type': 'genome',
+                                    'sequencing_platform': 'illumina',
+                                    'sequencing_technology': 'short-read',
+                                },
+                            ),
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                external_ids={'default': 'sg2_2'},
+                                meta={
+                                    'batch': 'batch-2',
+                                    'sequencing_type': 'genome',
+                                    'sequencing_platform': 'illumina',
+                                    'sequencing_technology': 'short-read',
+                                },
+                            ),
+                        ],
+                    ),
+                ],
+            )
+        )
+
+        sg_id = sample.sequencing_groups[0].id
+        assay_ids_sg1 = {a.id for a in sample.sequencing_groups[0].assays}
+
+        assays = await self.assaylayer.get_assays_for_sequencing_group_ids([sg_id])
+
+        self.assertSetEqual(
+            assay_ids_sg1, {a.id for sgs_as in assays.values() for a in sgs_as}
+        )
+
+        # subfilter
+        assays_batch_1a = await self.assaylayer.get_assays_for_sequencing_group_ids(
+            [sg_id],
+            filter_=AssayFilter(
+                meta={'batch': GenericFilter(eq='batch-1a')},
+            ),
+        )
+        self.assertEqual(1, len(assays_batch_1a))
+        batch_1a_assay = next(iter(assays_batch_1a.values()))[0]
+        self.assertEqual('batch-1a', batch_1a_assay.meta['batch'])
+
+    @run_as_sync
     async def test_update(self):
         """Test updating an assay, and all fields are updated correctly"""
         # insert
@@ -414,3 +509,180 @@ class TestAssay(DbIsolatedTest):
             {'id': assay.id},
         )
         self.assertEqual('metabolomics', row_to_check['type'])
+
+    @run_as_sync
+    async def test_batch_statistics(self):
+        """
+        Test batch statistics
+        """
+        samples_to_insert = [
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'SAMPLE_1'},
+                type='blood',
+                active=True,
+                meta={'collection-year': '2022'},
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        external_ids={'default': 'SG_1'},
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={'sgmeta': 'sgvalue'},
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                external_ids={'default': 'A1_1'},
+                                meta={
+                                    'batch': 'batch-1',
+                                    'sequencing_type': 'genome',
+                                    'sequencing_platform': 'illumina',
+                                    'sequencing_technology': 'short-read',
+                                },
+                            ),
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                external_ids={'default': 'A1_2'},
+                                meta={
+                                    'batch': 'batch-1',
+                                    'sequencing_type': 'genome',
+                                    'sequencing_platform': 'illumina',
+                                    'sequencing_technology': 'short-read',
+                                },
+                            ),
+                        ],
+                    ),
+                    SequencingGroupUpsertInternal(
+                        external_ids={'default': 'SG_2'},
+                        type='exome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={'sgmeta': 'sgvalue'},
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                external_ids={'default': 'A2_1'},
+                                meta={
+                                    'batch': 'batch-1',
+                                    'sequencing_type': 'exome',
+                                    'sequencing_platform': 'illumina',
+                                    'sequencing_technology': 'short-read',
+                                },
+                            ),
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                external_ids={'default': 'A2_2'},
+                                meta={
+                                    'batch': 'batch-2',
+                                    'sequencing_type': 'exome',
+                                    'sequencing_platform': 'illumina',
+                                    'sequencing_technology': 'short-read',
+                                },
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'SAMPLE_2'},
+                type='blood',
+                active=True,
+                meta={'collection-year': '2022'},
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        external_ids={'default': 'SG_3'},
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={'sgmeta': 'sgvalue'},
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                external_ids={'default': 'A3_1'},
+                                meta={
+                                    'batch': 'batch-1',
+                                    'sequencing_type': 'genome',
+                                    'sequencing_platform': 'illumina',
+                                    'sequencing_technology': 'short-read',
+                                },
+                            ),
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                external_ids={'default': 'A3_2'},
+                                meta={
+                                    'batch': 'batch-1',
+                                    'sequencing_type': 'genome',
+                                    'sequencing_platform': 'illumina',
+                                    'sequencing_technology': 'short-read',
+                                },
+                            ),
+                        ],
+                    ),
+                    SequencingGroupUpsertInternal(
+                        external_ids={'default': 'SG_4'},
+                        type='transcriptome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={'sgmeta': 'sgvalue'},
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                external_ids={'default': 'A4_1'},
+                                meta={
+                                    'batch': 'batch-3',
+                                    'sequencing_type': 'transcriptome',
+                                    'sequencing_platform': 'illumina',
+                                    'sequencing_technology': 'short-read',
+                                },
+                            ),
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                external_ids={'default': 'A4_2'},
+                                meta={
+                                    'batch': 'batch-3',
+                                    'sequencing_type': 'transcriptome',
+                                    'sequencing_platform': 'illumina',
+                                    'sequencing_technology': 'short-read',
+                                },
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        ]
+
+        await SampleLayer(self.connection).upsert_samples(samples_to_insert)
+        assay_layer = AssayTable(self.connection)
+        rows = await assay_layer.get_assay_type_numbers_by_batch_for_project(
+            self.project_id
+        )
+
+        assays_in_batch: dict[str, int] = defaultdict(int)
+        sgs_in_seq_type_batch: dict[str, dict[str, int]] = defaultdict(
+            lambda: defaultdict(int)
+        )
+        for r in rows:
+            # sequencing_group_ids has format [(sg_id, assay_count), ...]
+            assays_in_batch[r.batch] += sum(sg[1] for sg in r.sequencing_group_ids)
+            sgs_in_seq_type_batch[r.batch][r.sequencing_type] += len(
+                r.sequencing_group_ids
+            )
+
+        # aggregate to test, mostly to show there are multiple ways you
+        # may want to aggregate this information
+        self.assertDictEqual(
+            assays_in_batch,
+            {
+                'batch-1': 5,
+                'batch-2': 1,
+                'batch-3': 2,
+            },
+        )
+
+        self.assertDictEqual(
+            sgs_in_seq_type_batch,
+            {
+                'batch-1': {'genome': 2, 'exome': 1},
+                'batch-2': {'exome': 1},
+                'batch-3': {'transcriptome': 1},
+            },
+        )

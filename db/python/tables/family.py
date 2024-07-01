@@ -2,13 +2,9 @@ import dataclasses
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set
 
+from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
-from db.python.utils import (
-    GenericFilter,
-    GenericFilterModel,
-    NotFoundError,
-    escape_like_term,
-)
+from db.python.utils import NotFoundError, escape_like_term
 from models.models.family import FamilyInternal
 from models.models.project import ProjectId
 

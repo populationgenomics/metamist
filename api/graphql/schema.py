@@ -20,6 +20,7 @@ from api.graphql.filters import (
 )
 from api.graphql.loaders import GraphQLContext, LoaderKeys, get_context
 from db.python import enum_tables
+from db.python.filters import GenericFilter
 from db.python.layers import (
     AnalysisLayer,
     AnalysisRunnerLayer,
@@ -35,9 +36,9 @@ from db.python.tables.analysis_runner import AnalysisRunnerFilter
 from db.python.tables.assay import AssayFilter
 from db.python.tables.cohort import CohortFilter, CohortTemplateFilter
 from db.python.tables.family import FamilyFilter
+from db.python.tables.participant import ParticipantFilter
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
-from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
@@ -329,10 +330,39 @@ class GraphQLProject:
 
     @strawberry.field()
     async def participants(
-        self, info: Info[GraphQLContext, 'Query'], root: 'Project'
+        self,
+        info: Info[GraphQLContext, 'Query'],
+        root: 'GraphQLProject',
+        id: GraphQLFilter[int] | None = None,
+        external_id: GraphQLFilter[str] | None = None,
+        meta: GraphQLMetaFilter | None = None,
+        reported_sex: GraphQLFilter[int] | None = None,
+        reported_gender: GraphQLFilter[str] | None = None,
+        karyotype: GraphQLFilter[str] | None = None,
     ) -> list['GraphQLParticipant']:
         loader = info.context['loaders'][LoaderKeys.PARTICIPANTS_FOR_PROJECTS]
-        participants = await loader.load(root.id)
+        participants = await loader.load(
+            {
+                'id': root.id,
+                'filter_': ParticipantFilter(
+                    project=GenericFilter(eq=root.id),
+                    id=id.to_internal_filter() if id else None,
+                    external_id=(
+                        external_id.to_internal_filter() if external_id else None
+                    ),
+                    meta=graphql_meta_filter_to_internal_filter(meta),
+                    reported_gender=(
+                        reported_gender.to_internal_filter()
+                        if reported_gender
+                        else None
+                    ),
+                    reported_sex=(
+                        reported_sex.to_internal_filter() if reported_sex else None
+                    ),
+                    karyotype=karyotype.to_internal_filter() if karyotype else None,
+                ),
+            }
+        )
         return [GraphQLParticipant.from_internal(p) for p in participants]
 
     @strawberry.field()
@@ -1197,8 +1227,10 @@ class Query:  # entry point to graphql.
 
         filter_ = SequencingGroupFilter(
             project=_project_filter,
-            sample_id=(
-                sample_id.to_internal_filter_mapped(sample_id_transform_to_raw)
+            sample=(
+                SequencingGroupFilter.SequencingGroupSampleFilter(
+                    id=sample_id.to_internal_filter_mapped(sample_id_transform_to_raw)
+                )
                 if sample_id
                 else None
             ),
@@ -1216,7 +1248,11 @@ class Query:  # entry point to graphql.
                 else GenericFilter(eq=True)
             ),
             created_on=created_on.to_internal_filter() if created_on else None,
-            assay_meta=assay_meta,
+            assay=(
+                SequencingGroupFilter.SequencingGroupAssayFilter(
+                    meta=graphql_meta_filter_to_internal_filter(assay_meta),
+                )
+            ),
             has_cram=has_cram,
             has_gvcf=has_gvcf,
         )

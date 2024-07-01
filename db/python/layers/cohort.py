@@ -1,4 +1,5 @@
 from db.python.connect import Connection
+from db.python.filters import GenericFilter
 from db.python.layers.base import BaseLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.cohort import CohortFilter, CohortTable, CohortTemplateFilter
@@ -7,7 +8,7 @@ from db.python.tables.sequencing_group import (
     SequencingGroupFilter,
     SequencingGroupTable,
 )
-from db.python.utils import GenericFilter, get_logger
+from db.python.utils import get_logger
 from models.models.cohort import (
     CohortCriteriaInternal,
     CohortInternal,
@@ -48,7 +49,13 @@ def get_sg_filter(
         technology=GenericFilter(in_=sg_technology) if sg_technology else None,
         platform=GenericFilter(in_=sg_platform) if sg_platform else None,
         type=GenericFilter(in_=sg_type) if sg_type else None,
-        sample_id=GenericFilter(in_=sample_ids) if sample_ids else None,
+        sample=(
+            SequencingGroupFilter.SequencingGroupSampleFilter(
+                id=GenericFilter(in_=sample_ids)
+            )
+            if sample_ids
+            else None
+        ),
     )
 
     return sg_filter

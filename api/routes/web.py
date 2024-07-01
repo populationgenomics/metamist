@@ -3,26 +3,38 @@
 Web routes
 """
 
-from typing import Optional
+import asyncio
+import csv
+import io
+from datetime import date
+from typing import Any, Generator
 
-from fastapi import APIRouter, Request
-from pydantic import BaseModel
+from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 
 from api.utils.db import (
     Connection,
     get_project_db_connection,
     get_projectless_db_connection,
 )
+from api.utils.export import ExportType
+from db.python.filters.web import ProjectParticipantGridFilter
 from db.python.layers.search import SearchLayer
 from db.python.layers.seqr import SeqrLayer
-from db.python.layers.web import SearchItem, WebLayer
-from models.enums.web import SeqrDatasetType
+from db.python.layers.web import WebLayer
+from models.base import SMBase
+from models.enums.web import MetaSearchEntityPrefix, SeqrDatasetType
+from models.models.participant import NestedParticipant
 from models.models.project import FullWriteAccessRoles, ReadAccessRoles
 from models.models.search import SearchResponse
-from models.models.web import PagingLinks, ProjectSummary
+from models.models.web import (
+    ProjectParticipantGridField,
+    ProjectParticipantGridResponse,
+    ProjectSummary,
+)
 
 
-class SearchResponseModel(BaseModel):
+class SearchResponseModel(SMBase):
     """Parent model class, allows flexibility later on"""
 
     responses: list[SearchResponse]
@@ -46,28 +58,197 @@ async def get_project_summary(
     """Creates a new sample, and returns the internal sample ID"""
     st = WebLayer(connection)
 
-    summary = await st.get_project_summary(
-        token=token, limit=limit, grid_filter=grid_filter
+    summary = await st.get_project_summary()
+
+    return summary.to_external()
+
+
+@router.post(
+    '/{project}/participants/schema',
+    # response_model=,
+    operation_id='getProjectParticipantsFilterSchema',
+)
+async def get_project_project_participants_filter_schema(
+    _=get_project_readonly_connection,
+):
+    """Get project summary (from query) with some limit"""
+    return ProjectParticipantGridFilter.model_json_schema()
+
+
+@router.post(
+    '/{project}/participants',
+    response_model=ProjectParticipantGridResponse,
+    operation_id='getProjectParticipantsGridWithLimit',
+)
+async def get_project_participants_grid_with_limit(
+    limit: int,
+    query: ProjectParticipantGridFilter,
+    skip: int = 0,
+    connection=get_project_readonly_connection,
+):
+    """Get project summary (from query) with some limit"""
+
+    if not connection.project:
+        raise ValueError('No project was detected through the authentication')
+
+    wlayer = WebLayer(connection)
+    pfilter = query.to_internal(project=connection.project)
+
+    participants, pcount = await asyncio.gather(
+        wlayer.query_participants(pfilter, limit=limit, skip=skip),
+        wlayer.count_participants(pfilter),
     )
 
-    participants = summary.participants
-
-    collected_samples = sum(len(p.samples) for p in participants)
-    new_token = None
-    if collected_samples >= limit:
-        new_token = max(int(sample.id) for p in participants for sample in p.samples)
-
-    links = PagingLinks(
-        self=str(request.url),
-        next=(
-            str(request.base_url) + request.url.path.lstrip('/') + f'?token={new_token}'
-            if new_token
-            else None
-        ),
-        token=str(new_token) if new_token else None,
+    return ProjectParticipantGridResponse.from_params(
+        participants=participants,
+        total_results=pcount,
+        filter_fields=query,
     )
 
-    return summary.to_external(links)
+
+class ExportProjectParticipantFields(SMBase):
+    """fields for exporting project participants"""
+
+    fields: dict[MetaSearchEntityPrefix, list[ProjectParticipantGridField]]
+
+
+@router.post(
+    '/{project}/participants/export/{export_type}',
+    operation_id='exportProjectParticipants',
+)
+async def export_project_participants(
+    export_type: ExportType,
+    query: ProjectParticipantGridFilter,
+    fields: ExportProjectParticipantFields | None = None,
+    connection=get_project_readonly_connection,
+):
+    """Get project summary (from query) with some limit"""
+
+    if not connection.project:
+        raise ValueError('No project was detected through the authentication')
+
+    wlayer = WebLayer(connection)
+    pfilter = query.to_internal(project=connection.project)
+
+    participants_internal = await wlayer.query_participants(pfilter, limit=None)
+    participants = [p.to_external() for p in participants_internal]
+
+    if export_type == ExportType.JSON:
+        return participants
+
+    # then have to get all nested objects
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=export_type.get_delimiter())
+
+    for row in prepare_participants_for_export(participants, fields=fields):
+        writer.writerow(row)
+
+    basefn = f'{connection.project}-project-summary-{connection.author}-{date.today().isoformat()}'
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type=export_type.get_mime_type(),
+        headers={
+            'Content-Disposition': f'filename={basefn}{export_type.get_extension()}'
+        },
+    )
+
+
+def get_field_from_obj(obj, field: ProjectParticipantGridField) -> str | None:
+    """Get field from object"""
+    if field.key.startswith('meta.'):
+        if not hasattr(obj, 'meta'):
+            raise ValueError(f'Object {type(obj)} does not have meta field: {obj}')
+
+        return obj.meta.get(field.key.removeprefix('meta.'), None)
+    if not hasattr(obj, field.key):
+        raise ValueError(f'Object {type(obj)} does not have field: {field}')
+
+    return getattr(obj, field.key, None)
+
+
+def prepare_field_for_export(field_value: Any) -> str:
+    """Prepare field for export"""
+    if isinstance(field_value, (list, tuple)):
+        return ', '.join(prepare_field_for_export(f) for f in field_value)
+    if isinstance(field_value, dict):
+        # special case if the key is empty, then just return the value
+        return ', '.join(
+            f'{k}: {prepare_field_for_export(v)}' if k else v
+            for k, v in field_value.items()
+        )
+
+    return str(field_value)
+
+
+def prepare_participants_for_export(
+    participants: list[NestedParticipant], fields: ExportProjectParticipantFields | None
+) -> Generator[tuple[str, ...], None, None]:
+    """Prepare participants for export"""
+    _fields = fields.fields if fields else None
+    if not _fields:
+        # empty field, because we don't really care about the fields
+        _fields = ProjectParticipantGridResponse.get_entity_keys(
+            participants, ProjectParticipantGridFilter()
+        )
+
+    def get_visible_fields(key: MetaSearchEntityPrefix):
+        fs = _fields.get(key, [])
+        return [f for f in fs if f.is_visible]
+
+    family_keys = get_visible_fields(MetaSearchEntityPrefix.FAMILY)
+    participant_keys = get_visible_fields(MetaSearchEntityPrefix.PARTICIPANT)
+    sample_keys = get_visible_fields(MetaSearchEntityPrefix.SAMPLE)
+    sequencing_group_keys = get_visible_fields(MetaSearchEntityPrefix.SEQUENCING_GROUP)
+    assay_keys = get_visible_fields(MetaSearchEntityPrefix.ASSAY)
+
+    header = (
+        *('family.' + fk.key for fk in family_keys),
+        *('participant.' + pk.key for pk in participant_keys),
+        *('sample.' + sk.key for sk in sample_keys),
+        *('sequencing_group.' + sgk.key for sgk in sequencing_group_keys),
+        *('assay.' + ak.key for ak in assay_keys),
+    )
+    yield header
+    for participant in participants:
+        prow = []
+        for field in family_keys:
+            prow.append(
+                ', '.join(
+                    prepare_field_for_export(get_field_from_obj(f, field))
+                    for f in participant.families
+                )
+            )
+        for field in participant_keys:
+            prow.append(
+                prepare_field_for_export(get_field_from_obj(participant, field))
+            )
+
+        for sample in participant.samples:
+            srow = []
+            for field in sample_keys:
+                srow.append(prepare_field_for_export(get_field_from_obj(sample, field)))
+
+            for sg in sample.sequencing_groups or []:
+                sgrow = []
+                for field in sequencing_group_keys:
+                    sgrow.append(
+                        prepare_field_for_export(get_field_from_obj(sg, field))
+                    )
+
+                for assay in sg.assays or []:
+                    arow = []
+                    for field in assay_keys:
+                        arow.append(
+                            prepare_field_for_export(get_field_from_obj(assay, field))
+                        )
+
+                    yield (
+                        *prow,
+                        *srow,
+                        *sgrow,
+                        *arow,
+                    )
 
 
 @router.get(
@@ -84,7 +265,7 @@ async def search_by_keyword(
     projects = connection.all_projects()
     pmap = {p.id: p for p in projects}
     responses = await SearchLayer(connection).search(
-        keyword, project_ids=list(pmap.keys())
+        keyword, project_ids=[p for p in pmap.keys() if p]
     )
 
     for res in responses:
