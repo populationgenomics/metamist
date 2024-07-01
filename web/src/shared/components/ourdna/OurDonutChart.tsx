@@ -1,6 +1,6 @@
+import * as d3 from 'd3'
 import * as React from 'react'
 import { Card, Container } from 'semantic-ui-react'
-import * as d3 from 'd3'
 
 import { ourdnaColours } from './Colours'
 
@@ -56,6 +56,7 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
             .range(Object.values(ourdnaColours) || d3.schemeCategory10)
 
         const pie = d3.pie().value((d: any) => d[1])
+        // @ts-ignore
         const data_ready = pie(Object.entries(data))
 
         const arc = d3
@@ -79,12 +80,15 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
             .data(data_ready)
             .enter()
             .append('path')
+            // @ts-ignore
             .attr('d', arc)
+            // @ts-ignore
             .attr('fill', (d) => color(d.data[0]))
             .attr('stroke', 'white')
             .style('stroke-width', '2px')
             .style('opacity', 1)
             .on('mouseover', function (event, d) {
+                // @ts-ignore
                 tooltip.text(`${d.data[0]}: ${d.data[1]}`)
                 return tooltip.style('visibility', 'visible')
             })
@@ -113,6 +117,7 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
             .append('rect')
             .attr('width', 18)
             .attr('height', 18)
+            // @ts-ignore
             .attr('fill', (d) => color(d.data[0]))
 
         legendItems
@@ -120,6 +125,7 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
             .attr('x', 24)
             .attr('y', 9)
             .attr('dy', '0.35em')
+            // @ts-ignore
             .text((d) => d.data[0])
             .style('font-size', '12px')
             .style('fill', 'var(--color-text-primary)')

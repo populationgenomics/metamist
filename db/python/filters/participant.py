@@ -37,6 +37,9 @@ class ParticipantFilter(GenericFilterModel):
         external_id: GenericFilter[str] | None = None
         meta: GenericMetaFilter | None = None
 
+        sample_root_id: GenericFilter[int] | None = None
+        sample_parent_id: GenericFilter[int] | None = None
+
     @dataclasses.dataclass(kw_only=True)
     class ParticipantSequencingGroupFilter(GenericFilterModel):
         """
@@ -88,6 +91,8 @@ class ParticipantFilter(GenericFilterModel):
             external_id=self.sample.external_id if self.sample else None,
             type=self.sample.type if self.sample else None,
             meta=self.sample.meta if self.sample else None,
+            sample_root_id=self.sample.sample_root_id if self.sample else None,
+            sample_parent_id=self.sample.sample_parent_id if self.sample else None,
             project=self.project,
             participant_id=self.id,
             sequencing_group=(

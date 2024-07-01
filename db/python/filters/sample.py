@@ -47,6 +47,9 @@ class SampleFilter(GenericFilterModel):
     external_id: GenericFilter[str] | None = None
     active: GenericFilter[bool] | None = None
 
+    sample_root_id: GenericFilter[int] | None = None
+    sample_parent_id: GenericFilter[int] | None = None
+
     # nested
     sequencing_group: SampleSequencingGroupFilter | None = None
     assay: SampleAssayFilter | None = None

@@ -4,35 +4,28 @@ const getAdjustedDay = (value: string, days: number): string => {
     return [
         date.getFullYear(),
         (date.getMonth() + 1).toString().padStart(2, '0'),
-        date.getDate().toString().padStart(2, '0')
+        date.getDate().toString().padStart(2, '0'),
     ].join('-')
 }
 
 const getCurrentInvoiceMonth = () => {
     // get current month and year in the format YYYYMM
     const date = new Date()
-    return [
-        date.getFullYear(),
-        (date.getMonth() + 1).toString().padStart(2, '0')
-    ].join('')
+    return [date.getFullYear(), (date.getMonth() + 1).toString().padStart(2, '0')].join('')
 }
 
 const getCurrentInvoiceYearStart = () => {
     const date = new Date()
-    return [
-        date.getFullYear(),
-        '01'
-    ].join('')
+    return [date.getFullYear(), '01'].join('')
 }
 
 const generateInvoiceMonths = (start: string, end: string): string[] => {
-
     const invoiceMonths = []
-    const yearStart = start.substring(0, 4)
-    const yearEnd = end.substring(0, 4)
+    const yearStart = parseInt(start.substring(0, 4))
+    const yearEnd = parseInt(end.substring(0, 4))
 
-    const mthStart = start.substring(4, 6)
-    const mthEnd = end.substring(4, 6)
+    const mthStart = parseInt(start.substring(4, 6))
+    const mthEnd = parseInt(end.substring(4, 6))
 
     const dateStart = new Date(yearStart + '-' + mthStart + '-01')
     const dateEnd = new Date(yearEnd + '-' + mthEnd + '-01')
@@ -48,7 +41,7 @@ const generateInvoiceMonths = (start: string, end: string): string[] => {
             invoiceMonths.push(dateString)
         }
     }
-    return invoiceMonths;
+    return invoiceMonths
 }
 
-export {getAdjustedDay, generateInvoiceMonths, getCurrentInvoiceMonth, getCurrentInvoiceYearStart}
+export { generateInvoiceMonths, getAdjustedDay, getCurrentInvoiceMonth, getCurrentInvoiceYearStart }

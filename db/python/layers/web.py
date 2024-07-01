@@ -335,6 +335,8 @@ class WebDb(DbBase):
                         external_ids=sample.external_ids,
                         type=sample.type,
                         meta=sample.meta,
+                        sample_root_id=sample.sample_root_id,
+                        sample_parent_id=sample.sample_parent_id,
                         created_date=screate,
                         sequencing_groups=nested_sgs,
                         non_sequencing_assays=[],
