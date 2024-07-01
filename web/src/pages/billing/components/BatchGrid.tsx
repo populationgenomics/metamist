@@ -201,7 +201,12 @@ const AnalysisRunnerRecordCard: React.FC<{ data: AnalysisCostRecord }> = ({ data
                             Cost by Sequencing Groups -{' '}
                             {data.seq_groups?.filter((s) => !!s.sequencing_group)?.length || 0}{' '}
                             sequencing group(s) across{' '}
-                            {data.seq_groups?.filter((s) => !!s.stage)?.length || 0} stages
+                            {new Set(
+                                data.seq_groups
+                                    ?.filter((s) => s.stage && s.stage.trim() !== '')
+                                    .map((s) => s.stage)
+                            ).size || 0}{' '}
+                            stages
                         </CheckboxRow>
                         <DisplayRow label="" isVisible={isOpen && isSeqGroupOpen}>
                             <SeqGrpDisplay seq_groups={data.seq_groups || []} />
@@ -281,7 +286,12 @@ const BatchCard: React.FC<{ item: AnalysisCostRecordBatch }> = ({ item }) => {
                         Cost by Sequencing Groups -{' '}
                         {item.seq_groups?.filter((s) => !!s.sequencing_group)?.length || 0}{' '}
                         sequencing group(s) across{' '}
-                        {item.seq_groups?.filter((s) => !!s.stage)?.length || 0} stages
+                        {new Set(
+                            item.seq_groups
+                                ?.filter((s) => s.stage && s.stage.trim() !== '')
+                                .map((s) => s.stage)
+                        ).size || 0}{' '}
+                        stages
                     </CheckboxRow>
                     <DisplayRow
                         label="Cost By Sequencing Group"

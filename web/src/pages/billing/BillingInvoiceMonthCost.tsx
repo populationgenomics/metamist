@@ -46,7 +46,13 @@ const BillingCurrentCost = () => {
     // toISOString() will give you YYYY-MM-DDTHH:mm:ss.sssZ
     // toISOString().substring(0, 7) will give you YYYY-MM
     // .replace('-', '') will give you YYYYMM
-    const thisMonth = new Date().toISOString().substring(0, 7).replace('-', '')
+    const currentDate = new Date()
+    const dayOfMonth = new Date().toISOString().substring(8, 10)
+    if (parseInt(dayOfMonth, 10) < 3) {
+        // first 2 days of the month, show previous month as default
+        currentDate.setMonth(currentDate.getMonth() - 1)
+    }
+    const thisMonth = currentDate.toISOString().substring(0, 7).replace('-', '')
 
     const [groupBy, setGroupBy] = React.useState<BillingColumn>(
         fixedGroupBy ?? BillingColumn.GcpProject
