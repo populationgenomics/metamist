@@ -1,6 +1,6 @@
+import * as d3 from 'd3'
 import * as React from 'react'
 import { Card, Container } from 'semantic-ui-react'
-import * as d3 from 'd3'
 
 import { ourdnaColours } from './Colours'
 
@@ -113,6 +113,7 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
             .append('rect')
             .attr('width', 18)
             .attr('height', 18)
+            // @ts-ignore
             .attr('fill', (d) => color(d.data[0]))
 
         legendItems
@@ -120,6 +121,7 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
             .attr('x', 24)
             .attr('y', 9)
             .attr('dy', '0.35em')
+            // @ts-ignore
             .text((d) => d.data[0])
             .style('font-size', '12px')
             .style('fill', 'var(--color-text-primary)')

@@ -1,18 +1,17 @@
-import React from 'react'
-import * as _ from 'lodash'
+import Paper from '@mui/material/Paper'
 import TableBody from '@mui/material/TableBody'
 import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
-import Paper from '@mui/material/Paper'
+import * as _ from 'lodash'
+import React from 'react'
 import { AnalysisCostRecordBatch, AnalysisCostRecordBatchJob } from '../../../sm-api'
 
-import Table, { CheckboxRow, DisplayRow } from '../../../shared/components/Table'
-import { TableVirtuoso } from 'react-virtuoso'
-import { Checkbox } from 'semantic-ui-react'
-import { Table as SUITable, TableProps } from 'semantic-ui-react'
-import { calcDuration, CostBySkuRow } from './BillingByAnalysisComponents'
+import { TableComponents, TableVirtuoso } from 'react-virtuoso'
+import { Checkbox, Table as SUITable, TableBodyProps, TableProps } from 'semantic-ui-react'
+import Table, { DisplayRow } from '../../../shared/components/Table'
 import formatMoney from '../../../shared/utilities/formatMoney'
+import { calcDuration, CostBySkuRow } from './BillingByAnalysisComponents'
 
 const ExpandableRow: React.FC<{ item: AnalysisCostRecordBatchJob }> = ({ item, ...props }) => {
     const [isOpen, setIsOpen] = React.useState(false)
@@ -46,14 +45,21 @@ const ExpandableRow: React.FC<{ item: AnalysisCostRecordBatchJob }> = ({ item, .
     )
 }
 
-const TableComponents = {
+const TableComponents: TableComponents = {
     Scroller: React.forwardRef((props, ref) => (
-        <TableContainer component={Paper} {...props} ref={ref} />
+        <TableContainer
+            component={Paper}
+            // @ts-ignore
+            ref={ref}
+            {...props}
+        />
     )),
-    Table: (props) => <Table {...props} style={{ borderCollapse: 'separate' }} />,
+    Table: (props: TableProps) => <Table {...props} style={{ borderCollapse: 'separate' }} />,
     TableHead: TableHead,
+    // @ts-ignore
     TableRow: ExpandableRow,
-    TableBody: React.forwardRef((props, ref) => <TableBody {...props} ref={ref} />),
+    // @ts-ignore
+    TableBody: React.forwardRef((props: TableBodyProps, ref) => <TableBody ref={ref} {...props} />),
 }
 
 export const BatchJobsTable: React.FC<{ batch: AnalysisCostRecordBatch }> = ({ batch }) => {

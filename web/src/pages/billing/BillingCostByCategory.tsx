@@ -1,20 +1,20 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Checkbox, Grid, Input, Message } from 'semantic-ui-react'
-import CostByTimeBarChart from './components/CostByTimeBarChart'
-import FieldSelector from './components/FieldSelector'
 import {
     BillingApi,
     BillingColumn,
+    BillingTimePeriods,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
-    BillingTimePeriods,
 } from '../../sm-api'
+import CostByTimeBarChart from './components/CostByTimeBarChart'
+import FieldSelector from './components/FieldSelector'
 
-import { convertFieldName } from '../../shared/utilities/fieldName'
-import { getMonthStartDate, getMonthEndDate } from '../../shared/utilities/monthStartEndDate'
 import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
+import { convertFieldName } from '../../shared/utilities/fieldName'
 import generateUrl from '../../shared/utilities/generateUrl'
+import { getMonthEndDate, getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
 
 const BillingCostByCategory: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
@@ -124,10 +124,12 @@ const BillingCostByCategory: React.FunctionComponent = () => {
                 const recTotals: { [key: string]: number } = {}
                 response.data.forEach((item: BillingTotalCostRecord) => {
                     const { sku, cost } = item
-                    if (!recTotals[sku]) {
-                        recTotals[sku] = 0
+                    // if sku is not a string, set to unknown
+                    const _sku = typeof sku === 'string' ? sku : 'unknown'
+                    if (!(_sku in recTotals)) {
+                        recTotals[_sku] = 0
                     }
-                    recTotals[sku] += cost
+                    recTotals[_sku] += cost
                 })
                 const sortedRecTotals: { [key: string]: number } = Object.fromEntries(
                     Object.entries(recTotals).sort(([, a], [, b]) => b - a)

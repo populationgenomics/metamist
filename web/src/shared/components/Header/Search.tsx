@@ -1,16 +1,24 @@
+import _ from 'lodash'
 import * as React from 'react'
 import { Search } from 'semantic-ui-react'
-import _ from 'lodash'
 
-import { useNavigate } from 'react-router-dom'
-import Diversity3RoundedIcon from '@mui/icons-material/Diversity3Rounded'
-import PersonRoundedIcon from '@mui/icons-material/PersonRounded'
 import BloodtypeRoundedIcon from '@mui/icons-material/BloodtypeRounded'
+import Diversity3RoundedIcon from '@mui/icons-material/Diversity3Rounded'
 import ErrorRoundedIcon from '@mui/icons-material/ErrorRounded'
-import VaccinesRoundedIcon from '@mui/icons-material/VaccinesRounded'
+import PersonRoundedIcon from '@mui/icons-material/PersonRounded'
 import SearchIcon from '@mui/icons-material/Search'
+import VaccinesRoundedIcon from '@mui/icons-material/VaccinesRounded'
+import { useNavigate } from 'react-router-dom'
 
-import { SearchResponse, WebApi, SearchResponseType } from '../../../sm-api/api'
+import {
+    FamilySearchResponseData,
+    ParticipantSearchResponseData,
+    SampleSearchResponseData,
+    SearchResponse,
+    SearchResponseType,
+    SequencingGroupSearchResponseData,
+    WebApi,
+} from '../../../sm-api/api'
 import './Search.css'
 
 type State = {
@@ -72,61 +80,67 @@ const SearchReducer = (state: State, action: Action): State => {
     }
 }
 
-const resultRenderer = ({ data, ...props }) => {
+const resultRenderer: (resp: SearchResponse) => React.ReactElement = (searchResponse) => {
     let components = []
     let icon: React.ReactElement = <></>
     let available: string | undefined
     let colour = 'black'
-    if (!data) {
+    if (!searchResponse.data) {
         return <em>An error occurred when rendering search results</em>
     }
-    if (!data?.id) {
-        available = `No access to this ${props.type}`
+    if (!searchResponse.data?.id) {
+        available = `No access to this ${searchResponse.type}`
         colour = 'gray'
     }
-    if (props.type === SearchResponseType.Participant) {
-        available = `${_.capitalize(props.type)} result is not supported`
+    if (searchResponse.type === SearchResponseType.Participant) {
+        available = `${_.capitalize(searchResponse.type)} result is not supported`
         colour = 'gray'
     }
     const style = { fontSize: 50, color: colour, height: '33px' }
 
-    switch (props.type) {
+    switch (searchResponse.type) {
         case SearchResponseType.Sample: {
-            components.push(...(data.sample_external_ids || []))
+            const d = searchResponse.data as SampleSearchResponseData
+            components.push(...(d.sample_external_ids || []))
             icon = <BloodtypeRoundedIcon sx={style} />
             break
         }
         case SearchResponseType.Participant: {
-            components.push(...(data.participant_external_ids || []))
+            const d = searchResponse.data as ParticipantSearchResponseData
+            components.push(...(d.participant_external_ids || []))
             icon = <PersonRoundedIcon sx={style} />
             break
         }
         case SearchResponseType.Family: {
-            components.push(...(data.family_external_ids || []))
+            const d = searchResponse.data as FamilySearchResponseData
+            components.push(...(d.family_external_ids || []))
             icon = <Diversity3RoundedIcon sx={style} />
             break
         }
         case SearchResponseType.SequencingGroup: {
-            components.push(...(data.sample_external_ids || []))
+            const d = searchResponse.data as SequencingGroupSearchResponseData
+            components.push(...(d.sample_external_id || []))
             icon = <VaccinesRoundedIcon sx={style} />
             break
         }
         case SearchResponseType.Error: {
-            components.push(data?.error)
+            components.push(searchResponse.error?.error)
             icon = <ErrorRoundedIcon sx={style} />
             break
         }
         // no default
     }
 
-    components = components.filter((f) => f !== props.title)
+    components = components.filter((f) => f !== searchResponse.title)
 
     const subtitle = components.length > 0 ? components.join(' · ') : null
 
-    const key = String(data.id || `${data.project}|${data.title}`)
+    const key = String(
+        searchResponse.data.id || `${searchResponse.data.project}|${searchResponse.title}`
+    )
 
     // prefer early return for empty results
-    if (!props.title || !props.type) return <></>
+    if (!searchResponse.title || !searchResponse.type) return <></>
 
     return (
         <div key={key} className="content">
@@ -139,7 +153,7 @@ const resultRenderer = ({ data, ...props }) => {
                         display: 'inline',
                     }}
                 >
-                    <div className="title">{props.title}</div>
+                    <div className="title">{searchResponse.title}</div>
                     {subtitle && <div className="description">{subtitle}</div>}
                     {available && <div>{available}</div>}
                 </div>
@@ -151,7 +165,7 @@ const resultRenderer = ({ data, ...props }) => {
                         fontStyle: 'italic',
                     }}
                 >
-                    {data.project}
+                    {searchResponse.data.project}
                 </div>
             </div>
         </div>
@@ -232,6 +246,7 @@ const Searchbar: React.FunctionComponent = () => {
                                 type: 'error',
                                 data: {
                                     id: '#error',
+                                    // @ts-ignore
                                     error: er.response?.data?.description || er.message,
                                 },
                             },
@@ -272,6 +287,7 @@ const Searchbar: React.FunctionComponent = () => {
                         data.result.data?.sg_external_id
                     )
                 }}
+                // @ts-ignore
                 resultRenderer={resultRenderer}
                 onSearchChange={handleSearchChange}
                 results={results}
