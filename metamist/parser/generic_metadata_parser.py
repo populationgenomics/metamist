@@ -120,16 +120,24 @@ class GenericMetadataParser(GenericParser):
         allow_extra_files_in_search_path=False,
         **kwargs,
     ):
-        """_summary_
+        """
+        Configuration options for a GenericMetadata parser.
 
         Args:
             project (str): The name of the project to insert into
             search_locations (list[str]):
                 A list of locations to search for unqualified files in.
+
             sample_name_column (str): The name of the column containing the sample name.
             sample_external_id_column_map (str | None, optional):
                 {column: eid_name} mapping for sample external_ids. This should NOT
                 include the sample_name_column.
+            sample_meta_map (dict[str, str] | None, optional):
+                A mapping of column names to keys for sample.meta.
+                {[column]: [metadata_key]}
+            default_sample_type (str | None, optional):
+                The default sample type to use if not provided in the manifest.
+
             participant_name_column (str | None, optional):
                 The name of the column containing the participant name. Unsupplied means
                 there are no participants represented in the file.
@@ -143,6 +151,13 @@ class GenericMetadataParser(GenericParser):
             participant_external_id_column_map (str | None, optional):
                 {column: eid_name} mapping for participant external_ids.
                 This should NOT include the participant_name_column.
+            participant_meta_map (dict[str, str] | None, optional):
+                A mapping of column names to keys for participant.meta.
+                {[column]: [metadata_key]}
+
+            default_sequencing (_type_, optional):
+                Default sequencing values to use when not found.Defaults to
+                DefaultSequencing( seq_type='genome', technology='short-read', platform='illumina' ).
             seq_type_column (str | None, optional):
                 The name of the column containing the sequencing type.
             seq_technology_column (str | None, optional):
@@ -153,41 +168,40 @@ class GenericMetadataParser(GenericParser):
                 The name of the column containing the sequencing facility.
             seq_library_column (str | None, optional):
                 The name of the column containing the sequencing library.
+
             assay_id_column (str | None, optional):
-                The name of the column containing the assay ID.
+                The name of the column containing an external assay ID to group on.
+            assay_meta_map (dict[str, str] | None, optional):
+                A mapping of column names to keys for assay.meta.
+                {[column]: [metadata_key]}
             reads_column (str | None, optional):
                 The name of the column containing the reads.
             checksum_column (str | None, optional):
                 The name of the column containing the checksum.
             read_end_type_column (str | None, optional):
                 The name of the column containing the read end type.
+            default_read_end_type (str | None, optional):
+                The default read end type to use if not provided in the manifest.
             read_length_column (str | None, optional):
                 The name of the column containing the read length.
+            default_read_length (str | int | None, optional):
+                The default read length to use if not provided in the manifest.
             reference_assembly_location_column (str | None, optional):
                 The name of the column containing the reference assembly location.
+            default_reference_assembly_location (str | None, optional):
+                Path to a reference_assembly where the reads_type is a CRAM
+
             gvcf_column (str | None, optional):
                 The name of the column containing the path to a gvcf
-            participant_meta_map (dict[str, str] | None, optional):
-                A mapping of column names to keys for participant.meta.
-                {[column]: [metadata_key]}
-            sample_meta_map (dict[str, str] | None, optional):
-                A mapping of column names to keys for sample.meta.
-                {[column]: [metadata_key]}
-            assay_meta_map (dict[str, str] | None, optional):
-                A mapping of column names to keys for assay.meta.
-                {[column]: [metadata_key]}
+
             qc_meta_map (dict[str, str] | None, optional):
                 A mapping of column names to keys for QC analysis.meta
-            default_reference_assembly_location (str | None, optional): _description_. Defaults to None.
-            default_sample_type (str | None, optional): _description_. Defaults to None.
-            default_sequencing (_type_, optional): _description_. Defaults to DefaultSequencing( seq_type='genome', technology='short-read', platform='illumina' ).
-            default_read_end_type (str | None, optional): _description_. Defaults to None.
-            default_read_length (str | int | None, optional): _description_. Defaults to None.
-            batch_number (str | None, optional): _description_. Defaults to None.
-            allow_extra_files_in_search_path (bool, optional): _description_. Defaults to False.
 
-        Raises:
-            ValueError: _description_
+            batch_number (str | None, optional): a batch number to assign to the samples
+            allow_extra_files_in_search_path (bool, optional):
+                Whether to allow files in the search path that are not in the manifest.
+                This could be useful to ensure that all files uploaded to some dir
+                are covered by the manifest, and there aren't extras.
         """
         super().__init__(
             path_prefix=None,
