@@ -18,14 +18,16 @@ from api.utils.db import (
 from api.utils.export import ExportType
 from db.python.filters import GenericFilter
 from db.python.layers.analysis import AnalysisLayer
+from db.python.layers.analysis_runner import AnalysisRunnerLayer
 from db.python.tables.analysis import AnalysisFilter
+from db.python.tables.analysis_runner import AnalysisRunnerFilter
 from db.python.tables.project import ProjectPermissionsTable
 from models.enums import AnalysisStatus
 from models.models.analysis import (
     Analysis,
-    AnalysisInternal,
     ProportionalDateTemporalMethod,
 )
+from models.models.analysis_runner import AnalysisRunner
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
     sequencing_group_id_format_list,
@@ -242,28 +244,30 @@ async def query_analyses(
 async def get_analysis_runner_log(
     project_names: list[str] = Query(None),  # type: ignore
     # author: str = None, # not implemented yet, uncomment when we do
-    output_dir: str = None,
-    ar_guid: str = None,
+    ar_guid: str | None = None,
     connection: Connection = get_projectless_db_connection,
-) -> list[AnalysisInternal]:
+) -> list[AnalysisRunner]:
     """
     Get log for the analysis-runner, useful for checking this history of analysis
     """
-    atable = AnalysisLayer(connection)
-    project_ids = None
-    if project_names:
-        pt = ProjectPermissionsTable(connection)
-        project_ids = await pt.get_project_ids_from_names_and_user(
-            connection.author, project_names, readonly=True
-        )
+    if not project_names:
+        raise ValueError('Must specify "project_names"')
 
-    results = await atable.get_analysis_runner_log(
-        project_ids=project_ids,
-        # author=author,
-        output_dir=output_dir,
-        ar_guid=ar_guid,
+    arlayer = AnalysisRunnerLayer(connection)
+    pt = ProjectPermissionsTable(connection)
+    projects = await pt.get_and_check_access_to_projects_for_names(
+        connection.author, project_names, readonly=True
     )
-    return [a.to_external() for a in results]
+    project_ids = [p.id for p in projects if p.id]
+    project_map = {p.id: p.name for p in projects if p.id and p.name}
+
+    results = await arlayer.query(
+        AnalysisRunnerFilter(
+            project=GenericFilter(in_=project_ids) if project_ids else None,
+            ar_guid=GenericFilter(eq=ar_guid) if ar_guid else None,
+        )
+    )
+    return [a.to_external(project_map=project_map) for a in results]
 
 
 @router.get(
