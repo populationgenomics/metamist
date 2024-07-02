@@ -23,10 +23,7 @@ from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.analysis_runner import AnalysisRunnerFilter
 from db.python.tables.project import ProjectPermissionsTable
 from models.enums import AnalysisStatus
-from models.models.analysis import (
-    Analysis,
-    ProportionalDateTemporalMethod,
-)
+from models.models.analysis import Analysis, ProportionalDateTemporalMethod
 from models.models.analysis_runner import AnalysisRunner
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
