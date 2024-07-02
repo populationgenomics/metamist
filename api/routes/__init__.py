@@ -8,6 +8,7 @@ from api.routes.family import router as family_router
 from api.routes.imports import router as import_router
 from api.routes.participant import router as participant_router
 from api.routes.project import router as project_router
+from api.routes.project_insights import router as project_insights_router
 from api.routes.sample import router as sample_router
 from api.routes.sequencing_groups import router as sequencing_groups_router
 from api.routes.web import router as web_router

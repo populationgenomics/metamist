@@ -11,6 +11,7 @@ from db.python.filters import GenericFilter
 from db.python.layers import (
     AssayLayer,
     ParticipantLayer,
+    ProjectInsightsLayer,
     SampleLayer,
     SequencingGroupLayer,
     WebLayer,
@@ -361,11 +362,14 @@ SINGLE_PARTICIPANT_QUERY_RESULT = ProjectParticipantGridResponse(
 class TestWeb(DbIsolatedTest):
     """Test web class containing web endpoints"""
 
+    maxDiff = None
+
     @run_as_sync
     async def setUp(self) -> None:
         super().setUp()
         self.webl = WebLayer(self.connection)
         self.partl = ParticipantLayer(self.connection)
+        self.pil = ProjectInsightsLayer(self.connection)
         self.sampl = SampleLayer(self.connection)
         self.seql = AssayLayer(self.connection)
 

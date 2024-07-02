@@ -38,6 +38,14 @@ from models.models.participant import (
     ParticipantUpsertInternal,
 )
 from models.models.project import Project, ProjectId
+from models.models.project_insights import (
+    AnalysisStats,
+    AnalysisStatsInternal,
+    ProjectInsightsDetails,
+    ProjectInsightsDetailsInternal,
+    ProjectInsightsSummary,
+    ProjectInsightsSummaryInternal,
+)
 from models.models.sample import (
     NestedSample,
     NestedSampleInternal,

@@ -73,6 +73,27 @@ async def update_project(
     )
 
 
+@router.patch('/{project}/members', operation_id='updateProjectMembers')
+async def update_project_members(
+    project: str,
+    members: list[str],
+    readonly: bool,
+    connection: Connection = get_projectless_db_connection,
+):
+    """
+    Update project members for specific read / write group.
+    Not that this is protected by access to a specific access group
+    """
+    ptable = ProjectPermissionsTable(connection)
+    await ptable.set_group_members(
+        group_name=ptable.get_project_group_name(project, readonly=readonly),
+        members=members,
+        author=connection.author,
+    )
+
+    return {'success': True}
+
+
 @router.delete('/{project}', operation_id='deleteProjectData')
 async def delete_project_data(
     project: str,
@@ -93,24 +114,3 @@ async def delete_project_data(
     )
 
     return {'success': success}
-
-
-@router.patch('/{project}/members', operation_id='updateProjectMembers')
-async def update_project_members(
-    project: str,
-    members: list[str],
-    readonly: bool,
-    connection: Connection = get_projectless_db_connection,
-):
-    """
-    Update project members for specific read / write group.
-    Not that this is protected by access to a specific access group
-    """
-    ptable = ProjectPermissionsTable(connection)
-    await ptable.set_group_members(
-        group_name=ptable.get_project_group_name(project, readonly=readonly),
-        members=members,
-        author=connection.author,
-    )
-
-    return {'success': True}
