@@ -75,7 +75,7 @@ QUERY_ALL_DATA = gql(
                         meta
                         type
                     }
-                    analyses {
+                    analyses(type: {in_: ["cram", "gvcf"]}) {
                         active
                         id
                         meta
@@ -506,9 +506,6 @@ def transfer_analyses(
             )
             existing_sgid = existing_sg.get('id') if existing_sg else None
             for analysis in sg['analyses']:
-                if analysis['type'] not in ['cram', 'gvcf']:
-                    # Currently the create_test_subset script only handles crams or gvcf files.
-                    continue
 
                 existing_analysis: dict = {}
                 if existing_sgid:
