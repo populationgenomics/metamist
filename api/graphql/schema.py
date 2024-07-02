@@ -522,7 +522,7 @@ class GraphQLAnalysis:
     active: bool
     meta: strawberry.scalars.JSON | None
 
-    _project_id: strawberry.Private[int]
+    project_id: strawberry.Private[int]
 
     @staticmethod
     def from_internal(internal: AnalysisInternal) -> 'GraphQLAnalysis':
@@ -536,7 +536,7 @@ class GraphQLAnalysis:
             timestamp_completed=internal.timestamp_completed,
             active=internal.active,
             meta=internal.meta,
-            _project_id=internal.project,
+            project_id=internal.project,
         )
 
     @strawberry.field
@@ -550,7 +550,7 @@ class GraphQLAnalysis:
     @strawberry.field
     async def project(self, info: Info, root: 'GraphQLAnalysis') -> GraphQLProject:
         loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
-        project = await loader.load(root._project_id)
+        project = await loader.load(root.project_id)
         return GraphQLProject.from_internal(project)
 
     @strawberry.field

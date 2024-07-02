@@ -409,7 +409,10 @@ WHERE a.id = :analysis_id
     ) -> List[dict[str, str]]:
         """Get (ext_sample_id, cram_path, internal_id) map"""
 
-        values: dict[str, Any] = {'project': project, 'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG}
+        values: dict[str, Any] = {
+            'project': project,
+            'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG,
+        }
         filters = [
             'a.active',
             'a.type = "cram"',
@@ -446,39 +449,6 @@ ORDER BY a.timestamp_completed DESC;
         rows = await self.connection.fetch_all(_query, values)
         # many per analysis
         return [dict(d) for d in rows]
-
-    async def get_analysis_runner_log(
-        self,
-        project_ids: List[int] = None,
-        # author: str = None,
-        output_dir: str = None,
-        ar_guid: str = None,
-    ) -> List[AnalysisInternal]:
-        """
-        Get log for the analysis-runner, useful for checking this history of analysis
-        """
-        values: dict[str, Any] = {}
-        wheres = [
-            "type = 'analysis-runner'",
-            'active',
-        ]
-        if project_ids:
-            wheres.append('project in :project_ids')
-            values['project_ids'] = project_ids
-
-        if output_dir:
-            wheres.append('(output = :output OR output LIKE :output_like)')
-            values['output'] = output_dir
-            values['output_like'] = f'%{output_dir}'
-
-        if ar_guid:
-            wheres.append('JSON_EXTRACT(meta, "$.ar_guid") = :ar_guid')
-            values['ar_guid'] = ar_guid
-
-        wheres_str = ' AND '.join(wheres)
-        _query = f'SELECT * FROM analysis WHERE {wheres_str}'
-        rows = await self.connection.fetch_all(_query, values)
-        return [AnalysisInternal.from_db(**dict(r)) for r in rows]
 
     # region STATS
 
