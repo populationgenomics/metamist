@@ -25,6 +25,7 @@ class DbBase:
         self.connection: databases.Database = connection.connection
         self.author = connection.author
         self.project = connection.project
+        self.project_id = connection.project_id
 
         if self.author is None:
             raise InternalError(f'Must provide author to {self.__class__.__name__}')

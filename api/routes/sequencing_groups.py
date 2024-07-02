@@ -5,11 +5,11 @@ from pydantic import BaseModel
 
 from api.utils.db import (
     Connection,
-    get_project_readonly_connection,
-    get_project_write_connection,
+    get_project_db_connection,
     get_projectless_db_connection,
 )
 from db.python.layers.sequencing_group import SequencingGroupLayer
+from models.models.project import FullWriteAccessRoles, ReadAccessRoles
 from models.models.sequencing_group import SequencingGroupUpsertInternal
 from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import (  # Sample,
@@ -42,7 +42,7 @@ async def get_sequencing_group(
 
 @router.get('/project/{project}', operation_id='getAllSequencingGroupIdsBySampleByType')
 async def get_all_sequencing_group_ids_by_sample_by_type(
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ) -> dict[str, dict[str, list[str]]]:
     """Creates a new sample, and returns the internal sample ID"""
     st = SequencingGroupLayer(connection)
@@ -60,7 +60,7 @@ async def get_all_sequencing_group_ids_by_sample_by_type(
 async def update_sequencing_group(
     sequencing_group_id: str,
     sequencing_group: SequencingGroupMetaUpdateModel,
-    connection: Connection = get_project_write_connection,
+    connection: Connection = get_project_db_connection(FullWriteAccessRoles),
 ) -> bool:
     """Update the meta fields of a sequencing group"""
     st = SequencingGroupLayer(connection)

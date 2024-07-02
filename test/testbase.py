@@ -17,7 +17,6 @@ from testcontainers.mysql import MySqlContainer
 
 from api.graphql.loaders import get_context  # type: ignore
 from api.graphql.schema import schema  # type: ignore
-from api.settings import set_all_access
 from db.python.connect import (
     TABLES_ORDERED_BY_FK_DEPS,
     Connection,
@@ -25,7 +24,7 @@ from db.python.connect import (
     SMConnections,
 )
 from db.python.tables.project import ProjectPermissionsTable
-from models.models.project import ProjectId
+from models.models.project import Project, ProjectId, ProjectMemberUpdate
 
 # use this to determine where the db directory is relatively,
 # as pycharm runs in "test/" folder, and GH runs them in git root
@@ -81,6 +80,8 @@ class DbTest(unittest.TestCase):
     author: str
     project_id: ProjectId
     project_name: str
+    project_id_map: dict[ProjectId, Project]
+    project_name_map: dict[str, Project]
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -94,9 +95,10 @@ class DbTest(unittest.TestCase):
 
             Then you can destroy the database within tearDownClass as all tests have been completed.
             """
+            # Set environment to test
+            os.environ['SM_ENVIRONMENT'] = 'test'
             logger = logging.getLogger()
             try:
-                set_all_access(True)
                 db = MySqlContainer('mariadb:11.2.2', password='test')
                 port_to_expose = find_free_port()
                 # override the default port to map the container to
@@ -141,23 +143,56 @@ class DbTest(unittest.TestCase):
                 formed_connection = Connection(
                     connection=sm_db,
                     author=cls.author,
-                    readonly=False,
+                    project_id_map={},
+                    project_name_map={},
                     on_behalf_of=None,
                     ar_guid=None,
                     project=None,
                 )
+
+                # Add the test user to the admin groups
+                await formed_connection.connection.execute(
+                    f"""
+                    INSERT INTO group_member(group_id, member)
+                    SELECT id, '{cls.author}'
+                    FROM `group` WHERE name IN('project-creators', 'members-admin')
+                """
+                )
+
                 ppt = ProjectPermissionsTable(
                     connection=formed_connection,
-                    allow_full_access=True,
                 )
                 cls.project_name = 'test'
                 cls.project_id = await ppt.create_project(
                     project_name=cls.project_name,
                     dataset_name=cls.project_name,
                     author=cls.author,
-                    check_permissions=False,
                 )
-                formed_connection.project = cls.project_id
+
+                _, initial_project_name_map = await ppt.get_projects_accessible_by_user(
+                    user=cls.author
+                )
+                created_project = initial_project_name_map.get(cls.project_name)
+                assert created_project
+
+                await ppt.set_project_members(
+                    project=created_project,
+                    members=[
+                        ProjectMemberUpdate(
+                            member=cls.author, roles=['reader', 'writer']
+                        )
+                    ],
+                )
+
+                # Get the new project map now that project membership is updated
+                project_id_map, project_name_map = (
+                    await ppt.get_projects_accessible_by_user(user=cls.author)
+                )
+
+                cls.project_id_map = project_id_map
+                cls.project_name_map = project_name_map
+
+                # formed_connection.project = cls.project_id
 
             except subprocess.CalledProcessError as e:
                 logging.exception(e)
@@ -189,9 +224,10 @@ class DbTest(unittest.TestCase):
         # audit_log ID for each test
         self.connection = Connection(
             connection=self._connection,
-            project=self.project_id,
+            project=self.project_id_map.get(self.project_id),
             author=self.author,
-            readonly=False,
+            project_id_map=self.project_id_map,
+            project_name_map=self.project_name_map,
             ar_guid=None,
             on_behalf_of=None,
         )
@@ -266,7 +302,13 @@ class DbIsolatedTest(DbTest):
 
     async def clear_database(self):
         """Clear the database of all data, except for project + group tables"""
-        ignore = {'DATABASECHANGELOG', 'DATABASECHANGELOGLOCK', 'project', 'group'}
+        ignore = {
+            'DATABASECHANGELOG',
+            'DATABASECHANGELOGLOCK',
+            'project',
+            'group',
+            'project-member',
+        }
         for table in TABLES_ORDERED_BY_FK_DEPS:
             if table in ignore:
                 continue

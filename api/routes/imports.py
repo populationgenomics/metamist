@@ -4,12 +4,13 @@ from typing import Optional
 
 from fastapi import APIRouter, File, UploadFile
 
-from api.utils.db import Connection, get_project_write_connection
+from api.utils.db import Connection, get_project_db_connection
 from api.utils.extensions import guess_delimiter_by_upload_file_obj
 from db.python.layers.participant import (
     ExtraParticipantImporterHandler,
     ParticipantLayer,
 )
+from models.models.project import FullWriteAccessRoles
 
 router = APIRouter(prefix='/import', tags=['import'])
 
@@ -23,7 +24,7 @@ async def import_individual_metadata_manifest(
     file: UploadFile = File(...),
     delimiter: Optional[str] = None,
     extra_participants_method: ExtraParticipantImporterHandler = ExtraParticipantImporterHandler.FAIL,
-    connection: Connection = get_project_write_connection,
+    connection: Connection = get_project_db_connection(FullWriteAccessRoles),
 ):
     """
     Import individual metadata manifest

@@ -59,7 +59,7 @@ class TestAssay(DbIsolatedTest):
 
         @run_as_sync
         async def get():
-            return await self.assaylayer.get_assay_by_id(-1, check_project_id=False)
+            return await self.assaylayer.get_assay_by_id(-1)
 
         self.assertRaises(NotFoundError, get)
 
@@ -84,9 +84,7 @@ class TestAssay(DbIsolatedTest):
             )
         )
 
-        assay = await self.assaylayer.get_assay_by_id(
-            assay_id=upserted_assay.id, check_project_id=False
-        )
+        assay = await self.assaylayer.get_assay_by_id(assay_id=upserted_assay.id)
 
         self.assertEqual(upserted_assay.id, assay.id)
         self.assertEqual(self.sample_id_raw, int(assay.sample_id))
@@ -475,9 +473,7 @@ class TestAssay(DbIsolatedTest):
             )
         )
 
-        update_assay = await self.assaylayer.get_assay_by_id(
-            assay_id=assay.id, check_project_id=False
-        )
+        update_assay = await self.assaylayer.get_assay_by_id(assay_id=assay.id)
 
         self.assertEqual(assay.id, update_assay.id)
         self.assertEqual(self.sample_id_raw, int(update_assay.sample_id))
@@ -506,8 +502,7 @@ class TestAssay(DbIsolatedTest):
 
         # cycle through all statuses, and check that works
         await self.assaylayer.upsert_assay(
-            AssayUpsertInternal(id=assay.id, type='metabolomics'),
-            check_project_id=False,
+            AssayUpsertInternal(id=assay.id, type='metabolomics')
         )
         row_to_check = await self.connection.connection.fetch_one(
             'SELECT type FROM assay WHERE id = :id',

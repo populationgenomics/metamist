@@ -6,7 +6,13 @@ from db.python.tables.project import (
     GROUP_NAME_PROJECT_CREATORS,
     ProjectPermissionsTable,
 )
-from db.python.utils import Forbidden, NotFoundError
+from db.python.utils import Forbidden
+from models.models.project import (
+    FullWriteAccessRoles,
+    ProjectMemberRole,
+    ProjectMemberUpdate,
+    ReadAccessRoles,
+)
 
 
 class TestGroupAccess(DbIsolatedTest):
@@ -20,9 +26,9 @@ class TestGroupAccess(DbIsolatedTest):
         super().setUp()
 
         # specifically required to test permissions
-        self.pttable = ProjectPermissionsTable(self.connection, False)
+        self.pttable = ProjectPermissionsTable(self.connection)
 
-    async def _add_group_member_direct(self, group_name):
+    async def _add_group_member_direct(self, group_name: str):
         """
         Helper method to directly add members to group with name
         """
@@ -41,87 +47,6 @@ class TestGroupAccess(DbIsolatedTest):
                 'audit_log_id': await self.audit_log_id(),
             },
         )
-
-    @run_as_sync
-    async def test_group_set_members_failed_no_permission(self):
-        """
-        Test that a user without permission cannot set members
-        """
-        with self.assertRaises(Forbidden):
-            await self.pttable.set_group_members(
-                'another-test-project', ['user1'], self.author
-            )
-
-    @run_as_sync
-    async def test_group_set_members_failed_not_exists(self):
-        """
-        Test that a user with permission, cannot set members
-        for a group that doesn't exist
-        """
-        await self._add_group_member_direct(GROUP_NAME_MEMBERS_ADMIN)
-        with self.assertRaises(NotFoundError):
-            await self.pttable.set_group_members(
-                'another-test-project', ['user1'], self.author
-            )
-
-    @run_as_sync
-    async def test_group_set_members_succeeded(self):
-        """
-        Test that a user with permission, can set members for a group that exists
-        """
-        await self._add_group_member_direct(GROUP_NAME_MEMBERS_ADMIN)
-
-        g = str(uuid.uuid4())
-        await self.pttable.gtable.create_group(g, await self.audit_log_id())
-
-        self.assertFalse(
-            await self.pttable.gtable.check_if_member_in_group_name(g, 'user1')
-        )
-        self.assertFalse(
-            await self.pttable.gtable.check_if_member_in_group_name(g, 'user2')
-        )
-
-        await self.pttable.set_group_members(
-            group_name=g, members=['user1', 'user2'], author=self.author
-        )
-
-        self.assertTrue(
-            await self.pttable.gtable.check_if_member_in_group_name(g, 'user1')
-        )
-        self.assertTrue(
-            await self.pttable.gtable.check_if_member_in_group_name(g, 'user2')
-        )
-
-    @run_as_sync
-    async def test_check_which_groups_member_is_missing(self):
-        """Test the check_which_groups_member_has function"""
-        await self._add_group_member_direct(GROUP_NAME_MEMBERS_ADMIN)
-
-        group = str(uuid.uuid4())
-        gid = await self.pttable.gtable.create_group(group, await self.audit_log_id())
-        present_gids = await self.pttable.gtable.check_which_groups_member_has(
-            {gid}, self.author
-        )
-        missing_gids = {gid} - present_gids
-        self.assertEqual(1, len(missing_gids))
-        self.assertEqual(gid, missing_gids.pop())
-
-    @run_as_sync
-    async def test_check_which_groups_member_is_missing_none(self):
-        """Test the check_which_groups_member_has function"""
-        await self._add_group_member_direct(GROUP_NAME_MEMBERS_ADMIN)
-
-        group = str(uuid.uuid4())
-        gid = await self.pttable.gtable.create_group(group, await self.audit_log_id())
-        await self.pttable.gtable.set_group_members(
-            gid, [self.author], audit_log_id=await self.audit_log_id()
-        )
-        present_gids = await self.pttable.gtable.check_which_groups_member_has(
-            group_ids={gid}, member=self.author
-        )
-        missing_gids = {gid} - present_gids
-
-        self.assertEqual(0, len(missing_gids))
 
     @run_as_sync
     async def test_project_creators_failed(self):
@@ -145,11 +70,13 @@ class TestGroupAccess(DbIsolatedTest):
         project_id = await self.pttable.create_project(g, g, self.author)
 
         # pylint: disable=protected-access
-        project = await self.pttable._get_project_by_id(project_id)
+        project_id_map, _ = await self.pttable.get_projects_accessible_by_user(
+            user=self.author
+        )
 
-        # test that the group names make sense
-        self.assertIsNotNone(project.read_group_id)
-        self.assertIsNotNone(project.write_group_id)
+        project = project_id_map.get(project_id)
+        assert project
+        self.assertEqual(project.name, g)
 
 
 class TestProjectAccess(DbIsolatedTest):
@@ -161,9 +88,12 @@ class TestProjectAccess(DbIsolatedTest):
         super().setUp()
 
         # specifically required to test permissions
-        self.pttable = ProjectPermissionsTable(self.connection, False)
+        self.pttable = ProjectPermissionsTable(self.connection)
 
-    async def _add_group_member_direct(self, group_name):
+    async def _add_group_member_direct(
+        self,
+        group_name: str,
+    ):
         """
         Helper method to directly add members to group with name
         """
@@ -193,13 +123,13 @@ class TestProjectAccess(DbIsolatedTest):
 
         project_id = await self.pttable.create_project(g, g, self.author)
         with self.assertRaises(Forbidden):
-            await self.pttable.get_and_check_access_to_project_for_id(
-                user=self.author, project_id=project_id, readonly=True
+            self.connection.check_access_to_projects_for_ids(
+                project_ids=[project_id], allowed_roles=ReadAccessRoles
             )
 
         with self.assertRaises(Forbidden):
-            await self.pttable.get_and_check_access_to_project_for_name(
-                user=self.author, project_name=g, readonly=True
+            self.connection.get_and_check_access_to_projects_for_names(
+                project_names=[g], allowed_roles=ReadAccessRoles
             )
 
     @run_as_sync
@@ -213,21 +143,64 @@ class TestProjectAccess(DbIsolatedTest):
         g = str(uuid.uuid4())
 
         pid = await self.pttable.create_project(g, g, self.author)
-        await self.pttable.set_group_members(
-            group_name=self.pttable.get_project_group_name(g, readonly=True),
-            members=[self.author],
-            author=self.author,
+
+        project_id_map, _ = await self.pttable.get_projects_accessible_by_user(
+            user=self.author
+        )
+        project = project_id_map.get(pid)
+        assert project
+        await self.pttable.set_project_members(
+            project=project,
+            members=[ProjectMemberUpdate(member=self.author, roles=['reader'])],
         )
 
-        project_for_id = await self.pttable.get_and_check_access_to_project_for_id(
-            user=self.author, project_id=pid, readonly=True
+        project_for_id = self.connection.get_and_check_access_to_projects_for_ids(
+            project_ids=[pid], allowed_roles=ReadAccessRoles
         )
-        self.assertEqual(pid, project_for_id.id)
+        user_project_for_id = next(p for p in project_for_id)
+        self.assertEqual(pid, user_project_for_id.id)
 
-        project_for_name = await self.pttable.get_and_check_access_to_project_for_name(
-            user=self.author, project_name=g, readonly=True
+        project_for_name = self.connection.get_and_check_access_to_projects_for_names(
+            project_names=[g], allowed_roles=ReadAccessRoles
         )
-        self.assertEqual(pid, project_for_name.id)
+        user_project_for_name = next(p for p in project_for_name)
+        self.assertEqual(g, user_project_for_name.name)
+
+    @run_as_sync
+    async def test_project_access_insufficient(self):
+        """
+        Test that a user with access to a project will be disallowed if their access is
+        not sufficient
+        """
+        await self._add_group_member_direct(GROUP_NAME_PROJECT_CREATORS)
+        await self._add_group_member_direct(GROUP_NAME_MEMBERS_ADMIN)
+
+        g = str(uuid.uuid4())
+
+        pid = await self.pttable.create_project(g, g, self.author)
+
+        project_id_map, _ = await self.pttable.get_projects_accessible_by_user(
+            user=self.author
+        )
+        project = project_id_map.get(pid)
+        assert project
+        # Give the user read access to the project
+        await self.pttable.set_project_members(
+            project=project,
+            members=[ProjectMemberUpdate(member=self.author, roles=['reader'])],
+        )
+
+        # But require Write access
+
+        with self.assertRaises(Forbidden):
+            self.connection.check_access_to_projects_for_ids(
+                project_ids=[project.id], allowed_roles=FullWriteAccessRoles
+            )
+
+        with self.assertRaises(Forbidden):
+            self.connection.get_and_check_access_to_projects_for_names(
+                project_names=[g], allowed_roles=FullWriteAccessRoles
+            )
 
     @run_as_sync
     async def test_get_my_projects(self):
@@ -241,15 +214,27 @@ class TestProjectAccess(DbIsolatedTest):
 
         pid = await self.pttable.create_project(g, g, self.author)
 
-        await self.pttable.set_group_members(
-            group_name=self.pttable.get_project_group_name(g, readonly=True),
-            members=[self.author],
-            author=self.author,
+        project_id_map, _ = await self.pttable.get_projects_accessible_by_user(
+            user=self.author
+        )
+        project = project_id_map.get(pid)
+        assert project
+        # Give the user read access to the project
+        await self.pttable.set_project_members(
+            project=project,
+            members=[ProjectMemberUpdate(member=self.author, roles=['contributor'])],
         )
 
-        projects = await self.pttable.get_projects_accessible_by_user(
-            author=self.author
+        project_id_map, project_name_map = (
+            await self.pttable.get_projects_accessible_by_user(user=self.author)
         )
 
-        self.assertEqual(1, len(projects))
-        self.assertEqual(pid, projects[0].id)
+        # Get projects with at least a read access role
+        my_projects = self.connection.projects_with_role(
+            {ProjectMemberRole.contributor}
+        )
+        print(my_projects)
+
+        self.assertEqual(len(project_id_map), len(project_name_map))
+        self.assertEqual(len(my_projects), 1)
+        self.assertEqual(pid, my_projects[0].id)

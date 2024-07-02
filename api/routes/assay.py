@@ -2,14 +2,17 @@
 
 from fastapi import APIRouter
 
-from api.utils import get_project_readonly_connection
-from api.utils.db import Connection, get_projectless_db_connection
+from api.utils.db import (
+    Connection,
+    get_project_db_connection,
+    get_projectless_db_connection,
+)
 from db.python.filters import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.tables.assay import AssayFilter
-from db.python.tables.project import ProjectPermissionsTable
 from models.base import SMBase
 from models.models.assay import AssayUpsert
+from models.models.project import ReadAccessRoles
 from models.utils.sample_id_format import sample_id_transform_to_raw_list
 
 router = APIRouter(prefix='/assay', tags=['assay'])
@@ -53,7 +56,8 @@ async def get_assay_by_id(
     '/{project}/external_id/{external_id}/details', operation_id='getAssayByExternalId'
 )
 async def get_assay_by_external_id(
-    external_id: str, connection=get_project_readonly_connection
+    external_id: str,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """Get an assay by ONE of its external identifiers"""
     assay_layer = AssayLayer(connection)
@@ -80,13 +84,13 @@ async def get_assays_by_criteria(
 ):
     """Get assays by criteria"""
     assay_layer = AssayLayer(connection)
-    pt = ProjectPermissionsTable(connection)
 
     pids: list[int] | None = None
     if criteria.projects:
-        pids = await pt.get_project_ids_from_names_and_user(
-            connection.author, criteria.projects, readonly=True
+        project_list = connection.get_and_check_access_to_projects_for_names(
+            criteria.projects, allowed_roles=ReadAccessRoles
         )
+        pids = [p.id for p in project_list]
 
     unwrapped_sample_ids: list[int] | None = None
     if criteria.sample_ids:

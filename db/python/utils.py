@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import re
-from typing import Sequence, TypeVar
+from typing import Any, TypeVar
 
 T = TypeVar('T')
 X = TypeVar('X')
@@ -60,20 +60,18 @@ class NoProjectAccess(Forbidden):
 
     def __init__(
         self,
-        project_names: Sequence[str] | None,
+        project_names: list[str],
         author: str,
-        *args,
-        readonly: bool | None = None,
+        allowed_roles: list[str],
+        *args: tuple[Any, ...],
     ):
         project_names_str = (
             ', '.join(repr(p) for p in project_names) if project_names else ''
         )
-        access_type = ''
-        if readonly is False:
-            access_type = 'write '
+        required_roles_str = ' or '.join(allowed_roles)
 
         super().__init__(
-            f'{author} does not have {access_type}access to resources from the '
+            f'{author} does not have {required_roles_str} access to resources from the '
             f'following project(s), or they may not exist: {project_names_str}',
             *args,
         )
@@ -108,9 +106,13 @@ def get_logger():
     return _logger
 
 
+def from_db_json(text):
+    """Convert DB's JSON text to Python object"""
+    return json.loads(text)
+
+
 def to_db_json(val):
     """Convert val to json for DB"""
-    # return psycopg2.extras.Json(val)
     return json.dumps(val)
 
 

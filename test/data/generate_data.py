@@ -3,7 +3,9 @@
 import argparse
 import asyncio
 import datetime
+import os
 import random
+import sys
 from pathlib import Path
 from pprint import pprint
 from uuid import uuid4
@@ -76,6 +78,19 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
         await papi.create_project_async(
             name=project, dataset=project, create_test_project=False
         )
+        default_user = os.getenv('SM_LOCALONLY_DEFAULTUSER')
+        if not default_user:
+            print(
+                'SM_LOCALONLY_DEFAULTUSER env var is not set, please set it before generating data'
+            )
+            sys.exit(1)
+
+        await papi.update_project_members_async(
+            project=project,
+            project_member_update=[
+                {'member': default_user, 'roles': ['reader', 'writer']}
+            ],
+        )
 
     with open(ped_path, encoding='utf-8') as f:
         # skip the first line
@@ -108,7 +123,7 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
         )[0]
 
     samples = []
-    sample_id_index = 1003
+    sample_id_index = 10000
 
     for participant_eid in participant_eids:
         pid = id_map[participant_eid]

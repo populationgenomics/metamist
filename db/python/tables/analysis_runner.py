@@ -84,7 +84,7 @@ VALUES (
             'meta': to_db_json(analysis_runner.meta),
             'output_path': analysis_runner.output_path,
             'audit_log_id': await self.audit_log_id(),
-            'project': self.project,
+            'project': self.project_id,
         }
 
         await self.connection.execute(_query, values)

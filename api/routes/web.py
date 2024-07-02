@@ -14,8 +14,7 @@ from fastapi.responses import StreamingResponse
 
 from api.utils.db import (
     Connection,
-    get_project_readonly_connection,
-    get_project_write_connection,
+    get_project_db_connection,
     get_projectless_db_connection,
 )
 from api.utils.export import ExportType
@@ -23,10 +22,10 @@ from db.python.filters.web import ProjectParticipantGridFilter
 from db.python.layers.search import SearchLayer
 from db.python.layers.seqr import SeqrLayer
 from db.python.layers.web import WebLayer
-from db.python.tables.project import ProjectPermissionsTable
 from models.base import SMBase
 from models.enums.web import MetaSearchEntityPrefix, SeqrDatasetType
 from models.models.participant import NestedParticipant
+from models.models.project import FullWriteAccessRoles, ReadAccessRoles
 from models.models.search import SearchResponse
 from models.models.web import (
     ProjectParticipantGridField,
@@ -50,7 +49,7 @@ router = APIRouter(prefix='/web', tags=['web'])
     operation_id='getProjectSummary',
 )
 async def get_project_summary(
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ) -> ProjectSummary:
     """Creates a new sample, and returns the internal sample ID"""
     st = WebLayer(connection)
@@ -66,7 +65,7 @@ async def get_project_summary(
     operation_id='getProjectParticipantsFilterSchema',
 )
 async def get_project_project_participants_filter_schema(
-    _=get_project_readonly_connection,
+    _=get_project_db_connection(ReadAccessRoles),
 ):
     """Get project summary (from query) with some limit"""
     return ProjectParticipantGridFilter.model_json_schema()
@@ -81,15 +80,15 @@ async def get_project_participants_grid_with_limit(
     limit: int,
     query: ProjectParticipantGridFilter,
     skip: int = 0,
-    connection=get_project_readonly_connection,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """Get project summary (from query) with some limit"""
 
-    if not connection.project:
+    if not connection.project_id:
         raise ValueError('No project was detected through the authentication')
 
     wlayer = WebLayer(connection)
-    pfilter = query.to_internal(project=connection.project)
+    pfilter = query.to_internal(project=connection.project_id)
 
     participants, pcount = await asyncio.gather(
         wlayer.query_participants(pfilter, limit=limit, skip=skip),
@@ -117,15 +116,15 @@ async def export_project_participants(
     export_type: ExportType,
     query: ProjectParticipantGridFilter,
     fields: ExportProjectParticipantFields | None = None,
-    connection=get_project_readonly_connection,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """Get project summary (from query) with some limit"""
 
-    if not connection.project:
+    if not connection.project_id:
         raise ValueError('No project was detected through the authentication')
 
     wlayer = WebLayer(connection)
-    pfilter = query.to_internal(project=connection.project)
+    pfilter = query.to_internal(project=connection.project_id)
 
     participants_internal = await wlayer.query_participants(pfilter, limit=None)
     participants = [p.to_external() for p in participants_internal]
@@ -251,15 +250,15 @@ def prepare_participants_for_export(
 @router.get(
     '/search', response_model=SearchResponseModel, operation_id='searchByKeyword'
 )
-async def search_by_keyword(keyword: str, connection=get_projectless_db_connection):
+async def search_by_keyword(
+    keyword: str, connection: Connection = get_projectless_db_connection
+):
     """
     This searches the keyword, in families, participants + samples in the projects
     that you are a part of (automatically).
     """
-    pt = ProjectPermissionsTable(connection)
-    projects = await pt.get_projects_accessible_by_user(
-        connection.author, readonly=True
-    )
+    # raise ValueError("Test")
+    projects = connection.all_projects()
     pmap = {p.id: p for p in projects}
     responses = await SearchLayer(connection).search(
         keyword, project_ids=[p for p in pmap.keys() if p]
@@ -289,7 +288,7 @@ async def sync_seqr_project(
     sync_saved_variants: bool = True,
     sync_cram_map: bool = True,
     post_slack_notification: bool = True,
-    connection=get_project_write_connection,
+    connection: Connection = get_project_db_connection(FullWriteAccessRoles),
 ):
     """
     Sync a metamist project with its seqr project (for a specific sequence type)

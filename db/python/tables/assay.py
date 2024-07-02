@@ -139,12 +139,12 @@ class AssayTable(DbBase):
         self, external_sequence_id: str, project: ProjectId | None = None
     ) -> AssayInternal:
         """Get assay by EXTERNAL ID"""
-        if not (project or self.project):
+        if not (project or self.project_id):
             raise ValueError('Getting assay by external ID requires a project')
 
         f = AssayFilter(
             external_id=GenericFilter(eq=external_sequence_id),
-            project=GenericFilter(eq=project or self.project),
+            project=GenericFilter(eq=project or self.project_id),
         )
 
         _, assays = await self.query(f)
@@ -328,7 +328,7 @@ class AssayTable(DbBase):
             )
 
             if external_ids:
-                _project = project or self.project
+                _project = project or self.project_id
                 if not _project:
                     raise ValueError(
                         'When inserting an external identifier for a sequence, a '
@@ -343,7 +343,7 @@ class AssayTable(DbBase):
                 audit_log_id = await self.audit_log_id()
                 eid_values = [
                     {
-                        'project': project or self.project,
+                        'project': project or self.project_id,
                         'assay_id': id_of_new_assay,
                         'external_id': eid,
                         'name': name.lower(),
@@ -422,7 +422,7 @@ class AssayTable(DbBase):
             await self.connection.execute(_query, fields)
 
             if external_ids:
-                _project = project or self.project
+                _project = project or self.project_id
                 if not _project:
                     raise ValueError(
                         'When inserting or updating an external identifier for an '

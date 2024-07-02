@@ -2,6 +2,7 @@ from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.tables.analysis_runner import AnalysisRunnerFilter, AnalysisRunnerTable
 from models.models.analysis_runner import AnalysisRunnerInternal
+from models.models.project import ReadAccessRoles
 
 
 class AnalysisRunnerLayer(BaseLayer):
@@ -15,19 +16,18 @@ class AnalysisRunnerLayer(BaseLayer):
     # GETS
 
     async def query(
-        self, filter_: AnalysisRunnerFilter, check_project_ids: bool = True
+        self, filter_: AnalysisRunnerFilter
     ) -> list[AnalysisRunnerInternal]:
         """Get analysis runner logs"""
         logs = await self.at.query(filter_)
         if not logs:
             return []
 
-        if check_project_ids:
-            project_ids = set(log.project for log in logs)
+        project_ids = set(log.project for log in logs)
 
-            await self.ptable.check_access_to_project_ids(
-                self.author, project_ids, readonly=True
-            )
+        self.connection.check_access_to_projects_for_ids(
+            project_ids, allowed_roles=ReadAccessRoles
+        )
 
         return logs
 

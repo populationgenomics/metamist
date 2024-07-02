@@ -9,11 +9,10 @@ from fastapi import APIRouter, File, Query, UploadFile
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
-from api.utils import get_projectless_db_connection
 from api.utils.db import (
     Connection,
-    get_project_readonly_connection,
-    get_project_write_connection,
+    get_project_db_connection,
+    get_projectless_db_connection,
 )
 from api.utils.export import ExportType
 from api.utils.extensions import guess_delimiter_by_upload_file_obj
@@ -21,6 +20,7 @@ from db.python.filters import GenericFilter
 from db.python.layers.family import FamilyLayer, PedRow
 from db.python.tables.family import FamilyFilter
 from models.models.family import Family
+from models.models.project import FullWriteAccessRoles, ReadAccessRoles
 from models.utils.sample_id_format import sample_id_transform_to_raw_list
 
 router = APIRouter(prefix='/family', tags=['family'])
@@ -41,7 +41,7 @@ async def import_pedigree(
     has_header: bool = False,
     create_missing_participants: bool = False,
     perform_sex_check: bool = True,
-    connection: Connection = get_project_write_connection,
+    connection: Connection = get_project_db_connection(FullWriteAccessRoles),
 ):
     """Import a pedigree"""
     delimiter = guess_delimiter_by_upload_file_obj(file)
@@ -75,7 +75,7 @@ async def get_pedigree(
     replace_with_family_external_ids: bool = True,
     include_header: bool = True,
     empty_participant_value: Optional[str] = None,
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
     include_participants_not_in_families: bool = False,
 ):
     """
@@ -87,9 +87,9 @@ async def get_pedigree(
     """
 
     family_layer = FamilyLayer(connection)
-    assert connection.project
+    assert connection.project_id
     pedigree_dicts = await family_layer.get_pedigree(
-        project=connection.project,
+        project=connection.project_id,
         family_ids=internal_family_ids,
         replace_with_participant_external_ids=replace_with_participant_external_ids,
         replace_with_family_external_ids=replace_with_family_external_ids,
@@ -120,7 +120,7 @@ async def get_pedigree(
     ]
     writer.writerows(pedigree_rows)
 
-    basefn = f'{connection.project}-{date.today().isoformat()}'
+    basefn = f'{connection.project_id}-{date.today().isoformat()}'
 
     if internal_family_ids:
         basefn += '-'.join(str(fm) for fm in internal_family_ids)
@@ -142,7 +142,7 @@ async def get_pedigree(
 async def get_families(
     participant_ids: Optional[List[int]] = Query(None),
     sample_ids: Optional[List[str]] = Query(None),
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ) -> List[Family]:
     """Get families for some project"""
     family_layer = FamilyLayer(connection)
@@ -182,7 +182,7 @@ async def import_families(
     file: UploadFile = File(...),
     has_header: bool = True,
     delimiter: str | None = None,
-    connection: Connection = get_project_write_connection,
+    connection: Connection = get_project_db_connection(FullWriteAccessRoles),
 ):
     """Import a family csv"""
     delimiter = guess_delimiter_by_upload_file_obj(file, default_delimiter=delimiter)

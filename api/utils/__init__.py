@@ -1,14 +1,7 @@
 """Importing GCP libraries"""
+
 from collections import defaultdict
 from typing import Callable, Iterable, TypeVar
-
-from .db import (
-    authenticate,
-    get_project_readonly_connection,
-    get_project_write_connection,
-    get_projectless_db_connection,
-)
-from .openapi import get_openapi_schema_func
 
 T = TypeVar('T')
 X = TypeVar('X')

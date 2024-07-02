@@ -4,6 +4,7 @@ from collections import defaultdict
 from enum import Enum
 from typing import Any
 
+from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers.base import BaseLayer
 from db.python.layers.sample import SampleLayer
@@ -16,9 +17,10 @@ from db.python.tables.participant import ParticipantFilter, ParticipantTable
 from db.python.tables.participant_phenotype import ParticipantPhenotypeTable
 from db.python.tables.sample import SampleTable
 from db.python.utils import NoOpAenter, NotFoundError, split_generic_terms
-from models.models import PRIMARY_EXTERNAL_ORG, ProjectId
+from models.models import PRIMARY_EXTERNAL_ORG
 from models.models.family import PedRowInternal
 from models.models.participant import ParticipantInternal, ParticipantUpsertInternal
+from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
 
 HPO_REGEX_MATCHER = re.compile(r'HP\:\d+$')
 
@@ -234,7 +236,7 @@ class SeqrMetadataKeys(Enum):
 class ParticipantLayer(BaseLayer):
     """Layer for more complex sample logic"""
 
-    def __init__(self, connection):
+    def __init__(self, connection: Connection):
         super().__init__(connection)
         self.pttable = ParticipantTable(connection=connection)
 
@@ -243,7 +245,6 @@ class ParticipantLayer(BaseLayer):
         filter_: ParticipantFilter,
         limit: int | None = None,
         skip: int | None = None,
-        check_project_ids: bool = True,
     ) -> list[ParticipantInternal]:
         """
         Query participants from the database, heavy lifting done by the filter
@@ -255,10 +256,9 @@ class ParticipantLayer(BaseLayer):
         if not participants:
             return []
 
-        if check_project_ids:
-            await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
-            )
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=ReadAccessRoles
+        )
 
         return participants
 
@@ -283,7 +283,6 @@ class ParticipantLayer(BaseLayer):
     async def get_participants_by_ids(
         self,
         pids: list[int],
-        check_project_ids: bool = True,
         allow_missing: bool = False,
     ) -> list[ParticipantInternal]:
         """
@@ -295,10 +294,9 @@ class ParticipantLayer(BaseLayer):
         if not participants:
             return []
 
-        if check_project_ids:
-            await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
-            )
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=ReadAccessRoles
+        )
 
         if not allow_missing and len(participants) != len(pids):
             # participants are missing
@@ -336,7 +334,7 @@ class ParticipantLayer(BaseLayer):
         # { external_id: internal_id }
         samples_with_no_pid = (
             await sample_table.get_samples_with_missing_participants_by_internal_id(
-                project=self.connection.project
+                project=self.connection.project_id
             )
         )
         external_sample_map_with_no_pid = {
@@ -351,7 +349,7 @@ class ParticipantLayer(BaseLayer):
 
         unlinked_participants = await self.get_id_map_by_external_ids(
             list(external_sample_map_with_no_pid.keys()),
-            project=self.connection.project,
+            project=self.connection.project_id,
             allow_missing=True,
         )
 
@@ -442,10 +440,10 @@ class ParticipantLayer(BaseLayer):
             allow_missing_participants = (
                 extra_participants_method != ExtraParticipantImporterHandler.FAIL
             )
-            assert self.connection.project
+            assert self.connection.project_id
             external_pid_map = await self.get_id_map_by_external_ids(
                 list(external_participant_ids),
-                project=self.connection.project,
+                project=self.connection.project_id,
                 allow_missing=allow_missing_participants,
             )
             if extra_participants_method == ExtraParticipantImporterHandler.ADD:
@@ -459,7 +457,7 @@ class ParticipantLayer(BaseLayer):
                         reported_gender=None,
                         karyotype=None,
                         meta=None,
-                        project=self.connection.project,
+                        project=self.connection.project_id,
                     )
             elif extra_participants_method == ExtraParticipantImporterHandler.IGNORE:
                 rows = [
@@ -492,7 +490,7 @@ class ParticipantLayer(BaseLayer):
             fmap_by_internal = await ftable.get_id_map_by_internal_ids(list(fids))
             fmap_from_external = await ftable.get_id_map_by_external_ids(
                 list(external_family_ids),
-                project=self.connection.project,
+                project=self.connection.project_id,
                 allow_missing=True,
             )
             fmap_by_external = {
@@ -565,7 +563,7 @@ class ParticipantLayer(BaseLayer):
             return True
 
     async def get_participants_by_families(
-        self, family_ids: list[int], check_project_ids: bool = True
+        self, family_ids: list[int]
     ) -> dict[int, list[ParticipantInternal]]:
         """Get participants, keyed by family ID"""
         projects, family_map = await self.pttable.get_participants_by_families(
@@ -574,10 +572,9 @@ class ParticipantLayer(BaseLayer):
         if not family_map:
             return {}
 
-        if check_project_ids:
-            await self.ptable.check_access_to_project_ids(
-                self.connection.author, projects, readonly=True
-            )
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=ReadAccessRoles
+        )
 
         return family_map
 
@@ -625,7 +622,6 @@ class ParticipantLayer(BaseLayer):
         self,
         participant: ParticipantUpsertInternal,
         project: ProjectId = None,
-        check_project_id: bool = True,
         open_transaction=True,
     ) -> ParticipantUpsertInternal:
         """Create a single participant"""
@@ -637,16 +633,13 @@ class ParticipantLayer(BaseLayer):
 
         async with with_function():
             if participant.id:
-                if check_project_id:
-                    project_ids = (
-                        await self.pttable.get_project_ids_for_participant_ids(
-                            [participant.id]
-                        )
-                    )
+                project_ids = await self.pttable.get_project_ids_for_participant_ids(
+                    [participant.id]
+                )
 
-                    await self.ptable.check_access_to_project_ids(
-                        self.connection.author, project_ids, readonly=False
-                    )
+                self.connection.check_access_to_projects_for_ids(
+                    project_ids, allowed_roles=FullWriteAccessRoles
+                )
                 await self.pttable.update_participant(
                     participant_id=participant.id,
                     external_ids=participant.external_ids,
@@ -674,7 +667,6 @@ class ParticipantLayer(BaseLayer):
                 await slayer.upsert_samples(
                     participant.samples,
                     project=project,
-                    check_project_id=False,
                     open_transaction=False,
                 )
 
@@ -700,16 +692,15 @@ class ParticipantLayer(BaseLayer):
         return participants
 
     async def update_many_participant_external_ids(
-        self, internal_to_external_id: dict[int, str], check_project_ids=True
+        self, internal_to_external_id: dict[int, str]
     ):
         """Update many participant external ids"""
-        if check_project_ids:
-            projects = await self.pttable.get_project_ids_for_participant_ids(
-                list(internal_to_external_id.keys())
-            )
-            await self.ptable.check_access_to_project_ids(
-                user=self.author, project_ids=projects, readonly=False
-            )
+        projects = await self.pttable.get_project_ids_for_participant_ids(
+            list(internal_to_external_id.keys())
+        )
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=FullWriteAccessRoles
+        )
 
         return await self.pttable.update_many_participant_external_ids(
             internal_to_external_id
@@ -749,12 +740,12 @@ class ParticipantLayer(BaseLayer):
         internal_to_external_fid_map = {}
 
         if external_participant_ids or internal_participant_ids:
-            assert self.connection.project
+            assert self.connection.project_id
             pids = set(internal_participant_ids or [])
             if external_participant_ids:
                 pid_map = await self.get_id_map_by_external_ids(
                     external_participant_ids,
-                    project=self.connection.project,
+                    project=self.connection.project_id,
                     allow_missing=False,
                 )
                 pids |= set(pid_map.values())
@@ -822,7 +813,7 @@ class ParticipantLayer(BaseLayer):
         }
 
     async def get_family_participant_data(
-        self, family_id: int, participant_id: int, check_project_ids: bool = True
+        self, family_id: int, participant_id: int
     ) -> PedRowInternal:
         """Gets the family_participant row for a specific participant"""
         fptable = FamilyParticipantTable(self.connection)
@@ -838,10 +829,10 @@ class ParticipantLayer(BaseLayer):
                 f'Family participant row (family_id: {family_id}, '
                 f'participant_id: {participant_id}) not found'
             )
-        if check_project_ids:
-            await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
-            )
+
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=ReadAccessRoles
+        )
 
         return rows[0]
 
@@ -991,10 +982,9 @@ class ParticipantLayer(BaseLayer):
         )
         ftable = FamilyTable(self.connection)
         fprojects = await ftable.get_projects_by_family_ids(family_ids=family_ids)
-        return await self.ptable.check_access_to_project_ids(
-            self.connection.author,
-            list(pprojects | fprojects),
-            readonly=True,
+
+        return self.connection.check_access_to_projects_for_ids(
+            list(pprojects | fprojects), allowed_roles=ReadAccessRoles
         )
 
     async def update_participant_family(
