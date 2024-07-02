@@ -14,18 +14,12 @@ from io import StringIO
 from typing import (
     Any,
     Coroutine,
-    Dict,
     Hashable,
     Iterable,
     Iterator,
-    List,
     Match,
-    Optional,
     Sequence,
-    Set,
-    Tuple,
     TypeVar,
-    Union,
 )
 
 from cloudpathlib import AnyPath
@@ -79,8 +73,8 @@ rmatch_str = (
     + '$))'
 )
 rmatch = re.compile(rmatch_str)
-SingleRow = Dict[str, Any]
-GroupedRow = List[SingleRow]
+SingleRow = dict[str, Any]
+GroupedRow = list[SingleRow]
 
 T = TypeVar('T')
 
@@ -144,13 +138,13 @@ query GetSampleEidMapQuery($project: String!) {
 
 
 class CustomDictReader(csv.DictReader):
-    """csv.DictReader that strips whitespace off headers"""
+    """csv.dictReader that strips whitespace off headers"""
 
     def __init__(
         self,
         *args,
         key_map=None,
-        required_keys: Iterable[str] = None,
+        required_keys: Iterable[str] | None = None,
         ignore_extra_keys=False,
         **kwargs,
     ):
@@ -190,6 +184,22 @@ class CustomDictReader(csv.DictReader):
         return fieldname.strip()
 
 
+def prepare_external_ids(
+    primary_external_id: str, external_ids: dict[str, str]
+) -> dict[str, str]:
+    """Prepare external IDs"""
+    new_external_ids = dict(external_ids or {})
+
+    if primary_external_id in new_external_ids.values():
+        raise ValueError(
+            f'Primary external ID {primary_external_id!r} already exists in external IDs'
+        )
+
+    new_external_ids[PRIMARY_EXTERNAL_ORG] = primary_external_id
+
+    return new_external_ids
+
+
 class ParsedParticipant:
     """Class for holding participant metadata grouped by id"""
 
@@ -198,15 +208,17 @@ class ParsedParticipant:
         rows: GroupedRow,
         internal_pid: int | None,
         external_pid: str,
-        meta: Dict[str, Any],
-        reported_sex,
-        reported_gender,
-        karyotype,
+        meta: dict[str, Any],
+        reported_sex: int | None,
+        reported_gender: str | None,
+        karyotype: str | None,
+        external_pids: dict[str, str] | None = None,
     ):
         self.rows = rows
 
         self.internal_pid = internal_pid
         self.external_pid = external_pid
+        self.external_pids = external_pids or {}
 
         self.reported_sex = reported_sex
         self.reported_gender = reported_gender
@@ -220,7 +232,7 @@ class ParsedParticipant:
         samples = [s.to_sm() for s in self.samples]
         return ParticipantUpsert(
             id=self.internal_pid,
-            external_ids={PRIMARY_EXTERNAL_ORG: self.external_pid},
+            external_ids=prepare_external_ids(self.external_pid, self.external_pids),
             reported_sex=self.reported_sex,
             reported_gender=self.reported_gender,
             karyotype=self.karyotype,
@@ -239,13 +251,16 @@ class ParsedSample:
         internal_sid: str | None,
         external_sid: str,
         sample_type: str,
-        meta: Dict[str, Any] | None = None,
+        meta: dict[str, Any] | None = None,
+        external_sids: dict[str, str] | None = None,
     ):
         self.participant = participant
         self.rows = rows
 
         self.internal_sid = internal_sid
         self.external_sid = external_sid
+        self.external_sids = external_sids or {}
+
         self.sample_type = sample_type
         self.meta = meta
 
@@ -256,7 +271,7 @@ class ParsedSample:
         """Convert to SM upsert model"""
         return SampleUpsert(
             id=self.internal_sid,
-            external_ids={PRIMARY_EXTERNAL_ORG: self.external_sid},
+            external_ids=prepare_external_ids(self.external_sid, self.external_sids),
             type=self.sample_type,
             meta=self.meta,
             active=True,
@@ -396,8 +411,8 @@ class DefaultSequencing:
         seq_type: str = 'genome',  # seq_type because `type` is a built-in
         technology: str = 'short-read',
         platform: str = 'illumina',
-        facility: str = None,
-        library: str = None,
+        facility: str | None = None,
+        library: str | None = None,
     ):
         self.seq_type = seq_type
         self.technology = technology
@@ -406,11 +421,11 @@ class DefaultSequencing:
         self.library = library
 
 
-def chunk(iterable: Iterable[T], chunk_size=50) -> Iterator[List[T]]:
+def chunk(iterable: Iterable[T], chunk_size=50) -> Iterator[list[T]]:
     """
     Chunk an iterable by yielding lists of `chunk_size`
     """
-    chnk: List[T] = []
+    chnk: list[T] = []
     for element in iterable:
         chnk.append(element)
         if len(chnk) >= chunk_size:
@@ -448,17 +463,17 @@ class GenericParser(
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
-        path_prefix: Optional[str],
+        path_prefix: str | None,
         search_paths: list[str],
         project: str,
-        default_sample_type: str = None,
+        default_sample_type: str | None = None,
         default_sequencing: DefaultSequencing = DefaultSequencing(),
-        default_read_end_type: str = None,
-        default_read_length: str | int = None,
-        default_analysis_type: str = None,
+        default_read_end_type: str | None = None,
+        default_read_length: str | int | None = None,
+        default_analysis_type: str | None = None,
         default_analysis_status: str = 'completed',
-        key_map: Dict[str, str] = None,
-        required_keys: Set[str] = None,
+        key_map: dict[str, str] | None = None,
+        required_keys: set[str] | None = None,
         ignore_extra_keys=False,
         skip_checking_gcs_objects=False,
         verbose=True,
@@ -477,17 +492,17 @@ class GenericParser(
         self.project = project
 
         self.default_sequencing = default_sequencing
-        self.default_read_end_type: Optional[str] = default_read_end_type
-        self.default_read_length: Optional[str] = default_read_length
-        self.default_sample_type: Optional[str] = default_sample_type
-        self.default_analysis_type: Optional[str] = default_analysis_type
-        self.default_analysis_status: Optional[str] = default_analysis_status
+        self.default_read_end_type: str | None = default_read_end_type
+        self.default_read_length: str | int | None = default_read_length
+        self.default_sample_type: str | None = default_sample_type
+        self.default_analysis_type: str | None = default_analysis_type
+        self.default_analysis_status: str | None = default_analysis_status
 
         # gs specific
-        self.default_bucket = None
+        self.default_bucket: str | None = None
 
         self._client = None
-        self.bucket_clients: Dict[str, Any] = {}
+        self.bucket_clients: dict[str, Any] = {}
 
         self.papi = ParticipantApi()
         self.sapi = SampleApi()
@@ -667,9 +682,9 @@ class GenericParser(
 
     def _get_dict_reader(self, file_pointer, delimiter: str):
         """
-        Return a DictReader from file_pointer
+        Return a dictReader from file_pointer
         Override this method if you can't use the default implementation that simply
-        calls csv.DictReader
+        calls csv.dictReader
         """
         reader = CustomDictReader(
             file_pointer,
@@ -963,33 +978,52 @@ class GenericParser(
     # endregion
 
     @abstractmethod
-    def get_sample_id(self, row: SingleRow) -> str:
-        """Get external sample ID from row"""
+    def get_primary_sample_id(self, row: SingleRow) -> str:
+        """
+        Get primary external sample ID from row, used to group rows together
+        """
+
+    def get_sample_external_ids(self, row: GroupedRow) -> dict[str, str]:
+        """
+        Get a dictionary of {name: ex_id} from a list of rows
+        You should NOT return the primary sample ID here anywhere
+        """
+
+        return {}
 
     # @abstractmethod
-    def get_assay_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
+    def get_assay_id(self, row: GroupedRow) -> dict[str, str] | None:
         """Get external sequence ID from row"""
         return None
 
     @abstractmethod
-    def get_participant_id(self, row: SingleRow) -> Optional[str]:
+    def get_primary_participant_id(self, row: SingleRow) -> str | None:
         """Get external participant ID from row"""
 
-    def get_reported_sex(self, row: GroupedRow) -> Optional[int]:
+    def get_participant_external_ids(self, row: GroupedRow) -> dict[str, str]:
+        """
+        Get a dictionary of {name: ex_id} from a list of rows
+        You should NOT return the primary participant ID here anywhere
+        """
+
+        return {}
+
+    def get_reported_sex(self, row: GroupedRow) -> int | None:
         """Get reported sex from grouped row"""
         return None
 
-    def get_reported_gender(self, row: GroupedRow) -> Optional[str]:
+    def get_reported_gender(self, row: GroupedRow) -> str | None:
         """Get reported gender from grouped row"""
         return None
 
-    def get_karyotype(self, row: GroupedRow) -> Optional[str]:
+    def get_karyotype(self, row: GroupedRow) -> str | None:
         """Get karyotype from grouped row"""
         return None
 
     # @abstractmethod
     def has_participants(self, rows: list[SingleRow]) -> bool:
         """Returns True if the file has a Participants column"""
+        return False
 
     async def group_participants(
         self, rows: list[SingleRow]
@@ -1000,7 +1034,7 @@ class GenericParser(
         """
 
         participant_groups: list[ParsedParticipant] = []
-        pgroups = group_by(rows, self.get_participant_id)
+        pgroups = group_by(rows, self.get_primary_participant_id)
         for pid, prows in pgroups.items():
             participant_groups.append(
                 ParsedParticipant(
@@ -1028,7 +1062,7 @@ class GenericParser(
         and parse samples and their values.
         """
         samples = []
-        for sid, sample_rows in group_by(rows, self.get_sample_id).items():
+        for sid, sample_rows in group_by(rows, self.get_primary_sample_id).items():
             samples.append(
                 ParsedSample(
                     rows=sample_rows,
@@ -1204,7 +1238,7 @@ class GenericParser(
         return AnalysisStatus(self.default_analysis_status)
 
     def get_existing_external_sequence_ids(
-        self, participant_map: Dict[str, Dict[Any, List[Any]]]
+        self, participant_map: dict[str, dict[Any, list[Any]]]
     ):
         """Pulls external sequence IDs from participant map"""
         external_sequence_ids: list[str] = []
@@ -1271,8 +1305,8 @@ class GenericParser(
         return results
 
     async def parse_files(
-        self, sample_id: str, reads: list[str] | str, checksums: List[str] = None
-    ) -> Dict[SUPPORTED_FILE_TYPE, Dict[str, List]]:
+        self, sample_id: str, reads: list[str] | str, checksums: list[str] = None
+    ) -> dict[SUPPORTED_FILE_TYPE, dict[str, list]]:
         """
         Returns a tuple of:
         1. single / list-of CWL file object(s), based on the extensions of the reads
@@ -1294,7 +1328,7 @@ class GenericParser(
 
         read_to_checksum: dict[str, str | None] = dict(zip(_reads, checksums))
 
-        file_by_type: Dict[SUPPORTED_FILE_TYPE, Dict[str, List]] = defaultdict(
+        file_by_type: dict[SUPPORTED_FILE_TYPE, dict[str, list]] = defaultdict(
             lambda: defaultdict(list)
         )
 
@@ -1305,9 +1339,9 @@ class GenericParser(
         ]
         if fastqs:
             structured_fastqs = self.parse_fastqs_structure(fastqs)
-            fastq_files: List[Sequence[Union[Coroutine, BaseException]]] = []  # type: ignore
+            fastq_files: list[Sequence[Coroutine | BaseException]] = []  # type: ignore
             for fastq_group in structured_fastqs:
-                create_file_futures: List[Coroutine] = [
+                create_file_futures: list[Coroutine] = [
                     self.create_file_object(f, checksum=read_to_checksum.get(f))
                     for f in fastq_group
                 ]
@@ -1319,7 +1353,7 @@ class GenericParser(
         crams = [
             r for r in _reads if any(r.lower().endswith(ext) for ext in CRAM_EXTENSIONS)
         ]
-        file_promises: List[Coroutine]
+        file_promises: list[Coroutine]
 
         if crams:
             file_promises = []
@@ -1400,7 +1434,7 @@ class GenericParser(
         return file_by_type
 
     @staticmethod
-    def parse_fastqs_structure(fastqs) -> List[List[str]]:
+    def parse_fastqs_structure(fastqs: list[str]) -> list[list[str]]:
         """
         Takes a list of fastqs, and a set of nested lists of each R1 + R2 read.
 
@@ -1437,7 +1471,7 @@ class GenericParser(
         # find last instance of R\d, and then group by prefix on that
         sorted_fastqs = sorted(fastqs)
 
-        r_matches: Dict[str, Tuple[str, Optional[Match[str]]]] = {
+        r_matches: dict[str, tuple[str, Match[str] | None]] = {
             r: (os.path.basename(r), rmatch.search(os.path.basename(r)))
             for r in sorted_fastqs
         }
@@ -1452,6 +1486,9 @@ class GenericParser(
         fastq_groups = defaultdict(list)
         for full_filename, (basename, matched) in r_matches.items():
             # use only file path basename to define prefix first
+            if not matched:
+                raise ValueError(f'No match found for {full_filename}')
+
             pre_r_basename = basename[: matched.end()]
             bits_to_group_on = [pre_r_basename]
             groups = matched.groups()
@@ -1477,8 +1514,8 @@ class GenericParser(
     async def create_file_object(
         self,
         filename: str,
-        secondary_files: List[SingleRow] = None,
-        checksum: Optional[str] = None,
+        secondary_files: list[SingleRow] | None = None,
+        checksum: str | None = None,
     ) -> SingleRow:
         """Takes filename, returns formed CWL dictionary"""
         _checksum = checksum
@@ -1512,8 +1549,8 @@ class GenericParser(
         return d
 
     async def create_secondary_file_objects_by_potential_pattern(
-        self, filename, potential_secondary_patterns: List[str]
-    ) -> List[SingleRow]:
+        self, filename, potential_secondary_patterns: list[str]
+    ) -> list[SingleRow]:
         """
         Take a base filename and potential secondary patterns:
         - Try each secondary pattern, see if it works
@@ -1601,9 +1638,7 @@ def group_fastqs_by_common_filename_components(d: dict) -> dict:
     return fastq_groups
 
 
-def _apply_secondary_file_format_to_filename(
-    filepath: Optional[str], secondary_file: str
-):
+def _apply_secondary_file_format_to_filename(filepath: str | None, secondary_file: str):
     """
     You can trust this function to do what you want
     :param filepath: Filename to base

@@ -20,11 +20,11 @@ class GenericParserForTest(GenericParser):
         """Dummy method to implement abstract method"""
         return []
 
-    def get_sample_id(self, *_, **__) -> str:
+    def get_primary_sample_id(self, *_, **__) -> str:
         """Dummy method to implement abstract method"""
         return ''
 
-    def get_participant_id(self, *_, **__) -> str | None:
+    def get_primary_participant_id(self, *_, **__) -> str | None:
         """Dummy method to implement abstract method"""
         return ''
 

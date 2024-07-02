@@ -124,7 +124,7 @@ class ExistingCohortParser(GenericMetadataParser):
             project=project,
             search_locations=search_locations,
             sample_name_column=Columns.EXTERNAL_ID,
-            participant_column=participant_column,
+            participant_name_column=participant_column,
             reported_gender_column=Columns.SEX,
             sample_meta_map={},
             qc_meta_map={},
@@ -134,7 +134,7 @@ class ExistingCohortParser(GenericMetadataParser):
             allow_extra_files_in_search_path=True,
             default_sequencing=DefaultSequencing(
                 seq_type=sequencing_type,
-            )
+            ),
         )
 
     def _get_dict_reader(self, file_pointer, delimiter: str):
