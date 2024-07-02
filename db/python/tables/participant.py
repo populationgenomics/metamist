@@ -90,6 +90,8 @@ class ParticipantTable(DbBase):
                     'id': 's.id',
                     'type': 's.type',
                     'meta': 's.meta',
+                    'sample_root_id': 's.sample_root_id',
+                    'sample_parent_id': 's.sample_parent_id',
                 },
                 exclude=['external_id'],
             )

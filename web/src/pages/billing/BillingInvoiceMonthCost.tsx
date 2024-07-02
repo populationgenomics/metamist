@@ -46,7 +46,13 @@ const BillingCurrentCost = () => {
     // toISOString() will give you YYYY-MM-DDTHH:mm:ss.sssZ
     // toISOString().substring(0, 7) will give you YYYY-MM
     // .replace('-', '') will give you YYYYMM
-    const thisMonth = new Date().toISOString().substring(0, 7).replace('-', '')
+    const currentDate = new Date()
+    const dayOfMonth = new Date().toISOString().substring(8, 10)
+    if (parseInt(dayOfMonth, 10) < 3) {
+        // first 2 days of the month, show previous month as default
+        currentDate.setMonth(currentDate.getMonth() - 1)
+    }
+    const thisMonth = currentDate.toISOString().substring(0, 7).replace('-', '')
 
     const [groupBy, setGroupBy] = React.useState<BillingColumn>(
         fixedGroupBy ?? BillingColumn.GcpProject
@@ -64,11 +70,14 @@ const BillingCurrentCost = () => {
             source = 'gcp_billing'
         }
         new BillingApi()
+            // @ts-ignore
             .getRunningCost(grp, invoiceMth, source)
             .then((response) => {
                 setIsLoading(false)
-                setCosts(response.data)
-                setLastLoadedDay(response.data[0].last_loaded_day)
+                if (response.data.length > 0) {
+                    setCosts(response.data)
+                    setLastLoadedDay(response.data[0].last_loaded_day || '')
+                }
             })
             .catch((er) => setError(er.message))
     }
@@ -105,7 +114,7 @@ const BillingCurrentCost = () => {
         }
     }
 
-    function currencyFormat(num: number): string {
+    function currencyFormat(num: number | undefined | null): string {
         if (num === undefined || num === null) {
             return ''
         }
@@ -113,7 +122,7 @@ const BillingCurrentCost = () => {
         return `$${num.toFixed(2).replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')}`
     }
 
-    function percFormat(num: number): string {
+    function percFormat(num: number | undefined | null): string {
         if (num === undefined || num === null) {
             return ''
         }
@@ -262,6 +271,8 @@ const BillingCurrentCost = () => {
                                 sorted_by="total_monthly"
                                 isLoading={isLoading}
                                 showLegend={true}
+                                // @ts-ignore
+                                threshold_values={undefined}
                             />
                         </Grid.Column>
                     </Grid>
@@ -339,16 +350,22 @@ const BillingCurrentCost = () => {
                             [sort.column],
                             sort.direction === 'ascending' ? ['asc'] : ['desc']
                         ).map((p) => (
+                            // @ts-ignore
                             <React.Fragment key={`total - ${p.field}`}>
                                 <SUITable.Row
+                                    // @ts-ignore
                                     className={`${rowColor(p)}`}
+                                    // @ts-ignore
                                     key={`total-row-${p.field}`}
+                                    // @ts-ignore
                                     id={`total-row-${p.field}`}
                                 >
                                     <SUITable.Cell collapsing>
                                         <Checkbox
+                                            // @ts-ignore
                                             checked={openRows.includes(p.field)}
                                             slider
+                                            // @ts-ignore
                                             onChange={() => handleToggle(p.field)}
                                         />
                                     </SUITable.Cell>
@@ -358,8 +375,16 @@ const BillingCurrentCost = () => {
                                                 return (
                                                     <SUITable.Cell className="billing-href">
                                                         <b>
-                                                            <Link to={linkTo(p[k.category])}>
-                                                                {p[k.category]}
+                                                            <Link
+                                                                to={
+                                                                    // @ts-ignore
+                                                                    linkTo(p[k.category])
+                                                                }
+                                                            >
+                                                                {
+                                                                    // @ts-ignore
+                                                                    p[k.category]
+                                                                }
                                                             </Link>
                                                         </b>
                                                     </SUITable.Cell>
@@ -372,7 +397,10 @@ const BillingCurrentCost = () => {
                                                     case true:
                                                         return (
                                                             <SUITable.Cell>
-                                                                {currencyFormat(p[k.category])}
+                                                                {
+                                                                    // @ts-ignore
+                                                                    currencyFormat(p[k.category])
+                                                                }
                                                             </SUITable.Cell>
                                                         )
                                                     default:
@@ -383,7 +411,12 @@ const BillingCurrentCost = () => {
 
                                     {groupBy === BillingColumn.GcpProject &&
                                     invoiceMonth === thisMonth ? (
-                                        <SUITable.Cell>{percFormat(p.budget_spent)}</SUITable.Cell>
+                                        <SUITable.Cell>
+                                            {
+                                                // @ts-ignore
+                                                percFormat(p.budget_spent)
+                                            }
+                                        </SUITable.Cell>
                                     ) : null}
                                 </SUITable.Row>
                                 {typeof p === 'object' &&
@@ -391,6 +424,7 @@ const BillingCurrentCost = () => {
                                     _.orderBy(p?.details, ['monthly_cost'], ['desc']).map((dk) => (
                                         <SUITable.Row
                                             style={{
+                                                // @ts-ignore
                                                 display: openRows.includes(p.field)
                                                     ? 'table-row'
                                                     : 'none',

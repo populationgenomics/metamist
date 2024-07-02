@@ -75,7 +75,7 @@ QUERY_ALL_DATA = gql(
                         meta
                         type
                     }
-                    analyses {
+                    analyses(type: {in_: ["cram", "gvcf"]}) {
                         active
                         id
                         meta
@@ -506,9 +506,6 @@ def transfer_analyses(
             )
             existing_sgid = existing_sg.get('id') if existing_sg else None
             for analysis in sg['analyses']:
-                if analysis['type'] not in ['cram', 'gvcf']:
-                    # Currently the create_test_subset script only handles crams or gvcf files.
-                    continue
 
                 existing_analysis: dict = {}
                 if existing_sgid:
@@ -867,9 +864,10 @@ def copy_files_in_dict(d, dataset: str, sid_replacement: tuple[str, str] = None)
             new_path = new_path.replace(sid_replacement[0], sid_replacement[1])
 
         if not file_exists(new_path):
-            cmd = f'gsutil cp {old_path!r} {new_path!r}'
-            logger.info(f'Copying file in metadata: {cmd}')
-            subprocess.run(cmd, check=False, shell=True)
+            cmd = ['gcloud', 'storage', 'cp', old_path, new_path]
+            logger.info(f'Copying file in metadata: {" ".join(cmd)}')
+            subprocess.run(cmd, check=True)
+
         extra_exts = ['.md5']
         if new_path.endswith('.vcf.gz'):
             extra_exts.append('.tbi')
@@ -877,9 +875,9 @@ def copy_files_in_dict(d, dataset: str, sid_replacement: tuple[str, str] = None)
             extra_exts.append('.crai')
         for ext in extra_exts:
             if file_exists(old_path + ext) and not file_exists(new_path + ext):
-                cmd = f'gsutil cp {old_path + ext!r} {new_path + ext!r}'
-                logger.info(f'Copying extra file in metadata: {cmd}')
-                subprocess.run(cmd, check=False, shell=True)
+                cmd = ['gcloud', 'storage', 'cp', old_path + ext, new_path + ext]
+                logger.info(f'Copying extra file in metadata: {" ".join(cmd)}')
+                subprocess.run(cmd, check=True)
         return new_path
     if isinstance(d, list):
         return [copy_files_in_dict(x, dataset) for x in d]

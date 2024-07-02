@@ -120,7 +120,9 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
 
     return (
         <>
-            <ProjectSelector onClickFunction={projectSelectorOnClick} />
+            <ProjectSelector
+                onProjectSelect={(project) => navigate(`/analysis-runner/${project.name}`)}
+            />
             {projectName && loading && <LoadingDucks />}
             {projectName && error && <>Error! {error.message}</>}
             {projectName && !loading && !flatData?.length && (

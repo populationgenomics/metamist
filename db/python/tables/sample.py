@@ -37,6 +37,8 @@ class SampleTable(DbBase):
                 'project': 'ss.project',
                 'id': 'ss.id',
                 'meta': 'ss.meta',
+                'sample_root_id': 'ss.sample_root_id',
+                'sample_parent_id': 'ss.sample_parent_id',
             },
             exclude=['sequencing_group', 'assay', 'external_id'],
         )
@@ -154,6 +156,8 @@ class SampleTable(DbBase):
             's.active',
             's.type',
             's.project',
+            's.sample_root_id',
+            's.sample_parent_id',
         ]
         _query, values = self.construct_query(
             filter_, keys, sample_eid_table_alias='sexid'
@@ -224,6 +228,8 @@ class SampleTable(DbBase):
         active: bool,
         meta: dict | None,
         participant_id: int | None,
+        sample_parent_id: int | None,
+        sample_root_id: int | None,
         project=None,
     ) -> int:
         """
@@ -239,6 +245,8 @@ class SampleTable(DbBase):
             ('type', sample_type),
             ('active', active),
             ('audit_log_id', audit_log_id),
+            ('sample_parent_id', sample_parent_id),
+            ('sample_root_id', sample_root_id),
             ('project', project or self.project_id),
         ]
 
@@ -282,7 +290,9 @@ class SampleTable(DbBase):
         participant_id: int | None,
         external_ids: dict[str, str | None] | None,
         type_: str | None,
-        active: bool = None,
+        active: bool | None = None,
+        sample_parent_id: int | None = None,
+        sample_root_id: int | None = None,
     ):
         """Update a single sample"""
 
@@ -355,6 +365,14 @@ class SampleTable(DbBase):
         if active is not None:
             values['active'] = 1 if active else 0
             fields.append('active = :active')
+
+        if sample_parent_id is not None:
+            values['sample_parent_id'] = sample_parent_id
+            fields.append('sample_parent_id = :sample_parent_id')
+
+        if sample_root_id is not None:
+            values['sample_root_id'] = sample_root_id
+            fields.append('sample_root_id = :sample_root_id')
 
         # means you can't set to null
         fields_str = ', '.join(fields)
@@ -603,6 +621,8 @@ class SampleTable(DbBase):
             'type',
             'project',
             'author',
+            'sample_root_id',
+            'sample_parent_id',
             # 'audit_log_id',  # TODO SampleInternal does not allow an audit_log_id field
         ]
         keys_str = ', '.join(keys)
@@ -619,23 +639,10 @@ class SampleTable(DbBase):
         self, project: ProjectId
     ) -> list[SampleInternal]:
         """Get samples with missing participants"""
-        keys = [
-            's.id',
-            'JSON_OBJECTAGG(seid.name, seid.external_id) AS external_ids',
-            's.participant_id',
-            's.meta',
-            's.active',
-            's.type',
-            's.project',
-        ]
-        _query = f"""
-            SELECT {', '.join(keys)}
-            FROM sample s
-            INNER JOIN sample_external_id seid ON s.id = seid.sample_id
-            WHERE s.participant_id IS NULL AND s.project = :project
-            GROUP BY s.id
-        """
-        rows = await self.connection.fetch_all(
-            _query, {'project': project or self.project_id}
+        _, samples = await self.query(
+            SampleFilter(
+                participant_id=GenericFilter(isnull=True),
+                project=GenericFilter(eq=project or self.project_id),
+            )
         )
-        return [SampleInternal.from_db(dict(d)) for d in rows]
+        return samples

@@ -107,8 +107,8 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
     const svgRef = React.useRef(null)
     const legendRef = React.useRef(null)
 
-    const containerDivRef = React.useRef<HTMLDivElement>()
-    const tooltipDivRef = React.useRef<HTMLDivElement>()
+    const containerDivRef = React.useRef<HTMLDivElement | null>(null)
+    const tooltipDivRef = React.useRef<HTMLDivElement | null>(null)
 
     const colorFunc: (t: number) => string | undefined = d3.interpolateRainbow
     const margin = { top: 0, right: 10, bottom: 200, left: 100 }
@@ -161,6 +161,7 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
             stackedData = d3
                 .stack()
                 .offset(d3.stackOffsetNone)
+                // @ts-ignore
                 .keys(series)(combinedData.map((d) => ({ date: d.date, ...d.values })))
                 .map((ser, i) => ser.map((d) => ({ ...d, key: series[i] })))
         }
@@ -171,34 +172,35 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
         // tooltip events
         const tooltip = d3.select(tooltipDivRef.current)
 
-        const mouseover = (d) => {
+        const mouseover = (event: any, d: any) => {
             tooltip.style('opacity', 0.8)
-            d3.select(this).style('opacity', 0.5)
         }
-        const mousemove = (event, d) => {
+        const mousemove = (event: any, d: any) => {
             const formater = d3.format(',.2f')
             tooltip
                 .html(d.key + ' ' + formater(d[1] - d[0]) + ' AUD')
                 .style('top', event.layerY - 30 + 'px')
                 .style('left', event.layerX - 30 + 'px')
         }
-        const mouseleave = (d) => {
+        const mouseleave = (event: any, d: any) => {
             tooltip.style('opacity', 0)
-            d3.select(this).style('opacity', 1)
         }
 
         const x = d3
             .scaleBand()
+            // @ts-ignore
             .domain(d3.range(x_vals.length))
             .rangeRound([margin.left, minWidth - margin.right])
             .padding(0.08)
 
         // calculate opacity (for new dates)
         const opacity = 0.3
-        const calcOpacity = (d) => {
+        const calcOpacity = (d: any) => {
             const idx = series.indexOf(d.key)
+            // @ts-ignore
             const color = d3.color(colorFunc(idx / seriesCount))
             if (newDates.includes(d.data.date)) {
+                // @ts-ignore
                 return d3.rgb(color.r, color.g, color.b, opacity)
             }
 
@@ -218,6 +220,7 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
             .data(stackedData)
             .enter()
             .append('g')
+            // @ts-ignore
             .attr('fill', (d, i) => colorFunc(i / seriesCount))
             .attr('id', (d, i) => `path${i}`)
 
@@ -226,10 +229,12 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
             .data((d) => d)
             .enter()
             .append('rect')
+            // @ts-ignore
             .attr('x', (d, i) => x(i))
             .attr('y', height - margin.bottom)
             .attr('width', x.bandwidth())
             .attr('height', 0)
+            // @ts-ignore
             .attr('fill', (d) => calcOpacity(d))
             .on('mouseover', mouseover)
             .on('mousemove', mousemove)
@@ -246,8 +251,10 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
                 .append('g')
                 .attr('class', 'x-axis')
                 .attr('transform', `translate(0,${height - margin.bottom})`)
+                // @ts-ignore
                 .call(d3.axisBottom(x).tickSizeOuter(0).tickFormat(formatX))
         } else {
+            // @ts-ignore
             x_labels.call(d3.axisBottom(x).tickSizeOuter(0).tickFormat(formatX))
         }
 
@@ -271,6 +278,7 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
         // y-axis & labels
         const y = d3
             .scaleLinear()
+            // @ts-ignore
             .domain([0, y1Max])
             .range([height - margin.bottom, margin.top])
 
@@ -294,17 +302,18 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
             .attr('y', (d) => y(d[1]) || 0)
             .attr('height', (d) => y(d[0]) - y(d[1]))
             .transition()
+            // @ts-ignore
             .attr('x', (d, i) => x(i) || 0)
             .attr('width', x.bandwidth())
 
         // on Hover
-        const onHoverOver = (tg: HTMLElement, v) => {
+        const onHoverOver = (tg: HTMLElement, v: any) => {
             d3.selectAll(`#path${v}`).style('fill-opacity', 0.5)
             d3.select(tg).selectAll('circle').style('fill-opacity', 0.5)
             d3.select(tg).selectAll('text').attr('font-weight', 'bold')
         }
 
-        const onHoverOut = (tg: HTMLElement, v) => {
+        const onHoverOut = (tg: HTMLElement, v: any) => {
             d3.selectAll(`#path${v}`).style('fill-opacity', 1)
             d3.select(tg).selectAll('circle').style('fill-opacity', 1)
             d3.select(tg).selectAll('text').attr('font-weight', 'normal')
@@ -326,6 +335,7 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
                     .data([d]) // Use data to bind a single data element
                     .join('circle') // Use join to handle enter/update/exit selections
                     .attr('r', 8)
+                    // @ts-ignore
                     .attr('fill', (d) => colorFunc(i / seriesCount))
                 d3.select(this)
                     .selectAll('text') // Replace append with selectAll
@@ -340,10 +350,12 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
                 d3.select(this)
                     .on('mouseover', (event, v) => {
                         const element = d3.select(`#legend${i}`)
+                        // @ts-ignore
                         onHoverOver(element.node(), i)
                     })
                     .on('mouseout', (event, v) => {
                         const element = d3.select(`#legend${i}`)
+                        // @ts-ignore
                         onHoverOut(element.node(), i)
                     })
             })

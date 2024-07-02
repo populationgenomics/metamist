@@ -17,9 +17,12 @@ from api.utils.db import (
 from api.utils.export import ExportType
 from db.python.filters import GenericFilter
 from db.python.layers.analysis import AnalysisLayer
+from db.python.layers.analysis_runner import AnalysisRunnerLayer
 from db.python.tables.analysis import AnalysisFilter
+from db.python.tables.analysis_runner import AnalysisRunnerFilter
 from models.enums import AnalysisStatus
 from models.models.analysis import Analysis, ProportionalDateTemporalMethod
+from models.models.analysis_runner import AnalysisRunner
 from models.models.project import FullWriteAccessRoles, ReadAccessRoles
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
@@ -235,28 +238,31 @@ async def query_analyses(
 
 @router.get('/analysis-runner', operation_id='getAnalysisRunnerLog')
 async def get_analysis_runner_log(
-    project_names: list[str],
-    output_dir: str,
+    project_names: list[str] = Query(None),  # type: ignore
+    # author: str = None, # not implemented yet, uncomment when we do
     ar_guid: str | None = None,
     connection: Connection = get_projectless_db_connection,
-) -> list[Analysis]:
+) -> list[AnalysisRunner]:
     """
     Get log for the analysis-runner, useful for checking this history of analysis
     """
-    atable = AnalysisLayer(connection)
-    project_ids = None
+    if not project_names:
+        raise ValueError('Must specify "project_names"')
 
+    arlayer = AnalysisRunnerLayer(connection)
     projects = connection.get_and_check_access_to_projects_for_names(
         project_names, allowed_roles=ReadAccessRoles
     )
-    project_ids = [p.id for p in projects]
+    project_ids = [p.id for p in projects if p.id]
+    project_map = {p.id: p.name for p in projects if p.id and p.name}
 
-    results = await atable.get_analysis_runner_log(
-        project_ids=project_ids,
-        output_dir=output_dir,
-        ar_guid=ar_guid,
+    results = await arlayer.query(
+        AnalysisRunnerFilter(
+            project=GenericFilter(in_=project_ids) if project_ids else None,
+            ar_guid=GenericFilter(eq=ar_guid) if ar_guid else None,
+        )
     )
-    return [a.to_external() for a in results]
+    return [a.to_external(project_map=project_map) for a in results]
 
 
 @router.get(
