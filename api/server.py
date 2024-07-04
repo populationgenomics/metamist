@@ -17,7 +17,6 @@ from api.settings import (
     PROFILE_REQUESTS,
     PROFILE_REQUESTS_OUTPUT,
     SKIP_DATABASE_CONNECTION,
-    SM_ENVIRONMENT,
 )
 from api.utils import get_openapi_schema_func
 from api.utils.exceptions import determine_code_from_error
@@ -224,5 +223,5 @@ if __name__ == '__main__':
         'api.server:app',
         host='0.0.0.0',
         port=int(os.getenv('PORT', '8000')),
-        reload=SM_ENVIRONMENT == 'local',
+        reload=True,
     )
