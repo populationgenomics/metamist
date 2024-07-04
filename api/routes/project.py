@@ -6,6 +6,7 @@ from api.utils.db import (
     get_projectless_db_connection,
 )
 from db.python.tables.project import ProjectPermissionsTable
+from db.python.utils import Forbidden
 from models.models.project import (
     FullWriteAccessRoles,
     Project,
@@ -69,8 +70,20 @@ async def create_project(
 @router.get('/seqr/all', operation_id='getSeqrProjects')
 async def get_seqr_projects(connection: Connection = get_projectless_db_connection):
     """Get SM projects that should sync to seqr"""
-    projects = connection.all_projects()
-    return [p for p in projects if p.meta and p.meta.get('is_seqr')]
+    ptable = ProjectPermissionsTable(connection)
+    seqr_project_ids = await ptable.get_seqr_project_ids()
+    my_seqr_projects = [
+        p for p in connection.all_projects() if p.id in seqr_project_ids
+    ]
+
+    # Fail if user doesn't have access to all seqr projects. This endpoint is used
+    # for joint-calling where we would want to include all seqr projects and know if
+    # any are missing, so it is important to raise an error here rather than just
+    # excluding projects due to permission issues
+    if len(my_seqr_projects) != len(seqr_project_ids):
+        raise Forbidden('The current user does not have access to all seqr projects')
+
+    return my_seqr_projects
 
 
 @router.post('/{project}/update', operation_id='updateProject')

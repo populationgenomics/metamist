@@ -120,6 +120,15 @@ class ProjectPermissionsTable:
 
         return project_id_map, project_name_map
 
+    async def get_seqr_project_ids(self) -> list[int]:
+        """
+        Get all projects with meta.is_seqr = true
+        """
+        rows = await self.connection.fetch_all(
+            "SELECT id FROM project WHERE JSON_VALUE(meta, '$.is_seqr') = 1"
+        )
+        return [r['id'] for r in rows]
+
     async def check_if_member_in_group_by_name(self, group_name: str, member: str):
         """Check if a user exists in the group"""
 
