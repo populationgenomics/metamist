@@ -264,8 +264,19 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         for row in rows:
 
             analysis_data = dict(row)
-            analysis_data['output'] = analysis_outputs_by_aid.get(row['id'], None)
-            analysis_data['outputs'] = analysis_outputs_by_aid.get(row['id'], {})
+            analysis_output_for_id = analysis_outputs_by_aid.get(
+                analysis_data['id'], None
+            )
+            analysis_data['output'] = (
+                analysis_output_for_id.get('output', None)
+                if analysis_output_for_id
+                else None
+            )
+            analysis_data['outputs'] = (
+                analysis_output_for_id.get('outputs', {})
+                if analysis_output_for_id
+                else {}
+            )
 
             analysis = AnalysisInternal.from_db(**analysis_data)
 
@@ -283,7 +294,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
     async def get_file_outputs_by_analysis_ids(
         self, analysis_ids: list[int]
-    ) -> dict[int, str | RecursiveDict]:
+    ) -> dict[int, dict[str, RecursiveDict]]:
         """Fetches all output files for a list of analysis IDs"""
 
         _query = """
@@ -295,44 +306,37 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         rows = await self.connection.fetch_all(_query, {'analysis_ids': analysis_ids})
 
         # Preparing to accumulate analysis files
-        analysis_files: dict[int, list[Tuple[OutputFileInternal, str]] | str] = (
-            defaultdict(list)
-        )
-
-        # Extracting parent IDs with a guard for None values
-        parent_ids = [row['id'] for row in rows if row['id'] is not None]
-
-        # Fetching secondary files only if there are parent IDs to look up
-        secondary_files = (
-            await self.get_secondary_files_for_file_output(parent_ids)
-            if parent_ids
-            else {}
-        )
+        analysis_files: dict[
+            int, dict[str, list[Tuple[OutputFileInternal, str]] | str]
+        ] = defaultdict(lambda: defaultdict(list))
 
         for row in rows:
             file_id = row['id']
             if file_id:
-                # If no json_structure, just set to the output.
-                if row['json_structure'] is None:
-                    analysis_files[row['analysis_id']] = row['path']
                 # Building OutputFileInternal object with secondary files if available
                 file_internal = OutputFileInternal.from_db(**dict(row))
-                file_internal_with_secondary = file_internal.copy(
-                    update={'secondary_files': secondary_files.get(file_id, [])}
-                )
-                if isinstance(analysis_files[row['analysis_id']], list):
-                    analysis_files[row['analysis_id']].append((file_internal_with_secondary, row['json_structure']))  # type: ignore [union-attr]
+                # If no json_structure, just set to the output.
+
+                if row['json_structure'] is None:
+                    analysis_files[row['analysis_id']]['output'] = row['path']
+                else:
+                    analysis_files[row['analysis_id']]['output'] = ''
+                analysis_files[row['analysis_id']]['outputs'].append((file_internal, row['json_structure']))  # type: ignore [union-attr]
             else:
                 # If no file_id, just set to the output.
-                analysis_files[row['analysis_id']] = row['output']
+                analysis_files[row['analysis_id']]['output'] = row['output']
+                analysis_files[row['analysis_id']]['outputs'] = row['output']
 
         # Transforming analysis_files into the desired output format
         analysis_output_files = {
-            a_id: OutputFileInternal.reconstruct_json(files)
+            a_id: {
+                'output': files['output'],
+                'outputs': OutputFileInternal.reconstruct_json(files['outputs']),
+            }
             for a_id, files in analysis_files.items()
         }
 
-        return analysis_output_files
+        return analysis_output_files  # type: ignore [return-value]
 
     async def get_secondary_files_for_file_output(
         self, parent_file_ids: list[int]
@@ -404,11 +408,16 @@ WHERE a.id = (
         analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(
             [row['id'] for row in rows]
         )
-        latest_analysis_data['output'] = analysis_outputs_by_aid.get(
-            latest_analysis['id'], []
+        analysis_output_for_id = analysis_outputs_by_aid.get(
+            latest_analysis_data['id'], None
         )
-        latest_analysis_data['outputs'] = analysis_outputs_by_aid.get(
-            latest_analysis['id'], []
+        latest_analysis_data['output'] = (
+            analysis_output_for_id.get('output', None)
+            if analysis_output_for_id
+            else None
+        )
+        latest_analysis_data['outputs'] = (
+            analysis_output_for_id.get('outputs', {}) if analysis_output_for_id else {}
         )
 
         analysis = AnalysisInternal.from_db(**latest_analysis_data)
@@ -478,8 +487,19 @@ ORDER BY a.timestamp_completed DESC
                 continue
 
             analysis_data = dict(row)
-            analysis_data['output'] = analysis_outputs_by_aid.get(row['id'], [])
-            analysis_data['outputs'] = analysis_outputs_by_aid.get(row['id'], [])
+            analysis_output_for_id = analysis_outputs_by_aid.get(
+                analysis_data['id'], None
+            )
+            analysis_data['output'] = (
+                analysis_output_for_id.get('output', None)
+                if analysis_output_for_id
+                else None
+            )
+            analysis_data['outputs'] = (
+                analysis_output_for_id.get('outputs', {})
+                if analysis_output_for_id
+                else {}
+            )
 
             analysis = AnalysisInternal.from_db(**analysis_data)
             analyses.append(analysis)
@@ -513,8 +533,17 @@ WHERE a.id = :analysis_id
         analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(
             [analysis_data['id']]
         )
-        analysis_data['output'] = analysis_outputs_by_aid.get(analysis_data['id'], None)
-        analysis_data['outputs'] = analysis_outputs_by_aid.get(analysis_data['id'], {})
+
+        # TODO: Instead of fetching the same value for both, output should have a str or None, and outputs should have a dict or None
+        analysis_output_for_id = analysis_outputs_by_aid.get(analysis_data['id'], None)
+        analysis_data['output'] = (
+            analysis_output_for_id.get('output', None)
+            if analysis_output_for_id
+            else None
+        )
+        analysis_data['outputs'] = (
+            analysis_output_for_id.get('outputs', {}) if analysis_output_for_id else {}
+        )
 
         analysis = AnalysisInternal.from_db(**analysis_data)
         for row in rows[1:]:
@@ -577,8 +606,19 @@ ORDER BY a.timestamp_completed DESC;
         )
         for row in rows:
             analysis_data = dict(row)
-            analysis_data['output'] = analysis_outputs_by_aid.get(row['id'], None)
-            analysis_data['outputs'] = analysis_outputs_by_aid.get(row['id'], {})
+            analysis_output_for_id = analysis_outputs_by_aid.get(
+                analysis_data['id'], None
+            )
+            analysis_data['output'] = (
+                analysis_output_for_id.get('output', None)
+                if analysis_output_for_id
+                else None
+            )
+            analysis_data['outputs'] = (
+                analysis_output_for_id.get('outputs', {})
+                if analysis_output_for_id
+                else {}
+            )
             analysis_data.pop('id')
             results.append(analysis_data)
         # many per analysis

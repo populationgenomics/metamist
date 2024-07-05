@@ -36,6 +36,13 @@ class OutputFileTable(DbBase):
                 2,
             )
 
+        if outputs and isinstance(outputs, str):
+            warnings.warn(
+                'The outputs field should be a dictionary, passing a str will be deprecated soon.',
+                PendingDeprecationWarning,
+                2,
+            )
+
         output_data = outputs or output
 
         if output_data:
@@ -156,20 +163,35 @@ class OutputFileTable(DbBase):
                         analysis_id,
                         parent_file_id,
                         json_structure=primary_file['json_path'],
+                        # If the file couldnt be created, we just pass the basename as the output
                         output=None if parent_file_id else primary_file['basename'],
                     )
-                    if 'secondary_files_grouped' in files:
+                    if files.get('secondary_files_grouped'):
                         secondary_files = files['secondary_files_grouped']
                         if primary_file['basename'] in secondary_files:
                             for secondary_file in secondary_files[
                                 primary_file['basename']
                             ]:
-                                await self.create_or_update_output_file(
-                                    path=secondary_file,
-                                    parent_id=parent_file_id,
-                                    client=client,
+                                secondary_file_id = (
+                                    await self.create_or_update_output_file(
+                                        path=secondary_file['basename'],
+                                        parent_id=parent_file_id,
+                                        client=client,
+                                    )
                                 )
-                        file_ids.append(parent_file_id)
+                                await self.add_output_file_to_analysis(
+                                    analysis_id,
+                                    secondary_file_id,
+                                    json_structure=secondary_file['json_path'],
+                                    # If the file couldnt be created, we just pass the basename as the output
+                                    output=(
+                                        None
+                                        if secondary_file_id
+                                        else secondary_file['basename']
+                                    ),
+                                )
+                                file_ids.append(secondary_file_id)
+                    file_ids.append(parent_file_id)
 
         client.close()
         # check that only the files in this json_dict should be in the analysis. Remove what isn't in this dict.
@@ -181,9 +203,10 @@ class OutputFileTable(DbBase):
             """
         )
 
-        await self.connection.execute(
-            _update_query, {'analysis_id': analysis_id, 'file_ids': file_ids}
-        )
+        if file_ids:
+            await self.connection.execute(
+                _update_query, {'analysis_id': analysis_id, 'file_ids': file_ids}
+            )
 
     async def find_files_from_dict(
         self, json_dict, json_path=None, collected=None
@@ -215,14 +238,19 @@ class OutputFileTable(DbBase):
                 ]  # Keep track of current basename for secondary files
 
                 # Handle secondary files if present
-                if 'secondaryFiles' in json_dict:
-                    secondary = json_dict['secondaryFiles']
+                if 'secondary_files' in json_dict:
+                    secondary = json_dict['secondary_files']
                     if current_basename not in collected['secondary_files_grouped']:
                         collected['secondary_files_grouped'][current_basename] = []
-                    for _, value in secondary.items():
+                    for key, value in secondary.items():
                         # Append each secondary file to the list in secondary_files under its parent basename
                         collected['secondary_files_grouped'][current_basename].append(
-                            value['basename']
+                            {
+                                'json_path': '.'.join(
+                                    json_path + ['secondary_files', key]
+                                ),
+                                'basename': value['basename'],
+                            }
                         )
 
             else:

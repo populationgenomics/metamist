@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Optional, TypeAlias
+from typing import TypeAlias
 
 from cloudpathlib import AnyPath, CloudPath, GSPath
 from google.cloud.storage import Client
@@ -14,6 +14,7 @@ class OutputFileInternal(SMBase):
     """File model for internal use"""
 
     id: int
+    parent_id: int | None = None
     path: str
     basename: str
     dirname: str
@@ -21,9 +22,9 @@ class OutputFileInternal(SMBase):
     nameext: str | None
     file_checksum: str | None
     size: int
-    meta: str | None = None
+    meta: dict | None = None
     valid: bool = False
-    secondary_files: list[dict[str, Any]] | None = None
+    secondary_files: dict | None = {}
 
     @staticmethod
     def from_db(**kwargs):
@@ -32,6 +33,7 @@ class OutputFileInternal(SMBase):
         """
         return OutputFileInternal(
             id=kwargs.pop('id'),
+            parent_id=kwargs.pop('parent_id', None),
             path=kwargs.get('path'),
             basename=kwargs.get('basename'),
             dirname=kwargs.get('dirname'),
@@ -41,6 +43,7 @@ class OutputFileInternal(SMBase):
             size=kwargs.get('size'),
             meta=kwargs.get('meta'),
             valid=parse_sql_bool(kwargs.get('valid')),
+            secondary_files=kwargs.get('secondary_files', {}),
         )
 
     def to_external(self):
@@ -49,6 +52,7 @@ class OutputFileInternal(SMBase):
         """
         return OutputFile(
             id=self.id,
+            parent_id=self.parent_id,
             path=self.path,
             basename=self.basename,
             dirname=self.dirname,
@@ -91,12 +95,12 @@ class OutputFileInternal(SMBase):
             return None
 
     @staticmethod
-    def reconstruct_json(data: list | str) -> str | RecursiveDict:
-        """_summary_
+    def reconstruct_json(data: list | str) -> str | dict:
+        """Reconstruct JSON structure from provided data.
 
         Args:
-            data (list): A tuple of (OutputFileInternal, json_structure) if file_id is not None, else just the output string based on the
-                analysis_outputs table
+            data (list | str): A tuple of (OutputFileInternal, json_structure) if file_id is not None,
+                else just the output string based on the analysis_outputs table.
 
         Returns:
             dict: Should return the JSON structure based on the input data.
@@ -104,11 +108,41 @@ class OutputFileInternal(SMBase):
         root: dict = {}
         if isinstance(data, str):
             return data
+
+        def add_to_structure(current, path, content):
+            """Helper function to add content to the correct place in the structure."""
+            for key in path[:-1]:
+                if key.isdigit():
+                    key = int(key)
+                    while len(current) <= key:
+                        current.append({})
+                    if current[key] is None:
+                        current[key] = {}
+                    current = current[key]
+                else:
+                    if key not in current or current[key] is None:
+                        current[key] = {}
+                    current = current[key]
+
+            final_key = path[-1]
+            if final_key.isdigit():
+                final_key = int(final_key)
+                while len(current) <= final_key:
+                    current.append({})
+                current[final_key] = content
+            else:
+                if final_key in current:
+                    if isinstance(current[final_key], dict):
+                        current[final_key].update(content)
+                    else:
+                        current[final_key] = content
+                else:
+                    current[final_key] = content
+
         for file in data:
             file_root: dict = {}
 
             # Check if the file is a tuple or a string
-            # If it's a tuple, it's a file object and a json structure
             if isinstance(file, tuple):
                 file_obj, json_structure = file
                 file_obj = file_obj.dict()
@@ -121,29 +155,17 @@ class OutputFileInternal(SMBase):
                 if json_structure:
                     if isinstance(json_structure, str):
                         json_structure = json_structure.split('.')
-                    # Split the path into components and parse the JSON content
                     path = json_structure
-                    content = file_root
-
-                    # Navigate down the tree to the correct position, creating dictionaries as needed
-                    current = root
-                    for key in path[:-1]:
-                        current = current.setdefault(key, {})
-
-                    if path[-1] in current:
-                        current[path[-1]].update(content)
-                    else:
-                        current[path[-1]] = content
+                    add_to_structure(root, path, file_root)
                 else:
                     root.update(file_root)
-
-            # If it's a string, it's just the output
             else:
                 file_root['output'] = file
                 if 'output' in root:
                     root['output'].append(file)
                 else:
                     root['output'] = [file]
+
         return root
 
 
@@ -151,16 +173,17 @@ class OutputFile(BaseModel):
     """File model for external use"""
 
     id: int
+    parent_id: int | None = None
     path: str
     basename: str
     dirname: str
     nameroot: str
-    nameext: Optional[str]
-    file_checksum: Optional[str]
+    nameext: str | None
+    file_checksum: str | None
     size: int
-    meta: Optional[str] = None
+    meta: dict | None = None
     valid: bool = False
-    secondary_files: list[dict[str, Any]] | None = None
+    secondary_files: dict | None = {}
 
     def to_internal(self):
         """
@@ -168,6 +191,7 @@ class OutputFile(BaseModel):
         """
         return OutputFileInternal(
             id=self.id,
+            parent_id=self.parent_id,
             path=self.path,
             basename=self.basename,
             dirname=self.dirname,
@@ -177,4 +201,5 @@ class OutputFile(BaseModel):
             size=self.size,
             meta=self.meta,
             valid=self.valid,
+            secondary_files=self.secondary_files,
         )
