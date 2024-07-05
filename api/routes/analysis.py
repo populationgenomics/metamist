@@ -45,6 +45,7 @@ class AnalysisModel(BaseModel):
     status: AnalysisStatus
     meta: dict[str, Any] | None = None
     output: str | None = None
+    outputs: dict[str, Any] | None = None
     active: bool = True
     # please don't use this, unless you're the analysis-runner,
     # the usage is tracked ... (Ծ_Ծ)
@@ -56,6 +57,7 @@ class AnalysisUpdateModel(BaseModel):
 
     status: AnalysisStatus
     output: str | None = None
+    outputs: dict[str, Any] | None = None
     meta: dict[str, Any] | None = None
     active: bool | None = None
 
@@ -70,6 +72,8 @@ class AnalysisQueryModel(BaseModel):
     status: AnalysisStatus | None = None
     meta: dict[str, Any] | None = None
     output: str | None = None
+    # Need to consider how we might filter outputs that are dicts
+    # outputs: str | dict | None = None
     active: bool | None = None
 
     def to_filter(self, project_id_map: dict[str, int]) -> AnalysisFilter:
