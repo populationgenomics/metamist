@@ -1,6 +1,4 @@
-import json
-
-from models.base import OpenApiGenNoneType, SMBase
+from models.base import OpenApiGenNoneType, SMBase, parse_sql_dict
 from models.models.family import FamilySimple, FamilySimpleInternal
 from models.models.project import ProjectId
 from models.models.sample import (
@@ -27,11 +25,9 @@ class ParticipantInternal(SMBase):
     @classmethod
     def from_db(cls, data: dict):
         """Convert from db keys, mainly converting JSON-encoded fields"""
-        for key in ['external_ids', 'meta']:
-            if key in data and isinstance(data[key], str):
-                data[key] = json.loads(data[key])
-
-        return ParticipantInternal(**data)
+        meta = parse_sql_dict(data.pop('meta', {}))
+        external_ids = parse_sql_dict(data.pop('external_ids', {}))
+        return ParticipantInternal(**data, meta=meta, external_ids=external_ids)
 
     def to_external(self):
         """Convert to transport model"""
@@ -55,8 +51,8 @@ class NestedParticipantInternal(SMBase):
     reported_gender: str | None = None
     karyotype: str | None = None
     meta: dict
-    samples: list[NestedSampleInternal] | None = None
-    families: list[FamilySimpleInternal] | None = None
+    samples: list[NestedSampleInternal]
+    families: list[FamilySimpleInternal]
 
     def to_external(self):
         """Convert to transport model"""

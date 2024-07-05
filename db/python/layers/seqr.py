@@ -25,6 +25,7 @@ from api.settings import (
 )
 from db.python.connect import Connection
 from db.python.enum_tables import SequencingTypeTable
+from db.python.filters import GenericFilter
 from db.python.layers.analysis import AnalysisInternal, AnalysisLayer
 from db.python.layers.base import BaseLayer
 from db.python.layers.family import FamilyLayer
@@ -32,7 +33,6 @@ from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.project import Project
-from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
 from models.enums.web import SeqrDatasetType
 
@@ -368,7 +368,9 @@ class SeqrLayer(BaseLayer):
             f'Uploaded individual metadata for {len(processed_records)} individuals'
         ]
 
-    def check_updated_sequencing_group_ids(self, sequencing_group_ids: set[int], es_index_analyses: list[AnalysisInternal]):
+    def check_updated_sequencing_group_ids(
+        self, sequencing_group_ids: set[int], es_index_analyses: list[AnalysisInternal]
+    ):
         """Check if the sequencing group IDs have been updated"""
         messages = []
         if sequencing_group_ids:
@@ -388,7 +390,8 @@ class SeqrLayer(BaseLayer):
                 )
                 if sequencing_groups_diff:
                     messages.append(
-                        f'Sequencing groups added to {es_index_analyses[-1].output}: ' + ', '.join(sequencing_groups_diff),
+                        f'Sequencing groups added to {es_index_analyses[-1].output}: '
+                        + ', '.join(sequencing_groups_diff),
                     )
 
             sg_ids_missing_from_index = sequencing_group_id_format_list(
@@ -401,7 +404,13 @@ class SeqrLayer(BaseLayer):
                 )
         return messages
 
-    async def post_es_index_update(self, session: aiohttp.ClientSession, url: str, post_json: dict, headers: dict[str, str]):
+    async def post_es_index_update(
+        self,
+        session: aiohttp.ClientSession,
+        url: str,
+        post_json: dict,
+        headers: dict[str, str],
+    ):
         """Post request to update ES index"""
         resp = await session.post(
             url=url,
@@ -485,7 +494,11 @@ class SeqrLayer(BaseLayer):
 
             es_index = es_indexes_filtered_by_type[-1].output
 
-            messages.extend(self.check_updated_sequencing_group_ids(sequencing_group_ids, es_indexes_filtered_by_type))
+            messages.extend(
+                self.check_updated_sequencing_group_ids(
+                    sequencing_group_ids, es_indexes_filtered_by_type
+                )
+            )
 
             req1_url = SEQR_URL + _url_update_es_index.format(projectGuid=project_guid)
             post_json = {
@@ -494,7 +507,9 @@ class SeqrLayer(BaseLayer):
                 'mappingFilePath': fn_path,
                 'ignoreExtraSamplesInCallset': True,
             }
-            requests.append(self.post_es_index_update(session, req1_url, post_json, headers))
+            requests.append(
+                self.post_es_index_update(session, req1_url, post_json, headers)
+            )
 
         messages.extend(await asyncio.gather(*requests))
         return messages
@@ -731,9 +746,11 @@ class SeqrLayer(BaseLayer):
 
         def process_row(row):
             return {
-                seqr_key: key_processor[sm_key](row[sm_key])
-                if sm_key in key_processor
-                else row[sm_key]
+                seqr_key: (
+                    key_processor[sm_key](row[sm_key])
+                    if sm_key in key_processor
+                    else row[sm_key]
+                )
                 for seqr_key, sm_key in seqr_map.items()
                 if sm_key in row
             }

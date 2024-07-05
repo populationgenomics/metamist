@@ -7,11 +7,11 @@ from math import ceil
 from typing import Any
 
 from db.python.connect import Connection
+from db.python.filters import GenericFilter
 from db.python.layers.base import BaseLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from db.python.tables.sample import SampleFilter
-from db.python.utils import GenericFilter
 from models.models import OurDNADashboard, OurDNALostSample, ProjectId, Sample
 from models.models.participant import ParticipantInternal
 
@@ -29,19 +29,6 @@ class SampleProcessMeta:
             property_name.replace('-', '_')
         )
 
-    def get_time_difference_in_seconds(
-        self, start_property: str, end_property: str
-    ) -> int | None:
-        """Calculate time difference in seconds between two meta properties."""
-        start_time = self.get_property(start_property)
-        end_time = self.get_property(end_property)
-        if start_time is None or end_time is None:
-            return None
-        time_taken = datetime.strptime(
-            end_time, '%Y-%m-%d %H:%M:%S'
-        ) - datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S')
-        return int(time_taken.total_seconds())
-
     @staticmethod
     def try_parse_datetime(d: str) -> datetime | None:
         """
@@ -53,6 +40,8 @@ class SampleProcessMeta:
         Returns:
             datetime | None: A datetime object if parsing is successful, otherwise None.
         """
+        if not d:
+            return None
         try:
             return datetime.strptime(d, '%Y-%m-%d %H:%M:%S')
         except TypeError as e:
@@ -169,9 +158,9 @@ class OurDnaDashboardLayer(BaseLayer):
         s, participants = await asyncio.gather(
             self.sample_layer.query(
                 filter_=SampleFilter(
-                    # Added `ebld` filtering temporarily to prevent duplicate rows
                     project=GenericFilter(eq=project_id),
-                    type=GenericFilter(eq='ebld'),
+                    # Get the top level samples only
+                    sample_root_id=GenericFilter(isnull=True),
                 )
             ),
             self.participant_layer.get_participants(project=project_id),

@@ -4,10 +4,10 @@ from fastapi import APIRouter
 
 from api.utils import get_project_readonly_connection
 from api.utils.db import Connection, get_projectless_db_connection
+from db.python.filters import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.tables.assay import AssayFilter
 from db.python.tables.project import ProjectPermissionsTable
-from db.python.utils import GenericFilter
 from models.base import SMBase
 from models.models.assay import AssayUpsert
 from models.utils.sample_id_format import sample_id_transform_to_raw_list

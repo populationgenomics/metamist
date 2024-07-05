@@ -75,7 +75,7 @@ QUERY_ALL_DATA = gql(
                         meta
                         type
                     }
-                    analyses {
+                    analyses(type: {in_: ["cram", "gvcf"]}) {
                         active
                         id
                         meta
@@ -168,32 +168,63 @@ PARTICIPANT_QUERY = gql(
     """
 )
 
+COHORT_QUERY = gql(
+    """
+    query CohortQuery($project: String!) {
+        project(name: $project) {
+            cohorts {
+                id
+                sequencingGroups {
+                    sample {
+                        id
+                    }
+                }
+            }
+        }
+    }
+    """
+)
+
 
 def main(
     project: str,
     samples_n: int,
     families_n: int,
+    cohort_samples_n: int,
     additional_families: set[str],
     additional_samples: set[str],
+    cohorts: set[str],
     skip_ped: bool = True,
 ):
     """
     Script creates a test subset for a given project.
-    A new project with a prefix -test is created, and for any files in sample/meta,
+    A new project with a suffix -test is created, and for any files in sample/meta,
     sequence/meta, or analysis/output a copy in the -test namespace is created.
     """
-
-    if not any([additional_families, additional_samples, samples_n, families_n]):
+    if not any(
+        [additional_families, additional_samples, samples_n, families_n, cohorts]
+    ):
         raise ValueError('Come on, what exactly are you asking for?')
+
+    if cohorts and not cohort_samples_n:
+        raise ValueError(
+            'You must specify the number of samples to transfer from the cohort.'
+        )
 
     # for reproducibility
     logger.info('Setting random seed to 42')
     random.seed(42)
 
-    # 1. Find and SG IDs to be moved by Family ID -test.
+    # 1. Find SG IDs to be moved by Family ID to -test.
     if families_n or additional_families:
         additional_samples.update(
             get_sids_for_families(project, families_n, additional_families)
+        )
+
+    # 1.5 Find SG IDs to be moved by Cohort ID to -test.
+    if cohorts:
+        additional_samples.update(
+            get_sids_for_cohorts(project, cohorts, cohort_samples_n)
         )
 
     # 2. Get all sample IDs and their SG IDs in project.
@@ -208,7 +239,7 @@ def main(
     )
 
     # 4. Query all the samples from the selected sgs
-    logger.info(f'Transfering {len(additional_samples)} samples. Querying metadata.')
+    logger.info(f'Transferring {len(additional_samples)} samples. Querying metadata.')
     original_project_subset_data = query(
         QUERY_ALL_DATA, {'project': project, 'sids': list(additional_samples)}
     )
@@ -475,9 +506,6 @@ def transfer_analyses(
             )
             existing_sgid = existing_sg.get('id') if existing_sg else None
             for analysis in sg['analyses']:
-                if analysis['type'] not in ['cram', 'gvcf']:
-                    # Currently the create_test_subset script only handles crams or gvcf files.
-                    continue
 
                 existing_analysis: dict = {}
                 if existing_sgid:
@@ -627,6 +655,30 @@ def get_sids_for_families(
                 included_sids.add(sample['id'])
 
     return included_sids
+
+
+def get_sids_for_cohorts(
+    project: str, cohorts: set[str], cohort_samples_n: int
+) -> set[str]:
+    """Returns cohort_samples_n specific samples for given cohort IDs."""
+
+    cohort_sid_output = query(COHORT_QUERY, {'project': project})
+
+    all_cohort_groups = cohort_sid_output.get('project', {}).get('cohorts', [])
+
+    all_cohorts_sample_ids_subset: set[str] = set()
+    for cohort in all_cohort_groups:
+        sids_for_cohort: list[str] = []
+        if cohort.get('id') in cohorts:
+            seq_groups = cohort.get('sequencingGroups', [])
+            for seq_group in seq_groups:
+                sample = seq_group.get('sample')
+                sids_for_cohort.append(sample['id'])
+            all_cohorts_sample_ids_subset.update(
+                random.sample(sids_for_cohort, cohort_samples_n)
+            )
+
+    return all_cohorts_sample_ids_subset
 
 
 def transfer_families(
@@ -812,9 +864,10 @@ def copy_files_in_dict(d, dataset: str, sid_replacement: tuple[str, str] = None)
             new_path = new_path.replace(sid_replacement[0], sid_replacement[1])
 
         if not file_exists(new_path):
-            cmd = f'gsutil cp {old_path!r} {new_path!r}'
-            logger.info(f'Copying file in metadata: {cmd}')
-            subprocess.run(cmd, check=False, shell=True)
+            cmd = ['gcloud', 'storage', 'cp', old_path, new_path]
+            logger.info(f'Copying file in metadata: {" ".join(cmd)}')
+            subprocess.run(cmd, check=True)
+
         extra_exts = ['.md5']
         if new_path.endswith('.vcf.gz'):
             extra_exts.append('.tbi')
@@ -822,9 +875,9 @@ def copy_files_in_dict(d, dataset: str, sid_replacement: tuple[str, str] = None)
             extra_exts.append('.crai')
         for ext in extra_exts:
             if file_exists(old_path + ext) and not file_exists(new_path + ext):
-                cmd = f'gsutil cp {old_path + ext!r} {new_path + ext!r}'
-                logger.info(f'Copying extra file in metadata: {cmd}')
-                subprocess.run(cmd, check=False, shell=True)
+                cmd = ['gcloud', 'storage', 'cp', old_path + ext, new_path + ext]
+                logger.info(f'Copying extra file in metadata: {" ".join(cmd)}')
+                subprocess.run(cmd, check=True)
         return new_path
     if isinstance(d, list):
         return [copy_files_in_dict(x, dataset) for x in d]
@@ -857,6 +910,12 @@ if __name__ == '__main__':
     )
     parser.add_argument('-n', type=int, help='# Random Samples to copy', default=0)
     parser.add_argument('-f', type=int, help='# Random families to copy', default=0)
+    parser.add_argument(
+        '--nsamples-cohort',
+        type=int,
+        help='# Random samples to copy from each cohort',
+        default=0,
+    )
     # Flag to be used when there isn't available pedigree/family information.
     parser.add_argument(
         '--skip-ped',
@@ -878,6 +937,13 @@ if __name__ == '__main__':
         default={},
     )
     parser.add_argument(
+        '--cohorts',
+        nargs='+',
+        help='Cohorts to take random samples from.',
+        type=str,
+        default={},
+    )
+    parser.add_argument(
         '--noninteractive', action='store_true', help='Skip interactive confirmation'
     )
     args, fail = parser.parse_known_args()
@@ -889,7 +955,9 @@ if __name__ == '__main__':
         project=args.project,
         samples_n=args.n,
         families_n=args.f,
+        cohort_samples_n=args.nsamples_cohort,
         additional_samples=set(args.samples),
         additional_families=set(args.families),
         skip_ped=args.skip_ped,
+        cohorts=set(args.cohorts),
     )

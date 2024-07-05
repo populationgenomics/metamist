@@ -394,3 +394,39 @@ query MyQuery($project: String!) {
                 },
             ],
         )
+
+    @run_as_sync
+    async def test_get_project_name_from_analysis(self):
+        """Test getting project name from analysis"""
+        p = await self.player.upsert_participant(_get_single_participant_upsert())
+        sg_id = p.samples[0].sequencing_groups[0].id
+
+        alayer = AnalysisLayer(self.connection)
+        await alayer.create_analysis(
+            AnalysisInternal(
+                sequencing_group_ids=[sg_id],
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                meta={},
+                output='some-output',
+            )
+        )
+
+        q = """
+query MyQuery($sg_id: String!) {
+  sequencingGroups(id: {eq: $sg_id}) {
+    analyses {
+      id
+      project {
+        name
+      }
+    }
+  }
+}"""
+
+        resp = await self.run_graphql_query_async(
+            q, {'sg_id': sequencing_group_id_format(sg_id)}
+        )
+        self.assertIn('sequencingGroups', resp)
+        project_name = resp['sequencingGroups'][0]['analyses'][0]['project']['name']
+        self.assertEqual(self.project_name, project_name)

@@ -1,25 +1,25 @@
 import * as React from 'react'
 
+import { Route, Routes as Switch } from 'react-router-dom'
 import SwaggerUI from 'swagger-ui-react'
-import { Routes as Switch, Route } from 'react-router-dom'
 
+import ProjectsAdmin from './pages/admin/ProjectsAdmin'
 import {
-    BillingHome,
-    BillingSeqrProp,
-    BillingCostByTime,
     BillingCostByAnalysis,
-    BillingInvoiceMonthCost,
     BillingCostByCategory,
     BillingCostByMonth,
+    BillingCostByTime,
+    BillingHome,
+    BillingInvoiceMonthCost,
+    BillingSeqrProp,
 } from './pages/billing'
 import DocumentationArticle from './pages/docs/Documentation'
-import SampleView from './pages/sample/SampleView'
 import FamilyView from './pages/family/FamilyView'
 import OurDnaDashboard from './pages/ourdna/OurDnaDashboard'
-import ProjectSummaryView from './pages/project/ProjectSummary'
-import ProjectsAdmin from './pages/admin/ProjectsAdmin'
-import ErrorBoundary from './shared/utilities/errorBoundary'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
+import ProjectOverview from './pages/project/ProjectOverview'
+import SampleView from './pages/sample/SampleView'
+import ErrorBoundary from './shared/utilities/errorBoundary'
 
 const Routes: React.FunctionComponent = () => (
     <Switch>
@@ -30,7 +30,7 @@ const Routes: React.FunctionComponent = () => (
             path="/project/:projectName?/:page?"
             element={
                 <ErrorBoundary>
-                    <ProjectSummaryView />
+                    <ProjectOverview />
                 </ErrorBoundary>
             }
         />

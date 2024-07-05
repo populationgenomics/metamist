@@ -4,14 +4,9 @@ import datetime
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from db.python.filters import GenericFilter, GenericFilterModel, GenericMetaFilter
 from db.python.tables.base import DbBase
-from db.python.utils import (
-    GenericFilter,
-    GenericFilterModel,
-    GenericMetaFilter,
-    NotFoundError,
-    to_db_json,
-)
+from db.python.utils import NotFoundError, to_db_json
 from models.enums import AnalysisStatus
 from models.models import PRIMARY_EXTERNAL_ORG
 from models.models.analysis import AnalysisInternal
@@ -623,39 +618,6 @@ ORDER BY a.timestamp_completed DESC;
             results.append(analysis_data)
         # many per analysis
         return results
-
-    async def get_analysis_runner_log(
-        self,
-        project_ids: List[int] = None,
-        # author: str = None,
-        output_dir: str = None,
-        ar_guid: str = None,
-    ) -> List[AnalysisInternal]:
-        """
-        Get log for the analysis-runner, useful for checking this history of analysis
-        """
-        values: dict[str, Any] = {}
-        wheres = [
-            "type = 'analysis-runner'",
-            'active',
-        ]
-        if project_ids:
-            wheres.append('project in :project_ids')
-            values['project_ids'] = project_ids
-
-        if output_dir:
-            wheres.append('(output = :output OR output LIKE :output_like)')
-            values['output'] = output_dir
-            values['output_like'] = f'%{output_dir}'
-
-        if ar_guid:
-            wheres.append('JSON_EXTRACT(meta, "$.ar_guid") = :ar_guid')
-            values['ar_guid'] = ar_guid
-
-        wheres_str = ' AND '.join(wheres)
-        _query = f'SELECT * FROM analysis WHERE {wheres_str}'
-        rows = await self.connection.fetch_all(_query, values)
-        return [AnalysisInternal.from_db(**dict(r)) for r in rows]
 
     # region STATS
 
