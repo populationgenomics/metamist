@@ -777,6 +777,7 @@ INNER JOIN (
     ):
         """Combines the results of the above queries into a response"""
         ptable = ProjectPermissionsTable(self._connection)
+        # projects = self.get_and_check_access_to_projects_for_names(project_names, readonly=True)
         projects = await ptable.get_and_check_access_to_projects_for_names(
             user=self.author, project_names=project_names, readonly=True
         )
