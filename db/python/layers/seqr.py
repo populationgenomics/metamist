@@ -134,14 +134,13 @@ class SeqrLayer(BaseLayer):
             raise ValueError('Seqr synchronisation is not configured in metamist')
 
         token = self.generate_seqr_auth_token()
-        project = await self.ptable.get_and_check_access_to_project_for_id(
-            self.connection.author,
-            project_id=self.connection.project,
-            readonly=True,
-        )
+        project = self.connection.project
+        assert project
 
-        seqr_guid = project.meta.get(
-            self.get_meta_key_from_sequencing_type(sequencing_type)
+        seqr_guid = (
+            project.meta.get(self.get_meta_key_from_sequencing_type(sequencing_type))
+            if project.meta
+            else None
         )
 
         if not seqr_guid:
@@ -430,8 +429,9 @@ class SeqrLayer(BaseLayer):
         sequencing_group_ids: set[int],
     ) -> list[str]:
         """Update seqr samples for latest elastic-search index"""
+        assert self.connection.project_id
         eid_to_sgid_rows = await self.player.get_external_participant_id_to_internal_sequencing_group_id_map(
-            self.connection.project, sequencing_type=sequencing_type
+            self.connection.project_id, sequencing_type=sequencing_type
         )
 
         # format sample ID for transport
@@ -464,7 +464,7 @@ class SeqrLayer(BaseLayer):
         alayer = AnalysisLayer(connection=self.connection)
         es_index_analyses = await alayer.query(
             AnalysisFilter(
-                project=GenericFilter(eq=self.connection.project),
+                project=GenericFilter(eq=self.connection.project_id),
                 type=GenericFilter(eq='es-index'),
                 status=GenericFilter(eq=AnalysisStatus.COMPLETED),
                 meta={
@@ -542,8 +542,9 @@ class SeqrLayer(BaseLayer):
 
         alayer = AnalysisLayer(self.connection)
 
+        assert self.connection.project_id
         reads_map = await alayer.get_sample_cram_path_map_for_seqr(
-            project=self.connection.project,
+            project=self.connection.project_id,
             sequencing_types=[sequencing_type],
             participant_ids=participant_ids,
         )
@@ -619,9 +620,9 @@ class SeqrLayer(BaseLayer):
 
     async def _get_pedigree_from_sm(self, family_ids: set[int]) -> list[dict] | None:
         """Call get_pedigree and return formatted string with header"""
-
+        assert self.connection.project_id
         ped_rows = await self.flayer.get_pedigree(
-            self.connection.project,
+            self.connection.project_id,
             family_ids=list(family_ids),
             replace_with_family_external_ids=True,
             replace_with_participant_external_ids=True,
@@ -678,8 +679,9 @@ class SeqrLayer(BaseLayer):
         self, participant_ids: list[int]
     ) -> list[dict] | None:
         """Get formatted list of dictionaries for syncing individual meta to seqr"""
+        assert self.connection.project_id
         individual_metadata_resp = await self.player.get_seqr_individual_template(
-            self.connection.project, internal_participant_ids=participant_ids
+            self.connection.project_id, internal_participant_ids=participant_ids
         )
 
         json_rows: list[dict] = individual_metadata_resp['rows']

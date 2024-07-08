@@ -18,7 +18,7 @@ from api.graphql.filters import (
     GraphQLMetaFilter,
     graphql_meta_filter_to_internal_filter,
 )
-from api.graphql.loaders import LoaderKeys, get_context
+from api.graphql.loaders import GraphQLContext, LoaderKeys, get_context
 from db.python import enum_tables
 from db.python.filters import GenericFilter
 from db.python.layers import (
@@ -37,7 +37,6 @@ from db.python.tables.assay import AssayFilter
 from db.python.tables.cohort import CohortFilter, CohortTemplateFilter
 from db.python.tables.family import FamilyFilter
 from db.python.tables.participant import ParticipantFilter
-from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
 from models.enums import AnalysisStatus
@@ -57,7 +56,7 @@ from models.models import (
 from models.models.analysis_runner import AnalysisRunnerInternal
 from models.models.family import PedRowInternal
 from models.models.ourdna import OurDNADashboard, OurDNALostSample
-from models.models.project import ProjectId
+from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
 from models.models.sample import sample_id_transform_to_raw
 from models.utils.cohort_id_format import cohort_id_format, cohort_id_transform_to_raw
 from models.utils.cohort_template_id_format import (
@@ -76,7 +75,7 @@ for enum in enum_tables.__dict__.values():
         continue
 
     def create_function(_enum):
-        async def m(info: Info) -> list[str]:
+        async def m(info: Info[GraphQLContext, 'Query']) -> list[str]:
             return await _enum(info.context['connection']).get()
 
         m.__name__ = _enum.get_enum_name()
@@ -139,20 +138,18 @@ class GraphQLCohort:
 
     @strawberry.field()
     async def template(
-        self, info: Info, root: 'GraphQLCohort'
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLCohort'
     ) -> 'GraphQLCohortTemplate':
         connection = info.context['connection']
         template = await CohortLayer(connection).get_template_by_cohort_id(
             cohort_id_transform_to_raw(root.id)
         )
 
-        ptable = ProjectPermissionsTable(connection)
-        projects = await ptable.get_and_check_access_to_projects_for_ids(
-            user=connection.author,
+        projects = connection.get_and_check_access_to_projects_for_ids(
             project_ids=(
                 template.criteria.projects if template.criteria.projects else []
             ),
-            readonly=True,
+            allowed_roles=ReadAccessRoles,
         )
         project_names = [p.name for p in projects if p.name]
 
@@ -162,7 +159,7 @@ class GraphQLCohort:
 
     @strawberry.field()
     async def sequencing_groups(
-        self, info: Info, root: 'GraphQLCohort'
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLCohort'
     ) -> list['GraphQLSequencingGroup']:
         connection = info.context['connection']
         cohort_layer = CohortLayer(connection)
@@ -176,10 +173,9 @@ class GraphQLCohort:
 
     @strawberry.field()
     async def analyses(
-        self, info: Info, root: 'GraphQLCohort'
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLCohort'
     ) -> list['GraphQLAnalysis']:
         connection = info.context['connection']
-        connection.project = root.project_id
         internal_analysis = await AnalysisLayer(connection).query(
             AnalysisFilter(
                 cohort_id=GenericFilter(in_=[cohort_id_transform_to_raw(root.id)]),
@@ -188,8 +184,10 @@ class GraphQLCohort:
         return [GraphQLAnalysis.from_internal(a) for a in internal_analysis]
 
     @strawberry.field()
-    async def project(self, info: Info, root: 'GraphQLCohort') -> 'GraphQLProject':
-        loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
+    async def project(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLCohort'
+    ) -> 'GraphQLProject':
+        loader = info.context['loaders'][LoaderKeys.PROJECTS_FOR_IDS]
         project = await loader.load(root.project_id)
         return GraphQLProject.from_internal(project)
 
@@ -221,9 +219,9 @@ class GraphQLCohortTemplate:
 
     @strawberry.field()
     async def project(
-        self, info: Info, root: 'GraphQLCohortTemplate'
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLCohortTemplate'
     ) -> 'GraphQLProject':
-        loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
+        loader = info.context['loaders'][LoaderKeys.PROJECTS_FOR_IDS]
         project = await loader.load(root.project_id)
         return GraphQLProject.from_internal(project)
 
@@ -249,7 +247,7 @@ class GraphQLProject:
     @strawberry.field()
     async def analysis_runner(
         self,
-        info: Info,
+        info: Info[GraphQLContext, 'Query'],
         root: 'Project',
         ar_guid: GraphQLFilter[str] | None = None,
         author: GraphQLFilter[str] | None = None,
@@ -285,7 +283,7 @@ class GraphQLProject:
     @strawberry.field()
     async def pedigree(
         self,
-        info: Info,
+        info: Info[GraphQLContext, 'Query'],
         root: 'Project',
         internal_family_ids: list[int] | None = None,
         replace_with_participant_external_ids: bool = True,
@@ -313,7 +311,7 @@ class GraphQLProject:
     @strawberry.field()
     async def families(
         self,
-        info: Info,
+        info: Info[GraphQLContext, 'Query'],
         root: 'GraphQLProject',
         id: GraphQLFilter[int] | None = None,
         external_id: GraphQLFilter[str] | None = None,
@@ -333,7 +331,7 @@ class GraphQLProject:
     @strawberry.field()
     async def participants(
         self,
-        info: Info,
+        info: Info[GraphQLContext, 'Query'],
         root: 'GraphQLProject',
         id: GraphQLFilter[int] | None = None,
         external_id: GraphQLFilter[str] | None = None,
@@ -342,7 +340,7 @@ class GraphQLProject:
         reported_gender: GraphQLFilter[str] | None = None,
         karyotype: GraphQLFilter[str] | None = None,
     ) -> list['GraphQLParticipant']:
-        loader = info.context[LoaderKeys.PARTICIPANTS_FOR_PROJECTS]
+        loader = info.context['loaders'][LoaderKeys.PARTICIPANTS_FOR_PROJECTS]
         participants = await loader.load(
             {
                 'id': root.id,
@@ -370,14 +368,14 @@ class GraphQLProject:
     @strawberry.field()
     async def samples(
         self,
-        info: Info,
+        info: Info[GraphQLContext, 'Query'],
         root: 'GraphQLProject',
         type: GraphQLFilter[str] | None = None,
         external_id: GraphQLFilter[str] | None = None,
         id: GraphQLFilter[str] | None = None,
         meta: GraphQLMetaFilter | None = None,
     ) -> list['GraphQLSample']:
-        loader = info.context[LoaderKeys.SAMPLES_FOR_PROJECTS]
+        loader = info.context['loaders'][LoaderKeys.SAMPLES_FOR_PROJECTS]
         filter_ = SampleFilter(
             type=type.to_internal_filter() if type else None,
             external_id=external_id.to_internal_filter() if external_id else None,
@@ -390,7 +388,7 @@ class GraphQLProject:
     @strawberry.field()
     async def sequencing_groups(
         self,
-        info: Info,
+        info: Info[GraphQLContext, 'Query'],
         root: 'GraphQLProject',
         id: GraphQLFilter[str] | None = None,
         external_id: GraphQLFilter[str] | None = None,
@@ -399,7 +397,7 @@ class GraphQLProject:
         platform: GraphQLFilter[str] | None = None,
         active_only: GraphQLFilter[bool] | None = None,
     ) -> list['GraphQLSequencingGroup']:
-        loader = info.context[LoaderKeys.SEQUENCING_GROUPS_FOR_PROJECTS]
+        loader = info.context['loaders'][LoaderKeys.SEQUENCING_GROUPS_FOR_PROJECTS]
         filter_ = SequencingGroupFilter(
             id=(
                 id.to_internal_filter_mapped(sequencing_group_id_transform_to_raw)
@@ -422,7 +420,7 @@ class GraphQLProject:
     @strawberry.field()
     async def analyses(
         self,
-        info: Info,
+        info: Info[GraphQLContext, 'Query'],
         root: 'Project',
         type: GraphQLFilter[str] | None = None,
         status: GraphQLFilter[GraphQLAnalysisStatus] | None = None,
@@ -432,7 +430,6 @@ class GraphQLProject:
         ids: GraphQLFilter[int] | None = None,
     ) -> list['GraphQLAnalysis']:
         connection = info.context['connection']
-        connection.project = root.id
         internal_analysis = await AnalysisLayer(connection).query(
             AnalysisFilter(
                 id=ids.to_internal_filter() if ids else None,
@@ -457,7 +454,7 @@ class GraphQLProject:
     @strawberry.field()
     async def cohorts(
         self,
-        info: Info,
+        info: Info[GraphQLContext, 'Query'],
         root: 'Project',
         id: GraphQLFilter[str] | None = None,
         name: GraphQLFilter[str] | None = None,
@@ -466,7 +463,6 @@ class GraphQLProject:
         timestamp: GraphQLFilter[datetime.datetime] | None = None,
     ) -> list['GraphQLCohort']:
         connection = info.context['connection']
-        connection.project = root.id
 
         c_filter = CohortFilter(
             id=id.to_internal_filter_mapped(cohort_id_transform_to_raw) if id else None,
@@ -541,23 +537,25 @@ class GraphQLAnalysis:
 
     @strawberry.field
     async def sequencing_groups(
-        self, info: Info, root: 'GraphQLAnalysis'
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLAnalysis'
     ) -> list['GraphQLSequencingGroup']:
-        loader = info.context[LoaderKeys.SEQUENCING_GROUPS_FOR_ANALYSIS]
+        loader = info.context['loaders'][LoaderKeys.SEQUENCING_GROUPS_FOR_ANALYSIS]
         sgs = await loader.load(root.id)
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sgs]
 
     @strawberry.field
-    async def project(self, info: Info, root: 'GraphQLAnalysis') -> GraphQLProject:
-        loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
+    async def project(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLAnalysis'
+    ) -> GraphQLProject:
+        loader = info.context['loaders'][LoaderKeys.PROJECTS_FOR_IDS]
         project = await loader.load(root.project_id)
         return GraphQLProject.from_internal(project)
 
     @strawberry.field
     async def audit_logs(
-        self, info: Info, root: 'GraphQLAnalysis'
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLAnalysis'
     ) -> list[GraphQLAuditLog]:
-        loader = info.context[LoaderKeys.AUDIT_LOGS_BY_ANALYSIS_IDS]
+        loader = info.context['loaders'][LoaderKeys.AUDIT_LOGS_BY_ANALYSIS_IDS]
         audit_logs = await loader.load(root.id)
         return [GraphQLAuditLog.from_internal(audit_log) for audit_log in audit_logs]
 
@@ -586,25 +584,27 @@ class GraphQLFamily:
         )
 
     @strawberry.field
-    async def project(self, info: Info, root: 'GraphQLFamily') -> GraphQLProject:
-        loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
+    async def project(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLFamily'
+    ) -> GraphQLProject:
+        loader = info.context['loaders'][LoaderKeys.PROJECTS_FOR_IDS]
         project = await loader.load(root.project_id)
         return GraphQLProject.from_internal(project)
 
     @strawberry.field
     async def participants(
-        self, info: Info, root: 'GraphQLFamily'
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLFamily'
     ) -> list['GraphQLParticipant']:
-        participants = await info.context[LoaderKeys.PARTICIPANTS_FOR_FAMILIES].load(
-            root.id
-        )
+        participants = await info.context['loaders'][
+            LoaderKeys.PARTICIPANTS_FOR_FAMILIES
+        ].load(root.id)
         return [GraphQLParticipant.from_internal(p) for p in participants]
 
     @strawberry.field
     async def family_participants(
-        self, info: Info, root: 'GraphQLFamily'
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLFamily'
     ) -> list['GraphQLFamilyParticipant']:
-        family_participants = await info.context[
+        family_participants = await info.context['loaders'][
             LoaderKeys.FAMILY_PARTICIPANTS_FOR_FAMILIES
         ].load(root.id)
         return [
@@ -627,17 +627,17 @@ class GraphQLFamilyParticipant:
 
     @strawberry.field
     async def participant(
-        self, info: Info, root: 'GraphQLFamilyParticipant'
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLFamilyParticipant'
     ) -> 'GraphQLParticipant':
-        loader = info.context[LoaderKeys.PARTICIPANTS_FOR_IDS]
+        loader = info.context['loaders'][LoaderKeys.PARTICIPANTS_FOR_IDS]
         participant = await loader.load(root.participant_id)
         return GraphQLParticipant.from_internal(participant)
 
     @strawberry.field
     async def family(
-        self, info: Info, root: 'GraphQLFamilyParticipant'
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLFamilyParticipant'
     ) -> GraphQLFamily:
-        loader = info.context[LoaderKeys.FAMILIES_FOR_IDS]
+        loader = info.context['loaders'][LoaderKeys.FAMILIES_FOR_IDS]
         family = await loader.load(root.family_id)
         return GraphQLFamily.from_internal(family)
 
@@ -682,7 +682,7 @@ class GraphQLParticipant:
     @strawberry.field
     async def samples(
         self,
-        info: Info,
+        info: Info[GraphQLContext, 'Query'],
         root: 'GraphQLParticipant',
         type: GraphQLFilter[str] | None = None,
         meta: GraphQLMetaFilter | None = None,
@@ -695,28 +695,32 @@ class GraphQLParticipant:
         )
         q = {'id': root.id, 'filter': filter_}
 
-        samples = await info.context[LoaderKeys.SAMPLES_FOR_PARTICIPANTS].load(q)
+        samples = await info.context['loaders'][
+            LoaderKeys.SAMPLES_FOR_PARTICIPANTS
+        ].load(q)
         return [GraphQLSample.from_internal(s) for s in samples]
 
     @strawberry.field
     async def phenotypes(
-        self, info: Info, root: 'GraphQLParticipant'
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLParticipant'
     ) -> strawberry.scalars.JSON:
-        loader = info.context[LoaderKeys.PHENOTYPES_FOR_PARTICIPANTS]
+        loader = info.context['loaders'][LoaderKeys.PHENOTYPES_FOR_PARTICIPANTS]
         return await loader.load(root.id)
 
     @strawberry.field
     async def families(
-        self, info: Info, root: 'GraphQLParticipant'
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLParticipant'
     ) -> list[GraphQLFamily]:
-        fams = await info.context[LoaderKeys.FAMILIES_FOR_PARTICIPANTS].load(root.id)
+        fams = await info.context['loaders'][LoaderKeys.FAMILIES_FOR_PARTICIPANTS].load(
+            root.id
+        )
         return [GraphQLFamily.from_internal(f) for f in fams]
 
     @strawberry.field
     async def family_participants(
-        self, info: Info, root: 'GraphQLParticipant'
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLParticipant'
     ) -> list[GraphQLFamilyParticipant]:
-        family_participants = await info.context[
+        family_participants = await info.context['loaders'][
             LoaderKeys.FAMILY_PARTICIPANTS_FOR_PARTICIPANTS
         ].load(root.id)
         return [
@@ -724,18 +728,20 @@ class GraphQLParticipant:
         ]
 
     @strawberry.field
-    async def project(self, info: Info, root: 'GraphQLParticipant') -> GraphQLProject:
-        loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
+    async def project(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLParticipant'
+    ) -> GraphQLProject:
+        loader = info.context['loaders'][LoaderKeys.PROJECTS_FOR_IDS]
         project = await loader.load(root.project_id)
         return GraphQLProject.from_internal(project)
 
     @strawberry.field
     async def audit_log(
-        self, info: Info, root: 'GraphQLParticipant'
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLParticipant'
     ) -> GraphQLAuditLog | None:
         if root.audit_log_id is None:
             return None
-        loader = info.context[LoaderKeys.AUDIT_LOGS_BY_IDS]
+        loader = info.context['loaders'][LoaderKeys.AUDIT_LOGS_BY_IDS]
         audit_log = await loader.load(root.audit_log_id)
         return GraphQLAuditLog.from_internal(audit_log)
 
@@ -771,23 +777,27 @@ class GraphQLSample:
 
     @strawberry.field
     async def participant(
-        self, info: Info, root: 'GraphQLSample'
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLSample'
     ) -> GraphQLParticipant | None:
         if root.participant_id is None:
             return None
-        loader_participants_for_ids = info.context[LoaderKeys.PARTICIPANTS_FOR_IDS]
+        loader_participants_for_ids = info.context['loaders'][
+            LoaderKeys.PARTICIPANTS_FOR_IDS
+        ]
         participant = await loader_participants_for_ids.load(root.participant_id)
         return GraphQLParticipant.from_internal(participant)
 
     @strawberry.field
     async def assays(
         self,
-        info: Info,
+        info: Info[GraphQLContext, 'Query'],
         root: 'GraphQLSample',
         type: GraphQLFilter[str] | None = None,
         meta: GraphQLMetaFilter | None = None,
     ) -> list['GraphQLAssay']:
-        loader_assays_for_sample_ids = info.context[LoaderKeys.ASSAYS_FOR_SAMPLES]
+        loader_assays_for_sample_ids = info.context['loaders'][
+            LoaderKeys.ASSAYS_FOR_SAMPLES
+        ]
         filter_ = AssayFilter(
             type=type.to_internal_filter() if type else None,
             meta=meta,
@@ -798,14 +808,18 @@ class GraphQLSample:
         return [GraphQLAssay.from_internal(assay) for assay in assays]
 
     @strawberry.field
-    async def project(self, info: Info, root: 'GraphQLSample') -> GraphQLProject:
-        project = await info.context[LoaderKeys.PROJECTS_FOR_IDS].load(root.project_id)
+    async def project(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLSample'
+    ) -> GraphQLProject:
+        project = await info.context['loaders'][LoaderKeys.PROJECTS_FOR_IDS].load(
+            root.project_id
+        )
         return GraphQLProject.from_internal(project)
 
     @strawberry.field
     async def sequencing_groups(
         self,
-        info: Info,
+        info: Info[GraphQLContext, 'Query'],
         root: 'GraphQLSample',
         id: GraphQLFilter[str] | None = None,
         type: GraphQLFilter[str] | None = None,
@@ -814,7 +828,7 @@ class GraphQLSample:
         meta: GraphQLMetaFilter | None = None,
         active_only: GraphQLFilter[bool] | None = None,
     ) -> list['GraphQLSequencingGroup']:
-        loader = info.context[LoaderKeys.SEQUENCING_GROUPS_FOR_SAMPLES]
+        loader = info.context['loaders'][LoaderKeys.SEQUENCING_GROUPS_FOR_SAMPLES]
 
         _filter = SequencingGroupFilter(
             id=(
@@ -870,15 +884,17 @@ class GraphQLSequencingGroup:
         )
 
     @strawberry.field
-    async def sample(self, info: Info, root: 'GraphQLSequencingGroup') -> GraphQLSample:
-        loader = info.context[LoaderKeys.SAMPLES_FOR_IDS]
+    async def sample(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLSequencingGroup'
+    ) -> GraphQLSample:
+        loader = info.context['loaders'][LoaderKeys.SAMPLES_FOR_IDS]
         sample = await loader.load(root.sample_id)
         return GraphQLSample.from_internal(sample)
 
     @strawberry.field
     async def analyses(
         self,
-        info: Info,
+        info: Info[GraphQLContext, 'Query'],
         root: 'GraphQLSequencingGroup',
         status: GraphQLFilter[GraphQLAnalysisStatus] | None = None,
         type: GraphQLFilter[str] | None = None,
@@ -887,14 +903,14 @@ class GraphQLSequencingGroup:
         project: GraphQLFilter[str] | None = None,
     ) -> list[GraphQLAnalysis]:
         connection = info.context['connection']
-        loader = info.context[LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS]
+        loader = info.context['loaders'][LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS]
 
         _project_filter: GenericFilter[ProjectId] | None = None
         if project:
-            ptable = ProjectPermissionsTable(connection)
-            project_ids = project.all_values()
-            projects = await ptable.get_and_check_access_to_projects_for_names(
-                user=connection.author, project_names=project_ids, readonly=True
+            project_names = project.all_values()
+            projects = connection.get_and_check_access_to_projects_for_names(
+                project_names=project_names,
+                allowed_roles=ReadAccessRoles,
             )
             project_id_map: dict[str, int] = {
                 p.name: p.id for p in projects if p.name and p.id
@@ -923,9 +939,9 @@ class GraphQLSequencingGroup:
 
     @strawberry.field
     async def assays(
-        self, info: Info, root: 'GraphQLSequencingGroup'
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLSequencingGroup'
     ) -> list['GraphQLAssay']:
-        loader = info.context[LoaderKeys.ASSAYS_FOR_SEQUENCING_GROUPS]
+        loader = info.context['loaders'][LoaderKeys.ASSAYS_FOR_SEQUENCING_GROUPS]
         assays = await loader.load(root.internal_id)
         return [GraphQLAssay.from_internal(assay) for assay in assays]
 
@@ -956,8 +972,10 @@ class GraphQLAssay:
         )
 
     @strawberry.field
-    async def sample(self, info: Info, root: 'GraphQLAssay') -> GraphQLSample:
-        loader = info.context[LoaderKeys.SAMPLES_FOR_IDS]
+    async def sample(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLAssay'
+    ) -> GraphQLSample:
+        loader = info.context['loaders'][LoaderKeys.SAMPLES_FOR_IDS]
         sample = await loader.load(root.sample_id)
         return GraphQLSample.from_internal(sample)
 
@@ -1011,9 +1029,9 @@ class GraphQLAnalysisRunner:
 
     @strawberry.field
     async def project(
-        self, info: Info, root: 'GraphQLAnalysisRunner'
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLAnalysisRunner'
     ) -> GraphQLProject:
-        loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
+        loader = info.context['loaders'][LoaderKeys.PROJECTS_FOR_IDS]
         project = await loader.load(root.internal_project)
         return GraphQLProject.from_internal(project)
 
@@ -1023,26 +1041,25 @@ class Query:  # entry point to graphql.
     """GraphQL Queries"""
 
     @strawberry.field()
-    def enum(self, info: Info) -> GraphQLEnum:  # type: ignore
+    def enum(self, info: Info[GraphQLContext, 'Query']) -> GraphQLEnum:  # type: ignore
         return GraphQLEnum()
 
     @strawberry.field()
     async def cohort_templates(
         self,
-        info: Info,
+        info: Info[GraphQLContext, 'Query'],
         id: GraphQLFilter[str] | None = None,
         project: GraphQLFilter[str] | None = None,
     ) -> list[GraphQLCohortTemplate]:
         connection = info.context['connection']
         cohort_layer = CohortLayer(connection)
 
-        ptable = ProjectPermissionsTable(connection)
         project_name_map: dict[str, int] = {}
         project_filter = None
         if project:
             project_names = project.all_values()
-            projects = await ptable.get_and_check_access_to_projects_for_names(
-                user=connection.author, project_names=project_names, readonly=True
+            projects = connection.get_and_check_access_to_projects_for_names(
+                project_names=project_names, allowed_roles=ReadAccessRoles
             )
             project_name_map = {p.name: p.id for p in projects}
             project_filter = project.to_internal_filter_mapped(
@@ -1063,10 +1080,9 @@ class Query:  # entry point to graphql.
         external_templates = []
 
         for template in cohort_templates:
-            template_projects = await ptable.get_and_check_access_to_projects_for_ids(
-                user=connection.author,
+            template_projects = connection.get_and_check_access_to_projects_for_ids(
                 project_ids=template.criteria.projects or [],
-                readonly=True,
+                allowed_roles=ReadAccessRoles,
             )
             template_project_names = [p.name for p in template_projects if p.name]
             external_templates.append(
@@ -1078,7 +1094,7 @@ class Query:  # entry point to graphql.
     @strawberry.field()
     async def cohorts(
         self,
-        info: Info,
+        info: Info[GraphQLContext, 'Query'],
         id: GraphQLFilter[str] | None = None,
         project: GraphQLFilter[str] | None = None,
         name: GraphQLFilter[str] | None = None,
@@ -1088,13 +1104,12 @@ class Query:  # entry point to graphql.
         connection = info.context['connection']
         cohort_layer = CohortLayer(connection)
 
-        ptable = ProjectPermissionsTable(connection)
         project_name_map: dict[str, int] = {}
         project_filter = None
         if project:
             project_names = project.all_values()
-            projects = await ptable.get_and_check_access_to_projects_for_names(
-                user=connection.author, project_names=project_names, readonly=True
+            projects = connection.get_and_check_access_to_projects_for_names(
+                project_names=project_names, allowed_roles=ReadAccessRoles
             )
             project_name_map = {p.name: p.id for p in projects}
             project_filter = project.to_internal_filter_mapped(
@@ -1119,18 +1134,19 @@ class Query:  # entry point to graphql.
         return [GraphQLCohort.from_internal(cohort) for cohort in cohorts]
 
     @strawberry.field()
-    async def project(self, info: Info, name: str) -> GraphQLProject:
+    async def project(
+        self, info: Info[GraphQLContext, 'Query'], name: str
+    ) -> GraphQLProject:
         connection = info.context['connection']
-        ptable = ProjectPermissionsTable(connection)
-        project = await ptable.get_and_check_access_to_project_for_name(
-            user=connection.author, project_name=name, readonly=True
+        projects = connection.get_and_check_access_to_projects_for_names(
+            project_names=[name], allowed_roles=ReadAccessRoles
         )
-        return GraphQLProject.from_internal(project)
+        return GraphQLProject.from_internal(next(p for p in projects))
 
     @strawberry.field
     async def sample(
         self,
-        info: Info,
+        info: Info[GraphQLContext, 'Query'],
         id: GraphQLFilter[str] | None = None,
         project: GraphQLFilter[str] | None = None,
         type: GraphQLFilter[str] | None = None,
@@ -1140,7 +1156,6 @@ class Query:  # entry point to graphql.
         active: GraphQLFilter[bool] | None = None,
     ) -> list[GraphQLSample]:
         connection = info.context['connection']
-        ptable = ProjectPermissionsTable(connection)
         slayer = SampleLayer(connection)
 
         if not id and not project:
@@ -1152,8 +1167,9 @@ class Query:  # entry point to graphql.
         project_name_map: dict[str, int] = {}
         if project:
             project_names = project.all_values()
-            projects = await ptable.get_and_check_access_to_projects_for_names(
-                user=connection.author, project_names=project_names, readonly=True
+            projects = connection.get_and_check_access_to_projects_for_names(
+                project_names=project_names,
+                allowed_roles=ReadAccessRoles,
             )
             project_name_map = {p.name: p.id for p in projects if p.name and p.id}
 
@@ -1180,7 +1196,7 @@ class Query:  # entry point to graphql.
     @strawberry.field
     async def sequencing_groups(
         self,
-        info: Info,
+        info: Info[GraphQLContext, 'Query'],
         id: GraphQLFilter[str] | None = None,
         project: GraphQLFilter[str] | None = None,
         sample_id: GraphQLFilter[str] | None = None,
@@ -1195,7 +1211,6 @@ class Query:  # entry point to graphql.
     ) -> list[GraphQLSequencingGroup]:
         connection = info.context['connection']
         sglayer = SequencingGroupLayer(connection)
-        ptable = ProjectPermissionsTable(connection)
         if not (project or sample_id or id):
             raise ValueError('Must filter by project, sample or id')
 
@@ -1204,8 +1219,9 @@ class Query:  # entry point to graphql.
 
         if project:
             project_names = project.all_values()
-            projects = await ptable.get_and_check_access_to_projects_for_names(
-                user=connection.author, project_names=project_names, readonly=True
+            projects = connection.get_and_check_access_to_projects_for_names(
+                project_names=project_names,
+                allowed_roles=ReadAccessRoles,
             )
             project_id_map = {p.name: p.id for p in projects if p.name and p.id}
             _project_filter = project.to_internal_filter_mapped(
@@ -1247,36 +1263,41 @@ class Query:  # entry point to graphql.
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sgs]
 
     @strawberry.field
-    async def assay(self, info: Info, id: int) -> GraphQLAssay:
+    async def assay(self, info: Info[GraphQLContext, 'Query'], id: int) -> GraphQLAssay:
         connection = info.context['connection']
         slayer = AssayLayer(connection)
         assay = await slayer.get_assay_by_id(id)
         return GraphQLAssay.from_internal(assay)
 
     @strawberry.field
-    async def participant(self, info: Info, id: int) -> GraphQLParticipant:
-        loader = info.context[LoaderKeys.PARTICIPANTS_FOR_IDS]
+    async def participant(
+        self, info: Info[GraphQLContext, 'Query'], id: int
+    ) -> GraphQLParticipant:
+        loader = info.context['loaders'][LoaderKeys.PARTICIPANTS_FOR_IDS]
         return GraphQLParticipant.from_internal(await loader.load(id))
 
     @strawberry.field()
-    async def family(self, info: Info, family_id: int) -> GraphQLFamily:
+    async def family(
+        self, info: Info[GraphQLContext, 'Query'], family_id: int
+    ) -> GraphQLFamily:
         connection = info.context['connection']
         family = await FamilyLayer(connection).get_family_by_internal_id(family_id)
         return GraphQLFamily.from_internal(family)
 
     @strawberry.field
-    async def my_projects(self, info: Info) -> list[GraphQLProject]:
+    async def my_projects(
+        self, info: Info[GraphQLContext, 'Query']
+    ) -> list[GraphQLProject]:
         connection = info.context['connection']
-        ptable = ProjectPermissionsTable(connection)
-        projects = await ptable.get_projects_accessible_by_user(
-            connection.author, readonly=True
+        projects = connection.projects_with_role(
+            ReadAccessRoles.union(FullWriteAccessRoles)
         )
         return [GraphQLProject.from_internal(p) for p in projects]
 
     @strawberry.field
     async def analysis_runner(
         self,
-        info: Info,
+        info: Info[GraphQLContext, 'Query'],
         ar_guid: str,
     ) -> GraphQLAnalysisRunner:
         if not ar_guid:
