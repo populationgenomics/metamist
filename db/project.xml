@@ -1449,4 +1449,69 @@
 
 		</addColumn>
 	</changeSet>
+
+	<changeSet id="2024-06-05_project_member_table" author="dan.coates">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<createTable tableName="project_member">
+			<column name="project_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_PROJECT_MEMBER_PROJECT_ID"
+					references="project(id)" />
+			</column>
+			<column name="member" type="VARCHAR(255)"></column>
+			<column name="role" type="ENUM('reader', 'writer', 'contributor', 'project_admin', 'project_member_admin')">
+				<constraints nullable="false" />
+			</column>
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_PROJECT_MEMBER_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+
+		<addPrimaryKey tableName="project_member" columnNames="project_id,member,role" constraintName="PK_PROJECT_MEMBER"/>
+
+		<!-- Allow for quick accessing of a single member's projects -->
+		<createIndex indexName="PROJECT_MEMBER_MEMBER_INDEX" tableName="project_member">
+			<column name="member"/>
+		</createIndex>
+
+		<sql>ALTER TABLE project_member ADD SYSTEM VERSIONING;</sql>
+
+
+		<!-- Copy data across to new table -->
+
+		<sql>
+			-- copy across read and write roles from existing project table
+			INSERT INTO project_member (
+				SELECT
+					p.id AS project_id,
+					gm.member as member,
+					'reader' AS role,
+					coalesce(gm.audit_log_id, p.audit_log_id, g.audit_log_id) as audit_log_id
+				FROM project p
+				JOIN `group` g on g.id = p.read_group_id
+				JOIN group_member gm on gm.group_id = g.id
+				WHERE p.read_group_id IS NOT NULL
+
+				UNION ALL
+
+				SELECT
+					p.id AS project_id,
+					gm.member as member,
+					'writer' AS role,
+					coalesce(gm.audit_log_id, p.audit_log_id, g.audit_log_id) as audit_log_id
+				FROM project p
+				JOIN `group` g on g.id = p.write_group_id
+				JOIN group_member gm on gm.group_id = g.id
+				WHERE p.read_group_id IS NOT NULL
+			)
+		</sql>
+
+	</changeSet>
+
+
+
+
+
 </databaseChangeLog>

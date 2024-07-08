@@ -21,7 +21,7 @@ from models.models import (
     ProportionalDateTemporalMethod,
     SequencingGroupInternal,
 )
-from models.models.project import ProjectId
+from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
 from models.models.sequencing_group import SequencingGroupInternalId
 
 ES_ANALYSIS_OBJ_INTRO_DATE = datetime.date(2022, 6, 21)
@@ -54,13 +54,13 @@ class AnalysisLayer(BaseLayer):
 
     # GETS
 
-    async def get_analysis_by_id(self, analysis_id: int, check_project_id=True):
+    async def get_analysis_by_id(self, analysis_id: int):
         """Get analysis by ID"""
         project, analysis = await self.at.get_analysis_by_id(analysis_id)
-        if check_project_id:
-            await self.ptable.check_access_to_project_id(
-                self.author, project, readonly=True
-            )
+
+        self.connection.check_access_to_projects_for_ids(
+            [project], allowed_roles=ReadAccessRoles
+        )
 
         return analysis
 
@@ -115,17 +115,17 @@ class AnalysisLayer(BaseLayer):
             participant_ids=participant_ids,
         )
 
-    async def query(self, filter_: AnalysisFilter, check_project_ids=True):
+    async def query(self, filter_: AnalysisFilter) -> list[AnalysisInternal]:
         """Query analyses"""
         analyses = await self.at.query(filter_)
 
         if not analyses:
             return []
 
-        if check_project_ids and not filter_.project:
-            await self.ptable.check_access_to_project_ids(
-                self.author, set(a.project for a in analyses), readonly=True
-            )
+        self.connection.check_access_to_projects_for_ids(
+            set(a.project for a in analyses if a.project is not None),
+            allowed_roles=ReadAccessRoles,
+        )
 
         return analyses
 
@@ -156,8 +156,8 @@ class AnalysisLayer(BaseLayer):
         if start_date < datetime.date(2020, 1, 1):
             raise ValueError(f'start_date ({start_date}) must be after 2020-01-01')
 
-        project_objs = await self.ptable.get_and_check_access_to_projects_for_ids(
-            project_ids=projects, user=self.author, readonly=True
+        project_objs = self.connection.get_and_check_access_to_projects_for_ids(
+            project_ids=projects, allowed_roles=ReadAccessRoles
         )
         project_name_map = {p.id: p.name for p in project_objs}
 
@@ -554,14 +554,13 @@ class AnalysisLayer(BaseLayer):
         )
 
     async def add_sequencing_groups_to_analysis(
-        self, analysis_id: int, sequencing_group_ids: list[int], check_project_id=True
+        self, analysis_id: int, sequencing_group_ids: list[int]
     ):
         """Add samples to an analysis (through the linked table)"""
-        if check_project_id:
-            project_ids = await self.at.get_project_ids_for_analysis_ids([analysis_id])
-            await self.ptable.check_access_to_project_ids(
-                self.author, project_ids, readonly=False
-            )
+        project_ids = await self.at.get_project_ids_for_analysis_ids([analysis_id])
+        self.connection.check_access_to_projects_for_ids(
+            project_ids, allowed_roles=FullWriteAccessRoles
+        )
 
         return await self.at.add_sequencing_groups_to_analysis(
             analysis_id=analysis_id, sequencing_group_ids=sequencing_group_ids
@@ -573,16 +572,14 @@ class AnalysisLayer(BaseLayer):
         status: AnalysisStatus,
         meta: dict[str, Any] = None,
         output: str | None = None,
-        check_project_id=True,
     ):
         """
         Update the status of an analysis, set timestamp_completed if relevant
         """
-        if check_project_id:
-            project_ids = await self.at.get_project_ids_for_analysis_ids([analysis_id])
-            await self.ptable.check_access_to_project_ids(
-                self.author, project_ids, readonly=False
-            )
+        project_ids = await self.at.get_project_ids_for_analysis_ids([analysis_id])
+        self.connection.check_access_to_projects_for_ids(
+            project_ids, allowed_roles=FullWriteAccessRoles
+        )
 
         await self.at.update_analysis(
             analysis_id=analysis_id,
