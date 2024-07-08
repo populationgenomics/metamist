@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Card, Label, Statistic, Grid } from 'semantic-ui-react'
+import { Card, Label, Statistic, Grid, SemanticWIDTHS } from 'semantic-ui-react'
 
 interface StatTileProps {
     header: string
@@ -22,7 +22,7 @@ const StatTile: React.FC<StatTileProps> = ({ header, stats, icon, description })
                 {header}
             </Card.Header>
             <Card.Description>
-                <Grid columns={stats.length}>
+                <Grid columns={stats.length.toString() as SemanticWIDTHS}>
                     {stats.map((stat, index) => (
                         <Grid.Column key={index}>
                             <Statistic size="small">

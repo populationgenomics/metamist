@@ -3,7 +3,6 @@ from db.python.filters import GenericFilter
 from db.python.layers.base import BaseLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.cohort import CohortFilter, CohortTable, CohortTemplateFilter
-from db.python.tables.project import ProjectId, ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter, SampleTable
 from db.python.tables.sequencing_group import (
     SequencingGroupFilter,
@@ -16,6 +15,7 @@ from models.models.cohort import (
     CohortTemplateInternal,
     NewCohortInternal,
 )
+from models.models.project import ProjectId, ReadAccessRoles
 
 logger = get_logger()
 
@@ -69,29 +69,23 @@ class CohortLayer(BaseLayer):
 
         self.sampt = SampleTable(connection)
         self.ct = CohortTable(connection)
-        self.pt = ProjectPermissionsTable(connection)
         self.sgt = SequencingGroupTable(connection)
         self.sglayer = SequencingGroupLayer(self.connection)
 
-    async def query(
-        self, filter_: CohortFilter, check_project_ids: bool = True
-    ) -> list[CohortInternal]:
+    async def query(self, filter_: CohortFilter) -> list[CohortInternal]:
         """Query Cohorts"""
         cohorts, project_ids = await self.ct.query(filter_)
 
         if not cohorts:
             return []
 
-        if check_project_ids:
-            await self.pt.get_and_check_access_to_projects_for_ids(
-                user=self.connection.author,
-                project_ids=list(project_ids),
-                readonly=True,
-            )
+        self.connection.check_access_to_projects_for_ids(
+            project_ids=list(project_ids), allowed_roles=ReadAccessRoles
+        )
         return cohorts
 
     async def query_cohort_templates(
-        self, filter_: CohortTemplateFilter, check_project_ids: bool = True
+        self, filter_: CohortTemplateFilter
     ) -> list[CohortTemplateInternal]:
         """Query CohortTemplates"""
         project_ids, cohort_templates = await self.ct.query_cohort_templates(filter_)
@@ -99,12 +93,10 @@ class CohortLayer(BaseLayer):
         if not cohort_templates:
             return []
 
-        if check_project_ids:
-            await self.pt.get_and_check_access_to_projects_for_ids(
-                user=self.connection.author,
-                project_ids=list(project_ids),
-                readonly=True,
-            )
+        self.connection.check_access_to_projects_for_ids(
+            project_ids=list(project_ids), allowed_roles=ReadAccessRoles
+        )
+
         return cohort_templates
 
     async def get_template_by_cohort_id(self, cohort_id: int) -> CohortTemplateInternal:

@@ -106,6 +106,18 @@ DEFAULT_SAMPLE_FIELDS = [
         filter_key='external_id',
     ),
     ProjectParticipantGridField(
+        key='sample_root_id',
+        label='Root Sample ID',
+        is_visible=False,
+        filter_key='sample_root_id',
+    ),
+    ProjectParticipantGridField(
+        key='sample_parent_id',
+        label='Parent Sample ID',
+        is_visible=False,
+        filter_key='sample_root_id',
+    ),
+    ProjectParticipantGridField(
         key='created_date',
         label='Created date',
         is_visible=True,
@@ -726,6 +738,8 @@ class WebNonDBTests(unittest.TestCase):
                     type='blood',
                     created_date='2021-01-01',
                     non_sequencing_assays=[],
+                    sample_root_id=None,
+                    sample_parent_id=None,
                     sequencing_groups=[
                         NestedSequencingGroup(
                             id='cpgA',

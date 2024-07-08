@@ -1,25 +1,31 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Grid, Input, Message, Table as SUITable } from 'semantic-ui-react'
+import { Button, Card, Grid, Message } from 'semantic-ui-react'
 import {
     BillingApi,
     BillingColumn,
     BillingSource,
+    BillingTimePeriods,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 } from '../../sm-api'
 
+import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
+import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import {
-    getAdjustedDay,
     generateInvoiceMonths,
+    getAdjustedDay,
     getCurrentInvoiceMonth,
     getCurrentInvoiceYearStart,
 } from '../../shared/utilities/formatDates'
-import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
-import BillingCostByMonthTable from './components/BillingCostByMonthTable'
-import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import generateUrl from '../../shared/utilities/generateUrl'
+import BillingCostByMonthTable from './components/BillingCostByMonthTable'
 import FieldSelector from './components/FieldSelector'
+
+enum CloudSpendCategory {
+    STORAGE_COST = 'Storage Cost',
+    COMPUTE_COST = 'Compute Cost',
+}
 
 const BillingCostByTime: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
@@ -36,7 +42,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
     const [error, setError] = React.useState<string | undefined>()
     const [message, setMessage] = React.useState<string | undefined>()
     const [months, setMonths] = React.useState<string[]>([])
-    const [data, setData] = React.useState<IStackedAreaByDateChartData[]>([])
+    const [data, setData] = React.useState<any>([])
 
     // use navigate and update url params
     const location = useLocation()
@@ -69,11 +75,11 @@ const BillingCostByTime: React.FunctionComponent = () => {
         return `${year}-${month}-${lastDay}`
     }
 
-    const convertCostCategory = (costCategory: string) => {
-        if (costCategory.startsWith('Cloud Storage')) {
-            return 'Storage Cost'
+    const convertCostCategory = (costCategory: string | null | undefined) => {
+        if (costCategory?.startsWith('Cloud Storage')) {
+            return CloudSpendCategory.STORAGE_COST
         }
-        return 'Compute Cost'
+        return CloudSpendCategory.COMPUTE_COST
     }
 
     const getData = (query: BillingTotalCostQueryModel) => {
@@ -86,25 +92,43 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 setIsLoading(false)
 
                 // calc totals per topic, month and category
-                const recTotals: { [key: string]: { [key: string]: number } } = {}
+                interface RecTotals {
+                    [topic: string]: {
+                        [day: string]: {
+                            [category in CloudSpendCategory]?: number
+                        }
+                    }
+                }
+                const recTotals: RecTotals = {}
                 const recMonths: string[] = []
 
                 response.data.forEach((item: BillingTotalCostRecord) => {
                     const { day, cost_category, topic, cost } = item
                     const ccat = convertCostCategory(cost_category)
+                    const _topic = topic || ''
+                    if (!day) return
                     if (recMonths.indexOf(day) === -1) {
                         recMonths.push(day)
                     }
-                    if (!recTotals[topic]) {
-                        recTotals[topic] = {}
+                    if (!recTotals[_topic]) {
+                        recTotals[_topic] = {}
                     }
-                    if (!recTotals[topic][day]) {
-                        recTotals[topic][day] = {}
+                    if (!recTotals[_topic][day]) {
+                        recTotals[_topic][day] = {}
                     }
-                    if (!recTotals[topic][day][ccat]) {
-                        recTotals[topic][day][ccat] = 0
+                    if (!recTotals[_topic][day][ccat]) {
+                        recTotals[_topic][day][ccat] = 0
                     }
-                    recTotals[topic][day][ccat] += cost
+                    // Ensure recTotals[_topic] is initialized
+                    if (!recTotals[_topic]) {
+                        recTotals[_topic] = {}
+                    }
+                    // Ensure recTotals[_topic][day] is initialized
+                    if (!recTotals[_topic][day]) {
+                        recTotals[_topic][day] = {}
+                    }
+                    // Ensure recTotals[_topic][day][ccat] is initialized and add cost
+                    recTotals[_topic][day][ccat] = (recTotals[_topic][day][ccat] || 0) + cost
                 })
 
                 setMonths(recMonths)
@@ -198,7 +222,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 end_date: getAdjustedDay(convertInvoiceMonth(end, false), 3),
                 order_by: { day: false },
                 source: BillingSource.Aggregate,
-                time_periods: 'invoice_month',
+                time_periods: BillingTimePeriods.InvoiceMonth,
                 filters: {
                     invoice_month: generateInvoiceMonths(start, end),
                 },

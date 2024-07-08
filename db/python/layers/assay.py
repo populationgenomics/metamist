@@ -5,6 +5,7 @@ from db.python.tables.assay import AssayFilter, AssayTable
 from db.python.tables.sample import SampleTable
 from db.python.utils import NoOpAenter
 from models.models.assay import AssayInternal, AssayUpsertInternal
+from models.models.project import FullWriteAccessRoles, ReadAccessRoles
 
 
 class AssayLayer(BaseLayer):
@@ -16,7 +17,7 @@ class AssayLayer(BaseLayer):
         self.sampt: SampleTable = SampleTable(connection)
 
     # GET
-    async def query(self, filter_: AssayFilter = None, check_project_id=True):
+    async def query(self, filter_: AssayFilter = None):
         """Query for samples"""
 
         projects, assays = await self.seqt.query(filter_)
@@ -24,23 +25,19 @@ class AssayLayer(BaseLayer):
         if not assays:
             return []
 
-        if check_project_id:
-            await self.ptable.check_access_to_project_ids(
-                user=self.author, project_ids=projects, readonly=True
-            )
+        self.connection.check_access_to_projects_for_ids(
+            project_ids=projects, allowed_roles=ReadAccessRoles
+        )
 
         return assays
 
-    async def get_assay_by_id(
-        self, assay_id: int, check_project_id=True
-    ) -> AssayInternal:
+    async def get_assay_by_id(self, assay_id: int) -> AssayInternal:
         """Get assay by ID"""
         project, assay = await self.seqt.get_assay_by_id(assay_id)
 
-        if check_project_id:
-            await self.ptable.check_access_to_project_id(
-                self.author, project, readonly=True
-            )
+        self.connection.check_access_to_projects_for_ids(
+            [project], allowed_roles=ReadAccessRoles
+        )
 
         return assay
 
@@ -58,10 +55,7 @@ class AssayLayer(BaseLayer):
         return assay
 
     async def get_assays_for_sequencing_group_ids(
-        self,
-        sequencing_group_ids: list[int],
-        filter_: AssayFilter | None = None,
-        check_project_ids=True,
+        self, sequencing_group_ids: list[int], filter_: AssayFilter | None = None
     ) -> dict[int, list[AssayInternal]]:
         """Get assays for a list of sequencing group IDs"""
         if not sequencing_group_ids:
@@ -75,17 +69,16 @@ class AssayLayer(BaseLayer):
         if not assays:
             return {}
 
-        if check_project_ids:
-            await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
-            )
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=ReadAccessRoles
+        )
 
         return assays
 
     # region UPSERTs
 
     async def upsert_assay(
-        self, assay: AssayUpsertInternal, check_project_id=True, open_transaction=True
+        self, assay: AssayUpsertInternal, open_transaction=True
     ) -> AssayUpsertInternal:
         """Upsert a single assay"""
 
@@ -96,8 +89,9 @@ class AssayLayer(BaseLayer):
             project_ids = await self.sampt.get_project_ids_for_sample_ids(
                 [assay.sample_id]
             )
-            await self.ptable.check_access_to_project_ids(
-                self.author, project_ids, readonly=False
+
+            self.connection.check_access_to_projects_for_ids(
+                project_ids, allowed_roles=FullWriteAccessRoles
             )
 
             seq_id = await self.seqt.insert_assay(
@@ -109,12 +103,12 @@ class AssayLayer(BaseLayer):
             )
             assay.id = seq_id
         else:
-            if check_project_id:
-                # can check the project id of the assay we're updating
-                project_ids = await self.seqt.get_projects_by_assay_ids([assay.id])
-                await self.ptable.check_access_to_project_ids(
-                    self.author, project_ids, readonly=False
-                )
+            # can check the project id of the assay we're updating
+            project_ids = await self.seqt.get_projects_by_assay_ids([assay.id])
+            self.connection.check_access_to_projects_for_ids(
+                project_ids, allowed_roles=FullWriteAccessRoles
+            )
+
             # Otherwise update
             await self.seqt.update_assay(
                 assay.id,
@@ -129,27 +123,24 @@ class AssayLayer(BaseLayer):
     async def upsert_assays(
         self,
         assays: list[AssayUpsertInternal],
-        check_project_ids: bool = True,
         open_transaction=True,
     ) -> list[AssayUpsertInternal]:
         """Upsert multiple sequences to the given sample (sid)"""
 
-        if check_project_ids:
-            sample_ids = set(s.sample_id for s in assays)
-            st = SampleTable(self.connection)
-            project_ids = await st.get_project_ids_for_sample_ids(list(sample_ids))
-            await self.ptable.check_access_to_project_ids(
-                self.author, project_ids, readonly=False
-            )
+        sample_ids = set(s.sample_id for s in assays)
+        st = SampleTable(self.connection)
+        project_ids = await st.get_project_ids_for_sample_ids(list(sample_ids))
+
+        self.connection.check_access_to_projects_for_ids(
+            project_ids, allowed_roles=FullWriteAccessRoles
+        )
 
         with_function = (
             self.connection.connection.transaction if open_transaction else NoOpAenter
         )
         async with with_function():
             for a in assays:
-                await self.upsert_assay(
-                    a, check_project_id=False, open_transaction=False
-                )
+                await self.upsert_assay(a, open_transaction=False)
 
         return assays
 

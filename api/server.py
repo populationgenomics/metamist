@@ -1,3 +1,4 @@
+import datetime
 import os
 import time
 import traceback
@@ -12,15 +13,19 @@ from starlette.responses import FileResponse
 
 from api import routes
 from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
-from api.settings import PROFILE_REQUESTS, SKIP_DATABASE_CONNECTION
-from api.utils import get_openapi_schema_func
+from api.settings import (
+    PROFILE_REQUESTS,
+    PROFILE_REQUESTS_OUTPUT,
+    SKIP_DATABASE_CONNECTION,
+    SM_ENVIRONMENT,
+)
 from api.utils.exceptions import determine_code_from_error
+from api.utils.openapi import get_openapi_schema_func
 from db.python.connect import SMConnections
-from db.python.tables.project import is_all_access
 from db.python.utils import get_logger
 
 # This tag is automatically updated by bump2version
-_VERSION = '7.1.1'
+_VERSION = '7.2.0'
 
 
 logger = get_logger()
@@ -50,12 +55,44 @@ app = FastAPI(lifespan=app_lifespan)
 
 
 if PROFILE_REQUESTS:
+    from pyinstrument import Profiler
+    from pyinstrument.renderers.speedscope import SpeedscopeRenderer
 
-    from fastapi_profiler.profiler import PyInstrumentProfilerMiddleware
+    @app.middleware('http')
+    async def profile_request(request: Request, call_next):
+        """optional profiling for http requests"""
+        profiler = Profiler(async_mode='enabled')
+        profiler.start()
+        resp = await call_next(request)
+        profiler.stop()
 
-    app.add_middleware(PyInstrumentProfilerMiddleware)  # type: ignore
+        if 'text' in PROFILE_REQUESTS_OUTPUT:
+            text_output = profiler.output_text()
+            print(text_output)
 
-if is_all_access():
+        timestamp = (
+            datetime.datetime.now().replace(microsecond=0).isoformat().replace(':', '-')
+        )
+
+        if 'json' in PROFILE_REQUESTS_OUTPUT:
+            os.makedirs('profiles', exist_ok=True)
+            json = profiler.output(renderer=SpeedscopeRenderer())
+
+            with open(f'profiles/{timestamp}.json', 'w') as file:
+                file.write(json)
+                file.close()
+
+        if 'html' in PROFILE_REQUESTS_OUTPUT:
+            os.makedirs('profiles', exist_ok=True)
+            html = profiler.output_html()
+            with open(f'profiles/{timestamp}.html', 'w') as file:
+                file.write(html)
+                file.close()
+
+        return resp
+
+
+if SM_ENVIRONMENT == 'local':
     app.add_middleware(
         CORSMiddleware,
         allow_origins=['*'],
@@ -186,6 +223,5 @@ if __name__ == '__main__':
         'api.server:app',
         host='0.0.0.0',
         port=int(os.getenv('PORT', '8000')),
-        # debug=True,
         reload=True,
     )
