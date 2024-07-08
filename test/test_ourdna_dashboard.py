@@ -53,7 +53,7 @@ class OurDNADashboardTest(DbIsolatedTest):
                                 'received-time': '2022-07-03 14:28:00',
                                 'received-by': 'YP',
                                 'collection-lab': 'XYZ LAB',
-                                'collection-event-name': 'walk-in',
+                                'collection-event-type': 'walk-in',
                                 'courier': 'ABC COURIERS',
                                 'courier-tracking-number': 'ABCDEF12562',
                                 'courier-scheduled-pickup-time': '2022-07-03 13:28:00',
@@ -94,7 +94,7 @@ class OurDNADashboardTest(DbIsolatedTest):
                                 'received-time': '2022-07-03 14:28:00',
                                 'received-by': 'YP',
                                 'collection-lab': 'XYZ LAB',
-                                'collection-event-name': 'EventA',
+                                'collection-event-type': 'OSS',
                                 'courier': 'ABC COURIERS',
                                 'courier-tracking-number': 'ABCDEF12562',
                                 'courier-scheduled-pickup-time': '2022-07-03 13:28:00',
@@ -288,7 +288,7 @@ class OurDNADashboardTest(DbIsolatedTest):
         sample_tally: dict[str, int] = defaultdict()
         for sample in self.sample_external_objects:
             assert isinstance(sample.meta, dict)
-            event_name = sample.meta.get('collection-event-name', 'Unknown')
+            event_name = sample.meta.get('collection-event-type', 'Unknown')
             if event_name in sample_tally:
                 sample_tally[event_name] += 1
             else:
