@@ -11,7 +11,6 @@ import logging
 import os
 import re
 import sys
-from datetime import datetime, timezone
 
 import google.cloud.bigquery as bq
 import numpy as np
@@ -33,12 +32,14 @@ logger.addHandler(logging.StreamHandler())
 
 
 def get_metamist_billing(yr: str) -> pd.DataFrame:
-    """ """
+    """
+    Get the billing data from metamist BQ table
+    """
     invoice_months = [f'{yr}{str(m).zfill(2)}' for m in range(1, 13)]
     query = f"""
         SELECT topic, invoice.month as month, sum(cost) as total_cost_metamist
         FROM `{SM_GCP_BQ_AGGREG_RAW}`
-        WHERE 
+        WHERE
         -- only consider the last few days before and after to limit the size of the data
         DATE_TRUNC(usage_end_time, DAY) >= TIMESTAMP("{int(yr) - 1}-12-28")
         AND DATE_TRUNC(usage_end_time, DAY) <= TIMESTAMP("{int(yr) + 1}-01-05")
@@ -56,12 +57,14 @@ def get_metamist_billing(yr: str) -> pd.DataFrame:
 
 
 def get_gcp_billing(yr: str) -> pd.DataFrame:
-    """ """
+    """
+    Get the billing data from GCP BQ table
+    """
     invoice_months = [f'{yr}{str(m).zfill(2)}' for m in range(1, 13)]
     query = f"""
         SELECT project.name as project_name, invoice.month as month, sum(cost) as total_cost_gcp
         FROM `{GCP_BILLING_SOURCE_TABLE}`
-        WHERE 
+        WHERE
         -- only consider the last few days before and after to limit the size of the data
         TIMESTAMP_TRUNC(_PARTITIONTIME, DAY) >= TIMESTAMP("{int(yr) - 1}-12-28")
         AND TIMESTAMP_TRUNC(_PARTITIONTIME, DAY) <= TIMESTAMP("{int(yr) + 1}-01-05")
@@ -86,7 +89,7 @@ def get_gcp_billing(yr: str) -> pd.DataFrame:
 
 def main():
     """
-    Expect path to cpg-infrastructure-private folder as command line argument
+    Expect year and optional output path as command line argument
     """
     # check env vars
     if not GCP_BILLING_SOURCE_TABLE:
