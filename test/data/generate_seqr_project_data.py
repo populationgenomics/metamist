@@ -496,7 +496,12 @@ async def generate_web_report_analyses(project: str,
         )
 
 
-async def generate_joint_called_analyses(project: str, aligned_sgs: list[dict], analyses_to_insert: list[Analysis]):
+
+
+
+async def generate_joint_called_analyses(
+    project: str, aligned_sgs: list[dict], analyses_to_insert: list[Analysis]
+):
     """
     Selects a subset of the aligned sequencing groups for the input project and
     generates joint-called AnnotateDataset and ES-index analysis entries for them.
@@ -578,6 +583,21 @@ async def main():
             await papi.create_project_async(
                 name=project, dataset=project, create_test_project=False
             )
+
+            default_user = os.getenv('SM_LOCALONLY_DEFAULTUSER')
+            if not default_user:
+                print(
+                    'SM_LOCALONLY_DEFAULTUSER env var is not set, please set it before generating data'
+                )
+                sys.exit(1)
+
+            await papi.update_project_members_async(
+                project=project,
+                project_member_update=[
+                    {'member': default_user, 'roles': ['reader', 'writer']}
+                ],
+            )
+
 
             default_user = os.getenv('SM_LOCALONLY_DEFAULTUSER')
             if not default_user:
