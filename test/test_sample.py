@@ -51,7 +51,7 @@ class TestSample(DbIsolatedTest):
             )
         )
 
-        sample = await self.slayer.get_by_id(s.id, check_project_id=False)
+        sample = await self.slayer.get_by_id(s.id)
 
         self.assertEqual('blood', sample.type)
         self.assertDictEqual(meta_dict, sample.meta)
@@ -107,7 +107,7 @@ class TestSample(DbIsolatedTest):
             SampleUpsertInternal(id=s.id, external_ids=new_external_id_dict)
         )
 
-        sample = await self.slayer.get_by_id(s.id, check_project_id=False)
+        sample = await self.slayer.get_by_id(s.id)
 
         self.assertDictEqual(new_external_id_dict, sample.external_ids)
 

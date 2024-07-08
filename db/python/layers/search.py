@@ -4,7 +4,6 @@ from typing import List, Optional
 from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.family import FamilyTable
 from db.python.tables.participant import ParticipantTable
-from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import SequencingGroupTable
 from db.python.utils import NotFoundError
@@ -28,7 +27,6 @@ class SearchLayer(BaseLayer):
 
     def __init__(self, connection: Connection):
         super().__init__(connection)
-        self.pt = ProjectPermissionsTable(connection)
         self.connection = connection
 
     @staticmethod
