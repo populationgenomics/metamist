@@ -17,13 +17,8 @@ import numpy as np
 import pandas as pd
 
 # name of the BQ table to insert the records
-GCP_BILLING_SOURCE_TABLE = os.getenv(
-    'GCP_BILLING_SOURCE_TABLE',
-    'billing-admin-290403.billing.gcp_billing_export_v1_01D012_20A6A2_CBD343',
-)
-SM_GCP_BQ_AGGREG_RAW = os.getenv(
-    'SM_GCP_BQ_AGGREG_RAW', 'billing-admin-290403.billing_aggregate.aggregate'
-)
+GCP_BILLING_SOURCE_TABLE = os.getenv('GCP_BILLING_SOURCE_TABLE')
+SM_GCP_BQ_AGGREG_RAW = os.getenv('SM_GCP_BQ_AGGREG_RAW')
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -47,7 +42,6 @@ def get_metamist_billing(yr: str) -> pd.DataFrame:
         GROUP BY 1, 2
         ORDER BY 2, 1;
     """
-    logger.debug(f'Executing {query}')
     bq_client = bq.Client()
     df = bq_client.query(
         query,
@@ -72,7 +66,6 @@ def get_gcp_billing(yr: str) -> pd.DataFrame:
         GROUP BY 1, 2
         ORDER BY 2, 1;
     """
-    logger.debug(f'Executing {query}')
     bq_client = bq.Client()
     df = bq_client.query(
         query,
