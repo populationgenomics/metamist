@@ -496,9 +496,6 @@ async def generate_web_report_analyses(project: str,
         )
 
 
-
-
-
 async def generate_joint_called_analyses(
     project: str, aligned_sgs: list[dict], analyses_to_insert: list[Analysis]
 ):
@@ -597,7 +594,6 @@ async def main():
                     {'member': default_user, 'roles': ['reader', 'writer']}
                 ],
             )
-
 
             default_user = os.getenv('SM_LOCALONLY_DEFAULTUSER')
             if not default_user:

@@ -58,11 +58,6 @@ function getRowClassName(sequencingType: string) {
     }
 }
 
-type SortColumn = {
-    column: keyof ProjectInsightsSummary
-    direction: 'asc' | 'desc'
-}
-
 const GetAlignedPercentageCell: React.FC<{
     summary: ProjectInsightsSummary
     isDarkMode: boolean
