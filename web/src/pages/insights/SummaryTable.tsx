@@ -1,10 +1,10 @@
-import React, { ReactNode, useState } from 'react'
+import React, { ReactNode } from 'react'
 import { Table as SUITable } from 'semantic-ui-react'
 import Table from '../../shared/components/Table'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
 import HtmlTooltip from '../../shared/utilities/htmlTooltip'
 import { ProjectInsightsSummary } from '../../sm-api'
-import { ColumnKey, HeaderCell, summaryTableHeaderCellConfigs } from './HeaderCell'
+import { ColumnKey, HeaderCell, SUMMARY_TABLE_HEADER_CELL_CONFIGS } from './HeaderCell'
 import { FooterCell, footerCellConfigs } from './SummaryTableFooterCell'
 
 interface SummaryTableProps {
@@ -18,14 +18,12 @@ interface PercentageCellProps {
     percentage: number
     tooltipContent: ReactNode
     isDarkMode: boolean
-    getPercentageColor: (percentage: number, isDarkMode: boolean) => string
 }
 
 const PercentageCell: React.FC<PercentageCellProps> = ({
     percentage,
     tooltipContent,
     isDarkMode,
-    getPercentageColor,
 }) => (
     <SUITable.Cell
         className="percentage-cell"
@@ -49,7 +47,7 @@ function getPercentageColor(percentage: number, isDarkMode: boolean) {
     return `hsl(${hue}, ${saturation}, ${lightness})`
 }
 
-const getRowClassName = (sequencingType: string) => {
+function getRowClassName(sequencingType: string) {
     switch (sequencingType) {
         case 'exome':
             return 'exome-row'
@@ -60,30 +58,41 @@ const getRowClassName = (sequencingType: string) => {
     }
 }
 
-const getSummaryCell = (
-    summary: ProjectInsightsSummary,
-    key: ColumnKey,
+type SortColumn = {
+    column: keyof ProjectInsightsSummary
+    direction: 'asc' | 'desc'
+}
+
+const GetAlignedPercentageCell: React.FC<{
+    summary: ProjectInsightsSummary
     isDarkMode: boolean
-): React.ReactNode => {
-    // What goes into each cell of the table is determined by the column header or 'key'
-    // The percentage calculation cells are handled differently from the other cells
-    const percentageAligned =
+}> = ({ summary, isDarkMode }) => {
+    const percentage =
         summary.total_sequencing_groups > 0
             ? (summary.total_crams / summary.total_sequencing_groups) * 100
             : 0
-    const alignedCellTooltip = (
+    const tooltipContent = (
         <p>
             {summary.total_crams} / {summary.total_sequencing_groups} Total Sequencing Groups with a
             Completed CRAM Analysis
         </p>
     )
-
-    const latestAnnotateSgCount = summary.latest_annotate_dataset?.sg_count ?? 0
-    const percentageInJointCall = calculatePercentage(
-        latestAnnotateSgCount,
-        summary.total_sequencing_groups
+    return (
+        <PercentageCell
+            percentage={percentage}
+            tooltipContent={tooltipContent}
+            isDarkMode={isDarkMode}
+        />
     )
-    const inJointCallTooltip = (
+}
+
+const GetAnnotatedDatasetPercentageCell: React.FC<{
+    summary: ProjectInsightsSummary
+    isDarkMode: boolean
+}> = ({ summary, isDarkMode }) => {
+    const latestAnnotateSgCount = summary.latest_annotate_dataset?.sg_count ?? 0
+    const percentage = calculatePercentage(latestAnnotateSgCount, summary.total_sequencing_groups)
+    const tooltipContent = (
         <p>
             {latestAnnotateSgCount} / {summary.total_sequencing_groups} Sequencing Groups
             <br />
@@ -93,13 +102,22 @@ const getSummaryCell = (
             Analysis ID: {summary.latest_annotate_dataset?.id}
         </p>
     )
-
-    const latestSnvIndexSgCount = summary.latest_snv_es_index?.sg_count ?? 0
-    const percentageInSnvIndex = calculatePercentage(
-        latestSnvIndexSgCount,
-        summary.total_sequencing_groups
+    return (
+        <PercentageCell
+            percentage={percentage}
+            tooltipContent={tooltipContent}
+            isDarkMode={isDarkMode}
+        />
     )
-    const inSnvIndexTooltip = (
+}
+
+const GetSnvIndexPercentageCell: React.FC<{
+    summary: ProjectInsightsSummary
+    isDarkMode: boolean
+}> = ({ summary, isDarkMode }) => {
+    const latestSnvIndexSgCount = summary.latest_snv_es_index?.sg_count ?? 0
+    const percentage = calculatePercentage(latestSnvIndexSgCount, summary.total_sequencing_groups)
+    const tooltipContent = (
         <p>
             {latestSnvIndexSgCount} / {summary.total_sequencing_groups} Sequencing Groups
             <br />
@@ -110,13 +128,22 @@ const getSummaryCell = (
             {summary.latest_snv_es_index?.name}
         </p>
     )
-
-    const latestSvIndexSgCount = summary.latest_sv_es_index?.sg_count ?? 0
-    const percentageInSvIndex = calculatePercentage(
-        latestSvIndexSgCount,
-        summary.total_sequencing_groups
+    return (
+        <PercentageCell
+            percentage={percentage}
+            tooltipContent={tooltipContent}
+            isDarkMode={isDarkMode}
+        />
     )
-    const inSvIndexTooltip = (
+}
+
+const GetSvIndexPercentageCell: React.FC<{
+    summary: ProjectInsightsSummary
+    isDarkMode: boolean
+}> = ({ summary, isDarkMode }) => {
+    const latestSvIndexSgCount = summary.latest_sv_es_index?.sg_count ?? 0
+    const percentage = calculatePercentage(latestSvIndexSgCount, summary.total_sequencing_groups)
+    const tooltipContent = (
         <p>
             {latestSvIndexSgCount} / {summary.total_sequencing_groups} Sequencing Groups
             <br />
@@ -127,48 +154,33 @@ const getSummaryCell = (
             {summary.latest_sv_es_index?.name} <br />
         </p>
     )
+    return (
+        <PercentageCell
+            percentage={percentage}
+            tooltipContent={tooltipContent}
+            isDarkMode={isDarkMode}
+        />
+    )
+}
 
-    switch (key) {
+const GetSummaryCell: React.FC<{
+    summary: ProjectInsightsSummary
+    columnKey: ColumnKey
+    isDarkMode: boolean
+}> = ({ summary, columnKey, isDarkMode }) => {
+    switch (columnKey) {
         case 'aligned_percentage':
-            return (
-                <PercentageCell
-                    percentage={percentageAligned}
-                    tooltipContent={alignedCellTooltip}
-                    isDarkMode={isDarkMode}
-                    getPercentageColor={getPercentageColor}
-                ></PercentageCell>
-            )
+            return <GetAlignedPercentageCell summary={summary} isDarkMode={isDarkMode} />
         case 'annotated_dataset_percentage':
-            return (
-                <PercentageCell
-                    percentage={percentageInJointCall}
-                    tooltipContent={inJointCallTooltip}
-                    isDarkMode={isDarkMode}
-                    getPercentageColor={getPercentageColor}
-                ></PercentageCell>
-            )
+            return <GetAnnotatedDatasetPercentageCell summary={summary} isDarkMode={isDarkMode} />
         case 'snv_index_percentage':
-            return (
-                <PercentageCell
-                    percentage={percentageInSnvIndex}
-                    tooltipContent={inSnvIndexTooltip}
-                    isDarkMode={isDarkMode}
-                    getPercentageColor={getPercentageColor}
-                ></PercentageCell>
-            )
+            return <GetSnvIndexPercentageCell summary={summary} isDarkMode={isDarkMode} />
         case 'sv_index_percentage':
-            return (
-                <PercentageCell
-                    percentage={percentageInSvIndex}
-                    tooltipContent={inSvIndexTooltip}
-                    isDarkMode={isDarkMode}
-                    getPercentageColor={getPercentageColor}
-                ></PercentageCell>
-            )
+            return <GetSvIndexPercentageCell summary={summary} isDarkMode={isDarkMode} />
         default:
             return (
                 <SUITable.Cell className="table-cell">
-                    {summary[key as keyof ProjectInsightsSummary]}
+                    {summary[columnKey as keyof ProjectInsightsSummary]}
                 </SUITable.Cell>
             )
     }
@@ -179,13 +191,15 @@ const SummaryTableRow: React.FC<{ summary: ProjectInsightsSummary }> = ({ summar
     const isDarkMode = theme.theme === 'dark-mode'
     const rowClassName = getRowClassName(summary.sequencing_type)
     return (
-        <SUITable.Row
-            key={`${summary.dataset}-${summary.sequencing_type}-${summary.sequencing_technology}`}
-            className={rowClassName}
-        >
-            {summaryTableHeaderCellConfigs.map((config) =>
-                getSummaryCell(summary, config.key, isDarkMode)
-            )}
+        <SUITable.Row className={rowClassName}>
+            {SUMMARY_TABLE_HEADER_CELL_CONFIGS.map((config) => (
+                <GetSummaryCell
+                    key={config.key}
+                    summary={summary}
+                    columnKey={config.key}
+                    isDarkMode={isDarkMode}
+                />
+            ))}
         </SUITable.Row>
     )
 }
@@ -196,7 +210,7 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
     handleSelectionChange,
     getSelectedOptionsForColumn,
 }) => {
-    const [sortColumns, setSortColumns] = useState<
+    const [sortColumns, setSortColumns] = React.useState<
         Array<{ column: ColumnKey; direction: 'ascending' | 'descending' }>
     >([])
     const handleSort = (column: ColumnKey, isMultiSort: boolean) => {
@@ -250,19 +264,24 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
         return data
     }, [filteredData, sortColumns])
 
+    const sortDirectionMap = React.useMemo(() => {
+        const map = new Map<string, 'ascending' | 'descending' | undefined>()
+        sortColumns.forEach(({ column, direction }) => {
+            map.set(column, direction)
+        })
+        return map
+    }, [sortColumns])
+
     return (
         <div>
             <Table sortable>
                 <SUITable.Header>
                     <SUITable.Row>
-                        {summaryTableHeaderCellConfigs.map((config) => (
+                        {SUMMARY_TABLE_HEADER_CELL_CONFIGS.map((config) => (
                             <HeaderCell
                                 key={config.key}
                                 config={config}
-                                sortDirection={
-                                    sortColumns.find((column) => column.column === config.key)
-                                        ?.direction
-                                }
+                                sortDirection={sortDirectionMap.get(config.key)}
                                 onSort={handleSort}
                                 onFilter={handleSelectionChange}
                                 getUniqueOptionsForColumn={getUniqueOptionsForColumn}
@@ -272,11 +291,8 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                     </SUITable.Row>
                 </SUITable.Header>
                 <SUITable.Body>
-                    {sortedData.map((summary) => (
-                        <SummaryTableRow
-                            key={`${summary.dataset}-${summary.sequencing_type}-${summary.sequencing_technology}`}
-                            summary={summary}
-                        />
+                    {sortedData.map((summary: ProjectInsightsSummary) => (
+                        <SummaryTableRow summary={summary} />
                     ))}
                 </SUITable.Body>
                 <SUITable.Footer>

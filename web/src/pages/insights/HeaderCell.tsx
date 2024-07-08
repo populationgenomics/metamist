@@ -87,7 +87,7 @@ export const HeaderCell: React.FC<HeaderCellProps> = ({
     )
 }
 
-export const detailsTableHeaderCellConfigs: HeaderCellConfig[] = [
+export const DETAILS_TABLE_HEADER_CELL_CONFIGS: HeaderCellConfig[] = [
     { key: 'dataset', label: 'Dataset', sortable: true },
     { key: 'sequencing_type', label: 'Seq Type', sortable: true },
     {
@@ -204,7 +204,7 @@ export const detailsTableHeaderCellConfigs: HeaderCellConfig[] = [
     },
 ]
 
-export const summaryTableHeaderCellConfigs: HeaderCellConfig[] = [
+export const SUMMARY_TABLE_HEADER_CELL_CONFIGS: HeaderCellConfig[] = [
     { key: 'dataset', label: 'Dataset', sortable: true },
     { key: 'sequencing_type', label: 'Seq Type', sortable: true },
     { key: 'sequencing_technology', label: 'Technology', sortable: true, filterable: true },

@@ -13,9 +13,13 @@ from typing import List, Set
 from metamist.apis import AnalysisApi, FamilyApi, ParticipantApi, ProjectApi, SampleApi
 from metamist.graphql import gql, query_async
 from metamist.model.analysis import Analysis
-from metamist.models import AssayUpsert, SampleUpsert, SequencingGroupUpsert
+from metamist.models import (
+    AnalysisStatus,
+    AssayUpsert,
+    SampleUpsert,
+    SequencingGroupUpsert,
+)
 from metamist.parser.generic_parser import chunk
-from models.enums import AnalysisStatus
 
 PRIMARY_EXTERNAL_ORG = ''
 

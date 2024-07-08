@@ -12,13 +12,12 @@ from db.python.enum_tables import SequencingPlatformTable as SeqPlatformTable
 from db.python.enum_tables import SequencingTechnologyTable as SeqTechTable
 from db.python.layers.base import BaseLayer
 from db.python.tables.base import DbBase
-from db.python.tables.project import ProjectPermissionsTable
 from models.models import (
     AnalysisStatsInternal,
     ProjectInsightsDetailsInternal,
     ProjectInsightsSummaryInternal,
 )
-from models.models.project import Project, ProjectId
+from models.models.project import Project, ProjectId, ReadAccessRoles
 from models.models.sequencing_group import SequencingGroupInternalId
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
 
@@ -776,10 +775,8 @@ INNER JOIN (
         self, project_names: list[str], sequencing_types: list[str]
     ):
         """Combines the results of the above queries into a response"""
-        ptable = ProjectPermissionsTable(self._connection)
-        # projects = self.get_and_check_access_to_projects_for_names(project_names, readonly=True)
-        projects = await ptable.get_and_check_access_to_projects_for_names(
-            user=self.author, project_names=project_names, readonly=True
+        projects = self._connection.get_and_check_access_to_projects_for_names(
+            project_names=project_names, allowed_roles=ReadAccessRoles
         )
         project_ids: list[ProjectId] = [project.id for project in projects]
 
@@ -877,9 +874,8 @@ INNER JOIN (
         self, project_names: list[str], sequencing_types: list[str]
     ):
         """Combines the results of the queries above into a response"""
-        ptable = ProjectPermissionsTable(self._connection)
-        projects = await ptable.get_and_check_access_to_projects_for_names(
-            user=self.author, project_names=project_names, readonly=True
+        projects = self._connection.get_and_check_access_to_projects_for_names(
+            project_names=project_names, allowed_roles=ReadAccessRoles
         )
         project_ids: list[ProjectId] = [project.id for project in projects]
 

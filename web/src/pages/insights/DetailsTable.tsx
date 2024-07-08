@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Dropdown, Table as SUITable } from 'semantic-ui-react'
 import Table from '../../shared/components/Table'
 import { ProjectInsightsDetails } from '../../sm-api'
-import { ColumnKey, HeaderCell, detailsTableHeaderCellConfigs } from './HeaderCell'
+import { ColumnKey, DETAILS_TABLE_HEADER_CELL_CONFIGS, HeaderCell } from './HeaderCell'
 
 interface DetailsTableProps {
     filteredData: ProjectInsightsDetails[]
@@ -42,7 +42,7 @@ const DetailsTableRow: React.FC<{ details: ProjectInsightsDetails }> = ({ detail
     const rowClassName = getRowClassName(details.sequencing_type)
     return (
         <SUITable.Row key={`${details.sequencing_group_id}`} className={rowClassName}>
-            {detailsTableHeaderCellConfigs.map((config) => (
+            {DETAILS_TABLE_HEADER_CELL_CONFIGS.map((config) => (
                 <SUITable.Cell
                     key={config.key}
                     data-cell
@@ -120,10 +120,18 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
         return data
     }, [filteredData, sortColumns])
 
+    const sortDirectionMap = React.useMemo(() => {
+        const map = new Map<string, 'ascending' | 'descending' | undefined>()
+        sortColumns.forEach(({ column, direction }) => {
+            map.set(column, direction)
+        })
+        return map
+    }, [sortColumns])
+
     const exportToFile = (format: 'csv' | 'tsv') => {
-        const headerData = detailsTableHeaderCellConfigs.map((config) => config.label)
+        const headerData = DETAILS_TABLE_HEADER_CELL_CONFIGS.map((config) => config.label)
         const rowData = sortedData.map((details) =>
-            detailsTableHeaderCellConfigs.map((config) => {
+            DETAILS_TABLE_HEADER_CELL_CONFIGS.map((config) => {
                 const value = getCellValue(details, config.key)
                 if (value === '✅') return 'TRUE'
                 if (value === '❌') return 'FALSE'
@@ -169,14 +177,11 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
             <Table sortable id="project-insights-details-table">
                 <SUITable.Header>
                     <SUITable.Row>
-                        {detailsTableHeaderCellConfigs.map((config) => (
+                        {DETAILS_TABLE_HEADER_CELL_CONFIGS.map((config) => (
                             <HeaderCell
                                 key={config.key}
                                 config={config}
-                                sortDirection={
-                                    sortColumns.find((column) => column.column === config.key)
-                                        ?.direction
-                                }
+                                sortDirection={sortDirectionMap.get(config.key)}
                                 onSort={handleSort}
                                 onFilter={handleSelectionChange}
                                 getUniqueOptionsForColumn={getUniqueOptionsForColumn}
