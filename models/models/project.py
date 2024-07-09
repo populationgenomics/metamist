@@ -1,13 +1,11 @@
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Optional
-
-from pydantic import field_serializer
 
 from models.base import SMBase, parse_sql_dict
 
 ProjectId = int
 
-ProjectMemberRole = Enum(
+ProjectMemberRole = StrEnum(
     'ProjectMemberRole',
     [
         'reader',
@@ -40,11 +38,6 @@ class Project(SMBase):
     meta: Optional[dict[str, Any]] = None
     roles: set[ProjectMemberRole]
     """The roles that the current user has within the project"""
-
-    @field_serializer('roles')
-    def serialize_roles(self, roles: set[ProjectMemberRole]):
-        """convert roles into a form that can be returned from the API"""
-        return [r.name for r in roles]
 
     @staticmethod
     def from_db(kwargs):
