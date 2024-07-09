@@ -371,7 +371,7 @@ html[data-theme='dark-mode'] .ui.table {
 }
 
 .ui.table {
-    table-layout: fixed;
+    table-layout: auto;
 }
 
 .ui.table .table-cell {
