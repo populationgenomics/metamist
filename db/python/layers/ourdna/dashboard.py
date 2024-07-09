@@ -310,7 +310,7 @@ class OurDnaDashboardLayer(BaseLayer):
         for sample in samples:
             processed_meta = SampleProcessMeta(sample)
             _collection_event_name = processed_meta.get_property(
-                'collection-event-name'
+                'collection-event-type'
             )
             total_samples_by_collection_event_name[
                 _collection_event_name or 'Unknown'

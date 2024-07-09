@@ -15,6 +15,8 @@ import {
 } from './pages/billing'
 import DocumentationArticle from './pages/docs/Documentation'
 import FamilyView from './pages/family/FamilyView'
+import Details from './pages/insights/Details'
+import Summary from './pages/insights/Summary'
 import OurDnaDashboard from './pages/ourdna/OurDnaDashboard'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
 import ProjectOverview from './pages/project/ProjectOverview'
@@ -114,6 +116,24 @@ const Routes: React.FunctionComponent = () => (
             element={
                 <ErrorBoundary>
                     <FamilyView />
+                </ErrorBoundary>
+            }
+        />
+
+        <Route
+            path="insights/details"
+            element={
+                <ErrorBoundary>
+                    <Details />
+                </ErrorBoundary>
+            }
+        />
+
+        <Route
+            path="insights/summary"
+            element={
+                <ErrorBoundary>
+                    <Summary />
                 </ErrorBoundary>
             }
         />
