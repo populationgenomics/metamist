@@ -21,6 +21,13 @@ def str_to_datetime(timestamp_str):
     return datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
 
 
+def convert_to_dict(d):
+    """Converts a defaultdict into a dict recursively"""
+    if isinstance(d, defaultdict):
+        d = {k: convert_to_dict(v) for k, v in d.items()}
+    return d
+
+
 class OurDNADashboardTest(DbIsolatedTest):
     """Test sample class"""
 
@@ -338,7 +345,7 @@ class OurDNADashboardTest(DbIsolatedTest):
         self.assertTrue(processing_times_by_site)
         self.assertIsInstance(processing_times_by_site, dict)
 
-        sample_tally: dict[str, dict[int, int]] = defaultdict()
+        sample_tally: dict[str, dict[int, int]] = defaultdict(lambda: defaultdict(int))
         for sample in self.sample_external_objects:
             assert isinstance(sample.meta, dict)
             processing_site = sample.meta.get('processing-site', 'Unknown')
@@ -351,14 +358,52 @@ class OurDNADashboardTest(DbIsolatedTest):
                 process_start_time
             )
             current_bucket = ceil(time_difference.total_seconds() / 3600)
-            if processing_site in sample_tally:
-                sample_tally[processing_site][current_bucket] += 1
-            else:
-                sample_tally[processing_site] = {}
-                sample_tally[processing_site][current_bucket] = 1
+            sample_tally[processing_site][current_bucket] += 1
+
+        for site in sample_tally:
+            min_bucket = min(sample_tally[site])
+            max_bucket = max(sample_tally[site])
+            for i in range(min_bucket, max_bucket + 1):
+                sample_tally[site].setdefault(i, 0)
 
         # Checks that we have identical dicts (by extension, keys and their values)
-        self.assertDictEqual(processing_times_by_site, sample_tally)
+        self.assertDictEqual(processing_times_by_site, convert_to_dict(sample_tally))
+
+    @run_as_sync
+    async def test_processing_times_per_collection_site(self):
+        """I want to know how long it took to process samples collected at each site"""
+        dashboard = await self.odd.query(project_id=self.project_id)
+        processing_times_by_collection_site = (
+            dashboard.processing_times_by_collection_site
+        )
+
+        # Check that processing_times_per_site is not empty and is a dict
+        self.assertTrue(processing_times_by_collection_site)
+        self.assertIsInstance(processing_times_by_collection_site, dict)
+
+        sample_tally: dict[str, dict[int, int]] = defaultdict(lambda: defaultdict(int))
+        for sample in self.sample_external_objects:
+            assert isinstance(sample.meta, dict)
+            collection_site = sample.meta.get('collection-lab', 'Unknown')
+            process_start_time = sample.meta.get('process-start-time')
+            process_end_time = sample.meta.get('process-end-time')
+            # Skip samples that don't have process_start_time or process_end_time
+            if not process_start_time or not process_end_time:
+                continue
+            time_difference = str_to_datetime(process_end_time) - str_to_datetime(
+                process_start_time
+            )
+            current_bucket = ceil(time_difference.total_seconds() / 3600)
+            sample_tally[collection_site][current_bucket] += 1
+
+        for site in sample_tally:
+            min_bucket = min(sample_tally[site])
+            max_bucket = max(sample_tally[site])
+            for i in range(min_bucket, max_bucket + 1):
+                sample_tally[site].setdefault(i, 0)
+
+        # Checks that we have identical dicts (by extension, keys and their values)
+        self.assertDictEqual(processing_times_by_collection_site, sample_tally)
 
     @run_as_sync
     async def test_total_samples_by_collection_event_name(self):
@@ -519,6 +564,7 @@ class OurDNADashboardTest(DbIsolatedTest):
             '24h': 0,
             '48h': 0,
             '72h': 0,
+            '>72h': 0,
         }
         for sample in self.sample_external_objects:
             assert isinstance(sample.meta, dict)
@@ -537,6 +583,8 @@ class OurDNADashboardTest(DbIsolatedTest):
                 samples_filtered['48h'] += 1
             elif current_bucket <= 72:
                 samples_filtered['72h'] += 1
+            else:
+                samples_filtered['>72h'] += 1
 
         self.assertDictEqual(
             collection_to_process_end_time_bucket_statistics, samples_filtered

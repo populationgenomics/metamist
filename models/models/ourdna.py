@@ -32,6 +32,9 @@ class OurDNADashboard(BaseModel):
     processing_times_by_site: dict[str, dict[int, int]] = defaultdict(
         lambda: defaultdict(int)
     )
+    processing_times_by_collection_site: dict[str, dict[int, int]] = defaultdict(
+        lambda: defaultdict(int)
+    )
     total_samples_by_collection_event_name: dict[str, int] = defaultdict(int)
     samples_lost_after_collection: list[OurDNALostSample] = []
     samples_concentration_gt_1ug: dict[str, float] = {}

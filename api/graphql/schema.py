@@ -105,8 +105,10 @@ class GraphQLOurDNADashboard:
 
     collection_to_process_end_time: strawberry.scalars.JSON
     collection_to_process_end_time_statistics: strawberry.scalars.JSON
+    collection_to_process_end_time_bucket_statistics: strawberry.scalars.JSON
     collection_to_process_end_time_24h: strawberry.scalars.JSON
     processing_times_by_site: strawberry.scalars.JSON
+    processing_times_by_collection_site: strawberry.scalars.JSON
     total_samples_by_collection_event_name: strawberry.scalars.JSON
     samples_lost_after_collection: list[GraphQLOurDNALostSample]
     samples_concentration_gt_1ug: strawberry.scalars.JSON

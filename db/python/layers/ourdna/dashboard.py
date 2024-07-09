@@ -81,6 +81,11 @@ class SampleProcessMeta:
         return self.get_property('processing-site'), self.processing_time
 
     @cached_property
+    def processing_time_by_collection_site(self) -> tuple[str | None, int | None]:
+        """Get processing times and site for a sample."""
+        return self.get_property('collection-lab'), self.processing_time
+
+    @cached_property
     def collection_to_process_end_time(self) -> int | None:
         """Get the time taken from collection to process end."""
         if self.collection_time and self.process_end_time:
@@ -201,6 +206,9 @@ class OurDnaDashboardLayer(BaseLayer):
         processing_times_by_site: dict[str, dict[int, int]] = (
             self.process_processing_times_by_site(samples=samples)
         )
+        processing_times_by_collection_site: dict[str, dict[int, int]] = (
+            self.process_processing_times_by_collection_site(samples=samples)
+        )
         total_samples_by_collection_event_name: dict[str, int] = (
             self.process_total_samples_by_collection_event_name(samples=samples)
         )
@@ -227,6 +235,7 @@ class OurDnaDashboardLayer(BaseLayer):
             collection_to_process_end_time_bucket_statistics=collection_to_process_end_time_bucket_statistics,
             collection_to_process_end_time_24h=collection_to_process_end_time_24h,
             processing_times_by_site=processing_times_by_site,
+            processing_times_by_collection_site=processing_times_by_collection_site,
             total_samples_by_collection_event_name=total_samples_by_collection_event_name,
             samples_lost_after_collection=samples_lost_after_collection,
             samples_concentration_gt_1ug=samples_concentration_gt_1ug,
@@ -299,6 +308,12 @@ class OurDnaDashboardLayer(BaseLayer):
             if self._48_hr_threshold < time <= self._72_hr_threshold
         )
 
+        collection_to_process_end_time_bucket_statistics['>72h'] = sum(
+            1
+            for time in collection_to_process_end_time.values()
+            if time > self._72_hr_threshold
+        )
+
         return collection_to_process_end_time_bucket_statistics
 
     def process_collection_to_process_end_times_24h(
@@ -339,6 +354,33 @@ class OurDnaDashboardLayer(BaseLayer):
                 processing_times_by_site[site].setdefault(i, 0)
 
         return processing_times_by_site
+
+    def process_processing_times_by_collection_site(
+        self, samples: list[Sample]
+    ) -> dict:
+        """Get the processing times by collection site"""
+        processing_times_by_collection_site: dict[str, dict[int, int]] = defaultdict(
+            lambda: defaultdict(int)
+        )
+
+        for sample in samples:
+            processed_meta = SampleProcessMeta(sample)
+            processing_collection_site, processing_time = (
+                processed_meta.processing_time_by_collection_site
+            )
+            if processing_collection_site and processing_time:
+                hour_bucket = ceil(processing_time / 3600)
+                processing_times_by_collection_site[processing_collection_site][
+                    hour_bucket
+                ] += 1
+
+        for site in processing_times_by_collection_site:
+            min_bucket = min(processing_times_by_collection_site[site])
+            max_bucket = max(processing_times_by_collection_site[site])
+            for i in range(min_bucket, max_bucket + 1):
+                processing_times_by_collection_site[site].setdefault(i, 0)
+
+        return processing_times_by_collection_site
 
     def process_total_samples_by_collection_event_name(
         self, samples: list[Sample]
