@@ -74,7 +74,8 @@ const Dashboard = () => {
     const samplesLostAfterCollections =
         data.project.ourdnaDashboard.samplesLostAfterCollection.reduce(
             (rr: Record<string, any>, sample) => {
-                rr[sample.sampleId] = sample.timeSinceCollection / 3600
+                rr[sample.sampleId] =
+                    sample.timeSinceCollection != null ? sample.timeSinceCollection / 3600 : 0
                 return rr
             },
             {}
