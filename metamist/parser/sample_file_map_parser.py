@@ -99,8 +99,8 @@ class SampleFileMapParser(GenericMetadataParser):
         default_sequencing=DefaultSequencing(
             seq_type='genome', technology='short-read', platform='illumina'
         ),
-        default_read_end_type: str = None,
-        default_read_length: str | int = None,
+        default_read_end_type: str | None = None,
+        default_read_length: str | int | None = None,
         allow_extra_files_in_search_path=False,
         default_reference_assembly_location: str | None = None,
         verbose=True,
@@ -129,13 +129,13 @@ class SampleFileMapParser(GenericMetadataParser):
             **kwargs,
         )
 
-    def get_sample_id(self, row: SingleRow) -> str:
+    def get_primary_sample_id(self, row: SingleRow) -> str:
         """Get external sample ID from row"""
 
         if self.sample_primary_eid_column and self.sample_primary_eid_column in row:
             return row[self.sample_primary_eid_column]
 
-        return self.get_participant_id(row)
+        return self.get_primary_participant_id(row)
 
     @staticmethod
     def get_info() -> tuple[str, str]:
@@ -194,11 +194,11 @@ async def main(  # pylint: disable=too-many-arguments
     default_sequencing_type='genome',
     default_sequencing_technology='short-read',
     default_sequencing_platform='illumina',
-    default_sequencing_facility: str = None,
-    default_sequencing_library: str = None,
-    default_read_end_type: str = None,
-    default_read_length: str = None,
-    default_reference_assembly: str = None,
+    default_sequencing_facility: str | None = None,
+    default_sequencing_library: str | None = None,
+    default_read_end_type: str | None = None,
+    default_read_length: str | None = None,
+    default_reference_assembly: str | None = None,
     allow_extra_files_in_search_path=False,
     confirm=False,
     dry_run=False,
