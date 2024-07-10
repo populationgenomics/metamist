@@ -109,8 +109,8 @@ class SampleFileMapParser(GenericMetadataParser):
         super().__init__(
             search_locations=search_locations,
             project=project,
-            participant_column=PARTICIPANT_COL_NAME,
-            sample_name_column=SAMPLE_ID_COL_NAME,
+            participant_primary_eid_column=PARTICIPANT_COL_NAME,
+            sample_primary_eid_column=SAMPLE_ID_COL_NAME,
             reads_column=READS_COL_NAME,
             checksum_column=CHECKSUM_COL_NAME,
             seq_type_column=SEQ_TYPE_COL_NAME,
@@ -132,8 +132,8 @@ class SampleFileMapParser(GenericMetadataParser):
     def get_sample_id(self, row: SingleRow) -> str:
         """Get external sample ID from row"""
 
-        if self.sample_name_column and self.sample_name_column in row:
-            return row[self.sample_name_column]
+        if self.sample_primary_eid_column and self.sample_primary_eid_column in row:
+            return row[self.sample_primary_eid_column]
 
         return self.get_participant_id(row)
 

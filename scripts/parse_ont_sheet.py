@@ -68,8 +68,8 @@ class OntParser(GenericMetadataParser):
         super().__init__(
             search_locations=search_locations,
             project=project,
-            participant_name_column=Columns.SAMPLE_ID,
-            sample_name_column=Columns.SAMPLE_ID,
+            participant_primary_eid_column=Columns.SAMPLE_ID,
+            sample_primary_eid_column=Columns.SAMPLE_ID,
             reads_column=Columns.PASS_FASTQ_FILENAME,
             default_sample_type=default_sample_type,
             default_sequencing=default_sequencing,
@@ -97,9 +97,7 @@ class OntParser(GenericMetadataParser):
         """
         return [fastqs]
 
-    async def get_sample_sequencing_groups(
-        self, sample: ParsedSample
-    ) -> list[ParsedSequencingGroup]:
+    async def get_sample_sequencing_groups(self, sample: ParsedSample) -> list[ParsedSequencingGroup]:
         sequencing_groups = await super().get_sample_sequencing_groups(sample)
 
         for sequencing_group in sequencing_groups:

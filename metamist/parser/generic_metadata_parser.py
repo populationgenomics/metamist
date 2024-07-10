@@ -80,10 +80,10 @@ class GenericMetadataParser(GenericParser):
         project: str,
         search_locations: list[str],
         # sample columns
-        sample_name_column: str,
+        sample_primary_eid_column: str,
         sample_external_id_column_map: dict[str, str] | None = None,
         # Participant columns
-        participant_name_column: str | None = None,
+        participant_primary_eid_column: str | None = None,
         reported_sex_column: str | None = None,
         reported_gender_column: str | None = None,
         karyotype_column: str | None = None,
@@ -128,17 +128,17 @@ class GenericMetadataParser(GenericParser):
             search_locations (list[str]):
                 A list of locations to search for unqualified files in.
 
-            sample_name_column (str): The name of the column containing the sample name.
+            sample_primary_eid_column (str): The name of the column containing the sample name.
             sample_external_id_column_map (str | None, optional):
                 {column: eid_name} mapping for sample external_ids. This should NOT
-                include the sample_name_column.
+                include the sample_primary_eid_column.
             sample_meta_map (dict[str, str] | None, optional):
                 A mapping of column names to keys for sample.meta.
                 {[column]: [metadata_key]}
             default_sample_type (str | None, optional):
                 The default sample type to use if not provided in the manifest.
 
-            participant_name_column (str | None, optional):
+            participant_primary_eid_column (str | None, optional):
                 The name of the column containing the participant name. Unsupplied means
                 there are no participants represented in the file.
             reported_sex_column (str | None, optional):
@@ -150,7 +150,7 @@ class GenericMetadataParser(GenericParser):
                 The name of the column containing the karyotype, no validation.
             participant_external_id_column_map (str | None, optional):
                 {column: eid_name} mapping for participant external_ids.
-                This should NOT include the participant_name_column.
+                This should NOT include the participant_primary_eid_column.
             participant_meta_map (dict[str, str] | None, optional):
                 A mapping of column names to keys for participant.meta.
                 {[column]: [metadata_key]}
@@ -214,15 +214,15 @@ class GenericMetadataParser(GenericParser):
             **kwargs,
         )
 
-        if not sample_name_column:
+        if not sample_primary_eid_column:
             raise ValueError('A sample name column MUST be provided')
 
         self.cpg_id_column = 'Internal CPG Sequencing Group ID'
-        self.sample_name_column = sample_name_column
+        self.sample_primary_eid_column = sample_primary_eid_column
         self.sample_external_id_column_map = sample_external_id_column_map or {}
 
         # Participant columns
-        self.participant_column = participant_name_column
+        self.participant_column = participant_primary_eid_column
         self.participant_external_id_column_map = (
             participant_external_id_column_map or {}
         )
@@ -261,7 +261,7 @@ class GenericMetadataParser(GenericParser):
 
     def get_primary_sample_id(self, row: SingleRow) -> str:
         """Get external sample ID from row"""
-        return row[self.sample_name_column].strip()
+        return row[self.sample_primary_eid_column].strip()
 
     async def get_cpg_sample_id_from_row(self, row: SingleRow) -> str | None:
         """Get internal cpg id from a row using get_sample_id and an api call"""
@@ -1015,7 +1015,7 @@ async def main(
     manifests,
     project,
     search_path: list[str],
-    sample_name_column: str,
+    sample_primary_eid_column: str,
     participant_column: str | None = None,
     reported_sex_column: str | None = None,
     reported_gender_column: str | None = None,
@@ -1060,8 +1060,8 @@ async def main(
 
     parser = GenericMetadataParser(
         project=project,
-        sample_name_column=sample_name_column,
-        participant_name_column=participant_column,
+        sample_primary_eid_column=sample_primary_eid_column,
+        participant_primary_eid_column=participant_column,
         reported_sex_column=reported_sex_column,
         reported_gender_column=reported_gender_column,
         karyotype_column=karyotype_column,

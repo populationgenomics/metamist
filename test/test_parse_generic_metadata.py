@@ -133,7 +133,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
             },
             ignore_extra_keys=False,
             reads_column='fn',
-            sample_name_column='sample',
+            sample_primary_eid_column='sample',
             participant_meta_map={},
             sample_meta_map={},
             assay_meta_map={},
@@ -196,7 +196,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
         ]
         parser = GenericMetadataParser(
             search_locations=[],
-            sample_name_column='SampleId',
+            sample_primary_eid_column='SampleId',
             participant_meta_map={},
             sample_meta_map={'sample.centre': 'centre'},
             assay_meta_map={
@@ -306,8 +306,8 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
         parser = GenericMetadataParser(
             search_locations=[],
-            participant_name_column='Individual ID',
-            sample_name_column='Sample ID',
+            participant_primary_eid_column='Individual ID',
+            sample_primary_eid_column='Sample ID',
             reads_column='Filenames',
             seq_type_column='Type',
             participant_meta_map={},
@@ -406,8 +406,8 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
         parser = GenericMetadataParser(
             search_locations=[],
-            participant_name_column='Individual ID',
-            sample_name_column='Sample ID',
+            participant_primary_eid_column='Individual ID',
+            sample_primary_eid_column='Sample ID',
             participant_meta_map={},
             sample_meta_map={},
             assay_meta_map={},
@@ -464,8 +464,8 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
         parser = GenericMetadataParser(
             search_locations=[],
-            participant_name_column='Individual ID',
-            sample_name_column='Sample ID',
+            participant_primary_eid_column='Individual ID',
+            sample_primary_eid_column='Sample ID',
             participant_meta_map={},
             sample_meta_map={},
             assay_meta_map={},
@@ -499,8 +499,8 @@ class TestParseGenericMetadata(DbIsolatedTest):
         ]
         parser = GenericMetadataParser(
             search_locations=[],
-            participant_name_column='Individual ID',
-            sample_name_column='Sample ID',
+            participant_primary_eid_column='Individual ID',
+            sample_primary_eid_column='Sample ID',
             reads_column='Filename',
             assay_meta_map={
                 'Assay Meta 1': 'assay_meta1',
@@ -630,7 +630,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
         parser = GenericMetadataParser(
             search_locations=[],
-            sample_name_column='Sample ID',
+            sample_primary_eid_column='Sample ID',
             reads_column='Filename',
             participant_meta_map={},
             sample_meta_map={},
@@ -678,7 +678,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
         parser = GenericMetadataParser(
             search_locations=[],
-            sample_name_column='Sample ID',
+            sample_primary_eid_column='Sample ID',
             reads_column='Filename',
             participant_meta_map={},
             sample_meta_map={},
@@ -749,7 +749,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
         parser = GenericMetadataParser(
             search_locations=[],
-            sample_name_column='Sample ID',
+            sample_primary_eid_column='Sample ID',
             reads_column='Filename',
             participant_meta_map={},
             sample_meta_map={},
@@ -821,7 +821,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
         parser = GenericMetadataParser(
             search_locations=[],
-            sample_name_column='Sample ID',
+            sample_primary_eid_column='Sample ID',
             reads_column='Filename',
             participant_meta_map={},
             sample_meta_map={},
@@ -884,8 +884,8 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
         parser = GenericMetadataParser(
             search_locations=[],
-            participant_name_column='Participant ID',
-            sample_name_column='Sample ID',
+            participant_primary_eid_column='Participant ID',
+            sample_primary_eid_column='Sample ID',
             reads_column='Filename',
             participant_meta_map={},
             sample_meta_map={},

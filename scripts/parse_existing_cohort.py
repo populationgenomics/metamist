@@ -123,8 +123,8 @@ class ExistingCohortParser(GenericMetadataParser):
         super().__init__(
             project=project,
             search_locations=search_locations,
-            sample_name_column=Columns.EXTERNAL_ID,
-            participant_name_column=participant_column,
+            sample_primary_eid_column=Columns.EXTERNAL_ID,
+            participant_primary_eid_column=participant_column,
             reported_gender_column=Columns.SEX,
             sample_meta_map={},
             qc_meta_map={},

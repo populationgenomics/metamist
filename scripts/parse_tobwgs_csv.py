@@ -51,7 +51,7 @@ class TobWgsParser(GenericMetadataParser):
             project=project,
             default_sequencing_type=default_sequencing_type,
             default_sample_type=default_sample_type,
-            sample_name_column='sample.sample_name',
+            sample_primary_eid_column='sample.sample_name',
             participant_meta_map={},
             sample_meta_map={},
             assay_meta_map=SEQUENCE_MAP,

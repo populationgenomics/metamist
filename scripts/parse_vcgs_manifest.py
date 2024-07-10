@@ -87,7 +87,7 @@ class VcgsManifestParser(GenericMetadataParser):
             search_locations=search_locations,
             default_sequencing_type=default_sequencing_type,
             default_sample_type=default_sample_type,
-            sample_name_column=Columns.SAMPLE_NAME,
+            sample_primary_eid_column=Columns.SAMPLE_NAME,
             reads_column=Columns.FILENAME,
             participant_meta_map=Columns.participant_meta_map(),
             sample_meta_map=Columns.sample_meta_map(),
@@ -98,7 +98,7 @@ class VcgsManifestParser(GenericMetadataParser):
 
     def get_primary_sample_id(self, row: Dict[str, Any]) -> str:
         """Get external sample ID from row"""
-        external_id = row[self.sample_name_column]
+        external_id = row[self.sample_primary_eid_column]
         if '-' in external_id:
             external_id = external_id.split('-')[0]
         return external_id

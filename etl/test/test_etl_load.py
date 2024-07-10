@@ -18,7 +18,7 @@ class TestGetParserInstance(GenericMetadataParser):
     ):
         super().__init__(
             project=project,
-            sample_name_column='sample',
+            sample_primary_eid_column='sample',
             search_locations=[],
             participant_meta_map={},
             sample_meta_map={},
