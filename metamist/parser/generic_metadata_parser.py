@@ -219,9 +219,13 @@ class GenericMetadataParser(GenericParser):
 
         self.cpg_id_column = 'Internal CPG Sequencing Group ID'
         self.sample_name_column = sample_name_column
+        self.sample_external_id_column_map = sample_external_id_column_map or {}
 
         # Participant columns
         self.participant_column = participant_name_column
+        self.participant_external_id_column_map = (
+            participant_external_id_column_map or {}
+        )
         self.reported_sex_column = reported_sex_column
         self.reported_gender_column = reported_gender_column
         self.karyotype_column = karyotype_column
@@ -673,6 +677,32 @@ class GenericMetadataParser(GenericParser):
     async def get_sample_meta_from_group(self, rows: GroupedRow):
         """Get sample-metadata from row"""
         return self.collapse_arbitrary_meta(self.sample_meta_map, rows)
+
+    def get_participant_external_ids(self, row: GroupedRow) -> dict[str, str]:
+        eids = {}
+        for r in row:
+            for column, name in self.participant_external_id_column_map.items():
+                new_eid = r.get(column)
+                if not new_eid:
+                    continue
+                if name in eids and new_eid != eids[name]:
+                    raise ValueError
+                eids[name] = new_eid
+
+        return eids
+
+    def get_sample_external_ids(self, row: GroupedRow) -> dict[str, str]:
+        eids = {}
+        for r in row:
+            for column, name in self.sample_external_id_column_map.items():
+                new_eid = r.get(column)
+                if not new_eid:
+                    continue
+                if name in eids and new_eid != eids[name]:
+                    raise ValueError
+                eids[name] = new_eid
+
+        return eids
 
     async def get_participant_meta_from_group(self, rows: GroupedRow):
         """Get participant-metadata from rows then set it in the ParticipantMetaGroup"""

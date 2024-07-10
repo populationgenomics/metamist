@@ -857,10 +857,11 @@ class GenericParser(
         values = await query_async(
             QUERY_MATCH_PARTICIPANTS, variables={'project': self.project}
         )
-        pid_map = {p['externalId']: p['id'] for p in values['project']['participants']}
+        # case insensitive matching
+        pid_map = {p['externalId'].lower(): p['id'] for p in values['project']['participants']}
 
         for participant in participants:
-            participant.internal_pid = pid_map.get(participant.external_pid)
+            participant.internal_pid = pid_map.get(participant.external_pid.lower())
 
     async def match_sample_ids(self, samples: list[ParsedSample]):
         """
@@ -871,10 +872,11 @@ class GenericParser(
         values = await query_async(
             QUERY_MATCH_SAMPLES, variables={'project': self.project}
         )
-        sid_map = {p['externalId']: p['id'] for p in values['project']['samples']}
+        # case insensitive matching
+        sid_map = {p['externalId'].lower(): p['id'] for p in values['project']['samples']}
 
         for sample in ParsedSample.get_all_samples_from(samples):
-            sample.internal_sid = sid_map.get(sample.external_sid)
+            sample.internal_sid = sid_map.get(sample.external_sid.lower())
 
     async def match_sequencing_group_ids(
         self, sequencing_groups: list[ParsedSequencingGroup]
@@ -1040,6 +1042,7 @@ class GenericParser(
                 ParsedParticipant(
                     internal_pid=None,
                     external_pid=pid,
+                    external_pids=self.get_participant_external_ids(prows),
                     rows=prows,
                     meta=await self.get_participant_meta_from_group(prows),
                     reported_sex=self.get_reported_sex(prows),
@@ -1069,6 +1072,7 @@ class GenericParser(
                     participant=participant,
                     internal_sid=None,
                     external_sid=sid,
+                    external_sids=self.get_sample_external_ids(sample_rows),
                     sample_type=self.get_sample_type(sample_rows),
                     meta=await self.get_sample_meta_from_group(sample_rows),
                 )
