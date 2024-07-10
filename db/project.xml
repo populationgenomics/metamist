@@ -1449,6 +1449,7 @@
 
 		</addColumn>
 	</changeSet>
+
 	<changeSet id="2024-06-05_project_member_table" author="dan.coates">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
 		<createTable tableName="project_member">

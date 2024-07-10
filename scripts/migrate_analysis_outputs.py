@@ -4,7 +4,11 @@ from textwrap import dedent
 
 from databases import Database
 
-from db.python.connect import Connection, CredentialedDatabaseConfiguration
+from db.python.connect import (
+    Connection,
+    CredentialedDatabaseConfiguration,
+    SMConnections,
+)
 from db.python.tables.output_file import OutputFileTable
 
 
@@ -15,7 +19,8 @@ def _get_connection_string():
 
     # config = CredentialedDatabaseConfiguration(dbname='sm_dev', username='root')
 
-    return config.get_connection_string()
+    # return config.get_connection_string()
+    return config
 
 
 async def get_analyses_without_fileid(connection: Database):
@@ -42,16 +47,22 @@ if __name__ == '__main__':
     async def main():
         """Go through all analysis objects and create output file objects where possible"""
         connection_string = _get_connection_string()
-        database = Database(connection_string or _get_connection_string(), echo=True)
-        connection = Connection(
-            connection=database,
-            project=None,
-            author='migrate_output_files',
-            on_behalf_of='yash',
-            readonly=False,
-            ar_guid=None,
+        database = Database(connection_string.get_connection_string(), echo=True)
+
+        sm_db = SMConnections.make_connection(
+            config=connection_string,
         )
-        oft = OutputFileTable(connection)
+        await sm_db.connect()
+        formed_connection = Connection(
+            connection=sm_db,
+            author='yash',
+            project_id_map={},
+            project_name_map={},
+            on_behalf_of=None,
+            ar_guid=None,
+            project=None,
+        )
+        oft = OutputFileTable(formed_connection)
         analyses = await get_analyses_without_fileid(database)
         for analyis in analyses:
             await oft.process_output_for_analysis(
