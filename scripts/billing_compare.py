@@ -26,58 +26,121 @@ logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
 
 
-def get_metamist_billing(yr: str) -> pd.DataFrame:
+def generate_invoice_months(yr: str) -> str:
+    """
+    Generate the invoice months for the year
+    """
+    return "','".join([f'{yr}{str(m).zfill(2)}' for m in range(1, 13)])
+
+
+def generate_group_by(columns: list) -> str:
+    """
+    Generate the group by clause
+    """
+    return ','.join([str(r) for r in range(1, len(columns) + 1)])
+
+
+def set_index(
+    df: pd.DataFrame, include_topic: bool, include_service: bool
+) -> pd.DataFrame:
+    """
+    Set the index for the dataframe based on selected columns
+    """
+    if include_topic and include_service:
+        df['idx'] = (
+            df['month'].astype(str)
+            + '|'
+            + df['topic'].astype(str)
+            + '|'
+            + df['service'].astype(str)
+        )
+    elif include_topic:
+        df['idx'] = df['month'].astype(str) + '|' + df['topic'].astype(str)
+    elif include_service:
+        df['idx'] = df['month'].astype(str) + '|' + df['service'].astype(str)
+    else:
+        df['idx'] = df['month'].astype(str)
+    return df.set_index('idx')
+
+
+def get_metamist_billing(
+    yr: str,
+    include_topic: bool = True,
+    include_service: bool = False,
+) -> pd.DataFrame:
     """
     Get the billing data from metamist BQ table
     """
-    invoice_months = [f'{yr}{str(m).zfill(2)}' for m in range(1, 13)]
+    columns = ['invoice.month as month']
+    if include_topic:
+        columns.append('topic')
+    if include_service:
+        columns.append('service.description as service')
+
     query = f"""
-        SELECT topic, invoice.month as month, sum(cost) as total_cost_metamist
+        SELECT {','.join(columns)}, sum(cost) as metamist_total_cost
         FROM `{SM_GCP_BQ_AGGREG_RAW}`
         WHERE
         -- only consider the last few days before and after to limit the size of the data
         DATE_TRUNC(usage_end_time, DAY) >= TIMESTAMP("{int(yr) - 1}-12-28")
         AND DATE_TRUNC(usage_end_time, DAY) <= TIMESTAMP("{int(yr) + 1}-01-05")
-        AND invoice.month in ('{"','".join(invoice_months)}')
-        GROUP BY 1, 2
-        ORDER BY 2, 1;
+        AND invoice.month in ('{generate_invoice_months(yr)}')
+        GROUP BY {generate_group_by(columns)};
     """
+    # print(query)
     bq_client = bq.Client()
-    df = bq_client.query(
-        query,
-    ).to_dataframe()
-    df['idx'] = df['month'].astype(str) + '|' + df['topic'].astype(str)
-    return df.set_index('idx')
+    df = bq_client.query(query).to_dataframe()
+    return set_index(df, include_topic, include_service)
 
 
-def get_gcp_billing(yr: str) -> pd.DataFrame:
+def get_gcp_billing(
+    yr: str,
+    include_topic: bool = True,
+    include_service: bool = False,
+) -> pd.DataFrame:
     """
     Get the billing data from GCP BQ table
     """
-    invoice_months = [f'{yr}{str(m).zfill(2)}' for m in range(1, 13)]
+    columns = ['invoice.month as month']
+    if include_topic:
+        columns.append('project.name as gcp_project_name')
+    if include_service:
+        columns.append('service.description as service')
+
     query = f"""
-        SELECT project.name as project_name, invoice.month as month, sum(cost) as total_cost_gcp
+        SELECT {','.join(columns)}, sum(cost) as gcp_total_cost
         FROM `{GCP_BILLING_SOURCE_TABLE}`
         WHERE
         -- only consider the last few days before and after to limit the size of the data
         TIMESTAMP_TRUNC(_PARTITIONTIME, DAY) >= TIMESTAMP("{int(yr) - 1}-12-28")
         AND TIMESTAMP_TRUNC(_PARTITIONTIME, DAY) <= TIMESTAMP("{int(yr) + 1}-01-05")
-        AND invoice.month in ('{"','".join(invoice_months)}')
-        GROUP BY 1, 2
-        ORDER BY 2, 1;
+        AND invoice.month in ('{generate_invoice_months(yr)}')
+        GROUP BY {generate_group_by(columns)};
     """
+    # print(query)
     bq_client = bq.Client()
     df = bq_client.query(
         query,
     ).to_dataframe()
     # create topic as project_name, remove the number suffix
-    df['topic'] = (
-        df['project_name']
-        .fillna('')
-        .apply(lambda x: re.sub(r'\d+$', '', x).rstrip('-'))
-    )
-    df['idx'] = df['month'].astype(str) + '|' + df['topic'].astype(str)
-    return df.set_index('idx')[['project_name', 'total_cost_gcp']]
+    df['gcp_gcp'] = df['month']
+    return_cols = []
+    if include_topic:
+        df['topic'] = (
+            df['gcp_project_name']
+            .fillna('')
+            .apply(lambda x: re.sub(r'\d+$', '', x).rstrip('-'))
+        )
+        return_cols.append('gcp_project_name')
+    if include_service:
+        # include project service in the final df
+        df['gcp_service'] = df['service']
+        return_cols.append('gcp_service')
+
+    # total cost as last gcp column
+    return_cols.append('gcp_total_cost')
+
+    return set_index(df, include_topic, include_service)[return_cols]
 
 
 def main():
@@ -105,29 +168,45 @@ def main():
         help='CSV file name to save the output to',
         type=str,
     )
+    parser.add_argument(
+        '-t',
+        '--topic',
+        help='Include Topics',
+        type=int,
+        default=1,
+    )
+    parser.add_argument(
+        '-s',
+        '--service',
+        help='Include Services',
+        type=int,
+        default=0,
+    )
     args = parser.parse_args()
     if args.year is None:
         print('Missing year argument')
         sys.exit(1)
 
     in_year: str = args.year
+    in_topic: bool = args.topic == 1
+    in_service: bool = args.service == 1
 
     # get
-    m_df = get_metamist_billing(in_year)
-    gcp_df = get_gcp_billing(in_year)
+    m_df = get_metamist_billing(in_year, in_topic, in_service)
+    gcp_df = get_gcp_billing(in_year, in_topic, in_service)
 
-    total_metamist = np.sum(m_df.total_cost_metamist)
-    total_gcp = np.sum(gcp_df.total_cost_gcp)
+    total_metamist = np.sum(m_df.metamist_total_cost)
+    total_gcp = np.sum(gcp_df.gcp_total_cost)
 
     logger.info(f'GCP Total: {total_gcp}')
     logger.info(f'Metamist Total: {total_metamist}')
     logger.info(f'Difference: {total_metamist - total_gcp}')
     logger.info('-------------------------------')
 
-    combined_df = gcp_df.join(m_df, how='outer', lsuffix='_gcp', rsuffix='_metamist')
+    combined_df = gcp_df.join(m_df, how='outer')
     combined_df = combined_df.fillna(0)
     combined_df['diff'] = (
-        combined_df['total_cost_metamist'] - combined_df['total_cost_gcp']
+        combined_df['metamist_total_cost'] - combined_df['gcp_total_cost']
     )
     pd.set_option('display.max_rows', None)
     print(combined_df.sort_values(by='diff', ascending=False, na_position='first'))
