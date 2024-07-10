@@ -87,7 +87,7 @@ QUERY_MATCH_PARTICIPANTS = gql(
 query GetParticipantEidMapQuery($project: String!) {
   project(name: $project) {
     participants {
-      externalId
+      externalIds
       id
     }
   }
@@ -99,7 +99,7 @@ QUERY_MATCH_SAMPLES = gql(
 query GetSampleEidMapQuery($project: String!) {
   project(name: $project) {
     samples {
-      externalId
+      externalIds
       id
     }
   }
@@ -858,7 +858,11 @@ class GenericParser(
             QUERY_MATCH_PARTICIPANTS, variables={'project': self.project}
         )
         # case insensitive matching
-        pid_map = {p['externalId'].lower(): p['id'] for p in values['project']['participants']}
+        pid_map = {
+            p_eid.lower(): p['id']
+            for p in values['project']['participants']
+            for p_eid in p['externalIds'].values()
+        }
 
         for participant in participants:
             participant.internal_pid = pid_map.get(participant.external_pid.lower())
@@ -873,7 +877,11 @@ class GenericParser(
             QUERY_MATCH_SAMPLES, variables={'project': self.project}
         )
         # case insensitive matching
-        sid_map = {p['externalId'].lower(): p['id'] for p in values['project']['samples']}
+        sid_map = {
+            s_eid.lower(): s['id']
+            for s in values['project']['samples']
+            for s_eid in s['externalIds'].values()
+        }
 
         for sample in ParsedSample.get_all_samples_from(samples):
             sample.internal_sid = sid_map.get(sample.external_sid.lower())
