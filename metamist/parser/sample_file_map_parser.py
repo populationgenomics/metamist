@@ -31,32 +31,9 @@ KeyMap = {
     READS_COL_NAME: ['filename', 'filenames', 'files', 'file'],
     SEQ_TYPE_COL_NAME: ['type', 'types', 'sequencing type', 'sequencing_type'],
     SEQ_FACILITY_COL_NAME: ['facility', 'sequencing facility', 'sequencing_facility'],
-    SEQ_LIBRARY_COL_NAME: [
-        'library',
-        'library_prep',
-        'library prep',
-        'library type',
-        'library_type',
-        'sequencing_library',
-        'sequencing library',
-    ],
-    READ_END_TYPE_COL_NAME: [
-        'read_end_type',
-        'read end type',
-        'read_end_types',
-        'read end types',
-        'end type',
-        'end_type',
-        'end_types',
-        'end types',
-    ],
-    READ_LENGTH_COL_NAME: [
-        'length',
-        'read length',
-        'read_length',
-        'read lengths',
-        'read_lengths',
-    ],
+    SEQ_LIBRARY_COL_NAME: ['library', 'library_prep', 'library prep', 'library type', 'library_type', 'sequencing_library', 'sequencing library'],
+    READ_END_TYPE_COL_NAME: ['read_end_type', 'read end type', 'read_end_types', 'read end types', 'end type', 'end_type', 'end_types', 'end types'],
+    READ_LENGTH_COL_NAME: ['length', 'read length', 'read_length', 'read lengths', 'read_lengths'],
     CHECKSUM_COL_NAME: ['md5', 'checksum'],
 }
 
@@ -132,7 +109,7 @@ class SampleFileMapParser(GenericMetadataParser):
         super().__init__(
             search_locations=search_locations,
             project=project,
-            participant_name_column=PARTICIPANT_COL_NAME,
+            participant_column=PARTICIPANT_COL_NAME,
             sample_name_column=SAMPLE_ID_COL_NAME,
             reads_column=READS_COL_NAME,
             checksum_column=CHECKSUM_COL_NAME,
@@ -152,13 +129,13 @@ class SampleFileMapParser(GenericMetadataParser):
             **kwargs,
         )
 
-    def get_primary_sample_id(self, row: SingleRow) -> str:
+    def get_sample_id(self, row: SingleRow) -> str:
         """Get external sample ID from row"""
 
         if self.sample_name_column and self.sample_name_column in row:
             return row[self.sample_name_column]
 
-        return self.get_primary_participant_id(row)
+        return self.get_participant_id(row)
 
     @staticmethod
     def get_info() -> tuple[str, str]:
