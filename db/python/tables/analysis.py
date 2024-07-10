@@ -71,7 +71,7 @@ class AnalysisTable(DbBase):
                 ('status', status.value),
                 ('meta', to_db_json(meta or {})),
                 ('audit_log_id', await self.audit_log_id()),
-                ('project', project or self.project),
+                ('project', project or self.project_id),
                 ('active', active if active is not None else True),
             ]
 
@@ -440,7 +440,7 @@ WHERE s.project = :project AND
 
         rows = await self.connection.fetch_all(
             _query,
-            {'analysis_type': analysis_type, 'project': project or self.project},
+            {'analysis_type': analysis_type, 'project': project or self.project_id},
         )
         return [row[0] for row in rows]
 

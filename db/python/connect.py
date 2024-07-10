@@ -8,11 +8,19 @@ import asyncio
 import json
 import logging
 import os
+from typing import Iterable
 
 import databases
 
 from api.settings import LOG_DATABASE_QUERIES
-from db.python.utils import InternalError
+from db.python.tables.project import ProjectPermissionsTable
+from db.python.utils import (
+    InternalError,
+    NoProjectAccess,
+    NotFoundError,
+    ProjectDoesNotExist,
+)
+from models.models.project import Project, ProjectId, ProjectMemberRole
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -51,30 +59,174 @@ class Connection:
     def __init__(
         self,
         connection: databases.Database,
-        project: int | None,
+        project: Project | None,
+        project_id_map: dict[ProjectId, Project],
+        project_name_map: dict[str, Project],
         author: str,
         on_behalf_of: str | None,
-        readonly: bool,
         ar_guid: str | None,
         meta: dict[str, str] | None = None,
     ):
-        self.connection: databases.Database = connection
-        self.project: int | None = project
+        self.__connection: databases.Database = connection
+        self.__project: Project | None = project
+        self.__project_id_map = project_id_map
+        self.__project_name_map = project_name_map
         self.author: str = author
         self.on_behalf_of: str | None = on_behalf_of
-        self.readonly: bool = readonly
         self.ar_guid: str | None = ar_guid
         self.meta = meta
 
         self._audit_log_id: int | None = None
         self._audit_log_lock = asyncio.Lock()
 
+    @property
+    def connection(self):
+        """Public getter for private project class variable"""
+        return self.__connection
+
+    @property
+    def project(self):
+        """Public getter for private project class variable"""
+        return self.__project
+
+    @property
+    def project_id_map(self):
+        """Public getter for private project_id_map class variable"""
+        return self.__project_id_map
+
+    @property
+    def project_name_map(self):
+        """Public getter for private project_name_map class variable"""
+        return self.__project_name_map
+
+    @property
+    def project_id(self):
+        """Safely get the project id from the project model attached to the connection"""
+        return self.project.id if self.project is not None else None
+
+    def all_projects(self):
+        """Return all projects that the current user has access to"""
+        return list(self.project_id_map.values())
+
+    def projects_with_role(self, allowed_roles: set[ProjectMemberRole]):
+        """Return all projects that the current user has access to"""
+        return [p for p in self.project_id_map.values() if p.roles & allowed_roles]
+
+    def get_and_check_access_to_projects(
+        self, projects: Iterable[Project], allowed_roles: set[ProjectMemberRole]
+    ):
+        """
+        Check if the current user has _any_ of the specified roles in _all_ of the
+        specified projects. Raise an error if they do not.
+        """
+        # projects that the user has some access to, but not the required access
+        disallowed_projects = [p for p in projects if not p.roles & allowed_roles]
+
+        if disallowed_projects:
+            raise NoProjectAccess(
+                [p.name for p in disallowed_projects],
+                allowed_roles=[r.name for r in allowed_roles],
+                author=self.author,
+            )
+
+        return projects
+
+    def get_and_check_access_to_projects_for_ids(
+        self, project_ids: Iterable[ProjectId], allowed_roles: set[ProjectMemberRole]
+    ):
+        """
+        Check if the current user has _any_ of the specified roles in _all_ of the
+        projects based on the specified project ids. Raise an error if they do not.
+        Also raise an error if any of the specified project ids doesn't exist or the
+        current user has no access to it. Return the matching projects
+        """
+        projects = [
+            self.project_id_map[id] for id in project_ids if id in self.project_id_map
+        ]
+
+        # Check if any of the provided ids aren't valid project ids, or the user has
+        # no access to them at all. A NotFoundError is raised here rather than a
+        # Forbidden so as to not leak the existence of the project to those with no access.
+        missing_project_ids = set(project_ids) - set(p.id for p in projects)
+        if missing_project_ids:
+            missing_project_ids_str = ', '.join([str(p) for p in missing_project_ids])
+            raise NotFoundError(
+                f'Could not find projects with ids: {missing_project_ids_str}'
+            )
+
+        return self.get_and_check_access_to_projects(projects, allowed_roles)
+
+    def check_access_to_projects_for_ids(
+        self, project_ids: Iterable[ProjectId], allowed_roles: set[ProjectMemberRole]
+    ):
+        """
+        Check if the current user has _any_ of the specified roles in _all_ of the
+        projects based on the specified project ids. Raise an error if they do not.
+        Also raise an error if any of the specified project ids doesn't exist or the
+        current user has no access to it. Returns None
+        """
+        self.get_and_check_access_to_projects_for_ids(project_ids, allowed_roles)
+
+    def get_and_check_access_to_projects_for_names(
+        self, project_names: Iterable[str], allowed_roles: set[ProjectMemberRole]
+    ):
+        """
+        Check if the current user has _any_ of the specified roles in _all_ of the
+        projects based on the specified project names. Raise an error if they do not.
+        Also raise an error if any of the specified project names doesn't exist or
+        the current user has no access to it. Return the matching projects
+        """
+        projects = [
+            self.project_name_map[name]
+            for name in project_names
+            if name in self.project_name_map
+        ]
+
+        # Check if any of the provided names aren't valid project names, or the user has
+        # no access to them at all.  A NotFoundError is raised here rather than a
+        # Forbidden so as to not leak the existence of the project to those with no access.
+        missing_project_names = set(project_names) - set(p.name for p in projects)
+
+        if missing_project_names:
+            missing_project_names_str = ', '.join(
+                [f'"{str(p)}"' for p in missing_project_names]
+            )
+            raise NotFoundError(
+                f'Could not find projects with names: {missing_project_names_str}'
+            )
+
+        return self.get_and_check_access_to_projects(projects, allowed_roles)
+
+    def check_access_to_projects_for_names(
+        self, project_names: Iterable[str], allowed_roles: set[ProjectMemberRole]
+    ):
+        """
+        Check if the current user has _any_ of the specified roles in _all_ of the
+        projects based on the specified project names. Raise an error if they do not.
+        Also raise an error if any of the specified project names doesn't exist or
+        the current user has no access to it. Returns None
+        """
+        self.get_and_check_access_to_projects_for_names(project_names, allowed_roles)
+
+    def check_access(self, allowed_roles: set[ProjectMemberRole]):
+        """
+        Check if the current user has the specified role within the project that is
+        attached to the connection. If there is no project attached to the connection
+        this will raise an error.
+        """
+        if self.project is None:
+            raise InternalError(
+                'Connection was expected to have a project attached, but did not'
+            )
+        if not allowed_roles & self.project.roles:
+            raise NoProjectAccess(
+                project_names=[self.project.name],
+                author=self.author,
+                allowed_roles=[r.name for r in allowed_roles],
+            )
+
     async def audit_log_id(self):
         """Get audit_log ID for write operations, cached per connection"""
-        if self.readonly:
-            raise InternalError(
-                'Trying to get a audit_log ID, but not a write connection'
-            )
 
         async with self._audit_log_lock:
             if not self._audit_log_id:
@@ -90,26 +242,37 @@ class Connection:
                     on_behalf_of=self.on_behalf_of,
                     ar_guid=self.ar_guid,
                     comment=None,
-                    project=self.project,
+                    project=self.project_id,
                     meta=self.meta,
                 )
 
         return self._audit_log_id
 
-    def assert_requires_project(self):
-        """Assert the project is set, or return an exception"""
-        if self.project is None:
-            raise InternalError(
-                'An internal error has occurred when passing the project context, '
-                'please send this stacktrace to your system administrator'
-            )
+    async def refresh_projects(self):
+        """
+        Re-fetch the projects for the current user and update the connection.
+        This only really needs to be run after project member updates or project
+        creation, and really only for tests. The API fetches projects on each request
+        so subsequent requests after updates will already have up-to-date data
+        """
+        conn = self.connection
+        pt = ProjectPermissionsTable(connection=None, database_connection=conn)
+
+        project_id_map, project_name_map = await pt.get_projects_accessible_by_user(
+            user=self.author
+        )
+        self.__project_id_map = project_id_map
+        self.__project_name_map = project_name_map
+
+        if self.project_id:
+            self.__project = self.project_id_map.get(self.project_id)
 
 
 class DatabaseConfiguration(abc.ABC):
     """Base class for DatabaseConfiguration"""
 
     @abc.abstractmethod
-    def get_connection_string(self):
+    def get_connection_string(self) -> str:
         """Get connection string"""
         raise NotImplementedError
 
@@ -117,7 +280,7 @@ class DatabaseConfiguration(abc.ABC):
 class ConnectionStringDatabaseConfiguration(DatabaseConfiguration):
     """Database Configuration that takes a literal DatabaseConfiguration"""
 
-    def __init__(self, connection_string):
+    def __init__(self, connection_string: str):
         self.connection_string = connection_string
 
     def get_connection_string(self):
@@ -129,11 +292,11 @@ class CredentialedDatabaseConfiguration(DatabaseConfiguration):
 
     def __init__(
         self,
-        dbname,
-        host=None,
-        port=None,
-        username=None,
-        password=None,
+        dbname: str,
+        host: str | None = None,
+        port: str | None = None,
+        username: str | None = None,
+        password: str | None = None,
     ):
         self.dbname = dbname
         self.host = host
@@ -157,6 +320,8 @@ class CredentialedDatabaseConfiguration(DatabaseConfiguration):
         """Prepares the connection string for mysql / mariadb"""
 
         _host = self.host or 'localhost'
+
+        assert self.username
         u_p = self.username
 
         if self.password:
@@ -177,7 +342,7 @@ class CredentialedDatabaseConfiguration(DatabaseConfiguration):
 class SMConnections:
     """Contains useful functions for connecting to the database"""
 
-    _credentials: DatabaseConfiguration | None = None
+    _credentials: CredentialedDatabaseConfiguration | None = None
 
     @staticmethod
     def _get_config():
@@ -234,8 +399,47 @@ class SMConnections:
         return conn
 
     @staticmethod
+    async def get_connection_with_project(
+        *,
+        author: str,
+        project_name: str,
+        allowed_roles: set[ProjectMemberRole],
+        ar_guid: str,
+        on_behalf_of: str | None = None,
+        meta: dict[str, str] | None = None,
+    ):
+        """Get a db connection from a project and user"""
+        # maybe it makes sense to perform permission checks here too
+        logger.debug(f'Authenticate connection to {project_name} with {author!r}')
+
+        conn = await SMConnections.get_made_connection()
+        pt = ProjectPermissionsTable(connection=None, database_connection=conn)
+
+        project_id_map, project_name_map = await pt.get_projects_accessible_by_user(
+            user=author
+        )
+
+        if project_name not in project_name_map:
+            raise ProjectDoesNotExist(project_name)
+
+        connection = Connection(
+            connection=conn,
+            author=author,
+            project=project_name_map[project_name],
+            project_id_map=project_id_map,
+            project_name_map=project_name_map,
+            on_behalf_of=on_behalf_of,
+            ar_guid=ar_guid,
+            meta=meta,
+        )
+
+        connection.check_access(allowed_roles)
+
+        return connection
+
+    @staticmethod
     async def get_connection_no_project(
-        author: str, ar_guid: str, meta: dict[str, str]
+        author: str, ar_guid: str, meta: dict[str, str], on_behalf_of: str | None
     ):
         """Get a db connection from a project and user"""
         # maybe it makes sense to perform permission checks here too
@@ -243,15 +447,18 @@ class SMConnections:
 
         conn = await SMConnections.get_made_connection()
 
-        # we don't authenticate project-less connection, but rely on the
-        # the endpoint to validate the resources
+        pt = ProjectPermissionsTable(connection=None, database_connection=conn)
+        project_id_map, project_name_map = await pt.get_projects_accessible_by_user(
+            user=author
+        )
 
         return Connection(
             connection=conn,
             author=author,
             project=None,
-            on_behalf_of=None,
+            on_behalf_of=on_behalf_of,
             ar_guid=ar_guid,
-            readonly=False,
             meta=meta,
+            project_id_map=project_id_map,
+            project_name_map=project_name_map,
         )

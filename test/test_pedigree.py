@@ -24,7 +24,7 @@ class TestPedigree(DbIsolatedTest):
         )
 
         pedigree_dicts = await fl.get_pedigree(
-            project=self.connection.project,
+            project=self.connection.project_id,
             replace_with_participant_external_ids=True,
             replace_with_family_external_ids=True,
         )
@@ -60,7 +60,7 @@ class TestPedigree(DbIsolatedTest):
         )
 
         rows = await fl.get_pedigree(
-            project=self.connection.project,
+            project=self.connection.project_id,
             include_participants_not_in_families=True,
             replace_with_participant_external_ids=True,
         )

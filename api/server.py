@@ -17,15 +17,15 @@ from api.settings import (
     PROFILE_REQUESTS,
     PROFILE_REQUESTS_OUTPUT,
     SKIP_DATABASE_CONNECTION,
+    SM_ENVIRONMENT,
 )
-from api.utils import get_openapi_schema_func
 from api.utils.exceptions import determine_code_from_error
+from api.utils.openapi import get_openapi_schema_func
 from db.python.connect import SMConnections
-from db.python.tables.project import is_all_access
 from db.python.utils import get_logger
 
 # This tag is automatically updated by bump2version
-_VERSION = '7.1.1'
+_VERSION = '7.2.2'
 
 
 logger = get_logger()
@@ -92,7 +92,7 @@ if PROFILE_REQUESTS:
         return resp
 
 
-if is_all_access():
+if SM_ENVIRONMENT == 'local':
     app.add_middleware(
         CORSMiddleware,
         allow_origins=['*'],

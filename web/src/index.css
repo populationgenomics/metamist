@@ -48,6 +48,15 @@
     --ourdna-yellow: rgba(232, 199, 29);
     --ourdna-green: rgba(159, 201, 54);
     --ourdna-charcoal: rgba(85, 85, 85);
+
+    --color-header-row: #f9f9f9;
+    --color-exome-row: #ededa1;
+    --color-genome-row: #efc7aa;
+    --color-rna-row: #b2f5b2;
+    --color-page-total-row: #c0def8;
+    --color-grand-total-row: #a7a7ea;
+
+    --color-checkbox-bg: #f5f7f9;
 }
 
 html[data-theme='dark-mode'] {
@@ -75,6 +84,15 @@ html[data-theme='dark-mode'] {
     --color-bg-under-budget: rgba(0, 128, 0, 0.5);
 
     --color-text-href: rgb(188, 188, 251);
+
+    --color-header-row: #383838;
+    --color-exome-row: #887830;
+    --color-genome-row: #805223;
+    --color-rna-row: #155815;
+    --color-page-total-row: #163a5e;
+    --color-grand-total-row: #19195b;
+
+    --color-checkbox-bg: #ffffff;
 }
 
 /* poor man's dark mode: https://github.com/swagger-api/swagger-ui/issues/5327#issuecomment-742375520 */
@@ -341,4 +359,115 @@ html[data-theme='dark-mode'] .ui.table {
     height: auto;
     max-width: 200px;
     max-height: 100px;
+}
+
+/* Project Insights dashboard */
+.html-tooltip .MuiTooltip-tooltip {
+    background-color: #f5f5f9;
+    color: rgba(0, 0, 0, 0.87);
+    max-width: 220px;
+    font-size: 12px;
+    border: 1px solid #dadde9;
+}
+
+.ui.table {
+    table-layout: auto;
+}
+
+.ui.table .table-cell {
+    text-align: center;
+    vertical-align: middle;
+    color: var(--color-text-primary) !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+}
+
+.ui.table .header-cell {
+    text-align: center;
+    font-size: 1em;
+    padding: 30px 5px 10px !important;
+    min-width: 100px !important;
+    max-width: 350px !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    white-space: normal !important;
+    color: var(--color-text-primary) !important;
+    background-color: var(--color-header-row) !important;
+    border-color: var(--color-border-default) !important;
+    position: relative;
+    min-height: 80px;
+    justify-content: center;
+}
+
+.ui.table .percentage-cell {
+    text-align: center;
+    vertical-align: middle;
+    color: var(--color-text-primary) !important;
+    word-wrap: normal !important;
+    overflow-wrap: normal !important;
+}
+
+.header-cell .header-text {
+    margin-top: 20px;
+}
+
+.header-cell .filter-button {
+    position: absolute;
+    top: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+}
+
+.ui.table .header-cell.collapsible-header {
+    white-space: nowrap;
+    overflow: clip;
+    text-overflow: ellipsis;
+}
+
+.ui.table .header-cell.collapsible-header.expanded {
+    width: 150px !important;
+}
+.ui.table .header-cell.collapsible-header:not(.expanded) {
+    width: 70px !important;
+}
+
+.ui.table .header-cell.collapsible-header:not(.expanded) .header-text {
+    overflow: hidden;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+.ui.table .category-cell {
+    text-align: center;
+    vertical-align: middle;
+    color: var(--color-text-primary);
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.exome-row {
+    background-color: var(--color-exome-row);
+    border-color: var(--color-border-default);
+}
+
+.genome-row {
+    background-color: var(--color-genome-row);
+    border-color: var(--color-border-default);
+}
+
+.rna-row {
+    background-color: var(--color-rna-row);
+    border-color: var(--color-border-default);
+}
+
+.grand-total-row {
+    background-color: var(--color-grand-total-row);
+    font-weight: bold;
+}
+
+.seq-type-project-checkbox {
+    label {
+        color: var(--color-text-primary) !important;
+    }
 }

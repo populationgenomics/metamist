@@ -23,11 +23,11 @@ class GraphQLFilter(Generic[T]):
     icontains: T | None = None
     startswith: T | None = None
 
-    def all_values(self):
+    def all_values(self) -> list[T]:
         """
         Get all values used anywhere in a filter, useful for getting values to map later
         """
-        v = []
+        v: list[T] = []
         if self.eq:
             v.append(self.eq)
         if self.in_:

@@ -247,7 +247,7 @@ class SampleTable(DbBase):
             ('audit_log_id', audit_log_id),
             ('sample_parent_id', sample_parent_id),
             ('sample_root_id', sample_root_id),
-            ('project', project or self.project),
+            ('project', project or self.project_id),
         ]
 
         keys = [k for k, _ in kv_pairs]
@@ -270,7 +270,7 @@ class SampleTable(DbBase):
         """
         _eid_values = [
             {
-                'project': project or self.project,
+                'project': project or self.project_id,
                 'id': id_of_new_sample,
                 'name': name.lower(),
                 'external_id': eid,
@@ -548,7 +548,8 @@ class SampleTable(DbBase):
             WHERE external_id IN :external_ids AND project = :project
         """
         rows = await self.connection.fetch_all(
-            _query, {'external_ids': external_ids, 'project': project or self.project}
+            _query,
+            {'external_ids': external_ids, 'project': project or self.project_id},
         )
         sample_id_map = {el[1]: el[0] for el in rows}
 
@@ -584,7 +585,7 @@ class SampleTable(DbBase):
         rows = await self.connection.fetch_all(
             _query,
             {
-                'project': project or self.project,
+                'project': project or self.project_id,
                 'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG,
             },
         )
@@ -641,7 +642,7 @@ class SampleTable(DbBase):
         _, samples = await self.query(
             SampleFilter(
                 participant_id=GenericFilter(isnull=True),
-                project=GenericFilter(eq=project or self.project),
+                project=GenericFilter(eq=project or self.project_id),
             )
         )
         return samples
