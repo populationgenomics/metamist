@@ -1030,7 +1030,6 @@ class GenericParser(
         """Get karyotype from grouped row"""
         return None
 
-    # @abstractmethod
     def has_participants(self, rows: list[SingleRow]) -> bool:
         """Returns True if the file has a Participants column"""
         return False
