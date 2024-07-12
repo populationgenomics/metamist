@@ -75,8 +75,16 @@ class OutputFileInternal(SMBase):
             size = 0
             # try:
             if isinstance(file_obj, GSPath) and client:
+                if '/' in file_obj.blob:
+                    prefix = '/'.join(file_obj.blob.split('/')[:-1]) + '/'
+                else:
+                    prefix = ''
+                delimiter = '/'
                 blobs = client.list_blobs(
-                    file_obj.bucket, versions=False
+                    str(file_obj.bucket),
+                    versions=False,
+                    prefix=prefix,
+                    delimiter=str(delimiter),
                 )  # pylint: disable=E1101
                 for blob in blobs:
                     if blob.name == file_obj.name:
