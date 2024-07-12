@@ -46,7 +46,7 @@ def generate_invoice_months(yr: str) -> str:
     """
     Generate the invoice months for the year
     """
-    return "','".join([f'{yr}{str(m).zfill(2)}' for m in range(1, 7)])
+    return "','".join([f'{yr}{str(m).zfill(2)}' for m in range(1, 13)])
 
 
 def generate_group_by(columns: list) -> str:
