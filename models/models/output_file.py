@@ -75,12 +75,15 @@ class OutputFileInternal(SMBase):
             size = 0
             # try:
             if isinstance(file_obj, GSPath) and client:
-                bucket = client.get_bucket(file_obj.bucket)  # pylint: disable=E1101
-                blob = bucket.get_blob(file_obj.blob)  # pylint: disable=E1101
-                if file_obj.suffix != '.mt' and blob:
-                    file_checksum = blob.crc32c  # pylint: disable=E1101
-                    valid = True
-                    size = blob.size  # pylint: disable=E1101
+                blobs = client.list_blobs(
+                    file_obj.bucket, versions=False
+                )  # pylint: disable=E1101
+                for blob in blobs:
+                    if blob.name == file_obj.name:
+                        if file_obj.suffix != '.mt' and blob:
+                            file_checksum = blob.crc32c  # pylint: disable=E1101
+                            valid = True
+                            size = blob.size  # pylint: disable=E1101
 
             return {
                 'basename': file_obj.name,  # pylint: disable=E1101

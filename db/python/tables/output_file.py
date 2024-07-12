@@ -139,8 +139,7 @@ class OutputFileTable(DbBase):
         files = await self.find_files_from_dict(json_dict=json_dict)
         file_ids: list[int] = []
 
-        if os.environ.get('SM_ENVIRONMENT', 'development').lower() in (
-            'development',
+        if os.environ.get('SM_ENVIRONMENT', 'local').lower() in (
             'local',
             'test',
         ):
