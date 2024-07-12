@@ -6,15 +6,13 @@ import argparse
 import json
 import logging
 import os
-import re
 import sys
 
 import google.cloud.bigquery as bq
-import numpy as np
-import pandas as pd
 
 # name of the BQ table to insert the records
 SM_GCP_BQ_BATCHES_VIEW = os.getenv('SM_GCP_BQ_BATCHES_VIEW')
+GCP_PROJECT = os.getenv('GCP_PROJECT')
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -38,7 +36,7 @@ def get_min_max_batch_id(
     bq_client = bq.Client()
     job_config = bq.QueryJobConfig(
         query_parameters=[
-            bq.ScalarQueryParameter("min_day", "STRING", from_day),
+            bq.ScalarQueryParameter('min_day', 'STRING', from_day),
         ],
     )
     query_job_result = bq_client.query(query, job_config=job_config)
@@ -65,7 +63,7 @@ def get_missing_batches(
         ),
         t as (
             SELECT b.batch_id
-            FROM b LEFT JOIN 
+            FROM b LEFT JOIN
             `{SM_GCP_BQ_BATCHES_VIEW}` d on d.batch_id = b.batch_id
             WHERE d.batch_id IS NULL
         )
@@ -76,8 +74,8 @@ def get_missing_batches(
     bq_client = bq.Client()
     job_config = bq.QueryJobConfig(
         query_parameters=[
-            bq.ScalarQueryParameter("min_batch_id", "INT64", min_batch_id),
-            bq.ScalarQueryParameter("max_batch_id", "INT64", max_batch_id),
+            bq.ScalarQueryParameter('min_batch_id', 'INT64', min_batch_id),
+            bq.ScalarQueryParameter('max_batch_id', 'INT64', max_batch_id),
         ],
     )
     query_job_result = bq_client.query(query, job_config=job_config)
@@ -89,6 +87,28 @@ def get_missing_batches(
     return results
 
 
+def get_hail_token() -> str:
+    """
+    TODO Get Hail token from local tokens file
+    """
+    # if os.getenv('DEV') in ('1', 'true', 'yes'):
+    #     with open(os.path.expanduser('~/.hail/tokens.json'), encoding='utf-8') as f:
+    #         config = json.load(f)
+    #         return config['default']
+
+    # assert GCP_PROJECT
+    # secret_value = read_secret(
+    #     GCP_PROJECT,
+    #     'aggregate-billing-hail-token',
+    #     fail_gracefully=False,
+    # )
+    # if not secret_value:
+    #     raise ValueError('Could not find Hail token')
+
+    # return secret_value
+    return ''
+
+
 def main():
     """
     Expect year and optional output path as command line argument
@@ -96,6 +116,10 @@ def main():
     # check env vars
     if not SM_GCP_BQ_BATCHES_VIEW:
         print('SM_GCP_BQ_BATCHES_VIEW is not set')
+        sys.exit(1)
+
+    if not GCP_PROJECT:
+        print('GCP_PROJECT is not set')
         sys.exit(1)
 
     parser = argparse.ArgumentParser()
@@ -116,12 +140,13 @@ def main():
     if not missing_batches:
         print('No missing batches found')
         return
-    
+
     # we need to cross check with Hail Batch API to see if the batch information is available
     # otherwise we would get alerts for missing batches when reloading
     batches_to_be_loaded = []
-    for b in missing_batches:
-    
+    # for b in missing_batches:
+    # TODO: check if batch is available in Hail
+    batches_to_be_loaded = missing_batches
 
     # group the batches to be loaded
     # if the difference between two consecutive batches is more than 50, then start a new group
@@ -137,7 +162,7 @@ def main():
             batches_group[-1].append(b)
 
         prev_batch_id = b
-        
+
     print('Batches to be loaded, here are relevent URL calls to be made manually:')
     for i, group in enumerate(batches_group):
         print(f'Group {i+1}: {group}')
@@ -151,25 +176,6 @@ def main():
         {f"-d '{json.dumps({'batch_ids': group})}'" if group else ''}
         """
         )
-
-
-#    if message := request_data.get('message'):
-#         if attributes := message.get('attributes'):
-#             if 'batch_ids' in attributes:
-#                 request_data = attributes
-#         elif 'data' in message:
-#             # data field can be rubish, esp. when passed from pubsub
-#             # if it fails, than just return None
-#             try:
-#                 request_data = json.loads(b64decode(message['data']))
-#             except ValueError:
-#                 logger.warning(f'Data is invalid JSON: {message["data"]}')
-#                 return None
-
-
-#     https://billing-aggregator-hail-billing-function-e174484-hrc4bbiayq-ts.a.run.app/
-
-#     https://billing-aggregator-seqr-billing-function-5d2e4d2-hrc4bbiayq-ts.a.run.app/
 
 
 if __name__ == '__main__':
