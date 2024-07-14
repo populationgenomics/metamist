@@ -5,7 +5,7 @@ from google.cloud import storage
 
 from cpg_utils.hail_batch import copy_common_env, get_batch, config_retrieve
 
-def validate_all_objects_in_directory(gs_dir, skip_filetypes: tuple[str, ...], billing_project: str = None, driver_image: str = None):
+def validate_all_objects_in_directory(gs_dir, skip_filetypes: tuple[str, ...], billing_project: str = None):
     """Validate files with MD5s in the provided gs directory"""
     b = get_batch(f'Check md5 checksums for files in {gs_dir}')
     client = storage.Client()
@@ -32,7 +32,7 @@ def validate_all_objects_in_directory(gs_dir, skip_filetypes: tuple[str, ...], b
 
     b.run(wait=False)
 
-def create_md5s_for_files_in_directory(gs_dir, skip_filetypes: tuple[str, ...], force_recreate: bool, billing_project: str = None, driver_image: str = None):
+def create_md5s_for_files_in_directory(gs_dir, skip_filetypes: tuple[str, ...], force_recreate: bool, billing_project: str = None):
     """Validate files with MD5s in the provided gs directory"""
     b = get_batch(f'Create md5 checksums for files in {gs_dir}')
 
@@ -63,7 +63,7 @@ def create_md5s_for_files_in_directory(gs_dir, skip_filetypes: tuple[str, ...], 
     b.run(wait=False)
 
 
-def validate_md5(job, file, driver_image):
+def validate_md5(job, file, billing_project, driver_image):
     """
     This quickly validates a file and it's md5
     """
@@ -74,8 +74,8 @@ def validate_md5(job, file, driver_image):
         f"""\
     set -euxo pipefail
     gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
-    gsutil cat {file} | md5sum | cut -d " " -f1 > /tmp/uploaded.md5
-    diff <(cat /tmp/uploaded.md5) <(gsutil cat {md5_path or f'{file}.md5'} | cut -d " " -f1)
+    gsutil -u {billing_project} cat {file} | md5sum | cut -d " " -f1 > /tmp/uploaded.md5
+    diff <(cat /tmp/uploaded.md5) <(gsutil -u {billing_project} cat {md5_path or f'{file}.md5'} | cut -d " " -f1)
     """
     )
 
@@ -103,16 +103,17 @@ def create_md5(job, file, billing_project, driver_image):
 
 
 @click.command()
+@click.option('--billing-project', '-b', default=None)
 @click.option('--skip-filetypes', '-s', default=('.crai', '.tbi'), multiple=True)
 @click.option('--validate-only', '-v', is_flag=True, default=False, help='Validate existing md5s, do not create new ones.')
 @click.option('--force-recreate', '-f', is_flag=True, default=False)
 @click.argument('gs_dir')
-def main(skip_filetypes: tuple[str, str], validate_only: bool, force_recreate: bool, gs_dir: str):
+def main(billing_project: str | None, skip_filetypes: tuple[str, str], validate_only: bool, force_recreate: bool, gs_dir: str):
     """Scans the directory for files and creates md5 checksums for them."""
     if validate_only:
-        validate_all_objects_in_directory(gs_dir, skip_filetypes)
+        validate_all_objects_in_directory(gs_dir, skip_filetypes, billing_project)
     else:
-        create_md5s_for_files_in_directory(skip_filetypes, force_recreate, gs_dir=gs_dir)
+        create_md5s_for_files_in_directory(gs_dir, skip_filetypes, force_recreate, billing_project)
 
 
 if __name__ == '__main__':
