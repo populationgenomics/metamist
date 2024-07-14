@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
 # pylint: disable=logging-not-lazy,subprocess-popen-preexec-fn,consider-using-with
+import json
 import logging
 import os
 import re
 import shutil
-import signal
 import subprocess
 import tempfile
 import time
-from typing import List, Optional
+from functools import lru_cache
 
-import requests
+from api.server import _VERSION, app
+from api.utils.openapi import get_openapi_3_0_schema
 
-DOCKER_IMAGE = os.getenv('SM_DOCKER')
-PORT = os.getenv('PORT', '8000')
-SCHEMA_URL = os.getenv('SM_SCHEMAURL', f'http://localhost:{PORT}/openapi.json')
 OPENAPI_COMMAND = os.getenv('OPENAPI_COMMAND', 'openapi-generator').split(' ')
 MODULE_NAME = 'metamist'
 
@@ -26,80 +24,10 @@ OUTPUT_DOCS_DIR = os.path.join(STATIC_DIR, 'sm_docs')
 MODULE_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), MODULE_NAME)
 
 
-def check_if_server_is_accessible() -> bool:
-    """Check if request to 'SCHEMA_URL' returns OK"""
-    try:
-        return requests.get(SCHEMA_URL, timeout=30).ok
-    except requests.ConnectionError:
-        return False
-
-
-def assert_server_is_accessible():
-    """Assert that the server is accessible"""
-    if not check_if_server_is_accessible():
-        raise requests.ConnectionError(
-            f'Could not connect to server at {SCHEMA_URL}. '
-            'Please make sure the server is running and accessible.'
-        )
-
-
-def start_server() -> Optional[subprocess.Popen]:
-    """Start the API server, and return a process when it's started"""
-
-    command = ['python', '-m', 'api.server']
-
-    if DOCKER_IMAGE is not None:
-        command = [
-            'docker',
-            'run',
-            '-eSM_HOST=0.0.0.0',
-            '-eSM_IGNORE_GCP_CREDENTIALS_ERROR=1',
-            '-eSM_SKIP_DATABASE_CONNECTION=1',
-            '-p8000:8000',
-            DOCKER_IMAGE,
-            *command,
-        ]
-
-    logger.info('Starting API server with: ' + ' '.join(command))
-
-    _process = subprocess.Popen(
-        command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        # The os.setsid() is passed in the argument preexec_fn so
-        # it's run after the fork() and before  exec() to run the shell.
-        preexec_fn=os.setsid,
-    )
-
-    assert _process.stdout
-    for c in iter(_process.stdout.readline, 'b'):
-        line = None
-        if c:
-            line = c.decode('utf-8').rstrip()
-            if line is not None:
-                logger.info('API: ' + line)
-                if 'running on http' in line.lower():
-                    # server has been started
-                    logger.info('Started process')
-                    return _process
-
-        rc = _process.poll()
-        if rc is not None:
-            # the process exited early
-            logger.error(f'Server exited with rc={rc}')
-            if DOCKER_IMAGE is not None:
-                logger.warning(
-                    "If you're receiving a 'port is already allocated' message, "
-                    "run 'docker ps' and make sure the container isn't already running."
-                )
-            raise SystemExit(1)
-
-    return None
-
-
 def _get_openapi_version():
     # two different versions of openapi
     # require two different ways to get the version
+
     version_cmds = ['--version', 'version']
 
     has_timeout = False
@@ -131,7 +59,6 @@ def check_openapi_version():
     """
     Check compatible OpenAPI version
     """
-
     out = _get_openapi_version().decode().split('\n', maxsplit=1)[0].strip()
 
     version_match = re.search(pattern=r'\d+\.\d+\.\d+', string=out)
@@ -147,8 +74,14 @@ def check_openapi_version():
     logger.info(f'Got openapi version: {version}')
 
 
+@lru_cache
+def get_openapi_schema() -> dict:
+    """Get the OpenAPI schema (3.0) as a dictionary"""
+    return get_openapi_3_0_schema(app, _VERSION)
+
+
 def generate_api_and_copy(
-    output_type, output_copyer, extra_commands: List[str] | None = None
+    output_type, output_copyer, extra_commands: list[str] | None = None
 ):
     """
     Use OpenApiGenerator to generate the installable API
@@ -156,42 +89,51 @@ def generate_api_and_copy(
     with open('deploy/python/version.txt', encoding='utf-8') as f:
         version = f.read().strip()
 
-    tmpdir = tempfile.mkdtemp()
-    command = [
-        *OPENAPI_COMMAND,
-        'generate',
-        *('-i', SCHEMA_URL),
-        *('-g', output_type),
-        *('-o', tmpdir),
-        *('--package-name', MODULE_NAME),
-        *(extra_commands or []),
-        *('--artifact-version', version),
-        '--skip-validate-spec',
-    ]
-    # quotes commands by calling repr on each element
-    jcom = ' '.join(map(repr, command))
-    logger.info('Generating with command: ' + jcom)
-    # 5 attempts
-    n_attempts = 1
-    succeeded = False
-    for i in range(n_attempts, 0, -1):
-        try:
-            stdout = subprocess.check_output(command)
-            logger.info('Generated API: ' + str(stdout.decode()))
-            succeeded = True
-            break
+    # write to temporary file with extension .json
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json') as f:
+        schema = get_openapi_schema()
+        json.dump(schema, f)
+        # flush anything in memory to disk
+        f.flush()
 
-        except subprocess.CalledProcessError as e:
-            logger.warning(f'openapi generation failed, trying {i-1} more times: {e}')
-            time.sleep(2)
+        tmpdir = tempfile.mkdtemp()
+        command = [
+            *OPENAPI_COMMAND,
+            'generate',
+            *('-i', f.name),
+            *('-g', output_type),
+            *('-o', tmpdir),
+            *('--package-name', MODULE_NAME),
+            *(extra_commands or []),
+            *('--artifact-version', version),
+            '--skip-validate-spec',
+        ]
+        # quotes commands by calling repr on each element
+        jcom = ' '.join(map(repr, command))
+        logger.info('Generating with command: ' + jcom)
+        # 5 attempts
+        n_attempts = 1
+        succeeded = False
+        for i in range(n_attempts, 0, -1):
+            try:
+                stdout = subprocess.check_output(command)
+                logger.info('Generated API: ' + str(stdout.decode()))
+                succeeded = True
+                break
 
-    if not succeeded:
-        raise RuntimeError(
-            f'openapi generation failed after trying {n_attempts} time(s)'
-        )
+            except subprocess.CalledProcessError as e:
+                logger.warning(
+                    f'openapi generation failed, trying {i-1} more times: {e}'
+                )
+                time.sleep(2)
 
-    output_copyer(tmpdir)
-    shutil.rmtree(tmpdir)
+        if not succeeded:
+            raise RuntimeError(
+                f'openapi generation failed after trying {n_attempts} time(s)'
+            )
+
+        output_copyer(tmpdir)
+        shutil.rmtree(tmpdir)
 
 
 def generate_schema_file():
@@ -322,72 +264,31 @@ def main():
     """
     # check openapi version first, because it seems to be fairly sketchy
     check_openapi_version()
+    # Generate the installable Python API
+    generate_api_and_copy(
+        'python',
+        copy_python_files_from,
+        ['--template-dir', 'openapi-templates'],
+    )
 
-    if check_if_server_is_accessible():
-        logger.info(f'Using already existing server {SCHEMA_URL}')
-        process = None
-    else:
-        process = start_server()
+    # Generate the Typescript API for React application
+    generate_api_and_copy(
+        'typescript-axios',
+        copy_typescript_files_from,
+    )
 
-        # Loop until Docker has initialised server and is ready to accept connections
-        startup_tries = 5
-        wait_time_in_seconds = 2
-        while (not check_if_server_is_accessible()) and startup_tries > 0:
-            startup_tries -= 1
-            logger.info(
-                'Dockerised API server is not ready yet. '
-                + f'Retrying in {wait_time_in_seconds} seconds. '
-                + f'Remaining tries: {startup_tries}'
-            )
-            time.sleep(wait_time_in_seconds)
+    # Generate the GraphQL schema
+    generate_schema_file()
 
-    try:
-        assert_server_is_accessible()
-
-        # Generate the installable Python API
-        generate_api_and_copy(
-            'python',
-            copy_python_files_from,
-            ['--template-dir', 'openapi-templates'],
-        )
-
-        # Generate the Typescript API for React application
-        generate_api_and_copy(
-            'typescript-axios',
-            copy_typescript_files_from,
-        )
-
-        # Generate the GraphQL schema
-        generate_schema_file()
-
-        # Copy resources and README
-        shutil.copy(
-            './resources/muck-the-duck.svg',
-            os.path.join('web/src', 'muck-the-duck.svg'),
-        )
-        shutil.copy(
-            'README.md',
-            os.path.join(OUTPUT_DOCS_DIR, 'index.md'),
-        )
-
-    # pylint: disable=broad-except
-    except BaseException as e:
-        logger.error(str(e))
-        if process:
-            pid = process.pid
-            logger.info(f'Stopping self-managed server by sending sigkill to {pid}')
-            os.killpg(
-                os.getpgid(process.pid), signal.SIGTERM
-            )  # Send the signal to all the process groups
-
-        raise e
-
-    if process:
-        pid = process.pid
-        logger.info(f'Stopping self-managed server by sending sigkill to {pid}')
-        os.killpg(
-            os.getpgid(process.pid), signal.SIGTERM
-        )  # Send the signal to all the process groups
+    # Copy resources and README
+    shutil.copy(
+        './resources/muck-the-duck.svg',
+        os.path.join('web/src', 'muck-the-duck.svg'),
+    )
+    shutil.copy(
+        'README.md',
+        os.path.join(OUTPUT_DOCS_DIR, 'index.md'),
+    )
 
 
 if __name__ == '__main__':
