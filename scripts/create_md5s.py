@@ -3,18 +3,45 @@ import os
 import click
 from google.cloud import storage
 
-from cpg_utils.hail_batch import copy_common_env, get_batch, get_config
+from cpg_utils.hail_batch import copy_common_env, get_batch, config_retrieve
 
+def validate_all_objects_in_directory(gs_dir, skip_filetypes: tuple[str, ...], billing_project: str = None, driver_image: str = None):
+    """Validate files with MD5s in the provided gs directory"""
+    b = get_batch(f'Check md5 checksums for files in {gs_dir}')
+    client = storage.Client()
 
-def create_md5s_for_files_in_directory(skip_filetypes: tuple[str, str], force_recreate: bool, gs_dir):
+    if not gs_dir.startswith('gs://'):
+        raise ValueError(f'Expected GS directory, got: {gs_dir}')
+    
+    if not billing_project:
+        billing_project = config_retrieve(['workflow', 'gcp_billing_project'])
+    driver_image = config_retrieve(['workflow', 'driver_image'])
+
+    bucket_name, *components = gs_dir[5:].split('/')
+
+    blobs = client.list_blobs(bucket_name, prefix='/'.join(components))
+    files: set[str] = {f'gs://{bucket_name}/{blob.name}' for blob in blobs}
+    for obj in files:
+        if obj.endswith('.md5') or obj.endswith(skip_filetypes):
+            continue
+        if f'{obj}.md5' not in files:
+            continue
+
+        job = b.new_job(f'validate_{os.path.basename(obj)}')
+        validate_md5(job, obj, billing_project, driver_image)
+
+    b.run(wait=False)
+
+def create_md5s_for_files_in_directory(gs_dir, skip_filetypes: tuple[str, ...], force_recreate: bool, billing_project: str = None, driver_image: str = None):
     """Validate files with MD5s in the provided gs directory"""
     b = get_batch(f'Create md5 checksums for files in {gs_dir}')
 
     if not gs_dir.startswith('gs://'):
         raise ValueError(f'Expected GS directory, got: {gs_dir}')
 
-    billing_project = get_config()['workflow']['gcp_billing_project']
-    driver_image = get_config()['workflow']['driver_image']
+    if not billing_project:
+        billing_project = config_retrieve(['workflow', 'gcp_billing_project'])
+    driver_image = config_retrieve(['workflow', 'driver_image'])
 
     bucket_name, *components = gs_dir[5:].split('/')
 
@@ -34,6 +61,25 @@ def create_md5s_for_files_in_directory(skip_filetypes: tuple[str, str], force_re
         create_md5(job, filepath, billing_project, driver_image)
 
     b.run(wait=False)
+
+
+def validate_md5(job, file, driver_image):
+    """
+    This quickly validates a file and it's md5
+    """
+    copy_common_env(job)
+    job.image(driver_image)
+    md5_path = f'{file}.md5'
+    job.command(
+        f"""\
+    set -euxo pipefail
+    gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+    gsutil cat {file} | md5sum | cut -d " " -f1 > /tmp/uploaded.md5
+    diff <(cat /tmp/uploaded.md5) <(gsutil cat {md5_path or f'{file}.md5'} | cut -d " " -f1)
+    """
+    )
+
+    return job
 
 
 def create_md5(job, file, billing_project, driver_image):
@@ -58,11 +104,15 @@ def create_md5(job, file, billing_project, driver_image):
 
 @click.command()
 @click.option('--skip-filetypes', '-s', default=('.crai', '.tbi'), multiple=True)
+@click.option('--validate-only', '-v', is_flag=True, default=False, help='Validate existing md5s, do not create new ones.')
 @click.option('--force-recreate', '-f', is_flag=True, default=False)
 @click.argument('gs_dir')
-def main(skip_filetypes: tuple[str, str], force_recreate: bool, gs_dir: str):
+def main(skip_filetypes: tuple[str, str], validate_only: bool, force_recreate: bool, gs_dir: str):
     """Scans the directory for files and creates md5 checksums for them."""
-    create_md5s_for_files_in_directory(skip_filetypes, force_recreate, gs_dir=gs_dir)
+    if validate_only:
+        validate_all_objects_in_directory(gs_dir, skip_filetypes)
+    else:
+        create_md5s_for_files_in_directory(skip_filetypes, force_recreate, gs_dir=gs_dir)
 
 
 if __name__ == '__main__':
