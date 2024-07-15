@@ -48,7 +48,7 @@ def validate_md5(job, file: str, billing_project: str, driver_image: str):
     gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
     calculated_md5=$(gsutil -u {billing_project} cat {file} | md5sum | cut -d " " -f1)
     stored_md5=$(gsutil -u {billing_project} cat {md5_path} | cut -d " " -f1)
-    
+
     if [ "$calculated_md5" = "$stored_md5" ]; then
         echo "MD5 checksum validation successful."
         exit 0
@@ -93,7 +93,7 @@ def validate_md5s_in_directory(gs_dir: str, skip_filetypes: tuple[str, ...], bil
             continue
         if f'{obj}.md5' not in files:
             continue
-        
+
         print('Validating md5 for', obj)
         job = b.new_job(f'Validate md5 checksum: {os.path.basename(obj)}')
         validate_md5(job, obj, billing_project, driver_image)
@@ -111,13 +111,13 @@ def main(billing_project: str | None, skip_filetypes: tuple[str, str], validate_
     """Scans the directory for files and creates md5 checksums for them, OR validates existing md5s."""
     if not gs_dir.startswith('gs://'):
         raise ValueError(f'Expected GS directory, got: {gs_dir}')
-    
+
     if not billing_project:
         billing_project = config_retrieve(['workflow', 'dataset_gcp_project'])
     driver_image = config_retrieve(['workflow', 'driver_image'])
-    
+
     storage_client = storage.Client()
-    
+
     if validate_only:
         validate_md5s_in_directory(gs_dir, skip_filetypes, billing_project, driver_image, storage_client)
     else:
