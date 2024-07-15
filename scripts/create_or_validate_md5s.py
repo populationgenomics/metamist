@@ -92,7 +92,9 @@ def create_and_validate_md5s_for_files_in_directory(
             else:
                 print(f'{filepath}.md5 already exists, skipping')
             continue
-
+        
+        if mode == 'validate':
+            continue
         print('Creating md5 for', filepath)
         job = b.new_job(f'Create {os.path.basename(filepath)}.md5')
         create_md5(job, filepath, billing_project, driver_image)
