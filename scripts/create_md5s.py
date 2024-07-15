@@ -1,17 +1,15 @@
 import os
 
 import click
+from cpg_utils.hail_batch import config_retrieve, copy_common_env, get_batch
 from google.cloud import storage
 
-from cpg_utils.hail_batch import config_retrieve, copy_common_env, get_batch
+
 
 def validate_all_objects_in_directory(gs_dir, skip_filetypes: tuple[str, ...], billing_project: str = None):
     """Validate files with MD5s in the provided gs directory"""
     b = get_batch(f'Validate md5 checksums for files in {gs_dir}')
     client = storage.Client()
-
-    if not gs_dir.startswith('gs://'):
-        raise ValueError(f'Expected GS directory, got: {gs_dir}')
     
     if not billing_project:
         billing_project = config_retrieve(['workflow', 'gcp_billing_project'])
@@ -38,9 +36,6 @@ def validate_all_objects_in_directory(gs_dir, skip_filetypes: tuple[str, ...], b
 def create_md5s_for_files_in_directory(gs_dir, skip_filetypes: tuple[str, ...], force_recreate: bool, billing_project: str = None):
     """Validate files with MD5s in the provided gs directory"""
     b = get_batch(f'Create md5 checksums for files in {gs_dir}')
-
-    if not gs_dir.startswith('gs://'):
-        raise ValueError(f'Expected GS directory, got: {gs_dir}')
 
     if not billing_project:
         billing_project = config_retrieve(['workflow', 'gcp_billing_project'])
@@ -123,6 +118,9 @@ def create_md5(job, file, billing_project, driver_image):
 @click.argument('gs_dir')
 def main(billing_project: str | None, skip_filetypes: tuple[str, str], validate_only: bool, force_recreate: bool, gs_dir: str):
     """Scans the directory for files and creates md5 checksums for them."""
+    if not gs_dir.startswith('gs://'):
+        raise ValueError(f'Expected GS directory, got: {gs_dir}')
+    
     if validate_only:
         validate_all_objects_in_directory(gs_dir, skip_filetypes, billing_project)
     else:
