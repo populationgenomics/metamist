@@ -70,12 +70,30 @@ def validate_md5(job, file, billing_project, driver_image):
     copy_common_env(job)
     job.image(driver_image)
     md5_path = f'{file}.md5'
+    # job.command(
+    #     f"""\
+    # set -euxo pipefail
+    # gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+    # gsutil -u {billing_project} cat {file} | md5sum | cut -d " " -f1 > /tmp/uploaded.md5
+    # diff <(cat /tmp/uploaded.md5) <(gsutil -u {billing_project} cat {md5_path} | cut -d " " -f1)
+    # """
+    # )
     job.command(
         f"""\
     set -euxo pipefail
     gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
-    gsutil -u {billing_project} cat {file} | md5sum | cut -d " " -f1 > /tmp/uploaded.md5
-    diff <(cat /tmp/uploaded.md5) <(gsutil -u {billing_project} cat {md5_path or f'{file}.md5'} | cut -d " " -f1)
+    calculated_md5=$(gsutil -u {billing_project} cat {file} | md5sum | cut -d " " -f1)
+    stored_md5=$(gsutil -u {billing_project} cat {md5_path} | tr -d '[:space:]')
+    
+    if [ "$calculated_md5" = "$stored_md5" ]; then
+        echo "MD5 checksum validation successful."
+        exit 0
+    else
+        echo "MD5 checksum validation failed."
+        echo "Calculated MD5: $calculated_md5"
+        echo "Stored MD5:     $stored_md5"
+        exit 1
+    fi
     """
     )
 
