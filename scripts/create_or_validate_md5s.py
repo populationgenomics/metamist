@@ -92,7 +92,7 @@ def create_and_validate_md5s_for_files_in_directory(
             else:
                 print(f'{filepath}.md5 already exists, skipping')
             continue
-        
+
         if mode != 'create':
             continue
         print('Creating md5 for', filepath)
