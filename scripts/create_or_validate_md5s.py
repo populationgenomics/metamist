@@ -1,8 +1,9 @@
 import os
 
 import click
-from cpg_utils.hail_batch import config_retrieve, copy_common_env, get_batch
 from google.cloud import storage
+
+from cpg_utils.hail_batch import config_retrieve, copy_common_env, get_batch
 
 
 def get_blobs_in_directory(gs_dir: str, billing_project: str, storage_client: storage.Client):
@@ -13,27 +14,30 @@ def get_blobs_in_directory(gs_dir: str, billing_project: str, storage_client: st
     return {f'gs://{bucket_name}/{blob.name}' for blob in blobs}
 
 
-def validate_md5s_in_directory(gs_dir: str, skip_filetypes: tuple[str, ...], billing_project: str, driver_image: str, storage_client: storage.Client):
-    """Validate files with MD5s in the provided gs directory, skipping files with certain extensions"""
-    b = get_batch(f'Validate md5 checksums for files in {gs_dir}')
+def create_md5(job, file: str, billing_project: str, driver_image: str):
+    """
+    Streams the file with gsutil and calculates the md5 checksum,
+    then uploads the checksum to the same path as filename.md5.
+    """
+    copy_common_env(job)
+    job.image(driver_image)
+    md5 = f'{file}.md5'
+    job.command(
+        f"""\
+    set -euxo pipefail
+    gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+    gsutil -u {billing_project} cat {file} | md5sum | cut -d " " -f1  > /tmp/uploaded.md5
+    gsutil -u {billing_project} cp /tmp/uploaded.md5 {md5}
+    """
+    )
 
-    files = get_blobs_in_directory(gs_dir, billing_project, storage_client)
-    for obj in files:
-        if obj.endswith('.md5') or obj.endswith(skip_filetypes):
-            continue
-        if f'{obj}.md5' not in files:
-            continue
-        
-        print('Validating md5 for', obj)
-        job = b.new_job(f'Validate md5 checksum: {os.path.basename(obj)}')
-        validate_md5(job, obj, billing_project, driver_image)
-
-    b.run(wait=False)
+    return job
 
 
 def validate_md5(job, file: str, billing_project: str, driver_image: str):
     """
-    This quickly validates a file and it's md5
+    Streams the file with gsutil and calculates the md5 checksum,
+    then compares it to the stored checksum in the .md5 file.
     """
     copy_common_env(job)
     job.image(driver_image)
@@ -79,24 +83,22 @@ def create_md5s_for_files_in_directory(gs_dir: str, skip_filetypes: tuple[str, .
     b.run(wait=False)
 
 
-def create_md5(job, file: str, billing_project: str, driver_image: str):
-    """
-    Streams the file with gsutil and calculates the md5 checksum,
-    then uploads the checksum to the same path as filename.md5.
-    """
-    copy_common_env(job)
-    job.image(driver_image)
-    md5 = f'{file}.md5'
-    job.command(
-        f"""\
-    set -euxo pipefail
-    gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
-    gsutil -u {billing_project} cat {file} | md5sum | cut -d " " -f1  > /tmp/uploaded.md5
-    gsutil -u {billing_project} cp /tmp/uploaded.md5 {md5}
-    """
-    )
+def validate_md5s_in_directory(gs_dir: str, skip_filetypes: tuple[str, ...], billing_project: str, driver_image: str, storage_client: storage.Client):
+    """Validate files with MD5s in the provided gs directory, skipping files with certain extensions"""
+    b = get_batch(f'Validate md5 checksums for files in {gs_dir}')
 
-    return job
+    files = get_blobs_in_directory(gs_dir, billing_project, storage_client)
+    for obj in files:
+        if obj.endswith('.md5') or obj.endswith(skip_filetypes):
+            continue
+        if f'{obj}.md5' not in files:
+            continue
+        
+        print('Validating md5 for', obj)
+        job = b.new_job(f'Validate md5 checksum: {os.path.basename(obj)}')
+        validate_md5(job, obj, billing_project, driver_image)
+
+    b.run(wait=False)
 
 
 @click.command()
