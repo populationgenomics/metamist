@@ -83,12 +83,8 @@ def create_and_validate_md5s_for_files_in_directory(
     for filepath in files:
         if filepath.endswith('.md5') or filepath.endswith(skip_filetypes):
             continue
-        if f'{filepath}.md5' in files:
-            if force_recreate:
-                print('Re-creating md5 for', filepath)
-                job = b.new_job(f'Create {os.path.basename(filepath)}.md5')
-                create_md5(job, filepath, billing_project, driver_image)
-            elif validate_files:
+        if f'{filepath}.md5' in files and not force_recreate:
+            if validate_files:
                 print('Validating md5 for', filepath)
                 job = b.new_job(f'Validate md5 checksum: {os.path.basename(filepath)}')
                 validate_md5(job, filepath, billing_project, driver_image)
