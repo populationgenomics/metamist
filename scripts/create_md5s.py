@@ -1,10 +1,9 @@
 import os
 
 import click
-from cpg_utils.hail_batch import config_retrieve, copy_common_env, get_batch
 from google.cloud import storage
 
-
+from cpg_utils.hail_batch import config_retrieve, copy_common_env, get_batch
 
 def validate_all_objects_in_directory(gs_dir, skip_filetypes: tuple[str, ...], billing_project: str = None):
     """Validate files with MD5s in the provided gs directory"""
