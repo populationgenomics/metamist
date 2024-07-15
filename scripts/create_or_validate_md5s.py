@@ -14,40 +14,40 @@ def get_blobs_in_directory(gs_dir: str, billing_project: str, storage_client: st
     return {f'gs://{bucket_name}/{blob.name}' for blob in blobs}
 
 
-def create_md5(job, file: str, billing_project: str, driver_image: str):
+def create_md5(job, filepath: str, billing_project: str, driver_image: str):
     """
     Streams the file with gsutil and calculates the md5 checksum,
     then uploads the checksum to the same path as filename.md5.
     """
     copy_common_env(job)
     job.image(driver_image)
-    md5 = f'{file}.md5'
+    md5_filepath = f'{filepath}.md5'
     job.command(
         f"""\
     set -euxo pipefail
     gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
-    gsutil -u {billing_project} cat {file} | md5sum | cut -d " " -f1  > /tmp/uploaded.md5
-    gsutil -u {billing_project} cp /tmp/uploaded.md5 {md5}
+    gsutil -u {billing_project} cat {filepath} | md5sum | cut -d " " -f1  > /tmp/uploaded.md5
+    gsutil -u {billing_project} cp /tmp/uploaded.md5 {md5_filepath}
     """
     )
 
     return job
 
 
-def validate_md5(job, file: str, billing_project: str, driver_image: str):
+def validate_md5(job, filepath: str, billing_project: str, driver_image: str):
     """
     Streams the file with gsutil and calculates the md5 checksum,
     then compares it to the stored checksum in the .md5 file.
     """
     copy_common_env(job)
     job.image(driver_image)
-    md5_path = f'{file}.md5'
+    md5_filepath = f'{filepath}.md5'
     job.command(
         f"""\
     set -euxo pipefail
     gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
-    calculated_md5=$(gsutil -u {billing_project} cat {file} | md5sum | cut -d " " -f1)
-    stored_md5=$(gsutil -u {billing_project} cat {md5_path} | cut -d " " -f1)
+    calculated_md5=$(gsutil -u {billing_project} cat {filepath} | md5sum | cut -d " " -f1)
+    stored_md5=$(gsutil -u {billing_project} cat {md5_filepath} | cut -d " " -f1)
 
     if [ "$calculated_md5" = "$stored_md5" ]; then
         echo "MD5 checksum validation successful."
@@ -64,16 +64,28 @@ def validate_md5(job, file: str, billing_project: str, driver_image: str):
     return job
 
 
-def create_md5s_for_files_in_directory(gs_dir: str, skip_filetypes: tuple[str, ...], force_recreate: bool, billing_project: str, driver_image: str, storage_client: storage.Client):
-    """Validate files with MD5s in the provided gs directory, skipping files with certain extensions"""
-    b = get_batch(f'Create md5 checksums for files in {gs_dir}')
+def create_and_validate_md5s_for_files_in_directory(gs_dir: str, skip_filetypes: tuple[str, ...], force_recreate: bool, validate_files: bool, billing_project: str, driver_image: str, storage_client: storage.Client):
+    """
+    Create MD5s for files in the provided gs directory, skipping files with certain extensions.
+    If the MD5 already exists, validate it instead, unless force_recreate is set.
+    """
+    b = get_batch(f'Create or validate md5 checksums for files in {gs_dir}')
 
     files = get_blobs_in_directory(gs_dir, billing_project, storage_client)
     for filepath in files:
         if filepath.endswith('.md5') or filepath.endswith(skip_filetypes):
             continue
-        if f'{filepath}.md5' in files and not force_recreate:
-            print(f'{filepath}.md5 already exists, skipping')
+        if f'{filepath}.md5' in files:
+            if force_recreate:
+                print('Re-creating md5 for', filepath)
+                job = b.new_job(f'Create {os.path.basename(filepath)}.md5')
+                create_md5(job, filepath, billing_project, driver_image)
+            elif validate_files:
+                print('Validating md5 for', filepath)
+                job = b.new_job(f'Validate md5 checksum: {os.path.basename(filepath)}')
+                validate_md5(job, filepath, billing_project, driver_image)
+            else:
+                print(f'{filepath}.md5 already exists, skipping')
             continue
 
         print('Creating md5 for', filepath)
@@ -83,31 +95,13 @@ def create_md5s_for_files_in_directory(gs_dir: str, skip_filetypes: tuple[str, .
     b.run(wait=False)
 
 
-def validate_md5s_in_directory(gs_dir: str, skip_filetypes: tuple[str, ...], billing_project: str, driver_image: str, storage_client: storage.Client):
-    """Validate files with MD5s in the provided gs directory, skipping files with certain extensions"""
-    b = get_batch(f'Validate md5 checksums for files in {gs_dir}')
-
-    files = get_blobs_in_directory(gs_dir, billing_project, storage_client)
-    for obj in files:
-        if obj.endswith('.md5') or obj.endswith(skip_filetypes):
-            continue
-        if f'{obj}.md5' not in files:
-            continue
-
-        print('Validating md5 for', obj)
-        job = b.new_job(f'Validate md5 checksum: {os.path.basename(obj)}')
-        validate_md5(job, obj, billing_project, driver_image)
-
-    b.run(wait=False)
-
-
 @click.command()
 @click.option('--billing-project', '-b', default=None)
 @click.option('--skip-filetypes', '-s', default=('.crai', '.tbi'), multiple=True)
-@click.option('--validate-only', '-v', is_flag=True, default=False, help='Validate existing md5s, do not create new ones.')
-@click.option('--force-recreate', '-f', is_flag=True, default=False, help='Recreate md5s even if they already exist.')
+@click.option('--force-recreate-existing', '-f', is_flag=True, default=False, help='Re-create md5s even if they already exist. Only set one of --force-recreate-existing or --validate-existing.')
+@click.option('--validate-existing', '-v', is_flag=True, default=False, help='Validate existing md5s, do not create new ones. Not compatible with --force-recreate-existing.')
 @click.argument('gs_dir')
-def main(billing_project: str | None, skip_filetypes: tuple[str, str], validate_only: bool, force_recreate: bool, gs_dir: str):
+def main(billing_project: str | None, skip_filetypes: tuple[str, str], force_recreate_existing: bool, validate_existing: bool, gs_dir: str):
     """Scans the directory for files and creates md5 checksums for them, OR validates existing md5s."""
     if not gs_dir.startswith('gs://'):
         raise ValueError(f'Expected GS directory, got: {gs_dir}')
@@ -116,12 +110,12 @@ def main(billing_project: str | None, skip_filetypes: tuple[str, str], validate_
         billing_project = config_retrieve(['workflow', 'dataset_gcp_project'])
     driver_image = config_retrieve(['workflow', 'driver_image'])
 
+    if force_recreate_existing and validate_existing:
+        raise ValueError('Only one of --force-recreate-existing or --validate-existing can be set.')
+
     storage_client = storage.Client()
 
-    if validate_only:
-        validate_md5s_in_directory(gs_dir, skip_filetypes, billing_project, driver_image, storage_client)
-    else:
-        create_md5s_for_files_in_directory(gs_dir, skip_filetypes, force_recreate, billing_project, driver_image, storage_client)
+    create_and_validate_md5s_for_files_in_directory(gs_dir, skip_filetypes, force_recreate_existing, validate_existing, billing_project, driver_image, storage_client)
 
 
 if __name__ == '__main__':
