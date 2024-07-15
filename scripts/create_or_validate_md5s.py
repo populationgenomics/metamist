@@ -1,9 +1,8 @@
 import os
 
 import click
-from google.cloud import storage
-
 from cpg_utils.hail_batch import config_retrieve, copy_common_env, get_batch
+from google.cloud import storage
 
 
 def get_blobs_in_directory(gs_dir: str, billing_project: str, storage_client: storage.Client):
@@ -107,7 +106,7 @@ def create_md5(job, file: str, billing_project: str, driver_image: str):
 @click.option('--force-recreate', '-f', is_flag=True, default=False, help='Recreate md5s even if they already exist.')
 @click.argument('gs_dir')
 def main(billing_project: str | None, skip_filetypes: tuple[str, str], validate_only: bool, force_recreate: bool, gs_dir: str):
-    """Scans the directory for files and creates md5 checksums for them."""
+    """Scans the directory for files and creates md5 checksums for them, OR validates existing md5s."""
     if not gs_dir.startswith('gs://'):
         raise ValueError(f'Expected GS directory, got: {gs_dir}')
     
