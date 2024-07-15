@@ -175,8 +175,10 @@ class AnalysisLayer(BaseLayer):
             AnalysisFilter(
                 sequencing_group_id=GenericFilter(in_=list(sg_to_project.keys())),
                 type=GenericFilter(eq='cram'),
-                status=GenericFilter(eq=AnalysisStatus.COMPLETED),
-            )
+                status=GenericFilter(
+                    in_=[AnalysisStatus.COMPLETED, AnalysisStatus.FAILED],
+                ),
+            ),
         )
 
         crams_by_sg = group_by(cram_list, lambda c: c.sequencing_group_ids[0])
