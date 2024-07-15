@@ -1,10 +1,9 @@
 import os
 
 import click
-from cpg_utils.hail_batch import config_retrieve, copy_common_env, get_batch
 from google.cloud import storage
 
-
+from cpg_utils.hail_batch import config_retrieve, copy_common_env, get_batch
 
 def validate_all_objects_in_directory(gs_dir, skip_filetypes: tuple[str, ...], billing_project: str = None):
     """Validate files with MD5s in the provided gs directory"""
@@ -19,7 +18,7 @@ def validate_all_objects_in_directory(gs_dir, skip_filetypes: tuple[str, ...], b
     
     client = storage.Client()
     bucket = client.bucket(bucket_name, user_project=billing_project)
-    blobs = bucket.list_blobs(bucket_name, prefix='/'.join(components))
+    blobs = bucket.list_blobs(prefix='/'.join(components))
     files: set[str] = {f'gs://{bucket_name}/{blob.name}' for blob in blobs}
     for obj in files:
         if obj.endswith('.md5') or obj.endswith(skip_filetypes):
