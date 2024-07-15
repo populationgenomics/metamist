@@ -84,24 +84,24 @@ def create_and_validate_md5s_for_files_in_directory(
         if filepath.endswith('.md5') or filepath.endswith(skip_filetypes):
             continue
 
-        if mode == 'validate' and f'{filepath}.md5' not in files:
-            print(f'{filepath}.md5 not found, skipping validation')
-            continue
+        md5_exists = f'{filepath}.md5' in files
 
-        if mode == 'validate' and f'{filepath}.md5' in files:
-            print('Validating md5 for', filepath)
-            job = b.new_job(f'Validate md5 checksum: {os.path.basename(filepath)}')
-            validate_md5(job, filepath, billing_project, driver_image)
-            continue
+        if mode == 'create' :
+            if not md5_exists or force_recreate_existing:
+                print('Creating md5 for', filepath)
+                job = b.new_job(f'Create {os.path.basename(filepath)}.md5')
+                create_md5(job, filepath, billing_project, driver_image)
+            else:
+                print(f'{filepath}.md5 already exists, skipping')
+                continue
 
-        if mode == 'create' and f'{filepath}.md5' in files and not force_recreate_existing:
-            print(f'{filepath}.md5 already exists, skipping')
-            continue
-
-        if mode == 'create':
-            print('Creating md5 for', filepath)
-            job = b.new_job(f'Create {os.path.basename(filepath)}.md5')
-            create_md5(job, filepath, billing_project, driver_image)
+        if mode == 'validate':
+            if md5_exists:
+                print('Validating md5 for', filepath)
+                job = b.new_job(f'Validate md5 checksum: {os.path.basename(filepath)}')
+                validate_md5(job, filepath, billing_project, driver_image)
+            else:
+                print(f'{filepath}.md5 not found, skipping validation')
 
     b.run(wait=False)
 
