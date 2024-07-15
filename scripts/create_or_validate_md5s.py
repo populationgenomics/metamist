@@ -67,24 +67,25 @@ def validate_md5(job, filepath: str, billing_project: str, driver_image: str):
 def create_and_validate_md5s_for_files_in_directory(
     gs_dir: str,
     skip_filetypes: tuple[str, ...],
+    mode: str,
     force_recreate: bool,
-    validate_files: bool,
     billing_project: str,
     driver_image: str,
     storage_client: storage.Client
 ):
     """
-    Create MD5s for files in the provided gs directory, skipping files with certain extensions.
-    If the MD5 already exists, validate it instead, unless force_recreate is set.
+    Create OR validate MD5s for files in the provided gs directory, skipping files with certain extensions.
+    The mode parameter determines whether to create or validate the md5s.
+    If mode=create, the force_recreate parameter determines whether to re-create md5s that already exist.
     """
-    b = get_batch(f'Create or validate md5 checksums for files in {gs_dir}')
+    b = get_batch(f'{mode} md5 checksums for files in {gs_dir}')
 
     files = get_blobs_in_directory(gs_dir, billing_project, storage_client)
     for filepath in files:
         if filepath.endswith('.md5') or filepath.endswith(skip_filetypes):
             continue
         if f'{filepath}.md5' in files and not force_recreate:
-            if validate_files:
+            if mode == 'validate':
                 print('Validating md5 for', filepath)
                 job = b.new_job(f'Validate md5 checksum: {os.path.basename(filepath)}')
                 validate_md5(job, filepath, billing_project, driver_image)
@@ -102,14 +103,16 @@ def create_and_validate_md5s_for_files_in_directory(
 @click.command()
 @click.option('--billing-project', '-b', default=None)
 @click.option('--skip-filetypes', '-s', default=('.crai', '.tbi'), multiple=True)
+@click.option('--validate-existing-only', '-v', is_flag=True, default=False, help='Validate existing md5s, do not create new ones.')
+@click.option('--create-only', '-c', is_flag=True, default=False, help='Create new md5s, do not validate existing ones.')
 @click.option('--force-recreate-existing', '-f', is_flag=True, default=False, help='Re-create md5s even if they already exist.')
-@click.option('--validate-existing', '-v', is_flag=True, default=False, help='Validate existing md5s, do not create new ones.')
 @click.argument('gs_dir')
 def main(
     billing_project: str | None,
     skip_filetypes: tuple[str, str],
+    validate_existing_only: bool,
+    create_only: bool,
     force_recreate_existing: bool,
-    validate_existing: bool,
     gs_dir: str
 ):
     """
@@ -117,11 +120,12 @@ def main(
     params:
         gs_dir:                   The GCP bucket path / directory to scan for files.
         skip_filetypes:           File extensions to skip.
-        *force_recreate_existing: Re-create md5s even if they already exist.
-        *validate_existing:       Validate existing md5s, do not create new ones.
+        *validate_existing_only:  Validate existing md5s, do not create new ones.
+        *create_only:             Create new md5s, do not validate existing ones.
+        force_recreate_existing:  Re-create md5s even if they already exist.
         billing_project:          The GCP project to bill for the operations.
 
-        *Only one of force_recreate_existing or validate_existing can be set.
+        *Only one of validate_existing or create_only can be set.
     """
     if not gs_dir.startswith('gs://'):
         raise ValueError(f'Expected GS directory, got: {gs_dir}')
@@ -130,16 +134,18 @@ def main(
         billing_project = config_retrieve(['workflow', 'dataset_gcp_project'])
     driver_image = config_retrieve(['workflow', 'driver_image'])
 
-    if force_recreate_existing and validate_existing:
-        raise ValueError('Only one of --force-recreate-existing or --validate-existing can be set.')
+    if validate_existing_only and create_only:
+        raise ValueError('Only one of --validate-existing-only or --create-only can be set.')
+
+    mode = 'validate' if validate_existing_only else 'create'
 
     storage_client = storage.Client()
 
     create_and_validate_md5s_for_files_in_directory(
         gs_dir,
         skip_filetypes,
+        mode,
         force_recreate_existing,
-        validate_existing,
         billing_project,
         driver_image,
         storage_client
