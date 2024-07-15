@@ -1,5 +1,5 @@
-from shlex import quote
 import os
+from shlex import quote
 
 import click
 from google.cloud import storage
@@ -67,7 +67,7 @@ def create_and_validate_md5s_for_files_in_directory(
     gs_dir: str,
     skip_filetypes: tuple[str, ...],
     mode: str,
-    force_recreate: bool,
+    force_recreate_existing: bool,
     billing_project: str,
     driver_image: str,
     storage_client: storage.Client
@@ -83,26 +83,26 @@ def create_and_validate_md5s_for_files_in_directory(
     for filepath in files:
         if filepath.endswith('.md5') or filepath.endswith(skip_filetypes):
             continue
-        
+
         if mode == 'validate' and f'{filepath}.md5' not in files:
             print(f'{filepath}.md5 not found, skipping validation')
             continue
-        
+
         if mode == 'validate' and f'{filepath}.md5' in files:
             print('Validating md5 for', filepath)
             job = b.new_job(f'Validate md5 checksum: {os.path.basename(filepath)}')
             validate_md5(job, filepath, billing_project, driver_image)
             continue
-        
-        if mode == 'create' and f'{filepath}.md5' in files and not force_recreate:
+
+        if mode == 'create' and f'{filepath}.md5' in files and not force_recreate_existing:
             print(f'{filepath}.md5 already exists, skipping')
             continue
-        
+
         if mode == 'create':
             print('Creating md5 for', filepath)
             job = b.new_job(f'Create {os.path.basename(filepath)}.md5')
             create_md5(job, filepath, billing_project, driver_image)
-            
+
     b.run(wait=False)
 
 
@@ -124,7 +124,7 @@ def main(
     params:
         gs_dir:                   The GCP bucket path / directory to scan for files.
         skip_filetypes:           File extensions to skip.
-        mode:                     'create' md5s for files, or 'validate' existing md5s. 
+        mode:                     'create' md5s for files, or 'validate' existing md5s.
         force_recreate_existing:  Re-create md5s even if they already exist.
         billing_project:          The GCP project to bill for the operations.
 
