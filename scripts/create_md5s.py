@@ -7,7 +7,7 @@ from cpg_utils.hail_batch import copy_common_env, get_batch, config_retrieve
 
 def validate_all_objects_in_directory(gs_dir, skip_filetypes: tuple[str, ...], billing_project: str = None):
     """Validate files with MD5s in the provided gs directory"""
-    b = get_batch(f'Check md5 checksums for files in {gs_dir}')
+    b = get_batch(f'Validate md5 checksums for files in {gs_dir}')
     client = storage.Client()
 
     if not gs_dir.startswith('gs://'):
@@ -19,15 +19,17 @@ def validate_all_objects_in_directory(gs_dir, skip_filetypes: tuple[str, ...], b
 
     bucket_name, *components = gs_dir[5:].split('/')
 
-    blobs = client.list_blobs(bucket_name, prefix='/'.join(components))
+    bucket = client.bucket(bucket_name, user_project=billing_project)
+    blobs = bucket.list_blobs(bucket_name, prefix='/'.join(components))
     files: set[str] = {f'gs://{bucket_name}/{blob.name}' for blob in blobs}
     for obj in files:
         if obj.endswith('.md5') or obj.endswith(skip_filetypes):
             continue
         if f'{obj}.md5' not in files:
             continue
-
-        job = b.new_job(f'validate_{os.path.basename(obj)}')
+        
+        print('Validating md5 for', obj)
+        job = b.new_job(f'Validate md5 checksum: {os.path.basename(obj)}')
         validate_md5(job, obj, billing_project, driver_image)
 
     b.run(wait=False)
@@ -70,20 +72,12 @@ def validate_md5(job, file, billing_project, driver_image):
     copy_common_env(job)
     job.image(driver_image)
     md5_path = f'{file}.md5'
-    # job.command(
-    #     f"""\
-    # set -euxo pipefail
-    # gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
-    # gsutil -u {billing_project} cat {file} | md5sum | cut -d " " -f1 > /tmp/uploaded.md5
-    # diff <(cat /tmp/uploaded.md5) <(gsutil -u {billing_project} cat {md5_path} | cut -d " " -f1)
-    # """
-    # )
     job.command(
         f"""\
     set -euxo pipefail
     gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
     calculated_md5=$(gsutil -u {billing_project} cat {file} | md5sum | cut -d " " -f1)
-    stored_md5=$(gsutil -u {billing_project} cat {md5_path} | tr -d '[:space:]')
+    stored_md5=$(gsutil -u {billing_project} cat {md5_path} | cut -d " " -f1)
     
     if [ "$calculated_md5" = "$stored_md5" ]; then
         echo "MD5 checksum validation successful."
