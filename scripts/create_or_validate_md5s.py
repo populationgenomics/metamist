@@ -64,7 +64,15 @@ def validate_md5(job, filepath: str, billing_project: str, driver_image: str):
     return job
 
 
-def create_and_validate_md5s_for_files_in_directory(gs_dir: str, skip_filetypes: tuple[str, ...], force_recreate: bool, validate_files: bool, billing_project: str, driver_image: str, storage_client: storage.Client):
+def create_and_validate_md5s_for_files_in_directory(
+    gs_dir: str,
+    skip_filetypes: tuple[str, ...],
+    force_recreate: bool,
+    validate_files: bool,
+    billing_project: str,
+    driver_image: str,
+    storage_client: storage.Client
+):
     """
     Create MD5s for files in the provided gs directory, skipping files with certain extensions.
     If the MD5 already exists, validate it instead, unless force_recreate is set.
@@ -98,11 +106,27 @@ def create_and_validate_md5s_for_files_in_directory(gs_dir: str, skip_filetypes:
 @click.command()
 @click.option('--billing-project', '-b', default=None)
 @click.option('--skip-filetypes', '-s', default=('.crai', '.tbi'), multiple=True)
-@click.option('--force-recreate-existing', '-f', is_flag=True, default=False, help='Re-create md5s even if they already exist. Only set one of --force-recreate-existing or --validate-existing.')
-@click.option('--validate-existing', '-v', is_flag=True, default=False, help='Validate existing md5s, do not create new ones. Not compatible with --force-recreate-existing.')
+@click.option('--force-recreate-existing', '-f', is_flag=True, default=False, help='Re-create md5s even if they already exist.')
+@click.option('--validate-existing', '-v', is_flag=True, default=False, help='Validate existing md5s, do not create new ones.')
 @click.argument('gs_dir')
-def main(billing_project: str | None, skip_filetypes: tuple[str, str], force_recreate_existing: bool, validate_existing: bool, gs_dir: str):
-    """Scans the directory for files and creates md5 checksums for them, OR validates existing md5s."""
+def main(
+    billing_project: str | None,
+    skip_filetypes: tuple[str, str],
+    force_recreate_existing: bool,
+    validate_existing: bool,
+    gs_dir: str
+):
+    """
+    Scans the directory for files and creates md5 checksums for them, OR validates existing md5s.
+    params:
+        gs_dir:                   The GCP bucket path / directory to scan for files.
+        skip_filetypes:           File extensions to skip.
+        *force_recreate_existing: Re-create md5s even if they already exist.
+        *validate_existing:       Validate existing md5s, do not create new ones.
+        billing_project:          The GCP project to bill for the operations.
+
+        *Only one of force_recreate_existing or validate_existing can be set.
+    """
     if not gs_dir.startswith('gs://'):
         raise ValueError(f'Expected GS directory, got: {gs_dir}')
 
@@ -115,7 +139,15 @@ def main(billing_project: str | None, skip_filetypes: tuple[str, str], force_rec
 
     storage_client = storage.Client()
 
-    create_and_validate_md5s_for_files_in_directory(gs_dir, skip_filetypes, force_recreate_existing, validate_existing, billing_project, driver_image, storage_client)
+    create_and_validate_md5s_for_files_in_directory(
+        gs_dir,
+        skip_filetypes,
+        force_recreate_existing,
+        validate_existing,
+        billing_project,
+        driver_image,
+        storage_client
+    )
 
 
 if __name__ == '__main__':
