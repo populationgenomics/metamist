@@ -3,7 +3,7 @@ import ReactGoogleSlides from "react-google-slides";
 
 import { IBillingPage, billingPages } from './BillingPages';
 import { ThemeContext } from '../../shared/components/ThemeProvider';
-import { Icon, Input, Menu, MenuItem, MenuMenu, Segment } from 'semantic-ui-react';
+import { Button, Icon, Input, Menu, MenuItem, MenuMenu, Segment } from 'semantic-ui-react';
 
 // Google Slides
 const Slides = React.memo(({ link }: { link: string }) => {
@@ -31,6 +31,7 @@ const MenuItems = (props: MenuProps) => {
         return <>
             {Object.values(billingPages).map((page) => (
                 page.name === activeItem && <Segment attached='bottom' inverted={inverted}>
+                    <h3><Button size='large' href={page.url}>{page.title}</Button></h3>
                     <p>{page.description}</p>
                 </Segment>
             ))}
@@ -39,7 +40,7 @@ const MenuItems = (props: MenuProps) => {
 
     return (
         <>
-            <Menu pointing icon='labeled' attached='top' inverted={inverted} >
+            <Menu widths={billingPages.length} pointing icon='labeled' attached='top' inverted={inverted} >
                 {Object.values(billingPages).map((page) => {
                     return (
                         <MenuItem
