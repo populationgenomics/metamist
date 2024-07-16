@@ -9,7 +9,6 @@ import { BillingApi } from '../../../sm-api'
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney'
 import DescriptionIcon from '@mui/icons-material/Description'
 import ExploreIcon from '@mui/icons-material/Explore'
-import HomeIcon from '@mui/icons-material/Home'
 import InsightsIcon from '@mui/icons-material/Insights'
 import TableRowsIcon from '@mui/icons-material/TableRows'
 import TroubleshootIcon from '@mui/icons-material/Troubleshoot'
@@ -19,50 +18,15 @@ import DarkModeTriButton from './DarkModeTriButton/DarkModeTriButton'
 import Searchbar from './Search'
 
 import { ThemeContext } from '../ThemeProvider'
+import { IBillingPage, billingPages } from '../../../pages/billing/BillingPages'
 
 import './NavBar.css'
 
-const billingPages = {
+const billingPagesMenu = {
     title: 'Billing',
     url: '/billing',
     icon: <AttachMoneyIcon />,
-    submenu: [
-        {
-            title: 'Home',
-            url: '/billing',
-            icon: <HomeIcon />,
-        },
-        {
-            title: 'Cost By Invoice Month',
-            url: '/billing/invoiceMonthCost',
-            icon: <TableRowsIcon />,
-        },
-        {
-            title: 'Cost Across Invoice Months (Topics only)',
-            url: '/billing/costByMonth',
-            icon: <TableRowsIcon />,
-        },
-        {
-            title: 'Cost By Time',
-            url: '/billing/costByTime',
-            icon: <TableRowsIcon />,
-        },
-        {
-            title: 'Cost By Analysis',
-            url: '/billing/costByAnalysis',
-            icon: <TableRowsIcon />,
-        },
-        {
-            title: 'Cost By Category',
-            url: '/billing/costByCategory',
-            icon: <TableRowsIcon />,
-        },
-        {
-            title: 'Seqr Prop Map',
-            url: '/billing/seqrPropMap',
-            icon: <TableRowsIcon />,
-        },
-    ],
+    submenu: billingPages,
 }
 
 const InsightsPages = {
@@ -100,10 +64,11 @@ const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
 
     const dropdown = (item: MenuItem) => (
         <Dropdown text={item.title} key={index}>
-            <Dropdown.Menu id="navDrop">
+            <Dropdown.Menu id="navDrop" inverted={isDarkMode}>
                 {item.submenu &&
                     item.submenu.map((subitem, subindex) => (
                         <Dropdown.Item as={Link} id="navItem" to={subitem.url} key={subindex}>
+                            {subitem.icon} <span />
                             {subitem.title}
                         </Dropdown.Item>
                     ))}
@@ -179,9 +144,13 @@ const NavBar: React.FC<NavBarProps> = ({ fixed }) => {
     React.useEffect(() => {
         new BillingApi().isBillingEnabled().then((response) => {
             if (response.status === 200 && response.data === true) {
-                setMenuItems([...menuItems.slice(0, 2), billingPages, ...menuItems.slice(2)])
+                setMenuItems([...menuItems.slice(0, 2), billingPagesMenu, ...menuItems.slice(2)])
             }
         })
+    }, [])
+
+    React.useEffect(() => {
+        setMenuItems([...menuItems.slice(0, 2), billingPagesMenu, ...menuItems.slice(2)])
     }, [])
 
     return (
