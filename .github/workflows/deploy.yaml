@@ -71,16 +71,6 @@ jobs:
               --new-version $(cat deploy/python/version.txt)dev$(echo $(git rev-parse HEAD) | cut -c1-7)
           fi
 
-      # we have to build the image first without the web files to
-      # generate the openapi file to then generate the documentation
-      - name: "build image"
-        run: |
-          docker build \
-            --build-arg SM_ENVIRONMENT=$SM_ENVIRONMENT \
-            --tag $SM_DOCKER \
-            -f deploy/api/Dockerfile \
-            .
-
       - name: "build deployable API"
         run: |
           export OPENAPI_COMMAND="java -jar openapi-generator-cli.jar"
@@ -97,10 +87,13 @@ jobs:
           npm run build
           popd
 
-      # rebuild docker image now that front-end files are in the right place
-      - name: "build image II"
+      - name: "build image"
         run: |
-          docker build --tag $SM_DOCKER -f deploy/api/Dockerfile .
+          docker build \
+            --build-arg SM_ENVIRONMENT=$SM_ENVIRONMENT \
+            --tag $SM_DOCKER \
+            -f deploy/api/Dockerfile \
+            .
 
       - name: Build python package
         run: python setup.py sdist

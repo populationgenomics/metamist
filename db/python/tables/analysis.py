@@ -187,7 +187,10 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
         if status == AnalysisStatus.COMPLETED:
             fields['timestamp_completed'] = datetime.datetime.utcnow()
-            setters.append('timestamp_completed = :timestamp_completed')
+            # only set timestamp_completed if it's not already set
+            setters.append(
+                'timestamp_completed = CASE WHEN timestamp_completed IS NULL THEN :timestamp_completed ELSE timestamp_completed END',
+            )
 
         if output:
             fields['output'] = output
