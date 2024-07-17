@@ -81,14 +81,14 @@ class OutputFileInternal(SMBase):
                     prefix = ''
                 delimiter = '/'
                 blobs = client.list_blobs(
-                    str(file_obj.bucket),
+                    bucket_or_name=str(file_obj.bucket),
                     versions=False,
                     prefix=prefix,
                     delimiter=str(delimiter),
                 )  # pylint: disable=E1101
                 for blob in blobs:
-                    if blob.name == file_obj.name:
-                        if file_obj.suffix != '.mt' and blob:
+                    if blob.name == file_obj.blob:
+                        if file_obj.suffix != '.mt':
                             file_checksum = blob.crc32c  # pylint: disable=E1101
                             valid = True
                             size = blob.size  # pylint: disable=E1101
