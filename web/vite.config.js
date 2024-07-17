@@ -9,6 +9,7 @@ export default defineConfig({
         // Relative to the root
         outDir: '../dist',
         emptyOutDir: true,
+        chunkSizeWarningLimit: 3000,
     },
     publicDir: 'static',
     server: {

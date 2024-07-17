@@ -17,15 +17,14 @@ from testcontainers.mysql import MySqlContainer
 
 from api.graphql.loaders import get_context  # type: ignore
 from api.graphql.schema import schema  # type: ignore
-from api.settings import set_all_access
 from db.python.connect import (
     TABLES_ORDERED_BY_FK_DEPS,
     Connection,
-    ConnectionStringDatabaseConfiguration,
+    CredentialedDatabaseConfiguration,
     SMConnections,
 )
 from db.python.tables.project import ProjectPermissionsTable
-from models.models.project import ProjectId
+from models.models.project import Project, ProjectId, ProjectMemberUpdate
 
 # use this to determine where the db directory is relatively,
 # as pycharm runs in "test/" folder, and GH runs them in git root
@@ -81,6 +80,8 @@ class DbTest(unittest.TestCase):
     author: str
     project_id: ProjectId
     project_name: str
+    project_id_map: dict[ProjectId, Project]
+    project_name_map: dict[str, Project]
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -94,10 +95,11 @@ class DbTest(unittest.TestCase):
 
             Then you can destroy the database within tearDownClass as all tests have been completed.
             """
+            # Set environment to test
+            os.environ['SM_ENVIRONMENT'] = 'test'
             logger = logging.getLogger()
             try:
-                set_all_access(True)
-                db = MySqlContainer('mariadb:11.2.2')
+                db = MySqlContainer('mariadb:11.2.2', password='test')
                 port_to_expose = find_free_port()
                 # override the default port to map the container to
                 db.with_bind_ports(db.port, port_to_expose)
@@ -110,8 +112,6 @@ class DbTest(unittest.TestCase):
                 if am_i_in_test_environment:
                     db_prefix = '../db'
 
-                con_string = db.get_connection_url()
-                con_string = 'mysql://' + con_string.split('://', maxsplit=1)[1]
                 lcon_string = f'jdbc:mariadb://{db.get_container_host_ip()}:{port_to_expose}/{db.dbname}'
                 # apply the liquibase schema
                 command = [
@@ -128,7 +128,13 @@ class DbTest(unittest.TestCase):
                 subprocess.check_output(command, stderr=subprocess.STDOUT)
 
                 sm_db = SMConnections.make_connection(
-                    ConnectionStringDatabaseConfiguration(con_string)
+                    CredentialedDatabaseConfiguration(
+                        host=db.get_container_host_ip(),
+                        port=port_to_expose,
+                        username='root',
+                        password=db.password,
+                        dbname=db.dbname,
+                    )
                 )
                 await sm_db.connect()
                 cls.author = 'testuser'
@@ -137,23 +143,56 @@ class DbTest(unittest.TestCase):
                 formed_connection = Connection(
                     connection=sm_db,
                     author=cls.author,
-                    readonly=False,
+                    project_id_map={},
+                    project_name_map={},
                     on_behalf_of=None,
                     ar_guid=None,
                     project=None,
                 )
+
+                # Add the test user to the admin groups
+                await formed_connection.connection.execute(
+                    f"""
+                    INSERT INTO group_member(group_id, member)
+                    SELECT id, '{cls.author}'
+                    FROM `group` WHERE name IN('project-creators', 'members-admin')
+                """
+                )
+
                 ppt = ProjectPermissionsTable(
                     connection=formed_connection,
-                    allow_full_access=True,
                 )
                 cls.project_name = 'test'
                 cls.project_id = await ppt.create_project(
                     project_name=cls.project_name,
                     dataset_name=cls.project_name,
                     author=cls.author,
-                    check_permissions=False,
                 )
-                formed_connection.project = cls.project_id
+
+                _, initial_project_name_map = await ppt.get_projects_accessible_by_user(
+                    user=cls.author
+                )
+                created_project = initial_project_name_map.get(cls.project_name)
+                assert created_project
+
+                await ppt.set_project_members(
+                    project=created_project,
+                    members=[
+                        ProjectMemberUpdate(
+                            member=cls.author, roles=['reader', 'writer']
+                        )
+                    ],
+                )
+
+                # Get the new project map now that project membership is updated
+                project_id_map, project_name_map = (
+                    await ppt.get_projects_accessible_by_user(user=cls.author)
+                )
+
+                cls.project_id_map = project_id_map
+                cls.project_name_map = project_name_map
+
+                # formed_connection.project = cls.project_id
 
             except subprocess.CalledProcessError as e:
                 logging.exception(e)
@@ -185,9 +224,10 @@ class DbTest(unittest.TestCase):
         # audit_log ID for each test
         self.connection = Connection(
             connection=self._connection,
-            project=self.project_id,
+            project=self.project_id_map.get(self.project_id),
             author=self.author,
-            readonly=False,
+            project_id_map=self.project_id_map,
+            project_name_map=self.project_name_map,
             ar_guid=None,
             on_behalf_of=None,
         )
@@ -197,7 +237,7 @@ class DbTest(unittest.TestCase):
         """Run SYNC graphql query on internal database"""
         return await self.run_graphql_query_async(query, variables=variables)
 
-    async def run_graphql_query_async(self, query, variables=None):
+    async def run_graphql_query_async(self, query, variables=None) -> dict:
         """Run ASYNC graphql query on internal database"""
         if not isinstance(query, str):
             # if the query was wrapped in a gql() call, unwrap it
@@ -219,6 +259,10 @@ class DbTest(unittest.TestCase):
         )
         if value.errors:
             raise value.errors[0]
+
+        if value.data is None:
+            raise ValueError(f'No data returned from query: {query}')
+
         return value.data
 
     async def audit_log_id(self):
@@ -247,14 +291,40 @@ class DbIsolatedTest(DbTest):
     @run_as_sync
     async def setUp(self) -> None:
         super().setUp()
+        # make sure it's clear, for whatever reason
+        await self.clear_database()
 
-        ignore = {'DATABASECHANGELOG', 'DATABASECHANGELOGLOCK', 'project', 'group'}
+    @run_as_sync
+    async def tearDown(self) -> None:
+        super().tearDown()
+        # tear down on end to test any issues with deleting THAT test data
+        await self.clear_database()
+
+    async def clear_database(self):
+        """Clear the database of all data, except for project + group tables"""
+        ignore = {
+            'DATABASECHANGELOG',
+            'DATABASECHANGELOGLOCK',
+            'project',
+            'group',
+            'project-member',
+        }
         for table in TABLES_ORDERED_BY_FK_DEPS:
             if table in ignore:
                 continue
             try:
+                # mfranklin: Can't use truncate, despite what the docs say
+                #   docs: https://mariadb.com/kb/en/truncate-table/
+                #   error: System-versioned tables do not support TRUNCATE TABLE'
+                #   ticket: https://jira.mariadb.org/browse/MDEV-28439
+                #
+                # so disable FK checks earlier to more easily delete all rows
                 await self.connection.connection.execute(
-                    f'DELETE FROM `{table}` WHERE 1;'
+                    f"""
+                    SET GLOBAL FOREIGN_KEY_CHECKS = 0;
+                    DELETE FROM `{table}` WHERE 1;
+                    SET GLOBAL FOREIGN_KEY_CHECKS = 1;
+                    """
                 )
                 await self.connection.connection.execute(
                     f'DELETE HISTORY FROM `{table}`'

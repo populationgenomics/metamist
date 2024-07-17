@@ -1,16 +1,17 @@
 from datetime import date
 
 from db.python.connect import Connection
+from db.python.filters.generic import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer
-from db.python.tables.assay import AssayTable, NoOpAenter
+from db.python.tables.assay import AssayFilter, AssayTable, NoOpAenter
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import (
     SequencingGroupFilter,
     SequencingGroupTable,
 )
 from db.python.utils import NotFoundError
-from models.models.project import ProjectId
+from models.models.project import ProjectId, ReadAccessRoles
 from models.models.sequencing_group import (
     SequencingGroupInternal,
     SequencingGroupInternalId,
@@ -28,19 +29,17 @@ class SequencingGroupLayer(BaseLayer):
         self.sampt: SampleTable = SampleTable(connection)
 
     async def get_sequencing_group_by_id(
-        self, sequencing_group_id: int, check_project_id: bool = True
+        self, sequencing_group_id: int
     ) -> SequencingGroupInternal:
         """
         Get sequencing group by internal ID
         """
-        groups = await self.get_sequencing_groups_by_ids(
-            [sequencing_group_id], check_project_ids=check_project_id
-        )
+        groups = await self.get_sequencing_groups_by_ids([sequencing_group_id])
 
         return groups[0]
 
     async def get_sequencing_groups_by_ids(
-        self, sequencing_group_ids: list[int], check_project_ids: bool = True
+        self, sequencing_group_ids: list[int]
     ) -> list[SequencingGroupInternal]:
         """
         Get sequence groups by internal IDs
@@ -52,10 +51,12 @@ class SequencingGroupLayer(BaseLayer):
             sequencing_group_ids
         )
 
-        if check_project_ids:
-            await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
-            )
+        if not groups:
+            return []
+
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=ReadAccessRoles
+        )
 
         if len(groups) != len(sequencing_group_ids):
             missing_ids = set(sequencing_group_ids) - set(sg.id for sg in groups)
@@ -67,7 +68,7 @@ class SequencingGroupLayer(BaseLayer):
         return groups
 
     async def get_sequencing_groups_by_analysis_ids(
-        self, analysis_ids: list[int], check_project_ids: bool = True
+        self, analysis_ids: list[int]
     ) -> dict[int, list[SequencingGroupInternal]]:
         """
         Get sequencing groups by analysis IDs
@@ -82,17 +83,15 @@ class SequencingGroupLayer(BaseLayer):
         if not groups:
             return groups
 
-        if check_project_ids:
-            await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
-            )
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=ReadAccessRoles
+        )
 
         return groups
 
     async def query(
         self,
         filter_: SequencingGroupFilter,
-        check_project_ids: bool = True,
     ) -> list[SequencingGroupInternal]:
         """
         Query sequencing groups
@@ -101,10 +100,9 @@ class SequencingGroupLayer(BaseLayer):
         if not sequencing_groups:
             return []
 
-        if check_project_ids and not (filter_.project and filter_.project.in_):
-            await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
-            )
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=ReadAccessRoles
+        )
 
         return sequencing_groups
 
@@ -137,7 +135,7 @@ class SequencingGroupLayer(BaseLayer):
         return await self.seqgt.get_all_sequencing_group_ids_by_sample_ids_by_type()
 
     async def get_participant_ids_sequencing_group_ids_for_sequencing_type(
-        self, sequencing_type: str, check_project_ids: bool = True
+        self, sequencing_type: str
     ) -> dict[int, list[int]]:
         """
         Get list of partiicpant IDs for a specific sequence type,
@@ -152,10 +150,9 @@ class SequencingGroupLayer(BaseLayer):
         if not pids:
             return {}
 
-        if check_project_ids:
-            await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
-            )
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=ReadAccessRoles
+        )
 
         return pids
 
@@ -177,7 +174,9 @@ class SequencingGroupLayer(BaseLayer):
 
         # let's check the sequences first
         slayer = AssayTable(self.connection)
-        projects, assays = await slayer.get_assays_by(assay_ids=assay_ids)
+        projects, assays = await slayer.query(
+            AssayFilter(id=GenericFilter(in_=assay_ids))
+        )
 
         if len(assay_ids) != len(assays):
             missing_seq_ids = set(assay_ids) - set(s.id for s in assays)

@@ -33,7 +33,7 @@ export const BarChart: React.FC<BarChartProps> = ({ data, maxSlices, colors, isL
     //   const width = 1000 - margin.left - margin.right;
     const height = 400 - margin.top - margin.bottom
 
-    const containerDivRef = React.useRef<HTMLDivElement>()
+    const containerDivRef = React.useRef<HTMLDivElement | null>(null)
     const [width, setWidth] = React.useState(768)
 
     const scaleX = scaleBand()
@@ -77,12 +77,12 @@ export const BarChart: React.FC<BarChartProps> = ({ data, maxSlices, colors, isL
             .enter()
             .append('rect')
             .attr('key', (d) => `bar-${d.label}`)
-            .attr('x', (d) => scaleX(d.label))
-            .attr('y', (d) => scaleY(d.value))
+            .attr('x', (d) => scaleX(d.label) ?? 0)
+            .attr('y', (d) => scaleY(d.value) ?? 0)
             .attr('id', (d, i) => `rect${i}`)
             .attr('width', scaleX.bandwidth())
             .attr('height', (d) => height - scaleY(d.value))
-            .attr('fill', (d, i) => colorFunc(i / maxSlices))
+            .attr('fill', (d, i) => colorFunc(i / maxSlices) ?? 'black')
             .attr('stroke', '#fff')
 
         // Axis Left

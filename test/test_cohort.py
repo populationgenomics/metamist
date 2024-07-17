@@ -3,10 +3,14 @@ from test.testbase import DbIsolatedTest, run_as_sync
 
 from pymysql.err import IntegrityError
 
+from db.python.filters import GenericFilter
 from db.python.layers import CohortLayer, SampleLayer
 from db.python.tables.cohort import CohortFilter
-from db.python.utils import GenericFilter
-from models.models import SampleUpsertInternal, SequencingGroupUpsertInternal
+from models.models import (
+    PRIMARY_EXTERNAL_ORG,
+    SampleUpsertInternal,
+    SequencingGroupUpsertInternal,
+)
 from models.models.cohort import (
     CohortCriteria,
     CohortCriteriaInternal,
@@ -198,7 +202,7 @@ def get_sample_model(
     """Create a minimal sample"""
     return SampleUpsertInternal(
         meta={},
-        external_id=f'EXID{eid}',
+        external_ids={PRIMARY_EXTERNAL_ORG: f'EXID{eid}'},
         type=s_type,
         sequencing_groups=[
             SequencingGroupUpsertInternal(

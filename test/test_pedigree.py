@@ -2,7 +2,7 @@ from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
-from models.models.participant import ParticipantUpsertInternal
+from models.models import PRIMARY_EXTERNAL_ORG, ParticipantUpsertInternal
 
 
 class TestPedigree(DbIsolatedTest):
@@ -24,7 +24,7 @@ class TestPedigree(DbIsolatedTest):
         )
 
         pedigree_dicts = await fl.get_pedigree(
-            project=self.connection.project,
+            project=self.connection.project_id,
             replace_with_participant_external_ids=True,
             replace_with_family_external_ids=True,
         )
@@ -51,16 +51,16 @@ class TestPedigree(DbIsolatedTest):
 
         await pl.upsert_participant(
             ParticipantUpsertInternal(
-                external_id='EX01',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'EX01'},
                 reported_sex=1,
             )
         )
         await pl.upsert_participant(
-            ParticipantUpsertInternal(external_id='EX02', reported_sex=None)
+            ParticipantUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'EX02'}, reported_sex=None)
         )
 
         rows = await fl.get_pedigree(
-            project=self.connection.project,
+            project=self.connection.project_id,
             include_participants_not_in_families=True,
             replace_with_participant_external_ids=True,
         )

@@ -1,6 +1,7 @@
 # pylint: disable=too-many-lines,too-many-instance-attributes,too-many-locals,unused-argument,assignment-from-none,invalid-name,ungrouped-imports
 import asyncio
 import csv
+import dataclasses
 import json
 import logging
 import os
@@ -51,6 +52,8 @@ else:
 logging.basicConfig()
 logger = logging.getLogger(__file__)
 logger.setLevel(logging.INFO)
+
+PRIMARY_EXTERNAL_ORG = ''
 
 FASTQ_EXTENSIONS = ('.fq.gz', '.fastq.gz', '.fq', '.fastq')
 BAM_EXTENSIONS = ('.bam',)
@@ -217,7 +220,7 @@ class ParsedParticipant:
         samples = [s.to_sm() for s in self.samples]
         return ParticipantUpsert(
             id=self.internal_pid,
-            external_id=self.external_pid,
+            external_ids={PRIMARY_EXTERNAL_ORG: self.external_pid},
             reported_sex=self.reported_sex,
             reported_gender=self.reported_gender,
             karyotype=self.karyotype,
@@ -236,7 +239,7 @@ class ParsedSample:
         internal_sid: str | None,
         external_sid: str,
         sample_type: str,
-        meta: Dict[str, Any] = None,
+        meta: Dict[str, Any] | None = None,
     ):
         self.participant = participant
         self.rows = rows
@@ -246,18 +249,41 @@ class ParsedSample:
         self.sample_type = sample_type
         self.meta = meta
 
+        self.samples: list[ParsedSample] = []
         self.sequencing_groups: list[ParsedSequencingGroup] = []
 
     def to_sm(self) -> SampleUpsert:
         """Convert to SM upsert model"""
         return SampleUpsert(
             id=self.internal_sid,
-            external_id=self.external_sid,
+            external_ids={PRIMARY_EXTERNAL_ORG: self.external_sid},
             type=self.sample_type,
             meta=self.meta,
             active=True,
             sequencing_groups=[sg.to_sm() for sg in self.sequencing_groups],
+            nested_samples=[s.to_sm() for s in (self.samples or [])],
         )
+
+    @staticmethod
+    def get_all_samples_from(samples: list['ParsedSample']) -> list['ParsedSample']:
+        """Get all samples (including nested) from this list of samples"""
+        all_samples = []
+        for sample in samples:
+            all_samples.append(sample)
+            all_samples.extend(sample.get_all_samples_from(sample.samples))
+        return all_samples
+
+    def all_nested_samples(self) -> list['ParsedSample']:
+        """Get nested samples from self"""
+        if not self.samples:
+            return []
+
+        nested_samples = []
+        for sample in self.samples:
+            nested_samples.append(sample)
+            nested_samples.extend(sample.all_nested_samples())
+
+        return nested_samples
 
 
 class ParsedSequencingGroup:
@@ -317,7 +343,7 @@ class ParsedAssay:
         self.internal_id = internal_assay_id
         self.external_ids = external_assay_ids
         self.assay_type = assay_type
-        self.meta = meta
+        self.meta: dict[str, Any] = meta or {}
 
     def to_sm(self) -> AssayUpsert:
         """Convert to SM upsert model"""
@@ -594,7 +620,7 @@ class GenericParser(
 
         # remove sequencing groups with no assays
         sequencing_groups = [sg for sg in sequencing_groups if sg.assays]
-        for sample in samples:
+        for sample in ParsedSample.get_all_samples_from(samples):
             sample.sequencing_groups = [
                 sg for sg in sample.sequencing_groups if sg.assays
             ]
@@ -637,6 +663,8 @@ class GenericParser(
         else:
             self.prepare_detail(samples)
 
+        return result
+
     def _get_dict_reader(self, file_pointer, delimiter: str):
         """
         Return a DictReader from file_pointer
@@ -657,54 +685,75 @@ class GenericParser(
         reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
         return list(reader)
 
+    @dataclasses.dataclass
+    class ParserSummary:
+        """Summary of what will be inserted / updated"""
+
+        @dataclasses.dataclass
+        class ParserElementSummary:
+            """Container for an element summary"""
+
+            insert: int
+            update: int = 0
+
+        participants: ParserElementSummary
+        samples: ParserElementSummary
+        sequencing_groups: ParserElementSummary
+        assays: ParserElementSummary
+        analyses: ParserElementSummary
+
     def prepare_summary(
         self,
         participants: list[ParsedParticipant],
         samples: list[ParsedSample],
         sequencing_groups: list[ParsedSequencingGroup],
         assays: list[ParsedAssay],
-    ) -> dict[str, dict[Literal['insert', 'update'], int]]:
+    ) -> 'ParserSummary':
         """
         From the parsed objects, prepare a summary of what will be inserted / updated
         """
         participants_to_insert = sum(1 for p in participants if not p.internal_pid)
-        samples_to_insert = sum(1 for s in samples if not s.internal_sid)
+        all_samples = ParsedSample.get_all_samples_from(samples)
+        samples_to_insert = sum(1 for s in all_samples if not s.internal_sid)
         sgs_to_insert = sum(
             1 for sg in sequencing_groups if not sg.internal_seqgroup_id
         )
         assays_to_insert = sum(1 for sq in assays if not sq.internal_id)
         analyses_to_insert = sum(len(sg.analyses or []) for sg in sequencing_groups)
-        summary: dict[str, dict[Literal['insert', 'update'], int]] = {
-            'participants': {
-                'insert': participants_to_insert,
-                'update': len(participants) - participants_to_insert,
-            },
-            'samples': {
-                'insert': samples_to_insert,
-                'update': len(samples) - samples_to_insert,
-            },
-            'sequencing_groups': {
-                'insert': sgs_to_insert,
-                'update': len(sequencing_groups) - sgs_to_insert,
-            },
-            'assays': {
-                'insert': assays_to_insert,
-                'update': len(assays) - assays_to_insert,
-            },
-            'analyses': {'insert': analyses_to_insert},
-        }
+        summary = GenericParser.ParserSummary(
+            participants=GenericParser.ParserSummary.ParserElementSummary(
+                insert=participants_to_insert,
+                update=len(participants) - participants_to_insert,
+            ),
+            samples=GenericParser.ParserSummary.ParserElementSummary(
+                insert=samples_to_insert,
+                update=len(all_samples) - samples_to_insert,
+            ),
+            sequencing_groups=GenericParser.ParserSummary.ParserElementSummary(
+                insert=sgs_to_insert,
+                update=len(sequencing_groups) - sgs_to_insert,
+            ),
+            assays=GenericParser.ParserSummary.ParserElementSummary(
+                insert=assays_to_insert,
+                update=len(assays) - assays_to_insert,
+            ),
+            analyses=GenericParser.ParserSummary.ParserElementSummary(
+                insert=analyses_to_insert
+            ),
+        )
 
         return summary
 
     def prepare_detail(self, samples: list[ParsedSample]):
         """Uses tabulate to print a detailed summary of the samples being inserted / updated"""
         sample_participants = {}
-        for sample in samples:
+        all_samples = ParsedSample.get_all_samples_from(samples)
+        for sample in all_samples:
             sample_participants[sample.external_sid] = (
                 sample.participant.external_pid if sample.participant else None
             )
         sample_sequencing_groups = {
-            sample.external_sid: sample.sequencing_groups for sample in samples
+            sample.external_sid: sample.sequencing_groups for sample in all_samples
         }
 
         details = []
@@ -738,7 +787,9 @@ class GenericParser(
             )
             header = f'Processing participants: {external_participant_ids}'
         else:
-            external_sample_ids = ', '.join(set(s.external_sid for s in samples))
+            external_sample_ids = ', '.join(
+                set(s.external_sid for s in ParsedSample.get_all_samples_from(samples))
+            )
             header = f'Processing samples: {external_sample_ids}'
 
         assays_count: dict[str, int] = defaultdict(int)
@@ -767,16 +818,16 @@ class GenericParser(
                 Assays types count: {str_assay_types_count}
                 Sequencing group count: {str_seqg_count}
 
-                Adding {summary['participants']['insert']} participants
-                Adding {summary['samples']['insert']} samples
-                Adding {summary['sequencing_groups']['insert']} sequencing groups
-                Adding {summary['assays']['insert']} assays
-                Adding {summary['analyses']['insert']} analyses
+                Adding {summary.participants.insert} participants
+                Adding {summary.samples.insert} samples
+                Adding {summary.sequencing_groups.insert} sequencing groups
+                Adding {summary.assays.insert} assays
+                Adding {summary.analyses.insert} analyses
 
-                Updating {summary['participants']['update']} participants
-                Updating {summary['samples']['update']} samples
-                Updating {summary['sequencing_groups']['update']} sequencing groups
-                Updating {summary['assays']['update']} assays
+                Updating {summary.participants.update} participants
+                Updating {summary.samples.update} samples
+                Updating {summary.sequencing_groups.update} sequencing groups
+                Updating {summary.assays.update} assays
                 """
         return message
 
@@ -807,7 +858,7 @@ class GenericParser(
         )
         sid_map = {p['externalId']: p['id'] for p in values['project']['samples']}
 
-        for sample in samples:
+        for sample in ParsedSample.get_all_samples_from(samples):
             sample.internal_sid = sid_map.get(sample.external_sid)
 
     async def match_sequencing_group_ids(
@@ -970,7 +1021,7 @@ class GenericParser(
         return {}
 
     async def group_samples(
-        self, participant: ParsedParticipant | None, rows
+        self, participant: ParsedParticipant | None, rows: GroupedRow
     ) -> list[ParsedSample]:
         """
         From a set of rows, group (by calling self.get_sample_id)
@@ -1087,7 +1138,13 @@ class GenericParser(
             elif assay.meta.get('sequencing_technology') == 'long-read':
                 # lift all assay meta into the sequencing group meta for long-read
                 # except for assay reads, and keys that are already top-level sequencing group fields
-                keys_to_avoid = ('reads', 'reads_type', 'sequencing_type', 'sequencing_technology', 'sequencing_platform')
+                keys_to_avoid = (
+                    'reads',
+                    'reads_type',
+                    'sequencing_type',
+                    'sequencing_technology',
+                    'sequencing_platform',
+                )
                 keys = [k for k in assay.meta.keys() if k not in keys_to_avoid]
             else:
                 continue

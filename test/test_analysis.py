@@ -1,16 +1,19 @@
 # pylint: disable=invalid-overridden-method
 from test.testbase import DbIsolatedTest, run_as_sync
 
+from db.python.filters import GenericFilter
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.assay import AssayLayer
+from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter
-from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
 from models.models import (
+    PRIMARY_EXTERNAL_ORG,
     AnalysisInternal,
     AssayUpsertInternal,
+    ParticipantUpsertInternal,
     SampleUpsertInternal,
     SequencingGroupUpsertInternal,
 )
@@ -18,6 +21,8 @@ from models.models import (
 
 class TestAnalysis(DbIsolatedTest):
     """Test sample class"""
+
+    # pylint: disable=too-many-instance-attributes
 
     @run_as_sync
     async def setUp(self) -> None:
@@ -27,10 +32,11 @@ class TestAnalysis(DbIsolatedTest):
         self.sgl = SequencingGroupLayer(self.connection)
         self.asl = AssayLayer(self.connection)
         self.al = AnalysisLayer(self.connection)
+        self.pl = ParticipantLayer(self.connection)
 
         sample = await self.sl.upsert_sample(
             SampleUpsertInternal(
-                external_id='Test01',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
                 type='blood',
                 meta={'meta': 'meta ;)'},
                 active=True,
@@ -166,3 +172,88 @@ class TestAnalysis(DbIsolatedTest):
         ]
 
         self.assertEqual(analyses, expected)
+
+    @run_as_sync
+    async def test_get_sample_cram_path_map_for_seqr(self):
+        """
+        Exercise get_sample_cram_path_map_for_seqr()
+        """
+
+        part = await self.pl.upsert_participants(
+            [
+                ParticipantUpsertInternal(
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'PEXT1'},
+                    meta={},
+                    samples=[SampleUpsertInternal(id=self.sample_id)],
+                ),
+            ],
+        )
+
+        id_map = await self.al.get_sample_cram_path_map_for_seqr(
+            self.project_id, ['blood'], [part[0].id]
+        )
+        self.assertIsInstance(id_map, list)
+
+    @run_as_sync
+    async def test_get_sgs_by_analysis_id_with_no_eids(self):
+        """
+        Test get_sgs_by_analysis_id()
+        """
+
+        # duplicate here to ensure sgs don't have any external ids
+        assay_meta = {
+            'sequencing_type': 'genome',
+            'sequencing_technology': 'short-read',
+            'sequencing_platform': 'illumina',
+        }
+        sample = await self.sl.upsert_sample(
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'test_sgs_aid'},
+                type='blood',
+                meta={},
+                active=True,
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                meta=assay_meta,
+                            )
+                        ],
+                    ),
+                    SequencingGroupUpsertInternal(
+                        type='exome',
+                        technology='short-read',
+                        platform='illumina',
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                meta=assay_meta,
+                            )
+                        ],
+                    ),
+                ],
+            )
+        )
+
+        genome_id = sample.sequencing_groups[0].id
+        exome_id = sample.sequencing_groups[1].id
+
+        a_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='analysis-runner',
+                status=AnalysisStatus.UNKNOWN,
+                sequencing_group_ids=[genome_id, exome_id],
+                meta={},
+            )
+        )
+
+        sgs_by_aid = await self.sgl.get_sequencing_groups_by_analysis_ids([a_id])
+        self.assertIn(a_id, sgs_by_aid)
+        sgs = sorted(sgs_by_aid[a_id], key=lambda sg: sg.id)
+
+        self.assertEqual(sgs[0].id, genome_id)
+        self.assertEqual(sgs[1].id, exome_id)

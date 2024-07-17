@@ -1,37 +1,13 @@
 import asyncio
-import dataclasses
 from datetime import date
 from typing import Any, Iterable
 
+from db.python.filters import GenericFilter
+from db.python.filters.sample import SampleFilter
 from db.python.tables.base import DbBase
-from db.python.utils import (
-    GenericFilter,
-    GenericFilterModel,
-    GenericMetaFilter,
-    NotFoundError,
-    escape_like_term,
-    to_db_json,
-)
-from models.models.project import ProjectId
+from db.python.utils import NotFoundError, escape_like_term, to_db_json
+from models.models import PRIMARY_EXTERNAL_ORG, ProjectId
 from models.models.sample import SampleInternal, sample_id_format
-
-
-@dataclasses.dataclass(kw_only=True)
-class SampleFilter(GenericFilterModel):
-    """
-    Sample filter model
-    """
-
-    id: GenericFilter[int] | None = None
-    type: GenericFilter[str] | None = None
-    meta: GenericMetaFilter | None = None
-    external_id: GenericFilter[str] | None = None
-    participant_id: GenericFilter[int] | None = None
-    project: GenericFilter[ProjectId] | None = None
-    active: GenericFilter[bool] | None = None
-
-    def __hash__(self):  # pylint: disable=useless-super-delegation
-        return super().__hash__()
 
 
 class SampleTable(DbBase):
@@ -41,15 +17,121 @@ class SampleTable(DbBase):
 
     table_name = 'sample'
 
-    common_get_keys = [
-        'id',
-        'external_id',
-        'participant_id',
-        'meta',
-        'active',
-        'type',
-        'project',
-    ]
+    @staticmethod
+    def construct_query(
+        filter_: SampleFilter,
+        keys: list[str],
+        sample_eid_table_alias: str | None = None,
+        skip: int | None = None,
+        limit: int | None = None,
+    ):
+        """
+        Construct a nested sample query
+        """
+        needs_eid = False
+        needs_sequencing_group = False
+        needs_assay = False
+
+        _wheres, values = filter_.to_sql(
+            {
+                'project': 'ss.project',
+                'id': 'ss.id',
+                'meta': 'ss.meta',
+                'sample_root_id': 'ss.sample_root_id',
+                'sample_parent_id': 'ss.sample_parent_id',
+            },
+            exclude=['sequencing_group', 'assay', 'external_id'],
+        )
+        wheres = [_wheres]
+
+        if filter_.external_id:
+            needs_eid = True
+            seid_wheres, seid_values = filter_.to_sql(
+                {
+                    'external_id': 'seid.external_id',
+                },
+                only=['external_id'],
+            )
+            if seid_wheres:
+                wheres.append(seid_wheres)
+            values.update(seid_values)
+
+        if filter_.sequencing_group:
+            needs_sequencing_group = True
+            swheres, svalues = filter_.sequencing_group.to_sql(
+                {
+                    'id': 'sg.id',
+                    'meta': 'sg.meta',
+                    'type': 'sg.type',
+                    'technology': 'sg.technology',
+                    'platform': 'sg.platform',
+                }
+            )
+            values.update(svalues)
+            if swheres:
+                wheres.append(swheres)
+
+        if filter_.assay:
+            needs_sequencing_group = True
+            needs_assay = True
+
+            awheres, avalues = filter_.assay.to_sql(
+                {
+                    'id': 'a.id',
+                    'meta': 'a.meta',
+                    'type': 'a.type',
+                }
+            )
+            values.update(avalues)
+            if awheres:
+                wheres.append(awheres)
+
+        query_lines = [
+            'SELECT DISTINCT ss.id',
+            'FROM sample ss',
+        ]
+
+        if needs_eid:
+            # 2024-06-15 mfranklin: left join, inner join, doesn't matter as there
+            #       should always be an external_id
+            query_lines.append(
+                'LEFT JOIN sample_external_id seid ON seid.sample_id = ss.id'
+            )
+        if needs_sequencing_group:
+            query_lines.append('INNER JOIN sequencing_group sg ON sg.sample_id = ss.id')
+        if needs_assay:
+            query_lines.append('INNER JOIN assay a ON a.sample_id = ss.id')
+
+        if wheres:
+            query_lines.append('WHERE \n' + ' AND '.join(wheres))
+
+        if limit or skip:
+            query_lines.append('ORDER BY pp.id')
+
+        if limit:
+            query_lines.append('LIMIT :limit')
+            values['limit'] = limit
+
+        if skip:
+            query_lines.append('OFFSET :offset')
+            values['offset'] = skip
+
+        query = '\n'.join('  ' + line.strip() for line in query_lines)
+        sample_eid_join = ''
+        if sample_eid_table_alias:
+            sample_eid_join = f'INNER JOIN sample_external_id {sample_eid_table_alias} ON {sample_eid_table_alias}.sample_id = s.id'
+
+        outer_query = f"""
+            SELECT {', '.join(keys)}
+            FROM sample s
+            {sample_eid_join}
+            INNER JOIN (
+            {query}
+            ) as inner_query ON inner_query.id = s.id
+            GROUP BY s.id
+        """
+
+        return outer_query, values
 
     # region GETS
 
@@ -66,15 +148,20 @@ class SampleTable(DbBase):
         self, filter_: SampleFilter
     ) -> tuple[set[ProjectId], list[SampleInternal]]:
         """Query samples"""
-        wheres, values = filter_.to_sql(field_overrides={})
-        if not wheres:
-            raise ValueError(f'Invalid filter: {filter_}')
-        common_get_keys_str = ', '.join(self.common_get_keys)
-        _query = f"""
-        SELECT {common_get_keys_str}
-        FROM sample
-        WHERE {wheres}
-        """
+        keys = [
+            's.id',
+            'JSON_OBJECTAGG(sexid.name, sexid.external_id) AS external_ids',
+            's.participant_id',
+            's.meta',
+            's.active',
+            's.type',
+            's.project',
+            's.sample_root_id',
+            's.sample_parent_id',
+        ]
+        _query, values = self.construct_query(
+            filter_, keys, sample_eid_table_alias='sexid'
+        )
         rows = await self.connection.fetch_all(_query, values)
         samples = [SampleInternal.from_db(dict(r)) for r in rows]
         projects = set(s.project for s in samples)
@@ -83,7 +170,7 @@ class SampleTable(DbBase):
     async def get_sample_by_id(
         self, internal_id: int
     ) -> tuple[ProjectId, SampleInternal]:
-        """Get a Sample by its external_id"""
+        """Get a Sample by its internal_id"""
         projects, samples = await self.query(
             SampleFilter(id=GenericFilter(eq=internal_id))
         )
@@ -98,7 +185,7 @@ class SampleTable(DbBase):
         self, external_id, project: ProjectId, check_active=True
     ) -> SampleInternal:
         """
-        Get a single sample by its external_id
+        Get a single sample by (any of) its external_id(s)
         """
         _, samples = await self.query(
             SampleFilter(
@@ -136,25 +223,31 @@ class SampleTable(DbBase):
 
     async def insert_sample(
         self,
-        external_id: str,
+        external_ids: dict[str, str],
         sample_type: str,
         active: bool,
         meta: dict | None,
         participant_id: int | None,
+        sample_parent_id: int | None,
+        sample_root_id: int | None,
         project=None,
     ) -> int:
         """
         Create a new sample, and add it to database
         """
+        if not external_ids or external_ids.get(PRIMARY_EXTERNAL_ORG, None) is None:
+            raise ValueError('Sample must have primary external_id')
 
+        audit_log_id = await self.audit_log_id()
         kv_pairs = [
-            ('external_id', external_id),
             ('participant_id', participant_id),
             ('meta', to_db_json(meta or {})),
             ('type', sample_type),
             ('active', active),
-            ('audit_log_id', await self.audit_log_id()),
-            ('project', project or self.project),
+            ('audit_log_id', audit_log_id),
+            ('sample_parent_id', sample_parent_id),
+            ('sample_root_id', sample_root_id),
+            ('project', project or self.project_id),
         ]
 
         keys = [k for k, _ in kv_pairs]
@@ -171,6 +264,23 @@ class SampleTable(DbBase):
             dict(kv_pairs),
         )
 
+        _eid_query = """
+        INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
+        VALUES (:project, :id, :name, :external_id, :audit_log_id)
+        """
+        _eid_values = [
+            {
+                'project': project or self.project_id,
+                'id': id_of_new_sample,
+                'name': name.lower(),
+                'external_id': eid,
+                'audit_log_id': audit_log_id,
+            }
+            for name, eid in external_ids.items()
+            if eid is not None
+        ]
+        await self.connection.execute_many(_eid_query, _eid_values)
+
         return id_of_new_sample
 
     async def update_sample(
@@ -178,13 +288,16 @@ class SampleTable(DbBase):
         id_: int,
         meta: dict | None,
         participant_id: int | None,
-        external_id: str | None,
+        external_ids: dict[str, str | None] | None,
         type_: str | None,
-        active: bool = None,
+        active: bool | None = None,
+        sample_parent_id: int | None = None,
+        sample_root_id: int | None = None,
     ):
         """Update a single sample"""
 
-        values: dict[str, Any] = {'audit_log_id': await self.audit_log_id()}
+        audit_log_id = await self.audit_log_id()
+        values: dict[str, Any] = {'audit_log_id': audit_log_id}
         fields = [
             'audit_log_id = :audit_log_id',
         ]
@@ -192,9 +305,54 @@ class SampleTable(DbBase):
             values['participant_id'] = participant_id
             fields.append('participant_id = :participant_id')
 
-        if external_id:
-            values['external_id'] = external_id
-            fields.append('external_id = :external_id')
+        if external_ids:
+            to_delete = [k.lower() for k, v in external_ids.items() if v is None]
+            to_update = {k.lower(): v for k, v in external_ids.items() if v is not None}
+
+            if PRIMARY_EXTERNAL_ORG in to_delete:
+                raise ValueError("Can't remove sample's primary external_id")
+
+            if to_delete:
+                # Set audit_log_id to this transaction before deleting the rows
+                _audit_update_query = """
+                UPDATE sample_external_id
+                SET audit_log_id = :audit_log_id
+                WHERE sample_id = :id AND name IN :names
+                """
+                await self.connection.execute(
+                    _audit_update_query,
+                    {'id': id_, 'names': to_delete, 'audit_log_id': audit_log_id},
+                )
+
+                _delete_query = """
+                DELETE FROM sample_external_id
+                WHERE sample_id = :id AND name IN :names
+                """
+                await self.connection.execute(
+                    _delete_query, {'id': id_, 'names': to_delete}
+                )
+
+            if to_update:
+                _query = 'SELECT project FROM sample WHERE id = :id'
+                row = await self.connection.fetch_one(_query, {'id': id_})
+                project = row['project']
+
+                _update_query = """
+                INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
+                VALUES (:project, :id, :name, :external_id, :audit_log_id)
+                ON DUPLICATE KEY UPDATE external_id = :external_id, audit_log_id = :audit_log_id
+                """
+                _eid_values = [
+                    {
+                        'project': project,
+                        'id': id_,
+                        'name': name,
+                        'external_id': eid,
+                        'audit_log_id': audit_log_id,
+                    }
+                    for name, eid in to_update.items()
+                ]
+                await self.connection.execute_many(_update_query, _eid_values)
 
         if type_:
             values['type'] = type_
@@ -207,6 +365,14 @@ class SampleTable(DbBase):
         if active is not None:
             values['active'] = 1 if active else 0
             fields.append('active = :active')
+
+        if sample_parent_id is not None:
+            values['sample_parent_id'] = sample_parent_id
+            fields.append('sample_parent_id = :sample_parent_id')
+
+        if sample_root_id is not None:
+            values['sample_root_id'] = sample_root_id
+            fields.append('sample_root_id = :sample_root_id')
 
         # means you can't set to null
         fields_str = ', '.join(fields)
@@ -345,9 +511,10 @@ class SampleTable(DbBase):
         """
 
         _query = """
-            SELECT project, id, external_id, participant_id
-            FROM sample
-            WHERE project in :project_ids AND external_id LIKE :search_pattern
+            SELECT s.project, s.id, seid.external_id, s.participant_id
+            FROM sample s
+            INNER JOIN sample_external_id seid ON s.id = seid.sample_id
+            WHERE s.project IN :project_ids AND seid.external_id LIKE :search_pattern
             LIMIT :limit
         """.strip()
         rows = await self.connection.fetch_all(
@@ -376,12 +543,13 @@ class SampleTable(DbBase):
             raise ValueError('Must specify project when getting by external ids')
 
         _query = """\
-            SELECT id, external_id
-            FROM sample
-            WHERE external_id in :external_ids AND project = :project
+            SELECT sample_id AS id, external_id
+            FROM sample_external_id
+            WHERE external_id IN :external_ids AND project = :project
         """
         rows = await self.connection.fetch_all(
-            _query, {'external_ids': external_ids, 'project': project or self.project}
+            _query,
+            {'external_ids': external_ids, 'project': project or self.project_id},
         )
         sample_id_map = {el[1]: el[0] for el in rows}
 
@@ -390,9 +558,13 @@ class SampleTable(DbBase):
     async def get_sample_id_map_by_internal_ids(
         self, raw_internal_ids: list[int]
     ) -> tuple[Iterable[ProjectId], dict[int, str]]:
-        """Get map of external sample id to internal id"""
-        _query = 'SELECT id, external_id, project FROM sample WHERE id in :ids'
-        values = {'ids': raw_internal_ids}
+        """Get map of (primary) external sample id by internal id"""
+        _query = """
+        SELECT sample_id AS id, external_id, project
+        FROM sample_external_id
+        WHERE sample_id IN :ids AND name = :PRIMARY_EXTERNAL_ORG
+        """
+        values = {'ids': raw_internal_ids, 'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG}
         rows = await self.connection.fetch_all(_query, values)
 
         sample_id_map = {el['id']: el['external_id'] for el in rows}
@@ -404,9 +576,18 @@ class SampleTable(DbBase):
         self, project: ProjectId
     ) -> dict[int, str]:
         """Get sample id map for all samples"""
-        _query = 'SELECT id, external_id FROM sample WHERE project = :project'
+        _query = """
+        SELECT s.id, seid.external_id
+        FROM sample s
+        INNER JOIN sample_external_id seid ON s.id = seid.sample_id
+        WHERE s.project = :project AND name = :PRIMARY_EXTERNAL_ORG
+        """
         rows = await self.connection.fetch_all(
-            _query, {'project': project or self.project}
+            _query,
+            {
+                'project': project or self.project_id,
+                'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG,
+            },
         )
         return {el[0]: el[1] for el in rows}
 
@@ -428,16 +609,21 @@ class SampleTable(DbBase):
 
     async def get_history_of_sample(self, id_: int):
         """Get all versions (history) of a sample"""
+        # TODO Re-implement this for the separate sample_external_id table. Doing a join and/or aggregating
+        # the external_ids wreaks havoc with FOR SYSTEM_TIME ALL queries, collapsing the history we want to
+        # see into one aggregate record. For now, leave the query as is, with external_ids unavailable.
         keys = [
             'id',
-            'external_id',
+            """'{"(not available)": "(not available)"}' AS external_ids""",
             'participant_id',
             'meta',
-            'active+1 as active',
+            'active+1 AS active',
             'type',
             'project',
             'author',
-            'audit_log_id',
+            'sample_root_id',
+            'sample_parent_id',
+            # 'audit_log_id',  # TODO SampleInternal does not allow an audit_log_id field
         ]
         keys_str = ', '.join(keys)
         _query = f'SELECT {keys_str} FROM sample FOR SYSTEM_TIME ALL WHERE id = :id'
@@ -453,21 +639,10 @@ class SampleTable(DbBase):
         self, project: ProjectId
     ) -> list[SampleInternal]:
         """Get samples with missing participants"""
-        keys = [
-            'id',
-            'external_id',
-            'participant_id',
-            'meta',
-            'active',
-            'type',
-            'project',
-        ]
-        _query = f"""
-            SELECT {', '.join(keys)}
-            FROM sample
-            WHERE participant_id IS NULL AND project = :project
-        """
-        rows = await self.connection.fetch_all(
-            _query, {'project': project or self.project}
+        _, samples = await self.query(
+            SampleFilter(
+                participant_id=GenericFilter(isnull=True),
+                project=GenericFilter(eq=project or self.project_id),
+            )
         )
-        return [SampleInternal.from_db(dict(d)) for d in rows]
+        return samples

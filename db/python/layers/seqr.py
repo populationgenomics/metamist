@@ -25,6 +25,7 @@ from api.settings import (
 )
 from db.python.connect import Connection
 from db.python.enum_tables import SequencingTypeTable
+from db.python.filters import GenericFilter
 from db.python.layers.analysis import AnalysisInternal, AnalysisLayer
 from db.python.layers.base import BaseLayer
 from db.python.layers.family import FamilyLayer
@@ -32,7 +33,6 @@ from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.project import Project
-from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
 from models.enums.web import SeqrDatasetType
 
@@ -134,14 +134,13 @@ class SeqrLayer(BaseLayer):
             raise ValueError('Seqr synchronisation is not configured in metamist')
 
         token = self.generate_seqr_auth_token()
-        project = await self.ptable.get_and_check_access_to_project_for_id(
-            self.connection.author,
-            project_id=self.connection.project,
-            readonly=True,
-        )
+        project = self.connection.project
+        assert project
 
-        seqr_guid = project.meta.get(
-            self.get_meta_key_from_sequencing_type(sequencing_type)
+        seqr_guid = (
+            project.meta.get(self.get_meta_key_from_sequencing_type(sequencing_type))
+            if project.meta
+            else None
         )
 
         if not seqr_guid:
@@ -368,7 +367,9 @@ class SeqrLayer(BaseLayer):
             f'Uploaded individual metadata for {len(processed_records)} individuals'
         ]
 
-    def check_updated_sequencing_group_ids(self, sequencing_group_ids: set[int], es_index_analyses: list[AnalysisInternal]):
+    def check_updated_sequencing_group_ids(
+        self, sequencing_group_ids: set[int], es_index_analyses: list[AnalysisInternal]
+    ):
         """Check if the sequencing group IDs have been updated"""
         messages = []
         if sequencing_group_ids:
@@ -388,7 +389,8 @@ class SeqrLayer(BaseLayer):
                 )
                 if sequencing_groups_diff:
                     messages.append(
-                        f'Sequencing groups added to {es_index_analyses[-1].output}: ' + ', '.join(sequencing_groups_diff),
+                        f'Sequencing groups added to {es_index_analyses[-1].output}: '
+                        + ', '.join(sequencing_groups_diff),
                     )
 
             sg_ids_missing_from_index = sequencing_group_id_format_list(
@@ -401,7 +403,13 @@ class SeqrLayer(BaseLayer):
                 )
         return messages
 
-    async def post_es_index_update(self, session: aiohttp.ClientSession, url: str, post_json: dict, headers: dict[str, str]):
+    async def post_es_index_update(
+        self,
+        session: aiohttp.ClientSession,
+        url: str,
+        post_json: dict,
+        headers: dict[str, str],
+    ):
         """Post request to update ES index"""
         resp = await session.post(
             url=url,
@@ -421,8 +429,9 @@ class SeqrLayer(BaseLayer):
         sequencing_group_ids: set[int],
     ) -> list[str]:
         """Update seqr samples for latest elastic-search index"""
+        assert self.connection.project_id
         eid_to_sgid_rows = await self.player.get_external_participant_id_to_internal_sequencing_group_id_map(
-            self.connection.project, sequencing_type=sequencing_type
+            self.connection.project_id, sequencing_type=sequencing_type
         )
 
         # format sample ID for transport
@@ -455,7 +464,7 @@ class SeqrLayer(BaseLayer):
         alayer = AnalysisLayer(connection=self.connection)
         es_index_analyses = await alayer.query(
             AnalysisFilter(
-                project=GenericFilter(eq=self.connection.project),
+                project=GenericFilter(eq=self.connection.project_id),
                 type=GenericFilter(eq='es-index'),
                 status=GenericFilter(eq=AnalysisStatus.COMPLETED),
                 meta={
@@ -485,7 +494,11 @@ class SeqrLayer(BaseLayer):
 
             es_index = es_indexes_filtered_by_type[-1].output
 
-            messages.extend(self.check_updated_sequencing_group_ids(sequencing_group_ids, es_indexes_filtered_by_type))
+            messages.extend(
+                self.check_updated_sequencing_group_ids(
+                    sequencing_group_ids, es_indexes_filtered_by_type
+                )
+            )
 
             req1_url = SEQR_URL + _url_update_es_index.format(projectGuid=project_guid)
             post_json = {
@@ -494,7 +507,9 @@ class SeqrLayer(BaseLayer):
                 'mappingFilePath': fn_path,
                 'ignoreExtraSamplesInCallset': True,
             }
-            requests.append(self.post_es_index_update(session, req1_url, post_json, headers))
+            requests.append(
+                self.post_es_index_update(session, req1_url, post_json, headers)
+            )
 
         messages.extend(await asyncio.gather(*requests))
         return messages
@@ -527,8 +542,9 @@ class SeqrLayer(BaseLayer):
 
         alayer = AnalysisLayer(self.connection)
 
+        assert self.connection.project_id
         reads_map = await alayer.get_sample_cram_path_map_for_seqr(
-            project=self.connection.project,
+            project=self.connection.project_id,
             sequencing_types=[sequencing_type],
             participant_ids=participant_ids,
         )
@@ -604,9 +620,9 @@ class SeqrLayer(BaseLayer):
 
     async def _get_pedigree_from_sm(self, family_ids: set[int]) -> list[dict] | None:
         """Call get_pedigree and return formatted string with header"""
-
+        assert self.connection.project_id
         ped_rows = await self.flayer.get_pedigree(
-            self.connection.project,
+            self.connection.project_id,
             family_ids=list(family_ids),
             replace_with_family_external_ids=True,
             replace_with_participant_external_ids=True,
@@ -663,8 +679,9 @@ class SeqrLayer(BaseLayer):
         self, participant_ids: list[int]
     ) -> list[dict] | None:
         """Get formatted list of dictionaries for syncing individual meta to seqr"""
+        assert self.connection.project_id
         individual_metadata_resp = await self.player.get_seqr_individual_template(
-            self.connection.project, internal_participant_ids=participant_ids
+            self.connection.project_id, internal_participant_ids=participant_ids
         )
 
         json_rows: list[dict] = individual_metadata_resp['rows']
@@ -731,9 +748,11 @@ class SeqrLayer(BaseLayer):
 
         def process_row(row):
             return {
-                seqr_key: key_processor[sm_key](row[sm_key])
-                if sm_key in key_processor
-                else row[sm_key]
+                seqr_key: (
+                    key_processor[sm_key](row[sm_key])
+                    if sm_key in key_processor
+                    else row[sm_key]
+                )
                 for seqr_key, sm_key in seqr_map.items()
                 if sm_key in row
             }

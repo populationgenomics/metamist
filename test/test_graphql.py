@@ -8,6 +8,7 @@ from db.python.layers.family import FamilyLayer
 from metamist.graphql import configure_sync_client, gql, validate
 from models.enums import AnalysisStatus
 from models.models import (
+    PRIMARY_EXTERNAL_ORG,
     AnalysisInternal,
     AssayUpsertInternal,
     ParticipantUpsertInternal,
@@ -25,11 +26,11 @@ default_assay_meta = {
 
 def _get_single_participant_upsert():
     return ParticipantUpsertInternal(
-        external_id='Demeter',
+        external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'},
         meta={},
         samples=[
             SampleUpsertInternal(
-                external_id='sample_id001',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'sample_id001'},
                 meta={},
                 type='blood',
                 sequencing_groups=[
@@ -197,10 +198,10 @@ query MyQuery($project: String!) {
         await self.player.upsert_participant(
             ParticipantUpsertInternal(
                 meta={},
-                external_id='Demeter',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'},
                 samples=[
                     SampleUpsertInternal(
-                        external_id='sample_id001',
+                        external_ids={PRIMARY_EXTERNAL_ORG: 'sample_id001'},
                         meta={'thisKey': 'value'},
                     )
                 ],
@@ -278,7 +279,7 @@ query MyQuery($sg_id: String!, $project: String!) {
         """
         # insert participant
         p = await self.player.upsert_participant(
-            ParticipantUpsertInternal(external_id='Demeter', meta={}, samples=[])
+            ParticipantUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'}, meta={}, samples=[])
         )
 
         phenotypes = {'phenotype1': 'value1', 'phenotype2': {'number': 123}}
@@ -393,3 +394,39 @@ query MyQuery($project: String!) {
                 },
             ],
         )
+
+    @run_as_sync
+    async def test_get_project_name_from_analysis(self):
+        """Test getting project name from analysis"""
+        p = await self.player.upsert_participant(_get_single_participant_upsert())
+        sg_id = p.samples[0].sequencing_groups[0].id
+
+        alayer = AnalysisLayer(self.connection)
+        await alayer.create_analysis(
+            AnalysisInternal(
+                sequencing_group_ids=[sg_id],
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                meta={},
+                output='some-output',
+            )
+        )
+
+        q = """
+query MyQuery($sg_id: String!) {
+  sequencingGroups(id: {eq: $sg_id}) {
+    analyses {
+      id
+      project {
+        name
+      }
+    }
+  }
+}"""
+
+        resp = await self.run_graphql_query_async(
+            q, {'sg_id': sequencing_group_id_format(sg_id)}
+        )
+        self.assertIn('sequencingGroups', resp)
+        project_name = resp['sequencingGroups'][0]['analyses'][0]['project']['name']
+        self.assertEqual(self.project_name, project_name)

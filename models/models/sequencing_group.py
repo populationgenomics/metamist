@@ -1,7 +1,6 @@
-import json
 from typing import Any
 
-from models.base import OpenApiGenNoneType, SMBase
+from models.base import OpenApiGenNoneType, SMBase, parse_sql_bool, parse_sql_dict
 from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
 from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
 from models.utils.sequencing_group_id_format import (
@@ -47,23 +46,14 @@ class SequencingGroupInternal(SMBase):
     @classmethod
     def from_db(cls, **kwargs):
         """From database model"""
-        meta = kwargs.pop('meta')
-        if meta and isinstance(meta, str):
-            meta = json.loads(meta)
+        meta = parse_sql_dict(kwargs.pop('meta'))
 
-        _archived = kwargs.pop('archived', None)
-        if _archived is not None:
-            if isinstance(_archived, int):
-                _archived = _archived != 0
-            elif isinstance(_archived, bytes):
-                _archived = _archived != b'\x00'
-            else:
-                raise TypeError(
-                    f"Received type '{type(_archived)}' for SequencingGroup column 'archived'. "
-                    + "Allowed types are either 'int' or 'bytes'."
-                )
+        _archived = parse_sql_bool(kwargs.pop('archived', None))
+        external_ids = parse_sql_dict(kwargs.pop('external_ids', None)) or {}
 
-        return SequencingGroupInternal(**kwargs, archived=_archived, meta=meta)
+        return SequencingGroupInternal(
+            **kwargs, archived=_archived, meta=meta, external_ids=external_ids
+        )
 
     def to_external(self):
         """Convert to transport model"""
@@ -83,14 +73,14 @@ class SequencingGroupInternal(SMBase):
 class NestedSequencingGroupInternal(SMBase):
     """SequencingGroupInternal with nested assays"""
 
-    id: SequencingGroupInternalId | None = None
-    type: str | None = None
-    technology: str | None = None
-    platform: str | None = None
-    meta: dict[str, Any] | None = None
-    external_ids: dict[str, str] | None = None
+    id: SequencingGroupInternalId
+    type: str
+    technology: str
+    platform: str
+    meta: dict[str, Any]
+    external_ids: dict[str, str]
 
-    assays: list[AssayInternal] | None = None
+    assays: list[AssayInternal]
 
     def to_external(self):
         """Convert to transport model"""
@@ -100,7 +90,7 @@ class NestedSequencingGroupInternal(SMBase):
             technology=self.technology,
             platform=self.platform,
             meta=self.meta,
-            external_ids=self.external_ids,
+            external_ids=self.external_ids or {},
             assays=[a.to_external() for a in self.assays or []],
         )
 

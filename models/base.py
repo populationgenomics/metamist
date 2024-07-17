@@ -1,9 +1,16 @@
+import json
+
 from pydantic import ConfigDict
 from pydantic.main import BaseModel
 
 # annotate any external objects that must be instantiated with this
 # type to force openapi generator to allow for Nones (it will actually allow Any)
 OpenApiGenNoneType = bytes | None
+
+
+# The primary {sample,participant}_external_id entry, previously {sample,participant}.external_id
+# TODO This will eventually be removed when all analysis endpoints have been updated to record an external org
+PRIMARY_EXTERNAL_ORG = ''
 
 
 class SMBase(BaseModel):
@@ -15,6 +22,18 @@ class SMBase(BaseModel):
     def from_dict(cls, d: dict):
         """Create an object from a dictionary"""
         return cls(**d)
+
+
+def parse_sql_dict(val: str | bytes | dict | None) -> dict | None:
+    """Parse a string from a sql dict"""
+    if val is None:
+        return None
+    if isinstance(val, dict):
+        return val
+    if isinstance(val, (str, bytes)):
+        return json.loads(val)
+
+    raise ValueError(f'Unknown type for meta: {type(val)}')
 
 
 def parse_sql_bool(val: str | int | bytes) -> bool | None:

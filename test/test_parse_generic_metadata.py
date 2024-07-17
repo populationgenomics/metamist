@@ -21,6 +21,7 @@ from metamist.parser.generic_parser import (
     ParsedSequencingGroup,
 )
 from models.models import (
+    PRIMARY_EXTERNAL_ORG,
     AssayUpsertInternal,
     ParticipantUpsertInternal,
     SampleUpsertInternal,
@@ -38,11 +39,11 @@ def _get_basic_participant_to_upsert():
     }
 
     return ParticipantUpsertInternal(
-        external_id='Demeter',
+        external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'},
         meta={},
         samples=[
             SampleUpsertInternal(
-                external_id='sample_id001',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'sample_id001'},
                 meta={},
                 type='blood',
                 sequencing_groups=[
@@ -150,10 +151,10 @@ class TestParseGenericMetadata(DbIsolatedTest):
             StringIO('\n'.join(rows)), delimiter=',', dry_run=True
         )
 
-        self.assertEqual(1, summary['samples']['insert'])
-        self.assertEqual(1, summary['assays']['insert'])
-        self.assertEqual(0, summary['samples']['update'])
-        self.assertEqual(0, summary['assays']['update'])
+        self.assertEqual(1, summary.samples.insert)
+        self.assertEqual(1, summary.assays.insert)
+        self.assertEqual(0, summary.samples.update)
+        self.assertEqual(0, summary.assays.update)
 
         parser.ignore_extra_keys = False
         rows = [
@@ -226,11 +227,11 @@ class TestParseGenericMetadata(DbIsolatedTest):
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(1, summary['samples']['insert'])
-        self.assertEqual(1, summary['assays']['insert'])
-        self.assertEqual(0, summary['samples']['update'])
-        self.assertEqual(0, summary['assays']['update'])
-        self.assertEqual(1, summary['analyses']['insert'])
+        self.assertEqual(1, summary.samples.insert)
+        self.assertEqual(1, summary.assays.insert)
+        self.assertEqual(0, summary.samples.update)
+        self.assertEqual(0, summary.assays.update)
+        self.assertEqual(1, summary.analyses.insert)
 
         self.assertDictEqual({'centre': 'KCCG'}, samples[0].meta)
         expected_assay_dict = {
@@ -339,13 +340,13 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
         participants: list[ParsedParticipant] = prows
 
-        self.assertEqual(3, summary['participants']['insert'])
-        self.assertEqual(0, summary['participants']['update'])
-        self.assertEqual(4, summary['samples']['insert'])
-        self.assertEqual(0, summary['samples']['update'])
-        self.assertEqual(5, summary['assays']['insert'])
-        self.assertEqual(0, summary['assays']['update'])
-        self.assertEqual(0, summary['analyses']['insert'])
+        self.assertEqual(3, summary.participants.insert)
+        self.assertEqual(0, summary.participants.update)
+        self.assertEqual(4, summary.samples.insert)
+        self.assertEqual(0, summary.samples.update)
+        self.assertEqual(5, summary.assays.insert)
+        self.assertEqual(0, summary.assays.update)
+        self.assertEqual(0, summary.analyses.insert)
 
         expected_assay_dict = {
             'reads': [
@@ -485,10 +486,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
     @run_as_sync
     @patch('metamist.parser.generic_parser.query_async')
-    async def test_lrs_rows_with_arbitrary_assay_meta_columns(
-        self,
-        mock_graphql_query
-    ):
+    async def test_lrs_rows_with_arbitrary_assay_meta_columns(self, mock_graphql_query):
         """
         Test importing rows of long read sequencing data with arbitrary assay metadata columns
         """
@@ -504,7 +502,10 @@ class TestParseGenericMetadata(DbIsolatedTest):
             participant_column='Individual ID',
             sample_name_column='Sample ID',
             reads_column='Filename',
-            assay_meta_map={'Assay Meta 1': 'assay_meta1', 'Assay Meta 2': 'assay_meta2'},
+            assay_meta_map={
+                'Assay Meta 1': 'assay_meta1',
+                'Assay Meta 2': 'assay_meta2',
+            },
             default_sequencing=DefaultSequencing(
                 seq_type='genome',
                 technology='long-read',
@@ -756,7 +757,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
             project=self.project_name,
-            reference_assembly_location_column='Ref'
+            reference_assembly_location_column='Ref',
             # default_reference_assembly_location='gs://path/file.fasta',
         )
         parser.skip_checking_gcs_objects = True
@@ -828,7 +829,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
             project=self.project_name,
-            reference_assembly_location_column='Ref'
+            reference_assembly_location_column='Ref',
             # default_reference_assembly_location='gs://path/file.fasta',
         )
         parser.skip_checking_gcs_objects = True
@@ -900,14 +901,14 @@ class TestParseGenericMetadata(DbIsolatedTest):
             StringIO('\n'.join(rows)), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(1, summary['participants']['update'])
-        self.assertEqual(1, summary['samples']['update'])
-        self.assertEqual(1, summary['sequencing_groups']['update'])
-        self.assertEqual(1, summary['assays']['update'])
-        self.assertEqual(0, summary['participants']['insert'])
-        self.assertEqual(0, summary['samples']['insert'])
-        self.assertEqual(0, summary['sequencing_groups']['insert'])
-        self.assertEqual(0, summary['assays']['insert'])
+        self.assertEqual(1, summary.participants.update)
+        self.assertEqual(1, summary.samples.update)
+        self.assertEqual(1, summary.sequencing_groups.update)
+        self.assertEqual(1, summary.assays.update)
+        self.assertEqual(0, summary.participants.insert)
+        self.assertEqual(0, summary.samples.insert)
+        self.assertEqual(0, summary.sequencing_groups.insert)
+        self.assertEqual(0, summary.assays.insert)
 
         parsed_p: ParsedParticipant = parsed_files[0]
         self.assertEqual(participant.id, parsed_p.internal_pid)

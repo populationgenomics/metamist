@@ -5,7 +5,11 @@ from unittest.mock import patch
 
 from db.python.layers import ParticipantLayer
 from metamist.parser.generic_parser import ParsedParticipant
-from models.models import ParticipantUpsertInternal, SampleUpsertInternal
+from models.models import (
+    PRIMARY_EXTERNAL_ORG,
+    ParticipantUpsertInternal,
+    SampleUpsertInternal,
+)
 from scripts.parse_existing_cohort import Columns, ExistingCohortParser
 
 
@@ -59,10 +63,10 @@ class TestExistingCohortParser(DbIsolatedTest):
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(1, summary['samples']['insert'])
-        self.assertEqual(1, summary['assays']['insert'])
-        self.assertEqual(0, summary['samples']['update'])
-        self.assertEqual(0, summary['assays']['update'])
+        self.assertEqual(1, summary.samples.insert)
+        self.assertEqual(1, summary.assays.insert)
+        self.assertEqual(0, summary.samples.update)
+        self.assertEqual(0, summary.assays.update)
 
         sample_to_add = participants[0].samples[0]
         self.assertEqual('EXTID1234', sample_to_add.external_sid)
@@ -193,10 +197,10 @@ class TestExistingCohortParser(DbIsolatedTest):
         await player.upsert_participants(
             [
                 ParticipantUpsertInternal(
-                    external_id='EXTID1234',
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'EXTID1234'},
                     samples=[
                         SampleUpsertInternal(
-                            external_id='EXTID1234',
+                            external_ids={PRIMARY_EXTERNAL_ORG: 'EXTID1234'},
                         )
                     ],
                 )
@@ -232,10 +236,10 @@ class TestExistingCohortParser(DbIsolatedTest):
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(0, summary['samples']['insert'])
-        self.assertEqual(1, summary['assays']['insert'])
-        self.assertEqual(1, summary['samples']['update'])
-        self.assertEqual(0, summary['assays']['update'])
+        self.assertEqual(0, summary.samples.insert)
+        self.assertEqual(1, summary.assays.insert)
+        self.assertEqual(1, summary.samples.update)
+        self.assertEqual(0, summary.assays.update)
 
         return
 

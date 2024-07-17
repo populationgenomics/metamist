@@ -1,8 +1,8 @@
 import dataclasses
 from typing import Any
 
+from db.python.filters import GenericFilterModel
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
-from db.python.utils import GenericFilterModel
 
 
 def prepare_bq_query_from_dict_field(
@@ -70,7 +70,10 @@ class GenericBQFilterModel(GenericFilterModel):
                 setattr(self, field.name, GenericBQFilter(eq=value))
 
     def to_sql(
-        self, field_overrides: dict[str, str] = None,  only: list[str] | None = None, exclude: list[str] | None = None,
+        self,
+        field_overrides: dict[str, str] = None,
+        only: list[str] | None = None,
+        exclude: list[str] | None = None,
     ) -> tuple[str, dict[str, Any]]:
         """Convert the model to SQL, and avoid SQL injection"""
         _foverrides = field_overrides or {}

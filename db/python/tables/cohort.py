@@ -2,15 +2,16 @@
 import dataclasses
 import datetime
 
+from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
-from db.python.tables.project import ProjectId
-from db.python.utils import GenericFilter, GenericFilterModel, NotFoundError, to_db_json
+from db.python.utils import NotFoundError, to_db_json
 from models.models.cohort import (
     CohortCriteriaInternal,
     CohortInternal,
     CohortTemplateInternal,
     NewCohortInternal,
 )
+from models.models.project import ProjectId
 
 
 @dataclasses.dataclass(kw_only=True)
