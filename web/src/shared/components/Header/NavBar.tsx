@@ -63,11 +63,11 @@ const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
     const isDarkMode = theme.theme === 'dark-mode'
 
     const dropdown = (item: MenuItem) => (
-        <Dropdown text={item.title} key={index}>
-            <Dropdown.Menu id="navDrop" inverted={isDarkMode}>
+        <Dropdown id="navDrop" text={item.title} key={index} inverted={isDarkMode}>
+            <Dropdown.Menu id="navDropMenu">
                 {item.submenu &&
                     item.submenu.map((subitem, subindex) => (
-                        <Dropdown.Item as={Link} id="navItem" to={subitem.url} key={subindex}>
+                        <Dropdown.Item id="navDropMenuItem" as={Link} to={subitem.url} key={subindex}>
                             {subitem.icon} <span />
                             {subitem.title}
                         </Dropdown.Item>
@@ -88,16 +88,16 @@ const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
                     position="bottom center"
                     pinned
                 >
-                    <h5>{child}</h5>
+                    {child}
                 </Popup>
             </span>
         </>
     )
 
     return item.submenu ? (
-        <Menu.Item className="navItem">{popup(dropdown(item), item.icon)}</Menu.Item>
+        <Menu.Item className="headerMenuItem">{popup(dropdown(item), item.icon)}</Menu.Item>
     ) : (
-        <Menu.Item as={Link} className="navItem" to={item.url} key={index}>
+        <Menu.Item className="headerMenuItem" to={item.url} key={index}>
             {popup(item.title, item.icon)}
         </Menu.Item>
     )
