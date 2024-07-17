@@ -86,6 +86,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
                     trigger={icon}
                     hoverable
                     position="bottom center"
+                    pinned
                 >
                     <h5>{child}</h5>
                 </Popup>

@@ -1,15 +1,9 @@
 import * as React from 'react'
 import ReactGoogleSlides from 'react-google-slides'
 
-<<<<<<< HEAD
-import { IBillingPage, billingPages } from './BillingPages';
-import { ThemeContext } from '../../shared/components/ThemeProvider';
-import { Button, Icon, Input, Menu, MenuItem, MenuMenu, Segment } from 'semantic-ui-react';
-=======
 import { IBillingPage, billingPages } from './BillingPages'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
-import { Icon, Input, Menu, MenuItem, MenuMenu, Segment } from 'semantic-ui-react'
->>>>>>> 1fb68e07 (FIX: add ruff to linter and pass all local pre-commit checks)
+import { Button, Menu, MenuItem, Segment } from 'semantic-ui-react'
 
 // Google Slides
 const Slides = React.memo(({ link }: { link: string }) => {
@@ -46,7 +40,7 @@ const MenuItems = (props: MenuProps) => {
                             link
                             name={page.name}
                             active={activeItem === page.name}
-                            onClick={(e) => onItemSelect(e, page)}
+                            onMouseOver={(e) => onItemSelect(e, page)}
                         >
                             {page.icon}
                         </MenuItem>
