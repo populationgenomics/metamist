@@ -141,7 +141,7 @@ class OutputFileTable(DbBase):
 
         if os.environ.get('SM_ENVIRONMENT', 'local').lower() in (
             'local',
-            # 'test',
+            'test',
         ):
             client = Client(
                 credentials=AnonymousCredentials(),
