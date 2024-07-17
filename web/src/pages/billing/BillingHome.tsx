@@ -67,7 +67,7 @@ const MenuItems = (props: MenuProps) => {
     )
 }
 
-interface IBillingHomeProps { }
+interface IBillingHomeProps {}
 
 const BillingHome: React.FunctionComponent<IBillingHomeProps> = (props: IBillingHomeProps) => {
     const theme = React.useContext(ThemeContext)
