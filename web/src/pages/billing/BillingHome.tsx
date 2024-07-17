@@ -3,7 +3,7 @@ import ReactGoogleSlides from 'react-google-slides'
 
 import { IBillingPage, billingPages } from './BillingPages'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
-import { Button, Menu, MenuItem, Segment } from 'semantic-ui-react'
+import { Button, Menu, MenuItem, Segment, SemanticWIDTHS } from 'semantic-ui-react'
 
 // Google Slides
 const Slides = React.memo(({ link }: { link: string }) => {
@@ -43,7 +43,7 @@ const MenuItems = (props: MenuProps) => {
     return (
         <>
             <Menu
-                widths={billingPages.length}
+                widths={billingPages.length.toString() as SemanticWIDTHS}
                 pointing
                 icon="labeled"
                 attached="top"
@@ -55,7 +55,7 @@ const MenuItems = (props: MenuProps) => {
                             link
                             name={page.name}
                             active={activeItem === page.name}
-                            onMouseOver={(e) => onItemSelect(e, page)}
+                            onMouseOver={(event: any) => onItemSelect(event, page)}
                         >
                             {page.icon}
                         </MenuItem>
@@ -67,7 +67,7 @@ const MenuItems = (props: MenuProps) => {
     )
 }
 
-interface IBillingHomeProps {}
+interface IBillingHomeProps { }
 
 const BillingHome: React.FunctionComponent<IBillingHomeProps> = (props: IBillingHomeProps) => {
     const theme = React.useContext(ThemeContext)

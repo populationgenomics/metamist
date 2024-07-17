@@ -72,4 +72,5 @@ const billingPages: IBillingPage[] = [
     },
 ]
 
-export { IBillingPage, billingPages }
+export { billingPages }
+export type { IBillingPage }
