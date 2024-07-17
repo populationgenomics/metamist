@@ -41,7 +41,7 @@
     border: 1px solid #555 !important;
 }
 
-.ui.menu .ui.dropdown .menu>#navItem {
+.ui.menu .ui.dropdown .menu > #navItem {
     color: #f2f2f2 !important;
     padding: 16px !important;
     background: #24344f !important;

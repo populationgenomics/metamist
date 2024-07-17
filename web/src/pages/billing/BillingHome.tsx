@@ -1,21 +1,20 @@
 import * as React from 'react'
-import ReactGoogleSlides from "react-google-slides";
+import ReactGoogleSlides from 'react-google-slides'
 
+<<<<<<< HEAD
 import { IBillingPage, billingPages } from './BillingPages';
 import { ThemeContext } from '../../shared/components/ThemeProvider';
 import { Button, Icon, Input, Menu, MenuItem, MenuMenu, Segment } from 'semantic-ui-react';
+=======
+import { IBillingPage, billingPages } from './BillingPages'
+import { ThemeContext } from '../../shared/components/ThemeProvider'
+import { Icon, Input, Menu, MenuItem, MenuMenu, Segment } from 'semantic-ui-react'
+>>>>>>> 1fb68e07 (FIX: add ruff to linter and pass all local pre-commit checks)
 
 // Google Slides
 const Slides = React.memo(({ link }: { link: string }) => {
-    return (
-        <ReactGoogleSlides
-            width="100%"
-            slidesLink={link}
-            position={2}
-            showControls
-        />
-    )
-});
+    return <ReactGoogleSlides width="100%" slidesLink={link} position={2} showControls />
+})
 
 // Menu component
 interface MenuProps {
@@ -56,8 +55,8 @@ const MenuItems = (props: MenuProps) => {
             </Menu>
             <Descriptions />
         </>
-    );
-};
+    )
+}
 
 interface IBillingHomeProps { }
 
@@ -72,8 +71,10 @@ const BillingHome: React.FunctionComponent<IBillingHomeProps> = (props: IBilling
         setActiveItem(page.name)
     }
 
-    const billingSlidesLink = React.useMemo(() => "https://docs.google.com/presentation/d/12cyHMMVx82f5RjJhg_VrGIdQBTCrAWJrMPWAtDLmBxU", [])
-
+    const billingSlidesLink = React.useMemo(
+        () => 'https://docs.google.com/presentation/d/12cyHMMVx82f5RjJhg_VrGIdQBTCrAWJrMPWAtDLmBxU',
+        []
+    )
 
     return (
         <div className="article">
@@ -82,14 +83,16 @@ const BillingHome: React.FunctionComponent<IBillingHomeProps> = (props: IBilling
 
             <h2>Pages</h2>
             <p>Here you can find an overview of the different pages in the Billing section</p>
-            <MenuItems inverted={isDarkMode} activeItem={activeItem} onItemSelect={handleItemClick} />
+            <MenuItems
+                inverted={isDarkMode}
+                activeItem={activeItem}
+                onItemSelect={handleItemClick}
+            />
 
             <h2>An overview of billing at the CPG</h2>
             <Slides link={billingSlidesLink} />
-        </div >
+        </div>
     )
 }
 
 export default BillingHome
-
-

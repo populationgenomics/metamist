@@ -67,4 +67,4 @@ const billingPages: IBillingPage[] = [
     },
 ]
 
-export { IBillingPage, billingPages };
+export { IBillingPage, billingPages }
