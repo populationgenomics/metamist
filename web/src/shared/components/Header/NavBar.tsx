@@ -8,10 +8,14 @@ import { BillingApi } from '../../../sm-api'
 // import 'bootstrap/dist/css/bootstrap.min.css'
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney'
 import DescriptionIcon from '@mui/icons-material/Description'
+import PeopleIcon from '@mui/icons-material/People'
 import ExploreIcon from '@mui/icons-material/Explore'
 import InsightsIcon from '@mui/icons-material/Insights'
 import TableRowsIcon from '@mui/icons-material/TableRows'
 import TroubleshootIcon from '@mui/icons-material/Troubleshoot'
+import AnalyticsIcon from '@mui/icons-material/Analytics'
+import DisplaySettingsIcon from '@mui/icons-material/DisplaySettings'
+import SummarizeIcon from '@mui/icons-material/Summarize'
 import MuckTheDuck from '../MuckTheDuck'
 import SwaggerIcon from '../SwaggerIcon'
 import DarkModeTriButton from './DarkModeTriButton/DarkModeTriButton'
@@ -32,17 +36,17 @@ const billingPagesMenu = {
 const InsightsPages = {
     title: 'Insights',
     url: '/insights',
-    icon: <InsightsIcon />,
+    icon: <AnalyticsIcon />,
     submenu: [
         {
             title: 'Details',
             url: '/insights/details',
-            icon: <TableRowsIcon />,
+            icon: <DisplaySettingsIcon />,
         },
         {
             title: 'Summary',
             url: '/insights/summary',
-            icon: <TableRowsIcon />,
+            icon: <SummarizeIcon />,
         },
     ],
 }
@@ -67,7 +71,12 @@ const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
             <Dropdown.Menu id="navDropMenu">
                 {item.submenu &&
                     item.submenu.map((subitem, subindex) => (
-                        <Dropdown.Item id="navDropMenuItem" as={Link} to={subitem.url} key={subindex}>
+                        <Dropdown.Item
+                            id="navDropMenuItem"
+                            as={Link}
+                            to={subitem.url}
+                            key={subindex}
+                        >
                             {subitem.icon} <span />
                             {subitem.title}
                         </Dropdown.Item>
@@ -122,7 +131,7 @@ const NavBar: React.FC<NavBarProps> = ({ fixed }) => {
         {
             title: 'OurDNA',
             url: '/ourdna',
-            icon: <InsightsIcon />,
+            icon: <PeopleIcon />,
         },
         {
             title: 'Swagger',
@@ -148,10 +157,6 @@ const NavBar: React.FC<NavBarProps> = ({ fixed }) => {
                 setMenuItems([...menuItems.slice(0, 2), billingPagesMenu, ...menuItems.slice(2)])
             }
         })
-    }, [])
-
-    React.useEffect(() => {
-        setMenuItems([...menuItems.slice(0, 2), billingPagesMenu, ...menuItems.slice(2)])
     }, [])
 
     return (

@@ -21,19 +21,34 @@ const MenuItems = (props: MenuProps) => {
     const { inverted, activeItem, onItemSelect } = props
 
     const Descriptions = () => {
-        return <>
-            {Object.values(billingPages).map((page) => (
-                page.name === activeItem && <Segment attached='bottom' inverted={inverted}>
-                    <h3><Button size='large' href={page.url}>{page.title}</Button></h3>
-                    <p>{page.description}</p>
-                </Segment>
-            ))}
-        </>
+        return (
+            <>
+                {Object.values(billingPages).map(
+                    (page) =>
+                        page.name === activeItem && (
+                            <Segment attached="bottom" inverted={inverted}>
+                                <h3>
+                                    <Button size="large" href={page.url}>
+                                        {page.title}
+                                    </Button>
+                                </h3>
+                                <p>{page.description}</p>
+                            </Segment>
+                        )
+                )}
+            </>
+        )
     }
 
     return (
         <>
-            <Menu widths={billingPages.length} pointing icon='labeled' attached='top' inverted={inverted} >
+            <Menu
+                widths={billingPages.length}
+                pointing
+                icon="labeled"
+                attached="top"
+                inverted={inverted}
+            >
                 {Object.values(billingPages).map((page) => {
                     return (
                         <MenuItem
@@ -52,7 +67,7 @@ const MenuItems = (props: MenuProps) => {
     )
 }
 
-interface IBillingHomeProps { }
+interface IBillingHomeProps {}
 
 const BillingHome: React.FunctionComponent<IBillingHomeProps> = (props: IBillingHomeProps) => {
     const theme = React.useContext(ThemeContext)

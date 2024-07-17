@@ -77,7 +77,6 @@
 }
 
 #navDropMenuItem {
-    /* background-color: red !important; */
     border-radius: 4px !important;
     padding: 10px !important;
     margin: 1px !important;
@@ -103,4 +102,5 @@
 }
 
 /* To check */
-html[data-theme='dark-mode'] .ui.dropdown .menu>.item {}
+html[data-theme='dark-mode'] .ui.dropdown .menu > .item {
+}
