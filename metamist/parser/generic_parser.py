@@ -197,22 +197,6 @@ class CustomDictReader(csv.DictReader):
         return fieldname.strip()
 
 
-def prepare_external_ids(
-    primary_external_id: str, external_ids: dict[str, str] | None
-) -> dict[str, str]:
-    """Prepare external IDs"""
-    new_external_ids = dict(external_ids or {})
-
-    if primary_external_id in new_external_ids.values():
-        raise ValueError(
-            f'Primary external ID {primary_external_id!r} already exists in external IDs'
-        )
-
-    new_external_ids[PRIMARY_EXTERNAL_ORG] = primary_external_id
-
-    return new_external_ids
-
-
 class ParsedParticipant:
     """Class for holding participant metadata grouped by id"""
 
