@@ -6,7 +6,6 @@ from typing import Any, Dict, List
 
 import click
 
-from metamist.model.sequencing_type import SequenceType
 from metamist.parser.generic_metadata_parser import (
     GenericMetadataParser,
     SingleRow,
@@ -103,7 +102,7 @@ class VcgsManifestParser(GenericMetadataParser):
             external_id = external_id.split('-')[0]
         return external_id
 
-    def get_sequencing_type(self, row: SingleRow) -> SequenceType:
+    def get_sequencing_type(self, row: SingleRow) -> str:
         """
         Parse sequencing type (wgs / single-cell, etc)
         """
@@ -121,7 +120,7 @@ class VcgsManifestParser(GenericMetadataParser):
                     f"Couldn't detect sequence type for sample {sample_id}, and "
                     'no default was available.'
                 )
-            return SequenceType(self.default_sequencing.seq_type)
+            return self.default_sequencing.seq_type
         if len(types) > 1:
             raise ValueError(
                 f'Multiple library types for same sample {sample_id}, '
@@ -132,9 +131,9 @@ class VcgsManifestParser(GenericMetadataParser):
 
         type_ = types[0].lower()
         if type_ == 'wgs':
-            return SequenceType('genome')
+            return 'genome'
         if type_ in ('single-cell', 'ss'):
-            return SequenceType('single-cell')
+            return 'single-cell'
 
         raise ValueError(f'Unrecognised sequencing type {type_}')
 

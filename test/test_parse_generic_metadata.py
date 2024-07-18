@@ -377,7 +377,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
         self.assertDictEqual(expected_assay_dict, assay.meta)
 
         # Check that both of Demeter's assays are there
-        self.assertEqual(participants[0].external_pid, 'Demeter')
+        self.assertEqual(participants[0].primary_external_id, 'Demeter')
         self.assertEqual(len(participants[0].samples), 1)
         self.assertEqual(len(participants[0].samples[0].sequencing_groups), 2)
 
@@ -425,7 +425,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
         _, participants = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
-        p_by_name = {p.external_pid: p for p in participants}
+        p_by_name = {p.primary_external_id: p for p in participants}
         demeter = p_by_name['Demeter']
         apollo = p_by_name['Apollo']
         athena = p_by_name['Athena']

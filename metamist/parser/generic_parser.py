@@ -137,8 +137,21 @@ query GetSampleEidMapQuery($project: String!) {
 )
 
 
+def check_duplicate_external_ids(d: dict, message: str) -> None:
+    """
+    Check if there are duplicate values in a dictionary
+    """
+    duplicate = defaultdict(list)
+    for name, value in d.items():
+        duplicate[value.lower()].append(name)
+
+    duplicates = {k: v for k, v in duplicate.items() if len(v) > 1}
+    if duplicates:
+        raise ValueError(f'Duplicate external IDs {message}: {duplicates}')
+
+
 class CustomDictReader(csv.DictReader):
-    """csv.dictReader that strips whitespace off headers"""
+    """csv.DictReader that strips whitespace off headers"""
 
     def __init__(
         self,
@@ -185,7 +198,7 @@ class CustomDictReader(csv.DictReader):
 
 
 def prepare_external_ids(
-    primary_external_id: str, external_ids: dict[str, str]
+    primary_external_id: str, external_ids: dict[str, str] | None
 ) -> dict[str, str]:
     """Prepare external IDs"""
     new_external_ids = dict(external_ids or {})
@@ -207,18 +220,20 @@ class ParsedParticipant:
         self,
         rows: GroupedRow,
         internal_pid: int | None,
-        external_pid: str,
+        external_pids: dict[str, str],
         meta: dict[str, Any],
         reported_sex: int | None,
         reported_gender: str | None,
         karyotype: str | None,
-        external_pids: dict[str, str] | None = None,
     ):
         self.rows = rows
 
         self.internal_pid = internal_pid
-        self.external_pid = external_pid
-        self.external_pids = external_pids or {}
+        if external_pids is None or PRIMARY_EXTERNAL_ORG not in external_pids:
+            raise ValueError(
+                f'Primary external ID {PRIMARY_EXTERNAL_ORG!r} not found in external IDs: {external_pids}'
+            )
+        self.external_pids = external_pids
 
         self.reported_sex = reported_sex
         self.reported_gender = reported_gender
@@ -227,12 +242,20 @@ class ParsedParticipant:
 
         self.samples: list[ParsedSample] = []
 
+    @property
+    def primary_external_id(self) -> str:
+        """Get the primary external ID"""
+        return self.external_pids[PRIMARY_EXTERNAL_ORG]
+
     def to_sm(self) -> ParticipantUpsert:
         """Convert to SM upsert model"""
         samples = [s.to_sm() for s in self.samples]
+        check_duplicate_external_ids(
+            self.external_pids, f'for participant {self.primary_external_id}'
+        )
         return ParticipantUpsert(
             id=self.internal_pid,
-            external_ids=prepare_external_ids(self.external_pid, self.external_pids),
+            external_ids=self.external_pids,
             reported_sex=self.reported_sex,
             reported_gender=self.reported_gender,
             karyotype=self.karyotype,
@@ -249,17 +272,19 @@ class ParsedSample:
         participant: ParsedParticipant | None,
         rows: GroupedRow,
         internal_sid: str | None,
-        external_sid: str,
+        external_sids: dict[str, str],
         sample_type: str,
         meta: dict[str, Any] | None = None,
-        external_sids: dict[str, str] | None = None,
     ):
         self.participant = participant
         self.rows = rows
 
         self.internal_sid = internal_sid
-        self.external_sid = external_sid
-        self.external_sids = external_sids or {}
+        if external_sids is None or PRIMARY_EXTERNAL_ORG not in external_sids:
+            raise ValueError(
+                f'Primary external ID {PRIMARY_EXTERNAL_ORG!r} not found in external IDs {external_sids}'
+            )
+        self.external_sids = external_sids
 
         self.sample_type = sample_type
         self.meta = meta
@@ -267,11 +292,19 @@ class ParsedSample:
         self.samples: list[ParsedSample] = []
         self.sequencing_groups: list[ParsedSequencingGroup] = []
 
+    @property
+    def primary_external_id(self) -> str:
+        """Get the primary external ID"""
+        return self.external_sids[PRIMARY_EXTERNAL_ORG]
+
     def to_sm(self) -> SampleUpsert:
         """Convert to SM upsert model"""
+        check_duplicate_external_ids(
+            self.external_sids, f'for sample {self.primary_external_id}'
+        )
         return SampleUpsert(
             id=self.internal_sid,
-            external_ids=prepare_external_ids(self.external_sid, self.external_sids),
+            external_ids=self.external_sids,
             type=self.sample_type,
             meta=self.meta,
             active=True,
@@ -682,9 +715,9 @@ class GenericParser(
 
     def _get_dict_reader(self, file_pointer, delimiter: str):
         """
-        Return a dictReader from file_pointer
+        Return a DictReader from file_pointer
         Override this method if you can't use the default implementation that simply
-        calls csv.dictReader
+        calls csv.DictReader
         """
         reader = CustomDictReader(
             file_pointer,
@@ -764,11 +797,12 @@ class GenericParser(
         sample_participants = {}
         all_samples = ParsedSample.get_all_samples_from(samples)
         for sample in all_samples:
-            sample_participants[sample.external_sid] = (
-                sample.participant.external_pid if sample.participant else None
+            sample_participants[sample.primary_external_id] = (
+                sample.participant.primary_external_id if sample.participant else None
             )
         sample_sequencing_groups = {
-            sample.external_sid: sample.sequencing_groups for sample in all_samples
+            sample.primary_external_id: sample.sequencing_groups
+            for sample in all_samples
         }
 
         details = []
@@ -798,12 +832,15 @@ class GenericParser(
         """From summary, prepare a string to log to the console"""
         if participants:
             external_participant_ids = ', '.join(
-                set(p.external_pid for p in participants)
+                set(p.primary_external_id for p in participants)
             )
             header = f'Processing participants: {external_participant_ids}'
         else:
             external_sample_ids = ', '.join(
-                set(s.external_sid for s in ParsedSample.get_all_samples_from(samples))
+                set(
+                    s.primary_external_id
+                    for s in ParsedSample.get_all_samples_from(samples)
+                )
             )
             header = f'Processing samples: {external_sample_ids}'
 
@@ -865,7 +902,10 @@ class GenericParser(
         }
 
         for participant in participants:
-            participant.internal_pid = pid_map.get(participant.external_pid.lower())
+            for peid in participant.external_pids.values():
+                if internal_pid := pid_map.get(peid.lower()):
+                    participant.internal_pid = internal_pid
+                    break
 
     async def match_sample_ids(self, samples: list[ParsedSample]):
         """
@@ -884,7 +924,10 @@ class GenericParser(
         }
 
         for sample in ParsedSample.get_all_samples_from(samples):
-            sample.internal_sid = sid_map.get(sample.external_sid.lower())
+            for seid in sample.external_sids.values():
+                if internal_sid := sid_map.get(seid.lower()):
+                    sample.internal_sid = internal_sid
+                    break
 
     async def match_sequencing_group_ids(
         self, sequencing_groups: list[ParsedSequencingGroup]
@@ -1045,11 +1088,15 @@ class GenericParser(
         participant_groups: list[ParsedParticipant] = []
         pgroups = group_by(rows, self.get_primary_participant_id)
         for pid, prows in pgroups.items():
+            if not pid:
+                raise ValueError(f'Primary participant ID not found for rows: {prows}')
             participant_groups.append(
                 ParsedParticipant(
                     internal_pid=None,
-                    external_pid=pid,
-                    external_pids=self.get_participant_external_ids(prows),
+                    external_pids={
+                        **self.get_participant_external_ids(prows),
+                        PRIMARY_EXTERNAL_ORG: pid,
+                    },
                     rows=prows,
                     meta=await self.get_participant_meta_from_group(prows),
                     reported_sex=self.get_reported_sex(prows),
@@ -1078,8 +1125,10 @@ class GenericParser(
                     rows=sample_rows,
                     participant=participant,
                     internal_sid=None,
-                    external_sid=sid,
-                    external_sids=self.get_sample_external_ids(sample_rows),
+                    external_sids={
+                        **self.get_sample_external_ids(sample_rows),
+                        PRIMARY_EXTERNAL_ORG: sid,
+                    },
                     sample_type=self.get_sample_type(sample_rows),
                     meta=await self.get_sample_meta_from_group(sample_rows),
                 )

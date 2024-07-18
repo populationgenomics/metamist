@@ -222,7 +222,7 @@ class GenericMetadataParser(GenericParser):
         self.sample_external_id_column_map = sample_external_id_column_map or {}
 
         # Participant columns
-        self.participant_column = participant_primary_eid_column
+        self.participant_primary_eid_column = participant_primary_eid_column
         self.participant_external_id_column_map = (
             participant_external_id_column_map or {}
         )
@@ -363,9 +363,12 @@ class GenericMetadataParser(GenericParser):
 
     def get_primary_participant_id(self, row: SingleRow) -> str | None:
         """Get external participant ID from row"""
-        if not self.participant_column or self.participant_column not in row:
+        if (
+            not self.participant_primary_eid_column
+            or self.participant_primary_eid_column not in row
+        ):
             raise ValueError('Participant column does not exist')
-        return row[self.participant_column]
+        return row[self.participant_primary_eid_column]
 
     def get_reported_sex(self, row: GroupedRow) -> int | None:
         """Get reported sex from grouped row"""
@@ -398,7 +401,7 @@ class GenericMetadataParser(GenericParser):
 
     def has_participants(self, rows: list[SingleRow]) -> bool:
         """Returns True if the file has a Participants column"""
-        return self.participant_column in rows[0]
+        return self.participant_primary_eid_column in rows[0]
 
     async def validate_rows(self, rows):
         await super().validate_rows(rows)
@@ -539,6 +542,12 @@ class GenericMetadataParser(GenericParser):
         >>> GenericMetadataParser.collapse_arbitrary_meta({'key1': 'new.key'}, [{'key1': True}])
         {'new': {'key': True}}
 
+        >>> GenericMetadataParser.collapse_arbitrary_meta({'key1': 'new_key'}, [{}])
+        {}
+
+        >>> GenericMetadataParser.collapse_arbitrary_meta({'key1': 'new_key'}, [{'key1': None}])
+        {}
+
         >>> GenericMetadataParser.collapse_arbitrary_meta({'key1': 'new.key'}, [{'key1': 1}, {'key1': 2}, {'key1': 3}])
         {'new': {'key': [1, 2, 3]}}
 
@@ -571,7 +580,7 @@ class GenericMetadataParser(GenericParser):
                 return {key_parts[0]: val}
             return {key_parts[0]: prepare_dict_from_keys(key_parts[1:], val)}
 
-        dicts = []
+        dicts = [{}]
         for row_key, dict_key in key_map.items():
             if isinstance(row, list):
                 inner_values = [
@@ -713,12 +722,6 @@ class GenericMetadataParser(GenericParser):
     ) -> dict:
         """Get sequencing group metadata from variant (vcf) files"""
         meta: dict[str, Any] = {}
-
-        if not sequencing_group.sample.external_sid:
-            sequencing_group.sample.external_sid = (
-                await self.get_cpg_sample_id_from_row(sequencing_group.rows[0])
-            )
-
         gvcf_filenames: list[str] = []
 
         for r in sequencing_group.rows:
@@ -734,7 +737,7 @@ class GenericMetadataParser(GenericParser):
             )
 
         variant_file_types: dict[str, dict[str, list]] = await self.parse_files(
-            sequencing_group.sample.external_sid, full_gvcf_filenames, None
+            sequencing_group.sample.primary_external_id, full_gvcf_filenames, None
         )
         variants: dict[str, list] = variant_file_types.get('variants')
 
@@ -778,7 +781,7 @@ class GenericMetadataParser(GenericParser):
             # sorted for consistent testing
             str_ref_assemblies = ', '.join(sorted(reference_assemblies))
             raise ValueError(
-                f'Multiple reference assemblies were defined for {sample.external_sid}: {str_ref_assemblies}'
+                f'Multiple reference assemblies were defined for {sample.primary_external_id}: {str_ref_assemblies}'
             )
         if len(reference_assemblies) == 1:
             ref = next(iter(reference_assemblies))
@@ -786,7 +789,7 @@ class GenericMetadataParser(GenericParser):
             ref = self.default_reference_assembly_location
             if not ref:
                 raise ValueError(
-                    f'Reads type for {sample.external_sid!r} is CRAM, but a reference '
+                    f'Reads type for {sample.primary_external_id!r} is CRAM, but a reference '
                     f'is not defined, please set the default reference assembly path'
                 )
 
@@ -806,15 +809,14 @@ class GenericMetadataParser(GenericParser):
         sample = sequencing_group.sample
         rows = sequencing_group.rows
 
-        if not sample.external_sid:
-            sample.external_sid = await self.get_cpg_sample_id_from_row(rows[0])
-
         collapsed_assay_meta = self.collapse_arbitrary_meta(self.assay_meta_map, rows)
 
         assays = []
 
         read_filenames, read_checksums, reference_assemblies = (
-            await self.get_read_and_ref_files_and_checksums(sample.external_sid, rows)
+            await self.get_read_and_ref_files_and_checksums(
+                sample.primary_external_id, rows
+            )
         )
 
         # strip in case collaborator put "file1, file2"
@@ -824,7 +826,7 @@ class GenericMetadataParser(GenericParser):
                 self.file_path(f.strip()) for f in read_filenames if f.strip()
             )
         read_file_types: dict[str, dict[str, list]] = await self.parse_files(
-            sample.external_sid, full_read_filenames, read_checksums
+            sample.primary_external_id, full_read_filenames, read_checksums
         )
         reads: dict[str, list] = read_file_types.get('reads')
         if not reads:
@@ -873,7 +875,7 @@ class GenericMetadataParser(GenericParser):
                 # if any of the above fields are not set for an RNA assay, raise an error
                 if not all(collapsed_assay_meta.values()):
                     raise ValueError(
-                        f'Not all required fields were set for RNA sample {sample.external_sid}:\n'
+                        f'Not all required fields were set for RNA sample {sample.primary_external_id}:\n'
                         f'{collapsed_assay_meta}\n'
                         f'Use the default value arguments if they are not present in the manifest.'
                     )
@@ -911,7 +913,7 @@ class GenericMetadataParser(GenericParser):
         if not self.qc_meta_map:
             return []
 
-        sample_id = sequencing_group.sample.external_sid
+        sample_id = sequencing_group.sample.primary_external_id
 
         return [
             ParsedAnalysis(

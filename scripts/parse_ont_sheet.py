@@ -105,7 +105,7 @@ class OntParser(GenericMetadataParser):
 
             for r in sequencing_group.rows:
                 parsed_failed_fastqs = await self.parse_files(
-                    sequencing_group.sample.external_sid, r[Columns.FAIL_FASTQ_FILENAME]
+                    sequencing_group.sample.primary_external_id, r[Columns.FAIL_FASTQ_FILENAME]
                 )
                 if 'reads' not in parsed_failed_fastqs:
                     raise ValueError(

@@ -119,7 +119,7 @@ class TobWgsParser(GenericMetadataParser):
         """
         analyses = await super().get_analyses_from_sequencing_group(sequencing_group)
 
-        sample_id = sequencing_group.sample.external_sid
+        sample_id = sequencing_group.sample.primary_external_id
         cpg_id = sequencing_group.sample.internal_sid
 
         for analysis_type in ['gvcf', 'cram']:

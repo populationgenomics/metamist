@@ -74,7 +74,7 @@ class TestGenericParser(DbIsolatedTest):
                 participant=None,
                 rows=[],
                 internal_sid=None,
-                external_sid=exid,
+                external_sids={PRIMARY_EXTERNAL_ORG: exid},
                 sample_type='blood',
                 meta={},
             )
