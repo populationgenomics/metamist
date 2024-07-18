@@ -145,7 +145,7 @@ if __name__ == '__main__':
         '--dry-run', '--dry_run', action='store_true', help='Dry run mode'
     )
 
-    args, unknown = parser.parse_args()
+    args = parser.parse_args()
 
     cohort_spec = get_cohort_spec(
         cohort_name=args.name,
