@@ -8,11 +8,16 @@ include = "metamist/parser/"
 py_version = 311
 profile = "black"
 line_length = 88
-sections = ["FUTURE", "STDLIB", "THIRDPARTY", "HAIL", "CPG", "FIRSTPARTY", "LOCALFOLDER"]
-known_hail = [
-    "hail",
-    "hailtop",
+sections = [
+    "FUTURE",
+    "STDLIB",
+    "THIRDPARTY",
+    "HAIL",
+    "CPG",
+    "FIRSTPARTY",
+    "LOCALFOLDER",
 ]
+known_hail = ["hail", "hailtop"]
 # Adjust these for each repository, e.g., removing those that should be
 # local rather than CPG. Also fill in extend_skip below if there are any
 # subdirectories that should be ignored.
@@ -24,3 +29,9 @@ known_cpg = [
     "gnomad",
     "hail_scripts",
 ]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]

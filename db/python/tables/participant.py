@@ -364,7 +364,7 @@ RETURNING id
 
         keys = list(values.keys())
         list_values = [
-            {k: l[idx] for k, l in values.items()}
+            {k: item[idx] for k, item in values.items()}
             for idx in range(len(values[keys[0]]))
         ]
 

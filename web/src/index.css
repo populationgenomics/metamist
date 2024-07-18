@@ -428,6 +428,7 @@ html[data-theme='dark-mode'] .ui.table {
 .ui.table .header-cell.collapsible-header.expanded {
     width: 150px !important;
 }
+
 .ui.table .header-cell.collapsible-header:not(.expanded) {
     width: 70px !important;
 }
@@ -470,4 +471,9 @@ html[data-theme='dark-mode'] .ui.table {
     label {
         color: var(--color-text-primary) !important;
     }
+}
+
+/* See on billing home page - fixes attached menu dark mode border */
+.ui.attached.inverted.menu {
+    border: 1px solid #555 !important;
 }
