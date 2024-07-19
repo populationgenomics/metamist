@@ -155,13 +155,15 @@ class CustomDictReader(csv.DictReader):
 
     def __init__(
         self,
+        f,
         *args,
         key_map=None,
         required_keys: Iterable[str] | None = None,
         ignore_extra_keys=False,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
+        skip_row_func = filter(lambda x: not x.strip().startswith('#'), f)
+        super().__init__(skip_row_func, *args, **kwargs)
         self.key_map = key_map
         self.ignore_extra_keys = ignore_extra_keys
         self.required_keys = set(required_keys) if required_keys else None
@@ -927,6 +929,9 @@ class GenericParser(
         Otherwise we should leave the ID blank (forcing a create).
         """
 
+        if not sequencing_groups:
+            return sequencing_groups
+
         if not all(sg.assays for sg in sequencing_groups):
             raise ValueError('sequencing_groups must have assays attached')
 
@@ -946,11 +951,16 @@ class GenericParser(
             sorted_sg_ids = tuple(sorted(sg_ids))
             sg.internal_seqgroup_id = sg_map.get(sorted_sg_ids)
 
+        return sequencing_groups
+
     async def match_assay_ids(self, assays: list[ParsedAssay]):
         """
         Determine if assays are NEW, or UPDATE, and match the ID if so.
         This works based on the filenames of the reads.
         """
+
+        if not assays:
+            return assays
 
         values = await query_async(
             QUERY_MATCH_ASSAYS, variables={'project': self.project}
