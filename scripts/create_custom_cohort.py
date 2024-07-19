@@ -1,6 +1,7 @@
 """ A script to create a custom cohort """
-
 import argparse
+from argparse import ArgumentParser, Namespace
+from sys import argv, exit
 
 from metamist.apis import CohortApi
 from metamist.models import CohortBody, CohortCriteria
@@ -63,9 +64,19 @@ def get_cohort_spec(
     return CohortBody(**cohort_body_spec)
 
 
-if __name__ == '__main__':
+def parse_cli_arguments(cli_arguments: list[str], exit_on_error: bool = True) -> Namespace:
+    """
+    A wrapper to move argparse parsing out of the __name__ == __main__ block for testing purposes
 
-    parser = argparse.ArgumentParser(description='Create a custom cohort')
+    Args:
+        cli_arguments (list[str]): all command line arguments following the script path
+        exit_on_error (bool): whether the parser should quit completely (default), or raise an exception
+            when we encounter invalid arguments. exit = False is used in unit testing
+
+    Returns:
+        Namespace - the ArgParse digest of all arguments
+    """
+    parser = ArgumentParser(description='Create a custom cohort', exit_on_error=exit_on_error)
     parser.add_argument('--project', help='The project to create the cohort in', required=True)
     parser.add_argument('--name', help='The name of the cohort', required=True)
     parser.add_argument('--description', help='The description of the cohort', required=True)
@@ -81,13 +92,13 @@ if __name__ == '__main__':
     parser.add_argument(
         '--sg_ids_internal',
         nargs='*',
-        help='Include these sequencing groups',
+        help='Included sequencing groups',
         default=[],
     )
     parser.add_argument(
         '--excluded_sgs_internal',
         nargs='*',
-        help='Exclude these sequencing groups',
+        help='Excluded sequencing groups',
         default=[],
     )
     parser.add_argument(
@@ -107,7 +118,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--sg_type',
         nargs='*',
-        help='Sequencing group types, e.g. exome, genome',
+        help='Sequencing group types',
         default=[],
         choices=[
             'chip',
@@ -125,7 +136,7 @@ if __name__ == '__main__':
         required=False,
         nargs='*',
         default=[],
-        help='sample type',
+        help='Sample types',
         choices=[
             'blood',
             'ebff',
@@ -144,8 +155,11 @@ if __name__ == '__main__':
     parser.add_argument(
         '--dry-run', '--dry_run', action='store_true', help='Dry run mode'
     )
+    return parser.parse_args(cli_arguments)
 
-    args = parser.parse_args()
+
+if __name__ == '__main__':
+    args = parse_cli_arguments(argv[1:])
 
     cohort_spec = get_cohort_spec(
         cohort_name=args.name,
