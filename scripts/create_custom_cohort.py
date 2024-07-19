@@ -1,7 +1,6 @@
 """ A script to create a custom cohort """
-import argparse
 from argparse import ArgumentParser, Namespace
-from sys import argv, exit
+from sys import argv
 
 from metamist.apis import CohortApi
 from metamist.models import CohortBody, CohortCriteria
