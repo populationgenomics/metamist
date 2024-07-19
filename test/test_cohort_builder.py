@@ -3,8 +3,9 @@ from copy import deepcopy
 from test.testbase import DbIsolatedTest, run_as_sync
 from unittest.mock import patch
 
-import api.routes.cohort
 import metamist.models
+
+import api.routes.cohort
 from models.models.cohort import CohortBody, CohortCriteria, NewCohort
 from models.utils.cohort_template_id_format import cohort_template_id_format
 from scripts.create_custom_cohort import get_cohort_spec, main, parse_cli_arguments
@@ -103,6 +104,11 @@ class TestCohortBuilder(DbIsolatedTest):
         self.assertEqual(result.dry_run, False)
 
     def test_cli_parser(self):
+        """
+        runs the argparse parser on a range of arguments
+        base arguments are the minimum required to parse
+        each argument is tested in turn for valid success, and invalid failure
+        """
 
         # the minimum required fields
         minimal_base = ['--project', 'foo', '--name', 'epic_name', '--description', 'epic parsing']
