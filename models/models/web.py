@@ -211,11 +211,11 @@ class ProjectParticipantGridResponse(SMBase):
             for s in p.samples:
                 if s.meta:
                     update_d_from_meta(sample_meta_keys, s.meta)
-                if not s.sequencing_groups:
-                    continue
                 if s.sample_parent_id is not None:
                     has_nested_samples = True
 
+                if not s.sequencing_groups:
+                    continue
                 for sg in s.sequencing_groups or []:
                     if sg.meta:
                         update_d_from_meta(sg_meta_keys, sg.meta)
@@ -303,7 +303,7 @@ class ProjectParticipantGridResponse(SMBase):
             Field(
                 key='sample_root_id',
                 label='Root Sample ID',
-                is_visible=False,
+                is_visible=has_nested_samples,
                 filter_key='sample_root_id',
             ),
             Field(
