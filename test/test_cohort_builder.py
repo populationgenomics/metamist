@@ -24,7 +24,9 @@ class TestCohortBuilder(DbIsolatedTest):
         self.assertEqual(project, self.project_name)
         return await api.routes.cohort.create_cohort_from_criteria(
             CohortBody(**body_create_cohort_from_criteria['cohort_spec'].to_dict()),
-            CohortCriteria(**body_create_cohort_from_criteria['cohort_criteria'].to_dict()),
+            CohortCriteria(
+                **body_create_cohort_from_criteria['cohort_criteria'].to_dict()
+            ),
             self.connection,
             body_create_cohort_from_criteria['dry_run'],
         )
@@ -46,7 +48,9 @@ class TestCohortBuilder(DbIsolatedTest):
         mock.side_effect = self.mock_ccfc
         result = main(
             project=self.project_name,
-            cohort_body_spec=metamist.models.CohortBody(name='Empty cohort', description='No criteria'),
+            cohort_body_spec=metamist.models.CohortBody(
+                name='Empty cohort', description='No criteria'
+            ),
             projects=['test'],
             sg_ids_internal=[],
             excluded_sg_ids=[],
@@ -69,7 +73,9 @@ class TestCohortBuilder(DbIsolatedTest):
         mock.side_effect = self.mock_ccfc
         result = main(
             project=self.project_name,
-            cohort_body_spec=metamist.models.CohortBody(name='Epic cohort', description='Every criterion'),
+            cohort_body_spec=metamist.models.CohortBody(
+                name='Epic cohort', description='Every criterion'
+            ),
             projects=['test'],
             sg_ids_internal=['CPGLCL33'],
             excluded_sg_ids=['CPGLCL17', 'CPGLCL25'],
@@ -111,7 +117,14 @@ class TestCohortBuilder(DbIsolatedTest):
         """
 
         # the minimum required fields
-        minimal_base = ['--project', 'foo', '--name', 'epic_name', '--description', 'epic parsing']
+        minimal_base = [
+            '--project',
+            'foo',
+            '--name',
+            'epic_name',
+            '--description',
+            'epic parsing',
+        ]
 
         # copy this for updates
         cli_base_args = deepcopy(minimal_base)
@@ -140,9 +153,20 @@ class TestCohortBuilder(DbIsolatedTest):
         namespace = parse_cli_arguments(cli_base_args)
         self.assertEqual(namespace.excluded_sgs_internal, ['CPGC', 'CPGD'])
 
-        cli_base_args.extend(['--sg_technology', 'bulk-rna-seq', 'long-read', 'short-read', 'single-cell-rna-seq'])
+        cli_base_args.extend(
+            [
+                '--sg_technology',
+                'bulk-rna-seq',
+                'long-read',
+                'short-read',
+                'single-cell-rna-seq',
+            ]
+        )
         namespace = parse_cli_arguments(cli_base_args)
-        self.assertEqual(namespace.sg_technology, ['bulk-rna-seq', 'long-read', 'short-read', 'single-cell-rna-seq'])
+        self.assertEqual(
+            namespace.sg_technology,
+            ['bulk-rna-seq', 'long-read', 'short-read', 'single-cell-rna-seq'],
+        )
 
         failing_args = deepcopy(cli_base_args)
         failing_args.extend(['--sg_technology', 'invalid_tech'])
@@ -150,7 +174,9 @@ class TestCohortBuilder(DbIsolatedTest):
 
         cli_base_args.extend(['--sg_platform', 'illumina', 'oxford-nanopore', 'pacbio'])
         namespace = parse_cli_arguments(cli_base_args)
-        self.assertEqual(namespace.sg_platform, ['illumina', 'oxford-nanopore', 'pacbio'])
+        self.assertEqual(
+            namespace.sg_platform, ['illumina', 'oxford-nanopore', 'pacbio']
+        )
 
         failing_args = deepcopy(cli_base_args)
         failing_args.extend(['--sg_platform', 'invalid_platform'])
