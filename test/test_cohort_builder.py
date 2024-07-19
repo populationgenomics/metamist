@@ -119,7 +119,7 @@ class TestCohortBuilder(DbIsolatedTest):
         namespace = parse_cli_arguments(cli_base_args)
         self.assertEqual(namespace.project, 'foo')
         self.assertEqual(namespace.name, 'epic_name')
-        self.assertEqual(namespace.description, 'epic parser')
+        self.assertEqual(namespace.description, 'epic parsing')
         self.assertEqual(namespace.projects, [])
         self.assertEqual(namespace.excluded_sgs_internal, [])
         self.assertEqual(namespace.sg_technology, [])
