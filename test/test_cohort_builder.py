@@ -158,7 +158,7 @@ class TestCohortBuilder(DbIsolatedTest):
 
         cli_base_args.extend(['--sg_type', 'chip', 'exome', 'genome'])
         namespace = parse_cli_arguments(cli_base_args)
-        self.assertEqual(namespace.sg_platform, ['chip', 'exome', 'genome'])
+        self.assertEqual(namespace.sg_type, ['chip', 'exome', 'genome'])
 
         failing_args = deepcopy(cli_base_args)
         failing_args.extend(['--sg_type', 'invalid_type'])
@@ -166,7 +166,7 @@ class TestCohortBuilder(DbIsolatedTest):
 
         cli_base_args.extend(['--sample_type', 'blood', 'ebff', 'ebld'])
         namespace = parse_cli_arguments(cli_base_args)
-        self.assertEqual(namespace.sg_platform, ['blood', 'ebff', 'ebld'])
+        self.assertEqual(namespace.sample_type, ['blood', 'ebff', 'ebld'])
 
         failing_args = deepcopy(cli_base_args)
         failing_args.extend(['--sample_type', 'invalid_type'])
