@@ -68,8 +68,8 @@ class OntParser(GenericMetadataParser):
         super().__init__(
             search_locations=search_locations,
             project=project,
-            participant_column=Columns.SAMPLE_ID,
-            sample_name_column=Columns.SAMPLE_ID,
+            participant_primary_eid_column=Columns.SAMPLE_ID,
+            sample_primary_eid_column=Columns.SAMPLE_ID,
             reads_column=Columns.PASS_FASTQ_FILENAME,
             default_sample_type=default_sample_type,
             default_sequencing=default_sequencing,
@@ -105,7 +105,7 @@ class OntParser(GenericMetadataParser):
 
             for r in sequencing_group.rows:
                 parsed_failed_fastqs = await self.parse_files(
-                    sequencing_group.sample.external_sid, r[Columns.FAIL_FASTQ_FILENAME]
+                    sequencing_group.sample.primary_external_id, r[Columns.FAIL_FASTQ_FILENAME]
                 )
                 if 'reads' not in parsed_failed_fastqs:
                     raise ValueError(

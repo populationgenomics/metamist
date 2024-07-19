@@ -1,4 +1,4 @@
-# pylint: disable=R0904,too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument,too-many-arguments,unused-import
+# pylint: disable=R0904,too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument,too-many-arguments,unused-import,too-many-lines
 import asyncio
 import logging
 import re
@@ -79,38 +79,35 @@ class GenericMetadataParser(GenericParser):
         self,
         project: str,
         search_locations: list[str],
-        sample_name_column: str,
-
+        # sample columns
+        sample_primary_eid_column: str,
+        sample_external_id_column_map: dict[str, str] | None = None,
         # Participant columns
-        participant_column: str | None = None,
+        participant_primary_eid_column: str | None = None,
         reported_sex_column: str | None = None,
         reported_gender_column: str | None = None,
         karyotype_column: str | None = None,
-
+        participant_external_id_column_map: dict[str, str] | None = None,
         # Sequencing metadata columns
         seq_type_column: str | None = None,
         seq_technology_column: str | None = None,
         seq_platform_column: str | None = None,
         seq_facility_column: str | None = None,
         seq_library_column: str | None = None,
-
         # Assay columns
-        assay_id_column: str | None = None,
+        assay_external_id_column: str | None = None,
         reads_column: str | None = None,
         checksum_column: str | None = None,
         read_end_type_column: str | None = None,
         read_length_column: str | None = None,
         reference_assembly_location_column: str | None = None,
-
         # GVCF columns
         gvcf_column: str | None = None,
-
         # Meta field key maps
         participant_meta_map: dict[str, str] | None = None,
         sample_meta_map: dict[str, str] | None = None,
         assay_meta_map: dict[str, str] | None = None,
         qc_meta_map: dict[str, str] | None = None,
-
         # Default values
         default_reference_assembly_location: str | None = None,
         default_sample_type: str | None = None,
@@ -123,6 +120,89 @@ class GenericMetadataParser(GenericParser):
         allow_extra_files_in_search_path=False,
         **kwargs,
     ):
+        """
+        Configuration options for a GenericMetadata parser.
+
+        Args:
+            project (str): The name of the project to insert into
+            search_locations (list[str]):
+                A list of locations to search for unqualified files in.
+
+            sample_primary_eid_column (str): The name of the column containing the sample name.
+            sample_external_id_column_map (str | None, optional):
+                {column: eid_name} mapping for sample external_ids. This should NOT
+                include the sample_primary_eid_column.
+            sample_meta_map (dict[str, str] | None, optional):
+                A mapping of column names to keys for sample.meta.
+                {[column]: [metadata_key]}
+            default_sample_type (str | None, optional):
+                The default sample type to use if not provided in the manifest.
+
+            participant_primary_eid_column (str | None, optional):
+                The name of the column containing the participant name. Unsupplied means
+                there are no participants represented in the file.
+            reported_sex_column (str | None, optional):
+                The name of the column containing the reported sex, this will get parsed
+                into (0 = unknown, 1 = male, 2 = female), otherwise, ValueError
+            reported_gender_column (str | None, optional):
+                The name of the column containing the reported gender, no validation.
+            karyotype_column (str | None, optional):
+                The name of the column containing the karyotype, no validation.
+            participant_external_id_column_map (str | None, optional):
+                {column: eid_name} mapping for participant external_ids.
+                This should NOT include the participant_primary_eid_column.
+            participant_meta_map (dict[str, str] | None, optional):
+                A mapping of column names to keys for participant.meta.
+                {[column]: [metadata_key]}
+
+            default_sequencing (_type_, optional):
+                Default sequencing values to use when not found.Defaults to
+                DefaultSequencing( seq_type='genome', technology='short-read', platform='illumina' ).
+            seq_type_column (str | None, optional):
+                The name of the column containing the sequencing type.
+            seq_technology_column (str | None, optional):
+                The name of the column containing the sequencing technology.
+            seq_platform_column (str | None, optional):
+                The name of the column containing the sequencing platform.
+            seq_facility_column (str | None, optional):
+                The name of the column containing the sequencing facility.
+            seq_library_column (str | None, optional):
+                The name of the column containing the sequencing library.
+
+            assay_id_column (str | None, optional):
+                The name of the column containing an external assay ID to group on.
+            assay_meta_map (dict[str, str] | None, optional):
+                A mapping of column names to keys for assay.meta.
+                {[column]: [metadata_key]}
+            reads_column (str | None, optional):
+                The name of the column containing the reads.
+            checksum_column (str | None, optional):
+                The name of the column containing the checksum.
+            read_end_type_column (str | None, optional):
+                The name of the column containing the read end type.
+            default_read_end_type (str | None, optional):
+                The default read end type to use if not provided in the manifest.
+            read_length_column (str | None, optional):
+                The name of the column containing the read length.
+            default_read_length (str | int | None, optional):
+                The default read length to use if not provided in the manifest.
+            reference_assembly_location_column (str | None, optional):
+                The name of the column containing the reference assembly location.
+            default_reference_assembly_location (str | None, optional):
+                Path to a reference_assembly where the reads_type is a CRAM
+
+            gvcf_column (str | None, optional):
+                The name of the column containing the path to a gvcf
+
+            qc_meta_map (dict[str, str] | None, optional):
+                A mapping of column names to keys for QC analysis.meta
+
+            batch_number (str | None, optional): a batch number to assign to the samples
+            allow_extra_files_in_search_path (bool, optional):
+                Whether to allow files in the search path that are not in the manifest.
+                This could be useful to ensure that all files uploaded to some dir
+                are covered by the manifest, and there aren't extras.
+        """
         super().__init__(
             path_prefix=None,
             search_paths=search_locations,
@@ -134,14 +214,18 @@ class GenericMetadataParser(GenericParser):
             **kwargs,
         )
 
-        if not sample_name_column:
+        if not sample_primary_eid_column:
             raise ValueError('A sample name column MUST be provided')
 
         self.cpg_id_column = 'Internal CPG Sequencing Group ID'
-        self.sample_name_column = sample_name_column
+        self.sample_primary_eid_column = sample_primary_eid_column
+        self.sample_external_id_column_map = sample_external_id_column_map or {}
 
         # Participant columns
-        self.participant_column = participant_column
+        self.participant_primary_eid_column = participant_primary_eid_column
+        self.participant_external_id_column_map = (
+            participant_external_id_column_map or {}
+        )
         self.reported_sex_column = reported_sex_column
         self.reported_gender_column = reported_gender_column
         self.karyotype_column = karyotype_column
@@ -154,7 +238,7 @@ class GenericMetadataParser(GenericParser):
         self.seq_library_column = seq_library_column
 
         # Assay columns
-        self.assay_id_column = assay_id_column
+        self.assay_id_column = assay_external_id_column
         self.reads_column = reads_column
         self.checksum_column = checksum_column
         self.read_end_type_column = read_end_type_column
@@ -175,9 +259,9 @@ class GenericMetadataParser(GenericParser):
         self.default_reference_assembly_location = default_reference_assembly_location
         self.allow_extra_files_in_search_path = allow_extra_files_in_search_path
 
-    def get_sample_id(self, row: SingleRow) -> str:
+    def get_primary_sample_id(self, row: SingleRow) -> str:
         """Get external sample ID from row"""
-        return row[self.sample_name_column].strip()
+        return row[self.sample_primary_eid_column].strip()
 
     async def get_cpg_sample_id_from_row(self, row: SingleRow) -> str | None:
         """Get internal cpg id from a row using get_sample_id and an api call"""
@@ -198,7 +282,8 @@ class GenericMetadataParser(GenericParser):
         if isinstance(row, dict):
             return [self.get_sequencing_type(row)]
         return [
-            str(r.get(self.seq_type_column, self.default_sequencing.seq_type)) for r in row
+            str(r.get(self.seq_type_column, self.default_sequencing.seq_type))
+            for r in row
         ]
 
     def get_sequencing_technology(self, row: SingleRow) -> str:
@@ -261,17 +346,13 @@ class GenericMetadataParser(GenericParser):
 
     def get_read_end_type(self, row: SingleRow) -> str:
         """Get read end type from row"""
-        value = (
-            row.get(self.read_end_type_column, None) or self.default_read_end_type
-        )
+        value = row.get(self.read_end_type_column, None) or self.default_read_end_type
         value = str(value).lower() if value else None
         return value
 
     def get_read_length(self, row: SingleRow) -> int:
         """Get read length from row"""
-        value = (
-            row.get(self.read_length_column, None) or self.default_read_length
-        )
+        value = row.get(self.read_length_column, None) or self.default_read_length
         value = int(value) if value else None
         return value
 
@@ -280,11 +361,14 @@ class GenericMetadataParser(GenericParser):
         NOTE: To be re-thought after assay group changes are applied"""
         return None
 
-    def get_participant_id(self, row: SingleRow) -> str | None:
+    def get_primary_participant_id(self, row: SingleRow) -> str | None:
         """Get external participant ID from row"""
-        if not self.participant_column or self.participant_column not in row:
+        if (
+            not self.participant_primary_eid_column
+            or self.participant_primary_eid_column not in row
+        ):
             raise ValueError('Participant column does not exist')
-        return row[self.participant_column]
+        return row[self.participant_primary_eid_column]
 
     def get_reported_sex(self, row: GroupedRow) -> int | None:
         """Get reported sex from grouped row"""
@@ -317,7 +401,7 @@ class GenericMetadataParser(GenericParser):
 
     def has_participants(self, rows: list[SingleRow]) -> bool:
         """Returns True if the file has a Participants column"""
-        return self.participant_column in rows[0]
+        return self.participant_primary_eid_column in rows[0]
 
     async def validate_rows(self, rows):
         await super().validate_rows(rows)
@@ -362,7 +446,7 @@ class GenericMetadataParser(GenericParser):
         for grp in rows:
             for r in grp if isinstance(grp, list) else [grp]:
                 filename_promises.append(
-                    self.get_all_files_from_row(self.get_sample_id(r), r)
+                    self.get_all_files_from_row(self.get_primary_sample_id(r), r)
                 )
 
         files_from_rows: list[str] = sum(await asyncio.gather(*filename_promises), [])
@@ -458,6 +542,12 @@ class GenericMetadataParser(GenericParser):
         >>> GenericMetadataParser.collapse_arbitrary_meta({'key1': 'new.key'}, [{'key1': True}])
         {'new': {'key': True}}
 
+        >>> GenericMetadataParser.collapse_arbitrary_meta({'key1': 'new_key'}, [{}])
+        {}
+
+        >>> GenericMetadataParser.collapse_arbitrary_meta({'key1': 'new_key'}, [{'key1': None}])
+        {}
+
         >>> GenericMetadataParser.collapse_arbitrary_meta({'key1': 'new.key'}, [{'key1': 1}, {'key1': 2}, {'key1': 3}])
         {'new': {'key': [1, 2, 3]}}
 
@@ -490,15 +580,21 @@ class GenericMetadataParser(GenericParser):
                 return {key_parts[0]: val}
             return {key_parts[0]: prepare_dict_from_keys(key_parts[1:], val)}
 
-        dicts = []
+        dicts = [{}]
         for row_key, dict_key in key_map.items():
             if isinstance(row, list):
-                inner_values = [unstring_value(r[row_key]) for r in row if r.get(row_key) is not None]
+                inner_values = [
+                    unstring_value(r[row_key])
+                    for r in row
+                    if r.get(row_key) is not None
+                ]
                 if any(isinstance(inner, list) for inner in inner_values):
                     # lists are unhashable
                     value = inner_values
                 else:
-                    value = sorted(set(inner_values), key=str)  # sorted for unit test consistency
+                    value = sorted(
+                        set(inner_values), key=str
+                    )  # sorted for unit test consistency
                     if len(value) == 0:
                         continue
                     if len(value) == 1:
@@ -591,6 +687,32 @@ class GenericMetadataParser(GenericParser):
         """Get sample-metadata from row"""
         return self.collapse_arbitrary_meta(self.sample_meta_map, rows)
 
+    def get_participant_external_ids(self, row: GroupedRow) -> dict[str, str]:
+        eids = {}
+        for r in row:
+            for column, name in self.participant_external_id_column_map.items():
+                new_eid = r.get(column)
+                if not new_eid:
+                    continue
+                if name in eids and new_eid != eids[name]:
+                    raise ValueError
+                eids[name] = new_eid
+
+        return eids
+
+    def get_sample_external_ids(self, row: GroupedRow) -> dict[str, str]:
+        eids = {}
+        for r in row:
+            for column, name in self.sample_external_id_column_map.items():
+                new_eid = r.get(column)
+                if not new_eid:
+                    continue
+                if name in eids and new_eid != eids[name]:
+                    raise ValueError
+                eids[name] = new_eid
+
+        return eids
+
     async def get_participant_meta_from_group(self, rows: GroupedRow):
         """Get participant-metadata from rows then set it in the ParticipantMetaGroup"""
         return self.collapse_arbitrary_meta(self.participant_meta_map, rows)
@@ -600,12 +722,6 @@ class GenericMetadataParser(GenericParser):
     ) -> dict:
         """Get sequencing group metadata from variant (vcf) files"""
         meta: dict[str, Any] = {}
-
-        if not sequencing_group.sample.external_sid:
-            sequencing_group.sample.external_sid = (
-                await self.get_cpg_sample_id_from_row(sequencing_group.rows[0])
-            )
-
         gvcf_filenames: list[str] = []
 
         for r in sequencing_group.rows:
@@ -621,7 +737,7 @@ class GenericMetadataParser(GenericParser):
             )
 
         variant_file_types: dict[str, dict[str, list]] = await self.parse_files(
-            sequencing_group.sample.external_sid, full_gvcf_filenames, None
+            sequencing_group.sample.primary_external_id, full_gvcf_filenames, None
         )
         variants: dict[str, list] = variant_file_types.get('variants')
 
@@ -636,8 +752,9 @@ class GenericMetadataParser(GenericParser):
 
         return meta
 
-    async def get_read_and_ref_files_and_checksums(self, sample_id: str, rows: GroupedRow) -> (
-            tuple[list[str], list[str], set[str]]):
+    async def get_read_and_ref_files_and_checksums(
+        self, sample_id: str, rows: GroupedRow
+    ) -> tuple[list[str], list[str], set[str]]:
         """Get read filenames and checksums from rows."""
         read_filenames: list[str] = []
         read_checksums: list[str] = []
@@ -656,13 +773,15 @@ class GenericMetadataParser(GenericParser):
                     reference_assemblies.add(ref)
         return read_filenames, read_checksums, reference_assemblies
 
-    async def parse_cram_assays(self, sample: ParsedSample, reference_assemblies: set[str]) -> dict[str, Any]:
+    async def parse_cram_assays(
+        self, sample: ParsedSample, reference_assemblies: set[str]
+    ) -> dict[str, Any]:
         """Parse CRAM assays"""
         if len(reference_assemblies) > 1:
             # sorted for consistent testing
             str_ref_assemblies = ', '.join(sorted(reference_assemblies))
             raise ValueError(
-                f'Multiple reference assemblies were defined for {sample.external_sid}: {str_ref_assemblies}'
+                f'Multiple reference assemblies were defined for {sample.primary_external_id}: {str_ref_assemblies}'
             )
         if len(reference_assemblies) == 1:
             ref = next(iter(reference_assemblies))
@@ -670,20 +789,18 @@ class GenericMetadataParser(GenericParser):
             ref = self.default_reference_assembly_location
             if not ref:
                 raise ValueError(
-                    f'Reads type for {sample.external_sid!r} is CRAM, but a reference '
+                    f'Reads type for {sample.primary_external_id!r} is CRAM, but a reference '
                     f'is not defined, please set the default reference assembly path'
                 )
 
         ref_fp = self.file_path(ref)
-        secondary_files = (
-            await self.create_secondary_file_objects_by_potential_pattern(
-                ref_fp, ['.fai']
-            )
+        secondary_files = await self.create_secondary_file_objects_by_potential_pattern(
+            ref_fp, ['.fai']
         )
         cram_reference = await self.create_file_object(
             ref_fp, secondary_files=secondary_files
         )
-        return {'reference_assembly' : cram_reference}
+        return {'reference_assembly': cram_reference}
 
     async def get_assays_from_group(
         self, sequencing_group: ParsedSequencingGroup
@@ -692,15 +809,14 @@ class GenericMetadataParser(GenericParser):
         sample = sequencing_group.sample
         rows = sequencing_group.rows
 
-        if not sample.external_sid:
-            sample.external_sid = await self.get_cpg_sample_id_from_row(rows[0])
-
         collapsed_assay_meta = self.collapse_arbitrary_meta(self.assay_meta_map, rows)
 
         assays = []
 
-        read_filenames, read_checksums, reference_assemblies = await self.get_read_and_ref_files_and_checksums(
-            sample.external_sid, rows
+        read_filenames, read_checksums, reference_assemblies = (
+            await self.get_read_and_ref_files_and_checksums(
+                sample.primary_external_id, rows
+            )
         )
 
         # strip in case collaborator put "file1, file2"
@@ -710,7 +826,7 @@ class GenericMetadataParser(GenericParser):
                 self.file_path(f.strip()) for f in read_filenames if f.strip()
             )
         read_file_types: dict[str, dict[str, list]] = await self.parse_files(
-            sample.external_sid, full_read_filenames, read_checksums
+            sample.primary_external_id, full_read_filenames, read_checksums
         )
         reads: dict[str, list] = read_file_types.get('reads')
         if not reads:
@@ -736,13 +852,22 @@ class GenericMetadataParser(GenericParser):
         if self.batch_number is not None:
             collapsed_assay_meta['batch'] = self.batch_number
 
-        if sequencing_group.sequencing_type in ['exome', 'polyarna', 'totalrna', 'singlecellrna']:
+        if sequencing_group.sequencing_type in [
+            'exome',
+            'polyarna',
+            'totalrna',
+            'singlecellrna',
+        ]:
             rows = sequencing_group.rows
             # Exome / RNA should have facility and library, allow missing for exomes - for now
             if self.get_sequencing_facility(rows[0]):
-                collapsed_assay_meta['sequencing_facility'] = self.get_sequencing_facility(rows[0])
+                collapsed_assay_meta['sequencing_facility'] = (
+                    self.get_sequencing_facility(rows[0])
+                )
             if self.get_sequencing_library(rows[0]):
-                collapsed_assay_meta['sequencing_library'] = self.get_sequencing_library(rows[0])
+                collapsed_assay_meta['sequencing_library'] = (
+                    self.get_sequencing_library(rows[0])
+                )
             # RNA requires read end type and length as well
             if sequencing_group.sequencing_type != 'exome':
                 collapsed_assay_meta['read_end_type'] = self.get_read_end_type(rows[0])
@@ -750,7 +875,7 @@ class GenericMetadataParser(GenericParser):
                 # if any of the above fields are not set for an RNA assay, raise an error
                 if not all(collapsed_assay_meta.values()):
                     raise ValueError(
-                        f'Not all required fields were set for RNA sample {sample.external_sid}:\n'
+                        f'Not all required fields were set for RNA sample {sample.primary_external_id}:\n'
                         f'{collapsed_assay_meta}\n'
                         f'Use the default value arguments if they are not present in the manifest.'
                     )
@@ -788,7 +913,7 @@ class GenericMetadataParser(GenericParser):
         if not self.qc_meta_map:
             return []
 
-        sample_id = sequencing_group.sample.external_sid
+        sample_id = sequencing_group.sample.primary_external_id
 
         return [
             ParsedAnalysis(
@@ -892,7 +1017,7 @@ async def main(
     manifests,
     project,
     search_path: list[str],
-    sample_name_column: str,
+    sample_primary_eid_column: str,
     participant_column: str | None = None,
     reported_sex_column: str | None = None,
     reported_gender_column: str | None = None,
@@ -937,8 +1062,8 @@ async def main(
 
     parser = GenericMetadataParser(
         project=project,
-        sample_name_column=sample_name_column,
-        participant_column=participant_column,
+        sample_primary_eid_column=sample_primary_eid_column,
+        participant_primary_eid_column=participant_column,
         reported_sex_column=reported_sex_column,
         reported_gender_column=reported_gender_column,
         karyotype_column=karyotype_column,
