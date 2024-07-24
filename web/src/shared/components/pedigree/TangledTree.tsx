@@ -1,11 +1,13 @@
 /* Inspired by https://observablehq.com/@nitaku/tangled-tree-visualization-ii */
 
 /* eslint-disable no-param-reassign */
-import * as React from 'react'
 import _ from 'lodash'
+import * as React from 'react'
 
-import { min, max, sum, mean, extent } from 'd3'
+import { extent, max, mean, min, sum } from 'd3'
 import MuckError from '../MuckError'
+
+const DECEASED_NODE_INSET_FACTOR = 2.5
 
 export interface PedigreeEntry {
     affected: number
@@ -14,6 +16,7 @@ export interface PedigreeEntry {
     maternal_id?: string | null
     paternal_id?: string | null
     sex: number
+    deceased: boolean
 }
 
 interface ModifiedPedEntry {
@@ -23,6 +26,7 @@ interface ModifiedPedEntry {
     maternal_id?: string | null
     paternal_id?: string | null
     sex: number
+    deceased: boolean
     children: string[]
 }
 
@@ -68,13 +72,12 @@ interface Link {
 // layout
 const defaultNodeDiameter = 40
 
+const textColor = 'var(--color-text-primary)'
+const colLines = 'var(--color-border-color)'
 
-const textColor = "var(--color-text-primary)"
-const colLines = "var(--color-border-color)"
-
-const colAffected = "var(--color-pedigree-affected)"
-const colPersonBorder = "var(--color-pedigree-person-border)"
-const colUnaffected = "var(--color-pedigree-unaffected)"
+const colAffected = 'var(--color-pedigree-affected)'
+const colPersonBorder = 'var(--color-pedigree-person-border)'
+const colUnaffected = 'var(--color-pedigree-unaffected)'
 
 interface ITangleLayoutOptions {
     nodeDiameter: number
@@ -217,7 +220,7 @@ const constructTangleLayout = (levels: NodeList[], options: ITangleLayoutOptions
                     (a, b) =>
                         a.x - b.x ||
                         oldLevel.findIndex((c) => a.id === c.id) -
-                        oldLevel.findIndex((c) => b.id === c.id)
+                            oldLevel.findIndex((c) => b.id === c.id)
                 )
                 if (movedIndex < level.nodes.length - 1) {
                     // not the last node
@@ -374,12 +377,14 @@ interface ITangleTreeChartProps {
     nodeVerticalSpacing?: number
     paddingX?: number
     paddingY?: number
-
 }
 
 const TangleTreeChart: React.FC<ITangleTreeChartProps> = (props) => {
     const {
-        data, originalData, onClick, onHighlight,
+        data,
+        originalData,
+        onClick,
+        onHighlight,
         nodeHorizontalSpacing,
         nodeVerticalSpacing,
         nodeDiameter = defaultNodeDiameter,
@@ -387,10 +392,11 @@ const TangleTreeChart: React.FC<ITangleTreeChartProps> = (props) => {
         paddingY = 10,
     } = props
 
-    const tangleLayout = constructTangleLayout(
-        _.cloneDeep(data),
-        { nodeDiameter, horizontalSpacing: nodeHorizontalSpacing, verticalSpacing: nodeVerticalSpacing }
-    )
+    const tangleLayout = constructTangleLayout(_.cloneDeep(data), {
+        nodeDiameter,
+        horizontalSpacing: nodeHorizontalSpacing,
+        verticalSpacing: nodeVerticalSpacing,
+    })
 
     if ('error' in tangleLayout) {
         return <MuckError message={`Ah Muck, couldn't resolve this pedigree`} />
@@ -403,12 +409,7 @@ const TangleTreeChart: React.FC<ITangleTreeChartProps> = (props) => {
     const viewBox = `${minX} ${minY} ${width} ${height}`
 
     return (
-        <svg
-            width={width}
-            height={height}
-            viewBox={viewBox}
-            style={{ border: "1px solid black" }}
-        >
+        <svg width={width} height={height} viewBox={viewBox} style={{ border: '1px solid black' }}>
             {tangleLayout.bundles.map((b) => {
                 const d = b.links
                     .map(
@@ -430,7 +431,8 @@ const TangleTreeChart: React.FC<ITangleTreeChartProps> = (props) => {
 
             {tangleLayout.nodes.map((n) => (
                 <PersonNode
-                    key={`node-${n.id}`} node={n}
+                    key={`node-${n.id}`}
+                    node={n}
                     entry={originalData[n.id]}
                     onClick={onClick}
                     onHighlight={onHighlight}
@@ -451,54 +453,84 @@ interface IPersonNode {
     showIndividualId?: boolean
 }
 
-export const PersonNode: React.FC<IPersonNode> = ({ node, entry, onClick, onHighlight, nodeSize = defaultNodeDiameter, showIndividualId = true }) => {
+const getSVGPathForDeceasedLine = (node: NodePosition, nodeSize: number) => {
+    const insetFactor = DECEASED_NODE_INSET_FACTOR
+    const mX = node.x - nodeSize / insetFactor
+    const mY = node.y - nodeSize / insetFactor
+    const lX = node.x + nodeSize / insetFactor
+    const lY = node.y + nodeSize / insetFactor
+    return `M${mX} ${mY} L${lX} ${lY}`
+}
 
+export const PersonNode: React.FC<IPersonNode> = ({
+    node,
+    entry,
+    onClick,
+    onHighlight,
+    nodeSize = defaultNodeDiameter,
+    showIndividualId = true,
+}) => {
     const [isHighlighted, setIsHighlighted] = React.useState(false)
 
-    return <React.Fragment>
-        <g
-            onMouseOver={() => {
-                if (!!onHighlight) {
-                    setIsHighlighted(true);
-                    onHighlight?.(entry);
-                }
-            }}
-            onMouseLeave={() => {
-                setIsHighlighted(false)
-                onHighlight?.(null)
-            }}
-        >
-            <path
-                data-id={`${entry.individual_id}`}
-                stroke={isHighlighted ? "blue" : colPersonBorder}
-                strokeWidth={isHighlighted ? nodeSize : nodeSize * 0.8}
-                z="-1"
-                d={`M${node.x} ${node.y} L${node.x} ${node.y}`}
-                strokeLinecap={entry.sex === 1 ? 'square' : 'round'}
-            />
-            <path
-                stroke={entry.affected === 1 ? colAffected : colUnaffected}
-                strokeWidth={nodeSize * 0.65}
-                strokeLinecap={entry.sex === 1 ? 'square' : 'round'}
-                d={`M${node.x} ${node.y} L${node.x} ${node.y}`}
-                onClick={() => onClick?.(entry)}
-            />
-            {/* wrap text in g to get fill to work correctly */}
-            {showIndividualId && <g fill={textColor}>
-                <text
-                    className="selectable"
+    const isDeceased = entry.deceased
+
+    return (
+        <React.Fragment>
+            <g
+                onMouseOver={() => {
+                    if (!!onHighlight) {
+                        setIsHighlighted(true)
+                        onHighlight?.(entry)
+                    }
+                }}
+                onMouseLeave={() => {
+                    setIsHighlighted(false)
+                    onHighlight?.(null)
+                }}
+            >
+                <path
                     data-id={`${entry.individual_id}`}
-                    x={`${node.x}`}
-                    y={`${node.y + nodeSize / 2 + 10}`}
-                    fontSize="12px"
-                    textAnchor="middle"
-                    textDecoration={isHighlighted ? "underline" : "none"}
-                >
-                    {entry.individual_id}
-                </text>
-            </g>}
-        </g>
-    </React.Fragment>
+                    stroke={isHighlighted ? 'blue' : colPersonBorder}
+                    strokeWidth={isHighlighted ? nodeSize : nodeSize * 0.8}
+                    z="-1"
+                    d={`M${node.x} ${node.y} L${node.x} ${node.y}`}
+                    strokeLinecap={entry.sex === 1 ? 'square' : 'round'}
+                />
+                <path
+                    stroke={entry.affected === 1 ? colAffected : colUnaffected}
+                    strokeWidth={nodeSize * 0.65}
+                    strokeLinecap={entry.sex === 1 ? 'square' : 'round'}
+                    d={`M${node.x} ${node.y} L${node.x} ${node.y}`}
+                    onClick={() => onClick?.(entry)}
+                />
+                {/* if deceased, show diagonal bar through node */}
+                {isDeceased && (
+                    <path
+                        stroke={textColor}
+                        strokeWidth={nodeSize * 0.1}
+                        strokeLinecap="round"
+                        d={getSVGPathForDeceasedLine(node, nodeSize)}
+                    />
+                )}
+                {/* wrap text in g to get fill to work correctly */}
+                {showIndividualId && (
+                    <g fill={textColor}>
+                        <text
+                            className="selectable"
+                            data-id={`${entry.individual_id}`}
+                            x={`${node.x}`}
+                            y={`${node.y + nodeSize / 2 + 10}`}
+                            fontSize="12px"
+                            textAnchor="middle"
+                            textDecoration={isHighlighted ? 'underline' : 'none'}
+                        >
+                            {entry.individual_id}
+                        </text>
+                    </g>
+                )}
+            </g>
+        </React.Fragment>
+    )
 }
 
 const calculateDepth = (
@@ -720,21 +752,18 @@ interface RenderPedigreeProps {
 }
 
 const TangledTree: React.FunctionComponent<RenderPedigreeProps> = ({ data, onClick, ...props }) => {
-
     if (!data?.length) {
-        return <p><em>Empty pedigree</em></p>
+        return (
+            <p>
+                <em>Empty pedigree</em>
+            </p>
+        )
     }
 
     const tree = formatData(data)
-    const keyedData = _.keyBy(data, s => s.individual_id)
+    const keyedData = _.keyBy(data, (s) => s.individual_id)
 
-
-    return <TangleTreeChart
-        data={tree}
-        originalData={keyedData}
-        onClick={onClick}
-        {...props}
-    />
+    return <TangleTreeChart data={tree} originalData={keyedData} onClick={onClick} {...props} />
 }
 
 export default TangledTree
