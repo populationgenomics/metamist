@@ -106,7 +106,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
     return item.submenu ? (
         <Menu.Item className="headerMenuItem">{popup(dropdown(item), item.icon)}</Menu.Item>
     ) : (
-        <Menu.Item className="headerMenuItem" to={item.url} key={index}>
+        <Menu.Item className="headerMenuItem" as={Link} to={item.url} key={index}>
             {popup(item.title, item.icon)}
         </Menu.Item>
     )
