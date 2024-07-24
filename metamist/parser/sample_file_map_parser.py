@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument
 import logging
-from typing import List
 
 import click
 
@@ -95,23 +93,24 @@ class SampleFileMapParser(GenericMetadataParser):
 
     def __init__(
         self,
-        search_locations: List[str],
+        search_locations: list[str],
         project: str,
         default_sample_type='blood',
         default_sequencing=DefaultSequencing(
             seq_type='genome', technology='short-read', platform='illumina'
         ),
-        default_read_end_type: str = None,
-        default_read_length: str | int = None,
+        default_read_end_type: str | None = None,
+        default_read_length: str | int | None = None,
         allow_extra_files_in_search_path=False,
         default_reference_assembly_location: str | None = None,
         verbose=True,
+        **kwargs,
     ):
         super().__init__(
             search_locations=search_locations,
             project=project,
-            participant_column=PARTICIPANT_COL_NAME,
-            sample_name_column=SAMPLE_ID_COL_NAME,
+            participant_primary_eid_column=PARTICIPANT_COL_NAME,
+            sample_primary_eid_column=SAMPLE_ID_COL_NAME,
             reads_column=READS_COL_NAME,
             checksum_column=CHECKSUM_COL_NAME,
             seq_type_column=SEQ_TYPE_COL_NAME,
@@ -124,22 +123,19 @@ class SampleFileMapParser(GenericMetadataParser):
             default_read_end_type=default_read_end_type,
             default_read_length=default_read_length,
             default_reference_assembly_location=default_reference_assembly_location,
-            participant_meta_map={},
-            sample_meta_map={},
-            assay_meta_map={},
-            qc_meta_map={},
             allow_extra_files_in_search_path=allow_extra_files_in_search_path,
             key_map=KeyMap,
             verbose=verbose,
+            **kwargs,
         )
 
-    def get_sample_id(self, row: SingleRow) -> str:
+    def get_primary_sample_id(self, row: SingleRow) -> str:
         """Get external sample ID from row"""
 
-        if self.sample_name_column and self.sample_name_column in row:
-            return row[self.sample_name_column]
+        if self.sample_primary_eid_column and self.sample_primary_eid_column in row:
+            return row[self.sample_primary_eid_column]
 
-        return self.get_participant_id(row)
+        return self.get_primary_participant_id(row)
 
     @staticmethod
     def get_info() -> tuple[str, str]:
@@ -192,17 +188,17 @@ class SampleFileMapParser(GenericMetadataParser):
 @run_as_sync
 async def main(  # pylint: disable=too-many-arguments
     manifests,
-    search_path: List[str],
+    search_path: list[str],
     project,
     default_sample_type='blood',
     default_sequencing_type='genome',
     default_sequencing_technology='short-read',
     default_sequencing_platform='illumina',
-    default_sequencing_facility: str = None,
-    default_sequencing_library: str = None,
-    default_read_end_type: str = None,
-    default_read_length: str = None,
-    default_reference_assembly: str = None,
+    default_sequencing_facility: str | None = None,
+    default_sequencing_library: str | None = None,
+    default_read_end_type: str | None = None,
+    default_read_length: str | None = None,
+    default_reference_assembly: str | None = None,
     allow_extra_files_in_search_path=False,
     confirm=False,
     dry_run=False,

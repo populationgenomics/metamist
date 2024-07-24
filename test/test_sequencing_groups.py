@@ -1,11 +1,12 @@
 from datetime import datetime
 from test.testbase import DbIsolatedTest, run_as_sync
 
+from db.python.filters import GenericFilter
 from db.python.layers import AnalysisLayer, SampleLayer, SequencingGroupLayer
 from db.python.tables.sequencing_group import SequencingGroupFilter
-from db.python.utils import GenericFilter
 from models.enums.analysis import AnalysisStatus
 from models.models import (
+    PRIMARY_EXTERNAL_ORG,
     AnalysisInternal,
     AssayUpsertInternal,
     SampleUpsertInternal,
@@ -20,7 +21,7 @@ def get_sample_model():
     """
     return SampleUpsertInternal(
         meta={},
-        external_id='EX_ID',
+        external_ids={PRIMARY_EXTERNAL_ORG: 'EX_ID'},
         sequencing_groups=[
             SequencingGroupUpsertInternal(
                 type='genome',
@@ -29,7 +30,7 @@ def get_sample_model():
                 meta={
                     'meta-key': 'meta-value',
                 },
-                external_ids={},
+                external_ids={'ext': 'some-ext-id'},
                 assays=[
                     AssayUpsertInternal(
                         type='sequencing',
@@ -147,7 +148,11 @@ class TestSequencingGroup(DbIsolatedTest):
 
         # check that the "active" sequencing group is the new one
         active_sgs = await self.sglayer.query(
-            SequencingGroupFilter(sample_id=GenericFilter(eq=sample.id))
+            SequencingGroupFilter(
+                sample=SequencingGroupFilter.SequencingGroupSampleFilter(
+                    id=GenericFilter(eq=sample.id)
+                )
+            )
         )
 
         self.assertTrue(all(not sg.archived for sg in active_sgs))
@@ -189,7 +194,9 @@ class TestSequencingGroup(DbIsolatedTest):
         # Query for genome assay metadata
         sgs = await self.sglayer.query(
             SequencingGroupFilter(
-                assay_meta={'sequencing_type': GenericFilter(eq='genome')}
+                assay=SequencingGroupFilter.SequencingGroupAssayFilter(
+                    meta={'sequencing_type': GenericFilter(eq='genome')}
+                )
             )
         )
         self.assertEqual(len(sgs), 1)
@@ -198,7 +205,9 @@ class TestSequencingGroup(DbIsolatedTest):
         # Query for exome assay metadata
         sgs = await self.sglayer.query(
             SequencingGroupFilter(
-                assay_meta={'sequencing_type': GenericFilter(eq='exome')}
+                assay=SequencingGroupFilter.SequencingGroupAssayFilter(
+                    meta={'sequencing_type': GenericFilter(eq='exome')}
+                )
             )
         )
         self.assertEqual(len(sgs), 1)

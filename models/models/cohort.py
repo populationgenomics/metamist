@@ -1,6 +1,4 @@
-import json
-
-from models.base import SMBase
+from models.base import SMBase, parse_sql_dict
 from models.models.project import ProjectId
 from models.utils.cohort_id_format import cohort_id_format
 from models.utils.sequencing_group_id_format import (
@@ -52,6 +50,28 @@ class CohortCriteriaInternal(SMBase):
     sg_type: list[str] | None = None
     sample_type: list[str] | None = None
 
+    def to_external(self, project_names: list[str]) -> 'CohortCriteria':
+        """
+        Convert to external model
+        """
+        return CohortCriteria(
+            projects=project_names,
+            sg_ids_internal=(
+                sequencing_group_id_format_list(self.sg_ids_internal_raw)
+                if self.sg_ids_internal_raw
+                else []
+            ),
+            excluded_sgs_internal=(
+                sequencing_group_id_format_list(self.excluded_sgs_internal_raw)
+                if self.excluded_sgs_internal_raw
+                else []
+            ),
+            sg_technology=self.sg_technology if self.sg_technology else [],
+            sg_platform=self.sg_platform if self.sg_platform else [],
+            sg_type=self.sg_type if self.sg_type else [],
+            sample_type=self.sample_type if self.sample_type else [],
+        )
+
 
 class CohortTemplateInternal(SMBase):
     """Model for CohortTemplate"""
@@ -60,6 +80,7 @@ class CohortTemplateInternal(SMBase):
     name: str
     description: str
     criteria: CohortCriteriaInternal
+    project: ProjectId
 
     @staticmethod
     def from_db(d: dict):
@@ -69,15 +90,15 @@ class CohortTemplateInternal(SMBase):
         _id = d.pop('id', None)
         name = d.pop('name', None)
         description = d.pop('description', None)
-        criteria = d.pop('criteria', None)
-        if criteria and isinstance(criteria, str):
-            criteria = json.loads(criteria)
+        criteria = parse_sql_dict(d.pop('criteria', None)) or {}
+        project = d.pop('project', None)
 
         return CohortTemplateInternal(
             id=_id,
             name=name,
             description=description,
-            criteria=criteria,
+            criteria=CohortCriteriaInternal(**criteria),
+            project=project,
         )
 
 
@@ -136,7 +157,9 @@ class CohortTemplate(SMBase):
     description: str
     criteria: CohortCriteria
 
-    def to_internal(self, criteria_projects: list[ProjectId]) -> CohortTemplateInternal:
+    def to_internal(
+        self, criteria_projects: list[ProjectId], template_project: ProjectId
+    ) -> CohortTemplateInternal:
         """
         Convert to internal model
         """
@@ -145,6 +168,7 @@ class CohortTemplate(SMBase):
             name=self.name,
             description=self.description,
             criteria=self.criteria.to_internal(criteria_projects),
+            project=template_project,
         )
 
 

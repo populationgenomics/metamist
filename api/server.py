@@ -1,6 +1,8 @@
+import datetime
 import os
 import time
 import traceback
+from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,15 +13,19 @@ from starlette.responses import FileResponse
 
 from api import routes
 from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
-from api.settings import PROFILE_REQUESTS, SKIP_DATABASE_CONNECTION
-from api.utils import get_openapi_schema_func
+from api.settings import (
+    PROFILE_REQUESTS,
+    PROFILE_REQUESTS_OUTPUT,
+    SKIP_DATABASE_CONNECTION,
+    SM_ENVIRONMENT,
+)
 from api.utils.exceptions import determine_code_from_error
+from api.utils.openapi import get_openapi_schema_func
 from db.python.connect import SMConnections
-from db.python.tables.project import is_all_access
 from db.python.utils import get_logger
 
 # This tag is automatically updated by bump2version
-_VERSION = '6.10.1'
+_VERSION = '7.3.0'
 
 
 logger = get_logger()
@@ -28,14 +34,65 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'public')
 
 static_dir_exists = os.path.exists(STATIC_DIR)
 
-app = FastAPI()
+
+@asynccontextmanager
+async def app_lifespan(_: FastAPI):
+    """
+    Context manager for the app lifecycle. This is useful for running
+    code before and after the app is started. This is used by the
+    `run` command.
+    """
+    try:
+        if not SKIP_DATABASE_CONNECTION:
+            await SMConnections.connect()
+        yield
+    finally:
+        if not SKIP_DATABASE_CONNECTION:
+            await SMConnections.disconnect()
+
+
+app = FastAPI(lifespan=app_lifespan)
+
 
 if PROFILE_REQUESTS:
-    from fastapi_profiler.profiler import PyInstrumentProfilerMiddleware
+    from pyinstrument import Profiler
+    from pyinstrument.renderers.speedscope import SpeedscopeRenderer
 
-    app.add_middleware(PyInstrumentProfilerMiddleware)
+    @app.middleware('http')
+    async def profile_request(request: Request, call_next):
+        """optional profiling for http requests"""
+        profiler = Profiler(async_mode='enabled')
+        profiler.start()
+        resp = await call_next(request)
+        profiler.stop()
 
-if is_all_access():
+        if 'text' in PROFILE_REQUESTS_OUTPUT:
+            text_output = profiler.output_text()
+            print(text_output)
+
+        timestamp = (
+            datetime.datetime.now().replace(microsecond=0).isoformat().replace(':', '-')
+        )
+
+        if 'json' in PROFILE_REQUESTS_OUTPUT:
+            os.makedirs('profiles', exist_ok=True)
+            json = profiler.output(renderer=SpeedscopeRenderer())
+
+            with open(f'profiles/{timestamp}.json', 'w') as file:
+                file.write(json)
+                file.close()
+
+        if 'html' in PROFILE_REQUESTS_OUTPUT:
+            os.makedirs('profiles', exist_ok=True)
+            html = profiler.output_html()
+            with open(f'profiles/{timestamp}.html', 'w') as file:
+                file.write(html)
+                file.close()
+
+        return resp
+
+
+if SM_ENVIRONMENT == 'local':
     app.add_middleware(
         CORSMiddleware,
         allow_origins=['*'],
@@ -60,20 +117,6 @@ class SPAStaticFiles(StaticFiles):
             # server index.html if can't find existing resource
             response = await super().get_response('index.html', scope)
         return response
-
-
-@app.on_event('startup')
-async def startup():
-    """Server is starting up, connect dbs"""
-    if not SKIP_DATABASE_CONNECTION:
-        await SMConnections.connect()
-
-
-@app.on_event('shutdown')
-async def shutdown():
-    """Shutdown server, disconnect dbs"""
-    if not SKIP_DATABASE_CONNECTION:
-        await SMConnections.disconnect()
 
 
 @app.middleware('http')
@@ -141,11 +184,11 @@ async def exception_handler(request: Request, e: Exception):
         cors_middleware = middlewares[0]
 
         request_origin = request.headers.get('origin', '')
-        if cors_middleware and '*' in cors_middleware.options['allow_origins']:  # type: ignore
+        if cors_middleware and '*' in cors_middleware.kwargs['allow_origins']:  # type: ignore
             response.headers['Access-Control-Allow-Origin'] = '*'
         elif (
             cors_middleware
-            and request_origin in cors_middleware.options['allow_origins']  # type: ignore
+            and request_origin in cors_middleware.kwargs['allow_origins']  # type: ignore
         ):
             response.headers['Access-Control-Allow-Origin'] = request_origin
 
@@ -180,6 +223,5 @@ if __name__ == '__main__':
         'api.server:app',
         host='0.0.0.0',
         port=int(os.getenv('PORT', '8000')),
-        # debug=True,
         reload=True,
     )

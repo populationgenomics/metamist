@@ -1,15 +1,14 @@
+import SearchIcon from '@mui/icons-material/Search'
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Grid, Input, Message, Select, Dropdown } from 'semantic-ui-react'
-import SearchIcon from '@mui/icons-material/Search'
+import { Button, Card, Dropdown, Grid, Input, Message } from 'semantic-ui-react'
 
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
-import { BillingApi, AnalysisCostRecord } from '../../sm-api'
+import { AnalysisCostRecord, BillingApi } from '../../sm-api'
 import BatchGrid from './components/BatchGrid'
 
-import { getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
 import generateUrl from '../../shared/utilities/generateUrl'
-import { List } from 'lodash'
+import { getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
 
 enum SearchType {
     Ar_guid,
@@ -35,7 +34,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         if (!records || records.length === 0) {
             // nothing found
             setIsLoading(false)
-            setData(null)
+            setData(undefined)
             return
         }
         setIsLoading(false)
@@ -50,15 +49,17 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
     }))
 
     const [searchByType, setSearchByType] = React.useState<SearchType>(
-        (searchParams.get('searchType') as SearchType) ?? SearchType[0]
+        (SearchType[
+            parseInt(searchParams.get('searchType') ?? '0', 10)
+        ] as unknown as SearchType) ?? SearchType[0]
     )
 
     // use navigate and update url params
-    const location = useLocation()
+    const loc = useLocation()
     const navigate = useNavigate()
 
     const updateNav = (sType: SearchType, sTxt: string | undefined) => {
-        const url = generateUrl(location, {
+        const url = generateUrl(loc, {
             searchType: SearchType[sType],
             searchTxt: sTxt,
         })

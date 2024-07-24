@@ -2,8 +2,8 @@ import dataclasses
 from collections import defaultdict
 from typing import Any
 
+from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
-from db.python.utils import GenericFilter, GenericFilterModel
 from models.models.family import PedRowInternal
 from models.models.project import ProjectId
 

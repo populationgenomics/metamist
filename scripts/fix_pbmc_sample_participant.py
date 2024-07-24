@@ -3,6 +3,7 @@ PBMC samples should have the same participant as their WGS counterparts.
 This script adjusts the data within the TOB-WGS project to uphold this.
 """
 
+from api.routes.sample import GetSamplesCriteria
 from metamist.apis import SampleApi
 from metamist.models import SampleUpsert
 
@@ -12,18 +13,18 @@ def main():
     sapi = SampleApi()
 
     all_samples = sapi.get_samples(
-        body_get_samples_by_criteria_api_v1_sample_post={
-            'project_ids': ['tob-wgs'],
-            'active': True,
-        }
+        GetSamplesCriteria(
+            project_ids=['tob-wgs'],
+            active=True,
+        )
     )
 
-    sample_map_by_external_id = {s['external_id']: s for s in all_samples}
+    sample_map_by_external_id = {eid: s for s in all_samples for eid in s['external_ids'].values()}
 
-    pbmc_samples = [s for s in all_samples if '-PBMC' in s['external_id']]
+    pbmc_samples = [s for s in all_samples if any('-PBMC' in eid for eid in s['external_ids'].values())]
 
     for sample in pbmc_samples:
-        external_id = sample['external_id']
+        external_id = next(eid for eid in sample['external_ids'].values() if '-PBMC' in eid)
         non_pbmc_id = external_id.strip('-PBMC')
         non_pbmc_sample = sample_map_by_external_id.get(non_pbmc_id)
         pbmc_sample = sample_map_by_external_id.get(external_id)

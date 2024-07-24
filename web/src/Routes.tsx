@@ -1,23 +1,27 @@
 import * as React from 'react'
 
+import { Route, Routes as Switch } from 'react-router-dom'
 import SwaggerUI from 'swagger-ui-react'
-import { Routes as Switch, Route } from 'react-router-dom'
+
+import ProjectsAdmin from './pages/admin/ProjectsAdmin'
 import {
-    BillingHome,
-    BillingSeqrProp,
-    BillingCostByTime,
     BillingCostByAnalysis,
-    BillingInvoiceMonthCost,
     BillingCostByCategory,
     BillingCostByMonth,
+    BillingCostByTime,
+    BillingHome,
+    BillingInvoiceMonthCost,
+    BillingSeqrProp,
 } from './pages/billing'
 import DocumentationArticle from './pages/docs/Documentation'
-import SampleView from './pages/sample/SampleView'
 import FamilyView from './pages/family/FamilyView'
-import ProjectSummaryView from './pages/project/ProjectSummary'
-import ProjectsAdmin from './pages/admin/ProjectsAdmin'
-import ErrorBoundary from './shared/utilities/errorBoundary'
+import Details from './pages/insights/Details'
+import Summary from './pages/insights/Summary'
+import OurDnaDashboard from './pages/ourdna/OurDnaDashboard'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
+import ProjectOverview from './pages/project/ProjectOverview'
+import SampleView from './pages/sample/SampleView'
+import ErrorBoundary from './shared/utilities/errorBoundary'
 
 const Routes: React.FunctionComponent = () => (
     <Switch>
@@ -28,7 +32,7 @@ const Routes: React.FunctionComponent = () => (
             path="/project/:projectName?/:page?"
             element={
                 <ErrorBoundary>
-                    <ProjectSummaryView />
+                    <ProjectOverview />
                 </ErrorBoundary>
             }
         />
@@ -92,6 +96,8 @@ const Routes: React.FunctionComponent = () => (
             }
         />
 
+        <Route path="/ourdna" element={<OurDnaDashboard />} />
+
         <Route path="/swagger" element={<SwaggerUI url="/openapi.json" tryItOutEnabled={true} />} />
 
         <Route path="/documentation/:id?" element={<DocumentationArticle />} />
@@ -110,6 +116,24 @@ const Routes: React.FunctionComponent = () => (
             element={
                 <ErrorBoundary>
                     <FamilyView />
+                </ErrorBoundary>
+            }
+        />
+
+        <Route
+            path="insights/details"
+            element={
+                <ErrorBoundary>
+                    <Details />
+                </ErrorBoundary>
+            }
+        />
+
+        <Route
+            path="insights/summary"
+            element={
+                <ErrorBoundary>
+                    <Summary />
                 </ErrorBoundary>
             }
         />

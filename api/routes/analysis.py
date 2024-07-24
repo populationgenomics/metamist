@@ -11,22 +11,19 @@ from starlette.responses import StreamingResponse
 from api.utils.dates import parse_date_only_string
 from api.utils.db import (
     Connection,
-    get_project_readonly_connection,
-    get_project_write_connection,
+    get_project_db_connection,
     get_projectless_db_connection,
 )
 from api.utils.export import ExportType
+from db.python.filters import GenericFilter
 from db.python.layers.analysis import AnalysisLayer
+from db.python.layers.analysis_runner import AnalysisRunnerLayer
 from db.python.tables.analysis import AnalysisFilter
-from db.python.tables.project import ProjectPermissionsTable
-from db.python.utils import GenericFilter
+from db.python.tables.analysis_runner import AnalysisRunnerFilter
 from models.enums import AnalysisStatus
-from models.models.analysis import (
-    Analysis,
-    AnalysisInternal,
-    ProportionalDateTemporalMethod,
-)
-from models.utils.sample_id_format import sample_id_transform_to_raw_list
+from models.models.analysis import Analysis, ProportionalDateTemporalMethod
+from models.models.analysis_runner import AnalysisRunner
+from models.models.project import FullWriteAccessRoles, ReadAccessRoles
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
     sequencing_group_id_format_list,
@@ -65,10 +62,7 @@ class AnalysisQueryModel(BaseModel):
     """Used to query for many analysis"""
 
     # sequencing_group_ids means it the analysis contains at least one of in the list
-    sample_ids: list[str] | None = None
     sequencing_group_ids: list[str] | None
-    # # sample_ids_all means the analysis contains ALL of the sample_ids
-    # sample_ids_all: list[str] = None
     projects: list[str]
     type: str | None = None
     status: AnalysisStatus | None = None
@@ -79,11 +73,6 @@ class AnalysisQueryModel(BaseModel):
     def to_filter(self, project_id_map: dict[str, int]) -> AnalysisFilter:
         """Convert to internal analysis filter"""
         return AnalysisFilter(
-            sample_id=(
-                GenericFilter(in_=sample_id_transform_to_raw_list(self.sample_ids))
-                if self.sample_ids
-                else None
-            ),
             sequencing_group_id=(
                 GenericFilter(
                     in_=sequencing_group_id_transform_to_raw_list(
@@ -104,7 +93,8 @@ class AnalysisQueryModel(BaseModel):
 
 @router.put('/{project}/', operation_id='createAnalysis', response_model=int)
 async def create_analysis(
-    analysis: Analysis, connection: Connection = get_project_write_connection
+    analysis: Analysis,
+    connection: Connection = get_project_db_connection(FullWriteAccessRoles),
 ) -> int:
     """Create a new analysis"""
 
@@ -144,14 +134,14 @@ async def update_analysis(
 )
 async def get_all_sample_ids_without_analysis_type(
     analysis_type: str,
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """get_all_sample_ids_without_analysis_type"""
     atable = AnalysisLayer(connection)
-    assert connection.project
+    assert connection.project_id
     sequencing_group_ids = (
         await atable.get_all_sequencing_group_ids_without_analysis_type(
-            connection.project, analysis_type
+            connection.project_id, analysis_type
         )
     )
     return {
@@ -164,12 +154,12 @@ async def get_all_sample_ids_without_analysis_type(
     operation_id='getIncompleteAnalyses',
 )
 async def get_incomplete_analyses(
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """Get analyses with status queued or in-progress"""
     atable = AnalysisLayer(connection)
-    assert connection.project
-    results = await atable.get_incomplete_analyses(project=connection.project)
+    assert connection.project_id
+    results = await atable.get_incomplete_analyses(project=connection.project_id)
     return [r.to_external() for r in results]
 
 
@@ -179,13 +169,13 @@ async def get_incomplete_analyses(
 )
 async def get_latest_complete_analysis_for_type(
     analysis_type: str,
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """Get (SINGLE) latest complete analysis for some analysis type"""
     alayer = AnalysisLayer(connection)
-    assert connection.project
+    assert connection.project_id
     analysis = await alayer.get_latest_complete_analysis_for_type(
-        project=connection.project, analysis_type=analysis_type
+        project=connection.project_id, analysis_type=analysis_type
     )
     return analysis.to_external()
 
@@ -197,16 +187,16 @@ async def get_latest_complete_analysis_for_type(
 async def get_latest_complete_analysis_for_type_post(
     analysis_type: str,
     meta: dict[str, Any] = Body(..., embed=True),  # type: ignore[assignment]
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """
     Get SINGLE latest complete analysis for some analysis type
     (you can specify meta attributes in this route)
     """
     alayer = AnalysisLayer(connection)
-    assert connection.project
+    assert connection.project_id
     analysis = await alayer.get_latest_complete_analysis_for_type(
-        project=connection.project,
+        project=connection.project_id,
         analysis_type=analysis_type,
         meta=meta,
     )
@@ -237,9 +227,8 @@ async def query_analyses(
     if not query.projects:
         raise ValueError('Must specify "projects"')
 
-    pt = ProjectPermissionsTable(connection)
-    projects = await pt.get_and_check_access_to_projects_for_names(
-        user=connection.author, project_names=query.projects, readonly=True
+    projects = connection.get_and_check_access_to_projects_for_names(
+        query.projects, ReadAccessRoles
     )
     project_name_map = {p.name: p.id for p in projects}
     atable = AnalysisLayer(connection)
@@ -251,28 +240,29 @@ async def query_analyses(
 async def get_analysis_runner_log(
     project_names: list[str] = Query(None),  # type: ignore
     # author: str = None, # not implemented yet, uncomment when we do
-    output_dir: str = None,
-    ar_guid: str = None,
+    ar_guid: str | None = None,
     connection: Connection = get_projectless_db_connection,
-) -> list[AnalysisInternal]:
+) -> list[AnalysisRunner]:
     """
     Get log for the analysis-runner, useful for checking this history of analysis
     """
-    atable = AnalysisLayer(connection)
-    project_ids = None
-    if project_names:
-        pt = ProjectPermissionsTable(connection)
-        project_ids = await pt.get_project_ids_from_names_and_user(
-            connection.author, project_names, readonly=True
-        )
+    if not project_names:
+        raise ValueError('Must specify "project_names"')
 
-    results = await atable.get_analysis_runner_log(
-        project_ids=project_ids,
-        # author=author,
-        output_dir=output_dir,
-        ar_guid=ar_guid,
+    arlayer = AnalysisRunnerLayer(connection)
+    projects = connection.get_and_check_access_to_projects_for_names(
+        project_names, allowed_roles=ReadAccessRoles
     )
-    return [a.to_external() for a in results]
+    project_ids = [p.id for p in projects if p.id]
+    project_map = {p.id: p.name for p in projects if p.id and p.name}
+
+    results = await arlayer.query(
+        AnalysisRunnerFilter(
+            project=GenericFilter(in_=project_ids) if project_ids else None,
+            ar_guid=GenericFilter(eq=ar_guid) if ar_guid else None,
+        )
+    )
+    return [a.to_external(project_map=project_map) for a in results]
 
 
 @router.get(
@@ -283,7 +273,7 @@ async def get_analysis_runner_log(
 async def get_sample_reads_map(
     export_type: ExportType = ExportType.JSON,
     sequencing_types: list[str] = Query(None),  # type: ignore
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """
     Get map of ExternalSampleId  pathToCram  InternalSeqGroupID for seqr
@@ -298,9 +288,9 @@ async def get_sample_reads_map(
     """
 
     at = AnalysisLayer(connection)
-    assert connection.project
+    assert connection.project_id
     objs = await at.get_sample_cram_path_map_for_seqr(
-        project=connection.project, sequencing_types=sequencing_types
+        project=connection.project_id, sequencing_types=sequencing_types
     )
 
     for r in objs:
@@ -316,7 +306,7 @@ async def get_sample_reads_map(
     writer = csv.writer(output, delimiter=export_type.get_delimiter())
     writer.writerows(rows)
 
-    basefn = f'{connection.project}-seqr-igv-paths-{date.today().isoformat()}'
+    basefn = f'{connection.project_id}-seqr-igv-paths-{date.today().isoformat()}'
 
     return StreamingResponse(
         iter([output.getvalue()]),
@@ -350,10 +340,10 @@ async def get_proportionate_map(
         }
     }
     """
-    pt = ProjectPermissionsTable(connection)
-    project_ids = await pt.get_project_ids_from_names_and_user(
-        connection.author, projects, readonly=True
+    project_list = connection.get_and_check_access_to_projects_for_names(
+        projects, allowed_roles=ReadAccessRoles
     )
+    project_ids = [p.id for p in project_list]
 
     start_date = parse_date_only_string(start) if start else None
     end_date = parse_date_only_string(end) if end else None

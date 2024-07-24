@@ -1,6 +1,7 @@
 import json
 import logging
 from os import getenv
+from typing import Any
 
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -11,7 +12,7 @@ from api.settings import get_default_user
 from api.utils.gcp import email_from_id_token
 from db.python.connect import Connection, SMConnections
 from db.python.gcp_connect import BqConnection, PubSubConnection
-from db.python.tables.project import ProjectPermissionsTable
+from models.models.project import ProjectMemberRole
 
 EXPECTED_AUDIENCE = getenv('SM_OAUTHAUDIENCE')
 
@@ -30,7 +31,7 @@ def get_ar_guid(request: Request) -> str | None:
     return request.headers.get('sm-ar-guid')
 
 
-def get_extra_audit_log_values(request: Request) -> dict | None:
+def get_extra_audit_log_values(request: Request) -> dict[str, Any] | None:
     """Get a JSON encoded dictionary from the 'sm-extra-values' header if it exists"""
     headers = request.headers.get('sm-extra-values')
     if not headers:
@@ -78,57 +79,43 @@ def authenticate(
     raise HTTPException(status_code=401, detail='Not authenticated :(')
 
 
-async def dependable_get_write_project_connection(
-    project: str,
-    request: Request,
-    author: str = Depends(authenticate),
-    ar_guid: str = Depends(get_ar_guid),
-    extra_values: dict | None = Depends(get_extra_audit_log_values),
-    on_behalf_of: str | None = Depends(get_on_behalf_of),
-) -> Connection:
-    """FastAPI handler for getting connection WITH project"""
-    meta = {'path': request.url.path}
-    if request.client:
-        meta['ip'] = request.client.host
-    if extra_values:
-        meta.update(extra_values)
+def dependable_get_project_db_connection(allowed_roles: set[ProjectMemberRole]):
+    """Return a partially applied dependable db connection with allowed roles applied"""
 
-    return await ProjectPermissionsTable.get_project_connection(
-        project_name=project,
-        author=author,
-        readonly=False,
-        ar_guid=ar_guid,
-        on_behalf_of=on_behalf_of,
-        meta=meta,
-    )
+    async def dependable_project_db_connection(
+        project: str,
+        request: Request,
+        author: str = Depends(authenticate),
+        ar_guid: str = Depends(get_ar_guid),
+        extra_values: dict[str, Any] | None = Depends(get_extra_audit_log_values),
+        on_behalf_of: str | None = Depends(get_on_behalf_of),
+    ) -> Connection:
+        """FastAPI handler for getting connection WITH project"""
+        meta = {'path': request.url.path}
+        if request.client:
+            meta['ip'] = request.client.host
 
+        if extra_values:
+            meta.update(extra_values)
 
-async def dependable_get_readonly_project_connection(
-    project: str,
-    author: str = Depends(authenticate),
-    ar_guid: str = Depends(get_ar_guid),
-    extra_values: dict | None = Depends(get_extra_audit_log_values),
-) -> Connection:
-    """FastAPI handler for getting connection WITH project"""
-    meta = {}
-    if extra_values:
-        meta.update(extra_values)
+        return await SMConnections.get_connection_with_project(
+            project_name=project,
+            author=author,
+            allowed_roles=allowed_roles,
+            on_behalf_of=on_behalf_of,
+            ar_guid=ar_guid,
+            meta=meta,
+        )
 
-    return await ProjectPermissionsTable.get_project_connection(
-        project_name=project,
-        author=author,
-        readonly=True,
-        on_behalf_of=None,
-        ar_guid=ar_guid,
-        meta=meta,
-    )
+    return dependable_project_db_connection
 
 
 async def dependable_get_connection(
     request: Request,
     author: str = Depends(authenticate),
     ar_guid: str = Depends(get_ar_guid),
-    extra_values: dict | None = Depends(get_extra_audit_log_values),
+    extra_values: dict[str, Any] | None = Depends(get_extra_audit_log_values),
+    on_behalf_of: str | None = Depends(get_on_behalf_of),
 ):
     """FastAPI handler for getting connection withOUT project"""
     meta = {'path': request.url.path}
@@ -139,7 +126,7 @@ async def dependable_get_connection(
         meta.update(extra_values)
 
     return await SMConnections.get_connection_no_project(
-        author, ar_guid=ar_guid, meta=meta
+        author, ar_guid=ar_guid, meta=meta, on_behalf_of=on_behalf_of
     )
 
 
@@ -155,7 +142,7 @@ async def dependable_get_pubsub_connection(
     return await PubSubConnection.get_connection_no_project(author, topic)
 
 
-def validate_iap_jwt_and_get_email(iap_jwt, audience):
+def validate_iap_jwt_and_get_email(iap_jwt: str, audience: str):
     """
     Validate an IAP JWT and return email
     Source: https://cloud.google.com/iap/docs/signed-headers-howto
@@ -178,8 +165,13 @@ def validate_iap_jwt_and_get_email(iap_jwt, audience):
 
 
 get_author = Depends(authenticate)
-get_project_readonly_connection = Depends(dependable_get_readonly_project_connection)
-get_project_write_connection = Depends(dependable_get_write_project_connection)
+
+
+def get_project_db_connection(allowed_roles: set[ProjectMemberRole]):
+    """Get a project db connection with allowed roles applied"""
+    return Depends(dependable_get_project_db_connection(allowed_roles))
+
+
 get_projectless_db_connection = Depends(dependable_get_connection)
 get_projectless_bq_connection = Depends(dependable_get_bq_connection)
 get_projectless_pubsub_connection = Depends(dependable_get_pubsub_connection)

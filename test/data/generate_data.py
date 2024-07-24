@@ -3,10 +3,12 @@
 import argparse
 import asyncio
 import datetime
+import os
 import random
-import uuid
+import sys
 from pathlib import Path
 from pprint import pprint
+from uuid import uuid4
 
 from metamist.apis import (
     AnalysisApi,
@@ -21,6 +23,8 @@ from metamist.model.analysis import Analysis
 from metamist.model.analysis_status import AnalysisStatus
 from metamist.models import AssayUpsert, SampleUpsert, SequencingGroupUpsert
 from metamist.parser.generic_parser import chunk
+
+PRIMARY_EXTERNAL_ORG = ''
 
 EMOJIS = [':)', ':(', ':/', ':\'(']
 
@@ -76,6 +80,19 @@ async def main(
         await papi.create_project_async(
             name=project, dataset=project, create_test_project=False
         )
+        default_user = os.getenv('SM_LOCALONLY_DEFAULTUSER')
+        if not default_user:
+            print(
+                'SM_LOCALONLY_DEFAULTUSER env var is not set, please set it before generating data'
+            )
+            sys.exit(1)
+
+        await papi.update_project_members_async(
+            project=project,
+            project_member_update=[
+                {'member': default_user, 'roles': ['reader', 'writer']}
+            ],
+        )
 
     with open(ped_path, encoding='utf-8') as f:
         # skip the first line
@@ -108,7 +125,7 @@ async def main(
         )[0]
 
     samples = []
-    sample_id_index = 1003
+    sample_id_index = 10000
 
     for participant_eid in participant_eids:
         pid = id_map[participant_eid]
@@ -116,7 +133,9 @@ async def main(
         nsamples = generate_random_number_within_distribution()
         for _ in range(nsamples):
             sample = SampleUpsert(
-                external_id=f'{sample_prefix}{sample_id_index}',
+                external_ids={
+                    PRIMARY_EXTERNAL_ORG: f'{sample_prefix}{sample_id_index}'
+                },
                 type=random.choice(sample_types),
                 meta={
                     'collection_date': datetime.datetime.now()
@@ -126,6 +145,7 @@ async def main(
                     ),
                 },
                 participant_id=pid,
+                non_sequencing_assays=[],
                 sequencing_groups=[],
             )
             samples.append(sample)
@@ -197,7 +217,7 @@ async def main(
             *[
                 ar_api.create_analysis_runner_log_async(
                     project=project,
-                    ar_guid=f'fake-guid-{uuid.uuid4()}',
+                    ar_guid=str(uuid4()),
                     output_path=f'FAKE://greek-myth-test/output-dir/{s}',
                     access_level=random.choice(['full', 'standard', 'test']),
                     repository='metamist',

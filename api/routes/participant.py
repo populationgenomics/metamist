@@ -6,15 +6,16 @@ from fastapi import APIRouter
 from fastapi.params import Query
 from starlette.responses import JSONResponse, StreamingResponse
 
-from api.utils import get_projectless_db_connection
 from api.utils.db import (
     Connection,
-    get_project_readonly_connection,
-    get_project_write_connection,
+    get_project_db_connection,
+    get_projectless_db_connection,
 )
 from api.utils.export import ExportType
 from db.python.layers.participant import ParticipantLayer
+from models.base import SMBase
 from models.models.participant import ParticipantUpsert
+from models.models.project import FullWriteAccessRoles, ReadAccessRoles
 from models.models.sequencing_group import sequencing_group_id_format
 
 router = APIRouter(prefix='/participant', tags=['participant'])
@@ -24,7 +25,7 @@ router = APIRouter(prefix='/participant', tags=['participant'])
     '/{project}/fill-in-missing-participants', operation_id='fillInMissingParticipants'
 )
 async def fill_in_missing_participants(
-    connection: Connection = get_project_write_connection,
+    connection: Connection = get_project_db_connection(FullWriteAccessRoles),
 ):
     """
     Create a corresponding participant (if required)
@@ -46,13 +47,13 @@ async def get_individual_metadata_template_for_seqr(
     external_participant_ids: list[str] | None = Query(default=None),  # type: ignore[assignment]
     # pylint: disable=invalid-name
     replace_with_participant_external_ids: bool = True,
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """Get individual metadata template for SEQR as a CSV"""
     participant_layer = ParticipantLayer(connection)
-    assert connection.project
+    assert connection.project_id
     resp = await participant_layer.get_seqr_individual_template(
-        project=connection.project,
+        project=connection.project_id,
         external_participant_ids=external_participant_ids,
         replace_with_participant_external_ids=replace_with_participant_external_ids,
     )
@@ -89,14 +90,14 @@ async def get_individual_metadata_template_for_seqr(
 async def get_id_map_by_external_ids(
     external_participant_ids: list[str],
     allow_missing: bool = False,
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """Get ID map of participants, by external_id"""
     player = ParticipantLayer(connection)
     return await player.get_id_map_by_external_ids(
         external_participant_ids,
         allow_missing=allow_missing,
-        project=connection.project,
+        project=connection.project_id,
     )
 
 
@@ -120,7 +121,7 @@ async def get_external_participant_id_to_sequencing_group_id(
     sequencing_type: str = None,
     export_type: ExportType = ExportType.JSON,
     flip_columns: bool = False,
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """
     Get csv / tsv export of external_participant_id to sequencing_group_id
@@ -135,10 +136,10 @@ async def get_external_participant_id_to_sequencing_group_id(
     :param flip_columns: Set to True when exporting for seqr
     """
     player = ParticipantLayer(connection)
-    # this wants project ID (connection.project)
-    assert connection.project
+    # this wants project ID (connection.project_id)
+    assert connection.project_id
     m = await player.get_external_participant_id_to_internal_sequencing_group_id_map(
-        project=connection.project, sequencing_type=sequencing_type
+        project=connection.project_id, sequencing_type=sequencing_type
     )
 
     rows = [[pid, sequencing_group_id_format(sgid)] for pid, sgid in m]
@@ -153,7 +154,9 @@ async def get_external_participant_id_to_sequencing_group_id(
     writer.writerows(rows)
 
     ext = export_type.get_extension()
-    filename = f'{project}-participant-to-sequencing-group-map-{date.today().isoformat()}{ext}'
+    filename = (
+        f'{project}-participant-to-sequencing-group-map-{date.today().isoformat()}{ext}'
+    )
     if sequencing_type:
         filename = f'{project}-{sequencing_type}-participant-to-sequencing-group-map-{date.today().isoformat()}{ext}'
     return StreamingResponse(
@@ -186,7 +189,7 @@ async def update_participant(
 )
 async def upsert_participants(
     participants: list[ParticipantUpsert],
-    connection: Connection = get_project_write_connection,
+    connection: Connection = get_project_db_connection(FullWriteAccessRoles),
 ):
     """
     Upserts a list of participants with samples and sequences
@@ -197,22 +200,33 @@ async def upsert_participants(
     return [p.to_external() for p in results]
 
 
+class QueryParticipantCriteria(SMBase):
+    """Query criteria for participants"""
+
+    external_participant_ids: list[str] | None = None
+    internal_participant_ids: list[int] | None = None
+
+
 @router.post(
     '/{project}',
     # response_model=list[ParticipantModel],
     operation_id='getParticipants',
 )
 async def get_participants(
-    external_participant_ids: list[str] = None,
-    internal_participant_ids: list[int] = None,
-    connection: Connection = get_project_readonly_connection,
+    criteria: QueryParticipantCriteria,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """Get participants, default ALL participants in project"""
     player = ParticipantLayer(connection)
+    assert connection.project_id
     participants = await player.get_participants(
-        project=connection.project,
-        external_participant_ids=external_participant_ids,
-        internal_participant_ids=internal_participant_ids,
+        project=connection.project_id,
+        external_participant_ids=(
+            criteria.external_participant_ids if criteria else None
+        ),
+        internal_participant_ids=(
+            criteria.internal_participant_ids if criteria else None
+        ),
     )
     return [p.to_external() for p in participants]
 

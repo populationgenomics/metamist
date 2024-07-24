@@ -2,13 +2,9 @@ import dataclasses
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set
 
+from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
-from db.python.utils import (
-    GenericFilter,
-    GenericFilterModel,
-    NotFoundError,
-    escape_like_term,
-)
+from db.python.utils import NotFoundError, escape_like_term
 from models.models.family import FamilyInternal
 from models.models.project import ProjectId
 
@@ -65,8 +61,10 @@ class FamilyTable(DbBase):
         if not filter_.project and not filter_.id:
             raise ValueError('Project or ID filter is required for family queries')
 
+        has_participant_join = False
         field_overrides = {'id': 'f.id', 'external_id': 'f.external_id'}
 
+        has_participant_join = False
         if filter_.participant_id:
             field_overrides['participant_id'] = 'fp.participant_id'
             has_participant_join = True
@@ -206,7 +204,7 @@ WHERE id = :id
             'description': description,
             'coded_phenotype': coded_phenotype,
             'audit_log_id': await self.audit_log_id(),
-            'project': project or self.project,
+            'project': project or self.project_id,
         }
         keys = list(updater.keys())
         str_keys = ', '.join(keys)
@@ -235,7 +233,7 @@ RETURNING id
                 'description': descr,
                 'coded_phenotype': cph,
                 'audit_log_id': await self.audit_log_id(),
-                'project': project or self.project,
+                'project': project or self.project_id,
             }
             for eid, descr, cph in zip(external_ids, descriptions, coded_phenotypes)
         ]
@@ -269,7 +267,7 @@ ON DUPLICATE KEY UPDATE
 
         _query = 'SELECT external_id, id FROM family WHERE external_id in :external_ids AND project = :project'
         results = await self.connection.fetch_all(
-            _query, {'external_ids': family_ids, 'project': project or self.project}
+            _query, {'external_ids': family_ids, 'project': project or self.project_id}
         )
         id_map = {r['external_id']: r['id'] for r in results}
 

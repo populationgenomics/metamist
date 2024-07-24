@@ -2,15 +2,12 @@ import datetime
 
 from fastapi import APIRouter
 
-from api.utils.db import (
-    Connection,
-    get_project_readonly_connection,
-    get_project_write_connection,
-)
+from api.utils.db import Connection, get_project_db_connection
+from db.python.filters import GenericFilter
 from db.python.layers.analysis_runner import AnalysisRunnerLayer
 from db.python.tables.analysis_runner import AnalysisRunnerFilter
-from db.python.utils import GenericFilter
 from models.models.analysis_runner import AnalysisRunner, AnalysisRunnerInternal
+from models.models.project import FullWriteAccessRoles, ReadAccessRoles
 
 router = APIRouter(prefix='/analysis-runner', tags=['analysis-runner'])
 
@@ -32,13 +29,13 @@ async def create_analysis_runner_log(  # pylint: disable=too-many-arguments
     output_path: str,
     hail_version: str | None = None,
     cwd: str | None = None,
-    connection: Connection = get_project_write_connection,
+    connection: Connection = get_project_db_connection(FullWriteAccessRoles),
 ) -> str:
     """Create a new analysis runner log"""
 
     alayer = AnalysisRunnerLayer(connection)
 
-    if not connection.project:
+    if not connection.project_id:
         raise ValueError('Project not set')
 
     analysis_id = await alayer.insert_analysis_runner_entry(
@@ -58,7 +55,7 @@ async def create_analysis_runner_log(  # pylint: disable=too-many-arguments
             batch_url=batch_url,
             submitting_user=submitting_user,
             meta=meta,
-            project=connection.project,
+            project=connection.project_id,
             audit_log_id=None,
             output_path=output_path,
         )
@@ -75,13 +72,13 @@ async def get_analysis_runner_logs(
     repository: str | None = None,
     access_level: str | None = None,
     environment: str | None = None,
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
 ) -> list[AnalysisRunner]:
     """Get analysis runner logs"""
 
     atable = AnalysisRunnerLayer(connection)
 
-    if not connection.project:
+    if not connection.project_id:
         raise ValueError('Project not set')
 
     filter_ = AnalysisRunnerFilter(
@@ -90,9 +87,9 @@ async def get_analysis_runner_logs(
         repository=GenericFilter(eq=repository),
         access_level=GenericFilter(eq=access_level),
         environment=GenericFilter(eq=environment),
-        project=GenericFilter(eq=connection.project),
+        project=GenericFilter(eq=connection.project_id),
     )
 
     logs = await atable.query(filter_)
 
-    return [log.to_external({connection.project: project}) for log in logs]
+    return [log.to_external({connection.project_id: project}) for log in logs]

@@ -1,10 +1,9 @@
 from fastapi import APIRouter
 
-from api.utils.db import Connection, get_project_readonly_connection
+from api.utils.db import Connection, get_project_db_connection
 from db.python.layers.cohort import CohortLayer
-from db.python.tables.project import ProjectPermissionsTable
 from models.models.cohort import CohortBody, CohortCriteria, CohortTemplate, NewCohort
-from models.models.project import ProjectId
+from models.models.project import ProjectId, ProjectMemberRole, ReadAccessRoles
 from models.utils.cohort_template_id_format import (
     cohort_template_id_format,
     cohort_template_id_transform_to_raw,
@@ -17,7 +16,9 @@ router = APIRouter(prefix='/cohort', tags=['cohort'])
 async def create_cohort_from_criteria(
     cohort_spec: CohortBody,
     cohort_criteria: CohortCriteria | None = None,
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_db_connection(
+        {ProjectMemberRole.writer, ProjectMemberRole.contributor}
+    ),
     dry_run: bool = False,
 ) -> NewCohort:
     """
@@ -35,24 +36,21 @@ async def create_cohort_from_criteria(
 
     internal_project_ids: list[ProjectId] = []
 
-    if cohort_criteria:
-        if cohort_criteria.projects:
-            pt = ProjectPermissionsTable(connection)
-            projects = await pt.get_and_check_access_to_projects_for_names(
-                user=connection.author,
-                project_names=cohort_criteria.projects,
-                readonly=True,
-            )
-            if projects:
-                internal_project_ids = [p.id for p in projects if p.id]
+    if cohort_criteria and cohort_criteria.projects:
+        projects = connection.get_and_check_access_to_projects_for_names(
+            project_names=cohort_criteria.projects, allowed_roles=ReadAccessRoles
+        )
+
+        internal_project_ids = [p.id for p in projects if p.id]
 
     template_id_raw = (
         cohort_template_id_transform_to_raw(cohort_spec.template_id)
         if cohort_spec.template_id
         else None
     )
+    assert connection.project_id
     cohort_output = await cohort_layer.create_cohort_from_criteria(
-        project_to_write=connection.project,
+        project_to_write=connection.project_id,
         description=cohort_spec.description,
         cohort_name=cohort_spec.name,
         dry_run=dry_run,
@@ -70,7 +68,9 @@ async def create_cohort_from_criteria(
 @router.post('/{project}/cohort_template', operation_id='createCohortTemplate')
 async def create_cohort_template(
     template: CohortTemplate,
-    connection: Connection = get_project_readonly_connection,
+    connection: Connection = get_project_db_connection(
+        {ProjectMemberRole.writer, ProjectMemberRole.contributor}
+    ),
 ) -> str:
     """
     Create a cohort template with the given name and sample/sequencing group IDs.
@@ -83,18 +83,19 @@ async def create_cohort_template(
     criteria_project_ids: list[ProjectId] = []
 
     if template.criteria.projects:
-        pt = ProjectPermissionsTable(connection)
-        projects_for_criteria = await pt.get_and_check_access_to_projects_for_names(
-            user=connection.author,
+        projects_for_criteria = connection.get_and_check_access_to_projects_for_names(
             project_names=template.criteria.projects,
-            readonly=False,
+            allowed_roles=ReadAccessRoles,
         )
-        if projects_for_criteria:
-            criteria_project_ids = [p.id for p in projects_for_criteria if p.id]
+        criteria_project_ids = [p.id for p in projects_for_criteria if p.id]
 
+    assert connection.project_id
     cohort_raw_id = await cohort_layer.create_cohort_template(
-        cohort_template=template.to_internal(criteria_projects=criteria_project_ids),
-        project=connection.project,
+        cohort_template=template.to_internal(
+            criteria_projects=criteria_project_ids,
+            template_project=connection.project_id,
+        ),
+        project=connection.project_id,
     )
 
     return cohort_template_id_format(cohort_raw_id)

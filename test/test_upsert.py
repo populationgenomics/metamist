@@ -1,10 +1,13 @@
 from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.layers.participant import ParticipantLayer
-from models.models.assay import AssayUpsertInternal
-from models.models.participant import ParticipantUpsertInternal
-from models.models.sample import SampleUpsertInternal
-from models.models.sequencing_group import SequencingGroupUpsertInternal
+from models.models import (
+    PRIMARY_EXTERNAL_ORG,
+    AssayUpsertInternal,
+    ParticipantUpsertInternal,
+    SampleUpsertInternal,
+    SequencingGroupUpsertInternal,
+)
 
 default_assay_meta = {
     'sequencing_type': 'genome',
@@ -14,11 +17,11 @@ default_assay_meta = {
 
 all_participants = [
     ParticipantUpsertInternal(
-        external_id='Demeter',
+        external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'},
         meta={},
         samples=[
             SampleUpsertInternal(
-                external_id='sample_id001',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'sample_id001'},
                 meta={},
                 sequencing_groups=[
                     SequencingGroupUpsertInternal(
@@ -89,11 +92,11 @@ all_participants = [
         ],
     ),
     ParticipantUpsertInternal(
-        external_id='Apollo',
+        external_ids={PRIMARY_EXTERNAL_ORG: 'Apollo'},
         meta={},
         samples=[
             SampleUpsertInternal(
-                external_id='sample_id002',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'sample_id002'},
                 meta={},
                 sequencing_groups=[
                     SequencingGroupUpsertInternal(
@@ -131,7 +134,7 @@ all_participants = [
                 type='blood',
             ),
             SampleUpsertInternal(
-                external_id='sample_id004',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'sample_id004'},
                 meta={},
                 sequencing_groups=[
                     SequencingGroupUpsertInternal(
@@ -171,11 +174,11 @@ all_participants = [
         ],
     ),
     ParticipantUpsertInternal(
-        external_id='Athena',
+        external_ids={PRIMARY_EXTERNAL_ORG: 'Athena'},
         meta={},
         samples=[
             SampleUpsertInternal(
-                external_id='sample_id003',
+                external_ids={PRIMARY_EXTERNAL_ORG: 'sample_id003'},
                 meta={},
                 sequencing_groups=[
                     SequencingGroupUpsertInternal(
@@ -237,22 +240,33 @@ class TestUpsert(DbIsolatedTest):
         await pt.upsert_participants(all_participants, open_transaction=False)
 
         expected_sample_eid_to_participant_eid = {
-            sample.external_id: participant.external_id
+            sample_eid: participant_eid
             for participant in all_participants
+            for participant_eid in participant.external_ids.values()
             for sample in participant.samples
+            for sample_eid in sample.external_ids.values()
         }
 
         db_participants = await self.connection.connection.fetch_all(
-            'SELECT * FROM participant'
+            'SELECT * FROM participant_external_id ORDER BY participant_id'
         )
         self.assertEqual(3, len(db_participants))
         self.assertEqual('Demeter', db_participants[0]['external_id'])
         self.assertEqual('Apollo', db_participants[1]['external_id'])
         self.assertEqual('Athena', db_participants[2]['external_id'])
 
-        participant_id_map = {p['external_id']: p['id'] for p in db_participants}
+        participant_id_map = {p['external_id']: p['participant_id'] for p in db_participants}
 
-        db_samples = await self.connection.connection.fetch_all('SELECT * FROM sample')
+        db_samples = await self.connection.connection.fetch_all(
+            """
+            SELECT s.participant_id, seid.external_id
+            FROM sample s
+            INNER JOIN sample_external_id seid ON s.id = seid.sample_id
+            WHERE seid.name = :PRIMARY_EXTERNAL_ORG
+            ORDER BY s.id
+            """,
+            {'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG},
+        )
         self.assertEqual(4, len(db_samples))
         for db_sample in db_samples:
             self.assertIsNotNone(db_sample['external_id'])

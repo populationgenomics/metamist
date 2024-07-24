@@ -1,8 +1,9 @@
 import dataclasses
 import datetime
 
+from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
-from db.python.utils import GenericFilter, GenericFilterModel, to_db_json
+from db.python.utils import to_db_json
 from models.models.analysis_runner import AnalysisRunnerInternal
 from models.models.project import ProjectId
 
@@ -83,7 +84,7 @@ VALUES (
             'meta': to_db_json(analysis_runner.meta),
             'output_path': analysis_runner.output_path,
             'audit_log_id': await self.audit_log_id(),
-            'project': self.project,
+            'project': self.project_id,
         }
 
         await self.connection.execute(_query, values)

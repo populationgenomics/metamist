@@ -1,0 +1,20 @@
+-r requirements.in
+black>=22.3.0
+bump2version
+click==8.0.4
+coverage
+flake8
+flake8-bugbear
+nest-asyncio
+pre-commit
+pylint
+testcontainers[mysql]>=4.5.0
+types-PyMySQL
+# some strawberry dependency
+strawberry-graphql[debug-server]
+# following required to unit test etl functions
+functions_framework
+google-cloud-bigquery
+google-cloud-pubsub
+# following required to unit test some billing functions
+pytz

@@ -4,7 +4,6 @@ from typing import List, Optional
 from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.family import FamilyTable
 from db.python.tables.participant import ParticipantTable
-from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import SequencingGroupTable
 from db.python.utils import NotFoundError
@@ -28,7 +27,6 @@ class SearchLayer(BaseLayer):
 
     def __init__(self, connection: Connection):
         super().__init__(connection)
-        self.pt = ProjectPermissionsTable(connection)
         self.connection = connection
 
     @staticmethod
@@ -66,7 +64,7 @@ class SearchLayer(BaseLayer):
         except NotFoundError:
             return None
 
-        sample_eids = [sample.external_id]
+        sample_eids = list(sample.external_ids.values())
         participant_id = int(sample.participant_id) if sample.participant_id else None
         participant_eids: list[str] = []
         family_eids: list[str] = []
@@ -190,12 +188,12 @@ class SearchLayer(BaseLayer):
                 data=SampleSearchResponseData(
                     project=project,
                     id=sample_id_format(s_id),
-                    family_external_ids=participant_family_eids.get(p_id) or []
-                    if p_id
-                    else [],
-                    participant_external_ids=sample_participant_eids.get(p_id) or []
-                    if p_id
-                    else [],
+                    family_external_ids=(
+                        participant_family_eids.get(p_id) or [] if p_id else []
+                    ),
+                    participant_external_ids=(
+                        sample_participant_eids.get(p_id) or [] if p_id else []
+                    ),
                     sample_external_ids=[s_eid],
                 ),
             )

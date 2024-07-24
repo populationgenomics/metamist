@@ -4,7 +4,11 @@ from unittest.mock import patch
 
 from db.python.layers import ParticipantLayer
 from metamist.parser.generic_parser import ParsedParticipant
-from models.models import ParticipantUpsertInternal, SampleUpsertInternal
+from models.models import (
+    PRIMARY_EXTERNAL_ORG,
+    ParticipantUpsertInternal,
+    SampleUpsertInternal,
+)
 from scripts.parse_ont_sheet import OntParser
 
 
@@ -26,10 +30,10 @@ class TestOntSampleSheetParser(DbIsolatedTest):
         await player.upsert_participants(
             [
                 ParticipantUpsertInternal(
-                    external_id='Sample01',
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'Sample01'},
                     samples=[
                         SampleUpsertInternal(
-                            external_id='Sample01',
+                            external_ids={PRIMARY_EXTERNAL_ORG: 'Sample01'},
                         )
                     ],
                 )
@@ -65,12 +69,12 @@ class TestOntSampleSheetParser(DbIsolatedTest):
             StringIO(file_contents), delimiter=',', dry_run=True
         )
 
-        participants_to_add = summary['participants']['insert']
-        participants_to_update = summary['participants']['update']
-        samples_to_add = summary['samples']['insert']
-        samples_to_update = summary['samples']['update']
-        sequencing_to_add = summary['assays']['insert']
-        sequencing_to_update = summary['assays']['update']
+        participants_to_add = summary.participants.insert
+        participants_to_update = summary.participants.update
+        samples_to_add = summary.samples.insert
+        samples_to_update = summary.samples.update
+        sequencing_to_add = summary.assays.insert
+        sequencing_to_update = summary.assays.update
 
         self.assertEqual(1, participants_to_add)
         self.assertEqual(1, participants_to_update)
@@ -86,7 +90,7 @@ class TestOntSampleSheetParser(DbIsolatedTest):
             'experiment_name': 'PBXP_Awesome',
             'flow_cell': 'PRO002',
             'flowcell_id': 'XYZ1',
-            'mux_total': '7107',
+            'mux_total': 7107,
             'protocol': 'LSK1',
             'reads': [
                 {

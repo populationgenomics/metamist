@@ -4,18 +4,24 @@ import asyncio
 import csv
 import datetime
 import logging
+import os
 import random
 import sys
 import tempfile
-from pprint import pprint
 from typing import List, Set
 
 from metamist.apis import AnalysisApi, FamilyApi, ParticipantApi, ProjectApi, SampleApi
 from metamist.graphql import gql, query_async
 from metamist.model.analysis import Analysis
-from metamist.model.analysis_status import AnalysisStatus
-from metamist.models import AssayUpsert, SampleUpsert, SequencingGroupUpsert
+from metamist.models import (
+    AnalysisStatus,
+    AssayUpsert,
+    SampleUpsert,
+    SequencingGroupUpsert,
+)
 from metamist.parser.generic_parser import chunk
+
+PRIMARY_EXTERNAL_ORG = ''
 
 NAMES = [
     'SOLAR',
@@ -60,13 +66,19 @@ PROJECTS = [
     'OMEGA',
 ]
 
+LOCI = [
+    'ABCD',
+    'EFGH',
+    'IJKL',
+]
+
 QUERY_PROJECT_SGS = gql(
     """
     query MyQuery($project: String!) {
         project(name: $project) {
             sequencingGroups {
-            id
-            type
+                id
+                type
             }
         }
     }
@@ -91,6 +103,7 @@ QUERY_ENUMS = gql(
 
 class ped_row:
     """The pedigree row class"""
+
     def __init__(self, values):
         (
             self.family_id,
@@ -156,24 +169,28 @@ def generate_pedigree_rows(num_families=1):
             individual_id = generate_random_id(used_ids)
             if parent_sex == 1:
                 rows.append(
-                    ped_row([
-                        family_id,
-                        individual_id,
-                        parent_id,
-                        '',
-                        random.choice([0, 1]),
-                        2,]
+                    ped_row(
+                        [
+                            family_id,
+                            individual_id,
+                            parent_id,
+                            '',
+                            random.choice([0, 1]),
+                            2,
+                        ]
                     )
                 )
             else:
                 rows.append(
-                    ped_row([
-                        family_id,
-                        individual_id,
-                        '',
-                        parent_id,
-                        random.choice([0, 1]),
-                        2,]
+                    ped_row(
+                        [
+                            family_id,
+                            individual_id,
+                            '',
+                            parent_id,
+                            random.choice([0, 1]),
+                            2,
+                        ]
                     )
                 )
 
@@ -201,19 +218,46 @@ def generate_pedigree_rows(num_families=1):
                     0
                 ]  # Randomly assign affected status
                 rows.append(
-                    ped_row([family_id, individual_id, paternal_id, maternal_id, sex, affected])
+                    ped_row(
+                        [
+                            family_id,
+                            individual_id,
+                            paternal_id,
+                            maternal_id,
+                            sex,
+                            affected,
+                        ]
+                    )
                 )
 
     return rows
 
 
-def generate_sequencing_type(count_distribution: dict[int, float], sequencing_types: list[str]):
+def generate_sequencing_type(
+    count_distribution: dict[int, float], sequencing_types: list[str]
+):
     """Return a random length of random sequencing types"""
     k = random.choices(
         list(count_distribution.keys()),
         list(count_distribution.values()),
     )[0]
     return random.choices(sequencing_types, weights=[0.49, 0.49, 0.02], k=k)
+
+
+def generate_seq_platform(sequencing_platforms: list[str], technology: str):
+    """Return a random sequencing platforms, always pacbio for long-reads, biased towards illumina for short-reads"""
+    if technology == 'long-read':
+        return 'pacbio'
+    return random.choices(sequencing_platforms, weights=[0.90, 0.8, 0.02], k=1)[0]
+
+
+def generate_seq_technology(sequencing_technologies: list[str], sequencing_type: str):
+    """Return a random sequencing technology, biased towards illumina for short-reads"""
+    if sequencing_type == 'genome':
+        return random.choices(['short-read', 'long-read'], weights=[0.95, 0.05], k=1)[0]
+    if sequencing_type == 'exome':
+        return 'short-read'
+    return random.choice([t for t in sequencing_technologies if 'rna' in t])
 
 
 def generate_random_number_within_distribution(count_distribution: dict[int, float]):
@@ -228,10 +272,10 @@ async def generate_project_pedigree(project: str):
     Generates a pedigree file for a project with random families and participants
     Returns the participant internal - external id map for the project
     """
-    project_pedigree = generate_pedigree_rows(num_families=random.randint(1, 10))
+    project_pedigree = generate_pedigree_rows(num_families=random.randint(1, 100))
     participant_eids = [row.individual_id for row in project_pedigree]
 
-    pedfile = tempfile.NamedTemporaryFile(mode='w')
+    pedfile = tempfile.NamedTemporaryFile(mode='w')  # pylint: disable=consider-using-with
     ped_writer = csv.writer(pedfile, delimiter='\t')
     for row in project_pedigree:
         ped_writer.writerow(row)
@@ -263,8 +307,17 @@ async def generate_sample_entries(
     """
 
     sample_types = metamist_enums['enum']['sampleType']
-    sequencing_technologies = metamist_enums['enum']['sequencingTechnology']
-    sequencing_platforms = metamist_enums['enum']['sequencingPlatform']
+    sequencing_technologies = [
+        'short-read',
+        'long-read',
+        'bulk-rna-seq',
+        'single-cell-rna-seq'
+    ]
+    sequencing_platforms = [
+        'illumina',
+        'oxford-nanopore',
+        'pacbio'
+    ]
     sequencing_types = ['genome', 'exome', 'transcriptome']
 
     # Arbitrary distribution for number of samples, sequencing groups, assays
@@ -272,10 +325,12 @@ async def generate_sample_entries(
 
     samples = []
     for participant_eid, participant_id in participant_id_map.items():
-        nsamples = generate_random_number_within_distribution(default_count_probabilities)
+        nsamples = generate_random_number_within_distribution(
+            default_count_probabilities
+        )
         for i in range(nsamples):
             sample = SampleUpsert(
-                external_id=f'{participant_eid}_{i+1}',
+                external_ids={PRIMARY_EXTERNAL_ORG: f'{participant_eid}_{i+1}'},
                 type=random.choice(sample_types),
                 meta={
                     'collection_date': datetime.datetime.now()
@@ -289,7 +344,9 @@ async def generate_sample_entries(
             )
             samples.append(sample)
 
-            for stype in generate_sequencing_type(default_count_probabilities, sequencing_types):
+            for stype in generate_sequencing_type(
+                default_count_probabilities, sequencing_types
+            ):
                 facility = random.choice(
                     [
                         'Amazing sequence centre',
@@ -297,8 +354,8 @@ async def generate_sample_entries(
                         'Dept of Seq.',
                     ]
                 )
-                stechnology = random.choice(sequencing_technologies)
-                splatform = random.choice(sequencing_platforms)
+                stechnology = generate_seq_technology(sequencing_technologies, stype)
+                splatform = generate_seq_platform(sequencing_platforms, stechnology)
                 sg = SequencingGroupUpsert(
                     type=stype,
                     technology=stechnology,
@@ -309,13 +366,17 @@ async def generate_sample_entries(
                     assays=[],
                 )
                 sample.sequencing_groups.append(sg)
-                for _ in range(generate_random_number_within_distribution(default_count_probabilities)):
+                for _ in range(
+                    generate_random_number_within_distribution(
+                        default_count_probabilities
+                    )
+                ):
                     sg.assays.append(
                         AssayUpsert(
                             type='sequencing',
                             meta={
                                 'facility': facility,
-                                'reads' : [],
+                                'reads': [],
                                 'coverage': f'{random.choice([30, 90, 300, 9000, "?"])}x',
                                 'sequencing_type': stype,
                                 'sequencing_technology': stechnology,
@@ -324,22 +385,23 @@ async def generate_sample_entries(
                         )
                     )
 
-    response = await sapi.upsert_samples_async(project, samples)
-    pprint(response)
+    await sapi.upsert_samples_async(project, samples)
 
 
-async def generate_cram_analyses(project: str, analyses_to_insert: list[Analysis]):
+async def generate_cram_analyses(project: str, analyses_to_insert: list[Analysis]) -> list[dict]:
     """
     Queries the list of sequencing groups for a project and randomly selects some
     to generate CRAM analysis entries for.
     """
+    logging.getLogger().setLevel(logging.WARN)
     sgid_response = await query_async(QUERY_PROJECT_SGS, {'project': project})
+    logging.getLogger().setLevel(logging.INFO)
     sequencing_groups = list(sgid_response['project']['sequencingGroups'])
 
     # Randomly allocate some of the sequencing groups to be aligned
     aligned_sgs = random.sample(
         sequencing_groups,
-        k=random.randint(int(len(sequencing_groups)/2), len(sequencing_groups))
+        k=random.randint(int(len(sequencing_groups) / 2), len(sequencing_groups)),
     )
 
     # Insert completed CRAM analyses for the aligned sequencing groups
@@ -351,11 +413,14 @@ async def generate_cram_analyses(project: str, analyses_to_insert: list[Analysis
                 status=AnalysisStatus('completed'),
                 output=f'FAKE://{project}/crams/{sg["id"]}.cram',
                 timestamp_completed=(
-                    datetime.datetime.now() - datetime.timedelta(days=random.randint(1, 15))
+                    datetime.datetime.now()
+                    - datetime.timedelta(days=random.randint(1, 15))
                 ).isoformat(),
                 meta={
                     # random size between 5, 25 GB
-                    'size': random.randint(5 * 1024, 25 * 1024) * 1024 * 1024,
+                    'size': random.randint(5 * 1024, 25 * 1024)
+                    * 1024
+                    * 1024,
                 },
             )
             for sg in aligned_sgs
@@ -365,7 +430,75 @@ async def generate_cram_analyses(project: str, analyses_to_insert: list[Analysis
     return aligned_sgs
 
 
-async def generate_joint_called_analyses(project: str, aligned_sgs: list[dict], analyses_to_insert: list[Analysis]):
+async def generate_web_report_analyses(project: str,
+                                       aligned_sequencing_groups: list[dict],
+                                       analyses_to_insert: list[Analysis]
+                                       ):
+    """
+    Queries the list of sequencing groups for a project and generates web analysis (STRipy
+    and MITO report) entries for those with completed a CRAM analysis.
+    Stripy analyses have a random chance of having outliers detected, and a random number
+    of loci flagged as outliers.
+    """
+    def get_stripy_outliers():
+        """
+        Generate a the outliers_detected bool, and then the outlier_loci dict
+        """
+        outlier_loci = {}
+        outliers_detected = random.choice([True, False])
+        if outliers_detected:
+            for loci in random.sample(LOCI, k=random.randint(1, len(LOCI))):
+                outlier_loci[loci] = random.choice(['1', '2', '3'])
+
+        return {
+            'outliers_detected': outliers_detected,
+            'outlier_loci': outlier_loci
+        }
+
+    # Insert completed web analyses for the aligned sequencing groups
+    for sg in aligned_sequencing_groups:
+        stripy_outliers = get_stripy_outliers()
+        analyses_to_insert.extend(
+            [
+                Analysis(
+                    sequencing_group_ids=[sg['id']],
+                    type='web',
+                    status=AnalysisStatus('completed'),
+                    output=f'FAKE://{project}/stripy/{sg["id"]}.stripy.html',
+                    timestamp_completed=(
+                        datetime.datetime.now() - datetime.timedelta(days=random.randint(1, 15))
+                    ).isoformat(),
+                    meta={
+                        'stage': 'Stripy',
+                        'sequencing_type': sg['type'],
+                        # random size between 5, 50 MB
+                        'size': random.randint(5 * 1024, 25 * 1024) * 1024,
+                        'outliers_detected': stripy_outliers['outliers_detected'],
+                        'outlier_loci': stripy_outliers['outlier_loci']
+                    },
+                ),
+                Analysis(
+                    sequencing_group_ids=[sg['id']],
+                    type='web',
+                    status=AnalysisStatus('completed'),
+                    output=f'FAKE://{project}/mito/mitoreport-{sg["id"]}/index.html',
+                    timestamp_completed=(
+                        datetime.datetime.now() - datetime.timedelta(days=random.randint(1, 15))
+                    ).isoformat(),
+                    meta={
+                        'stage': 'MitoReport',
+                        'sequencing_type': sg['type'],
+                        # random size between 5, 50 MB
+                        'size': random.randint(5 * 1024, 25 * 1024) * 1024,
+                    },
+                )
+            ]
+        )
+
+
+async def generate_joint_called_analyses(
+    project: str, aligned_sgs: list[dict], analyses_to_insert: list[Analysis]
+):
     """
     Selects a subset of the aligned sequencing groups for the input project and
     generates joint-called AnnotateDataset and ES-index analysis entries for them.
@@ -373,7 +506,9 @@ async def generate_joint_called_analyses(project: str, aligned_sgs: list[dict], 
     seq_type_to_sg_list = {
         'genome': [sg['id'] for sg in aligned_sgs if sg['type'] == 'genome'],
         'exome': [sg['id'] for sg in aligned_sgs if sg['type'] == 'exome'],
-        'transcriptome': [sg['id'] for sg in aligned_sgs if sg['type'] == 'transcriptome']
+        'transcriptome': [
+            sg['id'] for sg in aligned_sgs if sg['type'] == 'transcriptome'
+        ],
     }
     for seq_type, sg_list in seq_type_to_sg_list.items():
         if not sg_list:
@@ -395,9 +530,34 @@ async def generate_joint_called_analyses(project: str, aligned_sgs: list[dict], 
                     status=AnalysisStatus('completed'),
                     output=f'FAKE::{project}-{seq_type}-es-{datetime.date.today()}',
                     meta={'stage': 'MtToEs', 'sequencing_type': seq_type},
-                )
+                ),
             ]
         )
+
+        if seq_type == 'genome':
+            analyses_to_insert.extend(
+                [
+                    Analysis(
+                        sequencing_group_ids=joint_called_sgs,
+                        type='es-index',
+                        status=AnalysisStatus('completed'),
+                        output=f'FAKE::{project}-{seq_type}-sv-{datetime.date.today()}',
+                        meta={'stage': 'MtToEsSv', 'sequencing_type': seq_type},
+                    ),
+                ]
+            )
+        elif seq_type == 'exome':
+            analyses_to_insert.extend(
+                [
+                    Analysis(
+                        sequencing_group_ids=joint_called_sgs,
+                        type='es-index',
+                        status=AnalysisStatus('completed'),
+                        output=f'FAKE::{project}-{seq_type}-gcnv-{datetime.date.today()}',
+                        meta={'stage': 'MtToEsCNV', 'sequencing_type': seq_type},
+                    ),
+                ]
+            )
 
 
 async def main():
@@ -413,16 +573,46 @@ async def main():
     sapi = SampleApi()
     metamist_enums: dict[str, dict[str, list[str]]] = await query_async(QUERY_ENUMS)
 
-    analyses_to_insert: list[Analysis] = []
     existing_projects = await papi.get_my_projects_async()
     for project in PROJECTS:
+        analyses_to_insert: list[Analysis] = []
         if project not in existing_projects:
             await papi.create_project_async(
                 name=project, dataset=project, create_test_project=False
             )
+
+            default_user = os.getenv('SM_LOCALONLY_DEFAULTUSER')
+            if not default_user:
+                print(
+                    'SM_LOCALONLY_DEFAULTUSER env var is not set, please set it before generating data'
+                )
+                sys.exit(1)
+
+            await papi.update_project_members_async(
+                project=project,
+                project_member_update=[
+                    {'member': default_user, 'roles': ['reader', 'writer']}
+                ],
+            )
+
+            default_user = os.getenv('SM_LOCALONLY_DEFAULTUSER')
+            if not default_user:
+                print(
+                    'SM_LOCALONLY_DEFAULTUSER env var is not set, please set it before generating data'
+                )
+                sys.exit(1)
+
+            await papi.update_project_members_async(
+                project=project,
+                project_member_update=[
+                    {'member': default_user, 'roles': ['reader', 'writer']}
+                ],
+            )
+
             logging.info(f'Created project "{project}"')
             await papi.update_project_async(
-                project=project, body={'meta': {'is_seqr': 'true'}},
+                project=project,
+                body={'meta': {'is_seqr': 'true'}},
             )
             logging.info(f'Set {project} as seqr project')
 
@@ -432,11 +622,15 @@ async def main():
 
         aligned_sgs = await generate_cram_analyses(project, analyses_to_insert)
 
+        await generate_web_report_analyses(project, aligned_sgs, analyses_to_insert)
+
         await generate_joint_called_analyses(project, aligned_sgs, analyses_to_insert)
 
         for analyses in chunk(analyses_to_insert, 50):
-            logging.info(f'Inserting {len(analyses)} analysis entries')
-            await asyncio.gather(*[aapi.create_analysis_async(project, a) for a in analyses])
+            logging.info(f'Inserting {len(analyses)} analysis entries into {project}')
+            await asyncio.gather(
+                *[aapi.create_analysis_async(project, a) for a in analyses]
+            )
 
 
 if __name__ == '__main__':
@@ -446,4 +640,5 @@ if __name__ == '__main__':
         datefmt='%Y-%m-%d %H:%M:%S',
         stream=sys.stderr,
     )
+    logging.getLogger().setLevel(logging.INFO)
     asyncio.new_event_loop().run_until_complete(main())

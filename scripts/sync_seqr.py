@@ -353,9 +353,11 @@ async def sync_individual_metadata(
 
     def process_row(row):
         return {
-            seqr_key: key_processor[sm_key](row[sm_key])
-            if sm_key in key_processor
-            else row[sm_key]
+            seqr_key: (
+                key_processor[sm_key](row[sm_key])
+                if sm_key in key_processor
+                else row[sm_key]
+            )
             for seqr_key, sm_key in seqr_map.items()
             if sm_key in row
         }
@@ -558,7 +560,7 @@ async def sync_cram_map(
         if not updates:
             continue
         print(
-            f'{dataset} :: Updating CRAMs {idx * chunk_size + 1} -> {(min((idx + 1 ) * chunk_size, len(all_updates)))} (/{len(all_updates)})'
+            f'{dataset} :: Updating CRAMs {idx * chunk_size + 1} -> {(min((idx + 1) * chunk_size, len(all_updates)))} (/{len(all_updates)})'
         )
 
         responses = await asyncio.gather(

@@ -1,7 +1,6 @@
 import datetime
-import json
 
-from models.base import SMBase
+from models.base import SMBase, parse_sql_dict
 from models.models.project import ProjectId
 
 
@@ -20,7 +19,7 @@ class AnalysisRunnerInternal(SMBase):
     script: str
     description: str
     driver_image: str
-    config_path: str
+    config_path: str | None
     cwd: str | None
     environment: str
     hail_version: str | None
@@ -34,9 +33,7 @@ class AnalysisRunnerInternal(SMBase):
     @staticmethod
     def from_db(**kwargs):
         """Convert from db Record"""
-        meta = kwargs.pop('meta')
-        if meta:
-            meta = json.loads(meta)
+        meta = parse_sql_dict(kwargs.pop('meta'))
 
         _timestamp = kwargs.pop('timestamp')
         # if _timestamp:
