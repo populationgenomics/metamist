@@ -22,6 +22,7 @@ class GraphQLFilter(Generic[T]):
     contains: T | None = None
     icontains: T | None = None
     startswith: T | None = None
+    isnull: bool | None = None
 
     def all_values(self) -> list[T]:
         """
@@ -64,6 +65,7 @@ class GraphQLFilter(Generic[T]):
             contains=self.contains,
             icontains=self.icontains,
             startswith=self.startswith,
+            isnull=self.isnull,
         )
 
     def to_internal_filter_mapped(self, f: Callable[[T], Y]) -> GenericFilter[Y]:
@@ -82,6 +84,7 @@ class GraphQLFilter(Generic[T]):
             contains=f(self.contains) if self.contains else None,
             icontains=f(self.icontains) if self.icontains else None,
             startswith=f(self.startswith) if self.startswith else None,
+            isnull=self.isnull,
         )
 
 
