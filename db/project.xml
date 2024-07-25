@@ -1606,4 +1606,55 @@
 		<sql>ALTER TABLE `output_file` MODIFY dirname VARCHAR(255) NOT NULL;</sql>
 		<sql>ALTER TABLE `output_file` ADD SYSTEM VERSIONING;</sql>
 	</changeSet>
+
+	<changeSet id="2024-07-25_comment_table" author="dan.coates">
+		<createTable tableName="comment">
+			<column name="id" type="INT" autoIncrement="true">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+
+			<column
+				name="parent_id"
+				type="INT"
+			>
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_COMMENT_PARENT_COMMENT"
+					references="comment(id)"
+					deleteCascade="true"
+				/>
+			</column>
+			<column name="content" type="LONGTEXT"></column>
+
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_COMMENT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+	</changeSet>
+
+	<changeSet id="2024-07-25_sample_comments" author="dan.coates">
+		<createTable tableName="sample_comment">
+			<column name="comment_id" type="INT">
+				<!--
+					Even though this is a foreign key, it is also the primary key of this table as 
+					a comment shoulnd only ever be attached to a single sample
+				-->
+				<constraints primaryKey="true" nullable="false" foreignKeyName="FK_SAMPLE_COMMENT_COMMENT_ID"
+					references="comment(id)" />
+			</column>
+			<column name="sample_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_SAMPLE_COMMENT_SAMPLE_ID"
+					references="sample(id)" />
+			</column>
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_SAMPLE_COMMENT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+	</changeSet>
 </databaseChangeLog>
