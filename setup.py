@@ -26,6 +26,7 @@ setup(
     url='https://github.com/populationgenomics/metamist',
     license='MIT',
     packages=all_packages,
+    python_requires='>=3.11',
     install_requires=[
         'backoff>=2.2.1',
         'click',
