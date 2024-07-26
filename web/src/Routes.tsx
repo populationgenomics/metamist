@@ -36,14 +36,7 @@ const Routes: React.FunctionComponent = () => (
                 </ErrorBoundary>
             }
         />
-        <Route
-            path="project/:projectName/participant/:participantName"
-            element={
-                <ErrorBoundary>
-                    <SampleView />
-                </ErrorBoundary>
-            }
-        />
+
         <Route
             path="/analysis-runner/:projectName?"
             element={
