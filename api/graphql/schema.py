@@ -31,6 +31,7 @@ from db.python.layers import (
     SampleLayer,
     SequencingGroupLayer,
 )
+from db.python.layers.comment import CommentLayer
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.analysis_runner import AnalysisRunnerFilter
 from db.python.tables.assay import AssayFilter
@@ -54,6 +55,7 @@ from models.models import (
     SequencingGroupInternal,
 )
 from models.models.analysis_runner import AnalysisRunnerInternal
+from models.models.comment import CommentInternal
 from models.models.family import PedRowInternal
 from models.models.ourdna import OurDNADashboard, OurDNALostSample
 from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
@@ -226,6 +228,26 @@ class GraphQLCohortTemplate:
         loader = info.context['loaders'][LoaderKeys.PROJECTS_FOR_IDS]
         project = await loader.load(root.project_id)
         return GraphQLProject.from_internal(project)
+
+
+@strawberry.type
+class GraphQLComment:
+
+    id: int
+    parentId: int | None
+    content: str
+    author: str
+    timestamp: datetime.datetime
+
+    @staticmethod
+    def from_internal(internal: CommentInternal) -> 'GraphQLComment':
+        return GraphQLComment(
+            id=internal.id,
+            parentId=internal.parent_id,
+            content=internal.content,
+            author=internal.author,
+            timestamp=internal.timestamp,
+        )
 
 
 @strawberry.type
@@ -1109,6 +1131,17 @@ class Query:  # entry point to graphql.
     @strawberry.field()
     def enum(self, info: Info[GraphQLContext, 'Query']) -> GraphQLEnum:  # type: ignore
         return GraphQLEnum()
+
+    @strawberry.field()
+    async def comments(
+        self,
+        info: Info[GraphQLContext, 'Query'],
+    ) -> list[GraphQLComment]:
+        connection = info.context['connection']
+        comment_layer = CommentLayer(connection)
+        comments = await comment_layer.query()
+
+        return [GraphQLComment.from_internal(comment) for comment in comments]
 
     @strawberry.field()
     async def cohort_templates(
