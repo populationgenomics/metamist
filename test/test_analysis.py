@@ -1,4 +1,5 @@
 # pylint: disable=invalid-overridden-method
+import time
 from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.filters import GenericFilter
@@ -257,3 +258,67 @@ class TestAnalysis(DbIsolatedTest):
 
         self.assertEqual(sgs[0].id, genome_id)
         self.assertEqual(sgs[1].id, exome_id)
+
+    @run_as_sync
+    async def test_update_analysis(self):
+        """
+        Test Analysis update
+        """
+
+        # create an analysis
+        a_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='analysis-runner',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[],
+                meta={},
+            ),
+        )
+
+        # get the timestamp_completed of the analysis
+        init_analyses = await self.al.query(
+            AnalysisFilter(
+                project=GenericFilter(eq=self.project_id),
+                type=GenericFilter(eq='analysis-runner'),
+            )
+        )
+
+        # store the timestamp_completed
+        init_timestamp_completed = init_analyses[0].timestamp_completed
+
+        # be sure the now is different than before
+        time.sleep(2)
+
+        # update the analysis with some new data
+        await self.al.update_analysis(
+            a_id,
+            status=AnalysisStatus.COMPLETED,
+            meta={'sequencing_type': 'genome', 'size': 1024},
+            output='test_output',
+        )
+
+        # check the analysis after update
+        # be sure timestamp_completed has not been touched
+        analyses = await self.al.query(
+            AnalysisFilter(
+                project=GenericFilter(eq=self.project_id),
+                type=GenericFilter(eq='analysis-runner'),
+            ),
+        )
+        expected = [
+            AnalysisInternal(
+                id=a_id,
+                type='analysis-runner',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[],
+                cohort_ids=[],
+                output='test_output',
+                timestamp_completed=init_timestamp_completed,
+                project=1,
+                meta={'sequencing_type': 'genome', 'size': 1024},
+                active=True,
+                author=None,
+            ),
+        ]
+
+        self.assertEqual(analyses, expected)

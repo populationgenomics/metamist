@@ -1,4 +1,4 @@
-# pylint: disable=no-value-for-parameter,redefined-builtin,missing-function-docstring,unused-argument,too-many-lines
+# pylint: disable=no-value-for-parameter,redefined-builtin,missing-function-docstring,unused-argument,too-many-lines,too-many-arguments
 """
 Schema for GraphQL.
 
@@ -374,6 +374,8 @@ class GraphQLProject:
         external_id: GraphQLFilter[str] | None = None,
         id: GraphQLFilter[str] | None = None,
         meta: GraphQLMetaFilter | None = None,
+        parent_id: GraphQLFilter[str] | None = None,
+        root_id: GraphQLFilter[str] | None = None,
     ) -> list['GraphQLSample']:
         loader = info.context['loaders'][LoaderKeys.SAMPLES_FOR_PROJECTS]
         filter_ = SampleFilter(
@@ -381,6 +383,16 @@ class GraphQLProject:
             external_id=external_id.to_internal_filter() if external_id else None,
             id=id.to_internal_filter_mapped(sample_id_transform_to_raw) if id else None,
             meta=graphql_meta_filter_to_internal_filter(meta),
+            sample_parent_id=(
+                parent_id.to_internal_filter_mapped(sample_id_transform_to_raw)
+                if parent_id
+                else None
+            ),
+            sample_root_id=(
+                root_id.to_internal_filter_mapped(sample_id_transform_to_raw)
+                if root_id
+                else None
+            ),
         )
         samples = await loader.load({'id': root.id, 'filter': filter_})
         return [GraphQLSample.from_internal(p) for p in samples]
@@ -765,6 +777,8 @@ class GraphQLSample:
     internal_id: strawberry.Private[int]
     participant_id: strawberry.Private[int]
     project_id: strawberry.Private[int]
+    root_id: strawberry.Private[int | None]
+    parent_id: strawberry.Private[int | None]
 
     @staticmethod
     def from_internal(sample: SampleInternal) -> 'GraphQLSample':
@@ -779,6 +793,8 @@ class GraphQLSample:
             internal_id=sample.id,
             participant_id=sample.participant_id,
             project_id=sample.project,
+            root_id=sample.sample_root_id,
+            parent_id=sample.sample_parent_id,
         )
 
     @strawberry.field
@@ -856,6 +872,50 @@ class GraphQLSample:
         sequencing_groups = await loader.load(obj)
 
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sequencing_groups]
+
+    @strawberry.field
+    async def parent_sample(
+        self,
+        info: Info[GraphQLContext, 'Query'],
+        root: 'GraphQLSample',
+    ) -> 'GraphQLSample | None':
+        if root.parent_id is None:
+            return None
+        loader = info.context['loaders'][LoaderKeys.SAMPLES_FOR_IDS]
+        parent = await loader.load(root.parent_id)
+        return GraphQLSample.from_internal(parent)
+
+    @strawberry.field
+    async def root_sample(
+        self,
+        info: Info[GraphQLContext, 'Query'],
+        root: 'GraphQLSample',
+    ) -> 'GraphQLSample | None':
+        if root.root_id is None:
+            return None
+        loader = info.context['loaders'][LoaderKeys.SAMPLES_FOR_IDS]
+        root_sample = await loader.load(root.root_id)
+        return GraphQLSample.from_internal(root_sample)
+
+    @strawberry.field
+    async def nested_samples(
+        self,
+        info: Info[GraphQLContext, 'Query'],
+        root: 'GraphQLSample',
+        type: GraphQLFilter[str] | None = None,
+        meta: GraphQLMetaFilter | None = None,
+    ) -> list['GraphQLSample']:
+        loader = info.context['loaders'][LoaderKeys.SAMPLES_FOR_PARENTS]
+        nested_samples = await loader.load(
+            {
+                'id': root.internal_id,
+                'filter_': SampleFilter(
+                    type=type.to_internal_filter() if type else None,
+                    meta=graphql_meta_filter_to_internal_filter(meta),
+                ),
+            }
+        )
+        return [GraphQLSample.from_internal(s) for s in nested_samples]
 
 
 @strawberry.type
@@ -1160,6 +1220,8 @@ class Query:  # entry point to graphql.
         external_id: GraphQLFilter[str] | None = None,
         participant_id: GraphQLFilter[int] | None = None,
         active: GraphQLFilter[bool] | None = None,
+        parent_id: GraphQLFilter[str] | None = None,
+        root_id: GraphQLFilter[str] | None = None,
     ) -> list[GraphQLSample]:
         connection = info.context['connection']
         slayer = SampleLayer(connection)
@@ -1193,6 +1255,16 @@ class Query:  # entry point to graphql.
                 else None
             ),
             active=active.to_internal_filter() if active else GenericFilter(eq=True),
+            sample_root_id=(
+                root_id.to_internal_filter_mapped(sample_id_transform_to_raw)
+                if root_id
+                else None
+            ),
+            sample_parent_id=(
+                parent_id.to_internal_filter_mapped(sample_id_transform_to_raw)
+                if parent_id
+                else None
+            ),
         )
 
         samples = await slayer.query(filter_)

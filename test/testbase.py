@@ -1,4 +1,4 @@
-# pylint: disable=invalid-overridden-method
+# pylint: disable=invalid-overridden-method,no-member
 
 import asyncio
 import dataclasses

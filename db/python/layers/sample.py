@@ -243,8 +243,8 @@ class SampleLayer(BaseLayer):
                         participant_id=s.participant_id,
                         type_=s.type,
                         active=s.active,
-                        sample_parent_id=sample_parent_id,
-                        sample_root_id=sample_root_id,
+                        sample_parent_id=r.parent.id if r.parent else sample_parent_id,
+                        sample_root_id=r.root.id if r.root else sample_root_id,
                     )
 
                 if sample.sequencing_groups:
