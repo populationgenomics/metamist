@@ -1624,7 +1624,20 @@
 					deleteCascade="true"
 				/>
 			</column>
-			<column name="content" type="LONGTEXT"></column>
+
+			<column
+				name="root_id"
+				type="INT"
+			>
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_COMMENT_ROOT_COMMENT"
+					references="comment(id)"
+					deleteCascade="true"
+				/>
+			</column>
+
+			<column name="content" type="TEXT"></column>
 
 			<column name="audit_log_id" type="INT">
 				<constraints
@@ -1633,6 +1646,9 @@
 					references="audit_log(id)" />
 			</column>
 		</createTable>
+
+		<!-- Add fulltext search index -->
+		<sql>ALTER TABLE comment ADD FULLTEXT INDEX `COMMENT_CONTENT_FULLTEXT_INDEX` (content);</sql>
 	</changeSet>
 
 	<changeSet id="2024-07-25_sample_comments" author="dan.coates">
