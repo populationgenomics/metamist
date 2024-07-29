@@ -20,6 +20,7 @@ from api.graphql.filters import (
     graphql_meta_filter_to_internal_filter,
 )
 from api.graphql.loaders import GraphQLContext, LoaderKeys, get_context
+from api.graphql.mutations import Mutation
 from db.python import enum_tables
 from db.python.filters import GenericFilter
 from db.python.layers import (
@@ -234,13 +235,39 @@ class GraphQLCohortTemplate:
 
 
 @strawberry.type
+class GraphQLCommentVersion:
+    content: str
+    author: str
+    timestamp: datetime.datetime
+
+
+@strawberry.type
 class GraphQLComment:
 
     id: int
     parentId: int | None
     content: str
     author: str
-    timestamp: datetime.datetime
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+    entity_type: strawberry.Private[str]
+    entity_id: strawberry.Private[int]
+    is_deleted: bool
+    versions: list[GraphQLCommentVersion]
+
+    @strawberry.field()
+    async def entity(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLComment'
+    ) -> 'GraphQLSample | GraphQLAnalysis':
+        entity_type = root.entity_type
+        entity_id = root.entity_id
+
+        if entity_type == 'sample':
+            loader = info.context['loaders'][LoaderKeys.SAMPLES_FOR_IDS]
+            sample = await loader.load(entity_id)
+            return GraphQLSample.from_internal(sample)
+
+        raise Exception('Unknown type')
 
     @staticmethod
     def from_internal(internal: CommentInternal) -> 'GraphQLComment':
@@ -249,7 +276,12 @@ class GraphQLComment:
             parentId=internal.parent_id,
             content=internal.content,
             author=internal.author,
-            timestamp=internal.timestamp,
+            created_at=internal.created_at,
+            updated_at=internal.updated_at,
+            entity_type=internal.entity_type,
+            entity_id=internal.entity_id,
+            is_deleted=internal.is_deleted,
+            versions=internal.versions,
         )
 
 
@@ -1442,7 +1474,7 @@ class Query:  # entry point to graphql.
 
 
 schema = strawberry.Schema(
-    query=Query, mutation=None, extensions=[QueryDepthLimiter(max_depth=10)]
+    query=Query, mutation=Mutation, extensions=[QueryDepthLimiter(max_depth=10)]
 )
 MetamistGraphQLRouter: GraphQLRouter = GraphQLRouter(
     schema, graphiql=True, context_getter=get_context
