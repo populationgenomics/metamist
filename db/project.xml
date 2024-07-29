@@ -1528,18 +1528,6 @@
 				/>
 			</column>
 
-			<column
-				name="root_id"
-				type="INT"
-			>
-				<constraints
-					nullable="true"
-					foreignKeyName="FK_COMMENT_ROOT_COMMENT"
-					references="comment(id)"
-					deleteCascade="true"
-				/>
-			</column>
-
 			<column name="content" type="TEXT"></column>
 
 			<column name="audit_log_id" type="INT">
@@ -1552,6 +1540,7 @@
 
 		<!-- Add fulltext search index -->
 		<sql>ALTER TABLE comment ADD FULLTEXT INDEX `COMMENT_CONTENT_FULLTEXT_INDEX` (content);</sql>
+		<sql>ALTER TABLE comment ADD SYSTEM VERSIONING;</sql>
 	</changeSet>
 
 	<changeSet id="2024-07-25_sample_comments" author="dan.coates">
@@ -1559,7 +1548,7 @@
 			<column name="comment_id" type="INT">
 				<!--
 					Even though this is a foreign key, it is also the primary key of this table as 
-					a comment shoulnd only ever be attached to a single sample
+					a comment should only ever be attached to a single sample
 				-->
 				<constraints primaryKey="true" nullable="false" foreignKeyName="FK_SAMPLE_COMMENT_COMMENT_ID"
 					references="comment(id)" />
@@ -1575,6 +1564,8 @@
 					references="audit_log(id)" />
 			</column>
 		</createTable>
+
+		<sql>ALTER TABLE sample_comment ADD SYSTEM VERSIONING;</sql>
 	</changeSet>
 
 </databaseChangeLog>
