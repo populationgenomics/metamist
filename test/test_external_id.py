@@ -170,7 +170,7 @@ class TestParticipant(DbIsolatedTest):
     async def test_get_by_families(self):
         """Exercise get_participants_by_families() method"""
         flayer = FamilyLayer(self.connection)
-        fid = await flayer.create_family(external_id='Jones')
+        fid = await flayer.create_family(external_ids={'org': 'Jones'})
 
         child = await self.player.upsert_participant(
             ParticipantUpsertInternal(

@@ -54,15 +54,21 @@ class FamilyTable(DbBase):
     ) -> tuple[set[ProjectId], list[FamilyInternal]]:
         """Get all families for some project"""
         _query = """
-            SELECT f.id, f.external_id, f.description, f.coded_phenotype, f.project
+            SELECT f.id, JSON_OBJECTAGG(feid.name, feid.external_id) AS external_ids,
+                   f.description, f.coded_phenotype, f.project
             FROM family f
+            INNER JOIN family_external_id feid ON f.id = feid.family_id
         """
 
         if not filter_.project and not filter_.id:
             raise ValueError('Project or ID filter is required for family queries')
 
         has_participant_join = False
-        field_overrides = {'id': 'f.id', 'external_id': 'f.external_id'}
+        field_overrides = {
+            'id': 'f.id',
+            'external_id': 'feid.external_id',
+            'project': 'f.project',
+        }
 
         has_participant_join = False
         if filter_.participant_id:
@@ -87,6 +93,10 @@ class FamilyTable(DbBase):
         if wheres:
             _query += f'WHERE {wheres}'
 
+        _query += """
+            GROUP BY f.id, f.description, f.coded_phenotype, f.project
+        """
+
         rows = await self.connection.fetch_all(_query, values)
         seen = set()
         families = []
@@ -107,10 +117,13 @@ class FamilyTable(DbBase):
             return set(), {}
 
         _query = """
-            SELECT id, external_id, description, coded_phenotype, project, fp.participant_id
-            FROM family
-            INNER JOIN family_participant fp ON family.id = fp.family_id
+            SELECT f.id, JSON_OBJECTAGG(feid.name, feid.external_id) AS external_ids,
+                   f.description, f.coded_phenotype, f.project, fp.participant_id
+            FROM family f
+            INNER JOIN family_external_id feid ON f.id = feid.family_id
+            INNER JOIN family_participant fp ON f.id = fp.family_id
             WHERE fp.participant_id in :pids
+            GROUP BY f.id, f.description, f.coded_phenotype, f.project, fp.participant_id
         """
         ret_map = defaultdict(list)
         projects: set[ProjectId] = set()
@@ -129,8 +142,8 @@ class FamilyTable(DbBase):
         Search by some term, return [ProjectId, FamilyId, ExternalId]
         """
         _query = """
-        SELECT project, id, external_id
-        FROM family
+        SELECT project, family_id, external_id
+        FROM family_external_id
         WHERE project in :project_ids AND external_id LIKE :search_pattern
         LIMIT :limit
         """
@@ -142,7 +155,7 @@ class FamilyTable(DbBase):
                 'limit': limit,
             },
         )
-        return [(r['project'], r['id'], r['external_id']) for r in rows]
+        return [(r['project'], r['family_id'], r['external_id']) for r in rows]
 
     async def get_family_external_ids_by_participant_ids(
         self, participant_ids
@@ -152,9 +165,9 @@ class FamilyTable(DbBase):
             return {}
 
         _query = """
-        SELECT f.external_id, fp.participant_id
+        SELECT feid.external_id, fp.participant_id
         FROM family_participant fp
-        INNER JOIN family f ON fp.family_id = f.id
+        INNER JOIN family_external_id feid ON fp.family_id = feid.family_id
         WHERE fp.participant_id in :pids
         """
         rows = await self.connection.fetch_all(_query, {'pids': participant_ids})
@@ -167,14 +180,60 @@ class FamilyTable(DbBase):
     async def update_family(
         self,
         id_: int,
-        external_id: str | None = None,
+        external_ids: dict[str, str | None] | None = None,
         description: str | None = None,
         coded_phenotype: str | None = None,
     ) -> bool:
         """Update values for a family"""
-        values: Dict[str, Any] = {'audit_log_id': await self.audit_log_id()}
-        if external_id:
-            values['external_id'] = external_id
+        audit_log_id = await self.audit_log_id()
+        values: Dict[str, Any] = {'audit_log_id': audit_log_id}
+
+        if external_ids:
+            to_delete = [k.lower() for k, v in external_ids.items() if v is None]
+            to_update = {k.lower(): v for k, v in external_ids.items() if v is not None}
+
+            if to_delete:
+                # Set audit_log_id to this transaction before deleting the rows
+                _audit_update_query = """
+UPDATE family_external_id
+SET audit_log_id = :audit_log_id
+WHERE family_id = :id AND name IN :names
+                """
+                await self.connection.execute(
+                    _audit_update_query,
+                    {'id': id_, 'names': to_delete, 'audit_log_id': audit_log_id},
+                )
+
+                _delete_query = """
+DELETE FROM family_exernal_id
+WHERE family_id = :id AND name in :names
+                """
+                await self.connection.execute(
+                    _delete_query, {'id': id_, 'names': to_delete}
+                )
+
+            if to_update:
+                _query = 'SELECT project FROM family WHERE id = :id'
+                row = await self.connection.fetch_one(_query, {'id': id_})
+                project = row['project']
+
+                _update_query = """
+INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
+VALUES (:project, :id, :name, :external_id, :audit_log_id)
+ON DUPLICATE KEY UPDATE external_id = :external_id, audit_log_id = :audit_log_id
+                """
+                _update_values = [
+                    {
+                        'project': project,
+                        'id': id_,
+                        'name': name,
+                        'external_id': eid,
+                        'audit_log_id': audit_log_id,
+                    }
+                    for name, eid in to_update.items()
+                ]
+                await self.connection.execute_many(_update_query, _update_values)
+
         if description:
             values['description'] = description
         if coded_phenotype:
@@ -191,7 +250,7 @@ WHERE id = :id
 
     async def create_family(
         self,
-        external_id: str,
+        external_ids: dict[str, str],
         description: Optional[str],
         coded_phenotype: Optional[str],
         project: ProjectId | None = None,
@@ -199,11 +258,11 @@ WHERE id = :id
         """
         Create a new sample, and add it to database
         """
+        audit_log_id = await self.audit_log_id()
         updater = {
-            'external_id': external_id,
             'description': description,
             'coded_phenotype': coded_phenotype,
-            'audit_log_id': await self.audit_log_id(),
+            'audit_log_id': audit_log_id,
             'project': project or self.project_id,
         }
         keys = list(updater.keys())
@@ -217,7 +276,25 @@ VALUES
 RETURNING id
         """
 
-        return await self.connection.fetch_val(_query, updater)
+        new_id = await self.connection.fetch_val(_query, updater)
+
+        _eid_query = """
+INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
+VALUES (:project, :family_id, :name, :external_id, :audit_log_id)
+        """
+        values = [
+            {
+                'project': project or self.project_id,
+                'family_id': new_id,
+                'name': name,
+                'external_id': eid,
+                'audit_log_id': audit_log_id,
+            }
+            for name, eid in external_ids.items()
+        ]
+        await self.connection.execute_many(_eid_query, values)
+
+        return new_id
 
     async def insert_or_update_multiple_families(
         self,
@@ -229,13 +306,12 @@ RETURNING id
         """Upsert"""
         updater = [
             {
-                'external_id': eid,
                 'description': descr,
                 'coded_phenotype': cph,
                 'audit_log_id': await self.audit_log_id(),
                 'project': project or self.project_id,
             }
-            for eid, descr, cph in zip(external_ids, descriptions, coded_phenotypes)
+            for descr, cph in zip(descriptions, coded_phenotypes)
         ]
 
         keys = list(updater[0].keys())
@@ -255,6 +331,9 @@ ON DUPLICATE KEY UPDATE
         """
 
         await self.connection.execute_many(_query, updater)
+
+        print(f'Need to insert {external_ids} into family_external_id')  # FIXME
+
         return True
 
     async def get_id_map_by_external_ids(
@@ -265,7 +344,10 @@ ON DUPLICATE KEY UPDATE
         if not family_ids:
             return {}
 
-        _query = 'SELECT external_id, id FROM family WHERE external_id in :external_ids AND project = :project'
+        _query = """\
+SELECT external_id, family_id AS id FROM family_external_id
+WHERE external_id in :external_ids AND project = :project
+        """
         results = await self.connection.fetch_all(
             _query, {'external_ids': family_ids, 'project': project or self.project_id}
         )
@@ -288,19 +370,20 @@ ON DUPLICATE KEY UPDATE
     async def get_id_map_by_internal_ids(
         self, family_ids: List[int], allow_missing=False
     ):
-        """Get map of {external_id: internal_id} for a family"""
+        """Get map of {internal_id: external_id} for a family"""
         if len(family_ids) == 0:
             return {}
-        _query = 'SELECT id, external_id FROM family WHERE id in :ids'
+        # FIXME needs to be uniqueified!!
+        _query = 'SELECT family_id, external_id FROM family_external_id WHERE family_id in :ids'
         results = await self.connection.fetch_all(_query, {'ids': family_ids})
-        id_map = {r['id']: r['external_id'] for r in results}
+        id_map = {r['family_id']: r['external_id'] for r in results}
         if not allow_missing and len(id_map) != len(family_ids):
-            provided_external_ids = set(family_ids)
+            provided_internal_ids = set(family_ids)
             # do the check again, but use the set this time
             # (in case we're provided a list with duplicates)
-            if len(id_map) != len(provided_external_ids):
+            if len(id_map) != len(provided_internal_ids):
                 # we have families missing from the map, so we'll 404 the whole thing
-                missing_family_ids = provided_external_ids - set(id_map.keys())
+                missing_family_ids = provided_internal_ids - set(id_map.keys())
 
                 raise NotFoundError(
                     f"Couldn't find families with internal IDS: {', '.join(str(m) for m in missing_family_ids)}"

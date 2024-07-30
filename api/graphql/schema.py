@@ -583,6 +583,7 @@ class GraphQLFamily:
 
     id: int
     external_id: str
+    external_ids: strawberry.scalars.JSON
 
     description: str | None
     coded_phenotype: str | None
@@ -594,7 +595,8 @@ class GraphQLFamily:
     def from_internal(internal: FamilyInternal) -> 'GraphQLFamily':
         return GraphQLFamily(
             id=internal.id,
-            external_id=internal.external_id,
+            external_id=internal.external_ids[PRIMARY_EXTERNAL_ORG],
+            external_ids=internal.external_ids or {},
             description=internal.description,
             coded_phenotype=internal.coded_phenotype,
             project_id=internal.project,
