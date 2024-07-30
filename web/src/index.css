@@ -485,3 +485,7 @@ html[data-theme='dark-mode'] .ui.table {
 .ui.attached.inverted.menu {
     border: 1px solid #555 !important;
 }
+
+.dimmed.dimmable > .ui.modals.dimmer.visible {
+    display: flex !important;
+  }

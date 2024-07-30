@@ -371,6 +371,7 @@ interface ITangleTreeChartProps {
     originalData: { [name: string]: PedigreeEntry }
     onClick?: (e: PedigreeEntry) => void
     onHighlight?: (entry?: PedigreeEntry | null) => void
+    highlightedIndividual?: string | null
 
     nodeDiameter?: number
     nodeHorizontalSpacing?: number
@@ -385,6 +386,7 @@ const TangleTreeChart: React.FC<ITangleTreeChartProps> = (props) => {
         originalData,
         onClick,
         onHighlight,
+        highlightedIndividual,
         nodeHorizontalSpacing,
         nodeVerticalSpacing,
         nodeDiameter = defaultNodeDiameter,
@@ -409,7 +411,7 @@ const TangleTreeChart: React.FC<ITangleTreeChartProps> = (props) => {
     const viewBox = `${minX} ${minY} ${width} ${height}`
 
     return (
-        <svg width={width} height={height} viewBox={viewBox} style={{ border: '1px solid black' }}>
+        <svg width={width} height={height} viewBox={viewBox} style={{ border: '0px solid black' }}>
             {tangleLayout.bundles.map((b) => {
                 const d = b.links
                     .map(
@@ -436,6 +438,7 @@ const TangleTreeChart: React.FC<ITangleTreeChartProps> = (props) => {
                     entry={originalData[n.id]}
                     onClick={onClick}
                     onHighlight={onHighlight}
+                    isHighlighted={highlightedIndividual == n.id}
                     nodeSize={nodeDiameter}
                 />
             ))}
@@ -443,9 +446,11 @@ const TangleTreeChart: React.FC<ITangleTreeChartProps> = (props) => {
     )
 }
 
-interface IPersonNode {
+interface IPersonNodeProps {
     node: NodePosition
     entry: PedigreeEntry
+    isHighlighted?: boolean
+
     onClick?: (entry: PedigreeEntry) => void
     onHighlight?: (entry?: PedigreeEntry | null) => void
 
@@ -462,36 +467,31 @@ const getSVGPathForDeceasedLine = (node: NodePosition, nodeSize: number) => {
     return `M${mX} ${mY} L${lX} ${lY}`
 }
 
-export const PersonNode: React.FC<IPersonNode> = ({
+export const PersonNode: React.FC<IPersonNodeProps> = ({
     node,
     entry,
     onClick,
     onHighlight,
+    isHighlighted = false,
     nodeSize = defaultNodeDiameter,
     showIndividualId = true,
 }) => {
-    const [isHighlighted, setIsHighlighted] = React.useState(false)
-
     const isDeceased = entry.deceased
 
     return (
         <React.Fragment>
             <g
                 onMouseOver={() => {
-                    if (!!onHighlight) {
-                        setIsHighlighted(true)
-                        onHighlight?.(entry)
-                    }
+                    onHighlight?.(entry)
                 }}
                 onMouseLeave={() => {
-                    setIsHighlighted(false)
                     onHighlight?.(null)
                 }}
             >
                 <path
                     data-id={`${entry.individual_id}`}
-                    stroke={isHighlighted ? 'blue' : colPersonBorder}
-                    strokeWidth={isHighlighted ? nodeSize : nodeSize * 0.8}
+                    stroke={isHighlighted ? colPersonBorder : colPersonBorder}
+                    strokeWidth={isHighlighted ? nodeSize * 0.9 : nodeSize * 0.75}
                     z="-1"
                     d={`M${node.x} ${node.y} L${node.x} ${node.y}`}
                     strokeLinecap={entry.sex === 1 ? 'square' : 'round'}
@@ -502,6 +502,7 @@ export const PersonNode: React.FC<IPersonNode> = ({
                     strokeLinecap={entry.sex === 1 ? 'square' : 'round'}
                     d={`M${node.x} ${node.y} L${node.x} ${node.y}`}
                     onClick={() => onClick?.(entry)}
+                    // on highlight
                 />
                 {/* if deceased, show diagonal bar through node */}
                 {isDeceased && (
@@ -522,7 +523,7 @@ export const PersonNode: React.FC<IPersonNode> = ({
                             y={`${node.y + nodeSize / 2 + 10}`}
                             fontSize="12px"
                             textAnchor="middle"
-                            textDecoration={isHighlighted ? 'underline' : 'none'}
+                            fontWeight={isHighlighted ? 'bold' : 'normal'}
                         >
                             {entry.individual_id}
                         </text>
@@ -744,7 +745,11 @@ const formatData = (data: PedigreeEntry[]) => {
 
 interface RenderPedigreeProps {
     data: PedigreeEntry[]
+
     onClick?: (e: PedigreeEntry) => void
+    onHighlight?: (e?: PedigreeEntry | null) => void
+
+    highlightedIndividual?: string | null
 
     nodeDiameter?: number
     nodeHorizontalSpacing?: number
@@ -763,7 +768,16 @@ const TangledTree: React.FunctionComponent<RenderPedigreeProps> = ({ data, onCli
     const tree = formatData(data)
     const keyedData = _.keyBy(data, (s) => s.individual_id)
 
-    return <TangleTreeChart data={tree} originalData={keyedData} onClick={onClick} {...props} />
+    return (
+        <TangleTreeChart
+            data={tree}
+            originalData={keyedData}
+            onClick={onClick}
+            highlightedIndividual={props.highlightedIndividual}
+            onHighlight={props.onHighlight}
+            {...props}
+        />
+    )
 }
 
 export default TangledTree

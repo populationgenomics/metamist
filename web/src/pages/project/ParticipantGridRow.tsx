@@ -1,10 +1,11 @@
 import * as React from 'react'
 
 import _ from 'lodash'
-import { TableCell, TableRow } from 'semantic-ui-react'
+import { Button, Modal, TableCell, TableRow } from 'semantic-ui-react'
 import FamilyLink from '../../shared/components/links/FamilyLink'
 import SampleLink from '../../shared/components/links/SampleLink'
 import SequencingGroupLink from '../../shared/components/links/SequencingGroupLink'
+import { SMModal } from '../../shared/components/Modal'
 import sanitiseValue from '../../shared/utilities/sanitiseValue'
 import {
     Assay,
@@ -13,6 +14,7 @@ import {
     NestedSequencingGroup,
     ProjectParticipantGridField,
 } from '../../sm-api/api'
+import FamilyView from '../family/FamilyView'
 import { firstColBorder, otherColBorder } from './ProjectGridHeaderGroup'
 
 const getBorderStyles = (idx: number) => {
@@ -64,34 +66,56 @@ const FamilyCells: React.FC<{
     backgroundColor?: string
     projectName: string
     participantRowSpan?: number
-}> = ({ fields, participant, backgroundColor, projectName, participantRowSpan }) => (
-    <>
-        {fields.map((field) => (
-            <TableCell
-                key={`${participant.id}family.${field.key}`}
-                style={{
-                    backgroundColor,
-                    ...getBorderStyles(0),
-                }}
-                rowSpan={participantRowSpan}
-            >
-                {field.key == 'external_id'
-                    ? participant.families.map((f) => (
-                          <FamilyLink
-                              key={`family-${participant.id}-${f.id}`}
-                              id={`${f.id ?? ''}`}
-                              projectName={projectName}
-                          >
-                              {f.external_id}
-                          </FamilyLink>
-                      ))
-                    : participant.families
-                          .map((fam) => sanitiseValue(_.get(fam, field.key)))
-                          .join(', ')}
-            </TableCell>
-        ))}
-    </>
-)
+}> = ({ fields, participant, backgroundColor, projectName, participantRowSpan }) => {
+    const [showFamilyModal, setShowFamilyModal] = React.useState(false)
+
+    const familyIdSingular = participant.families.length === 1 ? participant.families[0].id : null
+
+    return (
+        <>
+            {fields.map((field) => (
+                <TableCell
+                    key={`${participant.id}family.${field.key}`}
+                    style={{
+                        backgroundColor,
+                        ...getBorderStyles(0),
+                    }}
+                    rowSpan={participantRowSpan}
+                >
+                    {field.key == 'external_id'
+                        ? participant.families.map((f) => (
+                              <FamilyLink
+                                  key={`family-${participant.id}-${f.id}`}
+                                  id={`${f.id ?? ''}`}
+                                  projectName={projectName}
+                                  onClick={(e) => {
+                                      e.preventDefault()
+                                      setShowFamilyModal(true)
+                                      debugger
+                                  }}
+                              >
+                                  {f.external_id}
+                              </FamilyLink>
+                          ))
+                        : participant.families
+                              .map((fam) => sanitiseValue(_.get(fam, field.key)))
+                              .join(', ')}
+                </TableCell>
+            ))}
+            {!!familyIdSingular && (
+                <SMModal open={showFamilyModal} onClose={() => setShowFamilyModal(false)}>
+                    <Modal.Header>Family</Modal.Header>
+                    <Modal.Content>
+                        <FamilyView familyId={familyIdSingular} />
+                    </Modal.Content>
+                    <Modal.Actions>
+                        <Button onClick={() => setShowFamilyModal(false)}>Close</Button>
+                    </Modal.Actions>
+                </SMModal>
+            )}
+        </>
+    )
+}
 
 const ParticipantCells: React.FC<{
     fields: ProjectParticipantGridField[]
