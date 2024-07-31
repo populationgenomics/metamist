@@ -81,9 +81,6 @@ def get_openapi_schema_func(app, version):
             # openapi_version='3.1.0'
         )
 
-        # follow-up PR, upgrade swagger and use 3.1 directly
-        convert_3_dot_1_to_3_dot_0_inplace(openapi_schema)
-
         openapi_schema['servers'] = [{'url': url} for url in URLS]
 
         app.openapi_schema = openapi_schema
@@ -104,7 +101,7 @@ def get_openapi_3_0_schema(app, version):
         routes=app.routes,
         # update when FastAPI + swagger supports 3.1.0
         # openapi_version='3.1.0'
-        )
+    )
 
     convert_3_dot_1_to_3_dot_0_inplace(openapi_schema)
 
