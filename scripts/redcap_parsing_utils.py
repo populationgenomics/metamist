@@ -171,7 +171,7 @@ class FacilityFastq:  # pylint: disable=too-many-instance-attributes
 
         self.seq_type = SeqType.EXOME
 
-        if (self.sample_type == 'DNA') or (self.sample_type == 'CARDIOGEN'):
+        if (self.sample_type == 'DNA') or (self.sample_type == 'CARDIOGEN') or (self.sample_type == 'OHMR5DNA'):
             # logic: Garvan do not provide exome seq service
             self.seq_type = SeqType.GENOME
         else:
