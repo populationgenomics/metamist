@@ -249,6 +249,16 @@ class ProjectParticipantGridResponse(SMBase):
         )
         participant_fields = [
             Field(
+                key='id',
+                label='Participant ID',
+                is_visible=True,
+                filter_key='id',
+                filter_types=[
+                    ProjectParticipantGridFilterType.eq,
+                    ProjectParticipantGridFilterType.neq,
+                ],
+            ),
+            Field(
                 key='external_ids',
                 label='Participant ID',
                 is_visible=True,

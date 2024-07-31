@@ -215,12 +215,14 @@ interface IAnalysisGridAnalysis {
 const AnalysisGrid: React.FC<{
     analyses: IAnalysisGridAnalysis[]
     participantBySgId: { [sgId: string]: { externalId: string } }
+    sgsById?: { [sgId: string]: { technology: string; platform: string } }
     highlightedIndividual?: string | null
     setAnalysisIdToView: (analysisId: number) => void
     showSequencingGroup?: boolean
 }> = ({
     analyses,
     participantBySgId,
+    sgsById,
     highlightedIndividual,
     setAnalysisIdToView,
     showSequencingGroup,
@@ -235,45 +237,53 @@ const AnalysisGrid: React.FC<{
                     <SUITable.HeaderCell>Created</SUITable.HeaderCell>
                     <SUITable.HeaderCell>Type</SUITable.HeaderCell>
                     <SUITable.HeaderCell>Sequencing type</SUITable.HeaderCell>
+                    <SUITable.HeaderCell>Sequencing technology</SUITable.HeaderCell>
                     <SUITable.HeaderCell>Output</SUITable.HeaderCell>
                 </SUITable.Row>
             </thead>
             <tbody>
-                {analyses?.map((a) => (
-                    <SUITable.Row
-                        key={a.id}
-                        style={{
-                            backgroundColor: a.sgs.some(
-                                (sg) =>
-                                    !!highlightedIndividual &&
-                                    participantBySgId[sg]?.externalId === highlightedIndividual
-                            )
-                                ? 'var(--color-page-total-row)'
-                                : 'var(--color-bg-card)',
-                        }}
-                    >
-                        {showSequencingGroup && (
+                {analyses?.map((a) => {
+                    const sgId = a.sgs?.length === 1 ? a.sgs[0] : null
+                    const sg = sgId ? sgsById?.[sgId] : null
+                    return (
+                        <SUITable.Row
+                            key={a.id}
+                            style={{
+                                backgroundColor: a.sgs.some(
+                                    (sg) =>
+                                        !!highlightedIndividual &&
+                                        participantBySgId[sg]?.externalId === highlightedIndividual
+                                )
+                                    ? 'var(--color-page-total-row)'
+                                    : 'var(--color-bg-card)',
+                            }}
+                        >
+                            {showSequencingGroup && (
+                                <SUITable.Cell>
+                                    {a.sgs.map((sg) => (
+                                        <li>
+                                            {sg}{' '}
+                                            {participantBySgId && sg in participantBySgId
+                                                ? `(${participantBySgId[sg]?.externalId})`
+                                                : ''}
+                                        </li>
+                                    ))}
+                                </SUITable.Cell>
+                            )}
+                            <SUITable.Cell>{a.timestampCompleted}</SUITable.Cell>
+                            <SUITable.Cell>{a.type}</SUITable.Cell>
+                            <SUITable.Cell>{a.meta?.sequencing_type}</SUITable.Cell>
                             <SUITable.Cell>
-                                {a.sgs.map((sg) => (
-                                    <li>
-                                        {sg}{' '}
-                                        {participantBySgId && sg in participantBySgId
-                                            ? `(${participantBySgId[sg]?.externalId})`
-                                            : ''}
-                                    </li>
-                                ))}
+                                {!!sg && `${sg?.technology} (${sg?.platform})`}
                             </SUITable.Cell>
-                        )}
-                        <SUITable.Cell>{a.timestampCompleted}</SUITable.Cell>
-                        <SUITable.Cell>{a.type}</SUITable.Cell>
-                        <SUITable.Cell>{a.meta?.sequencing_type}</SUITable.Cell>
-                        <SUITable.Cell>
-                            <a href="#" onClick={() => setAnalysisIdToView(a.id)}>
-                                {a.output}
-                            </a>
-                        </SUITable.Cell>
-                    </SUITable.Row>
-                ))}
+                            <SUITable.Cell>
+                                <a href="#" onClick={() => setAnalysisIdToView(a.id)}>
+                                    {a.output}
+                                </a>
+                            </SUITable.Cell>
+                        </SUITable.Row>
+                    )
+                })}
             </tbody>
         </Table>
     )
@@ -412,6 +422,11 @@ const IndividualDetails: React.FC<{
     analyses: IAnalysisGridAnalysis[]
     individualToHiglight?: string | null
 }> = ({ participant, individualToHiglight, analyses }) => {
+    const sgsById = _.keyBy(
+        // @ts-ignore
+        participant.samples.flatMap((s) => s.sequencingGroups),
+        (sg) => sg.id
+    )
     return (
         <div
             style={{
@@ -427,6 +442,7 @@ const IndividualDetails: React.FC<{
                 <h5>Analyses</h5>
                 <AnalysisGrid
                     analyses={analyses}
+                    sgsById={sgsById}
                     participantBySgId={{}}
                     showSequencingGroup
                     setAnalysisIdToView={(analysisId) => console.log}
