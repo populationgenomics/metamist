@@ -1,3 +1,4 @@
+# pylint: disable=dangerous-default-value
 import csv
 import io
 from datetime import date
@@ -238,7 +239,7 @@ async def query_analyses(
 
 @router.get('/analysis-runner', operation_id='getAnalysisRunnerLog')
 async def get_analysis_runner_log(
-    project_names: Annotated[list[str], Query()] = [],  # type: ignore
+    project_names: Annotated[list[str], Query()] = [],  # noqa
     # author: str = None, # not implemented yet, uncomment when we do
     ar_guid: str | None = None,
     connection: Connection = get_projectless_db_connection,
@@ -272,7 +273,7 @@ async def get_analysis_runner_log(
 )
 async def get_sample_reads_map(
     export_type: ExportType = ExportType.JSON,
-    sequencing_types: Annotated[list[str], Query()] = [],
+    sequencing_types: Annotated[list[str], Query()] = [],  # noqa
     connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """

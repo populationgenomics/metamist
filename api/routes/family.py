@@ -1,4 +1,4 @@
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name,dangerous-default-value
 import codecs
 import csv
 import io
@@ -140,8 +140,8 @@ async def get_pedigree(
     tags=['seqr'],
 )
 async def get_families(
-    participant_ids: Annotated[list[int], Query()] = [],
-    sample_ids: Annotated[list[str], Query()] = [],
+    participant_ids: Annotated[list[int], Query()] = [],  # noqa
+    sample_ids: Annotated[list[str], Query()] = [],  # noqa
     connection: Connection = get_project_db_connection(ReadAccessRoles),
 ) -> list[Family]:
     """Get families for some project"""
