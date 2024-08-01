@@ -109,7 +109,7 @@ def create_and_validate_md5s_for_files_in_directory(
 @click.command()
 @click.option('--billing-project', '-b', default=None)
 @click.option('--skip-filetypes', '-s', default=('.crai', '.tbi'), multiple=True)
-@click.option('--mode', '-m', click.Choice(['create', 'validate']), default='create', help='Whether to validate existing md5s or create new ones.')
+@click.option('--mode', '-m', type=click.Choice(['create', 'validate']), default='create', help='Whether to validate existing md5s or create new ones.')
 @click.option('--force-recreate-existing', '-f', is_flag=True, default=False, help='Re-create md5s even if they already exist.')
 @click.argument('gs_dir')
 def main(
