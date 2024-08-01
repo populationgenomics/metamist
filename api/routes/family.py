@@ -1,9 +1,9 @@
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name,dangerous-default-value
 import codecs
 import csv
 import io
 from datetime import date
-from typing import List, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, File, Query, UploadFile
 from pydantic import BaseModel
@@ -30,9 +30,9 @@ class FamilyUpdateModel(BaseModel):
     """Model for updating a family"""
 
     id: int
-    external_id: Optional[str] = None
-    description: Optional[str] = None
-    coded_phenotype: Optional[str] = None
+    external_id: str | None = None
+    description: str | None = None
+    coded_phenotype: str | None = None
 
 
 @router.post('/{project}/pedigree', operation_id='importPedigree', tags=['seqr'])
@@ -69,12 +69,12 @@ async def import_pedigree(
 
 @router.get('/{project}/pedigree', operation_id='getPedigree', tags=['seqr'])
 async def get_pedigree(
-    internal_family_ids: List[int] = Query(None),
+    internal_family_ids: Annotated[list[int], Query()],
     export_type: ExportType = ExportType.JSON,
     replace_with_participant_external_ids: bool = True,
     replace_with_family_external_ids: bool = True,
     include_header: bool = True,
-    empty_participant_value: Optional[str] = None,
+    empty_participant_value: str | None = None,
     connection: Connection = get_project_db_connection(ReadAccessRoles),
     include_participants_not_in_families: bool = False,
 ):
@@ -140,10 +140,10 @@ async def get_pedigree(
     tags=['seqr'],
 )
 async def get_families(
-    participant_ids: Optional[List[int]] = Query(None),
-    sample_ids: Optional[List[str]] = Query(None),
+    participant_ids: Annotated[list[int], Query()] = [],  # noqa
+    sample_ids: Annotated[list[str], Query()] = [],  # noqa
     connection: Connection = get_project_db_connection(ReadAccessRoles),
-) -> List[Family]:
+) -> list[Family]:
     """Get families for some project"""
     family_layer = FamilyLayer(connection)
     sample_ids_raw = sample_id_transform_to_raw_list(sample_ids) if sample_ids else None
@@ -154,6 +154,7 @@ async def get_families(
                 GenericFilter(in_=participant_ids) if participant_ids else None
             ),
             sample_id=GenericFilter(in_=sample_ids_raw) if sample_ids_raw else None,
+            project=GenericFilter(eq=connection.project_id),
         )
     )
 
