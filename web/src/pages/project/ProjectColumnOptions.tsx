@@ -3,14 +3,17 @@ import * as React from 'react'
 
 import DragHandle from '@mui/icons-material/DragHandle'
 import FilterAltIcon from '@mui/icons-material/FilterAlt'
+import HelpIcon from '@mui/icons-material/Help'
 
 import {
     Accordion,
     AccordionTitle,
+    Button,
     Card,
     Checkbox,
     Grid,
     Message,
+    Modal,
     Segment,
 } from 'semantic-ui-react'
 import {
@@ -20,6 +23,7 @@ import {
     ProjectParticipantGridResponse,
 } from '../../sm-api'
 import { DictEditor, DictEditorInput } from './DictEditor'
+import { ProjectGridFilterGuide } from './ProjectGridFilterGuide'
 import {
     headerGroupOrder,
     metaSeachEntityPrefixToFilterKey,
@@ -57,58 +61,80 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
     isOpen,
     setIsOpen,
 }) => {
+    const [isHelpOpen, setIsHelpOpen] = React.useState<boolean>(false)
     return (
-        <Card
-            style={{
-                width: screen.width,
-                padding: '20px',
-                backgroundColor: 'var(--color-bg-card)',
-            }}
-        >
-            <Accordion>
-                <AccordionTitle active={isOpen} onClick={() => setIsOpen(!isOpen)}>
-                    <h3>Filter + display options</h3>
-                </AccordionTitle>
-                <Accordion.Content active={isOpen}>
-                    {participantCount > 200 && (
-                        <Message warning>
-                            There are a high number of participants ({participantCount}), showing /
-                            hiding columns may take a few seconds to process, and the UI might
-                            appear to freeze.
+        <>
+            <Card
+                style={{
+                    width: screen.width,
+                    padding: '20px',
+                    backgroundColor: 'var(--color-bg-card)',
+                }}
+            >
+                <Accordion>
+                    <AccordionTitle active={isOpen} onClick={() => setIsOpen(!isOpen)}>
+                        <h3>Filter + display options</h3>
+                    </AccordionTitle>
+                    <Accordion.Content active={isOpen}>
+                        {participantCount > 200 && (
+                            <Message warning>
+                                There are a high number of participants ({participantCount}),
+                                showing / hiding columns may take a few seconds to process, and the
+                                UI might appear to freeze.
+                            </Message>
+                        )}
+                        <Message info>
+                            To filter the data, you can use the <FilterAltIcon /> button at the top
+                            of each column. Or get{' '}
+                            <Button
+                                circular
+                                style={{ padding: 0 }}
+                                onClick={() => setIsHelpOpen(true)}
+                            >
+                                <HelpIcon />
+                            </Button>
                         </Message>
-                    )}
-                    <Message info>
-                        To filter the data, you can use the <FilterAltIcon /> button at the top of
-                        each column.
-                    </Message>
-                    <DictEditor input={filterValues as DictEditorInput} onChange={updateFilters} />
-                    <br />
-                    <Grid container divided>
-                        {headerGroupOrder.map((headerGroup) => {
-                            return (
-                                <Segment
-                                    key={`project-col-option-${headerGroup}`}
-                                    style={{ width: '50%' }}
-                                >
-                                    <CategoryColumnOptions
-                                        category={headerGroup}
-                                        fields={headerGroups[headerGroup]}
-                                        filterValues={filterValues}
-                                        updateFilters={updateFilters}
-                                        updateFields={(fields) => {
-                                            setHeaderGroups({
-                                                ...headerGroups,
-                                                [headerGroup]: fields,
-                                            })
-                                        }}
-                                    />
-                                </Segment>
-                            )
-                        })}
-                    </Grid>
-                </Accordion.Content>
-            </Accordion>
-        </Card>
+                        <DictEditor
+                            input={filterValues as DictEditorInput}
+                            onChange={updateFilters}
+                        />
+                        <br />
+                        <Grid container divided>
+                            {headerGroupOrder.map((headerGroup) => {
+                                return (
+                                    <Segment
+                                        key={`project-col-option-${headerGroup}`}
+                                        style={{ width: '50%' }}
+                                    >
+                                        <CategoryColumnOptions
+                                            category={headerGroup}
+                                            fields={headerGroups[headerGroup]}
+                                            filterValues={filterValues}
+                                            updateFilters={updateFilters}
+                                            updateFields={(fields) => {
+                                                setHeaderGroups({
+                                                    ...headerGroups,
+                                                    [headerGroup]: fields,
+                                                })
+                                            }}
+                                        />
+                                    </Segment>
+                                )
+                            })}
+                        </Grid>
+                    </Accordion.Content>
+                </Accordion>
+            </Card>
+            <Modal open={isHelpOpen} onClose={() => setIsHelpOpen(false)}>
+                <Modal.Header>Help with project grid filtering</Modal.Header>
+                <Modal.Content>
+                    <ProjectGridFilterGuide headerGroups={headerGroups} />
+                </Modal.Content>
+                <Modal.Actions>
+                    <Button onClick={() => setIsHelpOpen(false)}>Close</Button>
+                </Modal.Actions>
+            </Modal>
+        </>
     )
 }
 
