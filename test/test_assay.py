@@ -14,7 +14,10 @@ from models.models import (
     AssayUpsertInternal,
     SampleUpsertInternal,
 )
-from models.models.sequencing_group import SequencingGroupUpsertInternal
+from models.models.sequencing_group import (
+    SequencingGroupInternalId,
+    SequencingGroupUpsertInternal,
+)
 
 default_sequencing_meta = {
     'sequencing_type': 'genome',
@@ -686,3 +689,59 @@ class TestAssay(DbIsolatedTest):
                 'batch-3': {'transcriptome': 1},
             },
         )
+
+    @run_as_sync
+    async def test_get_assays_by_sg_ids(self):
+        """
+        Just check get asssays_by_sg_ids returns multiple assays
+        """
+
+        sample = SampleUpsertInternal(
+            external_ids={PRIMARY_EXTERNAL_ORG: 'SAMPLE_1'},
+            type='blood',
+            active=True,
+            meta={'collection-year': '2022'},
+            sequencing_groups=[
+                SequencingGroupUpsertInternal(
+                    external_ids={'default': 'SG_1'},
+                    type='genome',
+                    technology='short-read',
+                    platform='illumina',
+                    meta={'sgmeta': 'sgvalue'},
+                    assays=[
+                        AssayUpsertInternal(
+                            type='sequencing',
+                            external_ids={'default': 'A1_1'},
+                            meta={
+                                'batch': 'batch-1',
+                                'sequencing_type': 'genome',
+                                'sequencing_platform': 'illumina',
+                                'sequencing_technology': 'short-read',
+                            },
+                        ),
+                        AssayUpsertInternal(
+                            type='sequencing',
+                            external_ids={'default': 'A1_2'},
+                            meta={
+                                'batch': 'batch-1',
+                                'sequencing_type': 'genome',
+                                'sequencing_platform': 'illumina',
+                                'sequencing_technology': 'short-read',
+                            },
+                        ),
+                    ],
+                ),
+            ],
+        )
+
+        await SampleLayer(self.connection).upsert_samples([sample])
+        assert sample.sequencing_groups and sample.sequencing_groups[0].assays
+        sequencing_group_ids: list[SequencingGroupInternalId] = [
+            sample.sequencing_groups[0].id
+        ]
+        assay_layer = AssayTable(self.connection)
+        by_sgs = await assay_layer.get_assays_for_sequencing_group_ids(
+            sequencing_group_ids=sequencing_group_ids
+        )
+        self.assertEqual(1, len(by_sgs))
+        self.assertEqual(2, len(by_sgs[sequencing_group_ids[0]]))
