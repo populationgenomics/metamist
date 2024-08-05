@@ -1,8 +1,10 @@
-from pathlib import Path
+import os
+
+# from pathlib import Path
+import re
 from typing import TypeAlias
 
-from cloudpathlib import AnyPath, CloudPath, GSPath
-from google.cloud.storage import Client
+from google.cloud.storage import Blob, Client
 from pydantic import BaseModel
 
 from models.base import SMBase, parse_sql_bool
@@ -65,39 +67,108 @@ class OutputFileInternal(SMBase):
         )
 
     @staticmethod
+    async def list_blobs(
+        bucket: str,
+        prefix: str,
+        delimiter: str,
+        client: Client,
+        versions: bool = False,
+    ) -> list[Blob]:
+        """
+        List blobs in a bucket
+        """
+        blobs = client.list_blobs(
+            bucket, prefix=prefix, delimiter=delimiter, versions=versions
+        )
+        return list(blobs)
+
+    @staticmethod
+    async def extract_bucket_params(
+        path: str,
+    ) -> dict:
+        """Extracts bucket from output path"""
+        # Define the regex pattern
+        pattern = r'gs://([^/]+)(/.*)?'
+
+        # Match the pattern
+        match = re.match(pattern, path)
+
+        bucket = None
+        prefix = None
+        basename = None
+        dirname = None
+        file_extension = None
+        file_stem = None
+        if match:
+            bucket = match.group(1)
+            path_after_bucket = match.group(2) or ''
+            dirname = f'gs://{bucket}{os.path.dirname(path_after_bucket)}'
+            basename = os.path.basename(path_after_bucket)
+            file_extension = os.path.splitext(basename)[1] if basename else ''
+            file_stem = os.path.splitext(basename)[0] if basename else ''
+            prefix = (
+                os.path.dirname(path_after_bucket) + '/'
+                if path_after_bucket.count('/') > 1
+                else ''
+            )
+            blob_name = f'{path_after_bucket.strip("/")}'
+        else:
+            return {}
+
+        if not bucket:
+            return {}
+
+        return {
+            'bucket': bucket,
+            'prefix': prefix,
+            'delimiter': '/',
+            'dirname': dirname,
+            'basename': basename,
+            'file_extension': file_extension,
+            'file_stem': file_stem,
+            'blob_name': blob_name,
+        }
+
+    @staticmethod
     async def get_file_info(
-        file_obj: CloudPath | AnyPath | GSPath | Path, client: Client
+        path: str,
+        client: Client,
+        blobs: list[Blob] | None = None,
     ) -> dict | None:
         """Get file info for file at given path"""
         try:
             file_checksum = None
             valid = False
             size = 0
-            # try:
-            if isinstance(file_obj, GSPath) and client:
-                if '/' in file_obj.blob:
-                    prefix = '/'.join(file_obj.blob.split('/')[:-1]) + '/'
-                else:
-                    prefix = ''
-                delimiter = '/'
-                blobs = client.list_blobs(
-                    bucket_or_name=str(file_obj.bucket),
-                    versions=False,
-                    prefix=prefix,
-                    delimiter=str(delimiter),
-                )  # pylint: disable=E1101
+
+            params = await OutputFileInternal.extract_bucket_params(
+                path=path,
+            )
+            if not params:
+                return None
+            if path.startswith('gs://') and client:
+                if not blobs and not isinstance(blobs, list):
+                    blobs = await OutputFileInternal.list_blobs(
+                        bucket=params['bucket'],
+                        prefix=params['prefix'],
+                        delimiter=params['delimiter'],
+                        client=client,
+                        versions=False,
+                    )
                 for blob in blobs:
-                    if blob.name == file_obj.blob:
-                        if file_obj.suffix != '.mt':
-                            file_checksum = blob.crc32c  # pylint: disable=E1101
+                    if blob.name == params['blob_name']:
+                        if params['file_extension'] != '.mt':
+                            file_checksum = (
+                                blob.crc32c
+                            )  # pylint: disable=E1101
                             valid = True
                             size = blob.size  # pylint: disable=E1101
 
             return {
-                'basename': file_obj.name,  # pylint: disable=E1101
-                'dirname': str(file_obj.parent),  # pylint: disable=E1101
-                'nameroot': file_obj.stem,  # pylint: disable=E1101
-                'nameext': file_obj.suffix,  # pylint: disable=E1101
+                'basename': params['basename'],  # pylint: disable=E1101
+                'dirname': params['dirname'],  # pylint: disable=E1101
+                'nameroot': params['file_stem'],  # pylint: disable=E1101
+                'nameext': params['file_extension'],  # pylint: disable=E1101
                 'checksum': file_checksum,
                 'size': size,  # pylint: disable=E1101
                 'valid': valid,

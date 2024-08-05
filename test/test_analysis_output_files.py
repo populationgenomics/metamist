@@ -28,7 +28,9 @@ class TestOutputFiles(DbIsolatedTest):
         # don't need to await because it's tagged @run_as_sync
         super().setUp()
 
-        absolute_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+        absolute_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), 'data'
+        )
         gcs = (
             DockerContainer('fsouza/fake-gcs-server')
             .with_bind_ports(4443, 4443)
@@ -93,7 +95,9 @@ class TestOutputFiles(DbIsolatedTest):
         self.sample_id = sample.id
         assert sample.sequencing_groups
         self.genome_sequencing_group_id = sample.sequencing_groups[0].id
-        self.exome_sequencing_group_id = sample.sequencing_groups[self.project_id].id
+        self.exome_sequencing_group_id = sample.sequencing_groups[
+            self.project_id
+        ].id
 
     def tearDown(self) -> None:
         if self.gcs:
@@ -151,7 +155,7 @@ class TestOutputFiles(DbIsolatedTest):
         output_file_data = {
             'path': 'gs://fakegcs/file1.txt',
             'basename': 'file1.txt',
-            'dirname': 'gs://fakegcs',
+            'dirname': 'gs://fakegcs/',
             'nameroot': 'file1',
             'nameext': '.txt',
             'file_checksum': 'DG+fhg==',
@@ -189,7 +193,7 @@ class TestOutputFiles(DbIsolatedTest):
         output_file_data = {
             'path': 'gs://fakegcs/file1.txt',
             'basename': 'file1.txt',
-            'dirname': 'gs://fakegcs',
+            'dirname': 'gs://fakegcs/',
             'nameroot': 'file1',
             'nameext': '.txt',
             'file_checksum': 'DG+fhg==',
@@ -235,7 +239,7 @@ class TestOutputFiles(DbIsolatedTest):
                 'parent_id': None,
                 'path': 'gs://fakegcs/file2.cram',
                 'basename': 'file2.cram',
-                'dirname': 'gs://fakegcs',
+                'dirname': 'gs://fakegcs/',
                 'nameroot': 'file2',
                 'nameext': '.cram',
                 'file_checksum': 'sl7SXw==',
@@ -246,7 +250,7 @@ class TestOutputFiles(DbIsolatedTest):
                     'meta': {
                         'path': 'gs://fakegcs/file2.cram.meta',
                         'basename': 'file2.cram.meta',
-                        'dirname': 'gs://fakegcs',
+                        'dirname': 'gs://fakegcs/',
                         'nameroot': 'file2.cram',
                         'nameext': '.meta',
                         'file_checksum': 'af/YSw==',
@@ -258,7 +262,7 @@ class TestOutputFiles(DbIsolatedTest):
                     'ext': {
                         'path': 'gs://fakegcs/file2.cram.ext',
                         'basename': 'file2.cram.ext',
-                        'dirname': 'gs://fakegcs',
+                        'dirname': 'gs://fakegcs/',
                         'nameroot': 'file2.cram',
                         'nameext': '.ext',
                         'file_checksum': 'gb1EbA==',
@@ -294,7 +298,9 @@ class TestOutputFiles(DbIsolatedTest):
         self.assertIn('ext', analysis.outputs['cram']['secondary_files'])
 
         # Check for each field against the output file data and also check each secondary file
-        self.check_outputs_fields(analysis.outputs['cram'], output_file_data['cram'])
+        self.check_outputs_fields(
+            analysis.outputs['cram'], output_file_data['cram']
+        )
         self.check_outputs_fields(
             analysis.outputs['cram']['secondary_files']['meta'],
             output_file_data['cram']['secondary_files']['meta'],  # type: ignore [index]

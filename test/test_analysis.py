@@ -81,7 +81,9 @@ class TestAnalysis(DbIsolatedTest):
         )
         self.sample_id = sample.id
         self.genome_sequencing_group_id = sample.sequencing_groups[0].id
-        self.exome_sequencing_group_id = sample.sequencing_groups[self.project_id].id
+        self.exome_sequencing_group_id = sample.sequencing_groups[
+            self.project_id
+        ].id
 
     @run_as_sync
     async def test_get_analysis_by_id(self):
@@ -107,7 +109,9 @@ class TestAnalysis(DbIsolatedTest):
         """
         Test empty IDs to see the query construction
         """
-        analyses = await self.al.query(AnalysisFilter(id=GenericFilter(in_=[])))
+        analyses = await self.al.query(
+            AnalysisFilter(id=GenericFilter(in_=[]))
+        )
         self.assertEqual(len(analyses), 0)
 
     @run_as_sync
@@ -125,7 +129,9 @@ class TestAnalysis(DbIsolatedTest):
             )
         )
 
-        analyses = await self.connection.connection.fetch_all('SELECT * FROM analysis')
+        analyses = await self.connection.connection.fetch_all(
+            'SELECT * FROM analysis'
+        )
         analysis_sgs = await self.connection.connection.fetch_all(
             'SELECT * FROM analysis_sequencing_group'
         )
@@ -252,7 +258,9 @@ class TestAnalysis(DbIsolatedTest):
             )
         )
 
-        sgs_by_aid = await self.sgl.get_sequencing_groups_by_analysis_ids([a_id])
+        sgs_by_aid = await self.sgl.get_sequencing_groups_by_analysis_ids(
+            [a_id]
+        )
         self.assertIn(a_id, sgs_by_aid)
         sgs = sorted(sgs_by_aid[a_id], key=lambda sg: sg.id)
 
@@ -313,6 +321,7 @@ class TestAnalysis(DbIsolatedTest):
                 sequencing_group_ids=[],
                 cohort_ids=[],
                 output='test_output',
+                outputs='test_output',
                 timestamp_completed=init_timestamp_completed,
                 project=1,
                 meta={'sequencing_type': 'genome', 'size': 1024},

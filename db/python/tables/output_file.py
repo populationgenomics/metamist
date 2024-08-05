@@ -1,10 +1,10 @@
+# pylint: disable=too-many-nested-blocks
 import os
 import warnings
 from textwrap import dedent
 
-from cloudpathlib import AnyPath, GSClient
 from google.auth.credentials import AnonymousCredentials
-from google.cloud.storage import Client
+from google.cloud.storage import Blob, Client
 
 from db.python.tables.base import DbBase
 from models.models.output_file import OutputFileInternal, RecursiveDict
@@ -18,7 +18,12 @@ class OutputFileTable(DbBase):
     table_name = 'output_file'
 
     async def process_output_for_analysis(
-        self, analysis_id: int, output: str | None, outputs: str | RecursiveDict | None
+        self,
+        analysis_id: int,
+        output: str | None,
+        outputs: str | RecursiveDict | None,
+        blobs: list[Blob] | None = None,
+        client: Client | None = None,
     ):
         """
         Process output for analysis
@@ -47,7 +52,10 @@ class OutputFileTable(DbBase):
 
         if output_data:
             await self.create_or_update_analysis_output_files_from_output(
-                analysis_id=analysis_id, json_dict=output_data
+                analysis_id=analysis_id,
+                json_dict=output_data,
+                blobs=blobs,
+                client=client,
             )
 
     async def create_or_update_output_file(
@@ -55,17 +63,18 @@ class OutputFileTable(DbBase):
         path: str,
         parent_id: int | None = None,
         client: Client | None = None,
+        blobs: list[Blob] | None = None,
     ) -> int | None:
         """
         Create a new file, and add it to database
         """
-        file_obj = AnyPath(path, client=GSClient(storage_client=client))
+        # file_obj = AnyPath(path, client=GSClient(storage_client=client))
 
-        if not file_obj or not client:
-            raise ValueError('Invalid file path or client')
+        if not path or not client:
+            raise ValueError('Invalid cloud file path or client')
 
         file_info = await OutputFileInternal.get_file_info(
-            file_obj=file_obj, client=client
+            path=path, client=client, blobs=blobs
         )
 
         if not file_info or not file_info.get('valid'):
@@ -132,6 +141,8 @@ class OutputFileTable(DbBase):
         self,
         analysis_id: int,
         json_dict: RecursiveDict | str,
+        blobs: list[Blob] | None = None,
+        client: Client | None = None,
     ) -> None:
         """
         Create analysis files from JSON
@@ -139,32 +150,42 @@ class OutputFileTable(DbBase):
         files = await self.find_files_from_dict(json_dict=json_dict)
         file_ids: list[int] = []
 
-        if os.environ.get('SM_ENVIRONMENT', 'local').lower() in (
-            'local',
-            'test',
-        ):
-            client = Client(
-                credentials=AnonymousCredentials(),
-                project='test',
-                # Alternatively instead of using the global env STORAGE_EMULATOR_HOST. You can define it here.
-                # This will set this client object to point to the local google cloud storage.
-                client_options={'api_endpoint': 'http://localhost:4443'},
-            )
-        else:
-            client = Client()
+        if not client:
+            if os.environ.get('SM_ENVIRONMENT', 'local').lower() in (
+                # 'local',
+                'test',
+            ):
+                client = Client(
+                    credentials=AnonymousCredentials(),
+                    project='test',
+                    # Alternatively instead of using the global env STORAGE_EMULATOR_HOST. You can define it here.
+                    # This will set this client object to point to the local google cloud storage.
+                    client_options={'api_endpoint': 'http://localhost:4443'},
+                )
+            else:
+                # if project:
+                #     client = Client(project=project)
+                # else:
+                client = Client()
 
         async with self.connection.transaction():
             if 'main_files' in files:
                 for primary_file in files['main_files']:
                     parent_file_id = await self.create_or_update_output_file(
-                        path=primary_file['basename'], client=client
+                        path=primary_file['basename'],
+                        client=client,
+                        blobs=blobs,
                     )
                     await self.add_output_file_to_analysis(
                         analysis_id,
                         parent_file_id,
                         json_structure=primary_file['json_path'],
                         # If the file couldnt be created, we just pass the basename as the output
-                        output=None if parent_file_id else primary_file['basename'],
+                        output=(
+                            None
+                            if parent_file_id
+                            else primary_file['basename']
+                        ),
                     )
                     if files.get('secondary_files_grouped'):
                         secondary_files = files['secondary_files_grouped']
@@ -177,6 +198,7 @@ class OutputFileTable(DbBase):
                                         path=secondary_file['basename'],
                                         parent_id=parent_file_id,
                                         client=client,
+                                        blobs=blobs,
                                     )
                                 )
                                 await self.add_output_file_to_analysis(
@@ -190,8 +212,10 @@ class OutputFileTable(DbBase):
                                         else secondary_file['basename']
                                     ),
                                 )
-                                file_ids.append(secondary_file_id)
-                    file_ids.append(parent_file_id)
+                                if secondary_file_id:
+                                    file_ids.append(secondary_file_id)
+                    if parent_file_id:
+                        file_ids.append(parent_file_id)
 
         client.close()
         # check that only the files in this json_dict should be in the analysis. Remove what isn't in this dict.
@@ -205,7 +229,8 @@ class OutputFileTable(DbBase):
 
         if file_ids:
             await self.connection.execute(
-                _update_query, {'analysis_id': analysis_id, 'file_ids': file_ids}
+                _update_query,
+                {'analysis_id': analysis_id, 'file_ids': file_ids},
             )
 
     async def find_files_from_dict(
@@ -220,7 +245,9 @@ class OutputFileTable(DbBase):
 
         if isinstance(json_dict, str):
             # If the data is a plain string, return it as the basename with None as its keypath
-            collected['main_files'].append({'json_path': None, 'basename': json_dict})
+            collected['main_files'].append(
+                {'json_path': None, 'basename': json_dict}
+            )
             return collected
 
         if isinstance(json_dict, dict):
@@ -240,11 +267,18 @@ class OutputFileTable(DbBase):
                 # Handle secondary files if present
                 if 'secondary_files' in json_dict:
                     secondary = json_dict['secondary_files']
-                    if current_basename not in collected['secondary_files_grouped']:
-                        collected['secondary_files_grouped'][current_basename] = []
+                    if (
+                        current_basename
+                        not in collected['secondary_files_grouped']
+                    ):
+                        collected['secondary_files_grouped'][
+                            current_basename
+                        ] = []
                     for key, value in secondary.items():
                         # Append each secondary file to the list in secondary_files under its parent basename
-                        collected['secondary_files_grouped'][current_basename].append(
+                        collected['secondary_files_grouped'][
+                            current_basename
+                        ].append(
                             {
                                 'json_path': '.'.join(
                                     json_path + ['secondary_files', key]
@@ -256,7 +290,9 @@ class OutputFileTable(DbBase):
             else:
                 for key, value in json_dict.items():
                     # Recur for each sub-dictionary, updating the path
-                    await self.find_files_from_dict(value, json_path + [key], collected)
+                    await self.find_files_from_dict(
+                        value, json_path + [key], collected
+                    )
 
         elif isinstance(json_dict, list):
             # Recur for each item in the list, without updating the path (as lists don't contribute to JSON path)
