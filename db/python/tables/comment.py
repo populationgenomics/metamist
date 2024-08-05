@@ -47,10 +47,24 @@ class CommentTable(DbBase):
 
         comment_versions = await self.connection.fetch_all(_query)
 
-        return [
-            CommentInternal.from_db_versions(list(dict(v) for v in g))
-            for _, g in groupby(comment_versions, key=lambda k: k['comment_id'])
-        ]
+        comments: list[CommentInternal] = []
+
+        # Group comments by their ids so that versions get included within a comment
+        comment_map = {
+            id: CommentInternal.from_db_versions(list(dict(v) for v in g))
+            for id, g in groupby(comment_versions, key=lambda k: k['comment_id'])
+        }
+
+        # Organize threaded comments under their parents
+        for _, comment in comment_map.items():
+            if comment.parent_id is None:
+                comments.append(comment)
+            else:
+                parent = comment_map.get(comment.parent_id, None)
+                if parent is not None:
+                    parent.add_comment_to_thread(comment)
+
+        return comments
 
     async def add_comment(self, entity: str, entity_id: int, content: str):
 
