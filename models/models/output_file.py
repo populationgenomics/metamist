@@ -4,12 +4,35 @@ import os
 import re
 from typing import TypeAlias
 
+from google.auth.credentials import AnonymousCredentials
 from google.cloud.storage import Blob, Client
 from pydantic import BaseModel
 
 from models.base import SMBase, parse_sql_bool
 
 RecursiveDict: TypeAlias = dict[str, 'str | RecursiveDict']
+
+
+def get_gcs_client():
+    """Return a GCS client"""
+    if os.environ.get('SM_ENVIRONMENT', 'local').lower() in (
+        # 'local',
+        'test',
+    ):
+        # This connects to the local Fake GCS emulator on port 4443.
+        # Make sure you have the fake-gcs-server installed and running.
+        # https://github.com/fsouza/fake-gcs-server
+        return Client(
+            credentials=AnonymousCredentials(),
+            project='test',
+            # Alternatively instead of using the global env STORAGE_EMULATOR_HOST. You can define it here.
+            # This will set this client object to point to the local google cloud storage.
+            client_options={'api_endpoint': 'http://localhost:4443'},
+        )
+    return Client(project='sample-metadata')
+
+
+reusable_client = get_gcs_client()
 
 
 class OutputFileInternal(SMBase):
@@ -67,9 +90,9 @@ class OutputFileInternal(SMBase):
         )
 
     @staticmethod
-    async def list_blobs(
+    def list_blobs(
         bucket: str,
-        prefix: str,
+        prefix: str | None,
         delimiter: str,
         client: Client,
         versions: bool = False,
@@ -83,7 +106,7 @@ class OutputFileInternal(SMBase):
         return list(blobs)
 
     @staticmethod
-    async def extract_bucket_params(
+    def extract_bucket_params(
         path: str,
     ) -> dict:
         """Extracts bucket from output path"""
@@ -127,30 +150,38 @@ class OutputFileInternal(SMBase):
             'file_extension': file_extension,
             'file_stem': file_stem,
             'blob_name': blob_name,
+            'path_after_bucket': path_after_bucket,
         }
 
     @staticmethod
-    async def get_file_info(
+    def get_file_info(
         path: str,
-        client: Client,
+        client: Client | None = None,
         blobs: list[Blob] | None = None,
     ) -> dict | None:
         """Get file info for file at given path"""
         try:
+            if not client:
+                client = reusable_client
+
             file_checksum = None
             valid = False
             size = 0
 
-            params = await OutputFileInternal.extract_bucket_params(
+            params = OutputFileInternal.extract_bucket_params(
                 path=path,
             )
             if not params:
                 return None
             if path.startswith('gs://') and client:
                 if not blobs and not isinstance(blobs, list):
-                    blobs = await OutputFileInternal.list_blobs(
+                    blobs = OutputFileInternal.list_blobs(
                         bucket=params['bucket'],
-                        prefix=params['prefix'],
+                        prefix=(
+                            params['path_after_bucket']
+                            if params['prefix']
+                            else None
+                        ),
                         delimiter=params['delimiter'],
                         client=client,
                         versions=False,

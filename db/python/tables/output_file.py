@@ -1,10 +1,9 @@
 # pylint: disable=too-many-nested-blocks
-import os
 import warnings
 from textwrap import dedent
 
-from google.auth.credentials import AnonymousCredentials
-from google.cloud.storage import Blob, Client
+from fastapi.concurrency import run_in_threadpool
+from google.cloud.storage import Blob
 
 from db.python.tables.base import DbBase
 from models.models.output_file import OutputFileInternal, RecursiveDict
@@ -23,7 +22,6 @@ class OutputFileTable(DbBase):
         output: str | None,
         outputs: str | RecursiveDict | None,
         blobs: list[Blob] | None = None,
-        client: Client | None = None,
     ):
         """
         Process output for analysis
@@ -55,14 +53,12 @@ class OutputFileTable(DbBase):
                 analysis_id=analysis_id,
                 json_dict=output_data,
                 blobs=blobs,
-                client=client,
             )
 
     async def create_or_update_output_file(
         self,
         path: str,
         parent_id: int | None = None,
-        client: Client | None = None,
         blobs: list[Blob] | None = None,
     ) -> int | None:
         """
@@ -70,11 +66,13 @@ class OutputFileTable(DbBase):
         """
         # file_obj = AnyPath(path, client=GSClient(storage_client=client))
 
-        if not path or not client:
-            raise ValueError('Invalid cloud file path or client')
+        if not path:
+            raise ValueError('Invalid cloud file path')
 
-        file_info = await OutputFileInternal.get_file_info(
-            path=path, client=client, blobs=blobs
+        file_info = await run_in_threadpool(
+            OutputFileInternal.get_file_info,
+            path=path,
+            blobs=blobs,
         )
 
         if not file_info or not file_info.get('valid'):
@@ -97,18 +95,18 @@ class OutputFileTable(DbBase):
         cs_keys = ', '.join(keys)
         cs_id_keys = ', '.join(f':{k}' for k in keys)
         non_pk_keys = [k for k in keys if k != 'path']
-        update_clause = ', '.join(
-            [f'{k} = VALUES({k})' for k in non_pk_keys]
-        )  # ON DUPLICATE KEY UPDATE {update_clause}
+        update_clause = ', '.join([f'{k} = VALUES({k})' for k in non_pk_keys])
 
-        async with self.connection.transaction():
-            _query = dedent(
-                f"""INSERT INTO output_file ({cs_keys}) VALUES ({cs_id_keys}) ON DUPLICATE KEY UPDATE {update_clause} RETURNING id"""
-            )
-            id_of_new_file = await self.connection.fetch_val(
-                _query,
-                dict(kv_pairs),
-            )
+        _query = dedent(
+            f"""
+            INSERT INTO output_file ({cs_keys}) VALUES ({cs_id_keys})
+            ON DUPLICATE KEY UPDATE {update_clause} RETURNING id
+            """
+        )
+        id_of_new_file = await self.connection.fetch_val(
+            _query,
+            dict(kv_pairs),
+        )
 
         return id_of_new_file
 
@@ -142,38 +140,18 @@ class OutputFileTable(DbBase):
         analysis_id: int,
         json_dict: RecursiveDict | str,
         blobs: list[Blob] | None = None,
-        client: Client | None = None,
     ) -> None:
         """
         Create analysis files from JSON
         """
-        files = await self.find_files_from_dict(json_dict=json_dict)
+        files = await self.find_files_from_dict(json_dict=json_dict)  # type: ignore [arg-type]
         file_ids: list[int] = []
-
-        if not client:
-            if os.environ.get('SM_ENVIRONMENT', 'local').lower() in (
-                # 'local',
-                'test',
-            ):
-                client = Client(
-                    credentials=AnonymousCredentials(),
-                    project='test',
-                    # Alternatively instead of using the global env STORAGE_EMULATOR_HOST. You can define it here.
-                    # This will set this client object to point to the local google cloud storage.
-                    client_options={'api_endpoint': 'http://localhost:4443'},
-                )
-            else:
-                # if project:
-                #     client = Client(project=project)
-                # else:
-                client = Client()
 
         async with self.connection.transaction():
             if 'main_files' in files:
                 for primary_file in files['main_files']:
                     parent_file_id = await self.create_or_update_output_file(
                         path=primary_file['basename'],
-                        client=client,
                         blobs=blobs,
                     )
                     await self.add_output_file_to_analysis(
@@ -187,8 +165,8 @@ class OutputFileTable(DbBase):
                             else primary_file['basename']
                         ),
                     )
-                    if files.get('secondary_files_grouped'):
-                        secondary_files = files['secondary_files_grouped']
+                    secondary_files = files.get('secondary_files_grouped')
+                    if secondary_files:
                         if primary_file['basename'] in secondary_files:
                             for secondary_file in secondary_files[
                                 primary_file['basename']
@@ -197,7 +175,6 @@ class OutputFileTable(DbBase):
                                     await self.create_or_update_output_file(
                                         path=secondary_file['basename'],
                                         parent_id=parent_file_id,
-                                        client=client,
                                         blobs=blobs,
                                     )
                                 )
@@ -217,24 +194,25 @@ class OutputFileTable(DbBase):
                     if parent_file_id:
                         file_ids.append(parent_file_id)
 
-        client.close()
-        # check that only the files in this json_dict should be in the analysis. Remove what isn't in this dict.
-        _update_query = dedent(
-            """
-            DELETE ao FROM analysis_outputs ao
-            WHERE (ao.analysis_id = :analysis_id)
-            AND (ao.file_id NOT IN :file_ids)
-            """
-        )
-
-        if file_ids:
-            await self.connection.execute(
-                _update_query,
-                {'analysis_id': analysis_id, 'file_ids': file_ids},
-            )
+            # check that only the files in this json_dict should be in the analysis. Remove what isn't in this dict.
+            if file_ids:
+                _update_query = dedent(
+                    """
+                    DELETE ao FROM analysis_outputs ao
+                    WHERE (ao.analysis_id = :analysis_id)
+                    AND (ao.file_id NOT IN :file_ids)
+                    """
+                )
+                await self.connection.execute(
+                    _update_query,
+                    {'analysis_id': analysis_id, 'file_ids': file_ids},
+                )
 
     async def find_files_from_dict(
-        self, json_dict, json_path=None, collected=None
+        self,
+        json_dict: dict,
+        json_path: list[str] | None = None,
+        collected: dict | None = None,
     ) -> dict:
         """Retrieve filepaths from a dict of outputs"""
         if collected is None:

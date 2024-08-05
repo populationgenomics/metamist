@@ -52,6 +52,7 @@ if __name__ == '__main__':
             project=None,
         )
         oft = OutputFileTable(formed_connection)
+
         if os.environ.get('SM_ENVIRONMENT', 'local').lower() in (
             # 'local',
             'test',
@@ -72,9 +73,9 @@ if __name__ == '__main__':
         analyses = await get_analyses_without_fileid(sm_db)
         print(f'Found {len(analyses)} analysis outputs to be migrated')
 
-        analyses_group_by_bucket: dict[
-            str, dict[str, list[dict[str, Any]]]
-        ] = defaultdict(lambda: defaultdict(list))
+        analyses_group_by_bucket: dict[str, dict[str, list[Any]]] = (
+            defaultdict(lambda: defaultdict(list))
+        )
 
         analyses_local = {}
         bucket_params: dict[str, Any] = {}
@@ -133,7 +134,7 @@ if __name__ == '__main__':
         for bucket, prefixes in analyses_group_by_bucket.items():
             for prefix, analyses in prefixes.items():
                 params = bucket_params[bucket][prefix]
-                blobs = await OutputFileInternal.list_blobs(
+                blobs = OutputFileInternal.list_blobs(
                     bucket=bucket,
                     prefix=params['prefix'],
                     delimiter=params['delimiter'],
@@ -149,7 +150,6 @@ if __name__ == '__main__':
                         output=analysis['output'],
                         outputs=None,
                         blobs=blobs,
-                        client=client,
                     )
                     # Print progress
                     print(

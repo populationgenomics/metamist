@@ -45,10 +45,10 @@ class AnalysisTable(DbBase):
         self, analysis_ids: List[int]
     ) -> Set[ProjectId]:
         """Get project IDs for sampleIds (mostly for checking auth)"""
-        _query = (
-            'SELECT project FROM analysis WHERE id in :analysis_ids GROUP BY project'
+        _query = 'SELECT project FROM analysis WHERE id in :analysis_ids GROUP BY project'
+        rows = await self.connection.fetch_all(
+            _query, {'analysis_ids': analysis_ids}
         )
-        rows = await self.connection.fetch_all(_query, {'analysis_ids': analysis_ids})
         return set(r['project'] for r in rows)
 
     async def create_analysis(
@@ -76,7 +76,9 @@ class AnalysisTable(DbBase):
             ]
 
             if status == AnalysisStatus.COMPLETED:
-                kv_pairs.append(('timestamp_completed', datetime.datetime.utcnow()))
+                kv_pairs.append(
+                    ('timestamp_completed', datetime.datetime.utcnow())
+                )
 
             kv_pairs = [(k, v) for k, v in kv_pairs if v is not None]
             keys = [k for k, _ in kv_pairs]
@@ -98,7 +100,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 )
 
             if cohort_ids:
-                await self.add_cohorts_to_analysis(id_of_new_analysis, cohort_ids)
+                await self.add_cohorts_to_analysis(
+                    id_of_new_analysis, cohort_ids
+                )
 
         return id_of_new_analysis
 
@@ -123,7 +127,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         )
         await self.connection.execute_many(_query, list(values))
 
-    async def add_cohorts_to_analysis(self, analysis_id: int, cohort_ids: list[int]):
+    async def add_cohorts_to_analysis(
+        self, analysis_id: int, cohort_ids: list[int]
+    ):
         """Add cohorts to an analysis (through the linked table)"""
         _query = """
             INSERT INTO analysis_cohort
@@ -174,7 +180,10 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             'on_behalf_of': self.author,
             'audit_log_id': await self.audit_log_id(),
         }
-        setters = ['audit_log_id = :audit_log_id', 'on_behalf_of = :on_behalf_of']
+        setters = [
+            'audit_log_id = :audit_log_id',
+            'on_behalf_of = :on_behalf_of',
+        ]
         if status:
             setters.append('status = :status')
             fields['status'] = status.value
@@ -192,7 +201,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
         if meta is not None and len(meta) > 0:
             fields['meta'] = to_db_json(meta)
-            setters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
+            setters.append(
+                'meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)'
+            )
 
         fields_str = ', '.join(setters)
         _query = f'UPDATE analysis SET {fields_str} WHERE id = :analysis_id'
@@ -284,7 +295,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 ]
 
             if row['_cohort_ids']:
-                analysis.cohort_ids = [int(co) for co in row['_cohort_ids'].split(',')]
+                analysis.cohort_ids = [
+                    int(co) for co in row['_cohort_ids'].split(',')
+                ]
 
             result.append(analysis)
 
@@ -301,7 +314,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         LEFT JOIN output_file f ON ao.file_id = f.id
         WHERE ao.analysis_id IN :analysis_ids
         """
-        rows = await self.connection.fetch_all(_query, {'analysis_ids': analysis_ids})
+        rows = await self.connection.fetch_all(
+            _query, {'analysis_ids': analysis_ids}
+        )
 
         # Preparing to accumulate analysis files
         analysis_files: dict[
@@ -329,39 +344,14 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         analysis_output_files = {
             a_id: {
                 'output': files['output'],
-                'outputs': OutputFileInternal.reconstruct_json(files['outputs']),
+                'outputs': OutputFileInternal.reconstruct_json(
+                    files['outputs']
+                ),
             }
             for a_id, files in analysis_files.items()
         }
 
         return analysis_output_files  # type: ignore [return-value]
-
-    async def get_secondary_files_for_file_output(
-        self, parent_file_ids: list[int]
-    ) -> dict[int, list[OutputFileInternal]]:
-        """Fetches all secondary files for a list of parent files"""
-
-        _query = """
-        SELECT f.*
-        FROM output_file f
-        WHERE f.parent_id IN :parent_file_ids
-        """
-        # Ensure parent_file_ids is a list to prevent SQL injection and errors
-        if not isinstance(parent_file_ids, list):
-            raise ValueError('parent_file_ids must be a list of integers')
-
-        # Fetching rows from the database
-        rows = await self.connection.fetch_all(
-            _query, {'parent_file_ids': parent_file_ids}
-        )
-
-        # Accumulating secondary files
-        secondary_files: Dict[int, List[OutputFileInternal]] = defaultdict(list)
-        for row in rows:
-            secondary_file = OutputFileInternal.from_db(**dict(row))
-            secondary_files[row['parent_id']].append(secondary_file)
-
-        return secondary_files
 
     async def get_latest_complete_analysis_for_type(
         self,
@@ -400,7 +390,9 @@ WHERE a.id = (
 """
         rows = await self.connection.fetch_all(_query, values)
         if len(rows) == 0:
-            raise NotFoundError(f"Couldn't find any analysis with type {analysis_type}")
+            raise NotFoundError(
+                f"Couldn't find any analysis with type {analysis_type}"
+            )
         latest_analysis = rows[0]
         latest_analysis_data = dict(latest_analysis)
         analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(
@@ -415,7 +407,9 @@ WHERE a.id = (
             else None
         )
         latest_analysis_data['outputs'] = (
-            analysis_output_for_id.get('outputs', {}) if analysis_output_for_id else {}
+            analysis_output_for_id.get('outputs', {})
+            if analysis_output_for_id
+            else {}
         )
 
         analysis = AnalysisInternal.from_db(**latest_analysis_data)
@@ -443,7 +437,10 @@ WHERE s.project = :project AND
 
         rows = await self.connection.fetch_all(
             _query,
-            {'analysis_type': analysis_type, 'project': project or self.project_id},
+            {
+                'analysis_type': analysis_type,
+                'project': project or self.project_id,
+            },
         )
         return [row[0] for row in rows]
 
@@ -472,7 +469,10 @@ ORDER BY a.timestamp_completed DESC
                 f'Received analysis type {analysis_type!r}", expected {expected_types_str!r}'
             )
 
-        values = {'sequencing_group_ids': sequencing_group_ids, 'type': analysis_type}
+        values = {
+            'sequencing_group_ids': sequencing_group_ids,
+            'type': analysis_type,
+        }
         rows = await self.connection.fetch_all(_query, values)
         seen_sequencing_group_ids = set()
         analyses: List[AnalysisInternal] = []
@@ -521,9 +521,13 @@ FROM analysis a
 LEFT JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
 WHERE a.id = :analysis_id
 """
-        rows = await self.connection.fetch_all(_query, {'analysis_id': analysis_id})
+        rows = await self.connection.fetch_all(
+            _query, {'analysis_id': analysis_id}
+        )
         if len(rows) == 0:
-            raise NotFoundError(f"Couldn't find analysis with id = {analysis_id}")
+            raise NotFoundError(
+                f"Couldn't find analysis with id = {analysis_id}"
+            )
 
         project = rows[0]['project']
 
@@ -532,15 +536,18 @@ WHERE a.id = :analysis_id
             [analysis_data['id']]
         )
 
-        # TODO: Instead of fetching the same value for both, output should have a str or None, and outputs should have a dict or None
-        analysis_output_for_id = analysis_outputs_by_aid.get(analysis_data['id'], None)
+        analysis_output_for_id = analysis_outputs_by_aid.get(
+            analysis_data['id'], None
+        )
         analysis_data['output'] = (
             analysis_output_for_id.get('output', None)
             if analysis_output_for_id
             else None
         )
         analysis_data['outputs'] = (
-            analysis_output_for_id.get('outputs', {}) if analysis_output_for_id else {}
+            analysis_output_for_id.get('outputs', {})
+            if analysis_output_for_id
+            else {}
         )
 
         analysis = AnalysisInternal.from_db(**analysis_data)
@@ -576,7 +583,9 @@ WHERE a.id = :analysis_id
                 seq_check = 'IN :seq_types'
                 values['seq_types'] = sequencing_types
 
-            filters.append('JSON_VALUE(a.meta, "$.sequencing_type") ' + seq_check)
+            filters.append(
+                'JSON_VALUE(a.meta, "$.sequencing_type") ' + seq_check
+            )
 
         if participant_ids:
             filters.append('peid.participant_id IN :pids')
@@ -708,4 +717,6 @@ GROUP BY seq_type
         """
         Get audit logs for analysis IDs
         """
-        return await self.get_all_audit_logs_for_table('analysis', analysis_ids)
+        return await self.get_all_audit_logs_for_table(
+            'analysis', analysis_ids
+        )
