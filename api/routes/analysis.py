@@ -1,7 +1,8 @@
+# pylint: disable=dangerous-default-value
 import csv
 import io
 from datetime import date
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter
 from fastapi.params import Body, Query
@@ -238,7 +239,7 @@ async def query_analyses(
 
 @router.get('/analysis-runner', operation_id='getAnalysisRunnerLog')
 async def get_analysis_runner_log(
-    project_names: list[str] = Query(None),  # type: ignore
+    project_names: Annotated[list[str], Query()] = [],  # noqa
     # author: str = None, # not implemented yet, uncomment when we do
     ar_guid: str | None = None,
     connection: Connection = get_projectless_db_connection,
@@ -246,8 +247,8 @@ async def get_analysis_runner_log(
     """
     Get log for the analysis-runner, useful for checking this history of analysis
     """
-    if not project_names:
-        raise ValueError('Must specify "project_names"')
+    if not project_names and not ar_guid:
+        raise ValueError('Must specify "project_names" or "ar_guid"')
 
     arlayer = AnalysisRunnerLayer(connection)
     projects = connection.get_and_check_access_to_projects_for_names(
@@ -272,7 +273,7 @@ async def get_analysis_runner_log(
 )
 async def get_sample_reads_map(
     export_type: ExportType = ExportType.JSON,
-    sequencing_types: list[str] = Query(None),  # type: ignore
+    sequencing_types: Annotated[list[str], Query()] = [],  # noqa
     connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """
