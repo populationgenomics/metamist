@@ -47,11 +47,11 @@ for lname in (
     logging.getLogger(lname).setLevel(logging.WARNING)
 
 
-def find_free_port():
+def find_and_bind_socket() -> socket.socket:
     """Find free port to run tests on"""
     s = socket.socket()
     s.bind(('', 0))  # Bind to a free port provided by the host.
-    return s.getsockname()[1]  # Return the port number assigned.
+    return s
 
 
 loop = asyncio.new_event_loop()
@@ -83,6 +83,8 @@ class DbTest(unittest.TestCase):
     project_id_map: dict[ProjectId, Project]
     project_name_map: dict[str, Project]
 
+    socket_by_class = {}
+
     @classmethod
     def setUpClass(cls) -> None:
         @run_as_sync
@@ -100,10 +102,13 @@ class DbTest(unittest.TestCase):
             logger = logging.getLogger()
             try:
                 db = MySqlContainer('mariadb:11.2.2', password='test')
-                port_to_expose = find_free_port()
+                socket = find_and_bind_socket()
+                port_to_expose = int(socket.getsockname()[1])
+                cls.socket_by_class[cls.__name__] = socket
+
                 # override the default port to map the container to
                 db.with_bind_ports(db.port, port_to_expose)
-                logger.disabled = True
+                # logger.disabled = True
                 db.start()
                 logger.disabled = False
                 cls.dbs[cls.__name__] = db
@@ -217,6 +222,10 @@ class DbTest(unittest.TestCase):
         if db:
             db.exec(f'DROP DATABASE {db.dbname};')
             db.stop()
+
+        socket = cls.socket_by_class.get(cls.__name__)
+        if socket:
+            socket.close()
 
     def setUp(self) -> None:
         self._connection = self.connections[self.__class__.__name__]
