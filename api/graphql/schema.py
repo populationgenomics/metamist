@@ -57,7 +57,7 @@ from models.models import (
     SequencingGroupInternal,
 )
 from models.models.analysis_runner import AnalysisRunnerInternal
-from models.models.comment import CommentInternal
+from models.models.comment import CommentInternal, CommentVersionInternal
 from models.models.family import PedRowInternal
 from models.models.ourdna import OurDNADashboard, OurDNALostSample
 from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
@@ -240,6 +240,14 @@ class GraphQLCommentVersion:
     author: str
     timestamp: datetime.datetime
 
+    @staticmethod
+    def from_internal(internal: CommentVersionInternal) -> 'GraphQLCommentVersion':
+        return GraphQLCommentVersion(
+            content=internal.content,
+            author=internal.author,
+            timestamp=internal.timestamp,
+        )
+
 
 @strawberry.type
 class GraphQLComment:
@@ -253,6 +261,7 @@ class GraphQLComment:
     entity_type: strawberry.Private[str]
     entity_id: strawberry.Private[int]
     is_deleted: bool
+    thread: list['GraphQLComment']
     versions: list[GraphQLCommentVersion]
 
     @strawberry.field()
@@ -280,8 +289,11 @@ class GraphQLComment:
             updated_at=internal.updated_at,
             entity_type=internal.entity_type,
             entity_id=internal.entity_id,
+            thread=[GraphQLComment.from_internal(c) for c in internal.thread],
             is_deleted=internal.is_deleted,
-            versions=internal.versions,
+            versions=[
+                GraphQLCommentVersion.from_internal(v) for v in internal.versions
+            ],
         )
 
 

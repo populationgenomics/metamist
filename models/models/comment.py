@@ -22,7 +22,11 @@ class CommentInternal(SMBase):
     entity_type: str
     entity_id: int
     versions: list[CommentVersionInternal]
+    thread: list['CommentInternal']
     is_deleted: bool
+
+    def add_comment_to_thread(self, comment: 'CommentInternal'):
+        self.thread.append(comment)
 
     @staticmethod
     def from_db_versions(versions: list[dict[str, Any]]):
@@ -52,6 +56,7 @@ class CommentInternal(SMBase):
             author=first_version.get('author'),
             created_at=first_version.get('timestamp'),
             updated_at=last_version.get('timestamp'),
+            thread=[],
             versions=history,
             is_deleted=last_version.get('is_deleted'),
         )
