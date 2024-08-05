@@ -125,7 +125,11 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
                     </Accordion.Content>
                 </Accordion>
             </Card>
-            <Modal open={isHelpOpen} onClose={() => setIsHelpOpen(false)}>
+            <Modal
+                style={{ height: 'unset', top: '50px', left: 'unset' }}
+                open={isHelpOpen}
+                onClose={() => setIsHelpOpen(false)}
+            >
                 <Modal.Header>Help with project grid filtering</Modal.Header>
                 <Modal.Content>
                     <ProjectGridFilterGuide headerGroups={headerGroups} />

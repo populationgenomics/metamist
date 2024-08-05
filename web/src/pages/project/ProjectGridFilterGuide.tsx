@@ -22,11 +22,18 @@ const potentialFields = {
 
 const exampleDictionary = {
     participant: {
-        externalId: { icontains: 'participant-id' },
+        externalId: {
+            eq: 'participant_id',
+            in_: ['participant_id'],
+            nin: ['participant_id2'],
+            contains: 'ticipant_',
+            icontains: 'pARticIPaNt_iD',
+            startswith: 'participant_i',
+        },
     },
     sample: {
         meta: {
-            library: { startswith: 'WGS' },
+            numericalField: { gt: 0, gte: 1, lt: 2, lte: 1 },
         },
     },
 }
@@ -45,7 +52,7 @@ export const ProjectGridFilterGuide: React.FC<IProjectGridFilterGuideProps> = ({
             const filterTypes = field.filter_types?.length
                 ? field.filter_types
                 : Object.keys(potentialFields)
-            fieldMap[field.key] = filterTypes.join(', ')
+            fieldMap[field.filter_key] = filterTypes.join(', ')
         }
 
         const meta = metaFields.reduce((metaAcc, metaField) => {
@@ -53,7 +60,7 @@ export const ProjectGridFilterGuide: React.FC<IProjectGridFilterGuideProps> = ({
                 ? metaField.filter_types
                 : Object.keys(potentialFields)
 
-            metaAcc[metaField.key.substring(5)] = filterTypes.join(', ')
+            metaAcc[metaField.filter_key.substring(5)] = filterTypes.join(', ')
             return metaAcc
         }, {})
 
@@ -89,7 +96,7 @@ export const ProjectGridFilterGuide: React.FC<IProjectGridFilterGuideProps> = ({
             </p>
             <DictEditor
                 input={exampleDictionary}
-                height="150px"
+                height="330px"
                 readonly
                 onChange={() => console.log}
             />
