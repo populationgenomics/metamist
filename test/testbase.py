@@ -127,7 +127,7 @@ class DbTest(unittest.TestCase):
 
                 # create the database for each test class, and give permissions
                 await _root_connection.connect()
-                await _root_connection.execute(f"CREATE DATABASE {db_name};")
+                await _root_connection.execute(f'CREATE DATABASE {db_name};')
                 await _root_connection.execute(
                     f"GRANT ALL PRIVILEGES ON `{db_name}`.* TO {db.username}@'%';"
                 )
