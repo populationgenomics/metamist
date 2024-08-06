@@ -359,9 +359,16 @@ class SMConnections:
         return SMConnections._credentials
 
     @staticmethod
-    def make_connection(config: DatabaseConfiguration):
+    def make_connection(
+        config: DatabaseConfiguration, log_database_queries: bool | None = None
+    ):
         """Create connection from dbname"""
         # the connection string will prepare pooling automatically
+        _should_log = (
+            log_database_queries
+            if log_database_queries is not None
+            else LOG_DATABASE_QUERIES
+        )
         return databases.Database(
             config.get_connection_string(), echo=LOG_DATABASE_QUERIES
         )

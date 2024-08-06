@@ -75,15 +75,14 @@ class DbTest(unittest.TestCase):
 
     # store connections here, so they can be created PER-CLASS
     # and don't get recreated per test.
-    dbs: Dict[str, MySqlContainer] = {}
+    dbs: MySqlContainer | None = None
+    active_tests: dict[str, bool] = {}
     connections: Dict[str, databases.Database] = {}
     author: str
     project_id: ProjectId
     project_name: str
     project_id_map: dict[ProjectId, Project]
     project_name_map: dict[str, Project]
-
-    socket_by_class = {}
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -101,48 +100,82 @@ class DbTest(unittest.TestCase):
             os.environ['SM_ENVIRONMENT'] = 'test'
             logger = logging.getLogger()
             try:
-                db = MySqlContainer('mariadb:11.2.2', password='test')
-                socket = find_and_bind_socket()
-                port_to_expose = socket.getsockname()[1]
-                cls.socket_by_class[cls.__name__] = socket
+                db = cls.dbs
+                if not cls.dbs:
+                    db = MySqlContainer('mariadb:11.2.2', password='test')
 
-                # override the default port to map the container to
-                db.with_bind_ports(db.port, port_to_expose)
-                # logger.disabled = True
-                db.start()
-                logger.disabled = False
-                cls.dbs[cls.__name__] = db
+                    port_to_expose = 3309  # hopefully it's free
+
+                    # override the default port to map the container to
+                    db.with_bind_ports(db.port, port_to_expose)
+                    # logger.disabled = True
+                    db.start()
+                    logger.disabled = False
+                    cls.dbs = db
 
                 db_prefix = 'db'
                 if am_i_in_test_environment:
                     db_prefix = '../db'
 
-                lcon_string = f'jdbc:mariadb://{db.get_container_host_ip()}:{port_to_expose}/{db.dbname}'
-                # apply the liquibase schema
-                command = [
-                    'liquibase',
-                    *('--changeLogFile', db_prefix + '/project.xml'),
-                    *('--defaultsFile', db_prefix + '/liquibase.properties'),
-                    *('--url', lcon_string),
-                    *('--driver', 'org.mariadb.jdbc.Driver'),
-                    *('--classpath', db_prefix + '/mariadb-java-client-3.0.3.jar'),
-                    *('--username', db.username),
-                    *('--password', db.password),
-                    'update',
-                ]
-                subprocess.check_output(command, stderr=subprocess.STDOUT)
+                if not db:
+                    raise ValueError('No database container found')
+
+                # create the database
+                cls.active_tests[cls.__name__] = True
+                db_name = str(cls.__name__) + 'Db'
+
+                _root_connection = SMConnections.make_connection(
+                    CredentialedDatabaseConfiguration(
+                        host=db.get_container_host_ip(),
+                        port=str(port_to_expose),
+                        username='root',
+                        password=db.password,
+                        dbname=db.dbname,
+                    ),
+                    log_database_queries=True,
+                )
+                await _root_connection.connect()
+
+                await _root_connection.execute(f"CREATE DATABASE {db_name};")
+                await _root_connection.execute(
+                    f"GRANT ALL PRIVILEGES ON `{db_name}`.* TO {db.username}@'%';"
+                )
+                await _root_connection.execute('FLUSH PRIVILEGES;')
+
+                # mfranklin -> future dancoates: if you work out how to copy the
+                #       database instead of running liquibase, that would be great
+                is_copying_enabled = False
+
+                if is_copying_enabled:
+                    raise NotImplementedError("Copying databases doesn't work")
+                else:
+                    lcon_string = f'jdbc:mariadb://{db.get_container_host_ip()}:{port_to_expose}/{db_name}'
+                    # apply the liquibase schema
+                    command = [
+                        'liquibase',
+                        *('--changeLogFile', db_prefix + '/project.xml'),
+                        *('--defaultsFile', db_prefix + '/liquibase.properties'),
+                        *('--url', lcon_string),
+                        *('--driver', 'org.mariadb.jdbc.Driver'),
+                        *('--classpath', db_prefix + '/mariadb-java-client-3.0.3.jar'),
+                        *('--username', db.username),
+                        *('--password', db.password),
+                        'update',
+                    ]
+                    subprocess.check_output(command, stderr=subprocess.STDOUT)
+
+                cls.author = 'testuser'
 
                 sm_db = SMConnections.make_connection(
                     CredentialedDatabaseConfiguration(
                         host=db.get_container_host_ip(),
-                        port=port_to_expose,
+                        port=str(port_to_expose),
                         username='root',
                         password=db.password,
-                        dbname=db.dbname,
+                        dbname=db_name,
                     )
                 )
                 await sm_db.connect()
-                cls.author = 'testuser'
 
                 cls.connections[cls.__name__] = sm_db
                 formed_connection = Connection(
@@ -218,14 +251,11 @@ class DbTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls) -> None:
-        db = cls.dbs.get(cls.__name__)
-        if db:
-            db.exec(f'DROP DATABASE {db.dbname};')
-            db.stop()
+        # remove from active_tests
+        cls.active_tests.pop(cls.__name__)
 
-        socket = cls.socket_by_class.get(cls.__name__)
-        if socket:
-            socket.close()
+        if len(cls.active_tests) == 0 and cls.dbs:
+            cls.dbs.stop()
 
     def setUp(self) -> None:
         self._connection = self.connections[self.__class__.__name__]
