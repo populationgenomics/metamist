@@ -4,11 +4,9 @@ import asyncio
 import dataclasses
 import logging
 import os
-import socket
 import subprocess
 import unittest
 from functools import wraps
-from typing import Dict
 
 import databases.core
 import nest_asyncio
@@ -47,13 +45,6 @@ for lname in (
     logging.getLogger(lname).setLevel(logging.WARNING)
 
 
-def find_and_bind_socket() -> socket.socket:
-    """Find free port to run tests on"""
-    s = socket.socket()
-    # s.bind(('', 0))  # Bind to a free port provided by the host.
-    return s
-
-
 loop = asyncio.new_event_loop()
 
 
@@ -76,8 +67,8 @@ class DbTest(unittest.TestCase):
     # store connections here, so they can be created PER-CLASS
     # and don't get recreated per test.
     dbs: MySqlContainer | None = None
-    active_tests: dict[str, bool] = {}
-    connections: Dict[str, databases.Database] = {}
+    connections: dict[str, databases.Database] = {}
+
     author: str
     project_id: ProjectId
     project_name: str
@@ -121,7 +112,6 @@ class DbTest(unittest.TestCase):
                     raise ValueError('No database container found')
 
                 # create the database
-                cls.active_tests[cls.__name__] = True
                 db_name = str(cls.__name__) + 'Db'
 
                 _root_connection = SMConnections.make_connection(
@@ -134,13 +124,15 @@ class DbTest(unittest.TestCase):
                     ),
                     log_database_queries=True,
                 )
-                await _root_connection.connect()
 
+                # create the database for each test class, and give permissions
+                await _root_connection.connect()
                 await _root_connection.execute(f"CREATE DATABASE {db_name};")
                 await _root_connection.execute(
                     f"GRANT ALL PRIVILEGES ON `{db_name}`.* TO {db.username}@'%';"
                 )
                 await _root_connection.execute('FLUSH PRIVILEGES;')
+                await _root_connection.disconnect()
 
                 # mfranklin -> future dancoates: if you work out how to copy the
                 #       database instead of running liquibase, that would be great
@@ -252,10 +244,16 @@ class DbTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls) -> None:
         # remove from active_tests
-        cls.active_tests.pop(cls.__name__)
+        @run_as_sync
+        async def tearDown():
+            connection = cls.connections.pop(cls.__name__, None)
+            if connection:
+                await connection.disconnect()
 
-        if len(cls.active_tests) == 0 and cls.dbs:
-            cls.dbs.stop()
+            if len(cls.connections) == 0 and cls.dbs:
+                cls.dbs.stop()
+
+        tearDown()
 
     def setUp(self) -> None:
         self._connection = self.connections[self.__class__.__name__]
