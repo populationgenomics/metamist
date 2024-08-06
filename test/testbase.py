@@ -103,7 +103,7 @@ class DbTest(unittest.TestCase):
             try:
                 db = MySqlContainer('mariadb:11.2.2', password='test')
                 socket = find_and_bind_socket()
-                port_to_expose = int(socket.getsockname()[1])
+                port_to_expose = socket.getsockname()[1]
                 cls.socket_by_class[cls.__name__] = socket
 
                 # override the default port to map the container to
