@@ -50,7 +50,7 @@ for lname in (
 def find_and_bind_socket() -> socket.socket:
     """Find free port to run tests on"""
     s = socket.socket()
-    s.bind(('', 0))  # Bind to a free port provided by the host.
+    # s.bind(('', 0))  # Bind to a free port provided by the host.
     return s
 
 
