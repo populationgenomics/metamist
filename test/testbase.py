@@ -109,7 +109,7 @@ class DbTest(unittest.TestCase):
 
                     # override the default port to map the container to
                     db.with_bind_ports(db.port, port_to_expose)
-                    # logger.disabled = True
+                    logger.disabled = True
                     db.start()
                     logger.disabled = False
                     cls.dbs = db
@@ -132,7 +132,6 @@ class DbTest(unittest.TestCase):
                         password=db.password,
                         dbname=db.dbname,
                     ),
-                    log_database_queries=True,
                 )
 
                 # create the database for each test class, and give permissions
