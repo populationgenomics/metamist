@@ -369,9 +369,7 @@ class SMConnections:
             if log_database_queries is not None
             else LOG_DATABASE_QUERIES
         )
-        return databases.Database(
-            config.get_connection_string(), echo=LOG_DATABASE_QUERIES
-        )
+        return databases.Database(config.get_connection_string(), echo=_should_log)
 
     @staticmethod
     async def connect():

@@ -4,6 +4,7 @@ import asyncio
 import dataclasses
 import logging
 import os
+import socket
 import subprocess
 import unittest
 from functools import wraps
@@ -46,6 +47,15 @@ for lname in (
 
 
 loop = asyncio.new_event_loop()
+
+
+def find_free_port():
+    """Find free port to run tests on"""
+    s = socket.socket()
+    s.bind(('', 0))  # Bind to a free port provided by the host.
+    free_port_number = s.getsockname()[1]  # Return the port number assigned.
+    s.close()  # free the port so we can immediately use
+    return free_port_number
 
 
 def run_as_sync(f):
@@ -95,7 +105,7 @@ class DbTest(unittest.TestCase):
                 if not cls.dbs:
                     db = MySqlContainer('mariadb:11.2.2', password='test')
 
-                    port_to_expose = 3309  # hopefully it's free
+                    port_to_expose = find_free_port()
 
                     # override the default port to map the container to
                     db.with_bind_ports(db.port, port_to_expose)
