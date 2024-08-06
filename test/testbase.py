@@ -136,25 +136,20 @@ class DbTest(unittest.TestCase):
 
                 # mfranklin -> future dancoates: if you work out how to copy the
                 #       database instead of running liquibase, that would be great
-                is_copying_enabled = False
-
-                if is_copying_enabled:
-                    raise NotImplementedError("Copying databases doesn't work")
-                else:
-                    lcon_string = f'jdbc:mariadb://{db.get_container_host_ip()}:{port_to_expose}/{db_name}'
-                    # apply the liquibase schema
-                    command = [
-                        'liquibase',
-                        *('--changeLogFile', db_prefix + '/project.xml'),
-                        *('--defaultsFile', db_prefix + '/liquibase.properties'),
-                        *('--url', lcon_string),
-                        *('--driver', 'org.mariadb.jdbc.Driver'),
-                        *('--classpath', db_prefix + '/mariadb-java-client-3.0.3.jar'),
-                        *('--username', db.username),
-                        *('--password', db.password),
-                        'update',
-                    ]
-                    subprocess.check_output(command, stderr=subprocess.STDOUT)
+                lcon_string = f'jdbc:mariadb://{db.get_container_host_ip()}:{port_to_expose}/{db_name}'
+                # apply the liquibase schema
+                command = [
+                    'liquibase',
+                    *('--changeLogFile', db_prefix + '/project.xml'),
+                    *('--defaultsFile', db_prefix + '/liquibase.properties'),
+                    *('--url', lcon_string),
+                    *('--driver', 'org.mariadb.jdbc.Driver'),
+                    *('--classpath', db_prefix + '/mariadb-java-client-3.0.3.jar'),
+                    *('--username', db.username),
+                    *('--password', db.password),
+                    'update',
+                ]
+                subprocess.check_output(command, stderr=subprocess.STDOUT)
 
                 cls.author = 'testuser'
 
