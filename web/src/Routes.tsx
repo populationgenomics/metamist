@@ -14,18 +14,20 @@ import {
     BillingSeqrProp,
 } from './pages/billing'
 import DocumentationArticle from './pages/docs/Documentation'
-import FamilyView from './pages/family/FamilyView'
+import { FamilyPage } from './pages/family/FamilyView'
 import Details from './pages/insights/Details'
 import Summary from './pages/insights/Summary'
 import OurDnaDashboard from './pages/ourdna/OurDnaDashboard'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
 import ProjectOverview from './pages/project/ProjectOverview'
 import SampleView from './pages/sample/SampleView'
+import { TangledTreeExamples } from './shared/components/pedigree/TangledTreeExamples'
 import ErrorBoundary from './shared/utilities/errorBoundary'
 
 const Routes: React.FunctionComponent = () => (
     <Switch>
         <Route path="/" element={<DocumentationArticle articleid="index" />} />
+        <Route path="/tt" element={<TangledTreeExamples />} />
 
         <Route path="admin" element={<ProjectsAdmin />} />
         <Route
@@ -112,10 +114,10 @@ const Routes: React.FunctionComponent = () => (
         />
 
         <Route
-            path="/family/:familyID"
+            path="/family/:familyId"
             element={
                 <ErrorBoundary>
-                    <FamilyView />
+                    <FamilyPage />
                 </ErrorBoundary>
             }
         />

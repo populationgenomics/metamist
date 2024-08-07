@@ -1,0 +1,5 @@
+#Family	Individual ID	Paternal ID	Maternal ID	Sex	Affected
+Fam1	Father			1	2
+Fam1	Mother			2	1
+Fam1	Child1	Father	Mother	2	1
+Fam1	Child2	Father	Mother	1	2
