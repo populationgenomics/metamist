@@ -73,7 +73,16 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
             >
                 <Accordion>
                     <AccordionTitle active={isOpen} onClick={() => setIsOpen(!isOpen)}>
-                        <h3>Filter + display options</h3>
+                        <h3>
+                            Filter + display options{' '}
+                            <Button
+                                circular
+                                style={{ padding: 0, marginLeft: '10px' }}
+                                onClick={() => setIsHelpOpen(true)}
+                            >
+                                <HelpIcon />
+                            </Button>
+                        </h3>
                     </AccordionTitle>
                     <Accordion.Content active={isOpen}>
                         {participantCount > 200 && (
@@ -104,7 +113,7 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
                                 return (
                                     <Segment
                                         key={`project-col-option-${headerGroup}`}
-                                        style={{ width: '50%' }}
+                                        style={{ width: '45%', margin: '10px' }}
                                     >
                                         <CategoryColumnOptions
                                             category={headerGroup}
@@ -132,7 +141,13 @@ export const ProjectColumnOptions: React.FC<ProjectColumnOptionsProps> = ({
             >
                 <Modal.Header>Help with project grid filtering</Modal.Header>
                 <Modal.Content>
-                    <ProjectGridFilterGuide headerGroups={headerGroups} />
+                    <div style={{ padding: '10px 40px' }}>
+                        <ProjectGridFilterGuide
+                            headerGroups={headerGroups}
+                            filterValues={filterValues}
+                            updateFilters={updateFilters}
+                        />
+                    </div>
                 </Modal.Content>
                 <Modal.Actions>
                     <Button onClick={() => setIsHelpOpen(false)}>Close</Button>
@@ -167,7 +182,45 @@ const CategoryColumnOptions: React.FC<{
         updateFields(newFields)
     }
 
-    const start = (e: React.DragEvent<HTMLTableRowElement>) => {
+    const updateAll = (isChecked: boolean) => {
+        const newFields = fields.map((field) => ({
+            ...field,
+            is_visible: isChecked,
+        }))
+        updateFields(newFields)
+    }
+    const updateSome = (headers: ProjectParticipantGridField[], isChecked: boolean) => {
+        const fieldsToUpdate = new Set(headers.map((h) => h.key))
+        const newFields = fields.map((field) => {
+            if (!fieldsToUpdate.has(field.key)) {
+                return field
+            }
+            return {
+                ...field,
+                is_visible: isChecked,
+            }
+        })
+        updateFields(newFields)
+    }
+    const updateAllFromEvent: (isChecked: boolean) => React.MouseEventHandler<HTMLAnchorElement> =
+        (isChecked: boolean) => (e?: React.MouseEvent<HTMLAnchorElement>) => {
+            e?.preventDefault?.()
+            updateAll(isChecked)
+        }
+
+    const updateSomeFromEvent: (
+        headers: ProjectParticipantGridField[],
+        isChecked: boolean
+    ) => React.MouseEventHandler<HTMLAnchorElement> =
+        (headers: ProjectParticipantGridField[], isChecked: boolean) =>
+        (e?: React.MouseEvent<HTMLAnchorElement>) => {
+            e?.preventDefault?.()
+            updateSome(headers, isChecked)
+        }
+
+    const start: React.DragEventHandler<HTMLTableRowElement> = (
+        e: React.DragEvent<HTMLTableRowElement>
+    ) => {
         setDraggedRowIndex(e.currentTarget.rowIndex)
     }
     const dragEnd = (e: React.DragEvent<HTMLTableRowElement>) => {
@@ -193,52 +246,116 @@ const CategoryColumnOptions: React.FC<{
     }
 
     const _fields = tempFields || fields
+    const _nonMetaFields = _fields?.filter((f) => !f.key.startsWith('meta.'))
+    const _metaFields = _fields?.filter((f) => f.key.startsWith('meta.'))
     return (
         <>
             <h3>{_.startCase(metaSearchEntityToTitle(category))}</h3>
-            <table
-                style={{
-                    border: 'none', // '1px solid black',
-                    width: '100%',
-                }}
-            >
+            <p>
+                <a href="" onClick={updateAllFromEvent(true)}>
+                    Select all
+                </a>{' '}
+                |{' '}
+                <a href="" onClick={updateAllFromEvent(false)}>
+                    Select none
+                </a>
+            </p>
+            <table style={{ border: 'none', width: '100%' }}>
                 <tbody>
-                    {_fields?.map((field) => {
-                        return (
-                            <tr
-                                key={field.key}
-                                onDragStart={start}
-                                onDragOver={dragover}
-                                onDragEnd={dragEnd}
-                            >
-                                <td draggable>
-                                    <DragHandle />
-                                </td>
-                                <td>
-                                    <Checkbox
-                                        // key={`checkbox-${headerGroup}-${field.key}`}
-                                        type="checkbox"
-                                        checked={field.is_visible}
-                                        label={field.label}
-                                        onChange={(e, data) =>
-                                            updateChecked(field, data.checked || !field.is_visible)
-                                        }
-                                    />
-                                </td>
-                                <td style={{ paddingLeft: '10px' }}>
-                                    <ValueFilter
-                                        category={metaSeachEntityPrefixToFilterKey(category)}
-                                        field={field}
-                                        filterValues={filterValues}
-                                        updateFilterValues={updateFilters}
-                                        size="small"
-                                    />
-                                </td>
-                            </tr>
-                        )
-                    })}
+                    {_nonMetaFields?.map((field) => (
+                        <HeaderRow
+                            category={category}
+                            field={field}
+                            start={start}
+                            dragover={dragover}
+                            dragEnd={dragEnd}
+                            updateChecked={updateChecked}
+                            filterValues={filterValues}
+                            updateFilters={updateFilters}
+                        />
+                    ))}
                 </tbody>
             </table>
+
+            {_metaFields?.length > 0 && (
+                <>
+                    <hr />
+                    <p>
+                        <b>Meta fields: </b>
+                        <a href="" onClick={updateSomeFromEvent(_metaFields, true)}>
+                            Select all
+                        </a>{' '}
+                        |{' '}
+                        <a href="" onClick={updateSomeFromEvent(_metaFields, false)}>
+                            Select none
+                        </a>
+                    </p>
+                    <table style={{ border: 'none', width: '100%' }}>
+                        <tbody>
+                            {_metaFields?.map((field) => (
+                                <HeaderRow
+                                    category={category}
+                                    field={field}
+                                    start={start}
+                                    dragover={dragover}
+                                    dragEnd={dragEnd}
+                                    updateChecked={updateChecked}
+                                    filterValues={filterValues}
+                                    updateFilters={updateFilters}
+                                />
+                            ))}
+                        </tbody>
+                    </table>
+                </>
+            )}
         </>
+    )
+}
+
+interface IFieldOptionRow {
+    category: MetaSearchEntityPrefix
+    field: ProjectParticipantGridField
+
+    start: React.DragEventHandler<HTMLTableRowElement>
+    dragover: React.DragEventHandler<HTMLTableRowElement>
+    dragEnd: React.DragEventHandler<HTMLTableRowElement>
+    updateChecked: (field: ProjectParticipantGridField, isChecked: boolean) => void
+    filterValues: ProjectParticipantGridFilter
+    updateFilters: (e: ProjectParticipantGridFilter) => void
+}
+const HeaderRow: React.FC<IFieldOptionRow> = ({
+    category,
+    field,
+    start,
+    dragover,
+    dragEnd,
+    updateChecked,
+    filterValues,
+    updateFilters,
+}) => {
+    return (
+        <tr key={field.key} onDragStart={start} onDragOver={dragover} onDragEnd={dragEnd}>
+            <td draggable>
+                <DragHandle />
+            </td>
+            <td>
+                <Checkbox
+                    // key={`checkbox-${headerGroup}-${field.key}`}
+                    type="checkbox"
+                    checked={field.is_visible}
+                    label={field.label}
+                    onChange={(e, data) => updateChecked(field, data.checked || !field.is_visible)}
+                />
+            </td>
+            <td style={{ paddingLeft: '10px' }}>
+                <ValueFilter
+                    category={metaSeachEntityPrefixToFilterKey(category)}
+                    field={field}
+                    filterValues={filterValues}
+                    updateFilterValues={updateFilters}
+                    size="small"
+                />
+            </td>
+        </tr>
     )
 }

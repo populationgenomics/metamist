@@ -33,6 +33,14 @@ const getQueryTypeFromOperator = (operator: string) => {
             return ProjectParticipantGridFilterType.Eq
         case 'neq':
             return ProjectParticipantGridFilterType.Neq
+        case 'gt':
+            return ProjectParticipantGridFilterType.Gt
+        case 'gte':
+            return ProjectParticipantGridFilterType.Gte
+        case 'lt':
+            return ProjectParticipantGridFilterType.Lt
+        case 'lte':
+            return ProjectParticipantGridFilterType.Lte
     }
     return null
 }
@@ -51,6 +59,14 @@ const getDisplayNameFromFilterType = (filterType: ProjectParticipantGridFilterTy
             return 'Equals'
         case ProjectParticipantGridFilterType.Neq:
             return 'Does not equal'
+        case ProjectParticipantGridFilterType.Gt:
+            return 'Greater than'
+        case ProjectParticipantGridFilterType.Gte:
+            return 'Greater than or equal to'
+        case ProjectParticipantGridFilterType.Lt:
+            return 'Less than'
+        case ProjectParticipantGridFilterType.Lte:
+            return 'Less than or equal to'
     }
     return filterType
 }

@@ -197,6 +197,19 @@ blockquote {
     border: 1px solid var(--color-border-default);
 }
 
+.ui .modal > .content {
+    background: var(--color-bg-card);
+}
+.ui .modal > .header {
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
+}
+
+.ui .modal > .actions {
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
+}
+
 textarea {
     background: var(--color-bg);
     color: var(--color-text-primary);
