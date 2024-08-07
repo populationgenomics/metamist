@@ -57,7 +57,7 @@ from models.models import (
     SequencingGroupInternal,
 )
 from models.models.analysis_runner import AnalysisRunnerInternal
-from models.models.comment import CommentInternal, CommentVersionInternal
+from models.models.comment import CommentInternal, CommentStatus, CommentVersionInternal
 from models.models.family import PedRowInternal
 from models.models.ourdna import OurDNADashboard, OurDNALostSample
 from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
@@ -238,6 +238,7 @@ class GraphQLCohortTemplate:
 class GraphQLCommentVersion:
     content: str
     author: str
+    status: strawberry.enum(CommentStatus)  # type: ignore
     timestamp: datetime.datetime
 
     @staticmethod
@@ -246,6 +247,7 @@ class GraphQLCommentVersion:
             content=internal.content,
             author=internal.author,
             timestamp=internal.timestamp,
+            status=internal.status,
         )
 
 
@@ -260,14 +262,14 @@ class GraphQLComment:
     updated_at: datetime.datetime
     entity_type: strawberry.Private[str]
     entity_id: strawberry.Private[int]
-    is_deleted: bool
+    status: strawberry.enum(CommentStatus)  # type: ignore
     thread: list['GraphQLComment']
     versions: list[GraphQLCommentVersion]
 
     @strawberry.field()
     async def entity(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLComment'
-    ) -> 'GraphQLSample | GraphQLAnalysis':
+    ) -> 'GraphQLSample | GraphQLAssay | GraphQLSequencingGroup | GraphQLProject | GraphQLParticipant':
         entity_type = root.entity_type
         entity_id = root.entity_id
 
@@ -275,6 +277,26 @@ class GraphQLComment:
             loader = info.context['loaders'][LoaderKeys.SAMPLES_FOR_IDS]
             sample = await loader.load(entity_id)
             return GraphQLSample.from_internal(sample)
+
+        if entity_type == 'sequencing_group':
+            loader = info.context['loaders'][LoaderKeys.SEQUENCING_GROUPS_FOR_IDS]
+            sg = await loader.load(entity_id)
+            return GraphQLSequencingGroup.from_internal(sg)
+
+        if entity_type == 'project':
+            loader = info.context['loaders'][LoaderKeys.PROJECTS_FOR_IDS]
+            sg = await loader.load(entity_id)
+            return GraphQLProject.from_internal(sg)
+
+        if entity_type == 'assay':
+            loader = info.context['loaders'][LoaderKeys.ASSAYS_FOR_IDS]
+            ay = await loader.load(entity_id)
+            return GraphQLAssay.from_internal(ay)
+
+        if entity_type == 'participant':
+            loader = info.context['loaders'][LoaderKeys.PARTICIPANTS_FOR_IDS]
+            pt = await loader.load(entity_id)
+            return GraphQLParticipant.from_internal(pt)
 
         raise Exception('Unknown type')
 
@@ -290,7 +312,7 @@ class GraphQLComment:
             entity_type=internal.entity_type,
             entity_id=internal.entity_id,
             thread=[GraphQLComment.from_internal(c) for c in internal.thread],
-            is_deleted=internal.is_deleted,
+            status=internal.status,
             versions=[
                 GraphQLCommentVersion.from_internal(v) for v in internal.versions
             ],
@@ -1183,12 +1205,11 @@ class Query:  # entry point to graphql.
 
     @strawberry.field()
     async def comments(
-        self,
-        info: Info[GraphQLContext, 'Query'],
+        self, info: Info[GraphQLContext, 'Query'], entity: str, entity_id: int
     ) -> list[GraphQLComment]:
         connection = info.context['connection']
         comment_layer = CommentLayer(connection)
-        comments = await comment_layer.query()
+        comments = await comment_layer.query(entity, entity_id)
 
         return [GraphQLComment.from_internal(comment) for comment in comments]
 
