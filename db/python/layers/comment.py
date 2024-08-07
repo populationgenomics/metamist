@@ -15,7 +15,7 @@ class CommentLayer(BaseLayer):
 
         self.ct = CommentTable(connection)
 
-    async def query(self) -> list[CommentInternal]:
+    async def query(self, entity: str, entity_id: int) -> list[CommentInternal]:
         """Query Cohorts"""
-        rows = await self.ct.query()
+        rows = await self.ct.query(entity, entity_id)
         return rows

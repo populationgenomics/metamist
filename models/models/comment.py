@@ -1,12 +1,19 @@
 import datetime
+from enum import StrEnum
 from typing import Any
 
 from models.base import SMBase
+
+CommentStatus = StrEnum(
+    'CommentStatus',
+    ['active', 'deleted'],
+)
 
 
 class CommentVersionInternal(SMBase):
     content: str
     author: str
+    status: CommentStatus
     timestamp: datetime.datetime
 
 
@@ -23,7 +30,7 @@ class CommentInternal(SMBase):
     entity_id: int
     versions: list[CommentVersionInternal]
     thread: list['CommentInternal']
-    is_deleted: bool
+    status: CommentStatus
 
     def add_comment_to_thread(self, comment: 'CommentInternal'):
         self.thread.append(comment)
@@ -42,6 +49,7 @@ class CommentInternal(SMBase):
             CommentVersionInternal(
                 author=v.get('author'),
                 timestamp=v.get('timestamp'),
+                status=v.get('status'),
                 content=v.get('content'),
             )
             for v in versions[1:]
@@ -58,5 +66,5 @@ class CommentInternal(SMBase):
             updated_at=last_version.get('timestamp'),
             thread=[],
             versions=history,
-            is_deleted=last_version.get('is_deleted'),
+            status=last_version.get('status'),
         )

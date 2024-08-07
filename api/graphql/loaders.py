@@ -56,6 +56,7 @@ class LoaderKeys(enum.Enum):
 
     ANALYSES_FOR_SEQUENCING_GROUPS = 'analyses_for_sequencing_groups'
 
+    ASSAYS_FOR_IDS = 'assays_for_ids'
     ASSAYS_FOR_SAMPLES = 'sequences_for_samples'
     ASSAYS_FOR_SEQUENCING_GROUPS = 'assays_for_sequencing_groups'
 
@@ -182,6 +183,20 @@ async def load_audit_logs_by_analysis_ids(
     alayer = AnalysisLayer(connection)
     logs = await alayer.get_audit_logs_by_analysis_ids(analysis_ids)
     return [logs.get(a) or [] for a in analysis_ids]
+
+
+@connected_data_loader(LoaderKeys.ASSAYS_FOR_IDS)
+async def load_assays_for_ids(
+    assay_ids: list[int], connection: Connection
+) -> list[AssayInternal]:
+    """
+    DataLoader: get_samples_for_ids
+    """
+    assaylayer = AssayLayer(connection)
+    assays = await assaylayer.query(AssayFilter(id=GenericFilter(in_=assay_ids)))
+    # in case it's not ordered
+    assays_map = {a.id: a for a in assays}
+    return [assays_map.get(a) for a in assay_ids]
 
 
 @connected_data_loader_with_params(LoaderKeys.ASSAYS_FOR_SAMPLES, default_factory=list)
