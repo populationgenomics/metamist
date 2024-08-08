@@ -11,6 +11,7 @@ from models.enums import AnalysisStatus
 from models.models import PRIMARY_EXTERNAL_ORG
 from models.models.analysis import AnalysisInternal
 from models.models.audit_log import AuditLogInternal
+from models.models.output_file import OutputFileInternal, RecursiveDict
 from models.models.project import ProjectId
 
 
@@ -44,10 +45,10 @@ class AnalysisTable(DbBase):
         self, analysis_ids: List[int]
     ) -> Set[ProjectId]:
         """Get project IDs for sampleIds (mostly for checking auth)"""
-        _query = (
-            'SELECT project FROM analysis WHERE id in :analysis_ids GROUP BY project'
+        _query = 'SELECT project FROM analysis WHERE id in :analysis_ids GROUP BY project'
+        rows = await self.connection.fetch_all(
+            _query, {'analysis_ids': analysis_ids}
         )
-        rows = await self.connection.fetch_all(_query, {'analysis_ids': analysis_ids})
         return set(r['project'] for r in rows)
 
     async def create_analysis(
@@ -57,7 +58,6 @@ class AnalysisTable(DbBase):
         sequencing_group_ids: List[int] | None = None,
         cohort_ids: List[int] | None = None,
         meta: Optional[Dict[str, Any]] = None,
-        output: str | None = None,
         active: bool = True,
         project: ProjectId | None = None,
     ) -> int:
@@ -70,14 +70,15 @@ class AnalysisTable(DbBase):
                 ('type', analysis_type),
                 ('status', status.value),
                 ('meta', to_db_json(meta or {})),
-                ('output', output),
                 ('audit_log_id', await self.audit_log_id()),
                 ('project', project or self.project_id),
                 ('active', active if active is not None else True),
             ]
 
             if status == AnalysisStatus.COMPLETED:
-                kv_pairs.append(('timestamp_completed', datetime.datetime.utcnow()))
+                kv_pairs.append(
+                    ('timestamp_completed', datetime.datetime.utcnow())
+                )
 
             kv_pairs = [(k, v) for k, v in kv_pairs if v is not None]
             keys = [k for k, _ in kv_pairs]
@@ -99,7 +100,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 )
 
             if cohort_ids:
-                await self.add_cohorts_to_analysis(id_of_new_analysis, cohort_ids)
+                await self.add_cohorts_to_analysis(
+                    id_of_new_analysis, cohort_ids
+                )
 
         return id_of_new_analysis
 
@@ -124,7 +127,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         )
         await self.connection.execute_many(_query, list(values))
 
-    async def add_cohorts_to_analysis(self, analysis_id: int, cohort_ids: list[int]):
+    async def add_cohorts_to_analysis(
+        self, analysis_id: int, cohort_ids: list[int]
+    ):
         """Add cohorts to an analysis (through the linked table)"""
         _query = """
             INSERT INTO analysis_cohort
@@ -165,7 +170,6 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         status: AnalysisStatus,
         meta: Dict[str, Any] = None,
         active: bool = None,
-        output: Optional[str] = None,
     ):
         """
         Update the status of an analysis, set timestamp_completed if relevant
@@ -176,7 +180,10 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             'on_behalf_of': self.author,
             'audit_log_id': await self.audit_log_id(),
         }
-        setters = ['audit_log_id = :audit_log_id', 'on_behalf_of = :on_behalf_of']
+        setters = [
+            'audit_log_id = :audit_log_id',
+            'on_behalf_of = :on_behalf_of',
+        ]
         if status:
             setters.append('status = :status')
             fields['status'] = status.value
@@ -192,13 +199,11 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 'timestamp_completed = CASE WHEN timestamp_completed IS NULL THEN :timestamp_completed ELSE timestamp_completed END',
             )
 
-        if output:
-            fields['output'] = output
-            setters.append('output = :output')
-
         if meta is not None and len(meta) > 0:
             fields['meta'] = to_db_json(meta)
-            setters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
+            setters.append(
+                'meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)'
+            )
 
         fields_str = ', '.join(setters)
         _query = f'UPDATE analysis SET {fields_str} WHERE id = :analysis_id'
@@ -242,7 +247,6 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 a.id,
                 a.type,
                 a.status,
-                a.output,
                 a.project,
                 a.timestamp_completed,
                 a.active,
@@ -258,8 +262,29 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         """
         rows = await self.connection.fetch_all(_query, values)
         result: list[AnalysisInternal] = []
+
+        if not rows:
+            return result
+
+        analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(
+            [r['id'] for r in rows]
+        )
+
         for row in rows:
-            analysis = AnalysisInternal.from_db(**dict(row))
+
+            analysis_data = dict(row)
+            analysis_output_for_id = analysis_outputs_by_aid.get(
+                analysis_data['id'], None
+            )
+            if analysis_output_for_id:
+                analysis_data['output'] = analysis_output_for_id.get(
+                    'output', None
+                )
+                analysis_data['outputs'] = analysis_output_for_id.get(
+                    'outputs', {}
+                )
+
+            analysis = AnalysisInternal.from_db(**analysis_data)
 
             if row['_sequencing_group_ids']:
                 analysis.sequencing_group_ids = [
@@ -267,11 +292,63 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 ]
 
             if row['_cohort_ids']:
-                analysis.cohort_ids = [int(co) for co in row['_cohort_ids'].split(',')]
+                analysis.cohort_ids = [
+                    int(co) for co in row['_cohort_ids'].split(',')
+                ]
 
             result.append(analysis)
 
         return result
+
+    async def get_file_outputs_by_analysis_ids(
+        self, analysis_ids: list[int]
+    ) -> dict[int, dict[str, RecursiveDict]]:
+        """Fetches all output files for a list of analysis IDs"""
+
+        _query = """
+        SELECT ao.analysis_id, f.*, ao.json_structure, ao.output
+        FROM analysis_outputs ao
+        LEFT JOIN output_file f ON ao.file_id = f.id
+        WHERE ao.analysis_id IN :analysis_ids
+        """
+        rows = await self.connection.fetch_all(
+            _query, {'analysis_ids': analysis_ids}
+        )
+
+        # Preparing to accumulate analysis files
+        analysis_files: dict[
+            int, dict[str, list[Tuple[OutputFileInternal, str]] | str]
+        ] = defaultdict(lambda: defaultdict(list))
+
+        for row in rows:
+            file_id = row['id']
+            if file_id:
+                # Building OutputFileInternal object with secondary files if available
+                file_internal = OutputFileInternal.from_db(**dict(row))
+                # If no json_structure, just set to the output.
+
+                if row['json_structure'] is None:
+                    analysis_files[row['analysis_id']]['output'] = row['path']
+                else:
+                    analysis_files[row['analysis_id']]['output'] = ''
+                analysis_files[row['analysis_id']]['outputs'].append((file_internal, row['json_structure']))  # type: ignore [union-attr]
+            else:
+                # If no file_id, just set to the output.
+                analysis_files[row['analysis_id']]['output'] = row['output']
+                analysis_files[row['analysis_id']]['outputs'] = row['output']
+
+        # Transforming analysis_files into the desired output format
+        analysis_output_files = {
+            a_id: {
+                'output': files['output'],
+                'outputs': OutputFileInternal.reconstruct_json(
+                    files['outputs']
+                ),
+            }
+            for a_id, files in analysis_files.items()
+        }
+
+        return analysis_output_files  # type: ignore [return-value]
 
     async def get_latest_complete_analysis_for_type(
         self,
@@ -295,7 +372,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
         _query = f"""
 SELECT a.id as id, a.type as type, a.status as status,
-        a.output as output, a_sg.sequencing_group_id as sequencing_group_id,
+        a_sg.sequencing_group_id as sequencing_group_id,
         a.project as project, a.timestamp_completed as timestamp_completed,
         a.meta as meta
 FROM analysis_sequencing_group a_sg
@@ -310,13 +387,32 @@ WHERE a.id = (
 """
         rows = await self.connection.fetch_all(_query, values)
         if len(rows) == 0:
-            raise NotFoundError(f"Couldn't find any analysis with type {analysis_type}")
-        a = AnalysisInternal.from_db(**dict(rows[0]))
+            raise NotFoundError(
+                f"Couldn't find any analysis with type {analysis_type}"
+            )
+        latest_analysis = rows[0]
+        latest_analysis_data = dict(latest_analysis)
+        analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(
+            [row['id'] for row in rows]
+        )
+        analysis_output_for_id = analysis_outputs_by_aid.get(
+            latest_analysis_data['id'], None
+        )
+
+        if analysis_output_for_id:
+            latest_analysis_data['output'] = analysis_output_for_id.get(
+                'output', None
+            )
+            latest_analysis_data['outputs'] = analysis_output_for_id.get(
+                'outputs', {}
+            )
+
+        analysis = AnalysisInternal.from_db(**latest_analysis_data)
         # .from_db maps 'sequencing_group_id' -> sequencing_group_ids
         for row in rows[1:]:
-            a.sequencing_group_ids.append(row['sequencing_group_id'])
+            analysis.sequencing_group_ids.append(row['sequencing_group_id'])
 
-        return a
+        return analysis
 
     async def get_all_sequencing_group_ids_without_analysis_type(
         self, analysis_type: str, project: ProjectId
@@ -336,7 +432,10 @@ WHERE s.project = :project AND
 
         rows = await self.connection.fetch_all(
             _query,
-            {'analysis_type': analysis_type, 'project': project or self.project_id},
+            {
+                'analysis_type': analysis_type,
+                'project': project or self.project_id,
+            },
         )
         return [row[0] for row in rows]
 
@@ -346,7 +445,7 @@ WHERE s.project = :project AND
         """Get the latest complete analysis for samples (one per sample)"""
         _query = """
 SELECT
-    a.id AS id, a.type as type, a.status as status, a.output as output,
+    a.id AS id, a.type as type, a.status as status,
     a.project as project, a_sg.sequencing_group_id,
     a.timestamp_completed as timestamp_completed, a.meta as meta
 FROM analysis a
@@ -365,15 +464,38 @@ ORDER BY a.timestamp_completed DESC
                 f'Received analysis type {analysis_type!r}", expected {expected_types_str!r}'
             )
 
-        values = {'sequencing_group_ids': sequencing_group_ids, 'type': analysis_type}
+        values = {
+            'sequencing_group_ids': sequencing_group_ids,
+            'type': analysis_type,
+        }
         rows = await self.connection.fetch_all(_query, values)
         seen_sequencing_group_ids = set()
         analyses: List[AnalysisInternal] = []
+        analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(
+            [r['id'] for r in rows]
+        )
         for row in rows:
+
             if row['sequencing_group_id'] in seen_sequencing_group_ids:
                 continue
+
+            analysis_data = dict(row)
+            analysis_output_for_id = analysis_outputs_by_aid.get(
+                analysis_data['id'], None
+            )
+
+            if analysis_output_for_id:
+                analysis_data['output'] = analysis_output_for_id.get(
+                    'output', None
+                )
+                analysis_data['outputs'] = analysis_output_for_id.get(
+                    'outputs', {}
+                )
+
+            analysis = AnalysisInternal.from_db(**analysis_data)
+            analyses.append(analysis)
+
             seen_sequencing_group_ids.add(row['sequencing_group_id'])
-            analyses.append(AnalysisInternal.from_db(**dict(row)))
 
         # reverse after timestamp_completed
         return analyses[::-1]
@@ -385,24 +507,45 @@ ORDER BY a.timestamp_completed DESC
         _query = """
 SELECT
     a.id as id, a.type as type, a.status as status,
-    a.output as output, a.project as project,
+    a.project as project,
     a_sg.sequencing_group_id as sequencing_group_id,
     a.timestamp_completed as timestamp_completed, a.meta as meta
 FROM analysis a
 LEFT JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
 WHERE a.id = :analysis_id
 """
-        rows = await self.connection.fetch_all(_query, {'analysis_id': analysis_id})
+        rows = await self.connection.fetch_all(
+            _query, {'analysis_id': analysis_id}
+        )
         if len(rows) == 0:
-            raise NotFoundError(f"Couldn't find analysis with id = {analysis_id}")
+            raise NotFoundError(
+                f"Couldn't find analysis with id = {analysis_id}"
+            )
 
         project = rows[0]['project']
 
-        a = AnalysisInternal.from_db(**dict(rows[0]))
-        for row in rows[1:]:
-            a.sequencing_group_ids.append(row['sequencing_group_id'])
+        analysis_data = dict(rows[0])
+        analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(
+            [analysis_data['id']]
+        )
 
-        return project, a
+        analysis_output_for_id = analysis_outputs_by_aid.get(
+            analysis_data['id'], None
+        )
+
+        if analysis_output_for_id:
+            analysis_data['output'] = analysis_output_for_id.get(
+                'output', None
+            )
+            analysis_data['outputs'] = analysis_output_for_id.get(
+                'outputs', {}
+            )
+
+        analysis = AnalysisInternal.from_db(**analysis_data)
+        for row in rows[1:]:
+            analysis.sequencing_group_ids.append(row['sequencing_group_id'])
+
+        return project, analysis
 
     async def get_sample_cram_path_map_for_seqr(
         self,
@@ -431,14 +574,16 @@ WHERE a.id = :analysis_id
                 seq_check = 'IN :seq_types'
                 values['seq_types'] = sequencing_types
 
-            filters.append('JSON_VALUE(a.meta, "$.sequencing_type") ' + seq_check)
+            filters.append(
+                'JSON_VALUE(a.meta, "$.sequencing_type") ' + seq_check
+            )
 
         if participant_ids:
             filters.append('peid.participant_id IN :pids')
             values['pids'] = list(participant_ids)
 
         _query = f"""
-SELECT peid.external_id as participant_id, a.output as output, sg.id as sequencing_group_id
+SELECT a.id, peid.external_id as participant_id, a.output as output, sg.id as sequencing_group_id
 FROM analysis a
 INNER JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
 INNER JOIN sequencing_group sg ON a_sg.sequencing_group_id = sg.id
@@ -450,8 +595,31 @@ ORDER BY a.timestamp_completed DESC;
 """
 
         rows = await self.connection.fetch_all(_query, values)
+        results: list[dict] = []
+        if not rows:
+            return results
+
+        analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(
+            [r['id'] for r in rows]
+        )
+        for row in rows:
+            analysis_data = dict(row)
+            analysis_output_for_id = analysis_outputs_by_aid.get(
+                analysis_data['id'], None
+            )
+
+            if analysis_output_for_id:
+                analysis_data['output'] = analysis_output_for_id.get(
+                    'output', None
+                )
+                analysis_data['outputs'] = analysis_output_for_id.get(
+                    'outputs', {}
+                )
+
+            analysis_data.pop('id')
+            results.append(analysis_data)
         # many per analysis
-        return [dict(d) for d in rows]
+        return results
 
     # region STATS
 
@@ -539,4 +707,6 @@ GROUP BY seq_type
         """
         Get audit logs for analysis IDs
         """
-        return await self.get_all_audit_logs_for_table('analysis', analysis_ids)
+        return await self.get_all_audit_logs_for_table(
+            'analysis', analysis_ids
+        )
