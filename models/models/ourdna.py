@@ -7,7 +7,7 @@ class OurDNALostSample(BaseModel):
     """Model for OurDNA Lost Sample"""
 
     sample_id: str
-    time_since_collection: int
+    time_since_collection: int | None
     collection_time: str
     process_start_time: str | None
     process_end_time: str | None
@@ -27,8 +27,12 @@ class OurDNADashboard(BaseModel):
 
     collection_to_process_end_time: dict[str, int] = {}
     collection_to_process_end_time_statistics: dict[str, float | None] = {}
+    collection_to_process_end_time_bucket_statistics: dict[str, int] = {}
     collection_to_process_end_time_24h: dict[str, int] = {}
     processing_times_by_site: dict[str, dict[int, int]] = defaultdict(
+        lambda: defaultdict(int)
+    )
+    processing_times_by_collection_site: dict[str, dict[int, int]] = defaultdict(
         lambda: defaultdict(int)
     )
     total_samples_by_collection_event_name: dict[str, int] = defaultdict(int)
