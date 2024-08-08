@@ -2,34 +2,31 @@ from itertools import groupby
 
 from db.python.tables.base import DbBase
 from db.python.utils import InternalError
-from models.models.comment import CommentInternal
+from models.models.comment import CommentEntityType, CommentInternal
 
-entity_table_map = {'sample': ('sample_comment', 'sample_id')}
-
-
-comment_queries: dict[str, dict[str, str]] = {
-    'project': {
-        'project': """
+comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
+    CommentEntityType.project: {
+        CommentEntityType.project: """
             WHERE project_comment.project_id = :entity_id
         """,
-        'sample': """
+        CommentEntityType.sample: """
             JOIN sample
             ON sample.id = sample_comment.sample_id
             WHERE sample.project = :entity_id
         """,
-        'assay': """
+        CommentEntityType.project.assay: """
             JOIN assay
             ON assay.id = assay_comment.assay_id
             JOIN sample
             ON sample.id = assay.sample_id
             WHERE sample.project = :entity_id
         """,
-        'participant': """
+        CommentEntityType.participant: """
             JOIN participant
             ON participant.id = participant_comment.participant_id
             WHERE participant.project = :entity_id
         """,
-        'sequencing_group': """
+        CommentEntityType.sequencing_group: """
             JOIN sequencing_group
             ON sequencing_group.id = sequencing_group_comment.sequencing_group_id
             JOIN sample
@@ -37,8 +34,8 @@ comment_queries: dict[str, dict[str, str]] = {
             WHERE sample.project = :entity_id
         """,
     },
-    'sample': {
-        'sample': """
+    CommentEntityType.sample: {
+        CommentEntityType.sample: """
             JOIN sample
             ON sample.id = sample_comment.sample_id
             
@@ -47,61 +44,61 @@ comment_queries: dict[str, dict[str, str]] = {
             OR sample.sample_root_id = :entity_id
             OR sample.sample_parent_id = :entity_id
         """,
-        'assay': """
+        CommentEntityType.project.assay: """
             JOIN assay
             ON assay.id = assay_comment.assay_id
             WHERE assay.sample_id = :entity_id
         """,
-        'participant': """
+        CommentEntityType.participant: """
             JOIN sample
             ON sample.participant_id = participant_comment.participant_id
             WHERE sample.id = :entity_id
         """,
-        'sequencing_group': """
+        CommentEntityType.sequencing_group: """
             JOIN sequencing_group
             ON sequencing_group.id = sequencing_group_comment.sequencing_group_id
             WHERE sequencing_group.sample_id = :entity_id
         """,
     },
-    'assay': {
-        'assay': """
+    CommentEntityType.assay: {
+        CommentEntityType.project.assay: """
             WHERE assay_comment.assay_id = :entity_id
         """,
-        'sample': """
+        CommentEntityType.sample: """
             JOIN assay
             ON assay.sample_id = sample_comment.sample_id
             WHERE assay.id = :entity_id
         """,
-        'participant': """
+        CommentEntityType.participant: """
             JOIN sample
             ON sample.participant_id = participant_comment.participant_id
             JOIN assay
             ON assay.sample_id = sample.id
             WHERE assay.id = :entity_id
         """,
-        'sequencing_group': """
+        CommentEntityType.sequencing_group: """
             JOIN sequencing_group_assay
             ON sequencing_group_assay.sequencing_group_id = sequencing_group_comment.sequencing_group_id
             WHERE sequencing_group_assay.assay_id = :entity_id
         """,
     },
-    'participant': {
-        'participant': """
+    CommentEntityType.participant: {
+        CommentEntityType.participant: """
             WHERE participant_comment.participant_id = :entity_id
         """,
-        'assay': """
+        CommentEntityType.project.assay: """
             JOIN assay
             ON assay.id = assay_comment.assay_id
             JOIN sample
             ON sample.id = assay.sample_id
             WHERE sample.participant_id = :entity_id
         """,
-        'sample': """
+        CommentEntityType.sample: """
             JOIN sample
             ON sample.id = sample_comment.sample_id
             WHERE sample.participant_id = :entity_id
         """,
-        'sequencing_group': """
+        CommentEntityType.sequencing_group: """
             JOIN sequencing_group
             ON sequencing_group.id = sequencing_group_comment.sequencing_group_id
             JOIN sample
@@ -109,23 +106,23 @@ comment_queries: dict[str, dict[str, str]] = {
             WHERE sample.participant_id = :entity_id
         """,
     },
-    'sequencing_group': {
-        'sequencing_group': """
+    CommentEntityType.sequencing_group: {
+        CommentEntityType.sequencing_group: """
             WHERE sequencing_group_comment.sequencing_group_id = :entity_id
         """,
-        'participant': """
+        CommentEntityType.participant: """
             JOIN sample
             ON sample.participant_id = participant_comment.participant_id
             JOIN sequencing_group
             ON sequencing_group.sample_id = sample.id
             WHERE sequencing_group.id = :entity_id
         """,
-        'assay': """
+        CommentEntityType.project.assay: """
             JOIN sequencing_group_assay
             ON sequencing_group_assay.assay_id = assay_comment.assay_id
             WHERE sequencing_group_assay.sequencing_group_id = :entity_id
         """,
-        'sample': """
+        CommentEntityType.sample: """
             JOIN sequencing_group
             ON sequencing_group.sample_id = sample_comment.sample_id
             WHERE sequencing_group.id = :entity_id
@@ -139,14 +136,16 @@ class CommentTable(DbBase):
     Capture Comment table operations and queries
     """
 
-    async def query(self, entity: str, entity_id: int) -> list[CommentInternal]:
+    async def query(
+        self, entity: CommentEntityType, entity_id: int
+    ) -> list[CommentInternal]:
         """Query comments"""
 
         queries_for_entity = comment_queries.get(entity, None)
         if queries_for_entity is None:
             raise InternalError(f"Unknown comment entity {entity}")
 
-        combined_comment_query = "\nUNION ALL\n".join(
+        combined_comment_query = "\nUNION\n".join(
             [
                 f"""(
                     SELECT
@@ -205,12 +204,12 @@ class CommentTable(DbBase):
 
         return comments
 
-    async def add_comment(self, entity: str, entity_id: int, content: str):
+    async def add_comment(
+        self, entity: CommentEntityType, entity_id: int, content: str
+    ):
 
-        if entity not in entity_table_map:
-            raise ValueError(f'Unknown entity {entity}')
-
-        join_table, join_column = entity_table_map[entity]
+        join_table = f"{entity}_comment"
+        join_column = f"{entity}_id"
 
         comment_insert = """
             INSERT INTO comment (content, status, audit_log_id)
