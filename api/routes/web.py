@@ -138,15 +138,11 @@ async def export_project_participants(
     for row in prepare_participants_for_export(participants, fields=fields):
         writer.writerow(row)
 
-    # basefn = f'{connection.project}-project-summary-{connection.author}-{date.today().isoformat()}'
-
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type=export_type.get_mime_type(),
-        headers={
-            #  Content-disposition doesn't work here anyway
-            # 'Content-Disposition': f'filename={basefn}{export_type.get_extension()}'
-        },
+        # content-disposition doesn't work here :(
+        headers={},
     )
 
 

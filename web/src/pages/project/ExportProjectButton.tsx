@@ -55,7 +55,6 @@ export const ProjectExportButton: React.FunctionComponent<{
                 // {connection.project}-project-summary-{connection.author}-{date.today().isoformat()
                 const today = new Date().toISOString().split('T')[0]
                 const defaultFilename = `${projectName}-export-project-summary-${today}.${ext}`
-                debugger
                 link.setAttribute(
                     'download',
                     resp.headers['content-disposition']?.split('=')?.[1] || defaultFilename
