@@ -5,13 +5,15 @@ from db.python.filters.generic import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer
 from db.python.tables.assay import AssayFilter, AssayTable, NoOpAenter
+from db.python.tables.comment import CommentTable
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import (
     SequencingGroupFilter,
     SequencingGroupTable,
 )
 from db.python.utils import NotFoundError
-from models.models.project import ProjectId, ReadAccessRoles
+from models.models.comment import CommentEntityType
+from models.models.project import ProjectId, ProjectMemberRole, ReadAccessRoles
 from models.models.sequencing_group import (
     SequencingGroupInternal,
     SequencingGroupInternalId,
@@ -25,6 +27,7 @@ class SequencingGroupLayer(BaseLayer):
 
     def __init__(self, connection: Connection):
         super().__init__(connection)
+        self.ct = CommentTable(connection)
         self.seqgt: SequencingGroupTable = SequencingGroupTable(connection)
         self.sampt: SampleTable = SampleTable(connection)
 
@@ -352,5 +355,24 @@ class SequencingGroupLayer(BaseLayer):
             )
 
         return sequencing_groups
+
+    async def add_comment_to_sequencing_group(
+        self, sequencing_group_id: int, content: str
+    ):
+
+        projects, _ = await self.seqgt.get_sequencing_groups_by_ids(
+            [sequencing_group_id]
+        )
+
+        self.connection.check_access_to_projects_for_ids(
+            projects,
+            allowed_roles={ProjectMemberRole.writer, ProjectMemberRole.contributor},
+        )
+
+        return await self.ct.add_comment(
+            content=content,
+            entity=CommentEntityType.sequencing_group,
+            entity_id=sequencing_group_id,
+        )
 
     # endregion
