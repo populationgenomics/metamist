@@ -1,11 +1,14 @@
+from argparse import ArgumentError
+from copy import deepcopy
 from test.testbase import DbIsolatedTest, run_as_sync
 from unittest.mock import patch
 
-import api.routes.cohort
 import metamist.models
+
+import api.routes.cohort
 from models.models.cohort import CohortBody, CohortCriteria, NewCohort
 from models.utils.cohort_template_id_format import cohort_template_id_format
-from scripts.create_custom_cohort import get_cohort_spec, main
+from scripts.create_custom_cohort import get_cohort_spec, main, parse_cli_arguments
 
 
 class TestCohortBuilder(DbIsolatedTest):
@@ -21,7 +24,9 @@ class TestCohortBuilder(DbIsolatedTest):
         self.assertEqual(project, self.project_name)
         return await api.routes.cohort.create_cohort_from_criteria(
             CohortBody(**body_create_cohort_from_criteria['cohort_spec'].to_dict()),
-            CohortCriteria(**body_create_cohort_from_criteria['cohort_criteria'].to_dict()),
+            CohortCriteria(
+                **body_create_cohort_from_criteria['cohort_criteria'].to_dict()
+            ),
             self.connection,
             body_create_cohort_from_criteria['dry_run'],
         )
@@ -43,7 +48,9 @@ class TestCohortBuilder(DbIsolatedTest):
         mock.side_effect = self.mock_ccfc
         result = main(
             project=self.project_name,
-            cohort_body_spec=metamist.models.CohortBody(name='Empty cohort', description='No criteria'),
+            cohort_body_spec=metamist.models.CohortBody(
+                name='Empty cohort', description='No criteria'
+            ),
             projects=['test'],
             sg_ids_internal=[],
             excluded_sg_ids=[],
@@ -66,7 +73,9 @@ class TestCohortBuilder(DbIsolatedTest):
         mock.side_effect = self.mock_ccfc
         result = main(
             project=self.project_name,
-            cohort_body_spec=metamist.models.CohortBody(name='Epic cohort', description='Every criterion'),
+            cohort_body_spec=metamist.models.CohortBody(
+                name='Epic cohort', description='Every criterion'
+            ),
             projects=['test'],
             sg_ids_internal=['CPGLCL33'],
             excluded_sg_ids=['CPGLCL17', 'CPGLCL25'],
@@ -99,3 +108,92 @@ class TestCohortBuilder(DbIsolatedTest):
         self.assertIsInstance(result, NewCohort)
         self.assertListEqual(result.sequencing_group_ids, [])
         self.assertEqual(result.dry_run, False)
+
+    def test_cli_parser(self):
+        """
+        runs the argparse parser on a range of arguments
+        base arguments are the minimum required to parse
+        each argument is tested in turn for valid success, and invalid failure
+        """
+
+        # the minimum required fields
+        minimal_base = [
+            '--project',
+            'foo',
+            '--name',
+            'epic_name',
+            '--description',
+            'epic parsing',
+        ]
+
+        # copy this for updates
+        cli_base_args = deepcopy(minimal_base)
+
+        namespace = parse_cli_arguments(cli_base_args)
+        self.assertEqual(namespace.project, 'foo')
+        self.assertEqual(namespace.name, 'epic_name')
+        self.assertEqual(namespace.description, 'epic parsing')
+        self.assertEqual(namespace.projects, [])
+        self.assertEqual(namespace.excluded_sgs_internal, [])
+        self.assertEqual(namespace.sg_technology, [])
+        self.assertEqual(namespace.sg_platform, [])
+        self.assertEqual(namespace.sg_type, [])
+        self.assertEqual(namespace.sample_type, [])
+        self.assertEqual(namespace.dry_run, False)
+
+        cli_base_args.extend(['--projects', 'matt', 'rocks'])
+        namespace = parse_cli_arguments(cli_base_args)
+        self.assertEqual(namespace.projects, ['matt', 'rocks'])
+
+        cli_base_args.extend(['--sg_ids_internal', 'CPGA', 'CPGB'])
+        namespace = parse_cli_arguments(cli_base_args)
+        self.assertEqual(namespace.sg_ids_internal, ['CPGA', 'CPGB'])
+
+        cli_base_args.extend(['--excluded_sgs_internal', 'CPGC', 'CPGD'])
+        namespace = parse_cli_arguments(cli_base_args)
+        self.assertEqual(namespace.excluded_sgs_internal, ['CPGC', 'CPGD'])
+
+        cli_base_args.extend(
+            [
+                '--sg_technology',
+                'bulk-rna-seq',
+                'long-read',
+                'short-read',
+                'single-cell-rna-seq',
+            ]
+        )
+        namespace = parse_cli_arguments(cli_base_args)
+        self.assertEqual(
+            namespace.sg_technology,
+            ['bulk-rna-seq', 'long-read', 'short-read', 'single-cell-rna-seq'],
+        )
+
+        failing_args = deepcopy(cli_base_args)
+        failing_args.extend(['--sg_technology', 'invalid_tech'])
+        self.assertRaises(ArgumentError, parse_cli_arguments, failing_args, False)
+
+        cli_base_args.extend(['--sg_platform', 'illumina', 'oxford-nanopore', 'pacbio'])
+        namespace = parse_cli_arguments(cli_base_args)
+        self.assertEqual(
+            namespace.sg_platform, ['illumina', 'oxford-nanopore', 'pacbio']
+        )
+
+        failing_args = deepcopy(cli_base_args)
+        failing_args.extend(['--sg_platform', 'invalid_platform'])
+        self.assertRaises(ArgumentError, parse_cli_arguments, failing_args, False)
+
+        cli_base_args.extend(['--sg_type', 'chip', 'exome', 'genome'])
+        namespace = parse_cli_arguments(cli_base_args)
+        self.assertEqual(namespace.sg_type, ['chip', 'exome', 'genome'])
+
+        failing_args = deepcopy(cli_base_args)
+        failing_args.extend(['--sg_type', 'invalid_type'])
+        self.assertRaises(ArgumentError, parse_cli_arguments, failing_args, False)
+
+        cli_base_args.extend(['--sample_type', 'blood', 'ebff', 'ebld'])
+        namespace = parse_cli_arguments(cli_base_args)
+        self.assertEqual(namespace.sample_type, ['blood', 'ebff', 'ebld'])
+
+        failing_args = deepcopy(cli_base_args)
+        failing_args.extend(['--sample_type', 'invalid_type'])
+        self.assertRaises(ArgumentError, parse_cli_arguments, failing_args, False)

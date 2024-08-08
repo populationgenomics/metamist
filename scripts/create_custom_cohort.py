@@ -1,6 +1,6 @@
 """ A script to create a custom cohort """
-
-import argparse
+from argparse import ArgumentParser, Namespace
+from sys import argv
 
 from metamist.apis import CohortApi
 from metamist.models import CohortBody, CohortCriteria
@@ -45,7 +45,9 @@ def main(
 
 
 def get_cohort_spec(
-    cohort_name: str | None, cohort_description: str | None, cohort_template_id: str | None
+    cohort_name: str | None,
+    cohort_description: str | None,
+    cohort_template_id: str | None,
 ) -> CohortBody:
     """Get the cohort spec"""
 
@@ -61,60 +63,102 @@ def get_cohort_spec(
     return CohortBody(**cohort_body_spec)
 
 
-if __name__ == '__main__':
+def parse_cli_arguments(cli_arguments: list[str], exit_on_error: bool = True) -> Namespace:
+    """
+    A wrapper to move argparse parsing out of the __name__ == __main__ block for testing purposes
 
-    parser = argparse.ArgumentParser(description='Create a custom cohort')
+    Args:
+        cli_arguments (list[str]): all command line arguments following the script path
+        exit_on_error (bool): whether the parser should quit completely (default), or raise an exception
+            when we encounter invalid arguments. exit = False is used in unit testing
+
+    Returns:
+        Namespace - the ArgParse digest of all arguments
+    """
+    parser = ArgumentParser(description='Create a custom cohort', exit_on_error=exit_on_error)
+    parser.add_argument('--project', help='The project to create the cohort in', required=True)
+    parser.add_argument('--name', help='The name of the cohort', required=True)
+    parser.add_argument('--description', help='The description of the cohort', required=True)
     parser.add_argument(
-        '--project', type=str, help='The project to create the cohort in'
-    )
-    parser.add_argument('--name', type=str, help='The name of the cohort')
-    parser.add_argument('--description', type=str, help='The description of the cohort')
-    parser.add_argument(
-        '--template_id', required=False, type=str, help='The template id of the cohort'
+        '--template_id', required=False, help='The template id of the cohort'
     )
     parser.add_argument(
         '--projects',
-        required=False,
-        type=str,
         nargs='*',
         help='Pull sequencing groups from these projects',
+        default=[],
     )
     parser.add_argument(
         '--sg_ids_internal',
-        required=False,
-        type=list[str],
-        help='Include the following sequencing groups',
+        nargs='*',
+        help='Included sequencing groups',
+        default=[],
     )
     parser.add_argument(
         '--excluded_sgs_internal',
-        required=False,
-        type=list[str],
-        help='Exclude the following sequencing groups',
+        nargs='*',
+        help='Excluded sequencing groups',
+        default=[],
     )
     parser.add_argument(
         '--sg_technology',
-        required=False,
-        type=list[str],
+        nargs='*',
         help='Sequencing group technologies',
+        default=[],
+        choices=['bulk-rna-seq', 'long-read', 'short-read', 'single-cell-rna-seq'],
     )
     parser.add_argument(
         '--sg_platform',
-        required=False,
-        type=list[str],
+        nargs='*',
         help='Sequencing group platforms',
+        default=[],
+        choices=['illumina', 'oxford-nanopore', 'pacbio'],
     )
     parser.add_argument(
         '--sg_type',
-        required=False,
-        type=list[str],
-        help='Sequencing group types, e.g. exome, genome',
+        nargs='*',
+        help='Sequencing group types',
+        default=[],
+        choices=[
+            'chip',
+            'exome',
+            'genome',
+            'mtseq',
+            'polyarna',
+            'singlecellrna',
+            'totalrna',
+            'transcriptome',
+        ],
     )
     parser.add_argument(
-        '--sample_type', required=False, type=list[str], help='sample type'
+        '--sample_type',
+        required=False,
+        nargs='*',
+        default=[],
+        help='Sample types',
+        choices=[
+            'blood',
+            'ebff',
+            'ebld',
+            'ebuf',
+            'ecel',
+            'edwb',
+            'epl2',
+            'fibroblast',
+            'lcl',
+            'pbmc',
+            'saliva',
+            'skin',
+        ],
     )
-    parser.add_argument('--dry-run', '--dry_run', action='store_true', help='Dry run mode')
+    parser.add_argument(
+        '--dry-run', '--dry_run', action='store_true', help='Dry run mode'
+    )
+    return parser.parse_args(cli_arguments)
 
-    args = parser.parse_args()
+
+if __name__ == '__main__':
+    args = parse_cli_arguments(argv[1:])
 
     cohort_spec = get_cohort_spec(
         cohort_name=args.name,
