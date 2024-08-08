@@ -1,7 +1,7 @@
 from itertools import groupby
 
 from db.python.tables.base import DbBase
-from db.python.utils import InternalError
+from db.python.utils import InternalError, NotFoundError
 from models.models.comment import CommentEntityType, CommentInternal, DiscussionInternal
 
 comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
@@ -136,12 +136,15 @@ class CommentTable(DbBase):
     Comment table operations and queries
     """
 
-    async def get_discussion_for_entity_ids(
-        self, entity: CommentEntityType, entity_ids: list[int]
-    ) -> list[DiscussionInternal | None]:
+    async def get_comments_for_entity_ids(
+        self,
+        entity: CommentEntityType,
+        entity_ids: list[int],
+        include_related_comments: bool = True,
+        comment_id: int | None = None,
+    ):
         """
-        Get all the comments for a list of entities, will return comments grouped by
-        entity in the same order that they are requested in
+        Get all the comments for a list of entities, will return flat list of comments
         """
 
         queries_for_entity = comment_queries.get(entity, None)
@@ -165,10 +168,11 @@ class CommentTable(DbBase):
                     {comment_query}
                 )"""
                 for comment_entity, comment_query in queries_for_entity.items()
+                if comment_entity == entity or include_related_comments
             ]
         )
 
-        _query = f"""
+        query = f"""
             WITH entity_ids as (
                 SELECT id from {entity}
                 WHERE id in :entity_ids
@@ -190,12 +194,15 @@ class CommentTable(DbBase):
             ON c.id = tc.comment_id OR c.parent_id = tc.comment_id
             LEFT JOIN audit_log al
             ON al.id = c.audit_log_id
+            {'WHERE c.id = :comment_id' if comment_id else ''}
             ORDER BY c.id, al.timestamp
         """
+        values: dict['str', int | list[int]] = {'entity_ids': entity_ids}
 
-        comment_versions = await self.connection.fetch_all(
-            _query, {'entity_ids': entity_ids}
-        )
+        if comment_id:
+            values['comment_id'] = comment_id
+
+        comment_versions = await self.connection.fetch_all(query, values)
 
         comments: list[CommentInternal] = []
 
@@ -214,6 +221,20 @@ class CommentTable(DbBase):
                 if parent is not None:
                     parent.add_comment_to_thread(comment)
 
+        return comments
+
+    async def get_discussion_for_entity_ids(
+        self, entity: CommentEntityType, entity_ids: list[int]
+    ) -> list[DiscussionInternal | None]:
+        """
+        Get comments organized into a discussion, separated into direct and related
+        comments for the specified entity
+        """
+
+        comments = await self.get_comments_for_entity_ids(
+            entity=entity, entity_ids=entity_ids, include_related_comments=True
+        )
+
         # Group comments by the entity id so that they can be returned in the same order
         # They were requested in. And wrap them in the Discussion model to separate
         # direct from related comments
@@ -225,6 +246,40 @@ class CommentTable(DbBase):
         }
 
         return [comments_by_entity_id_map.get(eid, None) for eid in entity_ids]
+
+    async def get_comment_by_id(self, id: int):
+        # To get a comment by id and be able to return the necessary entity info
+        # we need to determine which entity the requested comment is attached to
+
+        query = "\nUNION\n".join(
+            [
+                f"""(
+                SELECT
+                    {entity_type}_id as entity_id,
+                    '{entity_type}' as entity_type
+                FROM {entity_type}_comment
+                WHERE comment_id = :comment_id
+            )"""
+                for entity_type in CommentEntityType
+            ]
+        )
+
+        rows = await self.connection.fetch_all(query, {'comment_id': id})
+
+        if len(rows) == 0:
+            raise NotFoundError(f"Comment with id {id} was not found")
+
+        comments = await self.get_comments_for_entity_ids(
+            entity_ids=rows[0]['entity_id'],
+            entity=rows[0]['entity_type'],
+            include_related_comments=False,
+            comment_id=id,
+        )
+
+        if len(comments) == 0:
+            raise NotFoundError(f"Comment with id {id} was not found")
+
+        return comments[0]
 
     async def add_comment(
         self, entity: CommentEntityType, entity_id: int, content: str
@@ -263,4 +318,4 @@ class CommentTable(DbBase):
                 },
             )
 
-            return 1
+            return await self.get_comment_by_id(comment_id)
