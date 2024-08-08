@@ -33,7 +33,6 @@ from db.python.layers import (
     SampleLayer,
     SequencingGroupLayer,
 )
-from db.python.layers.comment import CommentLayer
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.analysis_runner import AnalysisRunnerFilter
 from db.python.tables.assay import AssayFilter
@@ -63,6 +62,7 @@ from models.models.comment import (
     CommentInternal,
     CommentStatus,
     CommentVersionInternal,
+    DiscussionInternal,
 )
 from models.models.family import PedRowInternal
 from models.models.ourdna import OurDNADashboard, OurDNALostSample
@@ -258,6 +258,25 @@ class GraphQLCommentVersion:
 
 
 @strawberry.type
+class GraphQLDiscussion:
+    direct_comments: list['GraphQLComment']
+    related_comments: list['GraphQLComment']
+
+    @staticmethod
+    def from_internal(
+        internal: DiscussionInternal | None,
+    ) -> 'GraphQLDiscussion':
+        direct_comments = internal.direct_comments if internal is not None else []
+        related_comments = internal.related_comments if internal is not None else []
+        return GraphQLDiscussion(
+            direct_comments=[GraphQLComment.from_internal(c) for c in direct_comments],
+            related_comments=[
+                GraphQLComment.from_internal(c) for c in related_comments
+            ],
+        )
+
+
+@strawberry.type
 class GraphQLComment:
 
     id: int
@@ -266,8 +285,8 @@ class GraphQLComment:
     author: str
     created_at: datetime.datetime
     updated_at: datetime.datetime
-    entity_type: strawberry.Private[CommentEntityType]
-    entity_id: strawberry.Private[int]
+    comment_entity_type: strawberry.Private[CommentEntityType]
+    comment_entity_id: strawberry.Private[int]
     status: strawberry.enum(CommentStatus)  # type: ignore
     thread: list['GraphQLComment']
     versions: list[GraphQLCommentVersion]
@@ -276,8 +295,8 @@ class GraphQLComment:
     async def entity(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLComment'
     ) -> 'GraphQLSample | GraphQLAssay | GraphQLSequencingGroup | GraphQLProject | GraphQLParticipant':
-        entity_type = root.entity_type
-        entity_id = root.entity_id
+        entity_type = root.comment_entity_type
+        entity_id = root.comment_entity_id
 
         if entity_type == CommentEntityType.sample:
             loader = info.context['loaders'][LoaderKeys.SAMPLES_FOR_IDS]
@@ -315,8 +334,8 @@ class GraphQLComment:
             author=internal.author,
             created_at=internal.created_at,
             updated_at=internal.updated_at,
-            entity_type=internal.entity_type,
-            entity_id=internal.entity_id,
+            comment_entity_type=internal.comment_entity_type,
+            comment_entity_id=internal.comment_entity_id,
             thread=[GraphQLComment.from_internal(c) for c in internal.thread],
             status=internal.status,
             versions=[
@@ -593,6 +612,14 @@ class GraphQLProject:
         cohorts = await CohortLayer(connection).query(c_filter)
         return [GraphQLCohort.from_internal(c) for c in cohorts]
 
+    @strawberry.field()
+    async def discussion(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLProject'
+    ) -> GraphQLDiscussion:
+        loader = info.context['loaders'][LoaderKeys.COMMENTS_FOR_PROJECT_IDS]
+        discussion = await loader.load(root.id)
+        return GraphQLDiscussion.from_internal(discussion)
+
 
 @strawberry.type
 class GraphQLAuditLog:
@@ -860,6 +887,14 @@ class GraphQLParticipant:
         audit_log = await loader.load(root.audit_log_id)
         return GraphQLAuditLog.from_internal(audit_log)
 
+    @strawberry.field()
+    async def discussion(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLParticipant'
+    ) -> GraphQLDiscussion:
+        loader = info.context['loaders'][LoaderKeys.COMMENTS_FOR_PARTICIPANT_IDS]
+        discussion = await loader.load(root.id)
+        return GraphQLDiscussion.from_internal(discussion)
+
 
 @strawberry.type
 class GraphQLSample:
@@ -1016,6 +1051,14 @@ class GraphQLSample:
         )
         return [GraphQLSample.from_internal(s) for s in nested_samples]
 
+    @strawberry.field()
+    async def discussion(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLSample'
+    ) -> GraphQLDiscussion:
+        loader = info.context['loaders'][LoaderKeys.COMMENTS_FOR_SAMPLE_IDS]
+        discussion = await loader.load(root.internal_id)
+        return GraphQLDiscussion.from_internal(discussion)
+
 
 @strawberry.type
 class GraphQLSequencingGroup:
@@ -1110,6 +1153,14 @@ class GraphQLSequencingGroup:
         assays = await loader.load(root.internal_id)
         return [GraphQLAssay.from_internal(assay) for assay in assays]
 
+    @strawberry.field()
+    async def discussion(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLSequencingGroup'
+    ) -> GraphQLDiscussion:
+        loader = info.context['loaders'][LoaderKeys.COMMENTS_FOR_SEQUENCING_GROUP_IDS]
+        discussion = await loader.load(root.internal_id)
+        return GraphQLDiscussion.from_internal(discussion)
+
 
 @strawberry.type
 class GraphQLAssay:
@@ -1143,6 +1194,14 @@ class GraphQLAssay:
         loader = info.context['loaders'][LoaderKeys.SAMPLES_FOR_IDS]
         sample = await loader.load(root.sample_id)
         return GraphQLSample.from_internal(sample)
+
+    @strawberry.field()
+    async def discussion(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLAssay'
+    ) -> GraphQLDiscussion:
+        loader = info.context['loaders'][LoaderKeys.COMMENTS_FOR_ASSAY_IDS]
+        discussion = await loader.load(root.id)
+        return GraphQLDiscussion.from_internal(discussion)
 
 
 @strawberry.type
@@ -1208,16 +1267,6 @@ class Query:  # entry point to graphql.
     @strawberry.field()
     def enum(self, info: Info[GraphQLContext, 'Query']) -> GraphQLEnum:  # type: ignore
         return GraphQLEnum()
-
-    @strawberry.field()
-    async def comments(
-        self, info: Info[GraphQLContext, 'Query'], entity: str, entity_id: int
-    ) -> list[GraphQLComment]:
-        connection = info.context['connection']
-        comment_layer = CommentLayer(connection)
-        comments = await comment_layer.query(entity, entity_id)
-
-        return [GraphQLComment.from_internal(comment) for comment in comments]
 
     @strawberry.field()
     async def cohort_templates(

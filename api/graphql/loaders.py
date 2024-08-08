@@ -22,6 +22,7 @@ from db.python.layers import (
     SampleLayer,
     SequencingGroupLayer,
 )
+from db.python.layers.comment import CommentLayer
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.assay import AssayFilter
 from db.python.tables.family import FamilyFilter
@@ -40,6 +41,7 @@ from models.models import (
     SequencingGroupInternal,
 )
 from models.models.audit_log import AuditLogInternal
+from models.models.comment import CommentEntityType, DiscussionInternal
 from models.models.family import PedRowInternal
 
 
@@ -80,6 +82,12 @@ class LoaderKeys(enum.Enum):
     SEQUENCING_GROUPS_FOR_SAMPLES = 'sequencing_groups_for_samples'
     SEQUENCING_GROUPS_FOR_PROJECTS = 'sequencing_groups_for_projects'
     SEQUENCING_GROUPS_FOR_ANALYSIS = 'sequencing_groups_for_analysis'
+
+    COMMENTS_FOR_SAMPLE_IDS = 'comments_for_sample_ids'
+    COMMENTS_FOR_PARTICIPANT_IDS = 'comments_for_participant_ids'
+    COMMENTS_FOR_ASSAY_IDS = 'comments_for_assay_ids'
+    COMMENTS_FOR_PROJECT_IDS = 'comments_for_project_ids'
+    COMMENTS_FOR_SEQUENCING_GROUP_IDS = 'comments_for_sequencing_group_ids'
 
 
 loaders: dict[LoaderKeys, Any] = {}
@@ -514,6 +522,76 @@ async def load_family_participants_for_participants(
     fp_map = group_by(family_participants, lambda fp: fp.individual_id)
 
     return [fp_map.get(pid, []) for pid in participant_ids]
+
+
+@connected_data_loader(LoaderKeys.COMMENTS_FOR_SAMPLE_IDS)
+async def load_comments_for_sample_ids(
+    sample_ids: list[int], connection: Connection
+) -> list[DiscussionInternal | None]:
+    """
+    DataLoader: load_comments_for_sample_ids
+    """
+    clayer = CommentLayer(connection)
+    comments = await clayer.get_discussion_for_entity_ids(
+        entity=CommentEntityType.sample, entity_ids=sample_ids
+    )
+    return comments
+
+
+@connected_data_loader(LoaderKeys.COMMENTS_FOR_PARTICIPANT_IDS)
+async def load_comments_for_participant_ids(
+    participant_ids: list[int], connection: Connection
+) -> list[DiscussionInternal | None]:
+    """
+    DataLoader: load_comments_for_participant_ids
+    """
+    clayer = CommentLayer(connection)
+    comments = await clayer.get_discussion_for_entity_ids(
+        entity=CommentEntityType.participant, entity_ids=participant_ids
+    )
+    return comments
+
+
+@connected_data_loader(LoaderKeys.COMMENTS_FOR_ASSAY_IDS)
+async def load_comments_for_assay_ids(
+    assay_ids: list[int], connection: Connection
+) -> list[DiscussionInternal | None]:
+    """
+    DataLoader: load_comments_for_assay_ids
+    """
+    clayer = CommentLayer(connection)
+    comments = await clayer.get_discussion_for_entity_ids(
+        entity=CommentEntityType.assay, entity_ids=assay_ids
+    )
+    return comments
+
+
+@connected_data_loader(LoaderKeys.COMMENTS_FOR_PROJECT_IDS)
+async def load_comments_for_project_ids(
+    project_ids: list[int], connection: Connection
+) -> list[DiscussionInternal | None]:
+    """
+    DataLoader: load_comments_for_project_ids
+    """
+    clayer = CommentLayer(connection)
+    comments = await clayer.get_discussion_for_entity_ids(
+        entity=CommentEntityType.project, entity_ids=project_ids
+    )
+    return comments
+
+
+@connected_data_loader(LoaderKeys.COMMENTS_FOR_SEQUENCING_GROUP_IDS)
+async def load_comments_for_sequencing_group_ids(
+    sequencing_group_ids: list[int], connection: Connection
+) -> list[DiscussionInternal | None]:
+    """
+    DataLoader: load_comments_for_sequencing_group_ids
+    """
+    clayer = CommentLayer(connection)
+    comments = await clayer.get_discussion_for_entity_ids(
+        entity=CommentEntityType.sequencing_group, entity_ids=sequencing_group_ids
+    )
+    return comments
 
 
 class GraphQLContext(TypedDict):
