@@ -3,7 +3,6 @@ from textwrap import dedent
 from typing import Any
 
 from databases import Database
-from google.auth.credentials import AnonymousCredentials
 from google.cloud.storage import Client
 
 from db.python.connect import Connection, SMConnections
@@ -32,7 +31,7 @@ async def get_analyses_without_fileid(connection: Database):
 if __name__ == '__main__':
     import asyncio
 
-    from api.settings import METAMIST_GCP_PROJECT, SM_ENVIRONMENT
+    from api.settings import METAMIST_GCP_PROJECT
 
     async def main():
         """Go through all analysis objects and create output file objects where possible"""
@@ -54,22 +53,9 @@ if __name__ == '__main__':
         )
         oft = OutputFileTable(formed_connection)
 
-        if SM_ENVIRONMENT in (
-            'local',
-            'test',
-        ):
-            client = Client(
-                credentials=AnonymousCredentials(),
-                project='test',
-                # Alternatively instead of using the global env STORAGE_EMULATOR_HOST. You can define it here.
-                # This will set this client object to point to the local google cloud storage.
-                client_options={'api_endpoint': 'http://localhost:4443'},
-            )
-        else:
-
-            if METAMIST_GCP_PROJECT:
-                client = Client(project=METAMIST_GCP_PROJECT)
-            client = Client()
+        if METAMIST_GCP_PROJECT:
+            client = Client(project=METAMIST_GCP_PROJECT)
+        client = Client()
 
         analyses = await get_analyses_without_fileid(sm_db)
         print(f'Found {len(analyses)} analysis outputs to be migrated')

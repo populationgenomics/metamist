@@ -4,39 +4,30 @@ import os
 import re
 from typing import TypeAlias
 
-from google.auth.credentials import AnonymousCredentials
 from google.cloud.storage import Blob, Client
 from pydantic import BaseModel
 
-from api.settings import METAMIST_GCP_PROJECT, SM_ENVIRONMENT
+from api.settings import METAMIST_GCP_PROJECT
 from models.base import SMBase, parse_sql_bool
 
 RecursiveDict: TypeAlias = dict[str, 'str | RecursiveDict']
 
+GCS_CLIENT = None
+
 
 def get_gcs_client():
     """Return a GCS client"""
-    if SM_ENVIRONMENT in (
-        'local',
-        'test',
-    ):
-        # This connects to the local Fake GCS emulator on port 4443.
-        # Make sure you have the fake-gcs-server installed and running.
-        # https://github.com/fsouza/fake-gcs-server
-        return Client(
-            credentials=AnonymousCredentials(),
-            project='test',
-            # Alternatively instead of using the global env STORAGE_EMULATOR_HOST. You can define it here.
-            # This will set this client object to point to the local google cloud storage.
-            client_options={'api_endpoint': 'http://localhost:4443'},
-        )
+    global GCS_CLIENT  # pylint: disable=global-statement
+    if GCS_CLIENT:
+        return GCS_CLIENT
 
     if METAMIST_GCP_PROJECT:
-        return Client(project=METAMIST_GCP_PROJECT)
-    return Client()
+        GCS_CLIENT = Client(project=METAMIST_GCP_PROJECT)
 
+    if not GCS_CLIENT:
+        GCS_CLIENT = Client()
 
-reusable_client = get_gcs_client()
+    return GCS_CLIENT
 
 
 class OutputFileInternal(SMBase):
@@ -166,7 +157,7 @@ class OutputFileInternal(SMBase):
         """Get file info for file at given path"""
         try:
             if not client:
-                client = reusable_client
+                client = get_gcs_client()
 
             file_checksum = None
             valid = False
