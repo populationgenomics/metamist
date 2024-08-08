@@ -266,11 +266,11 @@ class TestCohortData(DbIsolatedTest):
         cc_external = CohortCriteria(**cc_external_dict)
         cc_internal = cc_external.to_internal(projects_internal=[self.project_id])
         self.assertIsInstance(cc_internal, CohortCriteriaInternal)
-        self.assertDictEqual(cc_internal.dict(), cc_internal_dict)
+        self.assertDictEqual(cc_internal.model_dump(), cc_internal_dict)
 
         cc_ext_trip = cc_internal.to_external(project_names=[self.project_name])
         self.assertIsInstance(cc_ext_trip, CohortCriteria)
-        self.assertDictEqual(cc_ext_trip.dict(), cc_external_dict)
+        self.assertDictEqual(cc_ext_trip.model_dump(), cc_external_dict)
 
         ctpl_internal_dict = {
             'id': 496,
@@ -289,7 +289,7 @@ class TestCohortData(DbIsolatedTest):
             criteria_projects=[self.project_id], template_project=self.project_id
         )
         self.assertIsInstance(ctpl_internal, CohortTemplateInternal)
-        self.assertDictEqual(ctpl_internal.dict(), ctpl_internal_dict)
+        self.assertDictEqual(ctpl_internal.model_dump(), ctpl_internal_dict)
 
     @run_as_sync
     async def test_create_cohort_by_sgs(self):
