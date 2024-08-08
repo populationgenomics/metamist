@@ -1,6 +1,7 @@
 import strawberry
 from strawberry.types import Info
 
+from api.graphql.loaders import GraphQLContext
 from db.python.layers.sample import SampleLayer
 from models.utils.sample_id_format import sample_id_transform_to_raw
 
@@ -14,7 +15,7 @@ class SampleMutations:
         self,
         content: str,
         id: str,
-        info: Info,
+        info: Info[GraphQLContext, 'SampleMutations'],
     ) -> int:
         """Add a comment to a sample"""
         connection = info.context['connection']
@@ -23,20 +24,3 @@ class SampleMutations:
             content=content, sample_id=sample_id_transform_to_raw(id)
         )
         return result
-
-    # @strawberry.mutation
-    # async def remove_sample(
-    #     self,
-
-    # @strawberry.mutation
-    # async def edit_sample(
-    #     self,
-    #     sample_id: int,
-    #     message: str,
-    #     info: Info,
-    # ) -> int:
-    #     """Create a new sample"""
-    #     # connection: Connection = info.context['connection']
-
-    #     print(message)
-    #     return 1

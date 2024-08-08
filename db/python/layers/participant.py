@@ -8,6 +8,7 @@ from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers.base import BaseLayer
 from db.python.layers.sample import SampleLayer
+from db.python.tables.comment import CommentTable
 from db.python.tables.family import FamilyTable
 from db.python.tables.family_participant import (
     FamilyParticipantFilter,
@@ -18,9 +19,15 @@ from db.python.tables.participant_phenotype import ParticipantPhenotypeTable
 from db.python.tables.sample import SampleTable
 from db.python.utils import NoOpAenter, NotFoundError, split_generic_terms
 from models.models import PRIMARY_EXTERNAL_ORG
+from models.models.comment import CommentEntityType
 from models.models.family import PedRowInternal
 from models.models.participant import ParticipantInternal, ParticipantUpsertInternal
-from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
+from models.models.project import (
+    FullWriteAccessRoles,
+    ProjectId,
+    ProjectMemberRole,
+    ReadAccessRoles,
+)
 
 HPO_REGEX_MATCHER = re.compile(r'HP\:\d+$')
 
@@ -239,6 +246,7 @@ class ParticipantLayer(BaseLayer):
     def __init__(self, connection: Connection):
         super().__init__(connection)
         self.pttable = ParticipantTable(connection=connection)
+        self.ct = CommentTable(connection)
 
     async def query(
         self,
@@ -1015,3 +1023,17 @@ class ParticipantLayer(BaseLayer):
                 maternal_id=fp_row.maternal_id,
                 affected=fp_row.affected,
             )
+
+    async def add_comment_to_participant(self, participant_id: int, content: str):
+        projects, _ = await self.pttable.get_participants_by_ids([participant_id])
+
+        self.connection.check_access_to_projects_for_ids(
+            projects,
+            allowed_roles={ProjectMemberRole.writer, ProjectMemberRole.contributor},
+        )
+
+        return await self.ct.add_comment(
+            content=content,
+            entity=CommentEntityType.participant,
+            entity_id=participant_id,
+        )
