@@ -1,10 +1,7 @@
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.tables.comment import CommentTable
-from db.python.utils import get_logger
-from models.models.comment import CommentEntityType, CommentInternal
-
-logger = get_logger()
+from models.models.comment import CommentEntityType, DiscussionInternal
 
 
 class CommentLayer(BaseLayer):
@@ -15,9 +12,8 @@ class CommentLayer(BaseLayer):
 
         self.ct = CommentTable(connection)
 
-    async def query(
-        self, entity: CommentEntityType, entity_id: int
-    ) -> list[CommentInternal]:
+    async def get_discussion_for_entity_ids(
+        self, entity: CommentEntityType, entity_ids: list[int]
+    ) -> list[DiscussionInternal | None]:
         """Query Cohorts"""
-        rows = await self.ct.query(entity, entity_id)
-        return rows
+        return await self.ct.get_discussion_for_entity_ids(entity, entity_ids)
