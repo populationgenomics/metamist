@@ -9,6 +9,11 @@ CommentStatus = StrEnum(
     ['active', 'deleted'],
 )
 
+CommentEntityType = StrEnum(
+    'CommentEntityType',
+    ['project', 'sample', 'assay', 'participant', 'sequencing_group'],
+)
+
 
 class CommentVersionInternal(SMBase):
     content: str
@@ -26,7 +31,7 @@ class CommentInternal(SMBase):
     author: str
     created_at: datetime.datetime
     updated_at: datetime.datetime
-    entity_type: str
+    entity_type: CommentEntityType
     entity_id: int
     versions: list[CommentVersionInternal]
     thread: list['CommentInternal']

@@ -9,6 +9,7 @@ from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.comment import CommentTable
 from db.python.tables.sample import SampleFilter, SampleTable
 from db.python.utils import NoOpAenter, NotFoundError
+from models.models.comment import CommentEntityType
 from models.models.project import (
     FullWriteAccessRoles,
     ProjectId,
@@ -454,5 +455,5 @@ class SampleLayer(BaseLayer):
         )
 
         return await self.ct.add_comment(
-            content=content, entity='sample', entity_id=sample.id
+            content=content, entity=CommentEntityType.sample, entity_id=sample.id
         )
