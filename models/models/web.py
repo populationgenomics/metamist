@@ -91,6 +91,10 @@ class ProjectParticipantGridFilterType(Enum):
     neq = 'neq'
     startswith = 'startswith'
     icontains = 'icontains'
+    gt = 'gt'
+    gte = 'gte'
+    lt = 'lt'
+    lte = 'lte'
 
 
 class ProjectParticipantGridField(SMBase):
@@ -249,8 +253,22 @@ class ProjectParticipantGridResponse(SMBase):
         )
         participant_fields = [
             Field(
-                key='external_ids',
+                key='id',
                 label='Participant ID',
+                is_visible=True,
+                filter_key='id',
+                filter_types=[
+                    ProjectParticipantGridFilterType.eq,
+                    ProjectParticipantGridFilterType.neq,
+                    ProjectParticipantGridFilterType.gt,
+                    ProjectParticipantGridFilterType.gte,
+                    ProjectParticipantGridFilterType.lt,
+                    ProjectParticipantGridFilterType.lte,
+                ],
+            ),
+            Field(
+                key='external_ids',
+                label='External Participant ID',
                 is_visible=True,
                 filter_key='external_id',
             ),
