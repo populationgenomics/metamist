@@ -276,16 +276,13 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             analysis_output_for_id = analysis_outputs_by_aid.get(
                 analysis_data['id'], None
             )
-            analysis_data['output'] = (
-                analysis_output_for_id.get('output', None)
-                if analysis_output_for_id
-                else None
-            )
-            analysis_data['outputs'] = (
-                analysis_output_for_id.get('outputs', {})
-                if analysis_output_for_id
-                else {}
-            )
+            if analysis_output_for_id:
+                analysis_data['output'] = analysis_output_for_id.get(
+                    'output', None
+                )
+                analysis_data['outputs'] = analysis_output_for_id.get(
+                    'outputs', {}
+                )
 
             analysis = AnalysisInternal.from_db(**analysis_data)
 
@@ -401,16 +398,14 @@ WHERE a.id = (
         analysis_output_for_id = analysis_outputs_by_aid.get(
             latest_analysis_data['id'], None
         )
-        latest_analysis_data['output'] = (
-            analysis_output_for_id.get('output', None)
-            if analysis_output_for_id
-            else None
-        )
-        latest_analysis_data['outputs'] = (
-            analysis_output_for_id.get('outputs', {})
-            if analysis_output_for_id
-            else {}
-        )
+
+        if analysis_output_for_id:
+            latest_analysis_data['output'] = analysis_output_for_id.get(
+                'output', None
+            )
+            latest_analysis_data['outputs'] = analysis_output_for_id.get(
+                'outputs', {}
+            )
 
         analysis = AnalysisInternal.from_db(**latest_analysis_data)
         # .from_db maps 'sequencing_group_id' -> sequencing_group_ids
@@ -488,16 +483,14 @@ ORDER BY a.timestamp_completed DESC
             analysis_output_for_id = analysis_outputs_by_aid.get(
                 analysis_data['id'], None
             )
-            analysis_data['output'] = (
-                analysis_output_for_id.get('output', None)
-                if analysis_output_for_id
-                else None
-            )
-            analysis_data['outputs'] = (
-                analysis_output_for_id.get('outputs', {})
-                if analysis_output_for_id
-                else {}
-            )
+
+            if analysis_output_for_id:
+                analysis_data['output'] = analysis_output_for_id.get(
+                    'output', None
+                )
+                analysis_data['outputs'] = analysis_output_for_id.get(
+                    'outputs', {}
+                )
 
             analysis = AnalysisInternal.from_db(**analysis_data)
             analyses.append(analysis)
@@ -539,16 +532,14 @@ WHERE a.id = :analysis_id
         analysis_output_for_id = analysis_outputs_by_aid.get(
             analysis_data['id'], None
         )
-        analysis_data['output'] = (
-            analysis_output_for_id.get('output', None)
-            if analysis_output_for_id
-            else None
-        )
-        analysis_data['outputs'] = (
-            analysis_output_for_id.get('outputs', {})
-            if analysis_output_for_id
-            else {}
-        )
+
+        if analysis_output_for_id:
+            analysis_data['output'] = analysis_output_for_id.get(
+                'output', None
+            )
+            analysis_data['outputs'] = analysis_output_for_id.get(
+                'outputs', {}
+            )
 
         analysis = AnalysisInternal.from_db(**analysis_data)
         for row in rows[1:]:
@@ -616,16 +607,15 @@ ORDER BY a.timestamp_completed DESC;
             analysis_output_for_id = analysis_outputs_by_aid.get(
                 analysis_data['id'], None
             )
-            analysis_data['output'] = (
-                analysis_output_for_id.get('output', None)
-                if analysis_output_for_id
-                else None
-            )
-            analysis_data['outputs'] = (
-                analysis_output_for_id.get('outputs', {})
-                if analysis_output_for_id
-                else {}
-            )
+
+            if analysis_output_for_id:
+                analysis_data['output'] = analysis_output_for_id.get(
+                    'output', None
+                )
+                analysis_data['outputs'] = analysis_output_for_id.get(
+                    'outputs', {}
+                )
+
             analysis_data.pop('id')
             results.append(analysis_data)
         # many per analysis

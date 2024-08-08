@@ -8,6 +8,7 @@ from google.auth.credentials import AnonymousCredentials
 from google.cloud.storage import Blob, Client
 from pydantic import BaseModel
 
+from api.settings import METAMIST_GCP_PROJECT, SM_ENVIRONMENT
 from models.base import SMBase, parse_sql_bool
 
 RecursiveDict: TypeAlias = dict[str, 'str | RecursiveDict']
@@ -15,8 +16,8 @@ RecursiveDict: TypeAlias = dict[str, 'str | RecursiveDict']
 
 def get_gcs_client():
     """Return a GCS client"""
-    if os.environ.get('SM_ENVIRONMENT', 'local').lower() in (
-        # 'local',
+    if SM_ENVIRONMENT in (
+        'local',
         'test',
     ):
         # This connects to the local Fake GCS emulator on port 4443.
@@ -29,7 +30,10 @@ def get_gcs_client():
             # This will set this client object to point to the local google cloud storage.
             client_options={'api_endpoint': 'http://localhost:4443'},
         )
-    return Client(project='sample-metadata')
+
+    if METAMIST_GCP_PROJECT:
+        return Client(project=METAMIST_GCP_PROJECT)
+    return Client()
 
 
 reusable_client = get_gcs_client()
@@ -38,7 +42,7 @@ reusable_client = get_gcs_client()
 class OutputFileInternal(SMBase):
     """File model for internal use"""
 
-    id: int
+    id: int | None = None
     parent_id: int | None = None
     path: str
     basename: str
@@ -57,17 +61,17 @@ class OutputFileInternal(SMBase):
         Convert from db keys, mainly converting id to id_
         """
         return OutputFileInternal(
-            id=kwargs.pop('id'),
+            id=kwargs.pop('id', None),
             parent_id=kwargs.pop('parent_id', None),
-            path=kwargs.get('path'),
-            basename=kwargs.get('basename'),
-            dirname=kwargs.get('dirname'),
-            nameroot=kwargs.get('nameroot'),
-            nameext=kwargs.get('nameext'),
-            file_checksum=kwargs.get('file_checksum'),
-            size=kwargs.get('size'),
-            meta=kwargs.get('meta'),
-            valid=parse_sql_bool(kwargs.get('valid')),
+            path=kwargs['path'],
+            basename=kwargs['basename'],
+            dirname=kwargs['dirname'],
+            nameroot=kwargs['nameroot'],
+            nameext=kwargs['nameext'],
+            file_checksum=kwargs['file_checksum'],
+            size=kwargs['size'],
+            meta=kwargs['meta'],
+            valid=parse_sql_bool(kwargs['valid']),
             secondary_files=kwargs.get('secondary_files', {}),
         )
 
@@ -158,7 +162,7 @@ class OutputFileInternal(SMBase):
         path: str,
         client: Client | None = None,
         blobs: list[Blob] | None = None,
-    ) -> dict | None:
+    ) -> 'OutputFileInternal | None':
         """Get file info for file at given path"""
         try:
             if not client:
@@ -188,6 +192,8 @@ class OutputFileInternal(SMBase):
                     )
                 for blob in blobs:
                     if blob.name == params['blob_name']:
+
+                        # .mt files present as folders on gcs so calculating checksums is not avail.
                         if params['file_extension'] != '.mt':
                             file_checksum = (
                                 blob.crc32c
@@ -195,15 +201,23 @@ class OutputFileInternal(SMBase):
                             valid = True
                             size = blob.size  # pylint: disable=E1101
 
-            return {
-                'basename': params['basename'],  # pylint: disable=E1101
-                'dirname': params['dirname'],  # pylint: disable=E1101
-                'nameroot': params['file_stem'],  # pylint: disable=E1101
-                'nameext': params['file_extension'],  # pylint: disable=E1101
-                'checksum': file_checksum,
-                'size': size,  # pylint: disable=E1101
-                'valid': valid,
-            }
+            return OutputFileInternal.from_db(
+                **{
+                    'path': path,
+                    'basename': params['basename'],  # pylint: disable=E1101
+                    'dirname': params['dirname'],  # pylint: disable=E1101
+                    'nameroot': params['file_stem'],  # pylint: disable=E1101
+                    'nameext': params[
+                        'file_extension'
+                    ],  # pylint: disable=E1101
+                    'file_checksum': file_checksum,
+                    'size': size,  # pylint: disable=E1101
+                    # At the moment we don't have any meta data for outputs
+                    'meta': None,
+                    'valid': valid,
+                    'secondary_files': None,
+                }
+            )
         except (FileNotFoundError, ValueError):
             return None
 
@@ -219,29 +233,32 @@ class OutputFileInternal(SMBase):
             dict: Should return the JSON structure based on the input data.
         """
         root: dict = {}
+
+        # If the data is a string, it may not be a valid file object, so return it as is.
         if isinstance(data, str):
             return data
 
-        def add_to_structure(current, path, content):
-            """Helper function to add content to the correct place in the structure."""
+        # If the data is a list, it may not be a valid file object, so we should
+        # reconstruct the JSON from this.
+        def add_to_structure(current: dict, path: list[str], content: dict):
+            """Helper function to add content to the correct place in the JSON structure."""
+
+            # We ensure the necessary keys exist in the current dictionary before adding the content.
             for key in path[:-1]:
                 if key.isdigit():
-                    key = int(key)
-                    while len(current) <= key:
-                        current.append({})
-                    if current[key] is None:
+                    key = int(key)  # type: ignore [assignment]
+                    if key not in current:
                         current[key] = {}
                     current = current[key]
                 else:
-                    if key not in current or current[key] is None:
+                    if key not in current:
                         current[key] = {}
                     current = current[key]
 
+            # We add the content to the final key in the current dictionary.
             final_key = path[-1]
             if final_key.isdigit():
-                final_key = int(final_key)
-                while len(current) <= final_key:
-                    current.append({})
+                final_key = int(final_key)  # type: ignore [assignment]
                 current[final_key] = content
             else:
                 if final_key in current:
@@ -253,25 +270,33 @@ class OutputFileInternal(SMBase):
                     current[final_key] = content
 
         for file in data:
+            # We initialize the file_root dictionary to store the file information.
             file_root: dict = {}
 
-            # Check if the file is a tuple or a string
+            # If the file variable is a tuple, we assume it is a tuple of (file_obj, json_structure)
             if isinstance(file, tuple):
                 file_obj, json_structure = file
                 file_obj = file_obj.dict()
                 fields = (
                     OutputFileInternal.model_fields.keys()
                 )  # type:ignore[attr-defined]
+
+                # Populate the file_root dictionary with the fields from the file_obj.
                 for field in fields:
                     file_root[field] = file_obj.get(field)
 
+                # If json_structure is not None, we assume it is a list of strings representing the path to the desired JSON structure.
                 if json_structure:
                     if isinstance(json_structure, str):
                         json_structure = json_structure.split('.')
                     path = json_structure
+
+                    # We add the file_root dictionary to the root dictionary based on the path.
                     add_to_structure(root, path, file_root)
                 else:
                     root.update(file_root)
+
+            # If the file variable is not a tuple, we assume it is a string representing the output of the file.
             else:
                 file_root['output'] = file
                 if 'output' in root:
@@ -285,7 +310,7 @@ class OutputFileInternal(SMBase):
 class OutputFile(BaseModel):
     """File model for external use"""
 
-    id: int
+    id: int | None = None
     parent_id: int | None = None
     path: str
     basename: str

@@ -1,5 +1,5 @@
 # pylint: disable=too-many-nested-blocks
-import warnings
+import logging
 from textwrap import dedent
 
 from fastapi.concurrency import run_in_threadpool
@@ -7,6 +7,10 @@ from google.cloud.storage import Blob
 
 from db.python.tables.base import DbBase
 from models.models.output_file import OutputFileInternal, RecursiveDict
+
+logger = logging.getLogger(__file__)
+logger.addHandler(logging.StreamHandler())
+logger.setLevel(logging.INFO)
 
 
 class OutputFileTable(DbBase):
@@ -27,23 +31,20 @@ class OutputFileTable(DbBase):
         Process output for analysis
         """
         if output and outputs:
-            warnings.warn(
-                'The output field is deprecated, using outputs instead since it was passed in..',
-                PendingDeprecationWarning,
-                2,
+            logger.warning(
+                'output and outputs both provided, using outputs instead..',
+                stacklevel=2,
             )
         if output and not outputs:
-            warnings.warn(
-                'The output field is deprecated, please use outputs instead',
-                PendingDeprecationWarning,
-                2,
+            logger.warning(
+                'The output field is going to be deprecated soon, please use outputs instead',
+                stacklevel=2,
             )
 
         if outputs and isinstance(outputs, str):
-            warnings.warn(
+            logger.warning(
                 'The outputs field should be a dictionary, passing a str will be deprecated soon.',
-                PendingDeprecationWarning,
-                2,
+                stacklevel=2,
             )
 
         output_data = outputs or output
@@ -69,24 +70,24 @@ class OutputFileTable(DbBase):
         if not path:
             raise ValueError('Invalid cloud file path')
 
-        file_info = await run_in_threadpool(
+        file_obj = await run_in_threadpool(
             OutputFileInternal.get_file_info,
             path=path,
             blobs=blobs,
         )
 
-        if not file_info or not file_info.get('valid'):
+        if not file_obj or not file_obj.valid:
             return None
 
         kv_pairs = [
             ('path', path),
-            ('basename', file_info['basename']),
-            ('dirname', file_info['dirname']),
-            ('nameroot', file_info['nameroot']),
-            ('nameext', file_info['nameext']),
-            ('file_checksum', file_info['checksum']),
-            ('size', file_info['size']),
-            ('valid', file_info['valid']),
+            ('basename', file_obj.basename),
+            ('dirname', file_obj.dirname),
+            ('nameroot', file_obj.nameroot),
+            ('nameext', file_obj.nameext),
+            ('file_checksum', file_obj.file_checksum),
+            ('size', file_obj.size),
+            ('valid', file_obj.valid),
             ('parent_id', parent_id),
         ]
 

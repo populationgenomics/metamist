@@ -1,4 +1,3 @@
-import os
 from collections import defaultdict
 from textwrap import dedent
 from typing import Any
@@ -33,6 +32,8 @@ async def get_analyses_without_fileid(connection: Database):
 if __name__ == '__main__':
     import asyncio
 
+    from api.settings import METAMIST_GCP_PROJECT, SM_ENVIRONMENT
+
     async def main():
         """Go through all analysis objects and create output file objects where possible"""
         # connection_string = SMConnections._get_config()
@@ -53,8 +54,8 @@ if __name__ == '__main__':
         )
         oft = OutputFileTable(formed_connection)
 
-        if os.environ.get('SM_ENVIRONMENT', 'local').lower() in (
-            # 'local',
+        if SM_ENVIRONMENT in (
+            'local',
             'test',
         ):
             client = Client(
@@ -65,9 +66,9 @@ if __name__ == '__main__':
                 client_options={'api_endpoint': 'http://localhost:4443'},
             )
         else:
-            # if project:
-            #     client = Client(project=project)
-            # else:
+
+            if METAMIST_GCP_PROJECT:
+                client = Client(project=METAMIST_GCP_PROJECT)
             client = Client()
 
         analyses = await get_analyses_without_fileid(sm_db)
