@@ -369,7 +369,7 @@ class SequencingGroupLayer(BaseLayer):
             allowed_roles={ProjectMemberRole.writer, ProjectMemberRole.contributor},
         )
 
-        return await self.ct.add_comment(
+        return await self.ct.add_comment_to_entity(
             content=content,
             entity=CommentEntityType.sequencing_group,
             entity_id=sequencing_group_id,
