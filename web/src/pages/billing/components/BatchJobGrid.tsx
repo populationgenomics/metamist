@@ -3,7 +3,7 @@ import TableBody from '@mui/material/TableBody'
 import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
-import * as _ from 'lodash'
+import orderBy from 'lodash/orderBy'
 import React from 'react'
 import { AnalysisCostRecordBatch, AnalysisCostRecordBatchJob } from '../../../sm-api'
 
@@ -64,12 +64,12 @@ const TblComponents: TableComponents = {
 
 export const BatchJobsTable: React.FC<{ batch: AnalysisCostRecordBatch }> = ({ batch }) => {
     const [sortedData, setSortedData] = React.useState(
-        _.orderBy(batch.jobs, (j) => parseInt(j.job_id))
+        orderBy(batch.jobs, (j) => parseInt(j.job_id))
     )
 
     React.useEffect(() => {
         // sort here to avoid sorting on each render
-        setSortedData(_.orderBy(batch.jobs, (j) => parseInt(j.job_id)))
+        setSortedData(orderBy(batch.jobs, (j) => parseInt(j.job_id)))
     }, [batch])
 
     return (

@@ -1,4 +1,4 @@
-import * as _ from 'lodash'
+import startCase from 'lodash/startCase'
 import * as React from 'react'
 
 import DragHandle from '@mui/icons-material/DragHandle'
@@ -250,7 +250,7 @@ const CategoryColumnOptions: React.FC<{
     const _metaFields = _fields?.filter((f) => f.key.startsWith('meta.'))
     return (
         <>
-            <h3>{_.startCase(metaSearchEntityToTitle(category))}</h3>
+            <h3>{startCase(metaSearchEntityToTitle(category))}</h3>
             <p>
                 <a href="" onClick={updateAllFromEvent(true)}>
                     Select all
