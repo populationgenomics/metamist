@@ -32,5 +32,5 @@ class ProjectMutations:
             allowed_roles={ProjectMemberRole.writer, ProjectMemberRole.contributor},
         )
         ct = CommentTable(connection)
-        result = await ct.add_comment(CommentEntityType.project, id, content)
+        result = await ct.add_comment_to_entity(CommentEntityType.project, id, content)
         return GraphQLComment.from_internal(result)

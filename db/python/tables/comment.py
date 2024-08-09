@@ -2,8 +2,14 @@ from itertools import groupby
 
 from db.python.tables.base import DbBase
 from db.python.utils import InternalError, NotFoundError
-from models.models.comment import CommentEntityType, CommentInternal, DiscussionInternal
+from models.models.comment import (
+    CommentEntityType,
+    CommentInternal,
+    CommentStatus,
+    DiscussionInternal,
+)
 
+# @TODO document what the heck is going on here
 comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
     CommentEntityType.project: {
         CommentEntityType.project: """
@@ -250,6 +256,8 @@ class CommentTable(DbBase):
     async def get_comment_by_id(self, id: int):
         # To get a comment by id and be able to return the necessary entity info
         # we need to determine which entity the requested comment is attached to
+        # so we build a query to union together results from all the comment join
+        # tables.
 
         query = "\nUNION\n".join(
             [
@@ -281,7 +289,7 @@ class CommentTable(DbBase):
 
         return comments[0]
 
-    async def add_comment(
+    async def add_comment_to_entity(
         self, entity: CommentEntityType, entity_id: int, content: str
     ):
 
@@ -319,3 +327,70 @@ class CommentTable(DbBase):
             )
 
             return await self.get_comment_by_id(comment_id)
+
+    async def add_comment_to_thread(self, content: str, parent_id: int):
+        audit_log_id = await self._connection.audit_log_id()
+
+        comment_insert = """
+            INSERT INTO comment (parent_id, content, status, audit_log_id)
+            VALUES (:parent_id, :content, 'active', :audit_log_id) RETURNING id;
+        """
+
+        comment_id = await self.connection.fetch_val(
+            comment_insert,
+            {
+                'content': content,
+                'parent_id': parent_id,
+                'audit_log_id': audit_log_id,
+            },
+        )
+
+        return await self.get_comment_by_id(comment_id)
+
+    async def update_comment(
+        self, comment_id: int, content: str | None, status: CommentStatus | None
+    ):
+        current_comment = await self.get_comment_by_id(comment_id)
+
+        content_changed = current_comment.content != content
+        status_changed = current_comment.status != status
+        no_update = content is None and status is None
+        comment_changed = content_changed or status_changed
+
+        # If changes are not passed, or nothing has changed then no need to do anything
+        if no_update or not comment_changed:
+            return current_comment
+
+        audit_log_id = await self._connection.audit_log_id()
+
+        # Construct the query string and values, excluding any updates that are
+        # unchanged or don't have a value set. The query string would be invalid
+        # if both content and status were not set or unchanged, but the checks
+        # above avoid getting this far if that is the case.
+        updates = [
+            ('content', content, content_changed),
+            ('status', status, status_changed),
+        ]
+
+        update_q = ', '.join(
+            [f"{k} = :{k}" for k, v, changed in updates if v is not None and changed]
+        )
+        update_v = {k: v for k, v, changed in updates if v is not None and changed}
+
+        comment_update = f"""
+            UPDATE comment
+            SET {update_q},
+                audit_log_id = :audit_log_id
+            WHERE id = :comment_id
+        """
+
+        comment_id = await self.connection.execute(
+            comment_update,
+            {
+                'comment_id': comment_id,
+                'audit_log_id': audit_log_id,
+            }
+            | update_v,
+        )
+
+        return await self.get_comment_by_id(comment_id)
