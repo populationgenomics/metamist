@@ -210,13 +210,26 @@ class CommentTable(DbBase):
 
         comment_versions = await self.connection.fetch_all(query, values)
 
-        comments: list[CommentInternal] = []
-
         # Group comments by their ids so that versions get included within a comment
-        comment_map = {
+        comment_map: dict[int, CommentInternal] = {
             id: CommentInternal.from_db_versions(list(dict(v) for v in g))
             for id, g in groupby(comment_versions, key=lambda k: k['comment_id'])
         }
+
+        return comment_map
+
+    async def get_discussion_for_entity_ids(
+        self, entity: CommentEntityType, entity_ids: list[int]
+    ) -> list[DiscussionInternal | None]:
+        """
+        Get comments organized into a discussion, separated into direct and related
+        comments for the specified entity
+        """
+        comments: list[CommentInternal] = []
+
+        comment_map = await self.get_comments_for_entity_ids(
+            entity=entity, entity_ids=entity_ids, include_related_comments=True
+        )
 
         # Organize threaded comments under their parents
         for _, comment in comment_map.items():
@@ -226,20 +239,6 @@ class CommentTable(DbBase):
                 parent = comment_map.get(comment.parent_id, None)
                 if parent is not None:
                     parent.add_comment_to_thread(comment)
-
-        return comments
-
-    async def get_discussion_for_entity_ids(
-        self, entity: CommentEntityType, entity_ids: list[int]
-    ) -> list[DiscussionInternal | None]:
-        """
-        Get comments organized into a discussion, separated into direct and related
-        comments for the specified entity
-        """
-
-        comments = await self.get_comments_for_entity_ids(
-            entity=entity, entity_ids=entity_ids, include_related_comments=True
-        )
 
         # Group comments by the entity id so that they can be returned in the same order
         # They were requested in. And wrap them in the Discussion model to separate
@@ -259,18 +258,29 @@ class CommentTable(DbBase):
         # so we build a query to union together results from all the comment join
         # tables.
 
-        query = "\nUNION\n".join(
+        join_table_query = "\nUNION\n".join(
             [
                 f"""(
                 SELECT
                     {entity_type}_id as entity_id,
                     '{entity_type}' as entity_type
-                FROM {entity_type}_comment
-                WHERE comment_id = :comment_id
+                FROM {entity_type}_comment ec
+                JOIN root_comment rc
+                ON rc.comment_id = ec.comment_id
             )"""
                 for entity_type in CommentEntityType
             ]
         )
+
+        # Only root comments are attached to entities, so if the comment has a parent
+        # ID we need to use that to find the entity type rather than the comment id
+        query = f"""
+            WITH root_comment as (
+                SELECT COALESCE(parent_id, id) as comment_id
+                FROM comment
+                WHERE id = :comment_id
+            ) {join_table_query}
+        """
 
         rows = await self.connection.fetch_all(query, {'comment_id': id})
 
@@ -284,10 +294,10 @@ class CommentTable(DbBase):
             comment_id=id,
         )
 
-        if len(comments) == 0:
+        if id not in comments:
             raise NotFoundError(f"Comment with id {id} was not found")
 
-        return comments[0]
+        return comments[id]
 
     async def add_comment_to_entity(
         self, entity: CommentEntityType, entity_id: int, content: str
@@ -348,12 +358,15 @@ class CommentTable(DbBase):
         return await self.get_comment_by_id(comment_id)
 
     async def update_comment(
-        self, comment_id: int, content: str | None, status: CommentStatus | None
+        self,
+        comment_id: int,
+        content: str | None = None,
+        status: CommentStatus | None = None,
     ):
         current_comment = await self.get_comment_by_id(comment_id)
 
-        content_changed = current_comment.content != content
-        status_changed = current_comment.status != status
+        content_changed = content is not None and current_comment.content != content
+        status_changed = status is not None and current_comment.status != status
         no_update = content is None and status is None
         comment_changed = content_changed or status_changed
 
@@ -384,7 +397,7 @@ class CommentTable(DbBase):
             WHERE id = :comment_id
         """
 
-        comment_id = await self.connection.execute(
+        await self.connection.execute(
             comment_update,
             {
                 'comment_id': comment_id,
