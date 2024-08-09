@@ -1,9 +1,14 @@
+from typing import TYPE_CHECKING, Annotated
+
 import strawberry
 from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
 from db.python.layers.sample import SampleLayer
 from models.utils.sample_id_format import sample_id_transform_to_raw
+
+if TYPE_CHECKING:
+    from api.graphql.schema import GraphQLComment
 
 
 @strawberry.type
@@ -16,11 +21,13 @@ class SampleMutations:
         content: str,
         id: str,
         info: Info[GraphQLContext, 'SampleMutations'],
-    ) -> int:
+    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
         """Add a comment to a sample"""
+        from api.graphql.schema import GraphQLComment
+
         connection = info.context['connection']
         sample_layer = SampleLayer(connection)
         result = await sample_layer.add_comment_to_sample(
             content=content, sample_id=sample_id_transform_to_raw(id)
         )
-        return result
+        return GraphQLComment.from_internal(result)

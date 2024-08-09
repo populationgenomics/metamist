@@ -270,7 +270,7 @@ class CommentTable(DbBase):
             raise NotFoundError(f"Comment with id {id} was not found")
 
         comments = await self.get_comments_for_entity_ids(
-            entity_ids=rows[0]['entity_id'],
+            entity_ids=[rows[0]['entity_id']],
             entity=rows[0]['entity_type'],
             include_related_comments=False,
             comment_id=id,

@@ -1,6 +1,8 @@
 import strawberry
 from strawberry.types import Info
 
+from api.graphql.loaders import GraphQLContext
+
 
 @strawberry.type
 class CommentMutations:
@@ -11,7 +13,7 @@ class CommentMutations:
         self,
         message: str,
         thread_id: int | None,
-        info: Info,
+        info: Info[GraphQLContext, 'CommentMutations'],
     ) -> int:
         """Create a new comment"""
         # connection: Connection = info.context['connection']
