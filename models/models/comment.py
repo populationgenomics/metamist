@@ -58,7 +58,7 @@ class CommentInternal(SMBase):
                 status=v.get('status'),
                 content=v.get('content'),
             )
-            for v in versions[1:]
+            for v in versions[0:-1]
         ]
 
         return CommentInternal(

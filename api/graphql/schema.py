@@ -41,7 +41,6 @@ from db.python.tables.family import FamilyFilter
 from db.python.tables.participant import ParticipantFilter
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
-from db.python.utils import InternalError
 from models.enums import AnalysisStatus
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
@@ -298,32 +297,31 @@ class GraphQLComment:
         entity_type = root.comment_entity_type
         entity_id = root.comment_entity_id
 
-        if entity_type == CommentEntityType.sample:
-            loader = info.context['loaders'][LoaderKeys.SAMPLES_FOR_IDS]
-            sample = await loader.load(entity_id)
-            return GraphQLSample.from_internal(sample)
+        match entity_type:
+            case CommentEntityType.sample:
+                loader = info.context['loaders'][LoaderKeys.SAMPLES_FOR_IDS]
+                sample = await loader.load(entity_id)
+                return GraphQLSample.from_internal(sample)
 
-        if entity_type == CommentEntityType.sequencing_group:
-            loader = info.context['loaders'][LoaderKeys.SEQUENCING_GROUPS_FOR_IDS]
-            sg = await loader.load(entity_id)
-            return GraphQLSequencingGroup.from_internal(sg)
+            case CommentEntityType.sequencing_group:
+                loader = info.context['loaders'][LoaderKeys.SEQUENCING_GROUPS_FOR_IDS]
+                sg = await loader.load(entity_id)
+                return GraphQLSequencingGroup.from_internal(sg)
 
-        if entity_type == CommentEntityType.project:
-            loader = info.context['loaders'][LoaderKeys.PROJECTS_FOR_IDS]
-            sg = await loader.load(entity_id)
-            return GraphQLProject.from_internal(sg)
+            case CommentEntityType.project:
+                loader = info.context['loaders'][LoaderKeys.PROJECTS_FOR_IDS]
+                sg = await loader.load(entity_id)
+                return GraphQLProject.from_internal(sg)
 
-        if entity_type == CommentEntityType.assay:
-            loader = info.context['loaders'][LoaderKeys.ASSAYS_FOR_IDS]
-            ay = await loader.load(entity_id)
-            return GraphQLAssay.from_internal(ay)
+            case CommentEntityType.assay:
+                loader = info.context['loaders'][LoaderKeys.ASSAYS_FOR_IDS]
+                ay = await loader.load(entity_id)
+                return GraphQLAssay.from_internal(ay)
 
-        if entity_type == CommentEntityType.participant:
-            loader = info.context['loaders'][LoaderKeys.PARTICIPANTS_FOR_IDS]
-            pt = await loader.load(entity_id)
-            return GraphQLParticipant.from_internal(pt)
-
-        raise InternalError(f"Unknown entity type of {entity_type}")
+            case CommentEntityType.participant:
+                loader = info.context['loaders'][LoaderKeys.PARTICIPANTS_FOR_IDS]
+                pt = await loader.load(entity_id)
+                return GraphQLParticipant.from_internal(pt)
 
     @staticmethod
     def from_internal(internal: CommentInternal) -> 'GraphQLComment':
