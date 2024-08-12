@@ -542,6 +542,9 @@ class GenericMetadataParser(GenericParser):
         >>> GenericMetadataParser.collapse_arbitrary_meta({'key1': 'new.key'}, [{'key1': True}])
         {'new': {'key': True}}
 
+        >>> GenericMetadataParser.collapse_arbitrary_meta({'key1': 'new_key'}, [{'key1': [1,2]}, {'key1': [2,3]}])
+        {'new_key': [[1, 2], [2, 3]}
+
         >>> GenericMetadataParser.collapse_arbitrary_meta({'key1': 'new_key'}, [{}])
         {}
 
