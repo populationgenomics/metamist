@@ -63,7 +63,7 @@ jobs:
       - name: "Run unit tests"
         id: runtests
         run: |
-          coverage run -m unittest discover -p 'test*.py' -s '.'
+          coverage run -m pytest --doctest-modules --doctest-continue-on-failure test/
           rc=$?
           coverage xml
 
