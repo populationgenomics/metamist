@@ -1,8 +1,7 @@
 import * as React from 'react'
 import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import { Table as SUITable, Message, Button, Checkbox, Dropdown, Grid } from 'semantic-ui-react'
-import _ from 'lodash'
-import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
+import orderBy from 'lodash/orderBy'
 import Table from '../../shared/components/Table'
 import { BillingApi, BillingColumn, BillingCostBudgetRecord } from '../../sm-api'
 import FieldSelector from './components/FieldSelector'
@@ -345,7 +344,7 @@ const BillingCurrentCost = () => {
                         </SUITable.Row>
                     </SUITable.Header>
                     <SUITable.Body>
-                        {_.orderBy(
+                        {orderBy(
                             costRecords,
                             [sort.column],
                             sort.direction === 'ascending' ? ['asc'] : ['desc']
@@ -421,7 +420,7 @@ const BillingCurrentCost = () => {
                                 </SUITable.Row>
                                 {typeof p === 'object' &&
                                     'details' in p &&
-                                    _.orderBy(p?.details, ['monthly_cost'], ['desc']).map((dk) => (
+                                    orderBy(p?.details, ['monthly_cost'], ['desc']).map((dk) => (
                                         <SUITable.Row
                                             style={{
                                                 // @ts-ignore

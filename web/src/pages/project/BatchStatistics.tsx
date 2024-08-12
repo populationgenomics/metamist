@@ -1,5 +1,5 @@
 import * as React from 'react'
-import _ from 'lodash'
+import capitalize from 'lodash/capitalize'
 import { Table as SUITable } from 'semantic-ui-react'
 import Table from '../../shared/components/Table'
 
@@ -28,7 +28,7 @@ const BatchStatistics: React.FunctionComponent<BatchStatisticsProps> = ({
                     <SUITable.HeaderCell>Batch</SUITable.HeaderCell>
                     {seqTypes.map((item) => (
                         <SUITable.HeaderCell key={`header-${item}-${projectName}`}>
-                            {_.capitalize(item)}
+                            {capitalize(item)}
                         </SUITable.HeaderCell>
                     ))}
                     <SUITable.HeaderCell>Total</SUITable.HeaderCell>
@@ -53,7 +53,7 @@ const BatchStatistics: React.FunctionComponent<BatchStatisticsProps> = ({
                     })
                     .map(([key, value]) => (
                         <SUITable.Row key={`body-${key}-${projectName}`}>
-                            <SUITable.Cell>{_.capitalize(key)}</SUITable.Cell>
+                            <SUITable.Cell>{capitalize(key)}</SUITable.Cell>
                             {seqTypes.map((seq) => (
                                 <SUITable.Cell
                                     key={`${key}-${seq}`}
