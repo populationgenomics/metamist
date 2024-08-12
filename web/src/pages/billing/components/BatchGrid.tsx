@@ -1,5 +1,5 @@
 import orderBy from 'lodash/orderBy'
-import startCase from 'lodash/startCase';
+import startCase from 'lodash/startCase'
 import * as React from 'react'
 import { Card } from 'semantic-ui-react'
 import '../../project/AnalysisRunnerView/AnalysisGrid.css'

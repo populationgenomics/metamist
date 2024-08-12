@@ -197,16 +197,12 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
                         isLoading={loading}
                         totalPageNumbers={Math.ceil(
                             (flatData.filter((log) =>
-                                filters.every(
-                                    ({ category, value }) => get(log, category) === value
-                                )
+                                filters.every(({ category, value }) => get(log, category) === value)
                             ).length || 0) / pageLimit
                         )}
                         total={Math.ceil(
                             flatData.filter((log) =>
-                                filters.every(
-                                    ({ category, value }) => get(log, category) === value
-                                )
+                                filters.every(({ category, value }) => get(log, category) === value)
                             ).length
                         )}
                         title="records"

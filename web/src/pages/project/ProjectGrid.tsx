@@ -1,5 +1,5 @@
-import capitalize  from 'lodash/capitalize'
-import startCase  from 'lodash/startCase'
+import capitalize from 'lodash/capitalize'
+import startCase from 'lodash/startCase'
 import * as React from 'react'
 
 import { TableBody, TableHeader, TableHeaderCell, TableRow } from 'semantic-ui-react'
