@@ -60,7 +60,7 @@ class TestBillingDailyTable(BqTest):
             BillingDailyTable(None)
 
         self.assertTrue(
-            'No connection was provided to the table \'BillingDailyTable\''
+            "No connection was provided to the table 'BillingDailyTable'"
             in str(context.exception)
         )
 

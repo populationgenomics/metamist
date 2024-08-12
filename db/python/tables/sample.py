@@ -176,7 +176,7 @@ class SampleTable(DbBase):
         )
         if not samples:
             raise NotFoundError(
-                f'Couldn\'t find sample with internal id {internal_id} (CPG id: {sample_id_format(internal_id)})'
+                f"Couldn't find sample with internal id {internal_id} (CPG id: {sample_id_format(internal_id)})"
             )
 
         return projects.pop(), samples.pop()
@@ -197,7 +197,7 @@ class SampleTable(DbBase):
 
         if not samples:
             raise NotFoundError(
-                f'Couldn\'t find sample with external id {external_id} in project {project}'
+                f"Couldn't find sample with external id {external_id} in project {project}"
             )
 
         return samples.pop()

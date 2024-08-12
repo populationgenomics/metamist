@@ -22,10 +22,14 @@ logger = LOGGING_CLIENT.logger(log_name)
 changelog_file = 'project.xml'
 
 
-def read_db_credentials(env: Literal['prod', 'dev']) -> Dict[Literal['dbname', 'username', 'password', 'host'], str]:
+def read_db_credentials(
+    env: Literal['prod', 'dev'],
+) -> Dict[Literal['dbname', 'username', 'password', 'host'], str]:
     """Get database credentials from Secret Manager."""
     try:
-        secret_path = SECRET_CLIENT.secret_version_path(SECRET_PROJECT, SECRET_NAME, 'latest')
+        secret_path = SECRET_CLIENT.secret_version_path(
+            SECRET_PROJECT, SECRET_NAME, 'latest'
+        )
         response = SECRET_CLIENT.access_secret_version(request={'name': secret_path})
         return json.loads(response.payload.data.decode('UTF-8'))[env]
     except Exception as e:  # Broad exception for example; refine as needed
@@ -35,7 +39,10 @@ def read_db_credentials(env: Literal['prod', 'dev']) -> Dict[Literal['dbname', '
 
 
 @app.post('/execute-liquibase')
-async def execute_liquibase(request: Request, environment: Literal['prod', 'dev'] = Query(default='dev', regex='^(prod|dev)$')):
+async def execute_liquibase(
+    request: Request,
+    environment: Literal['prod', 'dev'] = Query(default='dev', regex='^(prod|dev)$'),
+):
     """Endpoint to remotely trigger Liquibase commands on a GCP VM using XML content."""
     xml_content = await request.body()
 
@@ -67,10 +74,25 @@ async def execute_liquibase(request: Request, environment: Literal['prod', 'dev'
 
             try:
                 # Execute the gcloud command
-                result = subprocess.run(liquibase_command, check=True, capture_output=True, text=True, env={'LIQUIBASE_COMMAND_PASSWORD': db_password, 'LIQUIBASE_COMMAND_USERNAME': db_username, **os.environ},)
-                logger.log_text(f'Liquibase update successful: {result.stdout}', severity='INFO')
+                result = subprocess.run(
+                    liquibase_command,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={
+                        'LIQUIBASE_COMMAND_PASSWORD': db_password,
+                        'LIQUIBASE_COMMAND_USERNAME': db_username,
+                        **os.environ,
+                    },
+                )
+                logger.log_text(
+                    f'Liquibase update successful: {result.stdout}', severity='INFO'
+                )
                 os.remove(temp_file_path)
-                return {'message': 'Liquibase update executed successfully', 'output': result.stdout}
+                return {
+                    'message': 'Liquibase update executed successfully',
+                    'output': result.stdout,
+                }
             except subprocess.CalledProcessError as e:
                 text = f'Failed to execute Liquibase update: {e.stderr}'
                 logger.log_text(text, severity='ERROR')
@@ -79,4 +101,5 @@ async def execute_liquibase(request: Request, environment: Literal['prod', 'dev'
 
 if __name__ == '__main__':
     import uvicorn
+
     uvicorn.run(app, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))

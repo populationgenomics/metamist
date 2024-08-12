@@ -19,12 +19,20 @@ def main():
         )
     )
 
-    sample_map_by_external_id = {eid: s for s in all_samples for eid in s['external_ids'].values()}
+    sample_map_by_external_id = {
+        eid: s for s in all_samples for eid in s['external_ids'].values()
+    }
 
-    pbmc_samples = [s for s in all_samples if any('-PBMC' in eid for eid in s['external_ids'].values())]
+    pbmc_samples = [
+        s
+        for s in all_samples
+        if any('-PBMC' in eid for eid in s['external_ids'].values())
+    ]
 
     for sample in pbmc_samples:
-        external_id = next(eid for eid in sample['external_ids'].values() if '-PBMC' in eid)
+        external_id = next(
+            eid for eid in sample['external_ids'].values() if '-PBMC' in eid
+        )
         non_pbmc_id = external_id.strip('-PBMC')
         non_pbmc_sample = sample_map_by_external_id.get(non_pbmc_id)
         pbmc_sample = sample_map_by_external_id.get(external_id)

@@ -275,11 +275,13 @@ class FamilyLayer(BaseLayer):
         missing_external_family_ids = [
             f for f in external_family_ids if f not in external_family_id_map
         ]
-        external_participant_ids_map = await participant_table.get_id_map_by_external_ids(
-            list(external_participant_ids),
-            project=self.connection.project_id,
-            # Allow missing participants if we're creating them
-            allow_missing=create_missing_participants,
+        external_participant_ids_map = (
+            await participant_table.get_id_map_by_external_ids(
+                list(external_participant_ids),
+                project=self.connection.project_id,
+                # Allow missing participants if we're creating them
+                allow_missing=create_missing_participants,
+            )
         )
 
         async with self.connection.connection.transaction():

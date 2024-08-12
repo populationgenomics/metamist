@@ -1,4 +1,4 @@
-""" A really simple script to import a pedigree file """
+"""A really simple script to import a pedigree file"""
 
 import click
 from cloudpathlib import AnyPath
