@@ -1,4 +1,5 @@
-import _ from 'lodash'
+import orderBy from 'lodash/orderBy'
+import startCase from 'lodash/startCase'
 import * as React from 'react'
 import { Card } from 'semantic-ui-react'
 import '../../project/AnalysisRunnerView/AnalysisGrid.css'
@@ -97,7 +98,7 @@ const AnalysisRunnerRecordCard: React.FC<{ data: AnalysisCostRecord }> = ({ data
                                     : ''
                             return (
                                 <DisplayRow
-                                    label={_.startCase(tcat.category)}
+                                    label={startCase(tcat.category)}
                                     key={`ar-guid-${arGuid}-category-${tcat.category}`}
                                 >
                                     {formatMoney(tcat.cost, 2)} {workflows}
@@ -419,7 +420,7 @@ const BatchGrid: React.FunctionComponent<{
         <>
             <AnalysisRunnerRecordCard data={data} />
 
-            {_.orderBy(data?.batches || [], (b) => b.batch_id).map((batchRecord) => (
+            {orderBy(data?.batches || [], (b) => b.batch_id).map((batchRecord) => (
                 <BatchCard item={batchRecord} key={`batch-card-${batchRecord.batch_id}`} />
             ))}
 
