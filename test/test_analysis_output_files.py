@@ -1,10 +1,7 @@
 # pylint: disable=invalid-overridden-method
 import os
 from test.testbase import DbIsolatedTest, run_as_sync
-from unittest.mock import patch
 
-from google.auth.credentials import AnonymousCredentials
-from google.cloud.storage import Client
 from testcontainers.core.container import DockerContainer
 
 from db.python.layers.analysis import AnalysisLayer
@@ -126,24 +123,10 @@ class TestOutputFiles(DbIsolatedTest):
             )
 
     @run_as_sync
-    @patch('models.models.output_file.get_gcs_client')
-    async def test_output_str(self, mock_get_gcs_client):
+    async def test_output_str(self):
         """Test how the output(s) behave when you create an analysis by passing in
         just the `output` field
         """
-
-        custom_client = Client(
-            credentials=AnonymousCredentials(),
-            project='test',
-            client_options={'api_endpoint': 'http://localhost:4443'},
-        )
-
-        # Define a side effect function that returns the custom client
-        def custom_get_gcs_client():
-            return custom_client
-
-        # Set the side effect of the mock to the custom function
-        mock_get_gcs_client.side_effect = custom_get_gcs_client
 
         output_path = 'FAKE://this_file_doesnt_exist.txt'
 
@@ -165,24 +148,10 @@ class TestOutputFiles(DbIsolatedTest):
         self.assertEqual(analysis.outputs, output_path)
 
     @run_as_sync
-    @patch('models.models.output_file.get_gcs_client')
-    async def test_gs_output_path(self, mock_get_gcs_client):
+    async def test_gs_output_path(self):
         """Test how the output(s) behave when you create an analysis by passing in
         just the `output` field
         """
-        custom_client = Client(
-            credentials=AnonymousCredentials(),
-            project='test',
-            client_options={'api_endpoint': 'http://localhost:4443'},
-        )
-
-        # Define a side effect function that returns the custom client
-        def custom_get_gcs_client():
-            return custom_client
-
-        # Set the side effect of the mock to the custom function
-        mock_get_gcs_client.side_effect = custom_get_gcs_client
-
         output_path = 'gs://fakegcs/file1.txt'
         output_file_data = {
             'path': 'gs://fakegcs/file1.txt',
@@ -217,23 +186,10 @@ class TestOutputFiles(DbIsolatedTest):
         self.check_outputs_fields(analysis.outputs, output_file_data)
 
     @run_as_sync
-    @patch('models.models.output_file.get_gcs_client')
-    async def test_create_with_str_on_outputs(self, mock_get_gcs_client):
+    async def test_create_with_str_on_outputs(self):
         """This should test creating an Analysis by passing a string to the outputs field.
         The test should fail as we don't want to be passing string to this field.
         """
-        custom_client = Client(
-            credentials=AnonymousCredentials(),
-            project='test',
-            client_options={'api_endpoint': 'http://localhost:4443'},
-        )
-
-        # Define a side effect function that returns the custom client
-        def custom_get_gcs_client():
-            return custom_client
-
-        # Set the side effect of the mock to the custom function
-        mock_get_gcs_client.side_effect = custom_get_gcs_client
 
         output_path = 'gs://fakegcs/file1.txt'
         output_file_data = {
@@ -268,21 +224,8 @@ class TestOutputFiles(DbIsolatedTest):
         self.check_outputs_fields(analysis.outputs, output_file_data)
 
     @run_as_sync
-    @patch('models.models.output_file.get_gcs_client')
-    async def test_dict_with_outputs(self, mock_get_gcs_client):
+    async def test_dict_with_outputs(self):
         """Should test creating Analysis object with a dictionary as the outputs field"""
-        custom_client = Client(
-            credentials=AnonymousCredentials(),
-            project='test',
-            client_options={'api_endpoint': 'http://localhost:4443'},
-        )
-
-        # Define a side effect function that returns the custom client
-        def custom_get_gcs_client():
-            return custom_client
-
-        # Set the side effect of the mock to the custom function
-        mock_get_gcs_client.side_effect = custom_get_gcs_client
 
         outputs = {
             'cram': {
