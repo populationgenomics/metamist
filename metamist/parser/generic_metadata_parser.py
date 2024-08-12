@@ -583,22 +583,25 @@ class GenericMetadataParser(GenericParser):
         dicts = [{}]
         for row_key, dict_key in key_map.items():
             if isinstance(row, list):
-                inner_values = [
-                    unstring_value(r[row_key])
-                    for r in row
-                    if r.get(row_key) is not None
-                ]
-                if any(isinstance(inner, list) for inner in inner_values):
-                    # lists are unhashable
-                    value = inner_values
+                if len(row) == 1:
+                    value = unstring_value(row[0].get(row_key))
                 else:
-                    value = sorted(
-                        set(inner_values), key=str
-                    )  # sorted for unit test consistency
-                    if len(value) == 0:
-                        continue
-                    if len(value) == 1:
-                        value = unstring_value(value[0])
+                    inner_values = [
+                        unstring_value(r[row_key])
+                        for r in row
+                        if r.get(row_key) is not None
+                    ]
+                    if any(isinstance(inner, list) for inner in inner_values):
+                        # lists are unhashable
+                        value = inner_values
+                    else:
+                        value = sorted(
+                            set(inner_values), key=str
+                        )  # sorted for unit test consistency
+                        if len(value) == 0:
+                            continue
+                        if len(value) == 1:
+                            value = unstring_value(value[0])
             else:
                 if row_key not in row:
                     continue
