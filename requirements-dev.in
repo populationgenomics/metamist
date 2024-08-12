@@ -18,3 +18,5 @@ google-cloud-bigquery
 google-cloud-pubsub
 # following required to unit test some billing functions
 pytz
+pytest
+pytest-cov
