@@ -146,7 +146,7 @@ def validate(doc: DocumentNode, client=None, use_local_schema=False):
     backoff.fibo,
     exception=(HTTPError, JSONDecodeError, TransportServerError),
     max_time=55,
-    max_value=55
+    max_value=55,
 )
 def query(
     _query: str | DocumentNode,

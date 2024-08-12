@@ -2,13 +2,11 @@
 line-length = 88
 
 exclude = [
-    "metamist/*",
-]
+    "metamist/api/*",
+    "metamist/apis/*",
+    "metamist/model/*",
+    "metamist/models/*",
 
-include = [
-    "metamist/audit/*",
-    "metamist/graphql/*",
-    "metamist/parser/*",
 ]
 
 [tool.ruff.format]
