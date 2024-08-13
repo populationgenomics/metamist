@@ -1,11 +1,13 @@
 from db.python.connect import Connection
+from db.python.filters.generic import GenericFilter
 from db.python.layers.base import BaseLayer
 from db.python.tables.assay import AssayTable
 from db.python.tables.comment import CommentTable
+from db.python.tables.family import FamilyFilter, FamilyTable
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import SequencingGroupTable
-from db.python.utils import Forbidden
+from db.python.utils import Forbidden, NotFoundError
 from models.models.comment import (
     CommentEntityType,
     CommentInternal,
@@ -27,6 +29,7 @@ class CommentLayer(BaseLayer):
         self.at = AssayTable(connection)
         self.st = SampleTable(connection)
         self.pt = ParticipantTable(connection)
+        self.ft = FamilyTable(connection)
         self.sgt = SequencingGroupTable(connection)
 
     async def get_discussion_for_entity_ids(
@@ -60,14 +63,25 @@ class CommentLayer(BaseLayer):
                 pids, _ = await self.pt.get_participants_by_ids(
                     [comment.comment_entity_id]
                 )
-                project_id = list(pids)[0]
+                project_id = list(pids)[0] if len(pids) > 0 else None
+            case CommentEntityType.family:
+                pids, _ = await self.ft.query(
+                    FamilyFilter(id=GenericFilter(eq=comment.comment_entity_id))
+                )
+                project_id = list(pids)[0] if len(pids) > 0 else None
             case CommentEntityType.project:
                 project_id = comment.comment_entity_id
+
             case CommentEntityType.sequencing_group:
                 pids, _ = await self.sgt.get_sequencing_groups_by_ids(
                     [comment.comment_entity_id]
                 )
-                project_id = list(pids)[0]
+                project_id = list(pids)[0] if len(pids) > 0 else None
+
+        if project_id is None:
+            raise NotFoundError(
+                f"Project not found for {comment.comment_entity_type} with id {comment.comment_entity_id}"
+            )
 
         self.connection.check_access_to_projects_for_ids([project_id], allowed_roles)
 

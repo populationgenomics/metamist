@@ -88,6 +88,7 @@ class LoaderKeys(enum.Enum):
     COMMENTS_FOR_ASSAY_IDS = 'comments_for_assay_ids'
     COMMENTS_FOR_PROJECT_IDS = 'comments_for_project_ids'
     COMMENTS_FOR_SEQUENCING_GROUP_IDS = 'comments_for_sequencing_group_ids'
+    COMMENTS_FOR_FAMILY_IDS = 'comments_for_family_ids'
 
 
 loaders: dict[LoaderKeys, Any] = {}
@@ -548,6 +549,20 @@ async def load_comments_for_participant_ids(
     clayer = CommentLayer(connection)
     comments = await clayer.get_discussion_for_entity_ids(
         entity=CommentEntityType.participant, entity_ids=participant_ids
+    )
+    return comments
+
+
+@connected_data_loader(LoaderKeys.COMMENTS_FOR_FAMILY_IDS)
+async def load_comments_for_family_ids(
+    family_ids: list[int], connection: Connection
+) -> list[DiscussionInternal | None]:
+    """
+    DataLoader: load_comments_for_family_ids
+    """
+    clayer = CommentLayer(connection)
+    comments = await clayer.get_discussion_for_entity_ids(
+        entity=CommentEntityType.family, entity_ids=family_ids
     )
     return comments
 

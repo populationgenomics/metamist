@@ -1754,4 +1754,25 @@
 
 	</changeSet>
 
+	<changeSet id="2024-08-13_family_comments" author="dan.coates">
+		<createTable tableName="family_comment">
+			<column name="comment_id" type="INT">
+				<constraints primaryKey="true" nullable="false" foreignKeyName="FK_FAMILY_COMMENT_COMMENT_ID"
+					references="comment(id)" />
+			</column>
+			<column name="family_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_FAMILY_COMMENT_FAMILY_ID"
+					references="family(id)" />
+			</column>
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_FAMILY_COMMENT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+
+		<sql>ALTER TABLE family_comment ADD SYSTEM VERSIONING;</sql>
+	</changeSet>
+
 </databaseChangeLog>

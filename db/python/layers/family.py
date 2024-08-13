@@ -5,6 +5,7 @@ from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers.base import BaseLayer
 from db.python.layers.participant import ParticipantLayer
+from db.python.tables.comment import CommentTable
 from db.python.tables.family import FamilyFilter, FamilyTable
 from db.python.tables.family_participant import (
     FamilyParticipantFilter,
@@ -14,9 +15,10 @@ from db.python.tables.participant import ParticipantTable
 from db.python.tables.sample import SampleTable
 from db.python.utils import NotFoundError
 from models.models import PRIMARY_EXTERNAL_ORG
+from models.models.comment import CommentEntityType
 from models.models.family import FamilyInternal, PedRow, PedRowInternal
 from models.models.participant import ParticipantUpsertInternal
-from models.models.project import ProjectId, ReadAccessRoles
+from models.models.project import ProjectId, ProjectMemberRole, ReadAccessRoles
 
 
 class FamilyLayer(BaseLayer):
@@ -27,6 +29,7 @@ class FamilyLayer(BaseLayer):
         self.stable = SampleTable(connection)
         self.ftable = FamilyTable(connection)
         self.fptable = FamilyParticipantTable(self.connection)
+        self.ct = CommentTable(self.connection)
 
     async def create_family(
         self, external_id: str, description: str = None, coded_phenotype: str = None
@@ -445,3 +448,22 @@ class FamilyLayer(BaseLayer):
         )
 
         return fps
+
+    async def add_comment_to_family(self, family_id: int, content: str):
+
+        projects, families = await self.ftable.query(
+            FamilyFilter(id=GenericFilter(eq=family_id))
+        )
+        if not families:
+            raise NotFoundError(f'Family with ID {family_id} not found')
+
+        self.connection.check_access_to_projects_for_ids(
+            projects,
+            allowed_roles={ProjectMemberRole.writer, ProjectMemberRole.contributor},
+        )
+
+        return await self.ct.add_comment_to_entity(
+            content=content,
+            entity=CommentEntityType.family,
+            entity_id=family_id,
+        )

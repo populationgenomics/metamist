@@ -293,7 +293,7 @@ class GraphQLComment:
     @strawberry.field()
     async def entity(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLComment'
-    ) -> 'GraphQLSample | GraphQLAssay | GraphQLSequencingGroup | GraphQLProject | GraphQLParticipant':
+    ) -> 'GraphQLSample | GraphQLAssay | GraphQLSequencingGroup | GraphQLProject | GraphQLParticipant | GraphQLFamily':
         entity_type = root.comment_entity_type
         entity_id = root.comment_entity_id
 
@@ -322,6 +322,11 @@ class GraphQLComment:
                 loader = info.context['loaders'][LoaderKeys.PARTICIPANTS_FOR_IDS]
                 pt = await loader.load(entity_id)
                 return GraphQLParticipant.from_internal(pt)
+
+            case CommentEntityType.family:
+                loader = info.context['loaders'][LoaderKeys.FAMILIES_FOR_IDS]
+                fm = await loader.load(entity_id)
+                return GraphQLFamily.from_internal(fm)
 
     @staticmethod
     def from_internal(internal: CommentInternal) -> 'GraphQLComment':
@@ -748,6 +753,14 @@ class GraphQLFamily:
         return [
             GraphQLFamilyParticipant.from_internal(fp) for fp in family_participants
         ]
+
+    @strawberry.field()
+    async def discussion(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLFamily'
+    ) -> GraphQLDiscussion:
+        loader = info.context['loaders'][LoaderKeys.COMMENTS_FOR_FAMILY_IDS]
+        discussion = await loader.load(root.id)
+        return GraphQLDiscussion.from_internal(discussion)
 
 
 @strawberry.type

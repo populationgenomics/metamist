@@ -32,6 +32,11 @@ comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
             ON participant.id = participant_comment.participant_id
             JOIN entity_ids ON participant.project = entity_ids.id
         """,
+        CommentEntityType.family: """
+            JOIN family
+            ON family.id = family_comment.family_id
+            JOIN entity_ids ON family.project = entity_ids.id
+        """,
         CommentEntityType.sequencing_group: """
             JOIN sequencing_group
             ON sequencing_group.id = sequencing_group_comment.sequencing_group_id
@@ -60,6 +65,13 @@ comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
             ON sample.participant_id = participant_comment.participant_id
             JOIN entity_ids ON sample.id = entity_ids.id
         """,
+        CommentEntityType.family: """
+            JOIN family_participant
+            ON family_participant.family_id = family_comment.family_id
+            JOIN sample
+            ON sample.participant_id = family_participant.participant_id
+            JOIN entity_ids ON sample.id = entity_ids.id
+        """,
         CommentEntityType.sequencing_group: """
             JOIN sequencing_group
             ON sequencing_group.id = sequencing_group_comment.sequencing_group_id
@@ -76,6 +88,15 @@ comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
             JOIN entity_ids ON assay.id = entity_ids.id
         """,
         CommentEntityType.participant: """
+            JOIN family_participant
+            ON family_participant.family_id = family_comment.family_id
+            JOIN sample
+            ON sample.participant_id = family_participant.participant_id
+            JOIN assay
+            ON assay.sample_id = sample.id
+            JOIN entity_ids ON assay.id = entity_ids.id
+        """,
+        CommentEntityType.family: """
             JOIN sample
             ON sample.participant_id = participant_comment.participant_id
             JOIN assay
@@ -104,12 +125,52 @@ comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
             ON sample.id = sample_comment.sample_id
             JOIN entity_ids ON sample.participant_id = entity_ids.id
         """,
+        CommentEntityType.family: """
+            JOIN family_participant
+            ON family_participant.family_id = family_comment.family_id
+            JOIN entity_ids ON family_participant.participant_id = entity_ids.id
+        """,
         CommentEntityType.sequencing_group: """
             JOIN sequencing_group
             ON sequencing_group.id = sequencing_group_comment.sequencing_group_id
             JOIN sample
             ON sample.id = sequencing_group.sample_id
             JOIN entity_ids ON sample.participant_id = entity_ids.id
+        """,
+    },
+    CommentEntityType.family: {
+        CommentEntityType.family: """
+            JOIN entity_ids ON family_comment.family_id = entity_ids.id
+        """,
+        CommentEntityType.assay: """
+            JOIN assay
+            ON assay.id = assay_comment.assay_id
+            JOIN sample
+            ON sample.id = assay.sample_id
+            JOIN family_participant
+            ON family_participant.participant_id = sample.participant_id
+            JOIN entity_ids ON family_participant.family_id = entity_ids.id
+        """,
+        CommentEntityType.sample: """
+            JOIN sample
+            ON sample.id = sample_comment.sample_id
+            JOIN family_participant
+            ON family_participant.participant_id = sample.participant_id
+            JOIN entity_ids ON family_participant.family_id = entity_ids.id
+        """,
+        CommentEntityType.participant: """
+            JOIN family_participant
+            ON family_participant.participant_id = participant_comment.participant_id
+            JOIN entity_ids ON family_participant.family_id = entity_ids.id
+        """,
+        CommentEntityType.sequencing_group: """
+            JOIN sequencing_group
+            ON sequencing_group.id = sequencing_group_comment.sequencing_group_id
+            JOIN sample
+            ON sample.id = sequencing_group.sample_id
+            JOIN family_participant
+            ON family_participant.participant_id = sample.participant_id
+            JOIN entity_ids ON family_participant.family_id = entity_ids.id
         """,
     },
     CommentEntityType.sequencing_group: {
@@ -119,6 +180,15 @@ comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
         CommentEntityType.participant: """
             JOIN sample
             ON sample.participant_id = participant_comment.participant_id
+            JOIN sequencing_group
+            ON sequencing_group.sample_id = sample.id
+            JOIN entity_ids ON sequencing_group.id = entity_ids.id
+        """,
+        CommentEntityType.family: """
+            JOIN family_participant
+            ON family_participant.family_id = family_comment.family_id
+            JOIN sample
+            ON sample.participant_id = family_participant.participant_id
             JOIN sequencing_group
             ON sequencing_group.sample_id = sample.id
             JOIN entity_ids ON sequencing_group.id = entity_ids.id

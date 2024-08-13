@@ -11,7 +11,7 @@ CommentStatus = StrEnum(
 
 CommentEntityType = StrEnum(
     'CommentEntityType',
-    ['project', 'sample', 'assay', 'participant', 'sequencing_group'],
+    ['project', 'family', 'sample', 'assay', 'participant', 'sequencing_group'],
 )
 
 
