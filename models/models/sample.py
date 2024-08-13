@@ -115,6 +115,13 @@ class SampleUpsertInternal(SMBase):
     sequencing_groups: list[SequencingGroupUpsertInternal] | None = None
     non_sequencing_assays: list[AssayUpsertInternal] | None = None
 
+    def update_participant_id(self, participant_id: int):
+        """Update the participant ID for the samples"""
+        self.participant_id = participant_id
+        if self.nested_samples:
+            for s in self.nested_samples:
+                s.participant_id = participant_id
+
     def to_external(self):
         """Convert to transport model"""
         _id = None

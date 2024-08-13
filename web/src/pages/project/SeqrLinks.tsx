@@ -1,5 +1,5 @@
 import * as React from 'react'
-import _ from 'lodash'
+import capitalize from 'lodash/capitalize'
 
 interface SeqrLinksProps {
     seqrLinks: Record<string, string>
@@ -14,7 +14,7 @@ const SeqrLinks: React.FunctionComponent<SeqrLinksProps> = ({ seqrLinks }) => {
             <h4> Seqr Links</h4>
             {seqrLinkEntries.map(([key, value]) => (
                 <a href={value} className="ui button" key={key} target="_blank" rel="noreferrer">
-                    {_.capitalize(key)}
+                    {capitalize(key)}
                 </a>
             ))}
         </>

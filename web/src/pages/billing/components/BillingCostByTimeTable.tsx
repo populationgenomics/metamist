@@ -6,7 +6,6 @@ import { convertFieldName } from '../../../shared/utilities/fieldName'
 import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
 import { IStackedAreaByDateChartData } from '../../../shared/components/Graphs/StackedAreaByDateChart'
 import orderBy from '../../../shared/utilities/orderBy'
-import { ErrorBarDataPointFormatter } from 'recharts/types/cartesian/ErrorBar'
 
 interface IBillingCostByTimeTableProps {
     heading: string

@@ -87,10 +87,14 @@ class ProjectSummary(SMBase):
 class ProjectParticipantGridFilterType(Enum):
     """Filter types for grid response"""
 
-    eq = 'eq'
-    neq = 'neq'
-    startswith = 'startswith'
-    icontains = 'icontains'
+    eq = "eq"
+    neq = "neq"
+    startswith = "startswith"
+    icontains = "icontains"
+    gt = "gt"
+    gte = "gte"
+    lt = "lt"
+    lte = "lte"
 
 
 class ProjectParticipantGridField(SMBase):
@@ -155,14 +159,14 @@ class ProjectParticipantGridResponse(SMBase):
         Read through nested participants and full out the keys for the grid response
         """
         hidden_participant_meta_keys: set[str] = set()
-        hidden_sample_meta_keys = {'reads', 'vcfs', 'gvcf'}
+        hidden_sample_meta_keys = {"reads", "vcfs", "gvcf"}
         hidden_assay_meta_keys = {
-            'reads',
-            'vcfs',
-            'gvcf',
-            'sequencing_platform',
-            'sequencing_technology',
-            'sequencing_type',
+            "reads",
+            "vcfs",
+            "gvcf",
+            "sequencing_platform",
+            "sequencing_technology",
+            "sequencing_type",
         }
         hidden_sg_meta_keys: set[str] = set()
 
@@ -235,164 +239,178 @@ class ProjectParticipantGridResponse(SMBase):
 
         family_fields: list[ProjectParticipantGridField] = [
             Field(
-                key='external_id',
-                label='Family ID',
+                key="external_id",
+                label="Family ID",
                 is_visible=True,
-                filter_key='external_id',
+                filter_key="external_id",
             )
         ]
         family_fields.extend(
             Field(
-                key='meta.' + k, label=k, is_visible=has_value, filter_key='meta.' + k
+                key="meta." + k, label=k, is_visible=has_value, filter_key="meta." + k
             )
             for k, has_value in family_meta_keys.items()
         )
         participant_fields = [
             Field(
-                key='id',
-                label='Participant ID',
+                key="id",
+                label="Participant ID",
                 is_visible=True,
-                filter_key='id',
+                filter_key="id",
                 filter_types=[
                     ProjectParticipantGridFilterType.eq,
                     ProjectParticipantGridFilterType.neq,
                 ],
             ),
             Field(
-                key='external_ids',
-                label='Participant ID',
+                key="id",
+                label="Participant ID",
                 is_visible=True,
-                filter_key='external_id',
+                filter_key="id",
+                filter_types=[
+                    ProjectParticipantGridFilterType.eq,
+                    ProjectParticipantGridFilterType.neq,
+                    ProjectParticipantGridFilterType.gt,
+                    ProjectParticipantGridFilterType.gte,
+                    ProjectParticipantGridFilterType.lt,
+                    ProjectParticipantGridFilterType.lte,
+                ],
             ),
             Field(
-                key='reported_sex',
-                label='Reported sex',
+                key="external_ids",
+                label="External Participant ID",
+                is_visible=True,
+                filter_key="external_id",
+            ),
+            Field(
+                key="reported_sex",
+                label="Reported sex",
                 is_visible=has_reported_sex,
-                filter_key='reported_sex',
+                filter_key="reported_sex",
             ),
             Field(
-                key='reported_gender',
-                label='Reported gender',
+                key="reported_gender",
+                label="Reported gender",
                 is_visible=has_reported_gender,
-                filter_key='reported_gender',
+                filter_key="reported_gender",
             ),
             Field(
-                key='karyotype',
-                label='Karyotype',
+                key="karyotype",
+                label="Karyotype",
                 is_visible=has_karyotype,
-                filter_key='karyotype',
+                filter_key="karyotype",
             ),
         ]
         participant_fields.extend(
             Field(
-                key='meta.' + k,
+                key="meta." + k,
                 label=k,
                 is_visible=has_value and k not in hidden_participant_meta_keys,
-                filter_key='meta.' + k,
+                filter_key="meta." + k,
             )
             for k, has_value in participant_meta_keys.items()
         )
 
         sample_fields = [
             Field(
-                key='id',
-                label='Sample ID',
+                key="id",
+                label="Sample ID",
                 is_visible=True,
-                filter_key='id',
+                filter_key="id",
                 filter_types=[
                     ProjectParticipantGridFilterType.eq,
                     ProjectParticipantGridFilterType.neq,
                 ],
             ),
             Field(
-                key='external_ids',
-                label='External Sample ID',
+                key="external_ids",
+                label="External Sample ID",
                 is_visible=True,
-                filter_key='external_id',
+                filter_key="external_id",
             ),
             Field(
-                key='sample_root_id',
-                label='Root Sample ID',
+                key="sample_root_id",
+                label="Root Sample ID",
                 is_visible=has_nested_samples,
-                filter_key='sample_root_id',
+                filter_key="sample_root_id",
             ),
             Field(
-                key='sample_parent_id',
-                label='Parent Sample ID',
+                key="sample_parent_id",
+                label="Parent Sample ID",
                 is_visible=has_nested_samples,
-                filter_key='sample_root_id',
+                filter_key="sample_root_id",
             ),
             Field(
-                key='created_date',
-                label='Created date',
+                key="created_date",
+                label="Created date",
                 is_visible=True,
                 # filter_key='created_date',
             ),
         ]
         sample_fields.extend(
             Field(
-                key='meta.' + k,
+                key="meta." + k,
                 label=k,
                 is_visible=has_value and k not in hidden_sample_meta_keys,
-                filter_key='meta.' + k,
+                filter_key="meta." + k,
             )
             for k, has_value in sample_meta_keys.items()
         )
         assay_fields = [
             Field(
-                key='type',
-                label='Type',
+                key="type",
+                label="Type",
                 is_visible=True,
-                filter_key='type',
+                filter_key="type",
             )
         ]
         assay_fields.extend(
             Field(
-                key='meta.' + k,
+                key="meta." + k,
                 label=k,
                 is_visible=has_value and k not in hidden_assay_meta_keys,
-                filter_key='meta.' + k,
+                filter_key="meta." + k,
             )
             for k, has_value in assay_meta_keys.items()
         )
 
         sequencing_group_fields = [
             Field(
-                key='id',
-                label='Sequencing Group ID',
+                key="id",
+                label="Sequencing Group ID",
                 is_visible=True,
-                filter_key='id',
+                filter_key="id",
                 filter_types=[
                     ProjectParticipantGridFilterType.eq,
                     ProjectParticipantGridFilterType.neq,
                 ],
             ),
             Field(
-                key='type',
-                label='Type',
+                key="type",
+                label="Type",
                 is_visible=True,
-                filter_key='type',
+                filter_key="type",
             ),
             Field(
-                key='technology',
-                label='Technology',
+                key="technology",
+                label="Technology",
                 is_visible=True,
-                filter_key='technology',
+                filter_key="technology",
             ),
             Field(
-                key='platform',
-                label='Platform',
+                key="platform",
+                label="Platform",
                 is_visible=True,
-                filter_key='platform',
+                filter_key="platform",
             ),
         ]
 
         sequencing_group_fields.extend(
             Field(
-                key='meta.' + k,
+                key="meta." + k,
                 label=k,
                 is_visible=has_value and k not in hidden_sg_meta_keys,
-                filter_key='meta.' + k,
+                filter_key="meta." + k,
             )
             for k, has_value in sg_meta_keys.items()
         )

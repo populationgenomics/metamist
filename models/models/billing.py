@@ -220,7 +220,7 @@ class BillingTotalCostQueryModel(SMBase):
 
     def __hash__(self):
         """Create hash for this object to use in caching"""
-        return hash(self.json())
+        return hash(self.model_dump_json())
 
     def to_filter(self) -> BillingFilter:
         """

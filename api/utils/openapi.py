@@ -78,7 +78,7 @@ def get_openapi_schema_func(app, version):
             version=version,
             routes=app.routes,
             # update when FastAPI + swagger supports 3.1.0
-            # openapi_version='3.1.0'
+            openapi_version='3.0.2',
         )
 
         openapi_schema['servers'] = [{'url': url} for url in URLS]
