@@ -6,14 +6,11 @@ from db.python.filters import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer, Connection
 from db.python.layers.sequencing_group import SequencingGroupLayer
-from db.python.tables.comment import CommentTable
 from db.python.tables.sample import SampleFilter, SampleTable
 from db.python.utils import NoOpAenter, NotFoundError
-from models.models.comment import CommentEntityType
 from models.models.project import (
     FullWriteAccessRoles,
     ProjectId,
-    ProjectMemberRole,
     ReadAccessRoles,
 )
 from models.models.sample import SampleInternal, SampleUpsertInternal
@@ -26,7 +23,6 @@ class SampleLayer(BaseLayer):
     def __init__(self, connection: Connection):
         super().__init__(connection)
         self.st = SampleTable(connection)
-        self.ct = CommentTable(connection)
         self.connection = connection
 
     # GETS
@@ -446,14 +442,3 @@ class SampleLayer(BaseLayer):
         )
 
         return rows
-
-    async def add_comment_to_sample(self, sample_id: int, content: str):
-        project, sample = await self.st.get_sample_by_id(sample_id)
-        self.connection.check_access_to_projects_for_ids(
-            [project],
-            allowed_roles={ProjectMemberRole.writer, ProjectMemberRole.contributor},
-        )
-
-        return await self.ct.add_comment_to_entity(
-            content=content, entity=CommentEntityType.sample, entity_id=sample.id
-        )

@@ -43,47 +43,56 @@ class CommentLayer(BaseLayer):
         """
         return await self.ct.get_discussion_for_entity_ids(entity, entity_ids)
 
+    async def check_project_access_for_entity(
+        self,
+        entity: CommentEntityType,
+        entity_id: int,
+        allowed_roles: set[ProjectMemberRole],
+    ):
+        """
+        Check if the current user has access to the project related to the comment entity
+        """
+
+        project_id: int | None = None
+
+        match entity:
+            case CommentEntityType.assay:
+                pid, _ = await self.at.get_assay_by_id(entity_id)
+                project_id = pid
+            case CommentEntityType.sample:
+                pid, _ = await self.st.get_sample_by_id(entity_id)
+                project_id = pid
+            case CommentEntityType.participant:
+                pids, _ = await self.pt.get_participants_by_ids([entity_id])
+                project_id = list(pids)[0] if len(pids) > 0 else None
+            case CommentEntityType.family:
+                pids, _ = await self.ft.query(
+                    FamilyFilter(id=GenericFilter(eq=entity_id))
+                )
+                project_id = list(pids)[0] if len(pids) > 0 else None
+            case CommentEntityType.project:
+                project_id = entity_id
+
+            case CommentEntityType.sequencing_group:
+                pids, _ = await self.sgt.get_sequencing_groups_by_ids([entity_id])
+                project_id = list(pids)[0] if len(pids) > 0 else None
+
+        if project_id is None:
+            raise NotFoundError(f"Project not found for {entity} with id {entity_id}")
+
+        self.connection.check_access_to_projects_for_ids([project_id], allowed_roles)
+
     async def check_project_access_for_comment(
         self, comment: CommentInternal, allowed_roles: set[ProjectMemberRole]
     ):
         """
         Check if the current user has access to the project that the comment was made in
         """
-
-        project_id: int | None = None
-
-        match comment.comment_entity_type:
-            case CommentEntityType.assay:
-                pid, _ = await self.at.get_assay_by_id(comment.comment_entity_id)
-                project_id = pid
-            case CommentEntityType.sample:
-                pid, _ = await self.st.get_sample_by_id(comment.comment_entity_id)
-                project_id = pid
-            case CommentEntityType.participant:
-                pids, _ = await self.pt.get_participants_by_ids(
-                    [comment.comment_entity_id]
-                )
-                project_id = list(pids)[0] if len(pids) > 0 else None
-            case CommentEntityType.family:
-                pids, _ = await self.ft.query(
-                    FamilyFilter(id=GenericFilter(eq=comment.comment_entity_id))
-                )
-                project_id = list(pids)[0] if len(pids) > 0 else None
-            case CommentEntityType.project:
-                project_id = comment.comment_entity_id
-
-            case CommentEntityType.sequencing_group:
-                pids, _ = await self.sgt.get_sequencing_groups_by_ids(
-                    [comment.comment_entity_id]
-                )
-                project_id = list(pids)[0] if len(pids) > 0 else None
-
-        if project_id is None:
-            raise NotFoundError(
-                f"Project not found for {comment.comment_entity_type} with id {comment.comment_entity_id}"
-            )
-
-        self.connection.check_access_to_projects_for_ids([project_id], allowed_roles)
+        await self.check_project_access_for_entity(
+            entity=comment.comment_entity_type,
+            entity_id=comment.comment_entity_id,
+            allowed_roles=allowed_roles,
+        )
 
     async def check_author_access_for_comment(self, comment: CommentInternal):
         """
@@ -95,6 +104,18 @@ class CommentLayer(BaseLayer):
             raise Forbidden(
                 f"User {current_user} cannot update comment authored by {comment.author}"
             )
+
+    async def add_comment_to_entity(
+        self, entity: CommentEntityType, entity_id: int, content: str
+    ):
+        """
+        Add a comment to the specified entity, this will check if the user has the
+        necessary permissions in the project for the specified entity
+        """
+        await self.check_project_access_for_entity(
+            entity, entity_id, COMMENT_WRITE_ROLES
+        )
+        return await self.ct.add_comment_to_entity(entity, entity_id, content)
 
     async def add_comment_to_thread(self, parent_id: int, content: str):
         comment = await self.ct.get_comment_by_id(parent_id)

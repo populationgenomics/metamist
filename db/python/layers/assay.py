@@ -2,14 +2,11 @@
 
 from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.assay import AssayFilter, AssayTable
-from db.python.tables.comment import CommentTable
 from db.python.tables.sample import SampleTable
 from db.python.utils import NoOpAenter
 from models.models.assay import AssayInternal, AssayUpsertInternal
-from models.models.comment import CommentEntityType
 from models.models.project import (
     FullWriteAccessRoles,
-    ProjectMemberRole,
     ReadAccessRoles,
 )
 
@@ -21,7 +18,6 @@ class AssayLayer(BaseLayer):
         super().__init__(connection)
         self.seqt = AssayTable(connection)
         self.sampt = SampleTable(connection)
-        self.ct = CommentTable(connection)
 
     # GET
     async def query(self, filter_: AssayFilter = None):
@@ -150,18 +146,6 @@ class AssayLayer(BaseLayer):
                 await self.upsert_assay(a, open_transaction=False)
 
         return assays
-
-    async def add_comment_to_assay(self, assay_id: int, content: str):
-        project, assay = await self.seqt.get_assay_by_id(assay_id)
-
-        self.connection.check_access_to_projects_for_ids(
-            [project],
-            allowed_roles={ProjectMemberRole.writer, ProjectMemberRole.contributor},
-        )
-
-        return await self.ct.add_comment_to_entity(
-            content=content, entity=CommentEntityType.assay, entity_id=assay.id
-        )
 
     # endregion UPDATES
 

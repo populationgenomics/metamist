@@ -4,9 +4,8 @@ import strawberry
 from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
-from db.python.tables.comment import CommentTable
+from db.python.layers.comment import CommentLayer
 from models.models.comment import CommentEntityType
-from models.models.project import ProjectMemberRole
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLComment
@@ -27,10 +26,8 @@ class ProjectMutations:
         from api.graphql.schema import GraphQLComment
 
         connection = info.context['connection']
-        connection.check_access_to_projects_for_ids(
-            [id],
-            allowed_roles={ProjectMemberRole.writer, ProjectMemberRole.contributor},
+        cl = CommentLayer(connection)
+        result = await cl.add_comment_to_entity(
+            entity=CommentEntityType.project, entity_id=id, content=content
         )
-        ct = CommentTable(connection)
-        result = await ct.add_comment_to_entity(CommentEntityType.project, id, content)
         return GraphQLComment.from_internal(result)

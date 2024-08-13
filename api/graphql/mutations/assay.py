@@ -4,7 +4,8 @@ import strawberry
 from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
-from db.python.layers.assay import AssayLayer
+from db.python.layers.comment import CommentLayer
+from models.models.comment import CommentEntityType
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLComment
@@ -25,6 +26,8 @@ class AssayMutations:
         from api.graphql.schema import GraphQLComment
 
         connection = info.context['connection']
-        assay_layer = AssayLayer(connection)
-        result = await assay_layer.add_comment_to_assay(content=content, assay_id=id)
+        cl = CommentLayer(connection)
+        result = await cl.add_comment_to_entity(
+            entity=CommentEntityType.assay, entity_id=id, content=content
+        )
         return GraphQLComment.from_internal(result)

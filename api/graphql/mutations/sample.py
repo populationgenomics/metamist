@@ -4,7 +4,8 @@ import strawberry
 from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
-from db.python.layers.sample import SampleLayer
+from db.python.layers.comment import CommentLayer
+from models.models.comment import CommentEntityType
 from models.utils.sample_id_format import sample_id_transform_to_raw
 
 if TYPE_CHECKING:
@@ -26,8 +27,10 @@ class SampleMutations:
         from api.graphql.schema import GraphQLComment
 
         connection = info.context['connection']
-        sample_layer = SampleLayer(connection)
-        result = await sample_layer.add_comment_to_sample(
-            content=content, sample_id=sample_id_transform_to_raw(id)
+        cl = CommentLayer(connection)
+        result = await cl.add_comment_to_entity(
+            entity=CommentEntityType.sample,
+            entity_id=sample_id_transform_to_raw(id),
+            content=content,
         )
         return GraphQLComment.from_internal(result)

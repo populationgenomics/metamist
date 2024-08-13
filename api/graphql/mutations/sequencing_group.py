@@ -4,7 +4,8 @@ import strawberry
 from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
-from db.python.layers.sequencing_group import SequencingGroupLayer
+from db.python.layers.comment import CommentLayer
+from models.models.comment import CommentEntityType
 from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
 
 if TYPE_CHECKING:
@@ -26,9 +27,10 @@ class SequencingGroupMutations:
         from api.graphql.schema import GraphQLComment
 
         connection = info.context['connection']
-        sequencing_group_layer = SequencingGroupLayer(connection)
-        result = await sequencing_group_layer.add_comment_to_sequencing_group(
+        cl = CommentLayer(connection)
+        result = await cl.add_comment_to_entity(
+            entity=CommentEntityType.sequencing_group,
+            entity_id=sequencing_group_id_transform_to_raw(id),
             content=content,
-            sequencing_group_id=sequencing_group_id_transform_to_raw(id),
         )
         return GraphQLComment.from_internal(result)

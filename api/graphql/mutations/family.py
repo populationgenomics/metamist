@@ -4,7 +4,8 @@ import strawberry
 from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
-from db.python.layers.family import FamilyLayer
+from db.python.layers.comment import CommentLayer
+from models.models.comment import CommentEntityType
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLComment
@@ -25,6 +26,8 @@ class FamilyMutations:
         from api.graphql.schema import GraphQLComment
 
         connection = info.context['connection']
-        family_layer = FamilyLayer(connection)
-        result = await family_layer.add_comment_to_family(content=content, family_id=id)
+        cl = CommentLayer(connection)
+        result = await cl.add_comment_to_entity(
+            entity=CommentEntityType.family, entity_id=id, content=content
+        )
         return GraphQLComment.from_internal(result)
