@@ -95,7 +95,7 @@ const FamilyCells: React.FC<{
                                       setShowFamilyModal(true)
                                   }}
                               >
-                                  {f.external_id}
+                                  {prepareExternalIds(f.external_ids || {})}
                               </FamilyLink>
                           ))
                         : participant.families
