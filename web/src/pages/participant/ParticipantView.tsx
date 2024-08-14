@@ -52,7 +52,7 @@ export const ParticipantView: React.FC<IParticipantViewProps> = ({
         (sg) => sg.id
     )
     const analysesBySgId = groupBy(
-        analyses.filter((a) => a?.sgs?.length === 1),
+        analyses?.filter((a) => a?.sgs?.length === 1),
         (a) => a?.sgs?.[0]
     )
     const participantBySgId = Object.keys(sgsById).reduce(
@@ -65,7 +65,7 @@ export const ParticipantView: React.FC<IParticipantViewProps> = ({
     const extraAnalyses = showNonSingleSgAnalyses
         ? sortBy(
               uniqBy(
-                  analyses.filter((a) => a?.sgs?.length !== 1),
+                  analyses?.filter((a) => a?.sgs?.length !== 1),
                   (a) => a.id
               ),
               (a) => a.timestampCompleted

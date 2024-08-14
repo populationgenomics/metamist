@@ -290,7 +290,9 @@ const SeqrUrls: React.FC<{
         seqrProjectGuidToSequencingType
     )
         .filter(
-            (sequencingType) => getFamilyEidKeyForSeqrSeqType(sequencingType) in family.externalIds
+            (sequencingType) =>
+                family.externalIds &&
+                getFamilyEidKeyForSeqrSeqType(sequencingType) in family.externalIds
         )
         .reduce(
             (sequencingType, acc) => ({
