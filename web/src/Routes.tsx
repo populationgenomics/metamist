@@ -18,6 +18,7 @@ import { FamilyPage } from './pages/family/FamilyView'
 import Details from './pages/insights/Details'
 import Summary from './pages/insights/Summary'
 import OurDnaDashboard from './pages/ourdna/OurDnaDashboard'
+import { ParticipantPage } from './pages/participant/ParticipantViewContainer'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
 import ProjectOverview from './pages/project/ProjectOverview'
 import SampleView from './pages/sample/SampleView'
@@ -39,10 +40,10 @@ const Routes: React.FunctionComponent = () => (
             }
         />
         <Route
-            path="project/:projectName/participant/:participantName"
+            path="project/:projectName/participant/:participantId"
             element={
                 <ErrorBoundary>
-                    <SampleView />
+                    <ParticipantPage />
                 </ErrorBoundary>
             }
         />

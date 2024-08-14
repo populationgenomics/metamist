@@ -11,7 +11,9 @@ import { gql } from '../../__generated__/gql'
 import _ from 'lodash'
 import TangledTree, { PersonNode } from '../../shared/components/pedigree/TangledTree'
 import Table from '../../shared/components/Table'
+import { AnalysisGrid } from '../analysis/AnalysisGrid'
 import { AnalysisViewModal } from '../analysis/AnalysisView'
+import { ParticipantView } from '../participant/ParticipantView'
 
 const sampleFieldsToDisplay = ['active', 'type']
 const getSeqrUrl = (projectGuid: string, familyGuid: string) =>
@@ -36,6 +38,8 @@ query FamilyInfo($family_id: Int!) {
         participant {
           id
           externalId
+          karyotype
+          reportedGender
           phenotypes
           meta
           samples {
@@ -178,10 +182,11 @@ export const FamilyView: React.FC<IFamilyViewProps> = ({ familyId }) => {
             <SeqrUrls project={data?.family?.project} family={data?.family} />
 
             {data?.family?.familyParticipants.flatMap((fp) => (
-                <IndividualDetails
+                <ParticipantView
                     participant={fp.participant}
                     individualToHiglight={highlightedIndividual}
                     analyses={individualAnalysisByParticipantId[fp.participant?.externalId]}
+                    setHighlightedIndividual={setHighlightedIndividual}
                 />
             ))}
             <hr />
@@ -200,92 +205,6 @@ export const FamilyView: React.FC<IFamilyViewProps> = ({ familyId }) => {
                 onClose={() => setAnalysisIdToView(null)}
             />
         </div>
-    )
-}
-
-interface IAnalysisGridAnalysis {
-    id: number
-    timestampCompleted?: any | null
-    type: string
-    meta?: any | null
-    output?: string | null
-    sgs: string[]
-}
-
-const AnalysisGrid: React.FC<{
-    analyses: IAnalysisGridAnalysis[]
-    participantBySgId: { [sgId: string]: { externalId: string } }
-    sgsById?: { [sgId: string]: { technology: string; platform: string } }
-    highlightedIndividual?: string | null
-    setAnalysisIdToView: (analysisId: number) => void
-    showSequencingGroup?: boolean
-}> = ({
-    analyses,
-    participantBySgId,
-    sgsById,
-    highlightedIndividual,
-    setAnalysisIdToView,
-    showSequencingGroup,
-}) => {
-    return (
-        <Table>
-            <thead>
-                <SUITable.Row>
-                    {showSequencingGroup && (
-                        <SUITable.HeaderCell>Sequencing group</SUITable.HeaderCell>
-                    )}
-                    <SUITable.HeaderCell>Created</SUITable.HeaderCell>
-                    <SUITable.HeaderCell>Type</SUITable.HeaderCell>
-                    <SUITable.HeaderCell>Sequencing type</SUITable.HeaderCell>
-                    <SUITable.HeaderCell>Sequencing technology</SUITable.HeaderCell>
-                    <SUITable.HeaderCell>Output</SUITable.HeaderCell>
-                </SUITable.Row>
-            </thead>
-            <tbody>
-                {analyses?.map((a) => {
-                    const sgId = a.sgs?.length === 1 ? a.sgs[0] : null
-                    const sg = sgId ? sgsById?.[sgId] : null
-                    return (
-                        <SUITable.Row
-                            key={a.id}
-                            style={{
-                                backgroundColor: a.sgs.some(
-                                    (sg) =>
-                                        !!highlightedIndividual &&
-                                        participantBySgId[sg]?.externalId === highlightedIndividual
-                                )
-                                    ? 'var(--color-page-total-row)'
-                                    : 'var(--color-bg-card)',
-                            }}
-                        >
-                            {showSequencingGroup && (
-                                <SUITable.Cell>
-                                    {a.sgs.map((sg) => (
-                                        <li>
-                                            {sg}{' '}
-                                            {participantBySgId && sg in participantBySgId
-                                                ? `(${participantBySgId[sg]?.externalId})`
-                                                : ''}
-                                        </li>
-                                    ))}
-                                </SUITable.Cell>
-                            )}
-                            <SUITable.Cell>{a.timestampCompleted}</SUITable.Cell>
-                            <SUITable.Cell>{a.type}</SUITable.Cell>
-                            <SUITable.Cell>{a.meta?.sequencing_type}</SUITable.Cell>
-                            <SUITable.Cell>
-                                {!!sg && `${sg?.technology} (${sg?.platform})`}
-                            </SUITable.Cell>
-                            <SUITable.Cell>
-                                <a href="#" onClick={() => setAnalysisIdToView(a.id)}>
-                                    {a.output}
-                                </a>
-                            </SUITable.Cell>
-                        </SUITable.Row>
-                    )
-                })}
-            </tbody>
-        </Table>
     )
 }
 
@@ -414,41 +333,6 @@ const SeqrUrls: React.FC<{
                 ))}
             </tbody>
         </Table>
-    )
-}
-
-const IndividualDetails: React.FC<{
-    participant: any
-    analyses: IAnalysisGridAnalysis[]
-    individualToHiglight?: string | null
-}> = ({ participant, individualToHiglight, analyses }) => {
-    const sgsById = _.keyBy(
-        // @ts-ignore
-        participant.samples.flatMap((s) => s.sequencingGroups),
-        (sg) => sg.id
-    )
-    return (
-        <div
-            style={{
-                border:
-                    participant.externalId == individualToHiglight
-                        ? '5px solid var(--color-page-total-row)'
-                        : '',
-                paddingBottom: '20px',
-            }}
-        >
-            <h3>{participant.externalId}</h3>
-            <div style={{ marginLeft: '40px' }}>
-                <h5>Analyses</h5>
-                <AnalysisGrid
-                    analyses={analyses}
-                    sgsById={sgsById}
-                    participantBySgId={{}}
-                    showSequencingGroup
-                    setAnalysisIdToView={(analysisId) => console.log}
-                />
-            </div>
-        </div>
     )
 }
 

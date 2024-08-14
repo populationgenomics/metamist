@@ -3,6 +3,7 @@ import * as React from 'react'
 import get from 'lodash/get'
 import { Button, Modal, TableCell, TableRow } from 'semantic-ui-react'
 import FamilyLink from '../../shared/components/links/FamilyLink'
+import { getParticipantLink } from '../../shared/components/links/ParticipantLink'
 import SampleLink from '../../shared/components/links/SampleLink'
 import SequencingGroupLink from '../../shared/components/links/SequencingGroupLink'
 import { SMModal } from '../../shared/components/Modal'
@@ -15,6 +16,7 @@ import {
     ProjectParticipantGridField,
 } from '../../sm-api/api'
 import FamilyView from '../family/FamilyView'
+import { ParticipantModal } from '../participant/ParticipantViewContainer'
 import { firstColBorder, otherColBorder } from './ProjectGridHeaderGroup'
 
 const getBorderStyles = (idx: number) => {
@@ -123,24 +125,50 @@ const ParticipantCells: React.FC<{
     backgroundColor?: string
     projectName: string
     participantRowSpan?: number
-}> = ({ fields, participant, backgroundColor, projectName, participantRowSpan }) => (
-    <>
-        {fields.map((field, i) => (
-            <TableCell
-                style={{
-                    backgroundColor,
-                    ...getBorderStyles(i),
+}> = ({ fields, participant, backgroundColor, projectName, participantRowSpan }) => {
+    const [showParticipantModal, setShowParticipantModal] = React.useState(false)
+
+    const defaultRenderer = (field: ProjectParticipantGridField) =>
+        sanitiseValue(get(participant, field.key))
+    const valuePreparers: Record<string, (field: ProjectParticipantGridField) => any> = {
+        external_ids: (field: ProjectParticipantGridField) =>
+            prepareExternalIds(participant.external_ids || {}),
+        id: (field: ProjectParticipantGridField) => (
+            <a
+                href={getParticipantLink(participant.id, projectName)}
+                onClick={(e) => {
+                    e.preventDefault()
+                    setShowParticipantModal(true)
                 }}
-                key={`${participant.id}participant.${field.key}`}
-                rowSpan={participantRowSpan}
             >
-                {field.key == 'external_ids'
-                    ? prepareExternalIds(participant.external_ids || {})
-                    : sanitiseValue(get(participant, field.key))}
-            </TableCell>
-        ))}
-    </>
-)
+                {defaultRenderer(field)}
+            </a>
+        ),
+    }
+
+    return (
+        <>
+            {fields.map((field, i) => (
+                <TableCell
+                    style={{
+                        backgroundColor,
+                        ...getBorderStyles(i),
+                    }}
+                    key={`${participant.id}participant.${field.key}`}
+                    rowSpan={participantRowSpan}
+                >
+                    {(valuePreparers[field.key] || defaultRenderer)(field)}
+                </TableCell>
+            ))}
+
+            <ParticipantModal
+                isOpen={showParticipantModal}
+                participantId={participant.id}
+                onClose={() => setShowParticipantModal(false)}
+            />
+        </>
+    )
+}
 
 export const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProps> = ({
     participant,

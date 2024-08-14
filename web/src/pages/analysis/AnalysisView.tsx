@@ -55,13 +55,37 @@ export const AnalysisView: React.FC<IAnalysisViewProps> = ({ analysisId }) => {
 
     return (
         <>
-            <h2>Type: {analysis.type}</h2>
-            <AuditLogHistory auditLogs={sortedAuditLogs} />
-            <h3>Meta</h3>
+            <h3>Attributes</h3>
             {/* <DictEditor input={analysis.meta} readOnly /> */}
 
             <Table>
                 <SUITable.Body>
+                    <SUITable.Row>
+                        <td>ID</td>
+                        <td>{analysis.id}</td>
+                    </SUITable.Row>
+                    <SUITable.Row>
+                        <td>Output</td>
+                        <td>
+                            {' '}
+                            <pre>{analysis.output}</pre>
+                        </td>
+                    </SUITable.Row>
+
+                    <SUITable.Row>
+                        <td>Type</td>
+                        <td>{analysis.type}</td>
+                    </SUITable.Row>
+                    <SUITable.Row>
+                        <td>Status</td>
+                        <td>{analysis.status}</td>
+                    </SUITable.Row>
+                    {analysis.timestampCompleted && (
+                        <SUITable.Row>
+                            <td>Completed</td>
+                            <td>{analysis.timestampCompleted}</td>
+                        </SUITable.Row>
+                    )}
                     {Object.keys(analysis.meta).map((key) => {
                         return (
                             <SUITable.Row key={key}>
@@ -72,6 +96,8 @@ export const AnalysisView: React.FC<IAnalysisViewProps> = ({ analysisId }) => {
                     })}
                 </SUITable.Body>
             </Table>
+            <h3>History</h3>
+            <AuditLogHistory auditLogs={sortedAuditLogs} />
         </>
     )
 }
@@ -90,7 +116,6 @@ const getBatchInformationFromLog = (meta: Record<string, any>) => {
     // { "path": "/api/v1/analysis/vcgs-clinical/", "ip": "169.254.169.126", "HAIL_ATTEMPT_ID": "Y5QQS3", "HAIL_BATCH_ID": "474353", "HAIL_JOB_ID": "33"
     const batchId = meta.HAIL_BATCH_ID
     const jobId = meta.HAIL_JOB_ID
-    debugger
 
     if (!batchId) {
         return null
