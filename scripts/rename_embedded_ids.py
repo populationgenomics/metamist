@@ -52,9 +52,15 @@ if __name__ == '__main__':
     if len(sys.argv) < 2:
         print(__doc__)
 
+    old_urls = []
     for arg in sys.argv[1:]:
         field = arg.split(',')
         if len(field) >= 3:
             reheader_cram(field[0], field[1], field[2])
         else:
             reheader_cram(field[0], 'CPG[0-9]*', field[1])
+        old_urls.append(field[0])
+        old_urls.append(f'{field[0]}.crai')
+
+    logger.info(f'Check output, then manually remove {len(old_urls)} outdated files:')
+    logger.info(f'gcloud storage rm {" ".join(old_urls)}')
