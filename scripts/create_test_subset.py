@@ -506,7 +506,6 @@ def transfer_analyses(
             )
             existing_sgid = existing_sg.get('id') if existing_sg else None
             for analysis in sg['analyses']:
-
                 existing_analysis: dict = {}
                 if existing_sgid:
                     existing_analysis = get_existing_analysis(

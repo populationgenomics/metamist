@@ -21,7 +21,9 @@ class TestCohortBuilder(DbIsolatedTest):
         self.assertEqual(project, self.project_name)
         return await api.routes.cohort.create_cohort_from_criteria(
             CohortBody(**body_create_cohort_from_criteria['cohort_spec'].to_dict()),
-            CohortCriteria(**body_create_cohort_from_criteria['cohort_criteria'].to_dict()),
+            CohortCriteria(
+                **body_create_cohort_from_criteria['cohort_criteria'].to_dict()
+            ),
             self.connection,
             body_create_cohort_from_criteria['dry_run'],
         )
@@ -43,7 +45,9 @@ class TestCohortBuilder(DbIsolatedTest):
         mock.side_effect = self.mock_ccfc
         result = main(
             project=self.project_name,
-            cohort_body_spec=metamist.models.CohortBody(name='Empty cohort', description='No criteria'),
+            cohort_body_spec=metamist.models.CohortBody(
+                name='Empty cohort', description='No criteria'
+            ),
             projects=['test'],
             sg_ids_internal=[],
             excluded_sg_ids=[],
@@ -66,7 +70,9 @@ class TestCohortBuilder(DbIsolatedTest):
         mock.side_effect = self.mock_ccfc
         result = main(
             project=self.project_name,
-            cohort_body_spec=metamist.models.CohortBody(name='Epic cohort', description='Every criterion'),
+            cohort_body_spec=metamist.models.CohortBody(
+                name='Epic cohort', description='Every criterion'
+            ),
             projects=['test'],
             sg_ids_internal=['CPGLCL33'],
             excluded_sg_ids=['CPGLCL17', 'CPGLCL25'],

@@ -288,7 +288,6 @@ DELETE FROM analysis WHERE project = :project;
         """
 
         async with self.connection.transaction():
-
             # Get existing rows so that we can keep the existing audit log ids
             existing_rows = await self.connection.fetch_all(
                 """

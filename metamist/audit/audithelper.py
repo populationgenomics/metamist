@@ -16,9 +16,7 @@ class AuditHelper(CloudHelper):
     """General helper class for bucket auditing"""
 
     EXCLUDED_SGS: set[str] = set(
-        sg for sg in
-        os.getenv('SM_AUDIT_EXCLUDED_SGS', '').split(',')
-        if sg
+        sg for sg in os.getenv('SM_AUDIT_EXCLUDED_SGS', '').split(',') if sg
     )
 
     @staticmethod

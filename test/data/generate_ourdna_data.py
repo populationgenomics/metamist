@@ -7,6 +7,7 @@ NOTE: This is WIP and will be updated with more features
 If you want to regenerate the data you would need to
 delete records from table sample and participant first
 """
+
 import argparse
 import asyncio
 

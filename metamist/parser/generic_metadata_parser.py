@@ -819,10 +819,12 @@ class GenericMetadataParser(GenericParser):
 
         assays = []
 
-        read_filenames, read_checksums, reference_assemblies = (
-            await self.get_read_and_ref_files_and_checksums(
-                sample.primary_external_id, rows
-            )
+        (
+            read_filenames,
+            read_checksums,
+            reference_assemblies,
+        ) = await self.get_read_and_ref_files_and_checksums(
+            sample.primary_external_id, rows
         )
 
         # strip in case collaborator put "file1, file2"

@@ -5,6 +5,7 @@ Schema for GraphQL.
 Note, we silence a lot of linting here because GraphQL looks at type annotations
 and defaults to decide the GraphQL schema, so it might not necessarily look correct.
 """
+
 import datetime
 from inspect import isclass
 

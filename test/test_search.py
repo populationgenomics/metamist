@@ -53,7 +53,9 @@ class TestSample(DbIsolatedTest):
         Mock this in testing by limiting scope to non-existent project IDs
         """
         sample = await self.slayer.upsert_sample(
-            SampleUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'EX001'}, type='blood')
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'EX001'}, type='blood'
+            )
         )
         cpg_id = sample_id_format(sample.id)
 
@@ -68,7 +70,9 @@ class TestSample(DbIsolatedTest):
         Search by valid CPG sample ID (special case)
         """
         sample = await self.slayer.upsert_sample(
-            SampleUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'EX001'}, type='blood')
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'EX001'}, type='blood'
+            )
         )
         cpg_id = sample_id_format(sample.id)
         results = await self.schlay.search(query=cpg_id, project_ids=[self.project_id])
@@ -88,7 +92,9 @@ class TestSample(DbIsolatedTest):
         Search by valid CPG sequencing group ID (special case)
         """
         sample = await self.slayer.upsert_sample(
-            SampleUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'EXS001'}, type='blood')
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'EXS001'}, type='blood'
+            )
         )
         sg = await self.sglayer.upsert_sequencing_groups(
             [
@@ -135,7 +141,9 @@ class TestSample(DbIsolatedTest):
         should only return one result
         """
         sample = await self.slayer.upsert_sample(
-            SampleUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'EX001'}, type='blood')
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'EX001'}, type='blood'
+            )
         )
         results = await self.schlay.search(query='EX001', project_ids=[self.project_id])
 
