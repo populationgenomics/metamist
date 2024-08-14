@@ -2,6 +2,7 @@ import { useQuery } from '@apollo/client'
 import React from 'react'
 import { Button, Message, Modal, Table as SUITable } from 'semantic-ui-react'
 import { gql } from '../../__generated__'
+import { KeyValueTable } from '../../shared/components/KeyValueTable'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import Table from '../../shared/components/Table'
 import { getHailBatchURL } from '../../shared/utilities/hailBatch'
@@ -51,51 +52,27 @@ export const AnalysisView: React.FC<IAnalysisViewProps> = ({ analysisId }) => {
     const sortedAuditLogs = analysis.auditLogs.sort((a, b) => {
         return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     })
-    const author = sortedAuditLogs[0]?.author
+    const attributeDict: Record<string, any> = {
+        ID: analysis.id,
+        Output: <pre>{analysis.output}</pre>,
+        Type: analysis.type,
+        Status: analysis.status,
+    }
+    if (analysis.timestampCompleted) {
+        attributeDict.Completed = analysis.timestampCompleted
+    }
 
     return (
         <>
             <h3>Attributes</h3>
             {/* <DictEditor input={analysis.meta} readOnly /> */}
 
-            <Table>
-                <SUITable.Body>
-                    <SUITable.Row>
-                        <td>ID</td>
-                        <td>{analysis.id}</td>
-                    </SUITable.Row>
-                    <SUITable.Row>
-                        <td>Output</td>
-                        <td>
-                            {' '}
-                            <pre>{analysis.output}</pre>
-                        </td>
-                    </SUITable.Row>
+            <KeyValueTable
+                obj={{ ...attributeDict, ...analysis.meta }}
+                tableClass={Table}
+                rightPadding="0px"
+            />
 
-                    <SUITable.Row>
-                        <td>Type</td>
-                        <td>{analysis.type}</td>
-                    </SUITable.Row>
-                    <SUITable.Row>
-                        <td>Status</td>
-                        <td>{analysis.status}</td>
-                    </SUITable.Row>
-                    {analysis.timestampCompleted && (
-                        <SUITable.Row>
-                            <td>Completed</td>
-                            <td>{analysis.timestampCompleted}</td>
-                        </SUITable.Row>
-                    )}
-                    {Object.keys(analysis.meta).map((key) => {
-                        return (
-                            <SUITable.Row key={key}>
-                                <SUITable.Cell>{key}</SUITable.Cell>
-                                <SUITable.Cell>{JSON.stringify(analysis.meta[key])}</SUITable.Cell>
-                            </SUITable.Row>
-                        )
-                    })}
-                </SUITable.Body>
-            </Table>
             <h3>History</h3>
             <AuditLogHistory auditLogs={sortedAuditLogs} />
         </>

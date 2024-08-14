@@ -10,6 +10,19 @@ const DefaultTable: React.FC<
     React.DetailedHTMLProps<React.TableHTMLAttributes<HTMLTableElement>, HTMLTableElement>
 > = (props) => <table {...props} />
 
+function valueToDisplay(value: any) {
+    // if string, return
+    if (typeof value === 'string') {
+        return value
+    }
+    // if react element, return
+    if (React.isValidElement(value)) {
+        return value
+    }
+    // else json.stringify
+    return JSON.stringify(value)
+}
+
 export const KeyValueTable: React.FC<IKeyValueTableProps> = ({
     obj,
     tableClass,
@@ -20,11 +33,11 @@ export const KeyValueTable: React.FC<IKeyValueTableProps> = ({
         <TableClass>
             <tbody>
                 {Object.entries(obj || {}).map(([key, value]) => (
-                    <tr key={`sample-meta-${key}`}>
+                    <tr key={`key-value-table-row-${key}`}>
                         <td style={{ paddingRight: rightPadding }}>
                             <b>{key}</b>
                         </td>
-                        <td>{typeof value === 'string' ? value : JSON.stringify(value)}</td>
+                        <td>{valueToDisplay(value)}</td>
                     </tr>
                 ))}
             </tbody>
