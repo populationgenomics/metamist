@@ -114,7 +114,8 @@ class TestGraphQL(DbIsolatedTest):
         (strawberry has an as_str() method)
         """
         client = configure_sync_client(
-            schema=api.graphql.schema.schema.as_str(), auth_token='FAKE'  # type: ignore
+            schema=api.graphql.schema.schema.as_str(),
+            auth_token='FAKE',  # type: ignore
         )
         validate(TEST_QUERY, client=client)
 
@@ -279,7 +280,9 @@ query MyQuery($sg_id: String!, $project: String!) {
         """
         # insert participant
         p = await self.player.upsert_participant(
-            ParticipantUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'}, meta={}, samples=[])
+            ParticipantUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'}, meta={}, samples=[]
+            )
         )
 
         phenotypes = {'phenotype1': 'value1', 'phenotype2': {'number': 123}}

@@ -475,9 +475,7 @@ def run_as_sync(f):
     return wrapper
 
 
-class GenericParser(
-    CloudHelper
-):  # pylint: disable=too-many-public-methods,too-many-arguments
+class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too-many-arguments
     """Parser for ingesting rows of metadata"""
 
     def __init__(  # pylint: disable=too-many-arguments
@@ -1671,13 +1669,14 @@ def group_fastqs_by_common_filename_components(d: dict) -> dict:
         _, fastq_file_components = kv
         fastq_suffix = fastq_file_components[1]
         try:
-            common_component = fastq_suffix.split('_')[
+            common_component = fastq_suffix.split(
+                '_'
+            )[
                 1
             ]  # get the component of the file suffix after the first underscore if there
         except IndexError:
-            common_component = fastq_suffix.split('.', 1)[
-                1
-            ]  # or get the file extension if there is no trailing underscore after R1/R2
+            # or get the file extension if there is no trailing underscore after R1/R2
+            common_component = fastq_suffix.split('.', 1)[1]
 
         return fastq_suffix, common_component
 

@@ -225,9 +225,10 @@ class TestProjectAccess(DbIsolatedTest):
             members=[ProjectMemberUpdate(member=self.author, roles=['contributor'])],
         )
 
-        project_id_map, project_name_map = (
-            await self.pttable.get_projects_accessible_by_user(user=self.author)
-        )
+        (
+            project_id_map,
+            project_name_map,
+        ) = await self.pttable.get_projects_accessible_by_user(user=self.author)
 
         # Get projects with at least a read access role
         my_projects = self.connection.projects_with_role(

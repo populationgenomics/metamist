@@ -7,7 +7,12 @@ from models.models.project_insights import (
     ProjectInsightsSummary,
 )
 
-router = APIRouter(prefix='/project-insights', tags=['project-insights',])
+router = APIRouter(
+    prefix='/project-insights',
+    tags=[
+        'project-insights',
+    ],
+)
 
 
 @router.post(

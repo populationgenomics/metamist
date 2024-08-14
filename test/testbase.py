@@ -219,9 +219,10 @@ class DbTest(unittest.TestCase):
                 )
 
                 # Get the new project map now that project membership is updated
-                project_id_map, project_name_map = (
-                    await ppt.get_projects_accessible_by_user(user=cls.author)
-                )
+                (
+                    project_id_map,
+                    project_name_map,
+                ) = await ppt.get_projects_accessible_by_user(user=cls.author)
 
                 cls.project_id_map = project_id_map
                 cls.project_name_map = project_name_map

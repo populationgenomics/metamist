@@ -1,6 +1,7 @@
 """
 Small script to update external family IDs
 """
+
 import json
 
 import click
