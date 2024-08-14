@@ -10,7 +10,7 @@ This input file needs to be arranged into a more structured data type to pass to
 
 This function takes in an unordered pedigree file and returns an array of levels, which map to levels of a drawn pedigree (i.e. individuals on the same horizontal axis such as sets of siblings, parents, cousins etc are on the same level). Each level is an array of entries containing an individual id and an array of parents if they exist. The entries contain some additional information that need to be initialised but this is the gist of it.
 
-### Example:
+### Example
 
 TRIO
 
@@ -98,7 +98,7 @@ Note that the red is the 2 parent nodes, both in the same object (level 0) and t
 
 Generating this output correctly can be trivial for easy families (trios, standard nuclear, 3 generations etc) but can be tricky when for more complicated cases. It is likely that some tweaking will be necessary when we come across these cases. I've outlined the logic below. The idea is to identify the longest possible spine of consecutive descendants across generations, and then add branches where possible/necessary.
 
-### Logic:
+### Logic
 
 Identify all possible roots of the pedigree. These are individuals with no parents (ie no parental and maternal ids).
 
@@ -120,9 +120,9 @@ Next, this formatted level data is passed to the constructTangleLayout() functio
 
 ## constructTangleLayout() function
 
-This is likely the function that needs the most refactoring as it relies on deepcloning objects and recursive properties to work, which I don't think are necessary but haven't sat down to refactor it. This is inspired by https://observablehq.com/@nitaku/tangled-tree-visualization-ii
+This is likely the function that needs the most refactoring as it relies on deepcloning objects and recursive properties to work, which I don't think are necessary but haven't sat down to refactor it. This is inspired by [https://observablehq.com/@nitaku/tangled-tree-visualization-ii](https://observablehq.com/@nitaku/tangled-tree-visualization-ii).
 
-### Logic:
+### Logic 2
 
 Basically we give coordinates to each individual of each level, incrementing by some spacing variable across each level. Eg parents in level 0 would be at (0, 0) and (0, 50). Then individuals at level 1 might be at (100, 0), (100, 50), (100, 100) and (100, 150) etc.
 
