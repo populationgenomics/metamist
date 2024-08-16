@@ -572,6 +572,7 @@ class AnalysisLayer(BaseLayer):
         status: AnalysisStatus,
         meta: dict[str, Any] = None,
         output: str | None = None,
+        active: bool | None = None,
     ):
         """
         Update the status of an analysis, set timestamp_completed if relevant
@@ -586,4 +587,5 @@ class AnalysisLayer(BaseLayer):
             status=status,
             meta=meta,
             output=output,
+            active=active,
         )
