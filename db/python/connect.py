@@ -3,6 +3,7 @@
 """
 Code for connecting to Postgres database
 """
+
 import abc
 import asyncio
 import json
@@ -229,7 +230,6 @@ class Connection:
 
         async with self._audit_log_lock:
             if not self._audit_log_id:
-
                 # make this import here, otherwise we'd have a circular import
                 from db.python.tables.audit_log import (  # pylint: disable=import-outside-toplevel,R0401
                     AuditLogTable,
@@ -328,9 +328,9 @@ class CredentialedDatabaseConfiguration(DatabaseConfiguration):
         if self.port:
             _host += f':{self.port}'
 
-        options: dict[str, str | int] = (
-            {}
-        )  # {'min_size': self.min_pool_size, 'max_size': self.max_pool_size}
+        options: dict[
+            str, str | int
+        ] = {}  # {'min_size': self.min_pool_size, 'max_size': self.max_pool_size}
         _options = '&'.join(f'{k}={v}' for k, v in options.items())
 
         url = f'mysql://{u_p}@{_host}/{self.dbname}?{_options}'

@@ -7,7 +7,9 @@ from google.cloud import storage
 from cpg_utils.hail_batch import config_retrieve, copy_common_env, get_batch
 
 
-def get_blobs_in_directory(gs_dir: str, billing_project: str, storage_client: storage.Client):
+def get_blobs_in_directory(
+    gs_dir: str, billing_project: str, storage_client: storage.Client
+):
     """Get all blobs in a directory as a set of full gs:// URIs"""
     bucket_name, *components = gs_dir[5:].split('/')
     bucket = storage_client.bucket(bucket_name, user_project=billing_project)
@@ -70,7 +72,7 @@ def create_and_validate_md5s_for_files_in_directory(
     force_recreate_existing: bool,
     billing_project: str,
     driver_image: str,
-    storage_client: storage.Client
+    storage_client: storage.Client,
 ):
     """
     Create OR validate MD5s for files in the provided gs directory, skipping files with certain extensions.
@@ -86,7 +88,7 @@ def create_and_validate_md5s_for_files_in_directory(
 
         md5_exists = f'{filepath}.md5' in files
 
-        if mode == 'create' :
+        if mode == 'create':
             if not md5_exists or force_recreate_existing:
                 print('Creating md5 for', filepath)
                 job = b.new_job(f'Create {os.path.basename(filepath)}.md5')
@@ -109,15 +111,27 @@ def create_and_validate_md5s_for_files_in_directory(
 @click.command()
 @click.option('--billing-project', '-b', default=None)
 @click.option('--skip-filetypes', '-s', default=('.crai', '.tbi'), multiple=True)
-@click.option('--mode', '-m', type=click.Choice(['create', 'validate']), default='create', help='Whether to validate existing md5s or create new ones.')
-@click.option('--force-recreate-existing', '-f', is_flag=True, default=False, help='Re-create md5s even if they already exist.')
+@click.option(
+    '--mode',
+    '-m',
+    type=click.Choice(['create', 'validate']),
+    default='create',
+    help='Whether to validate existing md5s or create new ones.',
+)
+@click.option(
+    '--force-recreate-existing',
+    '-f',
+    is_flag=True,
+    default=False,
+    help='Re-create md5s even if they already exist.',
+)
 @click.argument('gs_dir')
 def main(
     billing_project: str | None,
     skip_filetypes: tuple[str, str],
     mode: str,
     force_recreate_existing: bool,
-    gs_dir: str
+    gs_dir: str,
 ):
     """
     Scans the directory for files and creates md5 checksums for them, OR validates existing md5s.
