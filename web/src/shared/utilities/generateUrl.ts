@@ -1,7 +1,6 @@
-import { Dictionary } from 'lodash'
 import { Location } from 'react-router-dom'
 
-const generateUrl = (location: Location, params: Dictionary<string | undefined>): string => {
+const generateUrl = (location: Location, params: Record<string, string | undefined>): string => {
     let paramsArray: string[] = []
     paramsArray = Object.entries(params)
         .filter(([_, value]) => value !== null && value !== undefined)

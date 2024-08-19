@@ -1,5 +1,5 @@
 import * as React from 'react'
-import _ from 'lodash'
+import sortBy from 'lodash/sortBy'
 
 import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
 import { AnalysisApi, Project, ProjectApi, ProportionalDateTemporalMethod } from '../../../sm-api'
@@ -162,7 +162,7 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
     }
 
     const selectedProjects: string[] = projectSelections
-        ? _.sortBy(Object.keys(projectSelections).filter((project) => projectSelections[project]))
+        ? sortBy(Object.keys(projectSelections).filter((project) => projectSelections[project]))
         : []
 
     const chart = (

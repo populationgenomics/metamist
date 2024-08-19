@@ -255,7 +255,9 @@ class TestUpsert(DbIsolatedTest):
         self.assertEqual('Apollo', db_participants[1]['external_id'])
         self.assertEqual('Athena', db_participants[2]['external_id'])
 
-        participant_id_map = {p['external_id']: p['participant_id'] for p in db_participants}
+        participant_id_map = {
+            p['external_id']: p['participant_id'] for p in db_participants
+        }
 
         db_samples = await self.connection.connection.fetch_all(
             """

@@ -23,7 +23,11 @@ from models.models import (
     SequencingGroupInternal,
 )
 from models.models.output_file import RecursiveDict
-from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
+from models.models.project import (
+    FullWriteAccessRoles,
+    ProjectId,
+    ReadAccessRoles,
+)
 from models.models.sequencing_group import SequencingGroupInternalId
 
 ES_ANALYSIS_OBJ_INTRO_DATE = datetime.date(2022, 6, 21)
@@ -86,10 +90,8 @@ class AnalysisLayer(BaseLayer):
         """
         Find all the sequencing_groups that don't have an "analysis_type"
         """
-        return (
-            await self.at.get_all_sequencing_group_ids_without_analysis_type(
-                analysis_type=analysis_type, project=project
-            )
+        return await self.at.get_all_sequencing_group_ids_without_analysis_type(
+            analysis_type=analysis_type, project=project
         )
 
     async def get_incomplete_analyses(
@@ -161,25 +163,17 @@ class AnalysisLayer(BaseLayer):
             )
 
         if start_date < datetime.date(2020, 1, 1):
-            raise ValueError(
-                f'start_date ({start_date}) must be after 2020-01-01'
-            )
+            raise ValueError(f'start_date ({start_date}) must be after 2020-01-01')
 
-        project_objs = (
-            self.connection.get_and_check_access_to_projects_for_ids(
-                project_ids=projects, allowed_roles=ReadAccessRoles
-            )
+        project_objs = self.connection.get_and_check_access_to_projects_for_ids(
+            project_ids=projects, allowed_roles=ReadAccessRoles
         )
         project_name_map = {p.id: p.name for p in project_objs}
 
         sglayer = SequencingGroupLayer(self.connection)
         sgfilter = SequencingGroupFilter(
             project=GenericFilter(in_=projects),
-            type=(
-                GenericFilter(in_=sequencing_types)
-                if sequencing_types
-                else None
-            ),
+            type=(GenericFilter(in_=sequencing_types) if sequencing_types else None),
         )
 
         sequencing_groups = await sglayer.query(sgfilter)
@@ -188,9 +182,7 @@ class AnalysisLayer(BaseLayer):
 
         cram_list = await self.at.query(
             AnalysisFilter(
-                sequencing_group_id=GenericFilter(
-                    in_=list(sg_to_project.keys())
-                ),
+                sequencing_group_id=GenericFilter(in_=list(sg_to_project.keys())),
                 type=GenericFilter(eq='cram'),
                 status=GenericFilter(eq=AnalysisStatus.COMPLETED),
             )
@@ -198,19 +190,15 @@ class AnalysisLayer(BaseLayer):
 
         crams_by_sg = group_by(cram_list, lambda c: c.sequencing_group_ids[0])
 
-        results: dict[
-            ProportionalDateTemporalMethod, list[ProportionalDateModel]
-        ] = {}
+        results: dict[ProportionalDateTemporalMethod, list[ProportionalDateModel]] = {}
         for method in temporal_methods:
             if method == ProportionalDateTemporalMethod.SAMPLE_CREATE_DATE:
-                results[method] = (
-                    await self.get_prop_map_for_sample_create_date(
-                        sg_by_id=sg_by_id,
-                        crams=crams_by_sg,
-                        project_name_map=project_name_map,
-                        start_date=start_date,
-                        end_date=end_date,
-                    )
+                results[method] = await self.get_prop_map_for_sample_create_date(
+                    sg_by_id=sg_by_id,
+                    crams=crams_by_sg,
+                    project_name_map=project_name_map,
+                    start_date=start_date,
+                    end_date=end_date,
                 )
             elif method == ProportionalDateTemporalMethod.SG_ES_INDEX_DATE:
                 results[method] = await self.get_prop_map_for_es_index_date(
@@ -249,22 +237,18 @@ class AnalysisLayer(BaseLayer):
         """
 
         # 1.
-        by_project_delta = (
-            await self.calculate_delta_of_crams_by_project_for_day(
-                sg_by_id=sg_by_id,
-                crams=crams,
-                project_name_map=project_name_map,
-                start_date=start_date,
-                end_date=end_date,
-            )
+        by_project_delta = await self.calculate_delta_of_crams_by_project_for_day(
+            sg_by_id=sg_by_id,
+            crams=crams,
+            project_name_map=project_name_map,
+            start_date=start_date,
+            end_date=end_date,
         )
 
         # 2: progressively sum up the sizes, prepping for step 3
 
         by_date_totals: list[tuple[datetime.date, dict[str, int]]] = []
-        sorted_days = list(
-            sorted(by_project_delta.items(), key=lambda el: el[0])
-        )
+        sorted_days = list(sorted(by_project_delta.items(), key=lambda el: el[0]))
         for dt, project_map in sorted_days:
             if len(by_date_totals) == 0:
                 by_date_totals.append((dt, project_map))
@@ -424,13 +408,9 @@ class AnalysisLayer(BaseLayer):
                     delta = cram.meta.get('size') or 0
                 else:
                     # replace with the current analyses timestamp_completed
-                    sg_start_date = check_or_parse_date(
-                        cram.timestamp_completed
-                    )
+                    sg_start_date = check_or_parse_date(cram.timestamp_completed)
                     if new_cram_size := cram.meta.get('size'):
-                        delta = new_cram_size - analyses[idx - 1].meta.get(
-                            'size', 0
-                        )
+                        delta = new_cram_size - analyses[idx - 1].meta.get('size', 0)
                 if not delta:
                     continue
                 if end_date and sg_start_date > end_date:
@@ -457,9 +437,9 @@ class AnalysisLayer(BaseLayer):
         sample_create_dates = await sglayer.get_samples_create_date_from_sgs(
             list(crams.keys())
         )
-        by_date: dict[
-            SequencingGroupInternalId, list[tuple[datetime.date, int]]
-        ] = defaultdict(list)
+        by_date: dict[SequencingGroupInternalId, list[tuple[datetime.date, int]]] = (
+            defaultdict(list)
+        )
 
         for sg_id, analyses in crams.items():
             if len(analyses) == 1:
@@ -485,17 +465,13 @@ class AnalysisLayer(BaseLayer):
                         continue
 
                     clamped_date = (
-                        max(sg_start_date, start_date)
-                        if start_date
-                        else sg_start_date
+                        max(sg_start_date, start_date) if start_date else sg_start_date
                     )
 
                     if 'size' not in cram.meta:
                         continue
 
-                    by_date[sg_id].append(
-                        (clamped_date, cram.meta.get('size') or 0)
-                    )
+                    by_date[sg_id].append((clamped_date, cram.meta.get('size') or 0))
 
         return by_date
 
@@ -509,19 +485,15 @@ class AnalysisLayer(BaseLayer):
         Fetch the relevant analysis objects + crams from sample-metadata
         to put together the proportionate_map.
         """
-        by_day: dict[datetime.date, set[SequencingGroupInternalId]] = (
-            defaultdict(set)
-        )
+        by_day: dict[datetime.date, set[SequencingGroupInternalId]] = defaultdict(set)
 
         # unfortunately, the way ES-indices are progressive, it's basically impossible
         # for us to know if a sequencing-group was removed. So we assume that no SG
         # was removed. So we'll sum up all SGs up to the start date and then use that
         # as the starting point for the prop map.
 
-        by_day[start] = (
-            await self.at.find_sgs_in_joint_call_or_es_index_up_to_date(
-                date=start
-            )
+        by_day[start] = await self.at.find_sgs_in_joint_call_or_es_index_up_to_date(
+            date=start
         )
 
         if start < ES_ANALYSIS_OBJ_INTRO_DATE:
@@ -539,9 +511,7 @@ class AnalysisLayer(BaseLayer):
                 )
             )
             for jc in joint_calls:
-                by_day[jc.timestamp_completed.date()].update(
-                    jc.sequencing_group_ids
-                )
+                by_day[jc.timestamp_completed.date()].update(jc.sequencing_group_ids)
 
         es_indices = await self.at.query(
             AnalysisFilter(
@@ -556,9 +526,7 @@ class AnalysisLayer(BaseLayer):
             )
         )
         for es in es_indices:
-            by_day[es.timestamp_completed.date()].update(
-                es.sequencing_group_ids
-            )
+            by_day[es.timestamp_completed.date()].update(es.sequencing_group_ids)
 
         return by_day
 
@@ -581,9 +549,7 @@ class AnalysisLayer(BaseLayer):
         if analysis.cohort_ids and analysis.sequencing_group_ids:
             all_cohort_sgs: list[int] = []
             for cohort_id in analysis.cohort_ids:
-                cohort_sgs = await self.ct.get_cohort_sequencing_group_ids(
-                    cohort_id
-                )
+                cohort_sgs = await self.ct.get_cohort_sequencing_group_ids(cohort_id)
                 all_cohort_sgs.extend(cohort_sgs)
             if set(all_cohort_sgs) != set(analysis.sequencing_group_ids):
                 raise ValueError(
@@ -613,9 +579,7 @@ class AnalysisLayer(BaseLayer):
         self, analysis_id: int, sequencing_group_ids: list[int]
     ):
         """Add samples to an analysis (through the linked table)"""
-        project_ids = await self.at.get_project_ids_for_analysis_ids(
-            [analysis_id]
-        )
+        project_ids = await self.at.get_project_ids_for_analysis_ids([analysis_id])
         self.connection.check_access_to_projects_for_ids(
             project_ids, allowed_roles=FullWriteAccessRoles
         )
@@ -631,13 +595,12 @@ class AnalysisLayer(BaseLayer):
         meta: dict[str, Any] = None,
         output: str | None = None,
         outputs: RecursiveDict | None = None,
+        active: bool | None = None,
     ):
         """
         Update the status of an analysis, set timestamp_completed if relevant
         """
-        project_ids = await self.at.get_project_ids_for_analysis_ids(
-            [analysis_id]
-        )
+        project_ids = await self.at.get_project_ids_for_analysis_ids([analysis_id])
         self.connection.check_access_to_projects_for_ids(
             project_ids, allowed_roles=FullWriteAccessRoles
         )
@@ -646,6 +609,7 @@ class AnalysisLayer(BaseLayer):
             analysis_id=analysis_id,
             status=status,
             meta=meta,
+            active=active,
         )
 
         await self.oft.process_output_for_analysis(

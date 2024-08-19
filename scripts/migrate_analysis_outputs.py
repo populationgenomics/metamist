@@ -60,8 +60,8 @@ if __name__ == '__main__':
         analyses = await get_analyses_without_fileid(sm_db)
         print(f'Found {len(analyses)} analysis outputs to be migrated')
 
-        analyses_group_by_bucket: dict[str, dict[str, list[Any]]] = (
-            defaultdict(lambda: defaultdict(list))
+        analyses_group_by_bucket: dict[str, dict[str, list[Any]]] = defaultdict(
+            lambda: defaultdict(list)
         )
 
         analyses_local = {}
@@ -97,20 +97,15 @@ if __name__ == '__main__':
                         analyses_group_by_bucket[params['bucket']][
                             params['prefix']
                         ].append(analysis)
-                elif (
-                    params['prefix']
-                    not in analyses_group_by_bucket[params['bucket']]
-                ):
-                    analyses_group_by_bucket[params['bucket']][
-                        params['prefix']
-                    ] = []
-                    analyses_group_by_bucket[params['bucket']][
-                        params['prefix']
-                    ].append(analysis)
+                elif params['prefix'] not in analyses_group_by_bucket[params['bucket']]:
+                    analyses_group_by_bucket[params['bucket']][params['prefix']] = []
+                    analyses_group_by_bucket[params['bucket']][params['prefix']].append(
+                        analysis
+                    )
                 else:
-                    analyses_group_by_bucket[params['bucket']][
-                        params['prefix']
-                    ].append(analysis)
+                    analyses_group_by_bucket[params['bucket']][params['prefix']].append(
+                        analysis
+                    )
 
                 if params['bucket'] not in bucket_params:
                     bucket_params[params['bucket']] = {}

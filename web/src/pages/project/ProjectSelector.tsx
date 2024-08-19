@@ -1,4 +1,5 @@
-import * as _ from 'lodash'
+import sortBy from 'lodash/sortBy'
+import keyBy from 'lodash/keyBy'
 import * as React from 'react'
 
 import { useParams } from 'react-router-dom'
@@ -46,7 +47,7 @@ const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({ onProj
         return <p>Loading projects...</p>
     }
 
-    const projectsByName = _.keyBy(data?.myProjects, 'name')
+    const projectsByName = keyBy(data?.myProjects, 'name')
 
     return (
         <div>
@@ -63,7 +64,7 @@ const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({ onProj
                 value={projectName}
                 options={
                     data &&
-                    _.sortBy(data.myProjects, (p) => p.name).map((p) => ({
+                    sortBy(data.myProjects, (p) => p.name).map((p) => ({
                         key: p.name,
                         text: p.name,
                         value: p.name,

@@ -128,7 +128,11 @@ async def update_analysis(
     """Update status of analysis"""
     atable = AnalysisLayer(connection)
     await atable.update_analysis(
-        analysis_id, status=analysis.status, output=analysis.output, meta=analysis.meta
+        analysis_id,
+        status=analysis.status,
+        output=analysis.output,
+        meta=analysis.meta,
+        active=analysis.active,
     )
     return True
 

@@ -173,9 +173,7 @@ class OutputFileInternal(SMBase):
                     blobs = OutputFileInternal.list_blobs(
                         bucket=params['bucket'],
                         prefix=(
-                            params['path_after_bucket']
-                            if params['prefix']
-                            else None
+                            params['path_after_bucket'] if params['prefix'] else None
                         ),
                         delimiter=params['delimiter'],
                         client=client,
@@ -183,12 +181,9 @@ class OutputFileInternal(SMBase):
                     )
                 for blob in blobs:
                     if blob.name == params['blob_name']:
-
                         # .mt files present as folders on gcs so calculating checksums is not avail.
                         if params['file_extension'] != '.mt':
-                            file_checksum = (
-                                blob.crc32c
-                            )  # pylint: disable=E1101
+                            file_checksum = blob.crc32c  # pylint: disable=E1101
                             valid = True
                             size = blob.size  # pylint: disable=E1101
 
@@ -198,9 +193,7 @@ class OutputFileInternal(SMBase):
                     'basename': params['basename'],  # pylint: disable=E1101
                     'dirname': params['dirname'],  # pylint: disable=E1101
                     'nameroot': params['file_stem'],  # pylint: disable=E1101
-                    'nameext': params[
-                        'file_extension'
-                    ],  # pylint: disable=E1101
+                    'nameext': params['file_extension'],  # pylint: disable=E1101
                     'file_checksum': file_checksum,
                     'size': size,  # pylint: disable=E1101
                     # At the moment we don't have any meta data for outputs
@@ -268,9 +261,7 @@ class OutputFileInternal(SMBase):
             if isinstance(file, tuple):
                 file_obj, json_structure = file
                 file_obj = file_obj.dict()
-                fields = (
-                    OutputFileInternal.model_fields.keys()
-                )  # type:ignore[attr-defined]
+                fields = OutputFileInternal.model_fields.keys()  # type:ignore[attr-defined]
 
                 # Populate the file_root dictionary with the fields from the file_obj.
                 for field in fields:

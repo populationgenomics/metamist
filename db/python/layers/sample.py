@@ -361,7 +361,6 @@ class SampleLayer(BaseLayer):
             new_round = []
             round_idx += 1
             for root, parent, nested_samples in prev_round:
-
                 for sample in nested_samples:
                     retval.append(
                         SampleLayer.UnwrappedSample(

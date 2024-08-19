@@ -160,11 +160,7 @@ class OutputFileTable(DbBase):
                         parent_file_id,
                         json_structure=primary_file['json_path'],
                         # If the file couldnt be created, we just pass the basename as the output
-                        output=(
-                            None
-                            if parent_file_id
-                            else primary_file['basename']
-                        ),
+                        output=(None if parent_file_id else primary_file['basename']),
                     )
                     secondary_files = files.get('secondary_files_grouped')
                     if secondary_files:
@@ -224,9 +220,7 @@ class OutputFileTable(DbBase):
 
         if isinstance(json_dict, str):
             # If the data is a plain string, return it as the basename with None as its keypath
-            collected['main_files'].append(
-                {'json_path': None, 'basename': json_dict}
-            )
+            collected['main_files'].append({'json_path': None, 'basename': json_dict})
             return collected
 
         if isinstance(json_dict, dict):
@@ -246,18 +240,11 @@ class OutputFileTable(DbBase):
                 # Handle secondary files if present
                 if 'secondary_files' in json_dict:
                     secondary = json_dict['secondary_files']
-                    if (
-                        current_basename
-                        not in collected['secondary_files_grouped']
-                    ):
-                        collected['secondary_files_grouped'][
-                            current_basename
-                        ] = []
+                    if current_basename not in collected['secondary_files_grouped']:
+                        collected['secondary_files_grouped'][current_basename] = []
                     for key, value in secondary.items():
                         # Append each secondary file to the list in secondary_files under its parent basename
-                        collected['secondary_files_grouped'][
-                            current_basename
-                        ].append(
+                        collected['secondary_files_grouped'][current_basename].append(
                             {
                                 'json_path': '.'.join(
                                     json_path + ['secondary_files', key]
@@ -269,9 +256,7 @@ class OutputFileTable(DbBase):
             else:
                 for key, value in json_dict.items():
                     # Recur for each sub-dictionary, updating the path
-                    await self.find_files_from_dict(
-                        value, json_path + [key], collected
-                    )
+                    await self.find_files_from_dict(value, json_path + [key], collected)
 
         elif isinstance(json_dict, list):
             # Recur for each item in the list, without updating the path (as lists don't contribute to JSON path)

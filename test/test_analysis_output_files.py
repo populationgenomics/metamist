@@ -28,9 +28,7 @@ class TestOutputFiles(DbIsolatedTest):
         # don't need to await because it's tagged @run_as_sync
         super().setUp()
 
-        absolute_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), 'data'
-        )
+        absolute_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
         gcs = (
             DockerContainer('fsouza/fake-gcs-server')
             .with_bind_ports(4443, 4443)
@@ -95,9 +93,7 @@ class TestOutputFiles(DbIsolatedTest):
         self.sample_id = sample.id
         assert sample.sequencing_groups
         self.genome_sequencing_group_id = sample.sequencing_groups[0].id
-        self.exome_sequencing_group_id = sample.sequencing_groups[
-            self.project_id
-        ].id
+        self.exome_sequencing_group_id = sample.sequencing_groups[self.project_id].id
 
     def tearDown(self) -> None:
         if self.gcs:
@@ -301,9 +297,7 @@ class TestOutputFiles(DbIsolatedTest):
         self.assertIn('ext', analysis.outputs['cram']['secondary_files'])
 
         # Check for each field against the output file data and also check each secondary file
-        self.check_outputs_fields(
-            analysis.outputs['cram'], output_file_data['cram']
-        )
+        self.check_outputs_fields(analysis.outputs['cram'], output_file_data['cram'])
         self.check_outputs_fields(
             analysis.outputs['cram']['secondary_files']['meta'],
             output_file_data['cram']['secondary_files']['meta'],  # type: ignore [index]

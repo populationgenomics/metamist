@@ -542,6 +542,9 @@ class GenericMetadataParser(GenericParser):
         >>> GenericMetadataParser.collapse_arbitrary_meta({'key1': 'new.key'}, [{'key1': True}])
         {'new': {'key': True}}
 
+        >>> GenericMetadataParser.collapse_arbitrary_meta({'key1': 'new_key'}, [{'key1': [1,2]}, {'key1': [2,3]}])
+        {'new_key': [[1, 2], [2, 3]}
+
         >>> GenericMetadataParser.collapse_arbitrary_meta({'key1': 'new_key'}, [{}])
         {}
 
@@ -583,22 +586,25 @@ class GenericMetadataParser(GenericParser):
         dicts = [{}]
         for row_key, dict_key in key_map.items():
             if isinstance(row, list):
-                inner_values = [
-                    unstring_value(r[row_key])
-                    for r in row
-                    if r.get(row_key) is not None
-                ]
-                if any(isinstance(inner, list) for inner in inner_values):
-                    # lists are unhashable
-                    value = inner_values
+                if len(row) == 1:
+                    value = unstring_value(row[0].get(row_key))
                 else:
-                    value = sorted(
-                        set(inner_values), key=str
-                    )  # sorted for unit test consistency
-                    if len(value) == 0:
-                        continue
-                    if len(value) == 1:
-                        value = unstring_value(value[0])
+                    inner_values = [
+                        unstring_value(r[row_key])
+                        for r in row
+                        if r.get(row_key) is not None
+                    ]
+                    if any(isinstance(inner, list) for inner in inner_values):
+                        # lists are unhashable
+                        value = inner_values
+                    else:
+                        value = sorted(
+                            set(inner_values), key=str
+                        )  # sorted for unit test consistency
+                        if len(value) == 0:
+                            continue
+                        if len(value) == 1:
+                            value = unstring_value(value[0])
             else:
                 if row_key not in row:
                     continue
@@ -813,10 +819,12 @@ class GenericMetadataParser(GenericParser):
 
         assays = []
 
-        read_filenames, read_checksums, reference_assemblies = (
-            await self.get_read_and_ref_files_and_checksums(
-                sample.primary_external_id, rows
-            )
+        (
+            read_filenames,
+            read_checksums,
+            reference_assemblies,
+        ) = await self.get_read_and_ref_files_and_checksums(
+            sample.primary_external_id, rows
         )
 
         # strip in case collaborator put "file1, file2"
