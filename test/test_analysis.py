@@ -313,6 +313,7 @@ class TestAnalysis(DbIsolatedTest):
                 sequencing_group_ids=[],
                 cohort_ids=[],
                 output='test_output',
+                outputs='test_output',
                 timestamp_completed=init_timestamp_completed,
                 project=1,
                 meta={'sequencing_type': 'genome', 'size': 1024},

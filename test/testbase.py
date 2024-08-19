@@ -8,9 +8,12 @@ import socket
 import subprocess
 import unittest
 from functools import wraps
+from unittest.mock import patch
 
 import databases.core
 import nest_asyncio
+from google.auth.credentials import AnonymousCredentials
+from google.cloud.storage import Client
 from pymysql import IntegrityError
 from testcontainers.mysql import MySqlContainer
 
@@ -153,7 +156,10 @@ class DbTest(unittest.TestCase):
                     *('--defaultsFile', db_prefix + '/liquibase.properties'),
                     *('--url', lcon_string),
                     *('--driver', 'org.mariadb.jdbc.Driver'),
-                    *('--classpath', db_prefix + '/mariadb-java-client-3.0.3.jar'),
+                    *(
+                        '--classpath',
+                        db_prefix + '/mariadb-java-client-3.0.3.jar',
+                    ),
                     *('--username', db.username),
                     *('--password', db.password),
                     'update',
@@ -272,6 +278,22 @@ class DbTest(unittest.TestCase):
             project_name_map=self.project_name_map,
             ar_guid=None,
             on_behalf_of=None,
+        )
+
+        # Patch get_gcs_client for all tests
+        patcher = patch(
+            'models.models.output_file.get_gcs_client',
+            self.custom_get_gcs_client,
+        )
+        self.addCleanup(patcher.stop)
+        self.mock_get_gcs_client = patcher.start()
+
+    def custom_get_gcs_client(self):
+        """Create the custom client instance with the desired configuration"""
+        return Client(
+            credentials=AnonymousCredentials(),
+            project='test',
+            client_options={'api_endpoint': 'http://localhost:4443'},
         )
 
     @run_as_sync
