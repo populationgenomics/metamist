@@ -3,7 +3,7 @@
 [![codecov](https://codecov.io/gh/populationgenomics/metamist/branch/dev/graph/badge.svg?token=OI3XZYR9HK)](https://codecov.io/gh/populationgenomics/metamist)
 
 
-## Introduction
+## Introduction 1
 
 **Metamist** is a database designed for storing **de-identified** -omics metadata.
 
