@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from models.base import SMBase, parse_sql_dict
+from models.base import SMBase, parse_sql_bool, parse_sql_dict
 from models.enums import AnalysisStatus
 from models.utils.cohort_id_format import (
     cohort_id_format_list,
@@ -64,7 +64,7 @@ class AnalysisInternal(SMBase):
             timestamp_completed=timestamp_completed,
             project=kwargs.get('project'),
             meta=meta,
-            active=bool(kwargs.get('active')),
+            active=parse_sql_bool(kwargs.get('active')),
             author=kwargs.get('author'),
         )
 
