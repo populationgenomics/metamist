@@ -1600,4 +1600,10 @@
 		<sql>ALTER TABLE output_file MODIFY dirname VARCHAR(255);</sql>
 		<sql>ALTER TABLE `output_file` ADD SYSTEM VERSIONING;</sql>
 	</changeSet>
+	<changeSet id="2024-08-22_fcf_nameext" author="yash.pankhania">
+		<sql>ALTER TABLE `output_file` DROP SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE `output_file` MODIFY nameext VARCHAR(255);</sql>
+		<sql>ALTER TABLE `output_file` MODIFY dirname VARCHAR(255) NOT NULL;</sql>
+		<sql>ALTER TABLE `output_file` ADD SYSTEM VERSIONING;</sql>
+	</changeSet>
 </databaseChangeLog>
