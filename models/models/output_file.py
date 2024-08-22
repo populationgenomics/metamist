@@ -5,6 +5,7 @@ import re
 from typing import TypeAlias
 
 from google.cloud.storage import Blob, Client
+from google.api_core.exceptions import NotFound
 from pydantic import BaseModel
 
 from api.settings import METAMIST_GCP_PROJECT
@@ -95,10 +96,14 @@ class OutputFileInternal(SMBase):
         """
         List blobs in a bucket
         """
-        blobs = client.list_blobs(
-            bucket, prefix=prefix, delimiter=delimiter, versions=versions
-        )
-        return list(blobs)
+        try:
+            blobs = client.list_blobs(
+                bucket, prefix=prefix, delimiter=delimiter, versions=versions
+            )
+            return list(blobs)
+        except NotFound as e:
+            print(f'Could not find bucket {bucket}: {e}')
+            return []
 
     @staticmethod
     def extract_bucket_params(

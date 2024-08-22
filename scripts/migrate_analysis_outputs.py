@@ -1,9 +1,11 @@
 from collections import defaultdict
+import re
 from textwrap import dedent
 from typing import Any
 
 from databases import Database
 from google.cloud.storage import Client
+from google.api_core.exceptions import Forbidden
 
 from db.python.connect import Connection, SMConnections
 from db.python.tables.output_file import OutputFileTable
@@ -18,7 +20,7 @@ async def get_analyses_without_fileid(connection: Database):
         FROM analysis a
         LEFT JOIN analysis_outputs ao ON ao.analysis_id = a.id
         LEFT JOIN output_file f ON f.id = ao.file_id
-        WHERE f.id IS NULL AND ao.output IS NULL
+        WHERE f.id IS NULL AND ao.output IS NULL AND a.output IS NOT NULL
         """
     )
     print('Fetching...')
@@ -116,13 +118,17 @@ if __name__ == '__main__':
         for bucket, prefixes in analyses_group_by_bucket.items():
             for prefix, analyses in prefixes.items():
                 params = bucket_params[bucket][prefix]
-                blobs = OutputFileInternal.list_blobs(
-                    bucket=bucket,
-                    prefix=params['prefix'],
-                    delimiter=params['delimiter'],
-                    client=client,
-                    versions=False,
-                )
+                try:
+                    blobs = OutputFileInternal.list_blobs(
+                        bucket=bucket,
+                        prefix=params['prefix'],
+                        delimiter=params['delimiter'],
+                        client=client,
+                        versions=False,
+                    )
+                except Forbidden as e:
+                    print(f'Could not list blobs in bucket {bucket}: {e}')
+                    blobs = []
                 print(
                     f'Processing bucket {bucket}/{prefix} with {len(analyses)} analyses'
                 )
@@ -139,12 +145,29 @@ if __name__ == '__main__':
                     )
 
         for analysis_id, file_path in analyses_local.items():
-            print(f'Processing local file {id}')
-            await oft.process_output_for_analysis(
-                analysis_id=analysis_id,
-                output=file_path,
-                outputs=None,
-                blobs=None,
-            )
+            print(f'Processing local file {file_path}')
+            if not file_path.startswith('gs://') and file_path.startswith('{'):
+                # Regular expression pattern to match key-value pairs
+                pattern = re.compile(r"'(\w+)':\s*GSPath\('(.+?)'\)")
+
+                # Find all matches
+                matches = pattern.findall(file_path)
+
+                # Convert matches to dictionary
+                result = {key: {'basename': path} for key, path in matches}
+
+                await oft.process_output_for_analysis(
+                    analysis_id=analysis_id,
+                    output=None,
+                    outputs=result,  # type: ignore [arg-type]
+                    blobs=None,
+                )
+            else:
+                await oft.process_output_for_analysis(
+                    analysis_id=analysis_id,
+                    output=file_path,
+                    outputs=None,
+                    blobs=None,
+                )
 
     asyncio.run(main())
