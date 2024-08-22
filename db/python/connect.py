@@ -50,6 +50,7 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'cohort_sequencing_group',
     'analysis_cohort',
     'analysis_runner',
+    'analysis_outputs',
 ][::-1]
 
 

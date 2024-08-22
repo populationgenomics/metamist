@@ -529,6 +529,7 @@ class GraphQLAnalysis:
     type: str
     status: strawberry.enum(AnalysisStatus)  # type: ignore
     output: str | None
+    outputs: strawberry.scalars.JSON | None
     timestamp_completed: datetime.datetime | None = None
     active: bool
     meta: strawberry.scalars.JSON | None
@@ -544,6 +545,7 @@ class GraphQLAnalysis:
             type=internal.type,
             status=internal.status,
             output=internal.output,
+            outputs=internal.outputs,
             timestamp_completed=internal.timestamp_completed,
             active=internal.active,
             meta=internal.meta,

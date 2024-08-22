@@ -9,6 +9,7 @@ from db.python.layers.base import BaseLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter, AnalysisTable
 from db.python.tables.cohort import CohortTable
+from db.python.tables.output_file import OutputFileTable
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import SequencingGroupFilter
 from db.python.utils import get_logger
@@ -21,7 +22,12 @@ from models.models import (
     ProportionalDateTemporalMethod,
     SequencingGroupInternal,
 )
-from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
+from models.models.output_file import RecursiveDict
+from models.models.project import (
+    FullWriteAccessRoles,
+    ProjectId,
+    ReadAccessRoles,
+)
 from models.models.sequencing_group import SequencingGroupInternalId
 
 ES_ANALYSIS_OBJ_INTRO_DATE = datetime.date(2022, 6, 21)
@@ -29,7 +35,9 @@ ES_ANALYSIS_OBJ_INTRO_DATE = datetime.date(2022, 6, 21)
 logger = get_logger()
 
 
-def check_or_parse_date(date_: datetime.date | str | None) -> datetime.date | None:
+def check_or_parse_date(
+    date_: datetime.date | str | None,
+) -> datetime.date | None:
     """Check or parse a date"""
     if not date_:
         return None
@@ -51,6 +59,7 @@ class AnalysisLayer(BaseLayer):
         self.sampt = SampleTable(connection)
         self.at = AnalysisTable(connection)
         self.ct = CohortTable(connection)
+        self.oft = OutputFileTable(connection)
 
     # GETS
 
@@ -164,7 +173,7 @@ class AnalysisLayer(BaseLayer):
         sglayer = SequencingGroupLayer(self.connection)
         sgfilter = SequencingGroupFilter(
             project=GenericFilter(in_=projects),
-            type=GenericFilter(in_=sequencing_types) if sequencing_types else None,
+            type=(GenericFilter(in_=sequencing_types) if sequencing_types else None),
         )
 
         sequencing_groups = await sglayer.query(sgfilter)
@@ -333,7 +342,9 @@ class AnalysisLayer(BaseLayer):
         }
 
         sgs_added_by_day = await self.get_sgs_added_by_day_by_es_indices(
-            start=start_date, end=end_date, projects=list(project_name_map.keys())
+            start=start_date,
+            end=end_date,
+            projects=list(project_name_map.keys()),
         )
         sgs_seen: set[SequencingGroupInternalId] = set()
 
@@ -465,7 +476,10 @@ class AnalysisLayer(BaseLayer):
         return by_date
 
     async def get_sgs_added_by_day_by_es_indices(
-        self, start: datetime.date, end: datetime.date, projects: list[ProjectId]
+        self,
+        start: datetime.date,
+        end: datetime.date,
+        projects: list[ProjectId],
     ):
         """
         Fetch the relevant analysis objects + crams from sample-metadata
@@ -542,16 +556,24 @@ class AnalysisLayer(BaseLayer):
                     'Cohort sequencing groups do not match analysis sequencing groups'
                 )
 
-        return await self.at.create_analysis(
+        new_analysis_id = await self.at.create_analysis(
             analysis_type=analysis.type,
             status=analysis.status,
             sequencing_group_ids=analysis.sequencing_group_ids,
             cohort_ids=analysis.cohort_ids,
             meta=analysis.meta,
-            output=analysis.output,
             active=analysis.active,
             project=project,
         )
+
+        await self.oft.process_output_for_analysis(
+            analysis_id=new_analysis_id,
+            output=analysis.output,
+            outputs=analysis.outputs,
+            blobs=None,
+        )
+
+        return new_analysis_id
 
     async def add_sequencing_groups_to_analysis(
         self, analysis_id: int, sequencing_group_ids: list[int]
@@ -572,6 +594,7 @@ class AnalysisLayer(BaseLayer):
         status: AnalysisStatus,
         meta: dict[str, Any] = None,
         output: str | None = None,
+        outputs: RecursiveDict | None = None,
         active: bool | None = None,
     ):
         """
@@ -586,6 +609,9 @@ class AnalysisLayer(BaseLayer):
             analysis_id=analysis_id,
             status=status,
             meta=meta,
-            output=output,
             active=active,
+        )
+
+        await self.oft.process_output_for_analysis(
+            analysis_id=analysis_id, output=output, outputs=outputs, blobs=None
         )

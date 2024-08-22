@@ -2,6 +2,7 @@
 import time
 from test.testbase import DbIsolatedTest, run_as_sync
 
+from api.routes.analysis import AnalysisUpdateModel, update_analysis
 from db.python.filters import GenericFilter
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.assay import AssayLayer
@@ -17,6 +18,7 @@ from models.models import (
     ParticipantUpsertInternal,
     SampleUpsertInternal,
     SequencingGroupUpsertInternal,
+    parse_sql_bool,
 )
 
 
@@ -313,6 +315,7 @@ class TestAnalysis(DbIsolatedTest):
                 sequencing_group_ids=[],
                 cohort_ids=[],
                 output='test_output',
+                outputs='test_output',
                 timestamp_completed=init_timestamp_completed,
                 project=1,
                 meta={'sequencing_type': 'genome', 'size': 1024},
@@ -322,3 +325,36 @@ class TestAnalysis(DbIsolatedTest):
         ]
 
         self.assertEqual(analyses, expected)
+
+    @run_as_sync
+    async def test_route_update_active(self):
+        """
+        Test that update_analysis(active=False) is effective
+        """
+        analysis_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[self.genome_sequencing_group_id],
+            )
+        )
+
+        analyses = await self.connection.connection.fetch_all('SELECT * FROM analysis')
+        self.assertEqual(1, len(analyses))
+        self.assertEqual(analysis_id, analyses[0]['id'])
+        self.assertTrue(parse_sql_bool(analyses[0]['active']))
+
+        inactivate = AnalysisUpdateModel(active=False, status=AnalysisStatus.COMPLETED)
+        await update_analysis(analysis_id, inactivate, self.connection)
+
+        analyses = await self.connection.connection.fetch_all('SELECT * FROM analysis')
+        self.assertEqual(1, len(analyses))
+        self.assertEqual(analysis_id, analyses[0]['id'])
+        self.assertFalse(parse_sql_bool(analyses[0]['active']))
+
+        analyses = await self.al.query(
+            AnalysisFilter(project=GenericFilter(eq=self.project_id))
+        )
+        self.assertEqual(1, len(analyses))
+        self.assertEqual(analysis_id, analyses[0].id)
+        self.assertFalse(analyses[0].active)
