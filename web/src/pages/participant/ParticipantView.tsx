@@ -6,6 +6,7 @@ import sortBy from 'lodash/sortBy'
 import uniqBy from 'lodash/uniqBy'
 
 import { KeyValueTable } from '../../shared/components/KeyValueTable'
+import { PedigreeEntry, PersonNode } from '../../shared/components/pedigree/TangledTree'
 import Table from '../../shared/components/Table'
 import { AnalysisGrid, IAnalysisGridAnalysis } from '../analysis/AnalysisGrid'
 import { AnalysisViewModal } from '../analysis/AnalysisView'
@@ -16,6 +17,7 @@ interface IParticipantViewParticipant {
     karyotype?: string | null
     meta?: any | null
     phenotypes?: { [key: string]: any }
+    pedEntry?: PedigreeEntry
     samples: {
         id: string
         type: string
@@ -45,6 +47,7 @@ export const ParticipantView: React.FC<IParticipantViewProps> = ({
     showNonSingleSgAnalyses,
 }) => {
     const [analysisIdToView, setAnalysisIdToView] = React.useState<number | undefined>()
+    const isHighlighted = individualToHiglight == participant.externalId
 
     const sgsById = keyBy(
         // @ts-ignore
@@ -96,6 +99,18 @@ export const ParticipantView: React.FC<IParticipantViewProps> = ({
                 }
                 style={{ cursor: 'hand' }}
             >
+                {participant.pedEntry && (
+                    <svg width={30} height={30} style={{ marginRight: '20px' }}>
+                        <PersonNode
+                            showIndividualId={false}
+                            isHighlighted={isHighlighted}
+                            nodeSize={30}
+                            node={{ x: 15, y: 15 }}
+                            entry={participant.pedEntry}
+                            onHighlight={(e) => setHighlightedIndividual?.(e?.individual_id)}
+                        />
+                    </svg>
+                )}
                 {participant.externalId}
             </h3>
 
@@ -138,8 +153,9 @@ export const ParticipantView: React.FC<IParticipantViewProps> = ({
                             <th>Type</th>
                             <th>Technology</th>
                             <th>Platform</th>
+                            <th></th>
                             <th>Analyses type</th>
-                            <th>Timestamp</th>
+                            <th></th>
                             <th></th>
                         </tr>
                     </thead>
@@ -156,7 +172,7 @@ export const ParticipantView: React.FC<IParticipantViewProps> = ({
                                             <td rowSpan={nAnalysis}>{sg.type}</td>
                                             <td rowSpan={nAnalysis}>{sg.technology}</td>
                                             <td rowSpan={nAnalysis}>{sg.platform}</td>
-                                            <td colSpan={3}>
+                                            <td colSpan={4}>
                                                 <em style={{ color: 'var(--color-text-disabled)' }}>
                                                     Analyses
                                                 </em>
@@ -164,8 +180,6 @@ export const ParticipantView: React.FC<IParticipantViewProps> = ({
                                         </tr>
                                         {analyses.map((a) => (
                                             <tr key={`sg-analyses-row-${a.id}`}>
-                                                <td>{a.type}</td>
-                                                <td>{a.timestampCompleted}</td>
                                                 <td>
                                                     <a
                                                         href="#"
@@ -174,9 +188,12 @@ export const ParticipantView: React.FC<IParticipantViewProps> = ({
                                                             setAnalysisIdToView(a.id)
                                                         }}
                                                     >
-                                                        {a.output}
+                                                        {a.id}
                                                     </a>
                                                 </td>
+                                                <td>{a.type}</td>
+                                                <td>{a.timestampCompleted.split('T')[0]}</td>
+                                                <td>{a.output}</td>
                                             </tr>
                                         ))}
                                     </React.Fragment>

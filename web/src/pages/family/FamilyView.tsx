@@ -149,41 +149,59 @@ export const FamilyView: React.FC<IFamilyViewProps> = ({ familyId }) => {
     )
     const familyAnalysis = Object.values(aById).filter((a) => a.sgs.length > 1)
     const analyses = _.orderBy(Object.values(aById), (a) => a.timestampCompleted)
+    const pedEntryByParticipantId = _.keyBy(
+        data?.family?.project.pedigree,
+        (pr) => pr.individual_id
+    )
 
     return (
         <div style={{ width: '100%' }}>
             <h2>
                 {data?.family?.externalId} ({data?.family?.project?.name})
             </h2>
-            <TangledTree
-                data={data?.family?.project.pedigree}
-                highlightedIndividual={highlightedIndividual}
-                onHighlight={(e) => {
-                    setHighlightedIndividual(e?.individual_id)
-                }}
-                nodeDiameter={60}
-            />
-            <Card
+            <div
                 style={{
-                    display: 'inline-block',
-                    padding: '20px',
-                    backgroundColor: 'var(--color-bg-card)',
-                    border: '1px solid var(--color-border-color)',
+                    display: 'flex',
+                    flexWrap: 'wrap', // Allows wrapping of elements
+                    alignItems: 'center',
+                    maxWidth: '100%', // Prevents overflow and ensures wrapping
                 }}
             >
-                test
-            </Card>
-            <PedigreeTable
-                pedigree={data?.family?.project.pedigree}
-                highlightedIndividual={highlightedIndividual}
-                setHighlightedIndividual={setHighlightedIndividual}
-            />
+                <span>
+                    <TangledTree
+                        data={data?.family?.project.pedigree}
+                        highlightedIndividual={highlightedIndividual}
+                        onHighlight={(e) => {
+                            setHighlightedIndividual(e?.individual_id)
+                        }}
+                        nodeDiameter={60}
+                    />
+                </span>
+                <Card
+                    style={{
+                        display: 'inline-block',
+                        backgroundColor: 'var(--color-bg-card)',
+                        border: '1px solid var(--color-border-color)',
+                        minWidth: '480px',
+                    }}
+                >
+                    <PedigreeTable
+                        pedigree={data?.family?.project.pedigree}
+                        highlightedIndividual={highlightedIndividual}
+                        setHighlightedIndividual={setHighlightedIndividual}
+                    />
+                </Card>
+            </div>
+            <br />
             {/* @ts-ignore: remove once families have external IDs*/}
             <SeqrUrls project={data?.family?.project} family={data?.family} />
 
             {data?.family?.familyParticipants.flatMap((fp) => (
                 <ParticipantView
-                    participant={fp.participant}
+                    participant={{
+                        ...fp.participant,
+                        pedEntry: pedEntryByParticipantId[fp.participant.externalId],
+                    }}
                     individualToHiglight={highlightedIndividual}
                     analyses={individualAnalysisByParticipantId[fp.participant?.externalId]}
                     setHighlightedIndividual={setHighlightedIndividual}

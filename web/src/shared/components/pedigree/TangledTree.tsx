@@ -16,17 +16,10 @@ export interface PedigreeEntry {
     maternal_id?: string | null
     paternal_id?: string | null
     sex: number
-    deceased: boolean
+    deceased?: boolean
 }
 
-interface ModifiedPedEntry {
-    affected: number
-    family_id: string
-    individual_id: string
-    maternal_id?: string | null
-    paternal_id?: string | null
-    sex: number
-    deceased: boolean
+interface ModifiedPedEntry extends PedigreeEntry {
     children: string[]
 }
 

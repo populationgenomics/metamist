@@ -1,8 +1,9 @@
 import { useQuery } from '@apollo/client'
 import React from 'react'
-import { Button, Message, Modal, Table as SUITable } from 'semantic-ui-react'
+import { Accordion, Button, Message, Modal, Table as SUITable } from 'semantic-ui-react'
 import { gql } from '../../__generated__'
 import { KeyValueTable } from '../../shared/components/KeyValueTable'
+import SequencingGroupLink from '../../shared/components/links/SequencingGroupLink'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import Table from '../../shared/components/Table'
 import { getHailBatchURL } from '../../shared/utilities/hailBatch'
@@ -20,6 +21,9 @@ query Analyses($analysisId: Int!) {
     status
     timestampCompleted
     type
+    project {
+        name
+    }
     auditLogs {
         id
         arGuid
@@ -27,11 +31,26 @@ query Analyses($analysisId: Int!) {
         timestamp
         meta
     }
+    # cohorts {
+    #     id
+    # }
+    sequencingGroups {
+        id
+        sample {
+            id
+            project {
+                name
+            }
+        }
+
+    }
   }
 }
 `)
 
 export const AnalysisView: React.FC<IAnalysisViewProps> = ({ analysisId }) => {
+    const [_sequencingGroupsIsOpen, setSequencingGroupsIsOpen] = React.useState(false)
+
     const { loading, error, data } = useQuery(ANALYSIS_QUERY, {
         variables: { analysisId: analysisId },
     })
@@ -55,12 +74,40 @@ export const AnalysisView: React.FC<IAnalysisViewProps> = ({ analysisId }) => {
     const attributeDict: Record<string, any> = {
         ID: analysis.id,
         Output: <pre>{analysis.output}</pre>,
-        Type: analysis.type,
-        Status: analysis.status,
     }
+    if (analysis.output?.includes('web')) {
+        // pattern is gs://cpg-{dataset}-{main,test}-web/{path}
+        // and the URL should become: https://{main,test}-web.populationgenomics.org.au/{dataset}/{path}
+        const match = analysis.output.match(/gs:\/\/cpg-(.+)-(main|test)-web\/(.+)/)
+        if (match) {
+            const [_, dataset, env, path] = match
+            const url = `https://${env}-web.populationgenomics.org.au/${dataset}/${path}`
+            attributeDict.Url = (
+                <a href={url} target="_blank">
+                    {url}
+                </a>
+            )
+        }
+    }
+
+    attributeDict.Type = analysis.type
+    attributeDict.Status = analysis.status
+    attributeDict.Project = analysis.project?.name
+
     if (analysis.timestampCompleted) {
         attributeDict.Completed = analysis.timestampCompleted
     }
+
+    const sequencingGroupsIsOpen = _sequencingGroupsIsOpen || analysis.sequencingGroups.length === 1
+    const tapToOpen =
+        analysis.sequencingGroups.length > 1 ? (
+            <span>
+                {' '}
+                - <em>tap to open</em>
+            </span>
+        ) : (
+            ''
+        )
 
     return (
         <>
@@ -75,6 +122,34 @@ export const AnalysisView: React.FC<IAnalysisViewProps> = ({ analysisId }) => {
 
             <h3>History</h3>
             <AuditLogHistory auditLogs={sortedAuditLogs} />
+
+            <Accordion>
+                <Accordion.Title onClick={() => setSequencingGroupsIsOpen(!sequencingGroupsIsOpen)}>
+                    <h4>
+                        Sequencing Groups ({analysis.sequencingGroups.length}){tapToOpen}
+                    </h4>
+                </Accordion.Title>
+                <Accordion.Content active={sequencingGroupsIsOpen}>
+                    {sequencingGroupsIsOpen && (
+                        <Table>
+                            <thead></thead>
+                            <tbody>
+                                {analysis.sequencingGroups.map((sg) => (
+                                    <tr key={sg.id}>
+                                        <td>
+                                            <SequencingGroupLink
+                                                sampleId={sg.sample.id}
+                                                id={sg.id}
+                                            />
+                                        </td>
+                                        <td>{sg?.sample?.project?.name}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </Table>
+                    )}
+                </Accordion.Content>
+            </Accordion>
         </>
     )
 }

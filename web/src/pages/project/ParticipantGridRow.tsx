@@ -105,7 +105,11 @@ const FamilyCells: React.FC<{
                 </TableCell>
             ))}
             {!!familyIdSingular && (
-                <SMModal open={showFamilyModal} onClose={() => setShowFamilyModal(false)}>
+                <SMModal
+                    open={showFamilyModal}
+                    size="large"
+                    onClose={() => setShowFamilyModal(false)}
+                >
                     <Modal.Header>Family</Modal.Header>
                     <Modal.Content>
                         <FamilyView familyId={familyIdSingular} />
@@ -163,6 +167,7 @@ const ParticipantCells: React.FC<{
 
             <ParticipantModal
                 isOpen={showParticipantModal}
+                size="large"
                 participantId={participant.id}
                 onClose={() => setShowParticipantModal(false)}
             />

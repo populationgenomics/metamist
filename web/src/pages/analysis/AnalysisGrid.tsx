@@ -28,6 +28,7 @@ export const AnalysisGrid: React.FC<{
         <Table>
             <thead>
                 <SUITable.Row>
+                    <SUITable.HeaderCell>ID</SUITable.HeaderCell>
                     {showSequencingGroup && (
                         <SUITable.HeaderCell>Sequencing group</SUITable.HeaderCell>
                     )}
@@ -55,6 +56,17 @@ export const AnalysisGrid: React.FC<{
                                     : 'var(--color-bg-card)',
                             }}
                         >
+                            <SUITable.Cell>
+                                <a
+                                    href="#"
+                                    onClick={(e) => {
+                                        e.preventDefault()
+                                        setAnalysisIdToView(a.id)
+                                    }}
+                                >
+                                    {a.id}
+                                </a>
+                            </SUITable.Cell>
                             {showSequencingGroup && (
                                 <SUITable.Cell>
                                     {sg
@@ -75,17 +87,7 @@ export const AnalysisGrid: React.FC<{
                             <SUITable.Cell>
                                 {!!sg && `${sg?.technology} (${sg?.platform})`}
                             </SUITable.Cell>
-                            <SUITable.Cell>
-                                <a
-                                    href="#"
-                                    onClick={(e) => {
-                                        e.preventDefault()
-                                        setAnalysisIdToView(a.id)
-                                    }}
-                                >
-                                    {a.output}
-                                </a>
-                            </SUITable.Cell>
+                            <SUITable.Cell>{a.output}</SUITable.Cell>
                         </SUITable.Row>
                     )
                 })}
