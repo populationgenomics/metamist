@@ -5,7 +5,7 @@ import { GraphQlAnalysis } from '../../__generated__/graphql'
 
 import Table from '../../shared/components/Table'
 
-export interface IAnalysisGridAnalysis extends GraphQlAnalysis {
+export interface IAnalysisGridAnalysis extends Partial<GraphQlAnalysis> {
     sgs?: string[]
 }
 
@@ -14,7 +14,7 @@ export const AnalysisGrid: React.FC<{
     participantBySgId: { [sgId: string]: { externalId: string } }
     sgsById?: { [sgId: string]: { technology: string; platform: string } }
     highlightedIndividual?: string | null
-    setAnalysisIdToView: (analysisId: number) => void
+    setAnalysisIdToView: (analysisId?: number | null) => void
     showSequencingGroup?: boolean
 }> = ({
     analyses,

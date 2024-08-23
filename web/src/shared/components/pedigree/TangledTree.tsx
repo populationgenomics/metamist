@@ -62,6 +62,11 @@ interface Link {
     bundle?: Node
 }
 
+interface NodeParentsList {
+    id: string
+    parentsList?: string[]
+}
+
 // layout
 const defaultNodeDiameter = 40
 
@@ -76,6 +81,20 @@ interface ITangleLayoutOptions {
     nodeDiameter: number
     horizontalSpacing?: number
     verticalSpacing?: number
+}
+
+function formObjectFromIdAndParents(
+    id: string,
+    parents: (string | null | undefined)[]
+): NodeParentsList {
+    const obj: NodeParentsList = { id }
+
+    const pl = parents.filter((i): i is string => !!i)
+    if (pl.length) {
+        obj.parentsList = pl
+    }
+
+    return obj
 }
 
 const constructTangleLayout = (levels: NodeList[], options: ITangleLayoutOptions) => {
@@ -550,7 +569,7 @@ const calculateDepth = (
 // };
 
 /* eslint-disable no-restricted-syntax */
-const findInHeirarchy = (id: string, heirarchy: Record<string, any>) => {
+const findInHeirarchy = (id: string | null | undefined, heirarchy: Record<string, any>) => {
     for (const [index, level] of heirarchy.entries()) {
         for (const person of level) {
             if (person.id === id) {
@@ -605,13 +624,13 @@ const formatData = (data: PedigreeEntry[]) => {
     const yetToSee = new Set(data.map((i) => i.individual_id))
     let queue = [[bestRoots[0]]]
 
-    const toReturn: { id: string; parentsList?: string[] }[][] = []
+    const toReturn: NodeParentsList[][] = []
 
     /* eslint no-loop-func: 0 */
 
     // create 1 lineage spine
     while (queue.flat().length) {
-        const toAdd: { id: string; parentsList?: string[] }[] = []
+        const toAdd: NodeParentsList[] = []
         const toAddToQueue: string[] = []
         const nextList = queue.shift() ?? []
         nextList.forEach((next) => {
@@ -619,14 +638,11 @@ const formatData = (data: PedigreeEntry[]) => {
                 return
             }
             yetToSee.delete(next)
-            toAdd.push({
-                id: next,
-                ...((keyedData[next].paternal_id || keyedData[next].maternal_id) && {
-                    parentsList: [keyedData[next].paternal_id, keyedData[next].maternal_id].filter(
-                        (i) => i
-                    ),
-                }),
-            }) // add entry
+            const obj: NodeParentsList = formObjectFromIdAndParents(next, [
+                keyedData[next].paternal_id,
+                keyedData[next].maternal_id,
+            ])
+            toAdd.push(obj) // add entry
             toAddToQueue.push(...keyedData[next].children.filter((i) => yetToSee.has(i)))
         })
         queue = [...queue, toAddToQueue]
@@ -650,15 +666,11 @@ const formatData = (data: PedigreeEntry[]) => {
                 if (partnerLevel > -1) {
                     const partnerPosition = toReturn[partnerLevel].findIndex((j) => j.id === n)
                     // add spouse in next to partner
-                    toReturn[partnerLevel].splice(partnerPosition + 1, 0, {
-                        id: next,
-                        ...((keyedData[next].paternal_id || keyedData[next].maternal_id) && {
-                            parentsList: [
-                                keyedData[next].paternal_id,
-                                keyedData[next].maternal_id,
-                            ].filter((k) => k),
-                        }),
-                    })
+                    const obj: NodeParentsList = formObjectFromIdAndParents(next, [
+                        keyedData[next].paternal_id,
+                        keyedData[next].maternal_id,
+                    ])
+                    toReturn[partnerLevel].splice(partnerPosition + 1, 0, obj)
                     couples = couples.filter(
                         ([dad, mum]) => !([next, n].includes(dad) && [next, n].includes(mum))
                     )
@@ -675,18 +687,11 @@ const formatData = (data: PedigreeEntry[]) => {
                 .map((n) => findInHeirarchy(n, toReturn))
                 .filter((a) => a > -1)
             if (levels.length) {
-                toReturn[min(levels) - 1] = [
-                    ...toReturn[min(levels) - 1],
-                    {
-                        id: next,
-                        ...((keyedData[next].paternal_id || keyedData[next].maternal_id) && {
-                            parentsList: [
-                                keyedData[next].paternal_id,
-                                keyedData[next].maternal_id,
-                            ].filter((l) => l),
-                        }),
-                    },
-                ]
+                const nextObj: NodeParentsList = formObjectFromIdAndParents(next, [
+                    keyedData[next].paternal_id,
+                    keyedData[next].maternal_id,
+                ])
+                toReturn[min(levels) - 1] = [...toReturn[min(levels) - 1], nextObj]
                 yetToSee.delete(next)
                 updatedList = true
                 break
@@ -697,18 +702,11 @@ const formatData = (data: PedigreeEntry[]) => {
                 findInHeirarchy(keyedData[next].paternal_id, toReturn),
             ])
             if (parentLevel > -1) {
-                toReturn[parentLevel + 1] = [
-                    ...toReturn[parentLevel + 1],
-                    {
-                        id: next,
-                        ...((keyedData[next].paternal_id || keyedData[next].maternal_id) && {
-                            parentsList: [
-                                keyedData[next].paternal_id,
-                                keyedData[next].maternal_id,
-                            ].filter((m) => m),
-                        }),
-                    },
-                ]
+                const nextObj: NodeParentsList = formObjectFromIdAndParents(next, [
+                    keyedData[next].paternal_id,
+                    keyedData[next].maternal_id,
+                ])
+                toReturn[parentLevel + 1] = [...toReturn[parentLevel + 1], nextObj]
                 yetToSee.delete(next)
                 updatedList = true
                 break

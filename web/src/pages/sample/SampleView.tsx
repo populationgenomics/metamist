@@ -1,14 +1,14 @@
 import * as React from 'react'
 
-import { useParams } from 'react-router-dom'
 import { useQuery } from '@apollo/client'
+import { useParams } from 'react-router-dom'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 
 import { gql } from '../../__generated__/gql'
-import Pedigree from '../../shared/components/pedigree/Pedigree'
-import SeqPanel from '../../shared/components/SeqPanel'
 import MuckError from '../../shared/components/MuckError'
+import Pedigree from '../../shared/components/pedigree/Pedigree'
 import SampleInfo from '../../shared/components/SampleInfo'
+import SeqPanel from '../../shared/components/SeqPanel'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
 
 const GET_SAMPLE_INFO = gql(`
@@ -84,7 +84,7 @@ const SampleView: React.FunctionComponent<Record<string, unknown>> = () => {
                         <div style={{ paddingBottom: '20px' }}>
                             {sample.participant?.families.map((family) => (
                                 <React.Fragment key={family.id}>
-                                    <Pedigree familyID={family.id} />
+                                    <Pedigree familyId={family.id} />
                                 </React.Fragment>
                             ))}
                         </div>

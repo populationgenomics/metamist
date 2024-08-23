@@ -46,7 +46,7 @@ export const ParticipantView: React.FC<IParticipantViewProps> = ({
     setHighlightedIndividual,
     showNonSingleSgAnalyses,
 }) => {
-    const [analysisIdToView, setAnalysisIdToView] = React.useState<number | undefined>()
+    const [analysisIdToView, setAnalysisIdToView] = React.useState<number | null | undefined>()
     const isHighlighted = individualToHiglight == participant.externalId
 
     const sgsById = keyBy(

@@ -5,6 +5,7 @@ import { gql } from '../../__generated__'
 import { useParams } from 'react-router-dom'
 import { Button, Message, Modal } from 'semantic-ui-react'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
+import { IAnalysisGridAnalysis } from '../analysis/AnalysisGrid'
 import { ParticipantView } from './ParticipantView'
 
 const GET_PARTICIPANT_VIEW_INFO = gql(`
@@ -69,10 +70,13 @@ export const ParticipantPage: React.FC<IParticipantPageProps> = (props) => {
     const participant = data?.participant
     const analyses = participant.samples.flatMap((s) =>
         s.sequencingGroups.flatMap((sg) =>
-            sg.analyses.flatMap((an) => ({
-                ...an,
-                sgs: an.sequencingGroups.map((sg) => sg.id),
-            }))
+            sg.analyses.flatMap(
+                (an) =>
+                    ({
+                        ...an,
+                        sgs: an.sequencingGroups.map((sg) => sg.id),
+                    } as IAnalysisGridAnalysis)
+            )
         )
     )
     return <ParticipantView participant={participant} analyses={analyses} showNonSingleSgAnalyses />

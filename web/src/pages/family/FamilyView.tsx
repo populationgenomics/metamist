@@ -9,6 +9,7 @@ import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { gql } from '../../__generated__/gql'
 
 import _ from 'lodash'
+import { GraphQlParticipant } from '../../__generated__/graphql'
 import TangledTree, { PersonNode } from '../../shared/components/pedigree/TangledTree'
 import Table from '../../shared/components/Table'
 import { AnalysisGrid } from '../analysis/AnalysisGrid'
@@ -87,7 +88,7 @@ export const FamilyView: React.FC<IFamilyViewProps> = ({ familyId }) => {
         string | null | undefined
     >()
 
-    const [analysisIdToView, setAnalysisIdToView] = React.useState<number | null>(null)
+    const [analysisIdToView, setAnalysisIdToView] = React.useState<number | null | undefined>(null)
 
     if (!familyId || isNaN(familyId)) return <em>Invalid family ID</em>
 
@@ -108,12 +109,12 @@ export const FamilyView: React.FC<IFamilyViewProps> = ({ familyId }) => {
         (acc, fp) => {
             for (const s of fp.participant.samples) {
                 for (const sg of s.sequencingGroups) {
-                    acc[sg.id] = fp.participant
+                    acc[sg.id] = fp.participant as GraphQlParticipant
                 }
             }
             return acc
         },
-        {}
+        {} as { [sgId: string]: GraphQlParticipant }
     )
 
     const aById: {
@@ -313,14 +314,14 @@ const SeqrUrls: React.FC<{
                 getFamilyEidKeyForSeqrSeqType(sequencingType) in family.externalIds
         )
         .reduce(
-            (sequencingType, acc) => ({
+            (acc, sequencingType) => ({
                 ...acc,
                 [sequencingType]: getSeqrUrl(
                     seqrProjectGuidToSequencingType[sequencingType],
                     family.externalIds[getFamilyEidKeyForSeqrSeqType(sequencingType)]
                 ),
             }),
-            {}
+            {} as { [sequencingType: string]: string }
         )
 
     if (Object.keys(sequencingTypeToSeqrUrl).length === 0) {

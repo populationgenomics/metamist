@@ -258,12 +258,8 @@ export const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProp
                                     key={`${sg.id}-sequencing_group.${field.key}`}
                                     rowSpan={sg.assays?.length || undefined}
                                 >
-                                    {field.key === 'id' ? (
-                                        <SequencingGroupLink
-                                            projectName={projectName}
-                                            id={s.id}
-                                            sg_id={sg.id?.toString()}
-                                        >
+                                    {field.key === 'id' && sg.id ? (
+                                        <SequencingGroupLink sampleId={s.id} id={sg.id?.toString()}>
                                             {sanitiseValue(sg.id)}
                                         </SequencingGroupLink>
                                     ) : (
