@@ -201,7 +201,7 @@ const Dashboard = () => {
                 <GridRow centered>
                     <GridColumn width={10}>
                         <BarChart
-                            header="Processing time per site"
+                            header="Processing time per Processing Site"
                             data={data.project.ourdnaDashboard.processingTimesBySite}
                             icon={
                                 <ClockIcon fill={ourdnaColours.yellow} style={{ ...iconStyle }} />
@@ -236,6 +236,23 @@ const Dashboard = () => {
                                     }
                                 />
                             </GridColumn>
+                        </Grid>
+                    </GridColumn>
+                </GridRow>
+                <GridRow centered>
+                    <GridColumn width={10}>
+                        <BarChart
+                            header="Processing time per Collection Site"
+                            data={data.project.ourdnaDashboard.processingTimesByCollectionSite}
+                            icon={
+                                <ClockIcon fill={ourdnaColours.yellow} style={{ ...iconStyle }} />
+                            }
+                        />
+                    </GridColumn>
+                    <GridColumn width={6}>
+                        <Grid stackable columns={1}>
+                            <GridColumn></GridColumn>
+                            <GridColumn></GridColumn>
                         </Grid>
                     </GridColumn>
                 </GridRow>
