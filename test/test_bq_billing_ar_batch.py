@@ -60,7 +60,7 @@ class TestBillingArBatchTable(BqTest):
             BillingArBatchTable(None)
 
         self.assertTrue(
-            'No connection was provided to the table \'BillingArBatchTable\''
+            "No connection was provided to the table 'BillingArBatchTable'"
             in str(context.exception)
         )
 

@@ -78,10 +78,8 @@ def get_openapi_schema_func(app, version):
             version=version,
             routes=app.routes,
             # update when FastAPI + swagger supports 3.1.0
-            # openapi_version='3.1.0'
+            openapi_version='3.0.2',
         )
-
-        convert_3_dot_1_to_3_dot_0_inplace(openapi_schema)
 
         openapi_schema['servers'] = [{'url': url} for url in URLS]
 
@@ -89,3 +87,25 @@ def get_openapi_schema_func(app, version):
         return openapi_schema
 
     return openapi
+
+
+def get_openapi_3_0_schema(app, version):
+    """
+    Uncouple the openapi schema of the server, for the OpenAPI generator
+    (Because we use an old version that only supports 3.0 schema)
+
+    """
+    openapi_schema = get_openapi(
+        title='Sample metadata API',
+        version=version,
+        routes=app.routes,
+        # update when FastAPI + swagger supports 3.1.0
+        # openapi_version='3.1.0'
+    )
+
+    convert_3_dot_1_to_3_dot_0_inplace(openapi_schema)
+
+    openapi_schema['servers'] = [{'url': url} for url in URLS]
+
+    app.openapi_schema = openapi_schema
+    return openapi_schema

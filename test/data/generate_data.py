@@ -26,7 +26,7 @@ from metamist.parser.generic_parser import chunk
 
 PRIMARY_EXTERNAL_ORG = ''
 
-EMOJIS = [':)', ':(', ':/', ':\'(']
+EMOJIS = [':)', ':(', ':/', ":'("]
 
 default_ped_location = str(Path(__file__).parent / 'greek-myth-forgeneration.ped')
 

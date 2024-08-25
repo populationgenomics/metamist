@@ -45,8 +45,6 @@ papi = ParticipantApi()
 
 DEFAULT_SAMPLES_N = 10
 
-PRIMARY_EXTERNAL_ORG = ''
-
 QUERY_ALL_DATA = gql(
     """
     query getAllData($project: String!, $sids: [String!]) {
@@ -56,8 +54,10 @@ QUERY_ALL_DATA = gql(
                 meta
                 type
                 externalId
+                externalIds
                 participant {
                     externalId
+                    externalIds
                     id
                     karyotype
                     meta
@@ -330,7 +330,7 @@ def transfer_samples_sgs_assays(
             existing_pid = upserted_participant_map[s['participant']['externalId']]
 
         sample_upsert = SampleUpsert(
-            external_ids={PRIMARY_EXTERNAL_ORG: s['externalId']},
+            external_ids=s['externalIds'],
             type=sample_type or None,
             meta=(copy_files_in_dict(s['meta'], project) or {}),
             participant_id=existing_pid,
@@ -506,7 +506,6 @@ def transfer_analyses(
             )
             existing_sgid = existing_sg.get('id') if existing_sg else None
             for analysis in sg['analyses']:
-
                 existing_analysis: dict = {}
                 if existing_sgid:
                     existing_analysis = get_existing_analysis(
@@ -768,7 +767,7 @@ def transfer_participants(
         else:
             del participant['id']
         transfer_participant = {
-            'external_ids': {PRIMARY_EXTERNAL_ORG: participant['externalId']},
+            'external_ids': participant['externalIds'],
             'meta': participant.get('meta') or {},
             'karyotype': participant.get('karyotype'),
             'reported_gender': participant.get('reportedGender'),

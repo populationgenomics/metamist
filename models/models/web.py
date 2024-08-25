@@ -91,6 +91,10 @@ class ProjectParticipantGridFilterType(Enum):
     neq = 'neq'
     startswith = 'startswith'
     icontains = 'icontains'
+    gt = 'gt'
+    gte = 'gte'
+    lt = 'lt'
+    lte = 'lte'
 
 
 class ProjectParticipantGridField(SMBase):
@@ -211,11 +215,11 @@ class ProjectParticipantGridResponse(SMBase):
             for s in p.samples:
                 if s.meta:
                     update_d_from_meta(sample_meta_keys, s.meta)
-                if not s.sequencing_groups:
-                    continue
                 if s.sample_parent_id is not None:
                     has_nested_samples = True
 
+                if not s.sequencing_groups:
+                    continue
                 for sg in s.sequencing_groups or []:
                     if sg.meta:
                         update_d_from_meta(sg_meta_keys, sg.meta)
@@ -249,8 +253,22 @@ class ProjectParticipantGridResponse(SMBase):
         )
         participant_fields = [
             Field(
-                key='external_ids',
+                key='id',
                 label='Participant ID',
+                is_visible=True,
+                filter_key='id',
+                filter_types=[
+                    ProjectParticipantGridFilterType.eq,
+                    ProjectParticipantGridFilterType.neq,
+                    ProjectParticipantGridFilterType.gt,
+                    ProjectParticipantGridFilterType.gte,
+                    ProjectParticipantGridFilterType.lt,
+                    ProjectParticipantGridFilterType.lte,
+                ],
+            ),
+            Field(
+                key='external_ids',
+                label='External Participant ID',
                 is_visible=True,
                 filter_key='external_id',
             ),
@@ -303,7 +321,7 @@ class ProjectParticipantGridResponse(SMBase):
             Field(
                 key='sample_root_id',
                 label='Root Sample ID',
-                is_visible=False,
+                is_visible=has_nested_samples,
                 filter_key='sample_root_id',
             ),
             Field(

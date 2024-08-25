@@ -2,7 +2,7 @@
 // to the table if the user has dark mode enabled in their browser.
 import * as React from 'react'
 
-import { range } from 'lodash'
+import range from 'lodash/range'
 
 import { Checkbox, Table as SUITable, TableProps } from 'semantic-ui-react'
 

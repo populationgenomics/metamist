@@ -343,7 +343,7 @@ class SequencingGroupTable(DbBase):
         _query = """
         SELECT sg.id, min(s.row_start)
         FROM sequencing_group sg
-        INNER JOIN sample s ON s.id = sg.sample_id
+        INNER JOIN sample FOR SYSTEM_TIME ALL s ON s.id = sg.sample_id
         WHERE sg.id in :sgids
         GROUP BY sg.id
         """

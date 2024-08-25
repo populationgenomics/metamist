@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from models.base import SMBase, parse_sql_dict
+from models.base import SMBase, parse_sql_bool, parse_sql_dict
 from models.enums import AnalysisStatus
 from models.utils.cohort_id_format import (
     cohort_id_format_list,
@@ -24,6 +24,7 @@ class AnalysisInternal(SMBase):
     status: AnalysisStatus
     active: bool | None = None
     output: str | None = None
+    outputs: str | dict | None = {}
     sequencing_group_ids: list[int] | None = None
     cohort_ids: list[int] | None = None
     timestamp_completed: datetime | None = None
@@ -58,11 +59,12 @@ class AnalysisInternal(SMBase):
             status=AnalysisStatus(status),
             sequencing_group_ids=sequencing_group_ids or [],
             cohort_ids=cohort_ids,
-            output=kwargs.pop('output', []),
+            output=kwargs.pop('output', None),
+            outputs=kwargs.pop('outputs', {}),
             timestamp_completed=timestamp_completed,
             project=kwargs.get('project'),
             meta=meta,
-            active=bool(kwargs.get('active')),
+            active=parse_sql_bool(kwargs.get('active')),
             author=kwargs.get('author'),
         )
 
@@ -79,6 +81,7 @@ class AnalysisInternal(SMBase):
             ),
             cohort_ids=cohort_id_format_list(self.cohort_ids),
             output=self.output,
+            outputs=self.outputs,
             timestamp_completed=(
                 self.timestamp_completed.isoformat()
                 if self.timestamp_completed
@@ -98,6 +101,7 @@ class Analysis(BaseModel):
     status: AnalysisStatus
     id: int | None = None
     output: str | None = None
+    outputs: str | dict | None = {}
     sequencing_group_ids: list[str] | None = None
     cohort_ids: list[str] | None = None
     author: str | None = None
@@ -127,6 +131,7 @@ class Analysis(BaseModel):
             sequencing_group_ids=sequencing_group_ids,
             cohort_ids=cohort_ids,
             output=self.output,
+            outputs=self.outputs,
             # don't allow this to be set
             timestamp_completed=None,
             project=self.project,

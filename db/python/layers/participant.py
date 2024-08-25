@@ -662,7 +662,7 @@ class ParticipantLayer(BaseLayer):
             if participant.samples:
                 slayer = SampleLayer(self.connection)
                 for s in participant.samples:
-                    s.participant_id = participant.id
+                    s.update_participant_id(participant.id)
 
                 await slayer.upsert_samples(
                     participant.samples,

@@ -48,7 +48,9 @@ def sequencing_group_id_transform_to_raw(identifier: int | str, strict=True) -> 
     if not luhn_is_valid(
         sequencing_group_id_with_checksum, offset=SEQUENCING_GROUP_CHECKSUM_OFFSET
     ):
-        raise ValueError(f'The provided sequencing group ID was not valid: {identifier!r}')
+        raise ValueError(
+            f'The provided sequencing group ID was not valid: {identifier!r}'
+        )
 
     return int(stripped_identifier[:-1])
 

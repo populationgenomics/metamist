@@ -1,7 +1,8 @@
+# pylint: disable=dangerous-default-value
 import csv
 import io
 from datetime import date
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter
 from fastapi.params import Body, Query
@@ -43,6 +44,7 @@ class AnalysisModel(BaseModel):
     status: AnalysisStatus
     meta: dict[str, Any] | None = None
     output: str | None = None
+    outputs: dict[str, Any] | None = None
     active: bool = True
     # please don't use this, unless you're the analysis-runner,
     # the usage is tracked ... (Ծ_Ծ)
@@ -54,6 +56,7 @@ class AnalysisUpdateModel(BaseModel):
 
     status: AnalysisStatus
     output: str | None = None
+    outputs: dict[str, Any] | None = None
     meta: dict[str, Any] | None = None
     active: bool | None = None
 
@@ -68,6 +71,8 @@ class AnalysisQueryModel(BaseModel):
     status: AnalysisStatus | None = None
     meta: dict[str, Any] | None = None
     output: str | None = None
+    # Need to consider how we might filter outputs that are dicts
+    # outputs: str | dict | None = None
     active: bool | None = None
 
     def to_filter(self, project_id_map: dict[str, int]) -> AnalysisFilter:
@@ -123,7 +128,11 @@ async def update_analysis(
     """Update status of analysis"""
     atable = AnalysisLayer(connection)
     await atable.update_analysis(
-        analysis_id, status=analysis.status, output=analysis.output, meta=analysis.meta
+        analysis_id,
+        status=analysis.status,
+        output=analysis.output,
+        meta=analysis.meta,
+        active=analysis.active,
     )
     return True
 
@@ -238,7 +247,7 @@ async def query_analyses(
 
 @router.get('/analysis-runner', operation_id='getAnalysisRunnerLog')
 async def get_analysis_runner_log(
-    project_names: list[str] = Query(None),  # type: ignore
+    project_names: Annotated[list[str], Query()] = [],  # noqa
     # author: str = None, # not implemented yet, uncomment when we do
     ar_guid: str | None = None,
     connection: Connection = get_projectless_db_connection,
@@ -246,8 +255,8 @@ async def get_analysis_runner_log(
     """
     Get log for the analysis-runner, useful for checking this history of analysis
     """
-    if not project_names:
-        raise ValueError('Must specify "project_names"')
+    if not project_names and not ar_guid:
+        raise ValueError('Must specify "project_names" or "ar_guid"')
 
     arlayer = AnalysisRunnerLayer(connection)
     projects = connection.get_and_check_access_to_projects_for_names(
@@ -272,7 +281,7 @@ async def get_analysis_runner_log(
 )
 async def get_sample_reads_map(
     export_type: ExportType = ExportType.JSON,
-    sequencing_types: list[str] = Query(None),  # type: ignore
+    sequencing_types: Annotated[list[str], Query()] = [],  # noqa
     connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """

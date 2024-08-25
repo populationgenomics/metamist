@@ -1,5 +1,5 @@
 import * as React from 'react'
-import _ from 'lodash'
+import capitalize from 'lodash/capitalize'
 import { Button, CheckboxProps, DropdownProps, Form, Message, Modal } from 'semantic-ui-react'
 import { SeqrDatasetType, WebApi } from '../../sm-api'
 import MuckTheDuck from '../../shared/components/MuckTheDuck'
@@ -102,7 +102,7 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
 
             {syncTypes.map((st) => (
                 <Button key={`sync-seqr-${st}`} onClick={() => setSeqTypeInModal(st)}>
-                    {_.capitalize(st)}
+                    {capitalize(st)}
                 </Button>
             ))}
             <Modal

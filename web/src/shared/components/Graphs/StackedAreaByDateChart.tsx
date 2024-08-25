@@ -14,7 +14,8 @@ import {
     utcHour,
     stackOffsetNone,
 } from 'd3'
-import _ from 'lodash'
+import min from 'lodash/min'
+import max from 'lodash/max'
 import React from 'react'
 import { Message } from 'semantic-ui-react'
 
@@ -86,8 +87,8 @@ export const StackedAreaByDateChart: React.FC<IStackedAreaByDateChartProps> = ({
     const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null)
     const [graphWidth, setGraphWidth] = React.useState<number>(768)
 
-    const _start = start || _.min(data.map((d) => d.date))
-    const _end = end || _.max(data.map((d) => d.date))
+    const _start = start || min(data.map((d) => d.date))
+    const _end = end || max(data.map((d) => d.date))
 
     React.useEffect(() => {
         function updateWindowWidth() {

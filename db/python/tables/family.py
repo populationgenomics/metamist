@@ -69,14 +69,14 @@ class FamilyTable(DbBase):
             field_overrides['participant_id'] = 'fp.participant_id'
             has_participant_join = True
             _query += """
-                JOIN family_participant fp ON family.id = fp.family_id
+                JOIN family_participant fp ON f.id = fp.family_id
             """
 
         if filter_.sample_id:
             field_overrides['sample_id'] = 's.id'
             if not has_participant_join:
                 _query += """
-                    JOIN family_participant fp ON family.id = fp.family_id
+                    JOIN family_participant fp ON f.id = fp.family_id
                 """
 
             _query += """

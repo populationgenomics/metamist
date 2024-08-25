@@ -18,12 +18,12 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - uses: actions/setup-java@v4
         with:
-          distribution: "temurin" # See 'Supported distributions' for available options
-          java-version: "17"
+          distribution: 'temurin' # See 'Supported distributions' for available options
+          java-version: '17'
 
       - name: Setup build env
         run: |
@@ -34,7 +34,7 @@ jobs:
           # openapi-generator
           wget https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/5.3.0/openapi-generator-cli-5.3.0.jar -O openapi-generator-cli.jar
 
-      - name: "build image"
+      - name: 'build image'
         run: |
           docker build \
             --build-arg SM_ENVIRONMENT=local \
