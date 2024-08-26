@@ -40,7 +40,7 @@ const Routes: React.FunctionComponent = () => (
             }
         />
         <Route
-            path="project/:projectName/participant/:participantId"
+            path="/participant/:participantId"
             element={
                 <ErrorBoundary>
                     <ParticipantPage />

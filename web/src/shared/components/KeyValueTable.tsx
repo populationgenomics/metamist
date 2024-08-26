@@ -6,6 +6,8 @@ interface IKeyValueTableProps {
     tableClass?: React.FC<{}>
 }
 
+// Define the default table like this, as it is not possible to set
+// the default value to "table" in the IKeyValueTableProps interface
 const DefaultTable: React.FC<
     React.DetailedHTMLProps<React.TableHTMLAttributes<HTMLTableElement>, HTMLTableElement>
 > = (props) => <table {...props} />
@@ -23,6 +25,13 @@ function valueToDisplay(value: any) {
     return JSON.stringify(value)
 }
 
+/**
+ * @name KeyValueTable
+ * @description A table that displays key-value pairs
+ * @param obj - object with key-value pairs
+ * @param rightPadding - padding for the right side of the key column
+ * @param tableClass - The class to use to present the table, by default, use the default html table
+ */
 export const KeyValueTable: React.FC<IKeyValueTableProps> = ({
     obj,
     tableClass,

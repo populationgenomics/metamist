@@ -139,7 +139,7 @@ const ParticipantCells: React.FC<{
             prepareExternalIds(participant.external_ids || {}),
         id: (field: ProjectParticipantGridField) => (
             <a
-                href={getParticipantLink(participant.id, projectName)}
+                href={getParticipantLink(participant.id)}
                 onClick={(e) => {
                     e.preventDefault()
                     setShowParticipantModal(true)
