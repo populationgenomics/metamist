@@ -158,6 +158,9 @@ class ProjectParticipantGridResponse(SMBase):
         """
         Read through nested participants and full out the keys for the grid response
         """
+        has_sequencing_groups = False
+        has_assays = False
+
         hidden_participant_meta_keys: set[str] = set()
         hidden_sample_meta_keys = {'reads', 'vcfs', 'gvcf'}
         hidden_assay_meta_keys = {
@@ -220,12 +223,14 @@ class ProjectParticipantGridResponse(SMBase):
 
                 if not s.sequencing_groups:
                     continue
+                has_sequencing_groups = True
                 for sg in s.sequencing_groups or []:
                     if sg.meta:
                         update_d_from_meta(sg_meta_keys, sg.meta)
 
                     if not sg.assays:
                         continue
+                    has_assays = True
                     for a in sg.assays:
                         if a.meta:
                             update_d_from_meta(assay_meta_keys, a.meta)
@@ -319,6 +324,11 @@ class ProjectParticipantGridResponse(SMBase):
                 filter_key='external_id',
             ),
             Field(
+                key='type',
+                label='Type',
+                is_visible=True,
+            ),
+            Field(
                 key='sample_root_id',
                 label='Root Sample ID',
                 is_visible=has_nested_samples,
@@ -350,7 +360,7 @@ class ProjectParticipantGridResponse(SMBase):
             Field(
                 key='type',
                 label='Type',
-                is_visible=True,
+                is_visible=has_assays,
                 filter_key='type',
             )
         ]
@@ -368,7 +378,7 @@ class ProjectParticipantGridResponse(SMBase):
             Field(
                 key='id',
                 label='Sequencing Group ID',
-                is_visible=True,
+                is_visible=has_sequencing_groups,
                 filter_key='id',
                 filter_types=[
                     ProjectParticipantGridFilterType.eq,
@@ -378,19 +388,19 @@ class ProjectParticipantGridResponse(SMBase):
             Field(
                 key='type',
                 label='Type',
-                is_visible=True,
+                is_visible=has_sequencing_groups,
                 filter_key='type',
             ),
             Field(
                 key='technology',
                 label='Technology',
-                is_visible=True,
+                is_visible=has_sequencing_groups,
                 filter_key='technology',
             ),
             Field(
                 key='platform',
                 label='Platform',
-                is_visible=True,
+                is_visible=has_sequencing_groups,
                 filter_key='platform',
             ),
         ]

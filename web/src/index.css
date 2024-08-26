@@ -37,6 +37,10 @@
 
     --color-text-href: rgb(65, 131, 196);
 
+    --color-pedigree-person-border: rgb(50, 50, 50);
+    --color-pedigree-affected: rgb(76, 76, 76);
+    --color-pedigree-unaffected: rgb(240, 240, 240);
+
     --ourdna-blue-transparent: rgba(113, 172, 225, 0.5);
     --ourdna-red-transparent: rgba(191, 0, 59, 0.5);
     --ourdna-yellow-transparent: rgba(232, 199, 29, 0.5);
@@ -66,7 +70,7 @@ html[data-theme='dark-mode'] {
     --color-bg-disabled-card: #353535;
     --color-table-header: #383838;
 
-    --color-border-color: #3a3a3a;
+    --color-border-color: #565656;
     --color-border-default: #292a2b;
     --color-border-red: #921111;
     --color-divider: rgba(255, 255, 255, 0.2);
@@ -84,6 +88,10 @@ html[data-theme='dark-mode'] {
     --color-bg-under-budget: rgba(0, 128, 0, 0.5);
 
     --color-text-href: rgb(188, 188, 251);
+
+    --color-pedigree-person-border: rgb(169, 169, 169);
+    --color-pedigree-affected: rgb(51, 51, 51);
+    --color-pedigree-unaffected: rgb(153, 153, 153);
 
     --color-header-row: #383838;
     --color-exome-row: #887830;
@@ -489,4 +497,8 @@ html[data-theme='dark-mode'] .ui.table {
 /* See on billing home page - fixes attached menu dark mode border */
 .ui.attached.inverted.menu {
     border: 1px solid #555 !important;
+}
+
+.dimmed.dimmable > .ui.modals.dimmer.visible {
+    display: flex !important;
 }
