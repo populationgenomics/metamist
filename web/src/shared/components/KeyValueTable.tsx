@@ -15,6 +15,13 @@ const DefaultTable: React.FC<
 function valueToDisplay(value: any) {
     // if string, return
     if (typeof value === 'string') {
+        if (value.startsWith('https://')) {
+            return (
+                <a href={value} target="_blank" rel="noreferrer">
+                    {value}
+                </a>
+            )
+        }
         return value
     }
     // if react element, return
@@ -39,14 +46,14 @@ export const KeyValueTable: React.FC<IKeyValueTableProps> = ({
 }) => {
     const TableClass = tableClass || DefaultTable
     return (
-        <TableClass>
+        <TableClass style={{ maxWidth: '100%' }}>
             <tbody>
                 {Object.entries(obj || {}).map(([key, value]) => (
                     <tr key={`key-value-table-row-${key}`}>
                         <td style={{ paddingRight: rightPadding }}>
                             <b>{key}</b>
                         </td>
-                        <td>{valueToDisplay(value)}</td>
+                        <td style={{ wordBreak: 'break-all' }}>{valueToDisplay(value)}</td>
                     </tr>
                 ))}
             </tbody>

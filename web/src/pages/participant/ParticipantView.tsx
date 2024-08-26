@@ -6,6 +6,7 @@ import sortBy from 'lodash/sortBy'
 import uniqBy from 'lodash/uniqBy'
 
 import { KeyValueTable } from '../../shared/components/KeyValueTable'
+import AnalysisLink from '../../shared/components/links/AnalysisLink'
 import { PedigreeEntry, PersonNode } from '../../shared/components/pedigree/TangledTree'
 import Table from '../../shared/components/Table'
 import { AnalysisGrid, IAnalysisGridAnalysis } from '../analysis/AnalysisGrid'
@@ -181,15 +182,14 @@ export const ParticipantView: React.FC<IParticipantViewProps> = ({
                                         {analyses.map((a) => (
                                             <tr key={`sg-analyses-row-${a.id}`}>
                                                 <td>
-                                                    <a
-                                                        href="#"
+                                                    <AnalysisLink
+                                                        id={a.id}
                                                         onClick={(e) => {
                                                             e.preventDefault()
+                                                            e.stopPropagation()
                                                             setAnalysisIdToView(a.id)
                                                         }}
-                                                    >
-                                                        {a.id}
-                                                    </a>
+                                                    />
                                                 </td>
                                                 <td>{a.type}</td>
                                                 <td>{a.timestampCompleted.split('T')[0]}</td>

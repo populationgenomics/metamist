@@ -1,8 +1,11 @@
 import { useQuery } from '@apollo/client'
 import React from 'react'
-import { Accordion, Button, Message, Modal, Table as SUITable } from 'semantic-ui-react'
+import { useParams } from 'react-router-dom'
+import { Accordion, Button, Card, Message, Modal, Table as SUITable } from 'semantic-ui-react'
 import { gql } from '../../__generated__'
 import { KeyValueTable } from '../../shared/components/KeyValueTable'
+import AnalysisLink from '../../shared/components/links/AnalysisLink'
+import ProjectLink from '../../shared/components/links/ProjectLink'
 import SequencingGroupLink from '../../shared/components/links/SequencingGroupLink'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import Table from '../../shared/components/Table'
@@ -48,6 +51,20 @@ query Analyses($analysisId: Int!) {
 }
 `)
 
+export const AnalysisViewPage: React.FC = () => {
+    const { analysisId } = useParams()
+    if (!analysisId) {
+        return <Message negative>Analysis ID not provided</Message>
+    }
+
+    return (
+        <Card style={{ width: '100%', padding: '40px' }}>
+            <h1>Analysis</h1>
+            <AnalysisView analysisId={parseInt(analysisId)} />
+        </Card>
+    )
+}
+
 export const AnalysisView: React.FC<IAnalysisViewProps> = ({ analysisId }) => {
     const [_sequencingGroupsIsOpen, setSequencingGroupsIsOpen] = React.useState(false)
 
@@ -72,8 +89,17 @@ export const AnalysisView: React.FC<IAnalysisViewProps> = ({ analysisId }) => {
         return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     })
     const attributeDict: Record<string, any> = {
-        ID: analysis.id,
-        Output: <pre>{analysis.output}</pre>,
+        ID: <AnalysisLink id={analysis.id} />,
+        Output: (
+            <span
+                style={{
+                    fontFamily: 'monospace',
+                    wordBreak: 'break-all',
+                }}
+            >
+                {analysis.output}
+            </span>
+        ),
     }
     if (analysis.output?.includes('web')) {
         // pattern is gs://cpg-{dataset}-{main,test}-web/{path}
@@ -92,7 +118,7 @@ export const AnalysisView: React.FC<IAnalysisViewProps> = ({ analysisId }) => {
 
     attributeDict.Type = analysis.type
     attributeDict.Status = analysis.status
-    attributeDict.Project = analysis.project?.name
+    attributeDict.Project = <ProjectLink name={analysis.project.name} />
 
     if (analysis.timestampCompleted) {
         attributeDict.Completed = analysis.timestampCompleted

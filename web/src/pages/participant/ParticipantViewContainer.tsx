@@ -68,17 +68,16 @@ export const ParticipantPage: React.FC<IParticipantPageProps> = (props) => {
     }
 
     const participant = data?.participant
-    const analyses = participant.samples.flatMap((s) =>
-        s.sequencingGroups.flatMap((sg) =>
-            sg.analyses.flatMap(
-                (an) =>
-                    ({
-                        ...an,
-                        sgs: an.sequencingGroups.map((sg) => sg.id),
-                    } as IAnalysisGridAnalysis)
-            )
+    const analyses = participant.samples
+        .flatMap((s) => s.sequencingGroups)
+        .flatMap((sg) => sg.analyses)
+        .flatMap(
+            (an) =>
+                ({
+                    ...an,
+                    sgs: an.sequencingGroups.map((sg) => sg.id),
+                }) as IAnalysisGridAnalysis
         )
-    )
     return <ParticipantView participant={participant} analyses={analyses} showNonSingleSgAnalyses />
 }
 

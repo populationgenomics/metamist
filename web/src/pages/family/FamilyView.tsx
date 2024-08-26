@@ -8,7 +8,9 @@ import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 
 import { gql } from '../../__generated__/gql'
 
-import _ from 'lodash'
+import groupBy from 'lodash/groupBy'
+import keyBy from 'lodash/keyBy'
+import orderBy from 'lodash/orderBy'
 import { GraphQlParticipant } from '../../__generated__/graphql'
 import TangledTree, { PersonNode } from '../../shared/components/pedigree/TangledTree'
 import Table from '../../shared/components/Table'
@@ -103,7 +105,7 @@ export const FamilyView: React.FC<IFamilyViewProps> = ({ familyId }) => {
     const sgs = data?.family?.familyParticipants.flatMap((fp) =>
         fp.participant.samples.flatMap((s) => s.sequencingGroups)
     )
-    const sgsById = _.keyBy(sgs, (s) => s.id)
+    const sgsById = keyBy(sgs, (s) => s.id)
 
     const participantBySgId: { [sgId: string]: any } = data?.family?.familyParticipants.reduce(
         (acc, fp) => {
@@ -144,16 +146,13 @@ export const FamilyView: React.FC<IFamilyViewProps> = ({ familyId }) => {
             }
         }
     }
-    const individualAnalysisByParticipantId = _.groupBy(
+    const individualAnalysisByParticipantId = groupBy(
         Object.values(aById).filter((a) => a.sgs.length == 1),
         (a) => participantBySgId[a.sgs[0]]?.externalId
     )
     const familyAnalysis = Object.values(aById).filter((a) => a.sgs.length > 1)
-    const analyses = _.orderBy(Object.values(aById), (a) => a.timestampCompleted)
-    const pedEntryByParticipantId = _.keyBy(
-        data?.family?.project.pedigree,
-        (pr) => pr.individual_id
-    )
+    const analyses = orderBy(Object.values(aById), (a) => a.timestampCompleted)
+    const pedEntryByParticipantId = keyBy(data?.family?.project.pedigree, (pr) => pr.individual_id)
 
     return (
         <div style={{ width: '100%' }}>
@@ -168,7 +167,7 @@ export const FamilyView: React.FC<IFamilyViewProps> = ({ familyId }) => {
                     maxWidth: '100%', // Prevents overflow and ensures wrapping
                 }}
             >
-                <span>
+                <span style={{ padding: '20px' }}>
                     <TangledTree
                         data={data?.family?.project.pedigree}
                         highlightedIndividual={highlightedIndividual}

@@ -4,6 +4,7 @@ import { Table as SUITable } from 'semantic-ui-react'
 import { GraphQlAnalysis } from '../../__generated__/graphql'
 
 import Table from '../../shared/components/Table'
+import AnalysisLink from '../../shared/components/links/AnalysisLink'
 
 export interface IAnalysisGridAnalysis extends Partial<GraphQlAnalysis> {
     sgs?: string[]
@@ -57,15 +58,14 @@ export const AnalysisGrid: React.FC<{
                             }}
                         >
                             <SUITable.Cell>
-                                <a
-                                    href="#"
+                                <AnalysisLink
+                                    id={a.id}
                                     onClick={(e) => {
                                         e.preventDefault()
+                                        e.stopPropagation()
                                         setAnalysisIdToView(a.id)
                                     }}
-                                >
-                                    {a.id}
-                                </a>
+                                />
                             </SUITable.Cell>
                             {showSequencingGroup && (
                                 <SUITable.Cell>
@@ -87,7 +87,7 @@ export const AnalysisGrid: React.FC<{
                             <SUITable.Cell>
                                 {!!sg && `${sg?.technology} (${sg?.platform})`}
                             </SUITable.Cell>
-                            <SUITable.Cell>{a.output}</SUITable.Cell>
+                            <td style={{ wordBreak: 'break-all' }}>{a.output}</td>
                         </SUITable.Row>
                     )
                 })}

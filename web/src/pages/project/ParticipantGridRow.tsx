@@ -93,7 +93,6 @@ const FamilyCells: React.FC<{
                                   onClick={(e) => {
                                       e.preventDefault()
                                       setShowFamilyModal(true)
-                                      debugger
                                   }}
                               >
                                   {f.external_id}
