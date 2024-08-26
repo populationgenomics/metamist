@@ -61,7 +61,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         """
         This method is called once all groups have been finalised
         """
-        # do this later on
+        # we set-up the etl here, as we need to know the etl accessors
         self._setup_etl()
 
     @cached_property
