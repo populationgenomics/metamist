@@ -643,7 +643,7 @@
 		<!--		In MariaDB, you can do _conditional_ unique values in a sort of hacky way.
 			You make a combined key, with one of the fields only NOT NULL when the row should participant in
 		the check.
-			IE: if you archive a sequencing group, marking the "nullIfInactitve field to NULL will allow
+			IE: if you archive a sequencing group, marking the "nullIfInactive" field to NULL will allow
 		multiple
 			copies - allowing for us to reuse the same external_ids for multiple sequencing groups. 	-->
 		<createTable tableName="sequencing_group_external_id">
@@ -1509,9 +1509,101 @@
 		</sql>
 
 	</changeSet>
-
-
-
-
-
+	<changeSet id="2024-06-26_output_file" author="yash.pankhania">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<createTable tableName="output_file">
+			<column name="id" type="INT" autoIncrement="true">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="path" type="VARCHAR(255)">
+				<constraints
+					nullable="false"
+					unique="true"
+				/>
+			</column>
+			<column name="basename" type="VARCHAR(255)">
+				<constraints
+					nullable="false"
+				/>
+			</column>
+			<column name="dirname" type="VARCHAR(100)">
+				<constraints
+					nullable="false"
+				/>
+			</column>
+			<column name="nameroot" type="VARCHAR(255)">
+				<constraints
+					nullable="false"
+				/>
+			</column>
+			<column name="nameext" type="VARCHAR(25)">
+				<constraints
+					nullable="true"
+				/>
+			</column>
+			<column name="file_checksum" type="VARCHAR(255)">
+				<constraints
+					nullable="true"
+				/>
+			</column>
+			<column name="size" type="BIGINT">
+				<constraints
+					nullable="false"
+				/>
+			</column>
+			<column name="meta" type="VARCHAR(255)">
+				<constraints
+					nullable="true"
+				/>
+			</column>
+			<column name="valid" type="BOOLEAN" />
+			<column name="parent_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_SECONDARY_FILE_PARENT_ID"
+					references="output_file(id)"
+				/>
+			</column>
+		</createTable>
+		<createTable tableName="analysis_outputs">
+			<column name="analysis_id" type="INT">
+				<constraints
+				nullable="false"
+				foreignKeyName="FK_ANALYSIS_OUTPUTS_ANALYSIS_ID"
+				references="analysis(id)"
+				/>
+			</column>
+			<column name="file_id" type="INT">
+				<constraints
+				nullable="true"
+				foreignKeyName="FK_ANALYSIS_OUTPUTS_FILE_ID"
+				references="output_file(id)"
+				/>
+			</column>
+			<column name="output" type="VARCHAR(255)">
+				<constraints
+				nullable="true"
+				/>
+			</column>
+			<column name="json_structure" type="VARCHAR(255)">
+				<constraints
+					nullable="true"
+				/>
+			</column>
+		</createTable>
+		<sql>ALTER TABLE `output_file` ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE `analysis_outputs` ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE `analysis_outputs` ADD CONSTRAINT `chk_file_id_output` CHECK ((file_id IS NOT NULL AND output IS NULL) OR (file_id IS NULL AND output IS NOT NULL));</sql>
+	</changeSet>
+	<changeSet id="2024-08-22_fcf_dirname" author="yash.pankhania">
+		<sql>ALTER TABLE `output_file` DROP SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE output_file MODIFY dirname VARCHAR(255);</sql>
+		<sql>ALTER TABLE `output_file` ADD SYSTEM VERSIONING;</sql>
+	</changeSet>
+	<changeSet id="2024-08-22_fcf_nameext" author="yash.pankhania">
+		<sql>ALTER TABLE `output_file` DROP SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE `output_file` MODIFY nameext VARCHAR(255);</sql>
+		<sql>ALTER TABLE `output_file` MODIFY dirname VARCHAR(255) NOT NULL;</sql>
+		<sql>ALTER TABLE `output_file` ADD SYSTEM VERSIONING;</sql>
+	</changeSet>
 </databaseChangeLog>

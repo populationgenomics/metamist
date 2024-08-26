@@ -3,6 +3,7 @@
 """
 Code for connecting to Postgres database
 """
+
 import abc
 import asyncio
 import json
@@ -49,6 +50,7 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'cohort_sequencing_group',
     'analysis_cohort',
     'analysis_runner',
+    'analysis_outputs',
 ][::-1]
 
 
@@ -229,7 +231,6 @@ class Connection:
 
         async with self._audit_log_lock:
             if not self._audit_log_id:
-
                 # make this import here, otherwise we'd have a circular import
                 from db.python.tables.audit_log import (  # pylint: disable=import-outside-toplevel,R0401
                     AuditLogTable,
@@ -328,9 +329,9 @@ class CredentialedDatabaseConfiguration(DatabaseConfiguration):
         if self.port:
             _host += f':{self.port}'
 
-        options: dict[str, str | int] = (
-            {}
-        )  # {'min_size': self.min_pool_size, 'max_size': self.max_pool_size}
+        options: dict[
+            str, str | int
+        ] = {}  # {'min_size': self.min_pool_size, 'max_size': self.max_pool_size}
         _options = '&'.join(f'{k}={v}' for k, v in options.items())
 
         url = f'mysql://{u_p}@{_host}/{self.dbname}?{_options}'
@@ -359,12 +360,17 @@ class SMConnections:
         return SMConnections._credentials
 
     @staticmethod
-    def make_connection(config: DatabaseConfiguration):
+    def make_connection(
+        config: DatabaseConfiguration, log_database_queries: bool | None = None
+    ):
         """Create connection from dbname"""
         # the connection string will prepare pooling automatically
-        return databases.Database(
-            config.get_connection_string(), echo=LOG_DATABASE_QUERIES
+        _should_log = (
+            log_database_queries
+            if log_database_queries is not None
+            else LOG_DATABASE_QUERIES
         )
+        return databases.Database(config.get_connection_string(), echo=_should_log)
 
     @staticmethod
     async def connect():

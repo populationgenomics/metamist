@@ -56,7 +56,9 @@ class TestPedigree(DbIsolatedTest):
             )
         )
         await pl.upsert_participant(
-            ParticipantUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'EX02'}, reported_sex=None)
+            ParticipantUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'EX02'}, reported_sex=None
+            )
         )
 
         rows = await fl.get_pedigree(

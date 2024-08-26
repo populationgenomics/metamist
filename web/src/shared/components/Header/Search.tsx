@@ -1,4 +1,4 @@
-import _ from 'lodash'
+import capitalize from 'lodash/capitalize'
 import * as React from 'react'
 import { Search } from 'semantic-ui-react'
 
@@ -93,7 +93,7 @@ const resultRenderer: (resp: SearchResponse) => React.ReactElement = (searchResp
         colour = 'gray'
     }
     if (searchResponse.type === SearchResponseType.Participant) {
-        available = `${_.capitalize(searchResponse.type)} result is not supported`
+        available = `${capitalize(searchResponse.type)} result is not supported`
         colour = 'gray'
     }
     const style = { fontSize: 50, color: colour, height: '33px' }

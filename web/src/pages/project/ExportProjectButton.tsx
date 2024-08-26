@@ -18,7 +18,7 @@ const extensionFromExportType = (exportType: ExportType) => {
         case ExportType.Json:
             return 'json'
         default:
-            return 'txt'
+            return 'csv'
     }
 }
 
@@ -52,7 +52,9 @@ export const ProjectExportButton: React.FunctionComponent<{
                 const link = document.createElement('a')
                 link.href = url
                 const ext = extensionFromExportType(_exportType)
-                const defaultFilename = `project-export-${projectName}.${ext}`
+                // {connection.project}-project-summary-{connection.author}-{date.today().isoformat()
+                const today = new Date().toISOString().split('T')[0]
+                const defaultFilename = `${projectName}-export-project-summary-${today}.${ext}`
                 link.setAttribute(
                     'download',
                     resp.headers['content-disposition']?.split('=')?.[1] || defaultFilename

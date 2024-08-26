@@ -9,6 +9,8 @@ export type DictEditorInput = { [key: string]: InputValue } | string
 
 interface DictEditorProps {
     input: DictEditorInput
+    height?: string
+    readonly?: boolean
     onChange: (json: object) => void
 }
 
@@ -38,7 +40,12 @@ const parseString = (str: string) => {
     }
 }
 
-export const DictEditor: React.FunctionComponent<DictEditorProps> = ({ input, onChange }) => {
+export const DictEditor: React.FunctionComponent<DictEditorProps> = ({
+    input,
+    onChange,
+    height,
+    readonly,
+}) => {
     const [textValue, setInnerTextValue] = React.useState<string>(getStringFromValue(input))
     const theme = React.useContext(ThemeContext)
 
@@ -75,13 +82,15 @@ export const DictEditor: React.FunctionComponent<DictEditorProps> = ({ input, on
         >
             <Editor
                 value={textValue}
-                height="200px"
+                height={height || '200px'}
                 theme={theme.theme === 'dark-mode' ? 'vs-dark' : 'vs-light'}
                 language="yaml"
                 onChange={(value) => handleChange(value || '')}
                 options={{
                     minimap: { enabled: false },
                     automaticLayout: true,
+                    readOnly: readonly,
+                    scrollBeyondLastLine: false,
                 }}
             />
             {error && (
@@ -89,11 +98,13 @@ export const DictEditor: React.FunctionComponent<DictEditorProps> = ({ input, on
                     <em style={{ color: 'var(--color-text-red)' }}>{error}</em>
                 </p>
             )}
-            <p>
-                <Button onClick={submit} disabled={!!error}>
-                    Apply
-                </Button>
-            </p>
+            {!readonly && (
+                <p>
+                    <Button onClick={submit} disabled={!!error}>
+                        Apply
+                    </Button>
+                </p>
+            )}
         </div>
     )
 }

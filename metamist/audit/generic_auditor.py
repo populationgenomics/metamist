@@ -137,7 +137,7 @@ class GenericAuditor(AuditHelper):
 
     @staticmethod
     def get_most_recent_analyses_by_sg(
-        analyses_list: list[dict[str, Any]]
+        analyses_list: list[dict[str, Any]],
     ) -> dict[str, dict[str, Any]]:
         """
         Takes a list of completed analyses for a number of sequencing groups and returns the latest

@@ -23,6 +23,7 @@ This script will:
 Noting, this script WILL modify the database, it's not easy to generate
 a list of SQL statements to run, because the script requires inserted IDS.
 """
+
 import asyncio
 import json
 from collections import defaultdict
@@ -355,9 +356,9 @@ ORDER BY sg.sample_id DESC;
     sequencing_group_ids_of_duplicate_samples = await connection.fetch_all(
         sequencing_group_ids_of_duplicate_samples_query
     )
-    duplicate_sg_id_map: Dict[
-        SampleId, Dict[SequenceType, SequenceGroupId]
-    ] = defaultdict(dict)
+    duplicate_sg_id_map: Dict[SampleId, Dict[SequenceType, SequenceGroupId]] = (
+        defaultdict(dict)
+    )
     for row in sequencing_group_ids_of_duplicate_samples:
         duplicate_sg_id_map[row['sample_id']][row['type']] = row['id']
 

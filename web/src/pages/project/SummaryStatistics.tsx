@@ -1,5 +1,5 @@
 import * as React from 'react'
-import _ from 'lodash'
+import capitalize from 'lodash/capitalize'
 import { Table as SUITable } from 'semantic-ui-react'
 import Table from '../../shared/components/Table'
 
@@ -29,7 +29,7 @@ const SummaryStatistics: React.FunctionComponent<SummaryStatisticsProps> = ({
                 {statsEntries.map(([key, value]) => (
                     <React.Fragment key={`${key}-${projectName}`}>
                         <SUITable.Row>
-                            <SUITable.Cell>{_.capitalize(key)}</SUITable.Cell>
+                            <SUITable.Cell>{capitalize(key)}</SUITable.Cell>
                             {Object.entries(value).map(([k1, v1]) => (
                                 <SUITable.Cell key={`${key}-${k1}-${projectName}`}>
                                     {`${v1}`}

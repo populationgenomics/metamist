@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Table as SUITable } from 'semantic-ui-react'
-import _ from 'lodash'
+import capitalize from 'lodash/capitalize'
 import Table from './Table'
 
 import { GraphQlSample } from '../../__generated__/graphql'
@@ -13,7 +13,7 @@ const SampleInfo: React.FunctionComponent<{
             {Object.entries(sample).map(([key, value]) => (
                 <SUITable.Row key={`${key}-${value}`}>
                     <SUITable.Cell>
-                        <b>{_.capitalize(key)}</b>
+                        <b>{capitalize(key)}</b>
                     </SUITable.Cell>
                     <SUITable.Cell>{value?.toString() ?? <em>no value</em>}</SUITable.Cell>
                 </SUITable.Row>

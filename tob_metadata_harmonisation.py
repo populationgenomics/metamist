@@ -7,6 +7,7 @@ If the field is in the dictionary but the value is None, the field is not added 
 If the field is in the dictionary and the value is not None, the field is added to the new_assay_data dictionary with the new field name as the key and the value as the value.
 If there are multiple mappings to the same field, the value is compared to the value already in the new_assay_data dictionary. If the values are different, the field is printed to the console.
 """
+
 from typing import Dict
 
 from metamist.apis import AssayApi

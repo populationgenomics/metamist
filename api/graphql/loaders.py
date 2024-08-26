@@ -62,6 +62,7 @@ class LoaderKeys(enum.Enum):
     SAMPLES_FOR_IDS = 'samples_for_ids'
     SAMPLES_FOR_PARTICIPANTS = 'samples_for_participants'
     SAMPLES_FOR_PROJECTS = 'samples_for_projects'
+    SAMPLES_FOR_PARENTS = 'samples_for_parents'
 
     PHENOTYPES_FOR_PARTICIPANTS = 'phenotypes_for_participants'
 
@@ -297,6 +298,21 @@ async def load_samples_for_projects(
     samples = await SampleLayer(connection).query(filter)
     samples_by_project = group_by(samples, lambda s: s.project)
     return samples_by_project
+
+
+@connected_data_loader_with_params(LoaderKeys.SAMPLES_FOR_PARENTS, default_factory=list)
+async def load_nested_samples_for_parents(
+    connection: Connection, ids: list[int], filter_: SampleFilter
+):
+    """
+    DataLoader: get_nested_samples_for_parents
+    """
+    filter_ = copy.copy(filter_)
+
+    filter_.sample_parent_id = GenericFilter(in_=ids)
+    samples = await SampleLayer(connection).query(filter_)
+    samples_by_parent = group_by(samples, lambda s: s.sample_parent_id)
+    return samples_by_parent
 
 
 @connected_data_loader(LoaderKeys.PARTICIPANTS_FOR_IDS)

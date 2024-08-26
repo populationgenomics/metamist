@@ -1,6 +1,6 @@
 import * as React from 'react'
 
-import _ from 'lodash'
+import get from 'lodash/get'
 import { TableCell, TableRow } from 'semantic-ui-react'
 import FamilyLink from '../../shared/components/links/FamilyLink'
 import SampleLink from '../../shared/components/links/SampleLink'
@@ -86,7 +86,7 @@ const FamilyCells: React.FC<{
                           </FamilyLink>
                       ))
                     : participant.families
-                          .map((fam) => sanitiseValue(_.get(fam, field.key)))
+                          .map((fam) => sanitiseValue(get(fam, field.key)))
                           .join(', ')}
             </TableCell>
         ))}
@@ -112,7 +112,7 @@ const ParticipantCells: React.FC<{
             >
                 {field.key == 'external_ids'
                     ? prepareExternalIds(participant.external_ids || {})
-                    : sanitiseValue(_.get(participant, field.key))}
+                    : sanitiseValue(get(participant, field.key))}
             </TableCell>
         ))}
     </>
@@ -187,7 +187,7 @@ export const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProp
                                                 : s.id}
                                         </SampleLink>
                                     ) : (
-                                        sanitiseValue(_.get(s, field.key))
+                                        sanitiseValue(get(s, field.key))
                                     )}
                                 </TableCell>
                             ))}
@@ -210,7 +210,7 @@ export const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProp
                                             {sanitiseValue(sg.id)}
                                         </SequencingGroupLink>
                                     ) : (
-                                        sanitiseValue(_.get(sg, field.key))
+                                        sanitiseValue(get(sg, field.key))
                                     )}
                                 </TableCell>
                             ))}
@@ -222,7 +222,7 @@ export const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProp
                                 }}
                                 key={`${s.id}-assay.${field.key || field.label}`}
                             >
-                                {sanitiseValue(_.get(assay, field.key))}
+                                {sanitiseValue(get(assay, field.key))}
                             </TableCell>
                         ))}
                     </TableRow>

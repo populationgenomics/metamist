@@ -1,5 +1,4 @@
 import * as React from 'react'
-import _ from 'lodash'
 import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
 import {
     StackedBarChart,

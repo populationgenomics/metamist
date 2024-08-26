@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # pylint: disable=broad-exception-caught,broad-exception-raised
-""" Daily back up function for databases within a local
-MariaDB instance """
+"""Daily back up function for databases within a local
+MariaDB instance"""
 
 import json
 import os
