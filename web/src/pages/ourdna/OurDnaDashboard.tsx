@@ -30,9 +30,11 @@ const GET_OURDNA_DASHBOARD = gql(`
                 collectionToProcessEndTime
                 collectionToProcessEndTime24h
                 collectionToProcessEndTimeStatistics
+                collectionToProcessEndTimeBucketStatistics
                 participantsConsentedNotCollected
                 participantsSignedNotConsented
                 processingTimesBySite
+                processingTimesByCollectionSite
                 samplesConcentrationGt1ug
                 samplesLostAfterCollection {
                     collectionLab
@@ -244,9 +246,7 @@ const Dashboard = () => {
                         <BarChart
                             header="Processing time per Collection Site"
                             data={data.project.ourdnaDashboard.processingTimesByCollectionSite}
-                            icon={
-                                <ClockIcon fill={ourdnaColours.yellow} style={{ ...iconStyle }} />
-                            }
+                            icon={<ClockIcon fill={ourdnaColours.green} style={{ ...iconStyle }} />}
                         />
                     </GridColumn>
                     <GridColumn width={6}>
