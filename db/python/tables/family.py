@@ -5,8 +5,7 @@ from typing import Any, Dict, List, Optional, Set
 from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
 from db.python.utils import NotFoundError, escape_like_term
-from models.models.family import FamilyInternal
-from models.models.project import ProjectId
+from models.models import PRIMARY_EXTERNAL_ORG, FamilyInternal, ProjectId
 
 
 @dataclasses.dataclass
@@ -303,36 +302,64 @@ VALUES (:project, :family_id, :name, :external_id, :audit_log_id)
         coded_phenotypes: List[Optional[str]],
         project: ProjectId | None = None,
     ):
-        """Upsert"""
-        updater = [
-            {
-                'description': descr,
-                'coded_phenotype': cph,
-                'audit_log_id': await self.audit_log_id(),
-                'project': project or self.project_id,
-            }
-            for descr, cph in zip(descriptions, coded_phenotypes)
-        ]
-
-        keys = list(updater[0].keys())
-        str_keys = ', '.join(keys)
-        placeholder_keys = ', '.join(f':{k}' for k in keys)
-
-        update_only_keys = [k for k in keys if k not in ('external_id', 'project')]
-        str_uo_placeholder_keys = ', '.join(f'{k} = :{k}' for k in update_only_keys)
-
-        _query = f"""\
-INSERT INTO family
-    ({str_keys})
-VALUES
-    ({placeholder_keys})
-ON DUPLICATE KEY UPDATE
-    {str_uo_placeholder_keys}
         """
+        Upsert several families.
+        At present, this function only supports upserting the primary external id.
+        """
+        audit_log_id = await self.audit_log_id()
 
-        await self.connection.execute_many(_query, updater)
+        for eid, descr, cph in zip(external_ids, descriptions, coded_phenotypes):
+            existing_id = await self.connection.fetch_val(
+                """
+                SELECT family_id FROM family_external_id
+                WHERE project = :project AND external_id = :external_id
+                """,
+                {'project': project or self.project_id, 'external_id': eid},
+            )
 
-        print(f'Need to insert {external_ids} into family_external_id')  # FIXME
+            if existing_id is None:
+                new_id = await self.connection.fetch_val(
+                    """
+                    INSERT INTO family (project, description, coded_phenotype, audit_log_id)
+                    VALUES (:project, :description, :coded_phenotype, :audit_log_id)
+                    RETURNING id
+                    """,
+                    {
+                        'project': project or self.project_id,
+                        'description': descr,
+                        'coded_phenotype': cph,
+                        'audit_log_id': audit_log_id,
+                    },
+                )
+                await self.connection.execute(
+                    """
+                    INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
+                    VALUES (:project, :family_id, :name, :external_id, :audit_log_id)
+                    """,
+                    {
+                        'project': project or self.project_id,
+                        'family_id': new_id,
+                        'name': PRIMARY_EXTERNAL_ORG,
+                        'external_id': eid,
+                        'audit_log_id': audit_log_id,
+                    },
+                )
+
+            else:
+                await self.connection.execute(
+                    """
+                    UPDATE family
+                    SET description = :description, coded_phenotype = :coded_phenotype,
+                        audit_log_id = :audit_log_id
+                    WHERE id = :id
+                    """,
+                    {
+                        'id': existing_id,
+                        'description': descr,
+                        'coded_phenotype': cph,
+                        'audit_log_id': audit_log_id,
+                    },
+                )
 
         return True
 

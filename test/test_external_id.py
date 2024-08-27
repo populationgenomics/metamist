@@ -2,7 +2,9 @@ from test.testbase import DbIsolatedTest, run_as_sync
 
 from pymysql.err import IntegrityError
 
+from db.python.filters import GenericFilter
 from db.python.layers import FamilyLayer, ParticipantLayer, SampleLayer
+from db.python.tables.family import FamilyFilter
 from db.python.utils import NotFoundError
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
@@ -423,3 +425,58 @@ class TestSample(DbIsolatedTest):
         self.assertDictEqual(result[1].meta, {'foo': 'bar'})
         self.assertDictEqual(result[2].meta, {'foo': 'bar', 'fruit': 'banana'})
         self.assertDictEqual(result[2].meta, sample.meta)
+
+
+class TestFamily(DbIsolatedTest):
+    """Test family external ids"""
+
+    @run_as_sync
+    async def setUp(self):
+        super().setUp()
+        self.flayer = FamilyLayer(self.connection)
+
+    @run_as_sync
+    async def test_import_families(self):
+        """Exercise import_families() method"""
+        await self.flayer.import_families(
+            ['familyid', 'description', 'phenotype'],
+            [
+                ['Smith', 'Blacksmiths', 'burnt'],
+                ['Jones', 'From Wales', 'sings well'],
+                ['Taylor', 'Post Norman', 'sews'],
+            ],
+        )
+
+        result = await self.flayer.query(
+            FamilyFilter(project=GenericFilter(eq=self.project_id))
+        )
+        self.assertEqual(len(result), 3)
+        family = {f.external_ids[PRIMARY_EXTERNAL_ORG]: f for f in result}
+        self.assertEqual(family['Smith'].description, 'Blacksmiths')
+        self.assertEqual(family['Smith'].coded_phenotype, 'burnt')
+        self.assertEqual(family['Jones'].description, 'From Wales')
+        self.assertEqual(family['Jones'].coded_phenotype, 'sings well')
+        self.assertEqual(family['Taylor'].description, 'Post Norman')
+        self.assertEqual(family['Taylor'].coded_phenotype, 'sews')
+
+        await self.flayer.import_families(
+            ['familyid', 'description', 'phenotype'],
+            [
+                ['Smith', 'Goldsmiths actually', 'gilt'],
+                ['Brown', 'From Jamaica', 'brunette'],
+            ],
+        )
+
+        result = await self.flayer.query(
+            FamilyFilter(project=GenericFilter(eq=self.project_id))
+        )
+        self.assertEqual(len(result), 4)
+        family = {f.external_ids[PRIMARY_EXTERNAL_ORG]: f for f in result}
+        self.assertEqual(family['Smith'].description, 'Goldsmiths actually')
+        self.assertEqual(family['Smith'].coded_phenotype, 'gilt')
+        self.assertEqual(family['Brown'].description, 'From Jamaica')
+        self.assertEqual(family['Brown'].coded_phenotype, 'brunette')
+        self.assertEqual(family['Jones'].description, 'From Wales')
+        self.assertEqual(family['Jones'].coded_phenotype, 'sings well')
+        self.assertEqual(family['Taylor'].description, 'Post Norman')
+        self.assertEqual(family['Taylor'].coded_phenotype, 'sews')
