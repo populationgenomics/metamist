@@ -11,7 +11,7 @@ interface DictEditorProps {
     input: DictEditorInput
     height?: string
     readonly?: boolean
-    onChange: (json: object) => void
+    onChange?: (json: object) => void
 }
 
 const getStringFromValue = (input: DictEditorInput) => {
@@ -68,7 +68,7 @@ export const DictEditor: React.FunctionComponent<DictEditorProps> = ({
     const submit = () => {
         try {
             const newJson = parseString(textValue)
-            onChange(newJson)
+            onChange?.(newJson)
         } catch (e: any) {
             setError(e.message)
         }

@@ -4,5 +4,6 @@ export interface LinkProps {
     id: string
     projectName: string
     sg_id?: string
-    children: React.ReactNode
+    children?: React.ReactNode
+    onClick?: React.MouseEventHandler<HTMLAnchorElement> | undefined
 }

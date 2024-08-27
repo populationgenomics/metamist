@@ -56,7 +56,9 @@ query EnumsQuery {
 )
 
 
-async def main(ped_path=default_ped_location, project='greek-myth'):
+async def main(
+    ped_path=default_ped_location, project='greek-myth', sample_prefix='GRK'
+):
     """Doing the generation for you"""
 
     papi = ProjectApi()
@@ -131,7 +133,9 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
         nsamples = generate_random_number_within_distribution()
         for _ in range(nsamples):
             sample = SampleUpsert(
-                external_ids={PRIMARY_EXTERNAL_ORG: f'GRK{sample_id_index}'},
+                external_ids={
+                    PRIMARY_EXTERNAL_ORG: f'{sample_prefix}{sample_id_index}'
+                },
                 type=random.choice(sample_types),
                 meta={
                     'collection_date': datetime.datetime.now()
@@ -207,6 +211,7 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
         )
         for s in sequencing_group_ids
     ]
+
     ar_entries_inserted = len(
         await asyncio.gather(
             *[
@@ -264,5 +269,6 @@ if __name__ == '__main__':
         help='Path to the pedigree file',
     )
     parser.add_argument('--project', type=str, default='greek-myth')
+    parser.add_argument('--sample-prefix', type=str, default='GRK')
     args = vars(parser.parse_args())
     asyncio.new_event_loop().run_until_complete(main(**args))

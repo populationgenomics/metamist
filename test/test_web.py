@@ -1,5 +1,4 @@
 import unittest
-from test.testbase import DbIsolatedTest, run_as_sync
 from typing import Any
 
 from api.routes.web import (
@@ -43,6 +42,7 @@ from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
     sequencing_group_id_transform_to_raw,
 )
+from test.testbase import DbIsolatedTest, run_as_sync
 
 default_assay_meta = {
     'sequencing_type': 'genome',
@@ -130,6 +130,9 @@ DEFAULT_SAMPLE_FIELDS = [
         label='Parent Sample ID',
         is_visible=False,
         filter_key='sample_root_id',
+    ),
+    ProjectParticipantGridField(
+        key='type', label='Type', is_visible=True, filter_key=None, filter_types=None
     ),
     ProjectParticipantGridField(
         key='created_date',

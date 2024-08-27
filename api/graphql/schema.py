@@ -1393,6 +1393,18 @@ class Query:  # entry point to graphql.
             )
         return GraphQLAnalysisRunner.from_internal(analysis_runners[0])
 
+    @strawberry.field
+    async def analyses(
+        self,
+        info: Info[GraphQLContext, 'Query'],
+        id: GraphQLFilter[int],
+    ) -> list[GraphQLAnalysis]:
+        connection = info.context['connection']
+        analyses = await AnalysisLayer(connection).query(
+            AnalysisFilter(id=id.to_internal_filter())
+        )
+        return [GraphQLAnalysis.from_internal(a) for a in analyses]
+
 
 schema = strawberry.Schema(
     query=Query, mutation=None, extensions=[QueryDepthLimiter(max_depth=10)]

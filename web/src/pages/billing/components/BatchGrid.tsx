@@ -12,6 +12,7 @@ import { useQuery } from '@apollo/client'
 import { gql } from '../../../__generated__'
 import MuckTheDuck from '../../../shared/components/MuckTheDuck'
 import formatMoney from '../../../shared/utilities/formatMoney'
+import { getHailBatchURL } from '../../../shared/utilities/hailBatch'
 import { AnalysisCostRecord, AnalysisCostRecordBatch } from '../../../sm-api'
 import { BatchJobsTable } from './BatchJobGrid'
 import { CostBySkuRow, SeqGrpDisplay } from './BillingByAnalysisComponents'
@@ -27,10 +28,8 @@ interface IGenericCardData {
     }[]
 }
 
-const hailBatchUrl = 'https://batch.hail.populationgenomics.org.au/batches'
-
 const BatchUrlLink: React.FC<{ batch_id: string }> = ({ batch_id }) => (
-    <a href={`${hailBatchUrl}/${batch_id}`} rel="noopener noreferrer" target="_blank">
+    <a href={getHailBatchURL(batch_id)} rel="noopener noreferrer" target="_blank">
         BATCH ID: {batch_id}
     </a>
 )

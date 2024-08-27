@@ -4,6 +4,7 @@ import { Route, Routes as Switch } from 'react-router-dom'
 import SwaggerUI from 'swagger-ui-react'
 
 import ProjectsAdmin from './pages/admin/ProjectsAdmin'
+import { AnalysisViewPage } from './pages/analysis/AnalysisView'
 import {
     BillingCostByAnalysis,
     BillingCostByCategory,
@@ -14,10 +15,11 @@ import {
     BillingSeqrProp,
 } from './pages/billing'
 import DocumentationArticle from './pages/docs/Documentation'
-import FamilyView from './pages/family/FamilyView'
+import { FamilyPage } from './pages/family/FamilyView'
 import Details from './pages/insights/Details'
 import Summary from './pages/insights/Summary'
 import OurDnaDashboard from './pages/ourdna/OurDnaDashboard'
+import { ParticipantPage } from './pages/participant/ParticipantViewContainer'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
 import ProjectOverview from './pages/project/ProjectOverview'
 import SampleView from './pages/sample/SampleView'
@@ -26,6 +28,7 @@ import ErrorBoundary from './shared/utilities/errorBoundary'
 const Routes: React.FunctionComponent = () => (
     <Switch>
         <Route path="/" element={<DocumentationArticle articleid="index" />} />
+        {/* <Route path="/tt" element={<TangledTreeExamples />} /> */}
 
         <Route path="admin" element={<ProjectsAdmin />} />
         <Route
@@ -37,10 +40,10 @@ const Routes: React.FunctionComponent = () => (
             }
         />
         <Route
-            path="project/:projectName/participant/:participantName"
+            path="/participant/:participantId"
             element={
                 <ErrorBoundary>
-                    <SampleView />
+                    <ParticipantPage />
                 </ErrorBoundary>
             }
         />
@@ -103,7 +106,7 @@ const Routes: React.FunctionComponent = () => (
         <Route path="/documentation/:id?" element={<DocumentationArticle />} />
 
         <Route
-            path="sample/:sampleName/:sequencingGroupName?"
+            path="/sample/:sampleName/:sequencingGroupName?"
             element={
                 <ErrorBoundary>
                     <SampleView />
@@ -112,10 +115,19 @@ const Routes: React.FunctionComponent = () => (
         />
 
         <Route
-            path="/family/:familyID"
+            path="/family/:familyId"
             element={
                 <ErrorBoundary>
-                    <FamilyView />
+                    <FamilyPage />
+                </ErrorBoundary>
+            }
+        />
+
+        <Route
+            path="/analysis/:analysisId"
+            element={
+                <ErrorBoundary>
+                    <AnalysisViewPage />
                 </ErrorBoundary>
             }
         />
