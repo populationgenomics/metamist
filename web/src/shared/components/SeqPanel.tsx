@@ -22,7 +22,10 @@ const SeqPanel: React.FunctionComponent<{
                     <h3
                         style={{
                             display: 'inline',
-                            color: seq.id === highlighted ? 'red' : 'black',
+                            color:
+                                seq.id === highlighted
+                                    ? 'var(--color-text-red)'
+                                    : 'var(--color-text-primary)',
                         }}
                     >
                         Sequencing Group ID: {seq.id}
