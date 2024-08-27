@@ -198,6 +198,7 @@ blockquote {
     color: var(--color-text-primary);
 }
 
+.ui.card,
 .ui .card,
 .ui .segment {
     background: var(--color-bg-card);
