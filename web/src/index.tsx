@@ -16,7 +16,21 @@ const httpLink = createHttpLink({
 
 const client = new ApolloClient({
     link: httpLink,
-    cache: new InMemoryCache(),
+    cache: new InMemoryCache({
+        possibleTypes: {
+            // Not sure why apollo can't get this from the schema,
+            // but this is required so that fields on the union
+            // types are retrievable.
+            GraphQLCommentEntity: [
+                'GraphQLSample',
+                'GraphQLAssay',
+                'GraphQLSequencingGroup',
+                'GraphQLProject',
+                'GraphQLParticipant',
+                'GraphQLFamily',
+            ],
+        },
+    }),
 })
 
 const storedTheme = localStorage.getItem('theme') || 'light-mode'

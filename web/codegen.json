@@ -1,12 +1,14 @@
 {
     "schema": "schema.graphql",
-    "documents": "src/**/*.tsx",
+    "documents": "src/**/*.{tsx,ts,js,jsx}",
     "emitLegacyCommonJSImports": false,
     "generates": {
         "./src/__generated__/": {
             "preset": "client",
             "presetConfig": {
-                "gqlTagName": "gql"
+                "gqlTagName": "gql",
+                "fragmentMasking": false
+                
             }
         }
     },
