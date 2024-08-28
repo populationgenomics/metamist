@@ -12,6 +12,7 @@ import pulumi
 import pulumi_gcp as gcp
 
 from cpg_infra.abstraction.gcp import get_member_key
+from cpg_infra.driver import CPGInfrastructure
 from cpg_infra.plugin import CpgInfrastructurePlugin
 from cpg_infra.utils import archive_folder
 
@@ -261,19 +262,24 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                 }
             )
             retval = json.dumps(config.to_dict())
-            pulumi.warn(retval)
             return retval
 
+        def get_email_or_else(
+            email: str | gcp.serviceaccount.Account,
+        ) -> pulumi.Output[str] | str:
+            if isinstance(email, gcp.serviceaccount.Account):
+                return email.email
+            return email
+
         # do this in a few hits as pretty sure pulumi.Output collects don't chain
-        etl_accessors_emails: dict[str, pulumi.Output[str]] = {
-            k: v.email for k, v in self.etl_accessors.items()
-        }
         datasets_to_lookup_analysis_members_for = set(
             t.analysis_group_dataset
             for t in self.config.metamist.etl.by_type.values()
             if t.analysis_group_dataset
         )
-        members_for_datasets: dict[str, pulumi.Output[str]] = {
+        members_for_datasets: dict[
+            str, list[CPGInfrastructure.GroupProvider.Group.GroupMember]
+        ] = {
             dataset: self.infrastructure.group_provider.resolve_group_members(
                 self.infrastructure.dataset_infrastructures[dataset]
                 .clouds['gcp']
@@ -285,14 +291,16 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         pulumi_outputs_by_etl_type: dict[str, pulumi.Output[list[str]]] = {}
 
         for by_type, by_type_config in self.config.metamist.etl.by_type.items():
-            members: list[pulumi.Output[str]] = []
+            members: list[str | pulumi.Output[str]] = []
 
             for etl_member in by_type_config.accessors:
-                members.append(etl_accessors_emails[etl_member])
+                members.append(get_email_or_else(self.etl_accessors[etl_member]))
 
             if by_type_config.analysis_group_dataset:
                 members.extend(
-                    members_for_datasets[by_type_config.analysis_group_dataset]
+                    get_email_or_else(u.cloud_id)
+                    for u in members_for_datasets[by_type_config.analysis_group_dataset]
+                    if u.cloud_id
                 )
             # turns list[Pulumi.Output[str]] into Pulumi.Output[list[str]]
             pulumi_outputs_by_etl_type[by_type] = pulumi.Output.all(*members)
