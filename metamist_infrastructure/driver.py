@@ -11,6 +11,7 @@ from pathlib import Path
 import pulumi
 import pulumi_gcp as gcp
 
+from cpg_infra.abstraction.gcp import get_member_key
 from cpg_infra.driver import CPGInfrastructure
 from cpg_infra.plugin import CpgInfrastructurePlugin
 from cpg_infra.utils import archive_folder
@@ -249,7 +250,6 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         def map_accessors_to_new_body(accessors_by_type: dict[str, list[str]]) -> str:
             assert self.config.metamist
             assert self.config.metamist.etl
-            pulumi.warn(str(accessors_by_type))
 
             config = EtlConfig(
                 by_type={
@@ -262,7 +262,6 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                 }
             )
             retval = json.dumps(config.to_dict())
-            pulumi.warn(retval)
             return retval
 
         def get_email_or_else(
