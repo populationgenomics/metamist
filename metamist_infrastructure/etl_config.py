@@ -1,15 +1,13 @@
 import dataclasses
 from typing import Any
 
-from cpg_infra.config.deserializabledataclass import DeserializableDataclass
-
 
 @dataclasses.dataclass(frozen=True)
-class EtlConfig(DeserializableDataclass):
+class EtlConfig:
     """ETL Config output type"""
 
     @dataclasses.dataclass(frozen=True)
-    class EtlConfigType(DeserializableDataclass):
+    class EtlConfigType:
         """ETL config type"""
 
         parser_name: str
