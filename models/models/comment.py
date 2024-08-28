@@ -15,6 +15,14 @@ CommentEntityType = StrEnum(
 )
 
 
+# Timestamps in the db come back without a timezone attached but should be sent through
+# as UTC time, so add the timezone here so it is sent through to the client
+def assume_utc(time: datetime.datetime | None):
+    if time is None:
+        return None
+    return time.replace(tzinfo=datetime.timezone.utc)
+
+
 class CommentVersionInternal(SMBase):
     content: str
     author: str
@@ -54,7 +62,7 @@ class CommentInternal(SMBase):
         history = [
             CommentVersionInternal(
                 author=v.get('author'),
-                timestamp=v.get('timestamp'),
+                timestamp=assume_utc(v.get('timestamp')),
                 status=v.get('status'),
                 content=v.get('content'),
             )
@@ -69,8 +77,8 @@ class CommentInternal(SMBase):
             comment_entity_id=first_version.get('comment_entity_id'),
             content=last_version.get('content'),
             author=first_version.get('author'),
-            created_at=first_version.get('timestamp'),
-            updated_at=last_version.get('timestamp'),
+            created_at=assume_utc(first_version.get('timestamp')),
+            updated_at=assume_utc(last_version.get('timestamp')),
             thread=[],
             versions=history,
             status=last_version.get('status'),
