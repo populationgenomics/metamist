@@ -873,7 +873,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                 .analysis_group
             )
 
-        for name, account in accessors:
+        for name, account in accessors.items():
             gcp.cloudfunctionsv2.FunctionIamMember(
                 f'metamist-etl-accessor-{name}',
                 location=self.etl_extract_function.location,
