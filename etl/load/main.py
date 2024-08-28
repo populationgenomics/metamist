@@ -113,11 +113,13 @@ def process_rows(
 
     # get config from payload and merge with the default
     config = {}
-    if payload_config_data := row_json.get('config'):
-        config.update(payload_config_data)
+    record_data = row_json
+    if isinstance(row_json, dict):
+        if payload_config_data := row_json.get('config'):
+            config.update(payload_config_data)
 
-    # get data from payload or use payload as data
-    record_data = row_json.get('data', row_json)
+        # get data from payload or use payload as data
+        record_data = row_json.get('data', row_json)
 
     (parser_obj, err_msg) = get_parser_instance(
         submitting_user=submitting_user, request_type=source_type, init_params=config
