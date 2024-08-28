@@ -352,17 +352,10 @@ def get_parser_instance(
     # check that submitting_user has access to parser
 
     accessor_config: dict[
-        str,
+        Literal['by_type'],
         dict[
-            Literal['parsers'],
-            list[
-                dict[
-                    Literal['name']
-                    | Literal['parser_name']
-                    | Literal['default_parameters'],
-                    Any,
-                ]
-            ],
+            str,
+            dict[Literal['parser_name', 'default_parameters', 'users'], Any],
         ],
     ] = get_accessor_config()
 
@@ -371,26 +364,21 @@ def get_parser_instance(
             f'Submitting user {submitting_user} is not allowed to access any parsers'
         )
 
-    # find the config
-    etl_accessor_config = next(
-        (
-            accessor_config
-            for accessor_config in accessor_config[submitting_user].get('parsers', [])
-            if accessor_config['name'].strip(STRIP_CHARS)
-            == request_type.strip(STRIP_CHARS)
-        ),
-        None,
-    )
-    if not etl_accessor_config:
+    parser_config = accessor_config['by_type'].get(request_type)
+    if not parser_config:
+        return None, (
+            f'Submitting user {submitting_user} requested type {request_type}, '
+            'but was not available'
+        )
+
+    if submitting_user not in parser_config.get('users', []):
         return None, (
             f'Submitting user {submitting_user} is not allowed to access {request_type}'
         )
 
-    parser_name = (etl_accessor_config.get('parser_name') or request_type).strip(
-        STRIP_CHARS
-    )
+    parser_name = (parser_config.get('parser_name') or request_type).strip(STRIP_CHARS)
 
-    init_params.update(etl_accessor_config.get('default_parameters', {}))
+    init_params.update(parser_config.get('default_parameters', {}))
 
     parser_map = prepare_parser_map()
 
