@@ -19,6 +19,10 @@ export const COMMENT_FRAGMENT = gql(`
         updatedAt
         status
 
+        entity {
+            ... CommentEntityFragment
+        }
+
         versions {
             ... CommentVersionFragment
         }
@@ -30,21 +34,30 @@ export const COMMENT_ENTITY_FRAGMENT = gql(`
         __typename
         ... on GraphQLProject {
             projectId: id
+            projectName: name
         }
         ... on GraphQLSample {
             sampleId: id
         }
         ... on GraphQLSequencingGroup {
             sequencingGroupId: id
+            sample {
+                id
+            }
         }
         ... on GraphQLAssay {
             assayId: id
+            sample {
+                project {
+                    name
+                }
+            }
         }
         ... on GraphQLParticipant {
             participantId:id
         }
         ... on GraphQLFamily {
-            participantId: id
+            familyId: id
         }
     }    
 `)
@@ -53,21 +66,17 @@ export const DISCUSSION_FRAGMENT = gql(`
     fragment DiscussionFragment on GraphQLDiscussion {
         directComments {
             ... CommentFragment
+
             thread {
                 ... CommentFragment
-            }
-            entity {
-                ... CommentEntityFragment
             }
         }
 
         relatedComments {
             ... CommentFragment
+
             thread {
                 ... CommentFragment
-            }
-            entity {
-                ... CommentEntityFragment
             }
         }
     }

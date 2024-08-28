@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 
 import ProjectSelector, { IMetamistProject } from './ProjectSelector'
 
+import { SidePanel } from '../../shared/components/SidePanel'
+import { ProjectCommentsView } from '../comments/ProjectCommentsView'
 import { ProjectGridContainer } from './ProjectGridContainer'
 import { ProjectSummaryView } from './ProjectSummary'
 
@@ -23,11 +25,15 @@ const ProjectOverview: React.FunctionComponent = () => {
     )
     if (projectName) {
         body = (
-            <>
-                <ProjectSummaryView projectName={projectName} />
-
-                <ProjectGridContainer projectName={projectName} />
-            </>
+            <SidePanel
+                main={() => (
+                    <>
+                        <ProjectSummaryView projectName={projectName} />
+                        <ProjectGridContainer projectName={projectName} />
+                    </>
+                )}
+                side={() => <ProjectCommentsView projectName={projectName} />}
+            />
         )
     }
 

@@ -89,7 +89,6 @@ const FamilyCells: React.FC<{
                               <FamilyLink
                                   key={`family-${participant.id}-${f.id}`}
                                   id={`${f.id ?? ''}`}
-                                  projectName={projectName}
                                   onClick={(e) => {
                                       e.preventDefault()
                                       setShowFamilyModal(true)

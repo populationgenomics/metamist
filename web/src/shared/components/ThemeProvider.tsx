@@ -1,3 +1,4 @@
+import { createTheme, ThemeProvider as MuiThemeProvider } from '@mui/material/styles'
 import * as React from 'react'
 import { useMediaQuery } from 'react-responsive'
 
@@ -36,9 +37,23 @@ const ThemeProvider: React.FunctionComponent<{ children?: React.ReactNode }> = (
         setTheme(savedTheme)
     }, [savedTheme])
 
+    const muiTheme = createTheme({
+        palette: {
+            mode: savedTheme === 'dark-mode' ? 'dark' : 'light',
+        },
+        typography: {
+            fontFamily: `-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
+        'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif`,
+        },
+    })
+
     return (
         <div>
-            <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>
+            <MuiThemeProvider theme={muiTheme}>
+                <ThemeContext.Provider value={{ theme, toggleTheme }}>
+                    {children}
+                </ThemeContext.Provider>
+            </MuiThemeProvider>
         </div>
     )
 }
