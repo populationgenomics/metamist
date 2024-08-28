@@ -11,6 +11,7 @@ from pathlib import Path
 import pulumi
 import pulumi_gcp as gcp
 
+from cpg_infra.abstraction.gcp import get_member_key
 from cpg_infra.plugin import CpgInfrastructurePlugin
 from cpg_infra.utils import archive_folder
 
@@ -245,33 +246,58 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         assert self.config.metamist.etl
         assert self.config.metamist.etl.accessors
 
-        etl_accessor_config = {
-            k: v.to_dict() for k, v in self.config.metamist.etl.accessors.items()
-        }
-
-        def map_accessors_to_new_body(_accessors_map):
+        def map_accessors_to_new_body(accessors_by_type: dict[str, list[str]]) -> str:
             assert self.config.metamist
             assert self.config.metamist.etl
 
-            accessors: dict[str, str] = dict(_accessors_map)
-            # dict[gcp.serviceaccount.Account: dict[str, ]]
-            remapped = {accessors[k]: v for k, v in etl_accessor_config.items()}
-            EtlConfig(
+            config = EtlConfig(
                 by_type={
                     t: EtlConfig.EtlConfigType(
                         parser_name=config.parser_name,
-                        users=[accessors[u] for u in config.accessors],
+                        users=accessors_by_type.get(t, []),
                         default_parameters=config.default_parameters,
                     )
                     for t, config in self.config.metamist.etl.by_type.items()
                 }
             )
-            return json.dumps(remapped)
+            retval = json.dumps(config.to_dict())
+            pulumi.warn(retval)
+            return retval
 
+        # do this in a few hits as pretty sure pulumi.Output collects don't chain
         etl_accessors_emails: dict[str, pulumi.Output[str]] = {
             k: v.email for k, v in self.etl_accessors.items()
         }
-        remapped_with_id = pulumi.Output.all(**etl_accessors_emails).apply(
+        datasets_to_lookup_analysis_members_for = set(
+            t.analysis_group_dataset
+            for t in self.config.metamist.etl.by_type.values()
+            if t.analysis_group_dataset
+        )
+        members_for_datasets: dict[str, pulumi.Output[str]] = {
+            dataset: self.infrastructure.group_provider.resolve_group_members(
+                self.infrastructure.dataset_infrastructures[dataset]
+                .clouds['gcp']
+                .analysis_group
+            )
+            for dataset in datasets_to_lookup_analysis_members_for
+        }
+
+        pulumi_outputs_by_etl_type: dict[str, pulumi.Output[list[str]]] = {}
+
+        for by_type, by_type_config in self.config.metamist.etl.by_type.items():
+            members: list[pulumi.Output[str]] = []
+
+            for etl_member in by_type_config.accessors:
+                members.append(etl_accessors_emails[etl_member])
+
+            if by_type_config.analysis_group_dataset:
+                members.extend(
+                    members_for_datasets[by_type_config.analysis_group_dataset]
+                )
+            # turns list[Pulumi.Output[str]] into Pulumi.Output[list[str]]
+            pulumi_outputs_by_etl_type[by_type] = pulumi.Output.all(*members)
+
+        remapped_with_id = pulumi.Output.all(**pulumi_outputs_by_etl_type).apply(
             map_accessors_to_new_body
         )
         return gcp.secretmanager.SecretVersion(
@@ -829,14 +855,32 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         return fxn
 
     def _setup_metamist_etl_accessors(self):
-        for name, sa in self.etl_accessors.items():
+        assert self.config.metamist
+        assert self.config.metamist.etl
+
+        accessors = dict(self.etl_accessors)
+        # grab datasets
+        datasets_to_lookup_analysis_members_for = set(
+            t.analysis_group_dataset
+            for t in self.config.metamist.etl.by_type.values()
+            if t.analysis_group_dataset
+        )
+
+        for dataset in datasets_to_lookup_analysis_members_for:
+            accessors[f'{dataset}-analysis-group'] = (
+                self.infrastructure.dataset_infrastructures[dataset]
+                .clouds['gcp']
+                .analysis_group
+            )
+
+        for name, account in accessors:
             gcp.cloudfunctionsv2.FunctionIamMember(
                 f'metamist-etl-accessor-{name}',
                 location=self.etl_extract_function.location,
                 project=self.etl_extract_function.project,
                 cloud_function=self.etl_extract_function.name,
                 role='roles/cloudfunctions.invoker',
-                member=pulumi.Output.concat('serviceAccount:', sa.email),
+                member=get_member_key(account),
             )
 
             gcp.cloudrun.IamMember(
@@ -845,7 +889,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                 project=self.etl_extract_function.project,
                 service=self.etl_extract_function.name,  # it shared the name
                 role='roles/run.invoker',
-                member=pulumi.Output.concat('serviceAccount:', sa.email),
+                member=get_member_key(account),
             )
 
     @cached_property
