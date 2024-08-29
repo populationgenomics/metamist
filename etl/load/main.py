@@ -361,11 +361,6 @@ def get_parser_instance(
         ],
     ] = get_accessor_config()
 
-    if submitting_user not in accessor_config:
-        return None, (
-            f'Submitting user {submitting_user} is not allowed to access any parsers'
-        )
-
     parser_config = accessor_config['by_type'].get(request_type)
     if not parser_config:
         return None, (
