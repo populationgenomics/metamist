@@ -65,7 +65,12 @@ from models.models.comment import (
 )
 from models.models.family import PedRowInternal
 from models.models.ourdna import OurDNADashboard, OurDNALostSample
-from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
+from models.models.project import (
+    FullWriteAccessRoles,
+    ProjectId,
+    ProjectMemberRole,
+    ReadAccessRoles,
+)
 from models.models.sample import sample_id_transform_to_raw
 from models.utils.cohort_id_format import cohort_id_format, cohort_id_transform_to_raw
 from models.utils.cohort_template_id_format import (
@@ -277,7 +282,6 @@ class GraphQLDiscussion:
 
 @strawberry.type
 class GraphQLComment:
-
     id: int
     parentId: int | None
     content: str
@@ -355,6 +359,7 @@ class GraphQLProject:
     name: str
     dataset: str
     meta: strawberry.scalars.JSON
+    roles: list[strawberry.enum(ProjectMemberRole)]  # type: ignore
 
     @staticmethod
     def from_internal(internal: Project) -> 'GraphQLProject':
@@ -363,6 +368,7 @@ class GraphQLProject:
             name=internal.name,
             dataset=internal.dataset,
             meta=internal.meta,
+            roles=list(internal.roles),
         )
 
     @strawberry.field()
@@ -1272,12 +1278,36 @@ class GraphQLAnalysisRunner:
 
 
 @strawberry.type
+class GraphQLViewer:
+    """
+    The "Viewer" construct is the current user and contains information about the
+    current user and their permissions
+    """
+
+    username: str
+    projects: list[GraphQLProject]
+
+
+@strawberry.type
 class Query:  # entry point to graphql.
     """GraphQL Queries"""
 
     @strawberry.field()
     def enum(self, info: Info[GraphQLContext, 'Query']) -> GraphQLEnum:  # type: ignore
         return GraphQLEnum()
+
+    @strawberry.field()
+    async def viewer(
+        self,
+        info: Info[GraphQLContext, 'Query'],
+    ) -> GraphQLViewer:
+        connection = info.context['connection']
+        return GraphQLViewer(
+            username=connection.author,
+            projects=[
+                GraphQLProject.from_internal(p) for p in connection.all_projects()
+            ],
+        )
 
     @strawberry.field()
     async def cohort_templates(
