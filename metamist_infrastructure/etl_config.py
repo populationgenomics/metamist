@@ -20,12 +20,4 @@ class EtlConfig:
         """
         Convert the config to a dictionary
         """
-        return {k: dataclasses.asdict(v) for k, v in self.by_type.items()}
-
-    @classmethod
-    def from_dict(cls, data: dict[str, dict[str, Any]]) -> 'EtlConfig':
-        """
-        Create an EtlConfig from a dictionary
-        """
-        by_type = {k: cls.EtlConfigType(**v) for k, v in data.items()}
-        return cls(by_type=by_type)
+        return {'by_type': {k: dataclasses.asdict(v) for k, v in self.by_type.items()}}
