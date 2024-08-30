@@ -213,6 +213,53 @@ const Dashboard = () => {
                     <GridColumn width={6}>
                         <Grid stackable columns={1}>
                             <GridColumn>
+                                <StatTile
+                                    header="Collection to Processing by 24h buckets"
+                                    stats={[
+                                        {
+                                            value: `${data.project.ourdnaDashboard.collectionToProcessEndTimeBucketStatistics['24h']}`,
+                                            units: '24 hours',
+                                            unitsColour: 'ourdna-green-transparent',
+                                        },
+                                        {
+                                            value: `${data.project.ourdnaDashboard.collectionToProcessEndTimeBucketStatistics['48h']}`,
+                                            units: '48 hours',
+                                            unitsColour: 'ourdna-red-transparent',
+                                        },
+                                        {
+                                            value: `${data.project.ourdnaDashboard.collectionToProcessEndTimeBucketStatistics['72h']}`,
+                                            units: '72 hours',
+                                            unitsColour: 'ourdna-blue-transparent',
+                                        },
+                                        {
+                                            value: `${data.project.ourdnaDashboard.collectionToProcessEndTimeBucketStatistics['>72h']}`,
+                                            units: '> 72 hours',
+                                            unitsColour: 'ourdna-yellow-transparent',
+                                        },
+                                    ]}
+                                    description="Count of samples processed within each 24h bucket."
+                                    icon={
+                                        <TruckIcon
+                                            fill={ourdnaColours.green}
+                                            style={{ ...iconStyle }}
+                                        />
+                                    }
+                                />
+                            </GridColumn>
+                        </Grid>
+                    </GridColumn>
+                </GridRow>
+                <GridRow centered>
+                    <GridColumn width={10}>
+                        <BarChart
+                            header="Processing time per Collection Site"
+                            data={data.project.ourdnaDashboard.processingTimesByCollectionSite}
+                            icon={<ClockIcon fill={ourdnaColours.green} style={{ ...iconStyle }} />}
+                        />
+                    </GridColumn>
+                    <GridColumn width={6}>
+                        <Grid stackable columns={1}>
+                            <GridColumn>
                                 <TableTile
                                     header="Viable Long Read"
                                     data={data.project.ourdnaDashboard.samplesConcentrationGt1ug}
@@ -238,21 +285,6 @@ const Dashboard = () => {
                                     }
                                 />
                             </GridColumn>
-                        </Grid>
-                    </GridColumn>
-                </GridRow>
-                <GridRow centered>
-                    <GridColumn width={10}>
-                        <BarChart
-                            header="Processing time per Collection Site"
-                            data={data.project.ourdnaDashboard.processingTimesByCollectionSite}
-                            icon={<ClockIcon fill={ourdnaColours.green} style={{ ...iconStyle }} />}
-                        />
-                    </GridColumn>
-                    <GridColumn width={6}>
-                        <Grid stackable columns={1}>
-                            <GridColumn></GridColumn>
-                            <GridColumn></GridColumn>
                         </Grid>
                     </GridColumn>
                 </GridRow>
