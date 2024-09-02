@@ -52,3 +52,15 @@ jobs:
 
       - name: pre-commit
         run: pre-commit run --all-files
+
+      - name: 'check frontend formatting'
+        run: |
+          set -eo pipefail
+          pushd web
+          # installs package-lock, not what it thinks it should be
+          npm ci
+          npm run format-check
+          rc=$?
+
+          echo "web_rc=$rc" >> $GITHUB_OUTPUT
+          popd
