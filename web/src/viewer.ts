@@ -1,4 +1,4 @@
-import { useQuery } from '@apollo/client'
+import { ApolloError, useQuery } from '@apollo/client'
 import { createContext } from 'react'
 import { gql } from './__generated__/gql'
 import { ProjectMemberRole, ViewerQueryQuery } from './__generated__/graphql'
@@ -64,11 +64,16 @@ class Viewer {
 
 export const ViewerContext = createContext<Viewer | null>(null)
 
-export function useViewer(): Viewer | null {
-    const { data, error } = useQuery(VIEWER_QUERY)
-    // @TODO add better error handling here?
-    if (error) console.error(`Error getting auth info :${error}`)
-    if (!data) return null
+export function useViewer(): {
+    viewer: Viewer | null
+    loading: boolean
+    error: ApolloError | undefined
+} {
+    const { data, loading, error } = useQuery(VIEWER_QUERY)
 
-    return new Viewer(data.viewer)
+    return {
+        loading,
+        error,
+        viewer: data ? new Viewer(data.viewer) : null,
+    }
 }
