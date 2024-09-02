@@ -1,15 +1,9 @@
 import orderBy from 'lodash/orderBy'
 import * as React from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import {
-    Button,
-    Checkbox,
-    DropdownProps,
-    Grid,
-    Message,
-    Table as SUITable,
-} from 'semantic-ui-react'
+import { Button, Checkbox, Grid, Message, Table as SUITable } from 'semantic-ui-react'
 import { HorizontalStackedBarChart } from '../../shared/components/Graphs/HorizontalStackedBarChart'
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import Table from '../../shared/components/Table'
 import { convertFieldName } from '../../shared/utilities/fieldName'
 import generateUrl from '../../shared/utilities/generateUrl'
@@ -499,4 +493,10 @@ const BillingCurrentCost = () => {
     )
 }
 
-export default BillingCurrentCost
+export default function BillingCurrentCostPage() {
+    return (
+        <PaddedPage>
+            <BillingCurrentCost />
+        </PaddedPage>
+    )
+}

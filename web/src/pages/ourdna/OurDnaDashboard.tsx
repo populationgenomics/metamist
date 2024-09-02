@@ -1,18 +1,11 @@
 import { useQuery } from '@apollo/client'
 import { Container, Grid, GridColumn, GridRow } from 'semantic-ui-react'
 import { gql } from '../../__generated__'
-
-import StatTile from '../../shared/components/ourdna/StatTile'
-import TableTile from '../../shared/components/ourdna/TableTile'
-import Tile from '../../shared/components/ourdna/Tile'
-
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import MuckError from '../../shared/components/MuckError'
 import BarChart from '../../shared/components/ourdna/BarChart'
 import { ourdnaColours } from '../../shared/components/ourdna/Colours'
-import OurDonutChart from '../../shared/components/ourdna/OurDonutChart'
-import OurDNALogo from '../../shared/components/OurDNALogo'
-
 import AlarmIcon from '../../shared/components/ourdna/dashboardIcons/AlarmIcon'
 import BloodSampleIcon from '../../shared/components/ourdna/dashboardIcons/BloodSampleIcon'
 import ClipboardIcon from '../../shared/components/ourdna/dashboardIcons/ClipboardIcon'
@@ -21,6 +14,11 @@ import RocketIcon from '../../shared/components/ourdna/dashboardIcons/RocketIcon
 import SyringeIcon from '../../shared/components/ourdna/dashboardIcons/SyringeIcon'
 import TestTubeIcon from '../../shared/components/ourdna/dashboardIcons/TestTubeIcon'
 import TruckIcon from '../../shared/components/ourdna/dashboardIcons/TruckIcon'
+import OurDonutChart from '../../shared/components/ourdna/OurDonutChart'
+import StatTile from '../../shared/components/ourdna/StatTile'
+import TableTile from '../../shared/components/ourdna/TableTile'
+import Tile from '../../shared/components/ourdna/Tile'
+import OurDNALogo from '../../shared/components/OurDNALogo'
 
 const GET_OURDNA_DASHBOARD = gql(`
     query DashboardQuery($project: String!) {
@@ -292,4 +290,10 @@ const Dashboard = () => {
     )
 }
 
-export default Dashboard
+export default function DashboardPage() {
+    return (
+        <PaddedPage>
+            <Dashboard />
+        </PaddedPage>
+    )
+}

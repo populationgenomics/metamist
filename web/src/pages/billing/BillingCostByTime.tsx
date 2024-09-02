@@ -1,6 +1,14 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, DropdownProps, Grid, Input, Message } from 'semantic-ui-react'
+import { Button, Card, Grid, Input, Message } from 'semantic-ui-react'
+import { BarChart, IData } from '../../shared/components/Graphs/BarChart'
+import { DonutChart } from '../../shared/components/Graphs/DonutChart'
+import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
+import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
+import { convertFieldName } from '../../shared/utilities/fieldName'
+import generateUrl from '../../shared/utilities/generateUrl'
+import { getMonthEndDate, getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
 import {
     BillingApi,
     BillingColumn,
@@ -8,17 +16,9 @@ import {
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 } from '../../sm-api'
+import BillingCostByTimeTable from './components/BillingCostByTimeTable'
 import CostByTimeChart from './components/CostByTimeChart'
 import FieldSelector from './components/FieldSelector'
-
-import { BarChart, IData } from '../../shared/components/Graphs/BarChart'
-import { DonutChart } from '../../shared/components/Graphs/DonutChart'
-import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
-import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
-import { convertFieldName } from '../../shared/utilities/fieldName'
-import generateUrl from '../../shared/utilities/generateUrl'
-import { getMonthEndDate, getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
-import BillingCostByTimeTable from './components/BillingCostByTimeTable'
 
 const BillingCostByTime: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
@@ -336,7 +336,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
     }, [start, end, groupBy, selectedData])
 
     return (
-        <>
+        <PaddedPage>
             <Card fluid style={{ padding: '20px' }} id="billing-container">
                 <h1
                     style={{
@@ -395,7 +395,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
             {messageComponent()}
 
             {dataComponent()}
-        </>
+        </PaddedPage>
     )
 }
 

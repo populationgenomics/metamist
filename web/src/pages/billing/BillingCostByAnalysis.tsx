@@ -2,13 +2,12 @@ import SearchIcon from '@mui/icons-material/Search'
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Dropdown, Grid, Input, Message } from 'semantic-ui-react'
-
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
-import { AnalysisCostRecord, BillingApi } from '../../sm-api'
-import BatchGrid from './components/BatchGrid'
-
 import generateUrl from '../../shared/utilities/generateUrl'
 import { getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
+import { AnalysisCostRecord, BillingApi } from '../../sm-api'
+import BatchGrid from './components/BatchGrid'
 
 enum SearchType {
     Ar_guid,
@@ -254,12 +253,12 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
     }
 
     return (
-        <>
+        <PaddedPage>
             {searchCard()}
             {errorComponent()}
             {loadingComponent()}
             {dataComponent()}
-        </>
+        </PaddedPage>
     )
 }
 

@@ -1,6 +1,11 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Checkbox, Grid, Input, Message } from 'semantic-ui-react'
+import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
+import { convertFieldName } from '../../shared/utilities/fieldName'
+import generateUrl from '../../shared/utilities/generateUrl'
+import { getMonthEndDate, getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
 import {
     BillingApi,
     BillingColumn,
@@ -11,12 +16,6 @@ import {
 import CostByTimeBarChart from './components/CostByTimeBarChart'
 import FieldSelector from './components/FieldSelector'
 
-import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
-import { convertFieldName } from '../../shared/utilities/fieldName'
-import generateUrl from '../../shared/utilities/generateUrl'
-import { getMonthEndDate, getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
-
-/* eslint-disable @typescript-eslint/no-explicit-any  -- too many anys in the file to fix right now but would be good to sort out when we can */
 const BillingCostByCategory: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
 
@@ -293,6 +292,12 @@ const BillingCostByCategory: React.FunctionComponent = () => {
     )
 }
 
-export default BillingCostByCategory
+export default function BillingCostByCategoryPage() {
+    return (
+        <PaddedPage>
+            <BillingCostByCategory />
+        </PaddedPage>
+    )
+}
 
 /* eslint-enable @typescript-eslint/no-explicit-any   */

@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Card, Grid, Input } from 'semantic-ui-react'
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import generateUrl from '../../shared/utilities/generateUrl'
 import { getMonthEndDate } from '../../shared/utilities/monthStartEndDate'
 import SeqrProportionalMapGraph from './components/SeqrProportionalMapGraph'
@@ -60,4 +61,10 @@ const BillingSeqrProp: React.FunctionComponent = () => {
     )
 }
 
-export default BillingSeqrProp
+export default function BillingSeqrPropPage() {
+    return (
+        <PaddedPage>
+            <BillingSeqrPropPage />
+        </PaddedPage>
+    )
+}
