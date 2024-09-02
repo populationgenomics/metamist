@@ -1,6 +1,6 @@
+import * as d3 from 'd3'
 import * as React from 'react'
 import { Card, Container } from 'semantic-ui-react'
-import * as d3 from 'd3'
 
 import { ourdnaColours } from './Colours'
 

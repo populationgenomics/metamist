@@ -1,7 +1,7 @@
 import * as React from 'react'
 
-import { Accordion } from 'semantic-ui-react'
 import ScienceRoundedIcon from '@mui/icons-material/ScienceRounded'
+import { Accordion } from 'semantic-ui-react'
 import { GraphQlSequencingGroup } from '../../__generated__/graphql'
 import iconStyle from '../iconStyle'
 import { DeepPartial } from '../utilities/deepPartial'

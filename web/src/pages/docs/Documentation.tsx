@@ -1,11 +1,11 @@
 import * as React from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 
 import Markdown from 'react-markdown'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { dracula, vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import remarkGfm from 'remark-gfm'
 import remarkToc from 'remark-toc'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { vs, dracula } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
 
 interface IDocumentationArticleProps {

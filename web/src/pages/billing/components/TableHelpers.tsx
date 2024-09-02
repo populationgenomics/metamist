@@ -1,5 +1,5 @@
 import range from 'lodash/range'
-import { Table as SUITable, Card, Checkbox } from 'semantic-ui-react'
+import { Checkbox, Table as SUITable } from 'semantic-ui-react'
 
 interface ICheckboxRowProps {
     isChecked: boolean

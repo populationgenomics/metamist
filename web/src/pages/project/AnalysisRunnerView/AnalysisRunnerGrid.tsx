@@ -1,11 +1,11 @@
-import * as React from 'react'
-import { Table as SUITable, Popup, Checkbox, Button, Label, Icon } from 'semantic-ui-react'
 import get from 'lodash/get'
+import * as React from 'react'
+import { Button, Checkbox, Icon, Label, Popup, Table as SUITable } from 'semantic-ui-react'
 import Table from '../../../shared/components/Table'
 import sanitiseValue from '../../../shared/utilities/sanitiseValue'
 
-import { Filter } from './Filter'
 import './AnalysisGrid.css'
+import { Filter } from './Filter'
 
 export interface AnalysisRunnerGridItem {
     arGuid: string

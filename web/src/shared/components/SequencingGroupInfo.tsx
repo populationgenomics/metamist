@@ -2,10 +2,10 @@ import * as React from 'react'
 import { Table as SUITable } from 'semantic-ui-react'
 
 import capitalize from 'lodash/capitalize'
-import { GraphQlSequencingGroup, GraphQlAssay } from '../../__generated__/graphql'
-import Table from './Table'
+import { GraphQlAssay, GraphQlSequencingGroup } from '../../__generated__/graphql'
 import { DeepPartial } from '../utilities/deepPartial'
 import AssayInfo from './AssayInfo'
+import Table from './Table'
 
 const excludedSequencingGroupFields = ['id', '__typename']
 

@@ -4,7 +4,6 @@ import { Button, Card, Checkbox, Grid, Input, Message } from 'semantic-ui-react'
 import {
     BillingApi,
     BillingColumn,
-    BillingCostBudgetRecord,
     BillingTimePeriods,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,

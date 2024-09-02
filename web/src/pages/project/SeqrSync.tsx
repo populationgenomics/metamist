@@ -1,8 +1,8 @@
-import * as React from 'react'
 import capitalize from 'lodash/capitalize'
+import * as React from 'react'
 import { Button, CheckboxProps, DropdownProps, Form, Message, Modal } from 'semantic-ui-react'
-import { SeqrDatasetType, WebApi } from '../../sm-api'
 import MuckTheDuck from '../../shared/components/MuckTheDuck'
+import { SeqrDatasetType, WebApi } from '../../sm-api'
 
 interface SeqrSyncProps {
     project: string

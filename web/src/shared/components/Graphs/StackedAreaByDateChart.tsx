@@ -1,21 +1,21 @@
 import {
-    scaleLinear,
-    extent,
-    stack,
     area,
-    stackOffsetExpand,
-    scaleTime,
-    utcDay,
-    utcMonth,
-    select,
-    pointer,
+    extent,
     interpolateRainbow,
-    TimeInterval,
-    utcHour,
+    pointer,
+    scaleLinear,
+    scaleTime,
+    select,
+    stack,
+    stackOffsetExpand,
     stackOffsetNone,
+    TimeInterval,
+    utcDay,
+    utcHour,
+    utcMonth,
 } from 'd3'
-import min from 'lodash/min'
 import max from 'lodash/max'
+import min from 'lodash/min'
 import React from 'react'
 import { Message } from 'semantic-ui-react'
 

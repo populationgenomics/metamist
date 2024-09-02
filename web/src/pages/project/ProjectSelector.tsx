@@ -1,5 +1,5 @@
-import sortBy from 'lodash/sortBy'
 import keyBy from 'lodash/keyBy'
+import sortBy from 'lodash/sortBy'
 import * as React from 'react'
 
 import { useParams } from 'react-router-dom'
