@@ -3,7 +3,7 @@
     "version": "7.4.1",
     "private": true,
     "dependencies": {
-        "@apollo/client": "^3.7.3",
+        "@apollo/client": "^3.11.5",
         "@monaco-editor/react": "^4.6.0",
         "@mui/icons-material": "^5.10.9",
         "@mui/material": "^5.10.9",
