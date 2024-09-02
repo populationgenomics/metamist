@@ -2,7 +2,6 @@ import { useQuery } from '@apollo/client'
 import React from 'react'
 import { useParams } from 'react-router-dom'
 import { Accordion, Button, Card, Message, Modal, Table as SUITable } from 'semantic-ui-react'
-import { gql } from '../../__generated__'
 import { KeyValueTable } from '../../shared/components/KeyValueTable'
 import AnalysisLink from '../../shared/components/links/AnalysisLink'
 import ProjectLink from '../../shared/components/links/ProjectLink'
@@ -10,6 +9,7 @@ import SequencingGroupLink from '../../shared/components/links/SequencingGroupLi
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import Table from '../../shared/components/Table'
 import { getHailBatchURL } from '../../shared/utilities/hailBatch'
+import { gql } from '../../__generated__'
 
 interface IAnalysisViewProps {
     analysisId: number

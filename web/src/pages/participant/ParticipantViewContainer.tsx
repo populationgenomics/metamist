@@ -76,7 +76,7 @@ export const ParticipantPage: React.FC<IParticipantPageProps> = (props) => {
                 ({
                     ...an,
                     sgs: an.sequencingGroups.map((sg) => sg.id),
-                } as IAnalysisGridAnalysis)
+                }) as IAnalysisGridAnalysis
         )
     return <ParticipantView participant={participant} analyses={analyses} showNonSingleSgAnalyses />
 }

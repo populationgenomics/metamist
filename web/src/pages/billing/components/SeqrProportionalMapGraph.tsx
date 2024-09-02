@@ -1,13 +1,13 @@
-import * as React from 'react'
 import sortBy from 'lodash/sortBy'
+import * as React from 'react'
 
-import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
-import { AnalysisApi, Project, ProjectApi, ProportionalDateTemporalMethod } from '../../../sm-api'
 import { Grid, Message, Select } from 'semantic-ui-react'
 import {
     IStackedAreaByDateChartData,
     StackedAreaByDateChart,
 } from '../../../shared/components/Graphs/StackedAreaByDateChart'
+import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
+import { AnalysisApi, Project, ProjectApi, ProportionalDateTemporalMethod } from '../../../sm-api'
 
 interface IProportionalDateProjectModel {
     project: string

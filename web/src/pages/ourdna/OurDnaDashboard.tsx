@@ -1,27 +1,26 @@
-import React from 'react'
-import { Container, Grid, GridRow, GridColumn } from 'semantic-ui-react'
 import { useQuery } from '@apollo/client'
+import { Container, Grid, GridColumn, GridRow } from 'semantic-ui-react'
 import { gql } from '../../__generated__'
 
-import Tile from '../../shared/components/ourdna/Tile'
-import TableTile from '../../shared/components/ourdna/TableTile'
 import StatTile from '../../shared/components/ourdna/StatTile'
+import TableTile from '../../shared/components/ourdna/TableTile'
+import Tile from '../../shared/components/ourdna/Tile'
 
-import OurDNALogo from '../../shared/components/OurDNALogo'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import MuckError from '../../shared/components/MuckError'
-import OurDonutChart from '../../shared/components/ourdna/OurDonutChart'
 import BarChart from '../../shared/components/ourdna/BarChart'
 import { ourdnaColours } from '../../shared/components/ourdna/Colours'
+import OurDonutChart from '../../shared/components/ourdna/OurDonutChart'
+import OurDNALogo from '../../shared/components/OurDNALogo'
 
-import ClipboardIcon from '../../shared/components/ourdna/dashboardIcons/ClipboardIcon'
-import SyringeIcon from '../../shared/components/ourdna/dashboardIcons/SyringeIcon'
-import TestTubeIcon from '../../shared/components/ourdna/dashboardIcons/TestTubeIcon'
+import AlarmIcon from '../../shared/components/ourdna/dashboardIcons/AlarmIcon'
 import BloodSampleIcon from '../../shared/components/ourdna/dashboardIcons/BloodSampleIcon'
-import TruckIcon from '../../shared/components/ourdna/dashboardIcons/TruckIcon'
+import ClipboardIcon from '../../shared/components/ourdna/dashboardIcons/ClipboardIcon'
 import ClockIcon from '../../shared/components/ourdna/dashboardIcons/ClockIcon'
 import RocketIcon from '../../shared/components/ourdna/dashboardIcons/RocketIcon'
-import AlarmIcon from '../../shared/components/ourdna/dashboardIcons/AlarmIcon'
+import SyringeIcon from '../../shared/components/ourdna/dashboardIcons/SyringeIcon'
+import TestTubeIcon from '../../shared/components/ourdna/dashboardIcons/TestTubeIcon'
+import TruckIcon from '../../shared/components/ourdna/dashboardIcons/TruckIcon'
 
 const GET_OURDNA_DASHBOARD = gql(`
     query DashboardQuery($project: String!) {

@@ -1,8 +1,8 @@
-import { Header, Table as SUITable } from 'semantic-ui-react'
-import Table from '../../../shared/components/Table'
 import React from 'react'
-import formatMoney from '../../../shared/utilities/formatMoney'
+import { Header, Table as SUITable } from 'semantic-ui-react'
 import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
+import Table from '../../../shared/components/Table'
+import formatMoney from '../../../shared/utilities/formatMoney'
 
 const date2Month = (dt: string): string => {
     if (dt === undefined || dt === null) {

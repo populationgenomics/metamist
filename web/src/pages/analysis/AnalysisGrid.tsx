@@ -3,8 +3,8 @@ import * as React from 'react'
 import { Table as SUITable } from 'semantic-ui-react'
 import { GraphQlAnalysis } from '../../__generated__/graphql'
 
-import Table from '../../shared/components/Table'
 import AnalysisLink from '../../shared/components/links/AnalysisLink'
+import Table from '../../shared/components/Table'
 
 export interface IAnalysisGridAnalysis extends Partial<GraphQlAnalysis> {
     sgs?: string[]

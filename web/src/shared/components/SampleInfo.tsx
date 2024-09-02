@@ -1,6 +1,6 @@
+import capitalize from 'lodash/capitalize'
 import * as React from 'react'
 import { Table as SUITable } from 'semantic-ui-react'
-import capitalize from 'lodash/capitalize'
 import Table from './Table'
 
 import { GraphQlSample } from '../../__generated__/graphql'

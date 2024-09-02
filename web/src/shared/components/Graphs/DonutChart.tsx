@@ -1,7 +1,7 @@
+import { arc, interpolateRainbow, pie, select } from 'd3'
 import React from 'react'
-import { select, interpolateRainbow, pie, arc } from 'd3'
-import LoadingDucks from '../LoadingDucks/LoadingDucks'
 import formatMoney from '../../utilities/formatMoney'
+import LoadingDucks from '../LoadingDucks/LoadingDucks'
 
 export interface IDonutChartData {
     label: string

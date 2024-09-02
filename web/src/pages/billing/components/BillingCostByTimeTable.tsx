@@ -1,11 +1,9 @@
-import { Checkbox, Grid, Header, Table as SUITable } from 'semantic-ui-react'
-import Table from '../../../shared/components/Table'
 import React from 'react'
-import { BillingColumn } from '../../../sm-api'
-import { convertFieldName } from '../../../shared/utilities/fieldName'
-import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
+import { Checkbox, Header, Table as SUITable } from 'semantic-ui-react'
 import { IStackedAreaByDateChartData } from '../../../shared/components/Graphs/StackedAreaByDateChart'
-import orderBy from '../../../shared/utilities/orderBy'
+import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
+import Table from '../../../shared/components/Table'
+import { convertFieldName } from '../../../shared/utilities/fieldName'
 
 interface IBillingCostByTimeTableProps {
     heading: string

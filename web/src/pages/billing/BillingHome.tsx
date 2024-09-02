@@ -1,9 +1,9 @@
 import * as React from 'react'
 import ReactGoogleSlides from 'react-google-slides'
 
-import { IBillingPage, billingPages } from './BillingPages'
-import { ThemeContext } from '../../shared/components/ThemeProvider'
 import { Button, Menu, MenuItem, Segment, SemanticWIDTHS } from 'semantic-ui-react'
+import { ThemeContext } from '../../shared/components/ThemeProvider'
+import { billingPages, IBillingPage } from './BillingPages'
 
 // Google Slides
 const Slides = React.memo(({ link }: { link: string }) => {

@@ -1,7 +1,7 @@
+import { axisBottom, axisLeft, interpolateRainbow, scaleBand, scaleLinear, select } from 'd3'
 import React from 'react'
-import { axisBottom, axisLeft, scaleBand, scaleLinear, select, interpolateRainbow } from 'd3'
-import LoadingDucks from '../LoadingDucks/LoadingDucks'
 import formatMoney from '../../utilities/formatMoney'
+import LoadingDucks from '../LoadingDucks/LoadingDucks'
 
 export interface IData {
     label: string

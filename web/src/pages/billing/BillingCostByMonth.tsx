@@ -10,7 +10,6 @@ import {
     BillingTotalCostRecord,
 } from '../../sm-api'
 
-import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import {
     generateInvoiceMonths,

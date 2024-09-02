@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Card, Label, Statistic, Grid, SemanticWIDTHS } from 'semantic-ui-react'
+import { Card, Grid, Label, SemanticWIDTHS, Statistic } from 'semantic-ui-react'
 
 interface StatTileProps {
     header: string
