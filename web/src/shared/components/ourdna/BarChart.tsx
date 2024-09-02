@@ -142,7 +142,8 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
 
         g.append('g')
             .attr('class', 'axis-label')
-            .call(d3.axisLeft(y).ticks(y.domain()[1]).tickFormat(d3.format('d')))
+            // Added a `.ticks(5)` to reduce the number of ticks on the y-axis
+            .call(d3.axisLeft(y).ticks(5).tickFormat(d3.format('d')))
             .selectAll('text')
             .attr('dx', '-1em') // Adjust the position of the y-axis labels
 
@@ -187,7 +188,8 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
         // Append Y axis
         g.append('g')
             .attr('class', 'axis-label')
-            .call(d3.axisLeft(y).ticks(y.domain()[1]).tickFormat(d3.format('d')))
+            // Added a `.ticks(5)` to reduce the number of ticks on the y-axis
+            .call(d3.axisLeft(y).ticks(5).tickFormat(d3.format('d')))
             .selectAll('text')
             .attr('dx', '-1em') // Adjust the position of the y-axis labels
             .style('fill', 'var(--color-text-primary)') // Change the color of the axis labels
