@@ -9,6 +9,7 @@ import { CommentThreadData } from './commentConfig'
 export function CommentEntityLink(props: { comment: CommentThreadData }) {
     const { comment } = props
     switch (comment.entity.__typename) {
+        // @TODO Change to include more context, ie the sample for the assay
         case 'GraphQLAssay':
             return (
                 <AssayLink

@@ -42,6 +42,9 @@ const ThemeProvider: React.FunctionComponent<{ children?: React.ReactNode }> = (
             mode: savedTheme === 'dark-mode' ? 'dark' : 'light',
         },
         typography: {
+            button: {
+                textTransform: 'none',
+            },
             fontFamily: `-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
         'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif`,
         },

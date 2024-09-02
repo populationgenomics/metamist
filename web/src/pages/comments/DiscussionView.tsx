@@ -1,15 +1,22 @@
-import { Box, ListItem, ListItemButton, Typography } from '@mui/material'
-import { useState } from 'react'
-import { DiscussionFragmentFragment } from '../../__generated__/graphql'
-import { CommentThread } from './CommentThread'
+import { ApolloError } from '@apollo/client'
+import { Alert, Box, Button, ListItem, ListItemButton, Typography } from '@mui/material'
+import { useContext, useState } from 'react'
+import { DiscussionFragmentFragment, ProjectMemberRole } from '../../__generated__/graphql'
+import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
+import { ViewerContext } from '../../viewer'
+import { CommentEditor, CommentThread } from './CommentThread'
 import { CommentEntityType, commentEntityTypeMap, CommentThreadData } from './commentConfig'
 
 function DiscussionSection(props: {
     entityType: CommentEntityType
+    canComment: boolean
+    viewerUser: string | null
     comments: CommentThreadData[]
+    projectName: string
 }) {
     const [expanded, setExpanded] = useState(false)
-    const { entityType, comments } = props
+
+    const { entityType, comments, canComment, viewerUser, projectName } = props
 
     return (
         <Box>
@@ -29,8 +36,11 @@ function DiscussionSection(props: {
                         <Box>
                             <CommentThread
                                 comment={cc}
+                                viewerUser={viewerUser}
+                                canComment={canComment}
                                 prevComment={prevComment}
                                 showEntityInfo={true}
+                                projectName={projectName}
                             />
                         </Box>
                     )
@@ -39,8 +49,67 @@ function DiscussionSection(props: {
     )
 }
 
-export function DiscussionView(props: { discussion: DiscussionFragmentFragment }) {
-    const { discussion } = props
+export function DiscussionView(props: {
+    discussionLoading: boolean
+    discussionError: ApolloError | undefined
+    addingCommentLoading: boolean
+    addingCommentError: ApolloError | undefined
+    discussion: DiscussionFragmentFragment | undefined
+    onReload: () => void
+    onAddComment: (content: string) => Promise<void>
+    projectName: string
+}) {
+    const {
+        discussion,
+        discussionError,
+        discussionLoading,
+        addingCommentLoading,
+        addingCommentError,
+        onReload,
+        onAddComment,
+        projectName,
+    } = props
+    const [commentContent, setCommentContent] = useState('')
+    const viewer = useContext(ViewerContext)
+
+    const addComment = () => {
+        onAddComment(commentContent)
+            .then(() => {
+                setCommentContent('')
+            })
+            .catch((err) => {
+                console.error('Error adding comment', err)
+            })
+    }
+
+    if (discussionLoading) {
+        return <LoadingDucks />
+    }
+
+    if (discussionError) {
+        return (
+            <Box my={1} px={2}>
+                <Alert
+                    severity="error"
+                    action={
+                        <Button color="inherit" size="small" onClick={() => onReload()}>
+                            Retry
+                        </Button>
+                    }
+                >
+                    Error loading comments: {discussionError.message}
+                </Alert>
+            </Box>
+        )
+    }
+
+    if (!discussion) return null
+
+    const canComment =
+        viewer?.checkProjectAccessByName(projectName, [
+            ProjectMemberRole.Writer,
+            ProjectMemberRole.Contributor,
+        ]) ?? false
 
     const groupedRelatedCommentsMap = discussion.relatedComments.reduce(
         (gg: Map<string, CommentThreadData[]>, cc) => {
@@ -58,17 +127,55 @@ export function DiscussionView(props: { discussion: DiscussionFragmentFragment }
     }
 
     return (
-        <Box>
+        <Box height={'100%'} sx={{ overflowY: 'auto' }}>
             <Box>
                 {discussion.directComments.map((cc) => (
-                    <CommentThread comment={cc} showEntityInfo={false} />
+                    <CommentThread
+                        key={cc.id}
+                        comment={cc}
+                        canComment={canComment}
+                        viewerUser={viewer?.username ?? null}
+                        showEntityInfo={false}
+                        projectName={projectName}
+                    />
                 ))}
+                <Box>
+                    <CommentEditor
+                        content={commentContent}
+                        onChange={(content) => setCommentContent(content)}
+                    />
+                    <Box mt={2} display="flex" gap={2}>
+                        <Button
+                            variant="contained"
+                            sx={{ fontSize: 12 }}
+                            color={'info'}
+                            disabled={addingCommentLoading}
+                            onClick={() => addComment()}
+                        >
+                            {addingCommentLoading ? 'Saving' : 'Save'}
+                        </Button>
+                    </Box>
+                </Box>
+                {addingCommentError && (
+                    <Box my={1}>
+                        <Alert severity="error">
+                            Error saving comment {addingCommentError.message}
+                        </Alert>
+                    </Box>
+                )}
             </Box>
-            <Box>
+            {/* <Box>
                 {groupedRelatedComments.map(([entityType, comments]) => (
-                    <DiscussionSection entityType={entityType} comments={comments} />
+                    <DiscussionSection
+                        key={entityType}
+                        entityType={entityType}
+                        canComment={canComment}
+                        viewerUser={viewer?.username ?? null}
+                        comments={comments}
+                        projectName={projectName}
+                    />
                 ))}
-            </Box>
+            </Box> */}
         </Box>
     )
 }

@@ -1,7 +1,18 @@
 import RobotIcon from '@mui/icons-material/SmartToy'
-import { Avatar, AvatarGroup, Box, Button, Divider, SxProps, Typography } from '@mui/material'
+import {
+    Alert,
+    Avatar,
+    AvatarGroup,
+    Box,
+    Button,
+    Divider,
+    SxProps,
+    TextField,
+    Typography,
+} from '@mui/material'
+
 import { DateTime } from 'luxon'
-import React, { useState } from 'react'
+import React, { forwardRef, useEffect, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import SyntaxHighlighter from 'react-syntax-highlighter'
 import { dracula, vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -14,6 +25,7 @@ import {
     getCommentEntityId,
 } from './commentConfig'
 import { CommentEntityLink } from './CommentEntityLink'
+import { useAddCommentToThread, useUpdateComment } from './commentMutations'
 
 const toTitleCase = (str: string) => {
     return str
@@ -82,15 +94,64 @@ function CommentAvatar(props: ReturnType<typeof parseAuthor> & { size: 'full' | 
     )
 }
 
-function Comment(props: { comment: CommentData }) {
-    const { comment } = props
+export const CommentEditor = forwardRef<
+    HTMLTextAreaElement,
+    {
+        content: string
+        label?: string
+        onChange: (content: string) => void
+    }
+>(function CommentEditor(props, ref) {
+    return (
+        <Box>
+            <TextField
+                inputRef={ref}
+                label={props.label}
+                multiline
+                value={props.content}
+                fullWidth
+                onChange={(e) => props.onChange(e.target.value)}
+            />
+        </Box>
+    )
+})
+
+function Comment(props: {
+    comment: CommentData
+    canComment: boolean
+    viewerUser: string | null
+    isTopLevel: boolean
+    onReply: () => void
+}) {
+    const { comment, canComment, viewerUser, isTopLevel, onReply } = props
     const author = parseAuthor(comment.author)
+
+    const canEdit = viewerUser === comment.author
+    const [isEditing, setIsEditing] = useState(false)
+    const [content, setContent] = useState(comment.content)
 
     const createdAt = DateTime.fromISO(comment.createdAt)
     const updatedAt = DateTime.fromISO(comment.updatedAt)
+    const hasBeenEdited = comment.versions.length > 0
 
     const theme = React.useContext(ThemeContext)
     const isDarkMode = theme.theme === 'dark-mode'
+
+    const [updateCommentMutation, updateCommentResult] = useUpdateComment()
+
+    const saveComment = () => {
+        // Don't do anything if already loading
+        if (updateCommentResult.loading) return
+
+        updateCommentMutation({
+            variables: {
+                id: comment.id,
+                content: content,
+            },
+        }).then(() => {
+            setIsEditing(false)
+        })
+    }
 
     return (
         <Box component={'article'} my={2}>
@@ -118,7 +179,7 @@ function Comment(props: { comment: CommentData }) {
                             >
                                 {createdAt.toRelative()}
                             </Typography>
-                            {!createdAt.equals(updatedAt) && (
+                            {hasBeenEdited && (
                                 <Typography
                                     fontSize={12}
                                     ml={1}
@@ -134,31 +195,102 @@ function Comment(props: { comment: CommentData }) {
                 </Box>
             </Box>
             <Box mt={1} pl={5}>
-                <Markdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                        code({ node, inline, className, children, ...props_ }) {
-                            const match_ = /language-(\w+)/.exec(className || '')
-                            return !inline && match_ ? (
-                                <SyntaxHighlighter
-                                    language={match_[1]}
-                                    PreTag="div"
-                                    // showLineNumbers={true}
-                                    style={isDarkMode ? dracula : vs}
-                                    {...props_}
+                <Box>
+                    {isEditing ? (
+                        <Box>
+                            <CommentEditor
+                                content={content}
+                                onChange={(content) => setContent(content)}
+                            />
+
+                            <Box mt={2} display="flex" gap={2}>
+                                <Button
+                                    variant="contained"
+                                    sx={{ fontSize: 12 }}
+                                    color={'info'}
+                                    disabled={updateCommentResult.loading}
+                                    onClick={saveComment}
                                 >
-                                    {String(children).replace(/\n$/, '')}
-                                </SyntaxHighlighter>
-                            ) : (
-                                <code className={className} {...props}>
-                                    {children}
-                                </code>
-                            )
-                        },
-                    }}
-                >
-                    {comment.content}
-                </Markdown>
+                                    {updateCommentResult.loading ? 'Saving' : 'Save'}
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    sx={{ fontSize: 12 }}
+                                    color={'secondary'}
+                                    onClick={() => {
+                                        setContent(comment.content)
+                                        setIsEditing(false)
+                                        updateCommentResult.reset()
+                                    }}
+                                >
+                                    Cancel
+                                </Button>
+                            </Box>
+                            {updateCommentResult.error && (
+                                <Box my={1}>
+                                    <Alert severity="error">
+                                        Error saving comment {updateCommentResult.error.message}
+                                    </Alert>
+                                </Box>
+                            )}
+                        </Box>
+                    ) : (
+                        <Box>
+                            <Markdown
+                                remarkPlugins={[remarkGfm]}
+                                components={{
+                                    code({ node, inline, className, children, ...props_ }) {
+                                        const match_ = /language-(\w+)/.exec(className || '')
+                                        return !inline && match_ ? (
+                                            <SyntaxHighlighter
+                                                language={match_[1]}
+                                                PreTag="div"
+                                                // showLineNumbers={true}
+                                                style={isDarkMode ? dracula : vs}
+                                                {...props_}
+                                            >
+                                                {String(children).replace(/\n$/, '')}
+                                            </SyntaxHighlighter>
+                                        ) : (
+                                            <code className={className} {...props_}>
+                                                {children}
+                                            </code>
+                                        )
+                                    },
+                                }}
+                            >
+                                {content}
+                            </Markdown>
+                            <Box mt={2} display="flex">
+                                {isTopLevel && canComment && (
+                                    <Button
+                                        variant="text"
+                                        sx={{ fontSize: 12 }}
+                                        onClick={() => onReply()}
+                                    >
+                                        Reply
+                                    </Button>
+                                )}
+                                {canEdit && (
+                                    <Button
+                                        variant="text"
+                                        sx={{ fontSize: 12 }}
+                                        onClick={() => setIsEditing(!isEditing)}
+                                    >
+                                        Edit
+                                    </Button>
+                                )}
+
+                                <Button variant="text" sx={{ fontSize: 12 }}>
+                                    Copy Link
+                                </Button>
+                                <Button variant="text" sx={{ fontSize: 12 }}>
+                                    View History
+                                </Button>
+                            </Box>
+                        </Box>
+                    )}
+                </Box>
             </Box>
         </Box>
     )
@@ -167,11 +299,22 @@ function Comment(props: { comment: CommentData }) {
 export function CommentThread(props: {
     comment: CommentThreadData
     prevComment?: CommentThreadData
+    canComment: boolean
+    viewerUser: string | null
     showEntityInfo: boolean
+    projectName: string
 }) {
-    const { comment, prevComment, showEntityInfo } = props
-    const [expanded, setExpanded] = useState(false)
+    const { comment, prevComment, canComment, showEntityInfo, viewerUser } = props
+
+    const [showThread, setShowThread] = useState(false)
+    const [isReplying, setIsReplying] = useState(false)
+    const [replyContent, setReplyContent] = useState('')
+    const replyFormRef = useRef<HTMLTextAreaElement>(null)
+
+    const [addCommentToThreadMutation, addCommentToThreadResult] = useAddCommentToThread(comment.id)
+
     const replyCount = comment.thread.length
+    const hasReplies = replyCount > 0
     const replyAuthors = [...new Set(comment.thread.flatMap((comment) => comment.author))]
 
     // Only show the entity info if it wasn't already displayed on the previous comment
@@ -179,8 +322,48 @@ export function CommentThread(props: {
         prevComment && getCommentEntityId(prevComment) === getCommentEntityId(comment)
     const shouldShowEntityInfo = showEntityInfo && !sameEntityAsPreviousComment
 
+    const onReply = () => {
+        setShowThread(true)
+        setIsReplying(true)
+
+        if (replyFormRef.current) {
+            replyFormRef.current.scrollIntoView({ block: 'center' })
+            replyFormRef.current.focus()
+        }
+    }
+
+    const onToggleReplies = () => {
+        // If this is closing the thread, then set replying to false
+        if (showThread) setIsReplying(false)
+        setShowThread(!showThread)
+    }
+
+    useEffect(() => {
+        if (replyFormRef.current && showThread && isReplying) {
+            replyFormRef.current.scrollIntoView({ block: 'center' })
+            replyFormRef.current.focus()
+        }
+    }, [showThread, isReplying])
+
+    const addCommentToThread = () => {
+        // Don't do anything if already loading
+        if (addCommentToThreadResult.loading || !replyContent) return
+
+        addCommentToThreadMutation({
+            variables: {
+                parentId: comment.id,
+                content: replyContent,
+            },
+        })
+            .then(() => {
+                setReplyContent('')
+            })
+            .catch((err) => console.error(err))
+    }
+
     return (
         <Box mb={2} px={2}>
+            {/* Show the entity that the comment is on for context's sake */}
             {shouldShowEntityInfo && (
                 <>
                     {prevComment && <Divider />}
@@ -190,25 +373,81 @@ export function CommentThread(props: {
                     </Typography>
                 </>
             )}
-            <Comment comment={comment} />
-            <Box display={'flex'} onClick={() => setExpanded(!expanded)}>
-                <AvatarGroup>
-                    {replyAuthors.map((authorStr) => (
-                        <CommentAvatar {...parseAuthor(authorStr)} size={'small'} />
-                    ))}
-                </AvatarGroup>
-                {replyCount > 0 && (
-                    <Button variant="text">
-                        {expanded ? 'Hide' : 'Show'} {replyCount}{' '}
-                        {replyCount > 1 ? 'replies' : 'reply'}
-                    </Button>
-                )}
-            </Box>
-            {expanded && (
-                <Box ml={2} pl={2} borderLeft={'2px solid var(--color-border-color)'}>
-                    {comment.thread.map((cc) => (
-                        <Comment comment={cc} />
-                    ))}
+
+            {/* The comment itself */}
+            <Comment
+                comment={comment}
+                canComment={canComment}
+                viewerUser={viewerUser}
+                isTopLevel={true}
+                onReply={onReply}
+            />
+
+            {/* Comment thread */}
+            {hasReplies && (
+                <>
+                    <Box display={'flex'} onClick={onToggleReplies}>
+                        <AvatarGroup>
+                            {replyAuthors.map((authorStr) => (
+                                <CommentAvatar
+                                    key={authorStr}
+                                    {...parseAuthor(authorStr)}
+                                    size={'small'}
+                                />
+                            ))}
+                        </AvatarGroup>
+
+                        <Button variant="text">
+                            {showThread ? 'Hide' : 'Show'} {replyCount}{' '}
+                            {replyCount > 1 ? 'replies' : 'reply'}
+                        </Button>
+                    </Box>
+                    {showThread && (
+                        <Box ml={2} pl={2} borderLeft={'2px solid var(--color-border-color)'}>
+                            {comment.thread.map((cc) => (
+                                <Comment
+                                    comment={cc}
+                                    canComment={canComment}
+                                    viewerUser={viewerUser}
+                                    isTopLevel={false}
+                                    onReply={onReply}
+                                />
+                            ))}
+                        </Box>
+                    )}
+                </>
+            )}
+            {showThread && (
+                <Box ml={4}>
+                    <CommentEditor
+                        ref={replyFormRef}
+                        label="Reply"
+                        content={replyContent}
+                        onChange={(content) => setReplyContent(content)}
+                    />
+
+                    <Box mt={2} display={'flex'} gap={2}>
+                        <Button
+                            variant="contained"
+                            sx={{ fontSize: 12 }}
+                            color={'info'}
+                            disabled={addCommentToThreadResult.loading}
+                            onClick={addCommentToThread}
+                        >
+                            {addCommentToThreadResult.loading ? 'Saving' : 'Save'}
+                        </Button>
+                        {/* Only show cancel button if there's no replies */}
+                        {comment.thread.length === 0 && (
+                            <Button
+                                variant="contained"
+                                sx={{ fontSize: 12 }}
+                                color={'secondary'}
+                                onClick={onToggleReplies}
+                            >
+                                Cancel
+                            </Button>
+                        )}
+                    </Box>
                 </Box>
             )}
         </Box>
