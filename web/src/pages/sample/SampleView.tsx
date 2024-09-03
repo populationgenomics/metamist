@@ -4,12 +4,12 @@ import { useQuery } from '@apollo/client'
 import { useParams } from 'react-router-dom'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 
+import { gql } from '../../__generated__/gql'
 import MuckError from '../../shared/components/MuckError'
 import Pedigree from '../../shared/components/pedigree/Pedigree'
 import SampleInfo from '../../shared/components/SampleInfo'
 import SeqPanel from '../../shared/components/SeqPanel'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
-import { gql } from '../../__generated__/gql'
 
 const GET_SAMPLE_INFO = gql(`
 query SampleInfo($sample_id: String!) {

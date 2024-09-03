@@ -9,11 +9,11 @@ import { Table as SUITable } from 'semantic-ui-react'
 import Table, { CheckboxRow, DisplayRow } from '../../../shared/components/Table'
 
 import { useQuery } from '@apollo/client'
+import { gql } from '../../../__generated__'
 import MuckTheDuck from '../../../shared/components/MuckTheDuck'
 import formatMoney from '../../../shared/utilities/formatMoney'
 import { getHailBatchUrl } from '../../../shared/utilities/hailBatch'
 import { AnalysisCostRecord, AnalysisCostRecordBatch } from '../../../sm-api'
-import { gql } from '../../../__generated__'
 import { BatchJobsTable } from './BatchJobGrid'
 import { CostBySkuRow, SeqGrpDisplay } from './BillingByAnalysisComponents'
 

@@ -10,12 +10,12 @@ import { gql } from '../../__generated__/gql'
 
 import groupBy from 'lodash/groupBy'
 import keyBy from 'lodash/keyBy'
+import { GraphQlParticipant } from '../../__generated__/graphql'
 import TangledTree, {
     PedigreeEntry,
     PersonNode,
 } from '../../shared/components/pedigree/TangledTree'
 import Table from '../../shared/components/Table'
-import { GraphQlParticipant } from '../../__generated__/graphql'
 import { AnalysisGrid } from '../analysis/AnalysisGrid'
 import { AnalysisViewModal } from '../analysis/AnalysisView'
 import { ParticipantView } from '../participant/ParticipantView'
