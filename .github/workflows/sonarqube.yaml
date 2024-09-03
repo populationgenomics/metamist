@@ -1,4 +1,4 @@
-name: SonarQube Build
+name: SonarQube Scan
 
 on:
   workflow_dispatch:
@@ -17,24 +17,16 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
 
       - id: 'branch-check'
         name: Fail if branch is not main or dev
-        if: github.event_name == 'workflow_dispatch' && (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/sonarqube-workflow')
+        if: github.event_name == 'workflow_dispatch' && (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev')
         run: |
           echo "This workflow should not be triggered with workflow_dispatch on a branch other than main or dev"
           exit 1
 
-      - id: 'google-cloud-auth'
-        name: 'Authenticate to Google Cloud'
-        uses: 'google-github-actions/auth@v2'
-        with:
-          workload_identity_provider: 'projects/379228030003/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
-          service_account: 'sonar-scanner@devops-tools-433123.iam.gserviceaccount.com'
-
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
       - uses: sonarsource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
