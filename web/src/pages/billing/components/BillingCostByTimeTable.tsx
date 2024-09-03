@@ -29,7 +29,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     React.useEffect(() => {
         setInternalData(
             data.map((p) => {
-                let newP = { ...p }
+                const newP = { ...p }
                 const total = Object.values(p.values).reduce((acc, cur) => acc + cur, 0)
                 newP.values['Daily Total'] = total
                 newP.values['Compute Cost'] = total - p.values['Cloud Storage']

@@ -1,5 +1,5 @@
-import { BrowserRouter as Router } from 'react-router-dom'
 import * as React from 'react'
+import { BrowserRouter as Router } from 'react-router-dom'
 
 // this wasn't working, so added import to HTML
 // import 'bootstrap/dist/css/bootstrap.min.css'

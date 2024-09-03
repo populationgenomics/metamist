@@ -1,4 +1,4 @@
-import { arc, interpolateRainbow, pie, select } from 'd3'
+import { arc, DefaultArcObject, interpolateRainbow, pie, select } from 'd3'
 import React from 'react'
 import formatMoney from '../../utilities/formatMoney'
 import LoadingDucks from '../LoadingDucks/LoadingDucks'
@@ -48,6 +48,27 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
     showLegend,
     maxWidth,
 }) => {
+    const colorFunc: (t: number) => string | undefined = colors ?? interpolateRainbow
+    const duration = 250
+    const containerDivRef = React.useRef<HTMLDivElement | null>(null)
+    const [graphWidth, setGraphWidth] = React.useState<number>(768)
+    // to distinquished between charts on the same page we need an id
+    const chartId = id ?? 'donutChart'
+
+    React.useEffect(() => {
+        function updateWindowWidth() {
+            setGraphWidth(containerDivRef.current?.clientWidth || 768)
+        }
+        if (containerDivRef.current) {
+            updateWindowWidth()
+        }
+        window.addEventListener('resize', updateWindowWidth)
+
+        return () => {
+            window.removeEventListener('resize', updateWindowWidth)
+        }
+    }, [])
+
     if (isLoading) {
         return (
             <div>
@@ -59,13 +80,6 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
     if (!data || data.length === 0) {
         return <>No Data</>
     }
-
-    const colorFunc: (t: number) => string | undefined = colors ?? interpolateRainbow
-    const duration = 250
-    const containerDivRef = React.useRef<HTMLDivElement | null>(null)
-    const [graphWidth, setGraphWidth] = React.useState<number>(768)
-    // to distinquished between charts on the same page we need an id
-    const chartId = id ?? 'donutChart'
 
     const onHoverOver = (tg: HTMLElement, v: IDonutChartPreparadData) => {
         select(`#${chartId}-lbl${v.index}`).select('tspan').attr('font-weight', 'bold')
@@ -132,20 +146,6 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
     const arcData = arc().innerRadius(innerRadius).outerRadius(outerRadius)
     const arcLabel = arc().innerRadius(labelRadius).outerRadius(labelRadius)
 
-    React.useEffect(() => {
-        function updateWindowWidth() {
-            setGraphWidth(containerDivRef.current?.clientWidth || 768)
-        }
-        if (containerDivRef.current) {
-            updateWindowWidth()
-        }
-        window.addEventListener('resize', updateWindowWidth)
-
-        return () => {
-            window.removeEventListener('resize', updateWindowWidth)
-        }
-    }, [])
-
     const contDiv = containerDivRef.current
     if (contDiv) {
         // reset svg
@@ -168,7 +168,7 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
             .data(data_ready)
             .enter()
             .append('path')
-            .attr('d', (d) => arcData(d as any) as string)
+            .attr('d', (d) => arcData(d as unknown as DefaultArcObject) as string)
             .attr('fill', (d) => colorFunc(d.index / maxSlices) ?? 'black')
             .attr('stroke', '#fff')
             .style('stroke-width', '2')
@@ -176,10 +176,10 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
             .style('cursor', 'pointer')
             .attr('id', (d) => `${chartId}-path${d.index}`)
             .on('mouseover', (event, v) => {
-                onHoverOver(event.currentTarget, v as any)
+                onHoverOver(event.currentTarget, v)
             })
             .on('mouseout', (event, v) => {
-                onHoverOut(event.currentTarget, v as any)
+                onHoverOut(event.currentTarget, v)
             })
             .append('title')
             .text((d) => `${d.data.label} ${d.data.value}`)
@@ -194,7 +194,10 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
             .selectAll('text')
             .data(data_ready)
             .join('text')
-            .attr('transform', (d) => `translate(${arcLabel.centroid(d as any)})`)
+            .attr(
+                'transform',
+                (d) => `translate(${arcLabel.centroid(d as unknown as DefaultArcObject)})`
+            )
             .attr('id', (d) => `${chartId}-lbl${d.index}`)
             .selectAll('tspan')
             .data((d) => {
@@ -221,7 +224,7 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
                 .enter()
                 .append('g')
                 .attr('transform', (d) => `translate(${margin},${margin + d.index * 20})`)
-                .each(function (d, i) {
+                .each(function (d) {
                     select(this)
                         .append('circle')
                         .attr('r', 8)
@@ -236,11 +239,11 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
                         .text(d.data.label)
                         .attr('font-size', '0.9em')
                     select(this)
-                        .on('mouseover', (event, v) => {
+                        .on('mouseover', () => {
                             const element = select(`#${chartId}-path${d.index}`)
                             onHoverOver(element.node() as HTMLElement, d)
                         })
-                        .on('mouseout', (event, v) => {
+                        .on('mouseout', () => {
                             const element = select(`#${chartId}-path${d.index}`)
                             onHoverOut(element.node() as HTMLHtmlElement, d)
                         })

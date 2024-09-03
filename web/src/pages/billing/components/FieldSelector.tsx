@@ -1,5 +1,6 @@
 import * as React from 'react'
-import { Dropdown, Input, Message } from 'semantic-ui-react'
+import { SyntheticEvent } from 'react'
+import { Dropdown, DropdownProps, Input, Message } from 'semantic-ui-react'
 import { convertFieldName } from '../../../shared/utilities/fieldName'
 import { BillingApi, BillingColumn, BillingTimePeriods } from '../../../sm-api'
 
@@ -9,7 +10,10 @@ interface FieldSelectorProps {
     selected?: string
     includeAll?: boolean
     autoSelect?: boolean
-    onClickFunction: (_: any, { value }: any) => void
+    onClickFunction: (
+        event: SyntheticEvent<HTMLElement, Event> | undefined,
+        data: DropdownProps
+    ) => void
 }
 
 const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
@@ -100,6 +104,7 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
             .catch((er) => setError(er.message))
     }
 
+    /* eslint-disable react-hooks/exhaustive-deps -- this is missing a ton of deps, probably buggy but hard to fix */
     React.useEffect(() => {
         if (fieldName === BillingColumn.Topic) getTopics()
         else if (fieldName === BillingColumn.GcpProject) getGcpProjects()
@@ -121,6 +126,7 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
             setError(`Could not load records for ${fieldName}`)
         }
     }, [fieldName])
+    /* eslint-enable react-hooks/exhaustive-deps */
 
     const capitalize = (str: string): string => {
         if (str === 'gcp_project') {
@@ -129,7 +135,7 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
         return str.charAt(0).toUpperCase() + str.slice(1)
     }
 
-    const recordsMap = (records: any[]) => {
+    const recordsMap = (records: BillingColumn[]) => {
         if (fieldName === 'Group') {
             return records.map((p: BillingColumn) => ({
                 key: p,
@@ -167,7 +173,7 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
                     onChange={onClickFunction}
                     placeholder={`Select ${convertFieldName(fieldName)}`}
                     value={selected ?? ''}
-                    options={records && recordsMap(records)}
+                    options={records && recordsMap(records as BillingColumn[])}
                     style={{
                         borderRadius: '0 4px 4px 0',
                     }}

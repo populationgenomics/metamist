@@ -20,7 +20,7 @@ export const CostBySkuRow: React.FC<{
     chartMaxWidth?: string
     colSpan: number
     skus: AnalysisCostRecordSku[]
-}> = ({ chartId, chartMaxWidth, colSpan, skus }) => (
+}> = ({ chartId, chartMaxWidth, skus }) => (
     <>
         {chartId && (
             <DonutChart

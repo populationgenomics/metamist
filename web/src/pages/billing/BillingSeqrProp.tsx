@@ -22,9 +22,11 @@ const BillingSeqrProp: React.FunctionComponent = () => {
         navigate(url)
     }
 
+    /* eslint-disable react-hooks/exhaustive-deps */
     React.useEffect(() => {
         updateNav(start, end)
     }, [start, end])
+    /* eslint-enable react-hooks/exhaustive-deps */
 
     return (
         <Card fluid style={{ padding: '20px' }} id="billing-container">

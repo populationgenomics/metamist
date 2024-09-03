@@ -12,7 +12,9 @@ interface GeneralFilteringResult<T> {
     getSelectedOptionsForColumn: (key: ColumnKey) => string[]
 }
 
-function filterData<T>(allData: T[]): GeneralFilteringResult<T> {
+function useFilterData<T extends { web_reports?: Record<string, unknown> }>(
+    allData: T[]
+): GeneralFilteringResult<T> {
     const [filterState, setFilterState] = useState<FilterState>({})
 
     const filteredData = useMemo(() => {
@@ -21,7 +23,7 @@ function filterData<T>(allData: T[]): GeneralFilteringResult<T> {
                 if (values.size === 0) return true
                 const itemValue = item[key as keyof T]
                 if (key === 'stripy' || key === 'mito') {
-                    const report = (item as any).web_reports?.[key]
+                    const report = item.web_reports?.[key]
                     return values.has(report ? 'Yes' : 'No')
                 }
                 if (typeof itemValue === 'boolean') {
@@ -49,7 +51,7 @@ function filterData<T>(allData: T[]): GeneralFilteringResult<T> {
                     )
                 ) {
                     if (key === 'stripy' || key === 'mito') {
-                        const report = (item as any).web_reports?.[key]
+                        const report = item.web_reports?.[key]
                         uniqueValues.add(report ? 'Yes' : 'No')
                     } else {
                         const value = item[key as keyof T]
@@ -90,4 +92,4 @@ function filterData<T>(allData: T[]): GeneralFilteringResult<T> {
     }
 }
 
-export default filterData
+export default useFilterData

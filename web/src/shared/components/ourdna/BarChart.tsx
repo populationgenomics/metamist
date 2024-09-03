@@ -227,7 +227,7 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
             .attr('y', 9.5)
             .attr('dy', '0.32em')
             .text((d) => d)
-    }, [data, dimensions])
+    }, [data, dimensions, groupedData, transformedData])
 
     return (
         <Card

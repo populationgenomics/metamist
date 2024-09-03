@@ -128,14 +128,16 @@ const ParticipantCells: React.FC<{
     backgroundColor?: string
     projectName: string
     participantRowSpan?: number
-}> = ({ fields, participant, backgroundColor, projectName, participantRowSpan }) => {
+}> = ({ fields, participant, backgroundColor, participantRowSpan }) => {
     const [showParticipantModal, setShowParticipantModal] = React.useState(false)
 
     const defaultRenderer = (field: ProjectParticipantGridField) =>
         sanitiseValue(get(participant, field.key))
-    const valuePreparers: Record<string, (field: ProjectParticipantGridField) => any> = {
-        external_ids: (field: ProjectParticipantGridField) =>
-            prepareExternalIds(participant.external_ids || {}),
+    const valuePreparers: Record<
+        string,
+        (field: ProjectParticipantGridField) => string | React.ReactNode
+    > = {
+        external_ids: () => prepareExternalIds(participant.external_ids || {}),
         id: (field: ProjectParticipantGridField) => (
             <a
                 href={getParticipantLink(participant.id)}

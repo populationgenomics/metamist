@@ -1,7 +1,14 @@
 import orderBy from 'lodash/orderBy'
 import * as React from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Checkbox, Grid, Message, Table as SUITable } from 'semantic-ui-react'
+import {
+    Button,
+    Checkbox,
+    DropdownProps,
+    Grid,
+    Message,
+    Table as SUITable,
+} from 'semantic-ui-react'
 import { HorizontalStackedBarChart } from '../../shared/components/Graphs/HorizontalStackedBarChart'
 import Table from '../../shared/components/Table'
 import { convertFieldName } from '../../shared/utilities/fieldName'
@@ -81,19 +88,27 @@ const BillingCurrentCost = () => {
             .catch((er) => setError(er.message))
     }
 
-    const onGroupBySelect = (event: any, data: any) => {
-        setGroupBy(data.value)
-        getCosts(data.value, invoiceMonth)
+    const onGroupBySelect = (event: unknown, data: DropdownProps) => {
+        const value = data.value
+        if (typeof value == 'string') {
+            setGroupBy(value as BillingColumn)
+            getCosts(value as BillingColumn, invoiceMonth)
+        }
     }
 
-    const onInvoiceMonthSelect = (event: any, data: any) => {
-        setInvoiceMonth(data.value)
-        getCosts(groupBy, data.value)
+    const onInvoiceMonthSelect = (event: unknown, data: DropdownProps) => {
+        const value = data.value
+        if (typeof value == 'string') {
+            setInvoiceMonth(value)
+            getCosts(groupBy, value)
+        }
     }
 
+    /* eslint-disable react-hooks/exhaustive-deps */
     React.useEffect(() => {
         getCosts(groupBy, invoiceMonth)
     }, [])
+    /* eslint-enable react-hooks/exhaustive-deps */
 
     const HEADER_FIELDS = [
         { category: 'field', title: groupBy.toUpperCase(), show_always: true },

@@ -111,11 +111,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
     )
 }
 
-interface NavBarProps {
-    fixed?: boolean
-}
-
-const NavBar: React.FC<NavBarProps> = ({ fixed }) => {
+const NavBar = () => {
     const [menuItems, setMenuItems] = React.useState<MenuItem[]>([
         {
             title: 'Explore',
@@ -153,7 +149,11 @@ const NavBar: React.FC<NavBarProps> = ({ fixed }) => {
     React.useEffect(() => {
         new BillingApi().isBillingEnabled().then((response) => {
             if (response.status === 200 && response.data === true) {
-                setMenuItems([...menuItems.slice(0, 2), billingPagesMenu, ...menuItems.slice(2)])
+                setMenuItems((menuItems) => [
+                    ...menuItems.slice(0, 2),
+                    billingPagesMenu,
+                    ...menuItems.slice(2),
+                ])
             }
         })
     }, [])

@@ -11,7 +11,7 @@ import Table, { CheckboxRow, DisplayRow } from '../../../shared/components/Table
 import { useQuery } from '@apollo/client'
 import MuckTheDuck from '../../../shared/components/MuckTheDuck'
 import formatMoney from '../../../shared/utilities/formatMoney'
-import { getHailBatchURL } from '../../../shared/utilities/hailBatch'
+import { getHailBatchUrl } from '../../../shared/utilities/hailBatch'
 import { AnalysisCostRecord, AnalysisCostRecordBatch } from '../../../sm-api'
 import { gql } from '../../../__generated__'
 import { BatchJobsTable } from './BatchJobGrid'
@@ -29,7 +29,7 @@ interface IGenericCardData {
 }
 
 const BatchUrlLink: React.FC<{ batch_id: string }> = ({ batch_id }) => (
-    <a href={getHailBatchURL(batch_id)} rel="noopener noreferrer" target="_blank">
+    <a href={getHailBatchUrl(batch_id)} rel="noopener noreferrer" target="_blank">
         BATCH ID: {batch_id}
     </a>
 )
@@ -90,7 +90,7 @@ const AnalysisRunnerRecordCard: React.FC<{ data: AnalysisCostRecord }> = ({ data
                         </DisplayRow>
 
                         {/* cost by categories */}
-                        {data?.categories?.map((tcat, cidx) => {
+                        {data?.categories?.map((tcat) => {
                             const workflows =
                                 tcat.workflows !== null
                                     ? ` (across ${tcat.workflows} workflows)`
@@ -242,7 +242,6 @@ const BatchCard: React.FC<{ item: AnalysisCostRecordBatch }> = ({ item }) => {
     const [isSeqGroupOpen, setIsSeqGroupOpen] = React.useState(false)
     const [isSkuOpen, setIsSkuOpen] = React.useState(false)
     const [isJobsOpen, setIsJobsOpen] = React.useState(false)
-    const [jobOpenSet, setJobOpenSet] = React.useState<Set<string>>(new Set())
 
     const isDriverBatch = item.jobs[0]?.job_name === 'driver'
 
@@ -344,26 +343,6 @@ const BatchCard: React.FC<{ item: AnalysisCostRecordBatch }> = ({ item }) => {
 const BatchGrid: React.FunctionComponent<{
     data: AnalysisCostRecord
 }> = ({ data }) => {
-    const [openRows, setOpenRows] = React.useState<string[]>([])
-
-    const handleToggle = (position: string) => {
-        if (!openRows.includes(position)) {
-            setOpenRows([...openRows, position])
-        } else {
-            setOpenRows(openRows.filter((value) => value !== position))
-        }
-    }
-
-    const prepareBgColor = (log: any) => {
-        if (log.batch_id === undefined) {
-            return 'var(--color-border-color)'
-        }
-        if (log.job_id === undefined) {
-            return 'var(--color-border-default)'
-        }
-        return 'var(--color-bg)'
-    }
-
     const GenericCard: React.FC<{
         data: IGenericCardData
         label: string

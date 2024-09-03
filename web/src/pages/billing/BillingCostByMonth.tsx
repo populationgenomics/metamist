@@ -26,6 +26,7 @@ enum CloudSpendCategory {
     COMPUTE_COST = 'Compute Cost',
 }
 
+/* eslint-disable @typescript-eslint/no-explicit-any  -- too many anys in the file to fix right now but would be good to sort out when we can */
 const BillingCostByTime: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
 
@@ -65,7 +66,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
         updateNav(start_update, end_update)
     }
 
-    const convertInvoiceMonth = (invoiceMonth: string, start: Boolean) => {
+    const convertInvoiceMonth = (invoiceMonth: string, start: boolean) => {
         const year = invoiceMonth.substring(0, 4)
         const month = invoiceMonth.substring(4, 6)
         if (start) return `${year}-${month}-01`
@@ -212,6 +213,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
         changeDate('end', data.value)
     }
 
+    /* eslint-disable react-hooks/exhaustive-deps */
     React.useEffect(() => {
         if (Boolean(start) && Boolean(end)) {
             // valid selection, retrieve data
@@ -238,6 +240,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
             }
         }
     }, [start, end])
+    /* eslint-enable react-hooks/exhaustive-deps */
 
     return (
         <>
@@ -279,3 +282,5 @@ const BillingCostByTime: React.FunctionComponent = () => {
 }
 
 export default BillingCostByTime
+
+/* eslint-enable @typescript-eslint/no-explicit-any  */

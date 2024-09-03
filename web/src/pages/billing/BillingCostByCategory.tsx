@@ -16,6 +16,7 @@ import { convertFieldName } from '../../shared/utilities/fieldName'
 import generateUrl from '../../shared/utilities/generateUrl'
 import { getMonthEndDate, getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
 
+/* eslint-disable @typescript-eslint/no-explicit-any  -- too many anys in the file to fix right now but would be good to sort out when we can */
 const BillingCostByCategory: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
 
@@ -293,3 +294,5 @@ const BillingCostByCategory: React.FunctionComponent = () => {
 }
 
 export default BillingCostByCategory
+
+/* eslint-enable @typescript-eslint/no-explicit-any   */

@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Grid, Input, Message } from 'semantic-ui-react'
+import { Button, Card, DropdownProps, Grid, Input, Message } from 'semantic-ui-react'
 import {
     BillingApi,
     BillingColumn,
@@ -68,15 +68,21 @@ const BillingCostByTime: React.FunctionComponent = () => {
         navigate(url)
     }
 
-    const onGroupBySelect = (event: any, data: any) => {
-        setGroupBy(data.value)
-        setSelectedData(undefined)
-        updateNav(data.value, undefined, start, end)
+    const onGroupBySelect = (event: unknown, data: DropdownProps) => {
+        const value = data.value
+        if (typeof value == 'string') {
+            setGroupBy(value as BillingColumn)
+            setSelectedData(undefined)
+            updateNav(value, undefined, start, end)
+        }
     }
 
-    const onSelect = (event: any, data: any) => {
-        setSelectedData(data.value)
-        updateNav(groupBy, data.value, start, end)
+    const onSelect = (event: unknown, data: DropdownProps) => {
+        const value = data.value
+        if (typeof value == 'string') {
+            setSelectedData(value)
+            updateNav(groupBy, value, start, end)
+        }
     }
 
     const changeDate = (name: string, value: string) => {

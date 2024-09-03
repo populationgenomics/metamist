@@ -30,10 +30,6 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
     isLoading,
     showLegend,
 }) => {
-    if (!isLoading && (!data || data.length === 0)) {
-        return <div>No data available</div>
-    }
-
     const colorFunc: (t: number) => string | undefined = colors ?? d3.interpolateRainbow
 
     // set the dimensions and margins of the graph
@@ -44,21 +40,9 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
 
     const containerDivRef = React.useRef<HTMLDivElement | null>(null)
 
-    const [clientWidth, setClientWidth] = React.useState(650)
-
-    React.useEffect(() => {
-        function updateWindowWidth() {
-            setClientWidth(containerDivRef.current?.clientWidth ?? 650)
-        }
-        if (containerDivRef.current) {
-            updateWindowWidth()
-        }
-        window.addEventListener('resize', updateWindowWidth)
-
-        return () => {
-            window.removeEventListener('resize', updateWindowWidth)
-        }
-    }, [])
+    if (!isLoading && (!data || data.length === 0)) {
+        return <div>No data available</div>
+    }
 
     const contDiv = containerDivRef.current
     if (contDiv) {
@@ -212,17 +196,17 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
         const tooltip = d3.select('body').append('div').attr('id', 'chart').attr('class', 'tooltip')
 
         // tooltip events
-        const mouseover = (d: any) => {
+        const mouseover = () => {
             tooltip.style('opacity', 0.8)
         }
-        const mousemove = (event: any, d: any) => {
+        const mousemove = (event: MouseEvent, d: { data: { 0: number; 1: number } }) => {
             const mformater = d3.format(',.2f')
             tooltip
                 .html(mformater(d.data[1] - d.data[0]) + ' AUD')
                 .style('top', event.pageY - 10 + 'px')
                 .style('left', event.pageX + 10 + 'px')
         }
-        const mouseleave = (d: any) => {
+        const mouseleave = () => {
             tooltip.style('opacity', 0)
         }
 
@@ -261,7 +245,13 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
             .on('mouseleave', mouseleave)
 
         // create bidgetn line
-        const budgetFnc = (d: any) => {
+        const budgetFnc = (d: {
+            outerIdx: number
+            innerIdx: number
+            data: d3.SeriesPoint<{
+                [key: string]: number
+            }>
+        }) => {
             if (showLegend) {
                 // @ts-ignore
                 return xScale(budgetData[d.data.data.field])
@@ -269,7 +259,13 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
             return 0
         }
 
-        const budgetColor = (d: any) => {
+        const budgetColor = (d: {
+            outerIdx: number
+            innerIdx: number
+            data: d3.SeriesPoint<{
+                [key: string]: number
+            }>
+        }) => {
             // @ts-ignore
             const budgetVal = budgetData[d.data.data.field]
             if (showLegend && budgetVal !== null && budgetVal !== undefined) {
@@ -288,7 +284,7 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
             .attr('x', (d) => budgetFnc(d))
             // @ts-ignore
             .attr('y', (d) => yScale(d.data.data.field) - 5)
-            .attr('width', (d) => 3)
+            .attr('width', () => 3)
             .attr('height', yScale.bandwidth() + 10)
             .attr('fill', (d) => budgetColor(d))
 

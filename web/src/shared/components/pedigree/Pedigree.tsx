@@ -20,7 +20,7 @@ interface IPedigreeProps {
     onClick?: (e: string) => void
 }
 
-const Pedigree: React.FC<IPedigreeProps> = ({ familyId, onClick }) => {
+const Pedigree: React.FC<IPedigreeProps> = ({ familyId }) => {
     const { loading, error, data } = useQuery(GET_PEDIGREE_INFO, {
         variables: { family_id: familyId },
     })

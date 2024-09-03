@@ -55,9 +55,8 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
             .domain(Object.keys(data))
             .range(Object.values(ourdnaColours) || d3.schemeCategory10)
 
-        const pie = d3.pie().value((d: any) => d[1])
-        // @ts-ignore
-        const data_ready = pie(Object.entries(data))
+        const pie = d3.pie()
+        const data_ready = pie(Object.values(data))
 
         const arc = d3
             .arc()

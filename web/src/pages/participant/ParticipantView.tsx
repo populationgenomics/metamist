@@ -16,13 +16,13 @@ interface IParticipantViewParticipant {
     id: number
     externalId: string
     karyotype?: string | null
-    meta?: any | null
-    phenotypes?: { [key: string]: any }
+    meta?: Record<string, unknown> | null
+    phenotypes?: { [key: string]: unknown }
     pedEntry?: PedigreeEntry
     samples: {
         id: string
         type: string
-        meta: { [key: string]: any }
+        meta: { [key: string]: unknown }
         sequencingGroups: {
             id: string
             type: string
@@ -134,7 +134,7 @@ export const ParticipantView: React.FC<IParticipantViewProps> = ({
                     </thead>
                     <tbody>
                         {participant.samples.map((s) => (
-                            <tr>
+                            <tr key={s.id}>
                                 <td>{s.id}</td>
                                 <td>{s.type}</td>
                                 <td>

@@ -12,11 +12,14 @@ interface IDocumentationArticleProps {
     articleid?: string
 }
 
-const RouterLink = (props: any) => {
+const RouterLink = (
+    props: React.DetailedHTMLProps<React.AnchorHTMLAttributes<HTMLAnchorElement>, HTMLAnchorElement>
+) => {
     // use an anchor for external links
-    if (props.href.match(/^(https?:)?\/\//)) return <a href={props.href}>{props.children}</a>
+    if (props.href && props.href.match(/^(https?:)?\/\//))
+        return <a href={props.href}>{props.children}</a>
 
-    let link: string = props.href
+    let link: string = props.href || '#'
     // rewrite the internal link here if it's a relative link
     // because the openapi-generator template is incompatible with how we display markdown here.
     if (!link.startsWith('/')) {

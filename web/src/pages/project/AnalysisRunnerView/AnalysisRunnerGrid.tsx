@@ -23,7 +23,7 @@ export interface AnalysisRunnerGridItem {
     batchUrl: string
     submittingUser: string
     outputPath: string
-    meta: any
+    meta: Record<string, unknown>
 
     // internal
     position: number

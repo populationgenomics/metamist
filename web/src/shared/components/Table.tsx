@@ -57,8 +57,7 @@ export const CheckboxRow: React.FC<ICheckboxRowProps> = ({
             <Checkbox
                 checked={isChecked}
                 toggle
-                onChange={(e) => {
-                    // debugger
+                onChange={() => {
                     setIsChecked(!isChecked)
                 }}
             />

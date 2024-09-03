@@ -18,7 +18,7 @@ interface File {
 
 interface SequenceMeta {
     reads?: File | Array<File> | Array<Array<File>>
-    [key: string]: any
+    [key: string]: unknown
 }
 
 const excludedSequenceFields = ['id', '__typename']
@@ -106,6 +106,7 @@ const AssayInfo: React.FunctionComponent<{
                                 )
                             }
                             if (v1 && typeof v1 === 'object' && !Array.isArray(v1)) {
+                                // @ts-ignore
                                 if (!!v1.location && !!v1.size) {
                                     return (
                                         <SUITable.Row key={`${k1}`}>

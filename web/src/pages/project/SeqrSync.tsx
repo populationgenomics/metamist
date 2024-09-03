@@ -36,6 +36,7 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
         syncCramMap: true,
         postSlackNotification: true,
     })
+    const [dropdownDisabled, setDropdownDisabled] = React.useState(!syncOptions.syncEsIndex)
 
     if (!syncTypes || syncTypes.length === 0) return <></>
 
@@ -76,8 +77,6 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
             })
     }
 
-    const [dropdownDisabled, setDropdownDisabled] = React.useState(!syncOptions.syncEsIndex)
-
     const updateStateFromCheckbox = (e: React.FormEvent<HTMLInputElement>, data: CheckboxProps) => {
         const value = data.checked
         setSyncOptions({ ...syncOptions, [data.id || '']: value })
@@ -90,9 +89,7 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
         e: React.SyntheticEvent<HTMLElement, Event>,
         data: DropdownProps
     ) => {
-        const value = Array.isArray((data as any).value)
-            ? (data as any).value
-            : [(data as any).value]
+        const value = Array.isArray(data.value) ? data.value : [data.value]
         setSyncOptions({ ...syncOptions, [data.id || '']: value })
     }
 

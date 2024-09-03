@@ -72,7 +72,7 @@ export const AnalysisGrid: React.FC<{
                                     {sg
                                         ? sgId
                                         : a.sgs?.map((sg) => (
-                                              <li>
+                                              <li key={sg}>
                                                   {sg}{' '}
                                                   {participantBySgId && sg in participantBySgId
                                                       ? `(${participantBySgId[sg]?.externalId})`

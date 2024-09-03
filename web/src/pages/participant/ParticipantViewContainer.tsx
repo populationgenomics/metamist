@@ -54,11 +54,12 @@ interface IParticipantPageProps {
 export const ParticipantPage: React.FC<IParticipantPageProps> = (props) => {
     const { participantId } = useParams()
     const pid = props.participantId || parseInt(participantId || '')
-    if (!pid || isNaN(pid)) return <em>No participant ID</em>
 
     const { loading, error, data } = useQuery(GET_PARTICIPANT_VIEW_INFO, {
         variables: { participantId: pid },
     })
+
+    if (!pid || isNaN(pid)) return <em>No participant ID</em>
 
     if (loading) {
         return <LoadingDucks />

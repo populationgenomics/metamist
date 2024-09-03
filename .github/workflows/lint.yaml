@@ -33,6 +33,15 @@ jobs:
 
           # openapi-generator
           wget https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/5.3.0/openapi-generator-cli-5.3.0.jar -O openapi-generator-cli.jar
+      
+      - name: 'install frontend deps'
+        run: npm ci
+        
+      - name: 'check frontend formatting'
+        run: npm run format:check
+
+      - name: 'check frontend linting'
+        run: npm run lint
 
       - name: 'build image'
         run: |
@@ -53,14 +62,4 @@ jobs:
       - name: pre-commit
         run: pre-commit run --all-files
 
-      - name: 'check frontend formatting'
-        run: |
-          set -eo pipefail
-          pushd web
-          # installs package-lock, not what it thinks it should be
-          npm ci
-          npm run format-check
-          rc=$?
 
-          echo "web_rc=$rc" >> $GITHUB_OUTPUT
-          popd

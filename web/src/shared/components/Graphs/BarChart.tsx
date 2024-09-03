@@ -16,18 +16,6 @@ interface BarChartProps {
 }
 
 export const BarChart: React.FC<BarChartProps> = ({ data, maxSlices, colors, isLoading }) => {
-    if (isLoading) {
-        return (
-            <div>
-                <LoadingDucks />
-            </div>
-        )
-    }
-
-    if (!data || data.length === 0) {
-        return <>No Data</>
-    }
-
     const colorFunc: (t: number) => string | undefined = colors ?? interpolateRainbow
     const margin = { top: 50, right: 0, bottom: 150, left: 100 }
     //   const width = 1000 - margin.left - margin.right;
@@ -57,6 +45,18 @@ export const BarChart: React.FC<BarChartProps> = ({ data, maxSlices, colors, isL
             window.removeEventListener('resize', updateWindowWidth)
         }
     }, [])
+
+    if (isLoading) {
+        return (
+            <div>
+                <LoadingDucks />
+            </div>
+        )
+    }
+
+    if (!data || data.length === 0) {
+        return <>No Data</>
+    }
 
     const contDiv = containerDivRef.current
     if (contDiv) {
