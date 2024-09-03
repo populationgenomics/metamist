@@ -258,40 +258,38 @@ WHERE id = :id
         Create a new sample, and add it to database
         """
         audit_log_id = await self.audit_log_id()
-        updater = {
-            'description': description,
-            'coded_phenotype': coded_phenotype,
-            'audit_log_id': audit_log_id,
-            'project': project or self.project_id,
-        }
-        keys = list(updater.keys())
-        str_keys = ', '.join(keys)
-        placeholder_keys = ', '.join(f':{k}' for k in keys)
-        _query = f"""
-INSERT INTO family
-    ({str_keys})
-VALUES
-    ({placeholder_keys})
-RETURNING id
-        """
 
-        new_id = await self.connection.fetch_val(_query, updater)
+        async with self.connection.transaction():
+            new_id = await self.connection.fetch_val(
+                """
+                INSERT INTO family (project, description, coded_phenotype, audit_log_id)
+                VALUES (:project, :description, :coded_phenotype, :audit_log_id)
+                RETURNING id
+                """,
+                {
+                    'project': project or self.project_id,
+                    'description': description,
+                    'coded_phenotype': coded_phenotype,
+                    'audit_log_id': audit_log_id,
+                },
+            )
 
-        _eid_query = """
-INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
-VALUES (:project, :family_id, :name, :external_id, :audit_log_id)
-        """
-        values = [
-            {
-                'project': project or self.project_id,
-                'family_id': new_id,
-                'name': name,
-                'external_id': eid,
-                'audit_log_id': audit_log_id,
-            }
-            for name, eid in external_ids.items()
-        ]
-        await self.connection.execute_many(_eid_query, values)
+            await self.connection.execute_many(
+                """
+                INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
+                VALUES (:project, :family_id, :name, :external_id, :audit_log_id)
+                """,
+                [
+                    {
+                        'project': project or self.project_id,
+                        'family_id': new_id,
+                        'name': name,
+                        'external_id': eid,
+                        'audit_log_id': audit_log_id,
+                    }
+                    for name, eid in external_ids.items()
+                ],
+            )
 
         return new_id
 
