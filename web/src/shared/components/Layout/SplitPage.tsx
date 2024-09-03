@@ -4,7 +4,7 @@ export type PanelProps = {
     width: number
 }
 
-export type SidePanelProps = {
+export type SplitPageProps = {
     main: (props: PanelProps) => React.ReactNode
     side: (props: PanelProps) => React.ReactNode
 }
@@ -16,7 +16,7 @@ type DragState = {
     percent: number
 }
 
-export function SidePanel(props: SidePanelProps) {
+export function SplitPage(props: SplitPageProps) {
     const divider = useRef<HTMLDivElement>(null)
     const container = useRef<HTMLDivElement>(null)
     const [clickTime, setClickTime] = useState<number | null>(null)
@@ -70,10 +70,8 @@ export function SidePanel(props: SidePanelProps) {
     return (
         <Box
             ref={container}
-            component={'div'}
-            display="flex"
             width="100%"
-            position={'relative'}
+            maxWidth="100%"
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -82,28 +80,34 @@ export function SidePanel(props: SidePanelProps) {
                 ...(dragState.isDragging ? { cursor: 'col-resize' } : {}),
             }}
         >
-            <Box style={{ width: `${dragState.percent}%` }} sx={{ overflowX: 'auto' }}>
+            <Box style={{ width: `${dragState.percent}%` }} sx={{ overflowY: 'auto' }}>
                 {props.main({ width: 10 })}
             </Box>
 
-            <div
-                ref={divider}
-                style={{
-                    width: '4px',
-                    height: '100%',
-                    background: 'var(--color-border-color)',
-                    position: 'absolute',
-                    left: `${dragState.percent}%`,
-                    cursor: 'col-resize',
-                }}
-            ></div>
-
             <Box
                 style={{ width: `${100 - dragState.percent}%` }}
-                sx={{ overflowX: 'auto' }}
-                paddingLeft={'4px'}
+                position={'fixed'}
+                height={'100%'}
+                top={0}
+                right={0}
+                pl={'4px'}
+                pt={7}
+                zIndex={1}
             >
-                {props.side({ width: 10 })}
+                <div
+                    ref={divider}
+                    style={{
+                        width: '4px',
+                        height: '100%',
+                        background: 'var(--color-border-color)',
+                        position: 'absolute',
+                        left: 0,
+                        cursor: 'col-resize',
+                    }}
+                ></div>
+                <Box height={'100vh'} sx={{ overflowY: 'auto' }}>
+                    {props.side({ width: 10 })}
+                </Box>
             </Box>
         </Box>
     )
