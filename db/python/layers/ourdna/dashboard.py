@@ -81,7 +81,7 @@ class SampleProcessMeta:
         return self.get_property('processing-site'), self.processing_time
 
     @cached_property
-    def processing_time_by_collection_site(self) -> tuple[str | None, int | None]:
+    def processing_time_by_collection_lab(self) -> tuple[str | None, int | None]:
         """Get processing times and site for a sample."""
         return self.get_property('collection-lab'), self.processing_time
 
@@ -366,7 +366,7 @@ class OurDnaDashboardLayer(BaseLayer):
         for sample in samples:
             processed_meta = SampleProcessMeta(sample)
             processing_collection_site, processing_time = (
-                processed_meta.processing_time_by_collection_site
+                processed_meta.processing_time_by_collection_lab
             )
             if processing_collection_site and processing_time:
                 hour_bucket = ceil(processing_time / 3600)
