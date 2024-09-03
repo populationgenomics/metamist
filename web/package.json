@@ -33,6 +33,7 @@
     "scripts": {
         "start": "vite --config vite.config.js",
         "prebuild": "npm run compile",
+        "typecheck": "tsc",
         "build": "tsc && vite build --config vite.config.js",
         "preview": "vite preview --config vite.config.js",
         "postbuild": "npm run copy:buildartifacts",
