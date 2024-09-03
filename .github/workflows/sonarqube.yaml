@@ -1,4 +1,4 @@
-name: Build
+name: SonarQube Build
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    name: SonarQube
+    name: SonarQube Scan
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -31,6 +31,7 @@ jobs:
         with:
           workload_identity_provider: 'projects/379228030003/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
           service_account: 'sonar-scanner@devops-tools-433123.iam.gserviceaccount.com'
+
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
