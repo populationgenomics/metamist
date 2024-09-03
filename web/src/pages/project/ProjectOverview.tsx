@@ -21,7 +21,7 @@ const ProjectOverview: React.FunctionComponent = () => {
             <em>Please select a project</em>
         </p>
     )
-    if (!!projectName) {
+    if (projectName) {
         body = (
             <>
                 <ProjectSummaryView projectName={projectName} />

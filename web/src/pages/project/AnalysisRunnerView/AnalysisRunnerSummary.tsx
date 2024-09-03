@@ -68,13 +68,6 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
         setSort({ column: null, direction: null })
     }
 
-    const projectSelectorOnClick = React.useCallback(
-        (__, { value }) => {
-            navigate(`/analysis-runner/${value}`)
-        },
-        [navigate]
-    )
-
     const handleOnClick = React.useCallback((p) => {
         setPageNumber(p)
     }, [])

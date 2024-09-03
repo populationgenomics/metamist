@@ -135,8 +135,7 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                 const value = getCellValue(details, config.key)
                 if (value === '✅') return 'TRUE'
                 if (value === '❌') return 'FALSE'
-                if (React.isValidElement(value) && value.type === 'a')
-                    return (value.props as any).href
+                if (React.isValidElement(value) && value.type === 'a') return value.props.href
                 return String(value)
             })
         )

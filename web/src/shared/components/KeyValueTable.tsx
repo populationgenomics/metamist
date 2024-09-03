@@ -1,9 +1,10 @@
 import * as React from 'react'
+import { ReactElement } from 'react-markdown/lib/react-markdown'
 
 interface IKeyValueTableProps {
-    obj: { [key: string]: any }
+    obj: { [key: string]: unknown }
     rightPadding?: string
-    tableClass?: React.FC<{}>
+    tableClass?: React.FC
 }
 
 // Define the default table like this, as it is not possible to set
@@ -12,7 +13,7 @@ const DefaultTable: React.FC<
     React.DetailedHTMLProps<React.TableHTMLAttributes<HTMLTableElement>, HTMLTableElement>
 > = (props) => <table {...props} />
 
-function valueToDisplay(value: any) {
+function valueToDisplay(value: string | ReactElement | unknown) {
     // if string, return
     if (typeof value === 'string') {
         if (value.startsWith('https://')) {
@@ -39,11 +40,7 @@ function valueToDisplay(value: any) {
  * @param rightPadding - padding for the right side of the key column
  * @param tableClass - The class to use to present the table, by default, use the default html table
  */
-export const KeyValueTable: React.FC<IKeyValueTableProps> = ({
-    obj,
-    tableClass,
-    rightPadding = '20px',
-}) => {
+export function KeyValueTable({ obj, tableClass, rightPadding = '20px' }: IKeyValueTableProps) {
     const TableClass = tableClass || DefaultTable
     return (
         <TableClass style={{ maxWidth: '100%' }}>

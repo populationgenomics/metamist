@@ -1,6 +1,6 @@
+import * as d3 from 'd3'
 import * as React from 'react'
 import { Card, Container } from 'semantic-ui-react'
-import * as d3 from 'd3'
 
 import { ourdnaColours } from './Colours'
 
@@ -227,7 +227,7 @@ const HistogramChart: React.FC<HistogramProps> = ({ icon, header, data }) => {
             .attr('y', 9.5)
             .attr('dy', '0.32em')
             .text((d) => d)
-    }, [data, dimensions])
+    }, [data, dimensions, groupedData, transformedData])
 
     return (
         <Card

@@ -1,22 +1,25 @@
 import * as React from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 
 import Markdown from 'react-markdown'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { dracula, vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import remarkGfm from 'remark-gfm'
 import remarkToc from 'remark-toc'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { vs, dracula } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
 
 interface IDocumentationArticleProps {
     articleid?: string
 }
 
-const RouterLink = (props: any) => {
+const RouterLink = (
+    props: React.DetailedHTMLProps<React.AnchorHTMLAttributes<HTMLAnchorElement>, HTMLAnchorElement>
+) => {
     // use an anchor for external links
-    if (props.href.match(/^(https?:)?\/\//)) return <a href={props.href}>{props.children}</a>
+    if (props.href && props.href.match(/^(https?:)?\/\//))
+        return <a href={props.href}>{props.children}</a>
 
-    let link: string = props.href
+    let link: string = props.href || '#'
     // rewrite the internal link here if it's a relative link
     // because the openapi-generator template is incompatible with how we display markdown here.
     if (!link.startsWith('/')) {

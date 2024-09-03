@@ -1,9 +1,9 @@
 import * as React from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Grid, Card, Input } from 'semantic-ui-react'
-import SeqrProportionalMapGraph from './components/SeqrProportionalMapGraph'
-import { getMonthEndDate } from '../../shared/utilities/monthStartEndDate'
+import { Card, Grid, Input } from 'semantic-ui-react'
 import generateUrl from '../../shared/utilities/generateUrl'
+import { getMonthEndDate } from '../../shared/utilities/monthStartEndDate'
+import SeqrProportionalMapGraph from './components/SeqrProportionalMapGraph'
 
 const BillingSeqrProp: React.FunctionComponent = () => {
     const now = new Date()
@@ -22,9 +22,11 @@ const BillingSeqrProp: React.FunctionComponent = () => {
         navigate(url)
     }
 
+    /* eslint-disable react-hooks/exhaustive-deps */
     React.useEffect(() => {
         updateNav(start, end)
     }, [start, end])
+    /* eslint-enable react-hooks/exhaustive-deps */
 
     return (
         <Card fluid style={{ padding: '20px' }} id="billing-container">

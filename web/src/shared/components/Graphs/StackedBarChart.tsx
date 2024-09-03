@@ -103,6 +103,10 @@ function prepareData(
     return extData
 }
 
+const colorFunc: (t: number) => string | undefined = d3.interpolateRainbow
+const margin = { top: 0, right: 10, bottom: 200, left: 100 }
+const height = 800 - margin.top - margin.bottom
+
 export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumulate }) => {
     const svgRef = React.useRef(null)
     const legendRef = React.useRef(null)
@@ -110,9 +114,6 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
     const containerDivRef = React.useRef<HTMLDivElement | null>(null)
     const tooltipDivRef = React.useRef<HTMLDivElement | null>(null)
 
-    const colorFunc: (t: number) => string | undefined = d3.interpolateRainbow
-    const margin = { top: 0, right: 10, bottom: 200, left: 100 }
-    const height = 800 - margin.top - margin.bottom
     const marginLegend = 10
     const minWidth = 1900
 
@@ -135,26 +136,30 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
         // prepare stacked data
         let stackedData
         if (accumulate) {
-            const accumulatedData = combinedData.reduce((acc: any[], curr) => {
-                const last = acc[acc.length - 1]
-                const accumulated = {
-                    date: curr.date,
-                    values: Object.keys(curr.values).reduce(
-                        (accValues: Record<string, number>, key) => {
-                            return {
-                                ...accValues,
-                                [key]: (last ? last.values[key] : 0) + curr.values[key],
-                            }
-                        },
-                        {}
-                    ),
-                }
-                return [...acc, accumulated]
-            }, [])
+            const accumulatedData = combinedData.reduce(
+                (acc: { date: Date; values: Record<string, number> }[], curr) => {
+                    const last = acc[acc.length - 1]
+                    const accumulated = {
+                        date: curr.date,
+                        values: Object.keys(curr.values).reduce(
+                            (accValues: Record<string, number>, key) => {
+                                return {
+                                    ...accValues,
+                                    [key]: (last ? last.values[key] : 0) + curr.values[key],
+                                }
+                            },
+                            {}
+                        ),
+                    }
+                    return [...acc, accumulated]
+                },
+                []
+            )
 
             stackedData = d3
                 .stack()
                 .offset(d3.stackOffsetNone)
+                // @ts-ignore
                 .keys(series)(accumulatedData.map((d) => ({ date: d.date, ...d.values })))
                 .map((ser, i) => ser.map((d) => ({ ...d, key: series[i] })))
         } else {
@@ -172,17 +177,24 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
         // tooltip events
         const tooltip = d3.select(tooltipDivRef.current)
 
-        const mouseover = (event: any, d: any) => {
+        const mouseover = () => {
             tooltip.style('opacity', 0.8)
         }
-        const mousemove = (event: any, d: any) => {
-            const formater = d3.format(',.2f')
+        const mousemove = (
+            event: MouseEvent,
+            d: {
+                key: string
+                0: number
+                1: number
+            }
+        ) => {
+            const formatter = d3.format(',.2f')
             tooltip
-                .html(d.key + ' ' + formater(d[1] - d[0]) + ' AUD')
+                .html(d.key + ' ' + formatter(d[1] - d[0]) + ' AUD')
                 .style('top', event.layerY - 30 + 'px')
                 .style('left', event.layerX - 30 + 'px')
         }
-        const mouseleave = (event: any, d: any) => {
+        const mouseleave = () => {
             tooltip.style('opacity', 0)
         }
 
@@ -195,7 +207,7 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
 
         // calculate opacity (for new dates)
         const opacity = 0.3
-        const calcOpacity = (d: any) => {
+        const calcOpacity = (d: { key: string; 0: number; 1: number; data: { date: Date } }) => {
             const idx = series.indexOf(d.key)
             // @ts-ignore
             const color = d3.color(colorFunc(idx / seriesCount))
@@ -307,13 +319,13 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
             .attr('width', x.bandwidth())
 
         // on Hover
-        const onHoverOver = (tg: HTMLElement, v: any) => {
+        const onHoverOver = (tg: HTMLElement, v: number) => {
             d3.selectAll(`#path${v}`).style('fill-opacity', 0.5)
             d3.select(tg).selectAll('circle').style('fill-opacity', 0.5)
             d3.select(tg).selectAll('text').attr('font-weight', 'bold')
         }
 
-        const onHoverOut = (tg: HTMLElement, v: any) => {
+        const onHoverOut = (tg: HTMLElement, v: number) => {
             d3.selectAll(`#path${v}`).style('fill-opacity', 1)
             d3.select(tg).selectAll('circle').style('fill-opacity', 1)
             d3.select(tg).selectAll('text').attr('font-weight', 'normal')
@@ -336,7 +348,7 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
                     .join('circle') // Use join to handle enter/update/exit selections
                     .attr('r', 8)
                     // @ts-ignore
-                    .attr('fill', (d) => colorFunc(i / seriesCount))
+                    .attr('fill', () => colorFunc(i / seriesCount))
                 d3.select(this)
                     .selectAll('text') // Replace append with selectAll
                     .data([d]) // Use data to bind a single data element
@@ -348,12 +360,12 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
                     .text(d)
                     .attr('font-size', '0.8em')
                 d3.select(this)
-                    .on('mouseover', (event, v) => {
+                    .on('mouseover', () => {
                         const element = d3.select(`#legend${i}`)
                         // @ts-ignore
                         onHoverOver(element.node(), i)
                     })
-                    .on('mouseout', (event, v) => {
+                    .on('mouseout', () => {
                         const element = d3.select(`#legend${i}`)
                         // @ts-ignore
                         onHoverOut(element.node(), i)
@@ -370,7 +382,7 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
             updateWindowWidth()
         }
         window.addEventListener('resize', updateWindowWidth)
-    }, [data, accumulate])
+    }, [data, accumulate, series, seriesCount])
 
     if (!data || data.length === 0) {
         return <>No Data</>

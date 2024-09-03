@@ -141,12 +141,6 @@ const fourGenTree: PedigreeEntry[] = [
 
 export const TangledTreeExamples: React.FC = () => {
     const [nodeDiameter, setNodeDiameter] = React.useState<number>(40)
-    const [horizontalNodeSpacing, setHorizontalNodeSpacing] = React.useState<number | undefined>(
-        undefined
-    )
-    const [verticalNodeSpacing, setVerticalNodeSpacing] = React.useState<number | undefined>(
-        undefined
-    )
 
     return (
         <>

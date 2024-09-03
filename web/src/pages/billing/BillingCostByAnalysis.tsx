@@ -15,6 +15,7 @@ enum SearchType {
     Batch_id,
 }
 
+/* eslint-disable @typescript-eslint/no-explicit-any  -- too many anys in the file to fix right now but would be good to sort out when we can */
 const BillingCostByAnalysis: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
 
@@ -126,9 +127,11 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         return dropdownOptions[0].value
     }
 
+    /* eslint-disable react-hooks/exhaustive-deps */
     React.useEffect(() => {
         handleSearch()
     }, [])
+    /* eslint-enable react-hooks/exhaustive-deps */
 
     const errorComponent = () => {
         if (error) {
@@ -261,3 +264,4 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
 }
 
 export default BillingCostByAnalysis
+/* eslint-enable @typescript-eslint/no-explicit-any */

@@ -1,21 +1,21 @@
 import {
-    scaleLinear,
-    extent,
-    stack,
     area,
-    stackOffsetExpand,
-    scaleTime,
-    utcDay,
-    utcMonth,
-    select,
-    pointer,
+    extent,
     interpolateRainbow,
-    TimeInterval,
-    utcHour,
+    pointer,
+    scaleLinear,
+    scaleTime,
+    select,
+    stack,
+    stackOffsetExpand,
     stackOffsetNone,
+    TimeInterval,
+    utcDay,
+    utcHour,
+    utcMonth,
 } from 'd3'
-import min from 'lodash/min'
 import max from 'lodash/max'
+import min from 'lodash/min'
 import React from 'react'
 import { Message } from 'semantic-ui-react'
 
@@ -76,19 +76,12 @@ export const StackedAreaByDateChart: React.FC<IStackedAreaByDateChartProps> = ({
     showDate,
     colors,
 }) => {
-    if (!data || data.length === 0) {
-        return <>No Data</>
-    }
-
     const colorFunc: (t: number) => string | undefined = colors ?? interpolateRainbow
 
     const tooltipRef = React.useRef<HTMLDivElement | null>(null)
     const containerDivRef = React.useRef<HTMLDivElement | null>(null)
     const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null)
     const [graphWidth, setGraphWidth] = React.useState<number>(768)
-
-    const _start = start || min(data.map((d) => d.date))
-    const _end = end || max(data.map((d) => d.date))
 
     React.useEffect(() => {
         function updateWindowWidth() {
@@ -103,6 +96,13 @@ export const StackedAreaByDateChart: React.FC<IStackedAreaByDateChartProps> = ({
             window.removeEventListener('resize', updateWindowWidth)
         }
     }, [])
+
+    if (!data || data.length === 0) {
+        return <>No Data</>
+    }
+
+    const _start = start || min(data.map((d) => d.date))
+    const _end = end || max(data.map((d) => d.date))
 
     if (!_start || !_end) {
         return (
@@ -159,12 +159,12 @@ export const StackedAreaByDateChart: React.FC<IStackedAreaByDateChartProps> = ({
     // function that takes the various stacked data info and generates an svg path element (magically)
     const areaGenerator = area()
         // @ts-ignore
-        .x((d, idx) => xScale(d.data.date))
+        .x((d) => xScale(d.data.date))
         .y0((d) => yScale(d[0]))
         .y1((d) => yScale(d[1]))
 
     const diffMinutes = Math.round((_end?.valueOf() - _start?.valueOf()) / 60000)
-    let interval: TimeInterval | null = getTimeInterval(diffMinutes)
+    const interval: TimeInterval | null = getTimeInterval(diffMinutes)
 
     const mouseover = (
         event: React.MouseEvent<SVGPathElement, MouseEvent>,

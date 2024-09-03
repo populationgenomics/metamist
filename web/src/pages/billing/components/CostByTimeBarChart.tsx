@@ -1,9 +1,9 @@
 import * as React from 'react'
-import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
 import {
-    StackedBarChart,
     IStackedBarChartData,
+    StackedBarChart,
 } from '../../../shared/components/Graphs/StackedBarChart'
+import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
 
 interface ICostByTimeBarChartProps {
     accumulate: boolean

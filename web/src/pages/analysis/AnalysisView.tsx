@@ -9,7 +9,7 @@ import ProjectLink from '../../shared/components/links/ProjectLink'
 import SequencingGroupLink from '../../shared/components/links/SequencingGroupLink'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import Table from '../../shared/components/Table'
-import { getHailBatchURL } from '../../shared/utilities/hailBatch'
+import { getHailBatchUrl } from '../../shared/utilities/hailBatch'
 
 interface IAnalysisViewProps {
     analysisId: number
@@ -78,7 +78,7 @@ export const AnalysisView: React.FC<IAnalysisViewProps> = ({ analysisId }) => {
         return <LoadingDucks />
     }
 
-    if (!!error) {
+    if (error) {
         return <Message negative>{error}</Message>
     }
 
@@ -88,7 +88,7 @@ export const AnalysisView: React.FC<IAnalysisViewProps> = ({ analysisId }) => {
     const sortedAuditLogs = analysis.auditLogs.sort((a, b) => {
         return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     })
-    const attributeDict: Record<string, any> = {
+    const attributeDict: Record<string, React.ReactNode> = {
         ID: <AnalysisLink id={analysis.id} />,
         Output: (
             <span
@@ -109,7 +109,7 @@ export const AnalysisView: React.FC<IAnalysisViewProps> = ({ analysisId }) => {
             const [_, dataset, env, path] = match
             const url = `https://${env}-web.populationgenomics.org.au/${dataset}/${path}`
             attributeDict.Url = (
-                <a href={url} target="_blank">
+                <a href={url} target="_blank" rel="noreferrer">
                     {url}
                 </a>
             )
@@ -186,11 +186,11 @@ interface IAuditLogHistoryProps {
         arGuid?: string | null
         author: string
         timestamp: string
-        meta: Record<string, any>
+        meta: Record<string, unknown>
     }[]
 }
 
-const getBatchInformationFromLog = (meta: Record<string, any>) => {
+const getBatchInformationFromLog = (meta: Record<string, unknown>) => {
     // { "path": "/api/v1/analysis/vcgs-clinical/", "ip": "169.254.169.126", "HAIL_ATTEMPT_ID": "Y5QQS3", "HAIL_BATCH_ID": "474353", "HAIL_JOB_ID": "33"
     const batchId = meta.HAIL_BATCH_ID
     const jobId = meta.HAIL_JOB_ID
@@ -200,7 +200,7 @@ const getBatchInformationFromLog = (meta: Record<string, any>) => {
     }
 
     return {
-        link: getHailBatchURL(batchId, jobId),
+        link: getHailBatchUrl(batchId as string, jobId as string),
         text: `batches/${batchId}/jobs/${jobId}`,
     }
 }
@@ -224,7 +224,11 @@ export const AuditLogHistory: React.FC<IAuditLogHistoryProps> = ({ auditLogs }) 
                             <SUITable.Cell>{log.author}</SUITable.Cell>
                             <SUITable.Cell>
                                 {batchInformation && (
-                                    <a href={batchInformation.link} target="_blank">
+                                    <a
+                                        href={batchInformation.link}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
                                         {batchInformation.text}
                                     </a>
                                 )}
