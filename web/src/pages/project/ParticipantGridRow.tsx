@@ -68,7 +68,7 @@ const FamilyCells: React.FC<{
     backgroundColor?: string
     projectName: string
     participantRowSpan?: number
-}> = ({ fields, participant, backgroundColor, projectName, participantRowSpan }) => {
+}> = ({ fields, participant, backgroundColor, participantRowSpan }) => {
     const [showFamilyModal, setShowFamilyModal] = React.useState(false)
 
     const familyIdSingular = participant.families.length === 1 ? participant.families[0].id : null
@@ -238,7 +238,7 @@ export const ProjectGridParticipantRows: React.FC<IProjectGridParticipantRowProp
                                     rowSpan={samplesRowSpan}
                                 >
                                     {field.key === 'external_ids' || field.key === 'id' ? (
-                                        <SampleLink id={s.id} projectName={projectName}>
+                                        <SampleLink id={s.id}>
                                             {field.key === 'external_ids'
                                                 ? prepareExternalIds(s.external_ids || {})
                                                 : s.id}

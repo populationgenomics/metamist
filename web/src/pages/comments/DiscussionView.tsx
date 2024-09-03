@@ -33,7 +33,7 @@ function DiscussionSection(props: {
                 comments.map((cc, index) => {
                     const prevComment = comments[index - 1]
                     return (
-                        <Box>
+                        <Box key={cc.id}>
                             <CommentThread
                                 comment={cc}
                                 viewerUser={viewerUser}
@@ -122,7 +122,7 @@ export function DiscussionView(props: {
     const groupedRelatedComments: [CommentEntityType, CommentThreadData[]][] = []
 
     for (const [_entityType, comments] of groupedRelatedCommentsMap) {
-        let entityType = _entityType as CommentEntityType
+        const entityType = _entityType as CommentEntityType
         groupedRelatedComments.push([entityType, comments])
     }
 
@@ -164,7 +164,7 @@ export function DiscussionView(props: {
                     </Box>
                 )}
             </Box>
-            {/* <Box>
+            <Box>
                 {groupedRelatedComments.map(([entityType, comments]) => (
                     <DiscussionSection
                         key={entityType}
@@ -175,7 +175,7 @@ export function DiscussionView(props: {
                         projectName={projectName}
                     />
                 ))}
-            </Box> */}
+            </Box>
         </Box>
     )
 }

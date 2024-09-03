@@ -16,6 +16,7 @@ import {
 import CostByTimeBarChart from './components/CostByTimeBarChart'
 import FieldSelector from './components/FieldSelector'
 
+/* eslint-disable @typescript-eslint/no-explicit-any  -- too many anys in the file to fix right now but would be good to sort out when we can */
 const BillingCostByCategory: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
 

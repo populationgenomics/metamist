@@ -29,7 +29,7 @@ export const PROJECT_ADD_COMMENT = gql(`
     }
 `)
 
-export function newCommentOnProject(id: number | null) {
+export function useNewCommentOnProject(id: number | null) {
     return useNewComment(
         PROJECT_ADD_COMMENT,
         id ? `GraphQLProject:${id}` : null,
@@ -47,7 +47,7 @@ export function ProjectCommentsView(props: ProjectCommentsViewProps) {
         notifyOnNetworkStatusChange: true,
     })
 
-    const [addCommentToProjectMutation, addCommentToProjectResult] = newCommentOnProject(
+    const [addCommentToProjectMutation, addCommentToProjectResult] = useNewCommentOnProject(
         data?.project.id ?? null
     )
 

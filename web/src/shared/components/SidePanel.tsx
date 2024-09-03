@@ -61,7 +61,7 @@ export function SidePanel(props: SidePanelProps) {
         }
     }
 
-    const handlePointerLeave: PointerEventHandler = (e) => {
+    const handlePointerLeave: PointerEventHandler = () => {
         if (dragState.isDragging) {
             setDragState({ isDragging: false, percent: dragState.percent })
         }

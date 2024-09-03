@@ -61,7 +61,7 @@ export function useUpdateComment() {
     return useMutation(UPDATE_COMMENT)
 }
 
-export function useNewComment<TData = any, TVariables = OperationVariables>(
+export function useNewComment<TData, TVariables = OperationVariables>(
     query: DocumentNode | TypedDocumentNode<TData, TVariables>,
     cacheId: string | null,
     commentGetter: (

@@ -52,7 +52,7 @@ const parseAuthor = (author: string) => {
     const authorParts = author.split('@')
     const username = authorParts[0]
     const domain = authorParts[1]
-    const isMachineUser = domain && domain.includes(serviceAccountStr)
+    const isMachineUser = domain && domain.endsWith(serviceAccountStr)
 
     let name = ''
 
@@ -61,7 +61,7 @@ const parseAuthor = (author: string) => {
             author.replace(serviceAccountStr, '').replace('@', ' @ ').replace(/-/g, ' ')
         )
     } else {
-        name = toTitleCase(username.replace(/[\.-]/g, ' '))
+        name = toTitleCase(username.replace(/[.-]/g, ' '))
     }
 
     const initials = name
@@ -406,6 +406,7 @@ export function CommentThread(props: {
                         <Box ml={2} pl={2} borderLeft={'2px solid var(--color-border-color)'}>
                             {comment.thread.map((cc) => (
                                 <Comment
+                                    key={cc.id}
                                     comment={cc}
                                     canComment={canComment}
                                     viewerUser={viewerUser}

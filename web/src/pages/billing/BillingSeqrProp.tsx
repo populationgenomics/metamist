@@ -64,7 +64,7 @@ const BillingSeqrProp: React.FunctionComponent = () => {
 export default function BillingSeqrPropPage() {
     return (
         <PaddedPage>
-            <BillingSeqrPropPage />
+            <BillingSeqrProp />
         </PaddedPage>
     )
 }

@@ -110,7 +110,7 @@ const DocumentationArticle: React.FunctionComponent<IDocumentationArticleProps> 
     )
 }
 
-export default function (props: IDocumentationArticleProps) {
+export default function DocumentationArticlePage(props: IDocumentationArticleProps) {
     return (
         <PaddedPage>
             <DocumentationArticle {...props} />

@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Grid, Input, Message } from 'semantic-ui-react'
+import { Button, Card, DropdownProps, Grid, Input, Message } from 'semantic-ui-react'
 import { BarChart, IData } from '../../shared/components/Graphs/BarChart'
 import { DonutChart } from '../../shared/components/Graphs/DonutChart'
 import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
