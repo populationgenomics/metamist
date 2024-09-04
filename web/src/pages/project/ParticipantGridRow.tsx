@@ -1,12 +1,11 @@
 import * as React from 'react'
 
 import get from 'lodash/get'
-import { Button, Modal, TableCell, TableRow } from 'semantic-ui-react'
+import { TableCell, TableRow } from 'semantic-ui-react'
 import FamilyLink from '../../shared/components/links/FamilyLink'
-import { getParticipantLink } from '../../shared/components/links/ParticipantLink'
+import ParticipantLink from '../../shared/components/links/ParticipantLink'
 import SampleLink from '../../shared/components/links/SampleLink'
 import SequencingGroupLink from '../../shared/components/links/SequencingGroupLink'
-import { SMModal } from '../../shared/components/Modal'
 import sanitiseValue from '../../shared/utilities/sanitiseValue'
 import {
     Assay,
@@ -15,8 +14,6 @@ import {
     NestedSequencingGroup,
     ProjectParticipantGridField,
 } from '../../sm-api/api'
-import FamilyView from '../family/FamilyView'
-import { ParticipantModal } from '../participant/ParticipantViewContainer'
 import { firstColBorder, otherColBorder } from './ProjectGridHeaderGroup'
 
 const getBorderStyles = (idx: number) => {
@@ -69,10 +66,6 @@ const FamilyCells: React.FC<{
     projectName: string
     participantRowSpan?: number
 }> = ({ fields, participant, backgroundColor, participantRowSpan }) => {
-    const [showFamilyModal, setShowFamilyModal] = React.useState(false)
-
-    const familyIdSingular = participant.families.length === 1 ? participant.families[0].id : null
-
     return (
         <>
             {fields.map((field) => (
@@ -89,10 +82,6 @@ const FamilyCells: React.FC<{
                               <FamilyLink
                                   key={`family-${participant.id}-${f.id}`}
                                   id={`${f.id ?? ''}`}
-                                  onClick={(e) => {
-                                      e.preventDefault()
-                                      setShowFamilyModal(true)
-                                  }}
                               >
                                   {f.external_id}
                               </FamilyLink>
@@ -102,21 +91,6 @@ const FamilyCells: React.FC<{
                               .join(', ')}
                 </TableCell>
             ))}
-            {!!familyIdSingular && (
-                <SMModal
-                    open={showFamilyModal}
-                    size="large"
-                    onClose={() => setShowFamilyModal(false)}
-                >
-                    <Modal.Header>Family</Modal.Header>
-                    <Modal.Content>
-                        <FamilyView familyId={familyIdSingular} />
-                    </Modal.Content>
-                    <Modal.Actions>
-                        <Button onClick={() => setShowFamilyModal(false)}>Close</Button>
-                    </Modal.Actions>
-                </SMModal>
-            )}
         </>
     )
 }
@@ -128,8 +102,6 @@ const ParticipantCells: React.FC<{
     projectName: string
     participantRowSpan?: number
 }> = ({ fields, participant, backgroundColor, participantRowSpan }) => {
-    const [showParticipantModal, setShowParticipantModal] = React.useState(false)
-
     const defaultRenderer = (field: ProjectParticipantGridField) =>
         sanitiseValue(get(participant, field.key))
     const valuePreparers: Record<
@@ -138,15 +110,7 @@ const ParticipantCells: React.FC<{
     > = {
         external_ids: () => prepareExternalIds(participant.external_ids || {}),
         id: (field: ProjectParticipantGridField) => (
-            <a
-                href={getParticipantLink(participant.id)}
-                onClick={(e) => {
-                    e.preventDefault()
-                    setShowParticipantModal(true)
-                }}
-            >
-                {defaultRenderer(field)}
-            </a>
+            <ParticipantLink id={participant.id}>{defaultRenderer(field)}</ParticipantLink>
         ),
     }
 
@@ -164,13 +128,6 @@ const ParticipantCells: React.FC<{
                     {(valuePreparers[field.key] || defaultRenderer)(field)}
                 </TableCell>
             ))}
-
-            <ParticipantModal
-                isOpen={showParticipantModal}
-                size="large"
-                participantId={participant.id}
-                onClose={() => setShowParticipantModal(false)}
-            />
         </>
     )
 }

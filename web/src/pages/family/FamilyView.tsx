@@ -17,7 +17,6 @@ import TangledTree, {
 } from '../../shared/components/pedigree/TangledTree'
 import Table from '../../shared/components/Table'
 import { AnalysisGrid } from '../analysis/AnalysisGrid'
-import { AnalysisViewModal } from '../analysis/AnalysisView'
 import { ParticipantView } from '../participant/ParticipantView'
 
 const getSeqrUrl = (projectGuid: string, familyGuid: string) =>
@@ -91,7 +90,6 @@ export const FamilyView: React.FC<IFamilyViewProps> = ({ familyId }) => {
         string | null | undefined
     >()
 
-    const [analysisIdToView, setAnalysisIdToView] = React.useState<number | null | undefined>(null)
     const invalidFamilyId = !familyId || isNaN(familyId)
 
     const { loading, error, data } = useQuery(GET_FAMILY_INFO, {
@@ -207,18 +205,8 @@ export const FamilyView: React.FC<IFamilyViewProps> = ({ familyId }) => {
             <hr />
             <section id="family-analyses">
                 <h4>Family analyses</h4>
-                <AnalysisGrid
-                    analyses={familyAnalysis}
-                    participantBySgId={participantBySgId}
-                    setAnalysisIdToView={(aId) => setAnalysisIdToView(aId)}
-                />
+                <AnalysisGrid analyses={familyAnalysis} participantBySgId={participantBySgId} />
             </section>
-
-            <AnalysisViewModal
-                size="small"
-                analysisId={analysisIdToView}
-                onClose={() => setAnalysisIdToView(null)}
-            />
         </div>
     )
 }

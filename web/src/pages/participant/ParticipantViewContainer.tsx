@@ -3,7 +3,7 @@ import * as React from 'react'
 import { gql } from '../../__generated__'
 
 import { useParams } from 'react-router-dom'
-import { Button, Message, Modal } from 'semantic-ui-react'
+import { Message } from 'semantic-ui-react'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { IAnalysisGridAnalysis } from '../analysis/AnalysisGrid'
 import { ParticipantView } from './ParticipantView'
@@ -80,35 +80,4 @@ export const ParticipantPage: React.FC<IParticipantPageProps> = (props) => {
                 }) as IAnalysisGridAnalysis
         )
     return <ParticipantView participant={participant} analyses={analyses} showNonSingleSgAnalyses />
-}
-
-interface IParticipantModalProps extends IParticipantPageProps {
-    isOpen?: boolean
-    onClose: () => void
-    size?: 'mini' | 'tiny' | 'small' | 'large' | 'fullscreen'
-}
-
-export const ParticipantModal: React.FC<IParticipantModalProps> = ({
-    isOpen,
-    onClose,
-    size,
-    ...viewProps
-}) => {
-    const _isOpen = isOpen !== undefined ? isOpen : !!viewProps.participantId
-    return (
-        <Modal
-            size={size}
-            onClose={onClose}
-            open={_isOpen}
-            style={{ height: 'unset', top: '50px', left: 'unset' }}
-        >
-            <Modal.Header>Participant</Modal.Header>
-            <Modal.Content>
-                {!!viewProps.participantId && <ParticipantPage {...viewProps} />}
-            </Modal.Content>
-            <Modal.Actions>
-                <Button onClick={() => onClose()}>Close</Button>
-            </Modal.Actions>
-        </Modal>
-    )
 }
