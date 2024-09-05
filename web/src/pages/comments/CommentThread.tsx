@@ -1,11 +1,12 @@
 import { AvatarGroup, Box, Button, Divider, Typography } from '@mui/material'
 
 import { useEffect, useRef, useState } from 'react'
-import { Comment, parseAuthor } from './Comment'
+import { Comment } from './Comment'
 import { CommentAvatar } from './CommentAvatar'
 import { CommentThreadData, getCommentEntityId } from './commentConfig'
 import { CommentEditor } from './CommentEditor'
 import { CommentEntityLink } from './CommentEntityLink'
+import { parseAuthor } from './commentUtils'
 import { useAddCommentToThread } from './data/commentMutations'
 
 export function CommentThread(props: {
@@ -16,7 +17,6 @@ export function CommentThread(props: {
     showEntityInfo: boolean
     projectName: string
 }) {
-    console.log('comment thread')
     const { comment, prevComment, canComment, showEntityInfo, viewerUser } = props
 
     const [showThread, setShowThread] = useState(false)

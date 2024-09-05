@@ -2,77 +2,33 @@ import {
     Alert,
     Box,
     Button,
+    Modal,
     Link as MuiLink,
     LinkProps as MuiLinkProps,
     Typography,
 } from '@mui/material'
 import { DateTime } from 'luxon'
 import { useContext, useEffect, useState } from 'react'
-import { Location, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import useCopyToClipboard from 'react-use/esm/useCopyToClipboard'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
 import { CommentAvatar } from './CommentAvatar'
 import { CommentData } from './commentConfig'
 import { CommentContent } from './CommentContent'
 import { CommentEditor } from './CommentEditor'
+import { CommentHistory } from './CommentHistory'
+import { getCommentLink, parseAuthor } from './commentUtils'
 import { useUpdateComment } from './data/commentMutations'
 
-const toTitleCase = (str: string) => {
-    return str
-        .split(' ')
-        .map((ss) => `${ss.charAt(0).toLocaleUpperCase()}${ss.substring(1).toLocaleLowerCase()}`)
-        .join(' ')
-}
-
-const serviceAccountStr = '.iam.gserviceaccount.com'
-
-// Convert the author email to something that is a bit more friendly
-// Makes an attempt at converting service accounts to something readable
-export const parseAuthor = (author: string) => {
-    const authorParts = author.split('@')
-    const username = authorParts[0]
-    const domain: string | undefined = authorParts[1]
-    const isMachineUser = domain ? domain.endsWith(serviceAccountStr) : false
-
-    let name = ''
-
-    if (isMachineUser) {
-        name = toTitleCase(
-            author.replace(serviceAccountStr, '').replace('@', ' @ ').replace(/-/g, ' ')
-        )
-    } else {
-        name = toTitleCase(username.replace(/[.-]/g, ' '))
-    }
-
-    const initials = name
-        .split(' ')
-        .map((nn) => nn[0])
-        .join('')
-        .slice(0, 2)
-
-    return {
-        username: author,
-        isMachineUser,
-        name,
-        initials,
-    }
-}
-
-const getCommentLink = (id: number, location: Location) => {
-    const params = new URLSearchParams(location.search)
-    params.set('show_comments', 'true')
-    params.set('comment_id', id.toString())
-    return `${window.location.protocol}//${window.location.host}${location.pathname}?${params.toString()}`
-}
-
 function CommentAction(props: MuiLinkProps & { preventDefault?: boolean }) {
+    const { preventDefault, ...otherProps } = props
     return (
         <MuiLink
             href="#"
             sx={{ fontSize: 12, mr: 2 }}
-            {...props}
+            {...otherProps}
             onClick={(e) => {
-                if (props.preventDefault) {
+                if (preventDefault) {
                     e.preventDefault()
                     e.stopPropagation()
                 }
@@ -97,6 +53,7 @@ export function Comment(props: {
     const [content, setContent] = useState(comment.content)
     const [copyLinkState, copyLinkToClipboard] = useCopyToClipboard()
     const [showCopiedState, setShowCopiedState] = useState(true)
+    const [isShowingHistory, setIsShowingHistory] = useState(false)
     const location = useLocation()
 
     // Hide the "Copied!" notification after a couple of seconds
@@ -252,12 +209,25 @@ export function Comment(props: {
                                         ? 'Copied!'
                                         : 'Copy Link'}
                                 </CommentAction>
-                                <CommentAction>View History</CommentAction>
+                                {comment.versions.length > 0 && (
+                                    <CommentAction onClick={() => setIsShowingHistory(true)}>
+                                        View Edits
+                                    </CommentAction>
+                                )}
                             </Box>
                         </Box>
                     )}
                 </Box>
             </Box>
+            <Modal
+                open={isShowingHistory}
+                onClose={() => setIsShowingHistory(false)}
+                disableEnforceFocus
+            >
+                <Box>
+                    <CommentHistory comment={comment} theme={isDarkMode ? 'dark' : 'light'} />
+                </Box>
+            </Modal>
         </Box>
     )
 }

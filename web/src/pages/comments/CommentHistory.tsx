@@ -1,0 +1,82 @@
+import { Box, List, ListItem, ListItemButton, ListItemText } from '@mui/material'
+import { DateTime } from 'luxon'
+import { useState } from 'react'
+import { CommentContent } from './CommentContent'
+import { CommentData } from './commentConfig'
+import { parseAuthor } from './commentUtils'
+
+export function CommentHistory(props: { comment: CommentData; theme: 'light' | 'dark' }) {
+    const comment = props.comment
+    // Add the current version to past versions
+    const versions = [
+        ...comment.versions.map((vv) => ({
+            content: vv.content,
+            author: vv.author,
+            status: vv.status,
+            timestamp: vv.timestamp,
+        })),
+        {
+            content: comment.content,
+            author: comment.author,
+            status: comment.status,
+            timestamp: comment.updatedAt,
+        },
+    ].reverse()
+
+    const [selectedTimestamp, setSelectedTimestamp] = useState(comment.updatedAt)
+    const selectedVersion = versions.find((vv) => vv.timestamp === selectedTimestamp)
+
+    return (
+        <Box
+            display={'flex'}
+            sx={{
+                position: 'absolute' as 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '80%',
+                minWidth: 400,
+                maxWidth: 960,
+                maxHeight: '90%',
+                bgcolor: 'background.paper',
+                border: '2px solid var(--color-border-color)',
+                p: 4,
+            }}
+        >
+            <Box mr={2} flexGrow={1} overflow={'auto'}>
+                <CommentContent content={selectedVersion?.content} theme={props.theme} />
+            </Box>
+            <Box
+                borderLeft={'1px solid var(--color-border-color)'}
+                width={'300px'}
+                sx={{ overflowY: 'auto' }}
+            >
+                <List>
+                    {versions.map((vv) => {
+                        const time = DateTime.fromISO(vv.timestamp)
+
+                        return (
+                            <ListItem
+                                key={vv.timestamp}
+                                disablePadding
+                                style={{
+                                    background:
+                                        vv.timestamp === selectedTimestamp
+                                            ? 'var(--color-border-color)'
+                                            : 'inherit',
+                                }}
+                            >
+                                <ListItemButton onClick={() => setSelectedTimestamp(vv.timestamp)}>
+                                    <ListItemText
+                                        primary={time.toLocaleString(DateTime.DATETIME_MED)}
+                                        secondary={parseAuthor(vv.author).name}
+                                    />
+                                </ListItemButton>
+                            </ListItem>
+                        )
+                    })}
+                </List>
+            </Box>
+        </Box>
+    )
+}
