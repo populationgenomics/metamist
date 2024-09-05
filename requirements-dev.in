@@ -8,7 +8,7 @@ flake8-bugbear
 nest-asyncio
 pre-commit
 pylint
-testcontainers[mysql]>=4.5.0
+testcontainers[mysql]>=4.8.1
 types-PyMySQL
 # some strawberry dependency
 strawberry-graphql[debug-server]
