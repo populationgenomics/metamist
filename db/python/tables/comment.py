@@ -225,14 +225,14 @@ class CommentTable(DbBase):
 
         queries_for_entity = comment_queries.get(entity, None)
         if queries_for_entity is None:
-            raise InternalError(f"Unknown comment entity {entity}")
+            raise InternalError(f'Unknown comment entity {entity}')
 
         # In the below there are two entity ids queried, requested_entity_id and
         # comment_entity_id. requested_entity_id is the ID of the entity requested
         # entity, whereas comment_entity_id is the id of the entity that the comment
         # is attached to, they can be different because comments related to the
         # requested entity can be returned as well as those attached directly
-        combined_comment_query = "\nUNION\n".join(
+        combined_comment_query = '\nUNION\n'.join(
             [
                 f"""(
                     SELECT
@@ -270,7 +270,7 @@ class CommentTable(DbBase):
             ON c.id = tc.comment_id OR c.parent_id = tc.comment_id
             LEFT JOIN audit_log al
             ON al.id = c.audit_log_id
-            {'WHERE c.id = :comment_id' if comment_id else ''}
+            {'WHERE c.id = :comment_id or c.parent_id = :comment_id'  if comment_id else ''}
             ORDER BY c.id, al.timestamp
         """
         values: dict['str', int | list[int]] = {'entity_ids': entity_ids}
@@ -285,6 +285,13 @@ class CommentTable(DbBase):
             id: CommentInternal.from_db_versions(list(dict(v) for v in g))
             for id, g in groupby(comment_versions, key=lambda k: k['comment_id'])
         }
+
+        # Organize threaded comments under their parents
+        for _, comment in comment_map.items():
+            if comment.parent_id is not None:
+                parent = comment_map.get(comment.parent_id, None)
+                if parent is not None:
+                    parent.add_comment_to_thread(comment)
 
         return comment_map
 
@@ -301,14 +308,10 @@ class CommentTable(DbBase):
             entity=entity, entity_ids=entity_ids, include_related_comments=True
         )
 
-        # Organize threaded comments under their parents
+        # Only add parent comments to list
         for _, comment in comment_map.items():
             if comment.parent_id is None:
                 comments.append(comment)
-            else:
-                parent = comment_map.get(comment.parent_id, None)
-                if parent is not None:
-                    parent.add_comment_to_thread(comment)
 
         # Group comments by the entity id so that they can be returned in the same order
         # They were requested in. And wrap them in the Discussion model to separate
@@ -328,7 +331,7 @@ class CommentTable(DbBase):
         # so we build a query to union together results from all the comment join
         # tables.
 
-        join_table_query = "\nUNION\n".join(
+        join_table_query = '\nUNION\n'.join(
             [
                 f"""(
                 SELECT
@@ -355,7 +358,7 @@ class CommentTable(DbBase):
         rows = await self.connection.fetch_all(query, {'comment_id': id})
 
         if len(rows) == 0:
-            raise NotFoundError(f"Comment with id {id} was not found")
+            raise NotFoundError(f'Comment with id {id} was not found')
 
         comments = await self.get_comments_for_entity_ids(
             entity_ids=[rows[0]['entity_id']],
@@ -365,16 +368,15 @@ class CommentTable(DbBase):
         )
 
         if id not in comments:
-            raise NotFoundError(f"Comment with id {id} was not found")
+            raise NotFoundError(f'Comment with id {id} was not found')
 
         return comments[id]
 
     async def add_comment_to_entity(
         self, entity: CommentEntityType, entity_id: int, content: str
     ):
-
-        join_table = f"{entity}_comment"
-        join_column = f"{entity}_id"
+        join_table = f'{entity}_comment'
+        join_column = f'{entity}_id'
 
         comment_insert = """
             INSERT INTO comment (content, status, audit_log_id)
@@ -456,7 +458,7 @@ class CommentTable(DbBase):
         ]
 
         update_q = ', '.join(
-            [f"{k} = :{k}" for k, v, changed in updates if v is not None and changed]
+            [f'{k} = :{k}' for k, v, changed in updates if v is not None and changed]
         )
         update_v = {k: v for k, v, changed in updates if v is not None and changed}
 
