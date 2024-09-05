@@ -3,26 +3,35 @@ import { AvatarGroup, Box, Button, Divider, Typography } from '@mui/material'
 import { useEffect, useRef, useState } from 'react'
 import { Comment } from './Comment'
 import { CommentAvatar } from './CommentAvatar'
-import { CommentThreadData, getCommentEntityId } from './commentConfig'
+import { CommentData, CommentThreadData, getCommentEntityId } from './commentConfig'
 import { CommentEditor } from './CommentEditor'
 import { CommentEntityLink } from './CommentEntityLink'
 import { parseAuthor } from './commentUtils'
 import { useAddCommentToThread } from './data/commentMutations'
 
+function commentIdInComments(id: number, comments: CommentData[]) {
+    return comments.some((cc) => cc.id === id)
+}
+
 export function CommentThread(props: {
     comment: CommentThreadData
+    commentToShow: CommentThreadData | CommentData | null
     prevComment?: CommentThreadData
     canComment: boolean
     viewerUser: string | null
     showEntityInfo: boolean
     projectName: string
 }) {
-    const { comment, prevComment, canComment, showEntityInfo, viewerUser } = props
+    const { comment, prevComment, canComment, showEntityInfo, commentToShow, viewerUser } = props
 
-    const [showThread, setShowThread] = useState(false)
+    const threadContainsCommentToShow =
+        commentToShow && commentIdInComments(commentToShow.id, comment.thread)
+
+    const [showThread, setShowThread] = useState(threadContainsCommentToShow)
     const [isReplying, setIsReplying] = useState(false)
     const [replyContent, setReplyContent] = useState('')
     const replyFormRef = useRef<HTMLTextAreaElement>(null)
+    const commentToShowRef = useRef<HTMLDivElement>(null)
 
     const [addCommentToThreadMutation, addCommentToThreadResult] = useAddCommentToThread(comment.id)
 
@@ -51,12 +60,21 @@ export function CommentThread(props: {
         setShowThread(!showThread)
     }
 
+    // Scroll down to the reply form after reply is clicked
     useEffect(() => {
         if (replyFormRef.current && showThread && isReplying) {
             replyFormRef.current.scrollIntoView({ block: 'center' })
             replyFormRef.current.focus()
         }
     }, [showThread, isReplying])
+
+    // Scroll to the comment that is specified in the URL
+    useEffect(() => {
+        console.log(commentToShowRef.current)
+        if (commentToShowRef.current) {
+            commentToShowRef.current.scrollIntoView({ block: 'center' })
+        }
+    }, [commentToShow?.id, commentToShowRef.current])
 
     const addCommentToThread = () => {
         // Don't do anything if already loading
@@ -69,8 +87,10 @@ export function CommentThread(props: {
             },
         })
             .then(() => {
+                // Reset the content of the textarea so that another comment can be written easily
                 setReplyContent('')
             })
+            // This error is shown as an alert below the button, this console is just for debugging
             .catch((err) => console.error(err))
     }
 
@@ -90,6 +110,8 @@ export function CommentThread(props: {
                 comment={comment}
                 canComment={canComment}
                 viewerUser={viewerUser}
+                highlighted={comment.id === commentToShow?.id}
+                ref={comment.id === commentToShow?.id ? commentToShowRef : undefined}
                 isTopLevel={true}
                 onReply={onReply}
             />
@@ -119,6 +141,8 @@ export function CommentThread(props: {
                                 <Comment
                                     key={cc.id}
                                     comment={cc}
+                                    highlighted={cc.id === commentToShow?.id}
+                                    ref={cc.id === commentToShow?.id ? commentToShowRef : undefined}
                                     canComment={canComment}
                                     viewerUser={viewerUser}
                                     isTopLevel={false}

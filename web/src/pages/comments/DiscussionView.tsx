@@ -17,7 +17,8 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material'
-import { useContext, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { DiscussionFragmentFragment, ProjectMemberRole } from '../../__generated__/graphql'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { ViewerContext } from '../../viewer'
@@ -41,6 +42,10 @@ function countComments(comments: CommentThreadData[]) {
         },
         { topLevel: 0, total: 0 }
     )
+}
+
+function findCommentById(id: number, comments: CommentThreadData[]) {
+    return comments.flatMap((cc) => [cc, ...cc.thread]).find((cc) => cc.id === id)
 }
 
 function commentHeading(
@@ -79,13 +84,38 @@ export function DiscussionView(props: {
         onAddComment,
         projectName,
     } = props
+
+    const location = useLocation()
+
+    const search = new URLSearchParams(location.search)
+    const showComments = search.get('show_comments')
+    const searchCommentId = search.get('comment_id')
+
+    // If there is a comment specified in the URL then find it in the comments
+    const commentIdToShow =
+        !searchCommentId || isNaN(parseInt(searchCommentId, 10))
+            ? null
+            : parseInt(searchCommentId, 10)
+
+    const commentToShow = commentIdToShow
+        ? findCommentById(commentIdToShow, [
+              ...(discussion?.directComments ?? []),
+              ...(discussion?.relatedComments ?? []),
+          ])
+        : null
+
     const [commentContent, setCommentContent] = useState('')
     const [selectedEntityType, setSelectedEntityType] = useState<CommentEntityType | undefined>(
-        undefined
+        commentToShow?.entity.__typename
     )
     const selectedEntityTypeWithFallback = selectedEntityType || discussionEntityType
-
     const viewer = useContext(ViewerContext)
+
+    useEffect(() => {
+        if (['1', 'true', 'yes'].includes(showComments || '0')) {
+            props.onToggleCollapsed(false)
+        }
+    }, [showComments])
 
     const addComment = () => {
         onAddComment(commentContent)
@@ -189,6 +219,7 @@ export function DiscussionView(props: {
                     <CommentThread
                         key={cc.id}
                         comment={cc}
+                        commentToShow={commentToShow ?? null}
                         prevComment={selectedComments[index - 1]}
                         canComment={canComment}
                         viewerUser={viewer?.username ?? null}

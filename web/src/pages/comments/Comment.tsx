@@ -8,7 +8,7 @@ import {
     Typography,
 } from '@mui/material'
 import { DateTime } from 'luxon'
-import { useContext, useEffect, useState } from 'react'
+import { forwardRef, useContext, useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import useCopyToClipboard from 'react-use/esm/useCopyToClipboard'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
@@ -38,13 +38,17 @@ function CommentAction(props: MuiLinkProps & { preventDefault?: boolean }) {
     )
 }
 
-export function Comment(props: {
-    comment: CommentData
-    canComment: boolean
-    viewerUser: string | null
-    isTopLevel: boolean
-    onReply: () => void
-}) {
+export const Comment = forwardRef<
+    HTMLDivElement,
+    {
+        comment: CommentData
+        highlighted: boolean
+        canComment: boolean
+        viewerUser: string | null
+        isTopLevel: boolean
+        onReply: () => void
+    }
+>(function Comment(props, ref) {
     const { comment, canComment, viewerUser, isTopLevel, onReply } = props
     const author = parseAuthor(comment.author)
 
@@ -96,7 +100,27 @@ export function Comment(props: {
     const commentLink = getCommentLink(comment.id, location)
 
     return (
-        <Box component={'article'} my={2}>
+        <Box
+            component={'article'}
+            my={2}
+            ref={ref}
+            position={'relative'}
+            sx={{
+                // Highlight the comment by placing a coloured square behind it
+                '&:before': {
+                    content: props.highlighted ? `" "` : 'initial',
+                    position: 'absolute',
+                    borderRadius: 2,
+                    overflow: 'hidden',
+                    top: -10,
+                    right: -10,
+                    left: -10,
+                    bottom: -10,
+                    bgcolor: 'var(--color-bg-highlight)',
+                    zIndex: -1,
+                },
+            }}
+        >
             <Box component="header">
                 <Box display={'flex'}>
                     <CommentAvatar {...author} size="full" />
@@ -230,4 +254,4 @@ export function Comment(props: {
             </Modal>
         </Box>
     )
-}
+})

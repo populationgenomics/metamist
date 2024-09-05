@@ -10,6 +10,7 @@
 :root {
     --color-bg: #f5f7f9;
     --color-bg-card: #fff;
+    --color-bg-highlight: rgb(95, 169, 209, 0.2);
     --color-bg-disabled-card: #eeeeee;
     --color-table-header: #eaeaea;
     --color-text-red: #ff0000;
@@ -67,6 +68,7 @@ html[data-theme='dark-mode'] {
     /* .dark-mode { */
     --color-bg: #1d1d1d;
     --color-bg-card: #2c2c2c;
+    --color-bg-highlight: rgb(95, 169, 209, 0.2);
     --color-bg-disabled-card: #353535;
     --color-table-header: #383838;
 
