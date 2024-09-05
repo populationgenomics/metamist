@@ -92,7 +92,7 @@ export const ParticipantPage: React.FC<IParticipantPageProps> = (props) => {
     return (
         <SplitPage
             collapsed={true}
-            collapsedWidth={60}
+            collapsedWidth={64}
             main={() => <PaddedPage>{content}</PaddedPage>}
             side={({ collapsed, onToggleCollapsed }) => {
                 const projectName = participant.project.name

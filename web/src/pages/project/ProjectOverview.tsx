@@ -35,7 +35,7 @@ const ProjectOverview: React.FunctionComponent = () => {
 
     return (
         <SplitPage
-            collapsedWidth={60}
+            collapsedWidth={64}
             collapsed={true}
             main={() => (
                 <Box p={10} pt={5}>

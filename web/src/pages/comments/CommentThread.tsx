@@ -362,7 +362,7 @@ export function CommentThread(props: {
     }
 
     return (
-        <Box mb={2} px={2}>
+        <Box mb={2}>
             {/* Show the entity that the comment is on for context's sake */}
             {shouldShowEntityInfo && (
                 <>

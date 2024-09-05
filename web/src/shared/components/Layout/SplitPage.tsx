@@ -59,6 +59,13 @@ export function SplitPage(props: SplitPageProps) {
         if (onDivider) {
             const isClick = clickTime && Date.now() - clickTime < CLICK_DURATION
             if (isClick) {
+                if (collapsed) {
+                    setDragState({
+                        isDragging: false,
+                        // Expand out to at least 30%
+                        percent: Math.min(dragState.percent, 70),
+                    })
+                }
                 setCollapsed(!collapsed)
                 setClickTime(null)
             }
@@ -77,8 +84,16 @@ export function SplitPage(props: SplitPageProps) {
     const Main = props.main
     const Side = props.side
 
-    const onToggleCollapsed = (collapsed: boolean) => {
-        setCollapsed(collapsed)
+    const onToggleCollapsed = (newCollapsed: boolean) => {
+        if (collapsed) {
+            console.log('setting percent to ', Math.max(dragState.percent, 30))
+            setDragState({
+                isDragging: false,
+                // Expand out to at least 30%
+                percent: Math.min(dragState.percent, 70),
+            })
+        }
+        setCollapsed(newCollapsed)
     }
 
     return (

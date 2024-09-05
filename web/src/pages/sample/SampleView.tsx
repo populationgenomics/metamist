@@ -66,7 +66,7 @@ const SampleView: React.FunctionComponent<Record<string, unknown>> = () => {
     return data ? (
         <SplitPage
             collapsed={true}
-            collapsedWidth={60}
+            collapsedWidth={64}
             main={() => (
                 <PaddedPage>
                     {data.sample.map((sample) => (

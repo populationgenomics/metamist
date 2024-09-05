@@ -216,7 +216,7 @@ export const FamilyView: React.FC<IFamilyViewProps> = ({ familyId }) => {
     return (
         <SplitPage
             collapsed={true}
-            collapsedWidth={60}
+            collapsedWidth={64}
             main={() => <PaddedPage>{content}</PaddedPage>}
             side={({ collapsed, onToggleCollapsed }) => {
                 const projectName = data.family.project.name
