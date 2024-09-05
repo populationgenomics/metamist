@@ -16,6 +16,7 @@ export function CommentThread(props: {
     showEntityInfo: boolean
     projectName: string
 }) {
+    console.log('comment thread')
     const { comment, prevComment, canComment, showEntityInfo, viewerUser } = props
 
     const [showThread, setShowThread] = useState(false)

@@ -1,6 +1,15 @@
-import { Alert, Box, Button, Typography } from '@mui/material'
+import {
+    Alert,
+    Box,
+    Button,
+    Link as MuiLink,
+    LinkProps as MuiLinkProps,
+    Typography,
+} from '@mui/material'
 import { DateTime } from 'luxon'
-import { useContext, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
+import { Location, useLocation } from 'react-router-dom'
+import useCopyToClipboard from 'react-use/esm/useCopyToClipboard'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
 import { CommentAvatar } from './CommentAvatar'
 import { CommentData } from './commentConfig'
@@ -49,6 +58,28 @@ export const parseAuthor = (author: string) => {
     }
 }
 
+const getCommentLink = (id: number, location: Location) => {
+    const params = new URLSearchParams(location.search)
+    params.set('show_comments', 'true')
+    params.set('comment_id', id.toString())
+    return `${window.location.host}${location.pathname}?${params.toString()}`
+}
+
+function CommentAction(props: MuiLinkProps) {
+    return (
+        <MuiLink
+            href="#"
+            sx={{ fontSize: 12, mr: 2 }}
+            {...props}
+            onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                if (props.onClick) props.onClick(e)
+            }}
+        ></MuiLink>
+    )
+}
+
 export function Comment(props: {
     comment: CommentData
     canComment: boolean
@@ -62,6 +93,23 @@ export function Comment(props: {
     const canEdit = viewerUser === comment.author
     const [isEditing, setIsEditing] = useState(false)
     const [content, setContent] = useState(comment.content)
+    const [copyLinkState, copyLinkToClipboard] = useCopyToClipboard()
+    const [showCopiedState, setShowCopiedState] = useState(true)
+    const location = useLocation()
+
+    // Hide the "Copied!" notification after a couple of seconds
+    useEffect(() => {
+        let timeout = null
+        if (copyLinkState.value) {
+            timeout = setTimeout(() => {
+                setShowCopiedState(false)
+            }, 1500)
+        }
+
+        return () => {
+            if (timeout) clearTimeout(timeout)
+        }
+    }, [copyLinkState])
 
     const createdAt = DateTime.fromISO(comment.createdAt)
     const updatedAt = DateTime.fromISO(comment.updatedAt)
@@ -175,30 +223,24 @@ export function Comment(props: {
                             />
                             <Box mt={2} display="flex">
                                 {isTopLevel && canComment && (
-                                    <Button
-                                        variant="text"
-                                        sx={{ fontSize: 12 }}
-                                        onClick={() => onReply()}
-                                    >
-                                        Reply
-                                    </Button>
+                                    <CommentAction onClick={() => onReply()}>Reply</CommentAction>
                                 )}
                                 {canEdit && (
-                                    <Button
-                                        variant="text"
-                                        sx={{ fontSize: 12 }}
-                                        onClick={() => setIsEditing(!isEditing)}
-                                    >
+                                    <CommentAction onClick={() => setIsEditing(!isEditing)}>
                                         Edit
-                                    </Button>
+                                    </CommentAction>
                                 )}
-
-                                <Button variant="text" sx={{ fontSize: 12 }}>
-                                    Copy Link
-                                </Button>
-                                <Button variant="text" sx={{ fontSize: 12 }}>
-                                    View History
-                                </Button>
+                                <CommentAction
+                                    onClick={() => {
+                                        setShowCopiedState(true)
+                                        copyLinkToClipboard(getCommentLink(comment.id, location))
+                                    }}
+                                >
+                                    {copyLinkState.value && showCopiedState
+                                        ? 'Copied!'
+                                        : 'Copy Link'}
+                                </CommentAction>
+                                <CommentAction>View History</CommentAction>
                             </Box>
                         </Box>
                     )}

@@ -1,13 +1,13 @@
 import { Box } from '@mui/material'
-import { PointerEventHandler, useRef, useState } from 'react'
+import { ComponentType, memo, PointerEventHandler, useCallback, useRef, useState } from 'react'
 export type PanelProps = {
     collapsed: boolean
     onToggleCollapsed: (collapsed: boolean) => void
 }
 
 export type SplitPageProps = {
-    main: (props: PanelProps) => JSX.Element | null
-    side: (props: PanelProps) => JSX.Element | null
+    main: ComponentType<PanelProps>
+    side: ComponentType<PanelProps>
     collapsed: boolean
     collapsedWidth: number
 }
@@ -19,6 +19,14 @@ type DragState = {
     isDragging: boolean
     percent: number
 }
+
+// Split the panel rendering out into a separate component so it can be memoized
+const SplitPagePanel = memo(function SplitPagePanel(
+    props: { component: ComponentType<PanelProps> } & PanelProps
+) {
+    const Panel = props.component
+    return <Panel collapsed={props.collapsed} onToggleCollapsed={props.onToggleCollapsed} />
+})
 
 export function SplitPage(props: SplitPageProps) {
     const divider = useRef<HTMLDivElement>(null)
@@ -81,12 +89,8 @@ export function SplitPage(props: SplitPageProps) {
     const mainWidth = collapsed ? `calc(100% - ${props.collapsedWidth}px)` : `${dragState.percent}%`
     const sideWidth = collapsed ? `${props.collapsedWidth}px` : `${100 - dragState.percent}%`
 
-    const Main = props.main
-    const Side = props.side
-
-    const onToggleCollapsed = (newCollapsed: boolean) => {
+    const onToggleCollapsed = useCallback((newCollapsed: boolean) => {
         if (collapsed) {
-            console.log('setting percent to ', Math.max(dragState.percent, 30))
             setDragState({
                 isDragging: false,
                 // Expand out to at least 30%
@@ -94,7 +98,7 @@ export function SplitPage(props: SplitPageProps) {
             })
         }
         setCollapsed(newCollapsed)
-    }
+    }, [])
 
     return (
         <Box
@@ -110,7 +114,11 @@ export function SplitPage(props: SplitPageProps) {
             }}
         >
             <Box style={{ width: mainWidth }} sx={{ overflowY: 'auto' }}>
-                <Main collapsed={collapsed} onToggleCollapsed={onToggleCollapsed} />
+                <SplitPagePanel
+                    component={props.main}
+                    collapsed={collapsed}
+                    onToggleCollapsed={onToggleCollapsed}
+                />
             </Box>
 
             <Box
@@ -140,7 +148,11 @@ export function SplitPage(props: SplitPageProps) {
                     }}
                 ></Box>
                 <Box position={'absolute'} height={'100%'} left={4} right={0}>
-                    <Side collapsed={collapsed} onToggleCollapsed={onToggleCollapsed} />
+                    <SplitPagePanel
+                        component={props.side}
+                        collapsed={collapsed}
+                        onToggleCollapsed={onToggleCollapsed}
+                    />
                 </Box>
             </Box>
         </Box>

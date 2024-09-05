@@ -32,7 +32,7 @@ const ProjectOverview: React.FunctionComponent = () => {
             </>
         )
     }
-
+    console.log('render project overview')
     return (
         <SplitPage
             collapsedWidth={64}

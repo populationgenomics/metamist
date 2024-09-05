@@ -1,9 +1,13 @@
+import { memo } from 'react'
 import Markdown from 'react-markdown'
 import SyntaxHighlighter from 'react-syntax-highlighter'
 import { dracula, vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import remarkGfm from 'remark-gfm'
 
-export function CommentContent(props: { content: string | undefined; theme: 'light' | 'dark' }) {
+export const CommentContent = memo(function CommentContent(props: {
+    content: string | undefined
+    theme: 'light' | 'dark'
+}) {
     const content = props.content || ''
     return (
         <Markdown
@@ -32,4 +36,4 @@ export function CommentContent(props: { content: string | undefined; theme: 'lig
             {content}
         </Markdown>
     )
-}
+})
