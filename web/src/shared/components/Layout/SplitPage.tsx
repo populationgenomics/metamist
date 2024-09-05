@@ -89,16 +89,19 @@ export function SplitPage(props: SplitPageProps) {
     const mainWidth = collapsed ? `calc(100% - ${props.collapsedWidth}px)` : `${dragState.percent}%`
     const sideWidth = collapsed ? `${props.collapsedWidth}px` : `${100 - dragState.percent}%`
 
-    const onToggleCollapsed = useCallback((newCollapsed: boolean) => {
-        if (collapsed) {
-            setDragState({
-                isDragging: false,
-                // Expand out to at least 30%
-                percent: Math.min(dragState.percent, 70),
-            })
-        }
-        setCollapsed(newCollapsed)
-    }, [])
+    const onToggleCollapsed = useCallback(
+        (newCollapsed: boolean) => {
+            if (collapsed) {
+                setDragState((dragState) => ({
+                    isDragging: false,
+                    // Expand out to at least 30%
+                    percent: Math.min(dragState.percent, 70),
+                }))
+            }
+            setCollapsed(newCollapsed)
+        },
+        [collapsed]
+    )
 
     return (
         <Box

@@ -110,12 +110,19 @@ export function DiscussionView(props: {
     )
     const selectedEntityTypeWithFallback = selectedEntityType || discussionEntityType
     const viewer = useContext(ViewerContext)
+    const onToggleCollapsed = props.onToggleCollapsed
 
     useEffect(() => {
         if (['1', 'true', 'yes'].includes(showComments || '0')) {
-            props.onToggleCollapsed(false)
+            onToggleCollapsed(false)
         }
-    }, [showComments])
+    }, [showComments, onToggleCollapsed])
+
+    useEffect(() => {
+        if (commentToShow && commentToShow.entity.__typename !== selectedEntityType) {
+            setSelectedEntityType(commentToShow.entity.__typename)
+        }
+    }, [commentToShow])
 
     const addComment = () => {
         onAddComment(commentContent)

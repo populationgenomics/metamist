@@ -73,7 +73,7 @@ export function CommentThread(props: {
         if (commentToShowRef.current) {
             commentToShowRef.current.scrollIntoView({ block: 'center' })
         }
-    }, [commentToShow?.id, commentToShowRef.current])
+    }, [commentToShow?.id])
 
     const addCommentToThread = () => {
         // Don't do anything if already loading

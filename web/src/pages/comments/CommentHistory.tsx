@@ -30,7 +30,7 @@ export function CommentHistory(props: { comment: CommentData; theme: 'light' | '
         <Box
             display={'flex'}
             sx={{
-                position: 'absolute' as 'absolute',
+                position: 'absolute',
                 top: '50%',
                 left: '50%',
                 transform: 'translate(-50%, -50%)',
