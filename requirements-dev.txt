@@ -333,9 +333,9 @@ pygments==2.18.0
     #   strawberry-graphql
 pylint==3.1.1
     # via -r requirements-dev.in
-pymysql[rsa]==1.1.0
+pymysql[rsa]==1.1.1
     # via
-    #   -r requirements.in
+    #   -r requirements-dev.in
     #   aiomysql
     #   testcontainers
 pytest==8.3.2

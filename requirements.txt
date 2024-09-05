@@ -249,9 +249,7 @@ pydantic-settings==2.4.0
 pygments==2.18.0
     # via rich
 pymysql==1.1.1
-    # via
-    #   -r requirements.in
-    #   aiomysql
+    # via aiomysql
 python-dateutil==2.8.2
     # via
     #   -r requirements.in

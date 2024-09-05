@@ -10,6 +10,7 @@ pre-commit
 pylint
 testcontainers[mysql]>=4.8.1
 types-PyMySQL
+pymysql==1.1.1
 # some strawberry dependency
 strawberry-graphql[debug-server]
 # following required to unit test etl functions
