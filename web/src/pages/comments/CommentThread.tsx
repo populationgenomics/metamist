@@ -368,7 +368,7 @@ export function CommentThread(props: {
                 <>
                     {prevComment && <Divider />}
                     <Typography fontStyle={'italic'} mt={1}>
-                        on {commentEntityTypeMap[comment.entity.__typename]}{' '}
+                        on {commentEntityTypeMap[comment.entity.__typename].name}{' '}
                         <CommentEntityLink comment={comment} />
                     </Typography>
                 </>

@@ -1,15 +1,19 @@
 import { Box } from '@mui/material'
-import React, { PointerEventHandler, useRef, useState } from 'react'
+import { PointerEventHandler, useRef, useState } from 'react'
 export type PanelProps = {
-    width: number
+    collapsed: boolean
+    onToggleCollapsed: (collapsed: boolean) => void
 }
 
 export type SplitPageProps = {
-    main: (props: PanelProps) => React.ReactNode
-    side: (props: PanelProps) => React.ReactNode
+    main: (props: PanelProps) => JSX.Element | null
+    side: (props: PanelProps) => JSX.Element | null
+    collapsed: boolean
+    collapsedWidth: number
 }
 
-const DOUBLE_CLICK_TIME = 100
+// The amount of time between pointer down and up to consider being a click
+const CLICK_DURATION = 150
 
 type DragState = {
     isDragging: boolean
@@ -21,6 +25,7 @@ export function SplitPage(props: SplitPageProps) {
     const container = useRef<HTMLDivElement>(null)
     const [clickTime, setClickTime] = useState<number | null>(null)
     const [dragState, setDragState] = useState<DragState>({ isDragging: false, percent: 70 })
+    const [collapsed, setCollapsed] = useState(props.collapsed)
 
     const handlePointerDown: PointerEventHandler = (e) => {
         const onDivider = e.target === divider.current
@@ -40,7 +45,7 @@ export function SplitPage(props: SplitPageProps) {
         const containerLeft = containerBox.left
 
         const percent = ((cX - containerLeft) / containerWidth) * 100
-
+        setCollapsed(false)
         setDragState({
             isDragging: true,
             percent,
@@ -48,14 +53,13 @@ export function SplitPage(props: SplitPageProps) {
     }
 
     const handlePointerUp: PointerEventHandler = (e) => {
-        // console.log('up', e)
         const onDivider = e.target === divider.current
         setDragState({ isDragging: false, percent: dragState.percent })
 
         if (onDivider) {
-            const isDoubleClick = clickTime && Date.now() - clickTime < DOUBLE_CLICK_TIME
-            // toggle sidebar
-            if (isDoubleClick) {
+            const isClick = clickTime && Date.now() - clickTime < CLICK_DURATION
+            if (isClick) {
+                setCollapsed(!collapsed)
                 setClickTime(null)
             }
         }
@@ -65,6 +69,16 @@ export function SplitPage(props: SplitPageProps) {
         if (dragState.isDragging) {
             setDragState({ isDragging: false, percent: dragState.percent })
         }
+    }
+
+    const mainWidth = collapsed ? `calc(100% - ${props.collapsedWidth}px)` : `${dragState.percent}%`
+    const sideWidth = collapsed ? `${props.collapsedWidth}px` : `${100 - dragState.percent}%`
+
+    const Main = props.main
+    const Side = props.side
+
+    const onToggleCollapsed = (collapsed: boolean) => {
+        setCollapsed(collapsed)
     }
 
     return (
@@ -80,33 +94,38 @@ export function SplitPage(props: SplitPageProps) {
                 ...(dragState.isDragging ? { cursor: 'col-resize' } : {}),
             }}
         >
-            <Box style={{ width: `${dragState.percent}%` }} sx={{ overflowY: 'auto' }}>
-                {props.main({ width: 10 })}
+            <Box style={{ width: mainWidth }} sx={{ overflowY: 'auto' }}>
+                <Main collapsed={collapsed} onToggleCollapsed={onToggleCollapsed} />
             </Box>
 
             <Box
-                style={{ width: `${100 - dragState.percent}%` }}
+                style={{ width: sideWidth }}
                 position={'fixed'}
-                height={'100%'}
-                top={0}
+                bottom={0}
+                top={56}
                 right={0}
-                pl={'4px'}
-                pt={7}
                 zIndex={1}
             >
-                <div
+                <Box
                     ref={divider}
-                    style={{
+                    sx={{
                         width: '4px',
                         height: '100%',
                         background: 'var(--color-border-color)',
                         position: 'absolute',
                         left: 0,
                         cursor: 'col-resize',
+                        zIndex: 10,
+                        '&:hover': {
+                            background: 'var(--color-text-href)',
+                        },
                     }}
-                ></div>
-                <Box height={'100vh'} sx={{ overflowY: 'auto' }}>
-                    {props.side({ width: 10 })}
+                    style={{
+                        ...(dragState.isDragging ? { background: 'var(--color-text-href)' } : {}),
+                    }}
+                ></Box>
+                <Box position={'absolute'} height={'100%'} left={4} right={0}>
+                    <Side collapsed={collapsed} onToggleCollapsed={onToggleCollapsed} />
                 </Box>
             </Box>
         </Box>

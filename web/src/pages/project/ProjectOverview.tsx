@@ -35,6 +35,8 @@ const ProjectOverview: React.FunctionComponent = () => {
 
     return (
         <SplitPage
+            collapsedWidth={60}
+            collapsed={true}
             main={() => (
                 <Box p={10} pt={5}>
                     <ProjectSelector onProjectSelect={onProjectSelect} />
@@ -42,7 +44,15 @@ const ProjectOverview: React.FunctionComponent = () => {
                     {body}
                 </Box>
             )}
-            side={() => (projectName ? <ProjectCommentsView projectName={projectName} /> : null)}
+            side={({ collapsed, onToggleCollapsed }) =>
+                projectName ? (
+                    <ProjectCommentsView
+                        projectName={projectName}
+                        collapsed={collapsed}
+                        onToggleCollapsed={onToggleCollapsed}
+                    />
+                ) : null
+            }
         />
     )
 }

@@ -39,6 +39,8 @@ export function useNewCommentOnProject(id: number | null) {
 
 type ProjectCommentsViewProps = {
     projectName: string
+    onToggleCollapsed: (collapsed: boolean) => void
+    collapsed: boolean
 }
 
 export function ProjectCommentsView(props: ProjectCommentsViewProps) {
@@ -52,28 +54,29 @@ export function ProjectCommentsView(props: ProjectCommentsViewProps) {
     )
 
     return (
-        <div>
-            <DiscussionView
-                discussionLoading={loading}
-                discussionError={error}
-                discussion={data?.project.discussion}
-                addingCommentLoading={addCommentToProjectResult.loading}
-                addingCommentError={addCommentToProjectResult.error}
-                projectName={props.projectName}
-                onReload={() => {
-                    refetch()
-                }}
-                onAddComment={async (content: string) => {
-                    if (data?.project.id) {
-                        await addCommentToProjectMutation({
-                            variables: {
-                                content,
-                                id: data.project.id,
-                            },
-                        })
-                    }
-                }}
-            />
-        </div>
+        <DiscussionView
+            discussionEntityType={data?.project.__typename}
+            discussionLoading={loading}
+            discussionError={error}
+            discussion={data?.project.discussion}
+            collapsed={props.collapsed}
+            onToggleCollapsed={props.onToggleCollapsed}
+            addingCommentLoading={addCommentToProjectResult.loading}
+            addingCommentError={addCommentToProjectResult.error}
+            projectName={props.projectName}
+            onReload={() => {
+                refetch()
+            }}
+            onAddComment={async (content: string) => {
+                if (data?.project.id) {
+                    await addCommentToProjectMutation({
+                        variables: {
+                            content,
+                            id: data.project.id,
+                        },
+                    })
+                }
+            }}
+        />
     )
 }

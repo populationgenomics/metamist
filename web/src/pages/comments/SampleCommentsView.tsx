@@ -7,9 +7,6 @@ export const SAMPLE_COMMENTS = gql(`
     query SampleComments($sampleId: String!) {
         sample(id:{eq: $sampleId}) {
             id
-            project {
-                name
-            }
             discussion {
                 ... DiscussionFragment
             }
@@ -42,6 +39,8 @@ export function useNewCommentOnSample(id: string | null) {
 type SampleCommentsViewProps = {
     sampleId: string
     projectName: string
+    onToggleCollapsed: (collapsed: boolean) => void
+    collapsed: boolean
 }
 
 export function SampleCommentsView(props: SampleCommentsViewProps) {
@@ -57,28 +56,29 @@ export function SampleCommentsView(props: SampleCommentsViewProps) {
     )
 
     return (
-        <div>
-            <DiscussionView
-                discussionLoading={loading}
-                discussionError={error}
-                discussion={sample?.discussion}
-                addingCommentLoading={addCommentToSampleResult.loading}
-                addingCommentError={addCommentToSampleResult.error}
-                projectName={props.projectName}
-                onReload={() => {
-                    refetch()
-                }}
-                onAddComment={async (content: string) => {
-                    if (sample?.id) {
-                        await addCommentToSampleMutation({
-                            variables: {
-                                content,
-                                id: sample.id,
-                            },
-                        })
-                    }
-                }}
-            />
-        </div>
+        <DiscussionView
+            discussionEntityType={sample?.__typename}
+            discussionLoading={loading}
+            discussionError={error}
+            discussion={sample?.discussion}
+            collapsed={props.collapsed}
+            onToggleCollapsed={props.onToggleCollapsed}
+            addingCommentLoading={addCommentToSampleResult.loading}
+            addingCommentError={addCommentToSampleResult.error}
+            projectName={props.projectName}
+            onReload={() => {
+                refetch()
+            }}
+            onAddComment={async (content: string) => {
+                if (sample?.id) {
+                    await addCommentToSampleMutation({
+                        variables: {
+                            content,
+                            id: sample.id,
+                        },
+                    })
+                }
+            }}
+        />
     )
 }
