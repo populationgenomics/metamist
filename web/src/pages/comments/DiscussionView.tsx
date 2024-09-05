@@ -238,14 +238,14 @@ export function DiscussionView(props: {
                                     : ''}
                                 , Add one below.
                             </Typography>
+                            <Box my={3}>
+                                <Divider />
+                            </Box>
                         </Box>
                     ))}
                 {/* Only show comment box if displaying direct comments */}
                 {selectedEntityTypeWithFallback === discussionEntityType && (
                     <>
-                        <Box my={3}>
-                            <Divider />
-                        </Box>
                         <Box>
                             <CommentEditor
                                 label={'New comment'}

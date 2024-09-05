@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import Markdown from 'react-markdown'
-import SyntaxHighlighter from 'react-syntax-highlighter'
-import { dracula, vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { materialDark, materialLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import remarkGfm from 'remark-gfm'
 
 export const CommentContent = memo(function CommentContent(props: {
@@ -18,12 +18,11 @@ export const CommentContent = memo(function CommentContent(props: {
                     return !inline && match_ ? (
                         <SyntaxHighlighter
                             language={match_[1]}
+                            style={props.theme === 'dark' ? materialDark : materialLight}
                             PreTag="div"
-                            // showLineNumbers={true}
-                            style={props.theme === 'dark' ? dracula : vs}
-                            {...props_}
+                            CodeTag="div"
                         >
-                            {String(children).replace(/\n$/, '')}
+                            {children}
                         </SyntaxHighlighter>
                     ) : (
                         <code className={className} {...props_}>

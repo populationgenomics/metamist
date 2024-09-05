@@ -70,7 +70,6 @@ export function CommentThread(props: {
 
     // Scroll to the comment that is specified in the URL
     useEffect(() => {
-        console.log(commentToShowRef.current)
         if (commentToShowRef.current) {
             commentToShowRef.current.scrollIntoView({ block: 'center' })
         }
