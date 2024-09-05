@@ -1,3 +1,4 @@
+# pylint: disable=redefined-builtin, import-outside-toplevel
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
@@ -24,6 +25,7 @@ class SequencingGroupMutations:
         info: Info[GraphQLContext, 'SequencingGroupMutations'],
     ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
         """Add a comment to a sequencing group"""
+        # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment
 
         connection = info.context['connection']

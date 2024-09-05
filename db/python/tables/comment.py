@@ -49,7 +49,7 @@ comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
         CommentEntityType.sample: """
             JOIN sample
             ON sample.id = sample_comment.sample_id
-            
+
             -- Include comments on subsamples too
             JOIN entity_ids ON sample.id = entity_ids.id
             OR sample.sample_root_id = entity_ids.id
@@ -325,7 +325,10 @@ class CommentTable(DbBase):
 
         return [comments_by_entity_id_map.get(eid, None) for eid in entity_ids]
 
-    async def get_comment_by_id(self, id: int):
+    async def get_comment_by_id(self, comment_id: int):
+        """
+        Get's a comment and its threaded comments by the comment id
+        """
         # To get a comment by id and be able to return the necessary entity info
         # we need to determine which entity the requested comment is attached to
         # so we build a query to union together results from all the comment join
@@ -364,17 +367,18 @@ class CommentTable(DbBase):
             entity_ids=[rows[0]['entity_id']],
             entity=rows[0]['entity_type'],
             include_related_comments=False,
-            comment_id=id,
+            comment_id=comment_id,
         )
 
-        if id not in comments:
+        if comment_id not in comments:
             raise NotFoundError(f'Comment with id {id} was not found')
 
-        return comments[id]
+        return comments[comment_id]
 
     async def add_comment_to_entity(
         self, entity: CommentEntityType, entity_id: int, content: str
     ):
+        """Adds a comment as a top level comment on the provided entity"""
         join_table = f'{entity}_comment'
         join_column = f'{entity}_id'
 
@@ -411,6 +415,7 @@ class CommentTable(DbBase):
             return await self.get_comment_by_id(comment_id)
 
     async def add_comment_to_thread(self, content: str, parent_id: int):
+        """Add a comment a child comment to a parent comment's thread"""
         audit_log_id = await self._connection.audit_log_id()
 
         comment_insert = """
@@ -435,6 +440,7 @@ class CommentTable(DbBase):
         content: str | None = None,
         status: CommentStatus | None = None,
     ):
+        """Update an existing comment"""
         current_comment = await self.get_comment_by_id(comment_id)
 
         content_changed = content is not None and current_comment.content != content

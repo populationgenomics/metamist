@@ -1,3 +1,5 @@
+# pylint: disable=redefined-builtin, import-outside-toplevel
+
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
@@ -21,6 +23,8 @@ class CommentMutations:
         content: str,
         info: Info[GraphQLContext, 'CommentMutations'],
     ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+        """Adds a comment to a thread on an existing comment"""
+        # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment
 
         connection = info.context['connection']
@@ -35,6 +39,8 @@ class CommentMutations:
         content: str,
         info: Info[GraphQLContext, 'CommentMutations'],
     ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+        """Updates the content of an existing comment"""
+        # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment
 
         connection = info.context['connection']
@@ -47,6 +53,8 @@ class CommentMutations:
     async def delete_comment(
         self, id: int, info: Info[GraphQLContext, 'CommentMutations']
     ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+        """Soft-deletes an existing comment"""
+        # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment
 
         connection = info.context['connection']
@@ -58,6 +66,8 @@ class CommentMutations:
     async def restore_comment(
         self, id: int, info: Info[GraphQLContext, 'CommentMutations']
     ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+        """Restores a previously deleted comment"""
+        # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment
 
         connection = info.context['connection']

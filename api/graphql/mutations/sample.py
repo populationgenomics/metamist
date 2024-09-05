@@ -1,3 +1,5 @@
+# pylint: disable=redefined-builtin, import-outside-toplevel
+
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry

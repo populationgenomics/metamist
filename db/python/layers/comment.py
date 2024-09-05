@@ -78,7 +78,7 @@ class CommentLayer(BaseLayer):
                 project_id = list(pids)[0] if len(pids) > 0 else None
 
         if project_id is None:
-            raise NotFoundError(f"Project not found for {entity} with id {entity_id}")
+            raise NotFoundError(f'Project not found for {entity} with id {entity_id}')
 
         self.connection.check_access_to_projects_for_ids([project_id], allowed_roles)
 
@@ -102,7 +102,7 @@ class CommentLayer(BaseLayer):
         current_user = self.connection.author
         if current_user != comment.author:
             raise Forbidden(
-                f"User {current_user} cannot update comment authored by {comment.author}"
+                f'User {current_user} cannot update comment authored by {comment.author}'
             )
 
     async def add_comment_to_entity(
@@ -118,17 +118,20 @@ class CommentLayer(BaseLayer):
         return await self.ct.add_comment_to_entity(entity, entity_id, content)
 
     async def add_comment_to_thread(self, parent_id: int, content: str):
+        """Adds a child comment to a parent comment's thread"""
         comment = await self.ct.get_comment_by_id(parent_id)
         await self.check_project_access_for_comment(comment, COMMENT_WRITE_ROLES)
         return await self.ct.add_comment_to_thread(content, parent_id)
 
     async def update_comment(self, comment_id: int, content: str):
+        """Updates an existing comment's content"""
         comment = await self.ct.get_comment_by_id(comment_id)
         await self.check_project_access_for_comment(comment, COMMENT_WRITE_ROLES)
         await self.check_author_access_for_comment(comment)
         return await self.ct.update_comment(content=content, comment_id=comment_id)
 
     async def delete_comment(self, comment_id: int):
+        """Soft deletes an existing comment"""
         comment = await self.ct.get_comment_by_id(comment_id)
         await self.check_project_access_for_comment(comment, COMMENT_WRITE_ROLES)
         await self.check_author_access_for_comment(comment)
@@ -137,6 +140,7 @@ class CommentLayer(BaseLayer):
         )
 
     async def restore_comment(self, comment_id: int):
+        """Restores a previously deleted comment"""
         comment = await self.ct.get_comment_by_id(comment_id)
         await self.check_project_access_for_comment(comment, COMMENT_WRITE_ROLES)
         await self.check_author_access_for_comment(comment)

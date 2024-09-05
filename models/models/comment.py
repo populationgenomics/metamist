@@ -18,12 +18,15 @@ CommentEntityType = StrEnum(
 # Timestamps in the db come back without a timezone attached but should be sent through
 # as UTC time, so add the timezone here so it is sent through to the client
 def assume_utc(time: datetime.datetime | None):
+    """Update timestamp to use UTC as timezone"""
     if time is None:
         return None
     return time.replace(tzinfo=datetime.timezone.utc)
 
 
 class CommentVersionInternal(SMBase):
+    """Model for comment versions"""
+
     content: str
     author: str
     status: CommentStatus
@@ -47,6 +50,7 @@ class CommentInternal(SMBase):
     status: CommentStatus
 
     def add_comment_to_thread(self, comment: 'CommentInternal'):
+        """Append the provided comment to this comment's thread"""
         self.thread.append(comment)
 
     @staticmethod
@@ -86,6 +90,11 @@ class CommentInternal(SMBase):
 
 
 class DiscussionInternal(SMBase):
+    """
+    Model for a comment discussion containing comments made directly on the entity, as
+    well as comments made on related entities
+    """
+
     direct_comments: list[CommentInternal]
     related_comments: list[CommentInternal]
 
@@ -95,6 +104,10 @@ class DiscussionInternal(SMBase):
         requested_entity_type: CommentEntityType,
         requested_entity_id: int,
     ):
+        """
+        Convert a flat list of comments into two groups, direct comments and related
+        comments.
+        """
         direct_comments: list[CommentInternal] = []
         related_comments: list[CommentInternal] = []
 

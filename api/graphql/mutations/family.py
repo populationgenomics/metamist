@@ -1,3 +1,5 @@
+# pylint: disable=redefined-builtin, import-outside-toplevel
+
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
@@ -23,6 +25,7 @@ class FamilyMutations:
         info: Info[GraphQLContext, 'FamilyMutations'],
     ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
         """Add a comment to a family"""
+        # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment
 
         connection = info.context['connection']

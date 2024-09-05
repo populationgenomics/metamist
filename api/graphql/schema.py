@@ -103,7 +103,7 @@ for enum in enum_tables.__dict__.values():
 
 GraphQLEnum = strawberry.type(type('GraphQLEnum', (object,), enum_methods))
 
-GraphQLAnalysisStatus = strawberry.enum(AnalysisStatus)
+GraphQLAnalysisStatus = strawberry.enum(AnalysisStatus)  # type: ignore
 
 
 @strawberry.experimental.pydantic.type(model=OurDNALostSample, all_fields=True)  # type: ignore
@@ -246,6 +246,8 @@ class GraphQLCohortTemplate:
 
 @strawberry.type
 class GraphQLCommentVersion:
+    """A version of a comment's content"""
+
     content: str
     author: str
     status: strawberry.enum(CommentStatus)  # type: ignore
@@ -263,6 +265,8 @@ class GraphQLCommentVersion:
 
 @strawberry.type
 class GraphQLDiscussion:
+    """A comment discussion, made up of flat lists of direct and related comments"""
+
     direct_comments: list['GraphQLComment']
     related_comments: list['GraphQLComment']
 
@@ -282,6 +286,8 @@ class GraphQLDiscussion:
 
 @strawberry.type
 class GraphQLComment:
+    """A comment made on a entity"""
+
     id: int
     parentId: int | None
     content: str
