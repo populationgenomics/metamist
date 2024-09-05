@@ -4,8 +4,11 @@ import { gql } from '../../__generated__'
 
 import { useParams } from 'react-router-dom'
 import { Message } from 'semantic-ui-react'
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
+import { SplitPage } from '../../shared/components/Layout/SplitPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { IAnalysisGridAnalysis } from '../analysis/AnalysisGrid'
+import { ParticipantCommentsView } from '../comments/ParticipantCommentsView'
 import { ParticipantView } from './ParticipantView'
 
 const GET_PARTICIPANT_VIEW_INFO = gql(`
@@ -17,6 +20,9 @@ query ParticipantViewInfo($participantId: Int!) {
     reportedGender
     phenotypes
     meta
+    project {
+      name
+    }
     samples {
       id
       externalId
@@ -79,5 +85,29 @@ export const ParticipantPage: React.FC<IParticipantPageProps> = (props) => {
                     sgs: an.sequencingGroups.map((sg) => sg.id),
                 }) as IAnalysisGridAnalysis
         )
-    return <ParticipantView participant={participant} analyses={analyses} showNonSingleSgAnalyses />
+    const content = (
+        <ParticipantView participant={participant} analyses={analyses} showNonSingleSgAnalyses />
+    )
+
+    return (
+        <SplitPage
+            collapsed={true}
+            collapsedWidth={60}
+            main={() => <PaddedPage>{content}</PaddedPage>}
+            side={({ collapsed, onToggleCollapsed }) => {
+                const projectName = participant.project.name
+                const participantId = participant.id
+                if (!projectName || !participantId) return null
+
+                return (
+                    <ParticipantCommentsView
+                        projectName={projectName}
+                        participantId={participantId}
+                        collapsed={collapsed}
+                        onToggleCollapsed={onToggleCollapsed}
+                    />
+                )
+            }}
+        />
+    )
 }
