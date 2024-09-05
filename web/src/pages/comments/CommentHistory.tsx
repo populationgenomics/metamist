@@ -36,7 +36,7 @@ export function CommentHistory(props: { comment: CommentData; theme: 'light' | '
                 transform: 'translate(-50%, -50%)',
                 width: '80%',
                 minWidth: 400,
-                maxWidth: 960,
+                maxWidth: 1280,
                 maxHeight: '90%',
                 bgcolor: 'background.paper',
                 border: '2px solid var(--color-border-color)',
@@ -48,7 +48,7 @@ export function CommentHistory(props: { comment: CommentData; theme: 'light' | '
             </Box>
             <Box
                 borderLeft={'1px solid var(--color-border-color)'}
-                width={'300px'}
+                minWidth={250}
                 sx={{ overflowY: 'auto' }}
             >
                 <List>

@@ -110,7 +110,7 @@ export const Comment = forwardRef<
                 '&:before': {
                     content: props.highlighted ? `" "` : 'initial',
                     position: 'absolute',
-                    borderRadius: 2,
+                    borderRadius: 1,
                     overflow: 'hidden',
                     top: -10,
                     right: -10,
