@@ -75,11 +75,10 @@ export function CommentThread(props: {
     }
 
     return (
-        <Box mb={2}>
+        <Box>
             {/* Show the entity that the comment is on for context's sake */}
             {shouldShowEntityInfo && (
                 <>
-                    {prevComment && <Divider />}
                     <Typography fontStyle={'italic'} mt={1}>
                         <CommentEntityLink comment={comment} />
                     </Typography>
@@ -99,7 +98,7 @@ export function CommentThread(props: {
             {hasReplies && (
                 <>
                     <Box display={'flex'} onClick={onToggleReplies}>
-                        <AvatarGroup>
+                        <AvatarGroup max={4}>
                             {replyAuthors.map((authorStr) => (
                                 <CommentAvatar
                                     key={authorStr}
@@ -163,6 +162,9 @@ export function CommentThread(props: {
                     </Box>
                 </Box>
             )}
+            <Box my={3}>
+                <Divider />
+            </Box>
         </Box>
     )
 }

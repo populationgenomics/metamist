@@ -298,7 +298,9 @@ export function DiscussionView(props: {
                                     sx={{ p: 0, py: 2 }}
                                     onClick={() => {
                                         setSelectedEntityType(entityType)
-                                        props.onToggleCollapsed(false)
+                                        if (props.collapsed) {
+                                            props.onToggleCollapsed(false)
+                                        }
                                     }}
                                     style={{
                                         background:

@@ -62,18 +62,20 @@ const getCommentLink = (id: number, location: Location) => {
     const params = new URLSearchParams(location.search)
     params.set('show_comments', 'true')
     params.set('comment_id', id.toString())
-    return `${window.location.host}${location.pathname}?${params.toString()}`
+    return `${window.location.protocol}//${window.location.host}${location.pathname}?${params.toString()}`
 }
 
-function CommentAction(props: MuiLinkProps) {
+function CommentAction(props: MuiLinkProps & { preventDefault?: boolean }) {
     return (
         <MuiLink
             href="#"
             sx={{ fontSize: 12, mr: 2 }}
             {...props}
             onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
+                if (props.preventDefault) {
+                    e.preventDefault()
+                    e.stopPropagation()
+                }
                 if (props.onClick) props.onClick(e)
             }}
         ></MuiLink>
@@ -133,6 +135,8 @@ export function Comment(props: {
             setIsEditing(false)
         })
     }
+
+    const commentLink = getCommentLink(comment.id, location)
 
     return (
         <Box component={'article'} my={2}>
@@ -231,9 +235,17 @@ export function Comment(props: {
                                     </CommentAction>
                                 )}
                                 <CommentAction
-                                    onClick={() => {
-                                        setShowCopiedState(true)
-                                        copyLinkToClipboard(getCommentLink(comment.id, location))
+                                    href={commentLink}
+                                    preventDefault={false}
+                                    onClick={(e) => {
+                                        // Don't prevent default if meta key is held
+                                        // to keep default behaviour of opening the link
+                                        if (!e.metaKey) {
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            setShowCopiedState(true)
+                                            copyLinkToClipboard(commentLink)
+                                        }
                                     }}
                                 >
                                     {copyLinkState.value && showCopiedState

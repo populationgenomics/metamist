@@ -59,10 +59,14 @@ export function CommentEntityLink(props: { comment: CommentThreadData }) {
             )
         case 'GraphQLSequencingGroup':
             return (
-                <SequencingGroupLink
-                    sampleId={comment.entity.sample.id}
-                    id={comment.entity.sequencingGroupId}
-                />
+                <>
+                    on Sequencing Group{' '}
+                    <SequencingGroupLink
+                        sampleId={comment.entity.sample.id}
+                        id={comment.entity.sequencingGroupId}
+                    />{' '}
+                    for Sample <SampleLink id={comment.entity.sample.id} />
+                </>
             )
     }
 }
