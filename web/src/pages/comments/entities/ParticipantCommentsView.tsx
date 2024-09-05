@@ -1,7 +1,7 @@
 import { useQuery } from '@apollo/client'
-import { gql } from '../../__generated__'
-import { DiscussionView } from './DiscussionView'
-import { useNewComment } from './commentMutations'
+import { gql } from '../../../__generated__'
+import { DiscussionView } from '../DiscussionView'
+import { useNewComment } from '../data/commentMutations'
 
 export const PARTICIPANT_COMMENTS = gql(`
     query ParticipantComments($participantId: Int!) {

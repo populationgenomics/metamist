@@ -19,7 +19,7 @@ import TangledTree, {
 } from '../../shared/components/pedigree/TangledTree'
 import Table from '../../shared/components/Table'
 import { AnalysisGrid } from '../analysis/AnalysisGrid'
-import { FamilyCommentsView } from '../comments/FamilyCommentsView'
+import { FamilyCommentsView } from '../comments/entities/FamilyCommentsView'
 import { ParticipantView } from '../participant/ParticipantView'
 
 const getSeqrUrl = (projectGuid: string, familyGuid: string) =>

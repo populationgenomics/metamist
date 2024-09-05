@@ -9,26 +9,54 @@ import { CommentThreadData } from './commentConfig'
 export function CommentEntityLink(props: { comment: CommentThreadData }) {
     const { comment } = props
     switch (comment.entity.__typename) {
-        // @TODO Change to include more context, ie the sample for the assay
         case 'GraphQLAssay':
             return (
-                <AssayLink
-                    id={comment.entity.assayId}
-                    project={comment.entity.sample.project.name}
-                />
+                <>
+                    on Assay{' '}
+                    <AssayLink
+                        id={comment.entity.assayId}
+                        project={comment.entity.sample.project.name}
+                    />{' '}
+                    of Sample <SampleLink id={comment.entity.sample.id} />
+                </>
             )
 
         case 'GraphQLFamily':
-            return <FamilyLink id={comment.entity.familyId} />
+            return (
+                <>
+                    on Family{' '}
+                    <FamilyLink id={comment.entity.familyId}>
+                        {comment.entity.familyId} ({comment.entity.familyExternalId})
+                    </FamilyLink>
+                </>
+            )
 
         case 'GraphQLParticipant':
-            return <ParticipantLink id={comment.entity.participantId} />
+            return (
+                <>
+                    on Participant{' '}
+                    <ParticipantLink id={comment.entity.participantId}>
+                        {comment.entity.participantId} ({comment.entity.participantExternalId})
+                    </ParticipantLink>
+                </>
+            )
 
         case 'GraphQLProject':
-            return <ProjectLink name={comment.entity.projectName} />
+            return (
+                <>
+                    on Project <ProjectLink name={comment.entity.projectName} />
+                </>
+            )
 
         case 'GraphQLSample':
-            return <SampleLink id={comment.entity.sampleId} />
+            return (
+                <>
+                    on Sample{' '}
+                    <SampleLink id={comment.entity.sampleId}>
+                        {comment.entity.sampleId} ({comment.entity.sampleExternalId})
+                    </SampleLink>
+                </>
+            )
         case 'GraphQLSequencingGroup':
             return (
                 <SequencingGroupLink

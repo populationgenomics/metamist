@@ -8,7 +8,7 @@ import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import { SplitPage } from '../../shared/components/Layout/SplitPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { IAnalysisGridAnalysis } from '../analysis/AnalysisGrid'
-import { ParticipantCommentsView } from '../comments/ParticipantCommentsView'
+import { ParticipantCommentsView } from '../comments/entities/ParticipantCommentsView'
 import { ParticipantView } from './ParticipantView'
 
 const GET_PARTICIPANT_VIEW_INFO = gql(`

@@ -27,7 +27,8 @@ import {
     commentEntityTypeMap,
     CommentThreadData,
 } from './commentConfig'
-import { CommentEditor, CommentThread } from './CommentThread'
+import { CommentEditor } from './CommentEditor'
+import { CommentThread } from './CommentThread'
 
 // Count how many comments are in a list of comments, including threaded ones
 function countComments(comments: CommentThreadData[]) {

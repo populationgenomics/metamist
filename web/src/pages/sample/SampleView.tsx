@@ -13,8 +13,8 @@ import Pedigree from '../../shared/components/pedigree/Pedigree'
 import SampleInfo from '../../shared/components/SampleInfo'
 import SeqPanel from '../../shared/components/SeqPanel'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
-import { SampleCommentsView } from '../comments/SampleCommentsView'
-import { SequencingGroupCommentsView } from '../comments/SequencingGroupCommentsView'
+import { SampleCommentsView } from '../comments/entities/SampleCommentsView'
+import { SequencingGroupCommentsView } from '../comments/entities/SequencingGroupCommentsView'
 
 const GET_SAMPLE_INFO = gql(`
 query SampleInfo($sample_id: String!) {

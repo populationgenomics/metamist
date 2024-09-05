@@ -1,4 +1,4 @@
-import { gql } from '../../__generated__/gql'
+import { gql } from '../../../__generated__/gql'
 
 export const VERSION_FRAGMENT = gql(`
     fragment CommentVersionFragment on GraphQLCommentVersion {
@@ -38,6 +38,7 @@ export const COMMENT_ENTITY_FRAGMENT = gql(`
         }
         ... on GraphQLSample {
             sampleId: id
+            sampleExternalId: externalId
         }
         ... on GraphQLSequencingGroup {
             sequencingGroupId: id
@@ -48,6 +49,7 @@ export const COMMENT_ENTITY_FRAGMENT = gql(`
         ... on GraphQLAssay {
             assayId: id
             sample {
+                id
                 project {
                     name
                 }
@@ -55,9 +57,11 @@ export const COMMENT_ENTITY_FRAGMENT = gql(`
         }
         ... on GraphQLParticipant {
             participantId:id
+            participantExternalId: externalId
         }
         ... on GraphQLFamily {
             familyId: id
+            familyExternalId: externalId
         }
     }    
 `)

@@ -5,8 +5,8 @@ import {
     TypedDocumentNode,
     useMutation,
 } from '@apollo/client'
-import { gql } from '../../__generated__'
-import { CommentFragmentFragment, GraphQlComment } from '../../__generated__/graphql'
+import { gql } from '../../../__generated__'
+import { CommentFragmentFragment, GraphQlComment } from '../../../__generated__/graphql'
 import { COMMENT_FRAGMENT } from './commentQueries'
 
 const ADD_COMMENT_TO_THREAD = gql(`

@@ -5,7 +5,7 @@ import ProjectSelector, { IMetamistProject } from './ProjectSelector'
 
 import { Box } from '@mui/material'
 import { SplitPage } from '../../shared/components/Layout/SplitPage'
-import { ProjectCommentsView } from '../comments/ProjectCommentsView'
+import { ProjectCommentsView } from '../comments/entities/ProjectCommentsView'
 import { ProjectGridContainer } from './ProjectGridContainer'
 import { ProjectSummaryView } from './ProjectSummary'
 
