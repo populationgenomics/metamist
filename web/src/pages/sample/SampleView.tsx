@@ -70,7 +70,7 @@ const SampleView: React.FunctionComponent<Record<string, unknown>> = () => {
             main={() => (
                 <PaddedPage>
                     {data.sample.map((sample) => (
-                        <>
+                        <div key={sample.id}>
                             <div className="dataStyle">
                                 <SampleLink id={sample.id}>
                                     <div
@@ -125,7 +125,7 @@ const SampleView: React.FunctionComponent<Record<string, unknown>> = () => {
                                     sequencingGroups={sample.sequencingGroups}
                                 />
                             </div>
-                        </>
+                        </div>
                     ))}
                 </PaddedPage>
             )}

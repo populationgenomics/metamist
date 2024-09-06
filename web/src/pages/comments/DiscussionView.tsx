@@ -48,16 +48,16 @@ function findCommentById(id: number, comments: CommentThreadData[]) {
     return comments.flatMap((cc) => [cc, ...cc.thread]).find((cc) => cc.id === id)
 }
 
-function commentHeading(
-    entityType: CommentEntityType,
-    discussionEntityType: CommentEntityType | undefined
-) {
+function commentHeading(entityType: CommentEntityType, sectionType: 'direct' | 'related') {
     const name = commentEntityTypeMap[entityType].name
     const namePlural = commentEntityTypeMap[entityType].namePlural
-    return entityType === discussionEntityType
+    return sectionType === 'direct'
         ? `Comments on this ${name}`
         : `Comments on related ${namePlural}`
 }
+
+type CommentSectionTuple = [CommentEntityType, CommentThreadData[], 'direct' | 'related']
+type SelectedCommentSectionTuple = [CommentEntityType, 'direct' | 'related']
 
 export function DiscussionView(props: {
     discussionEntityType: CommentEntityType | undefined
@@ -97,18 +97,22 @@ export function DiscussionView(props: {
             ? null
             : parseInt(searchCommentId, 10)
 
-    const commentToShow = commentIdToShow
-        ? findCommentById(commentIdToShow, [
-              ...(discussion?.directComments ?? []),
-              ...(discussion?.relatedComments ?? []),
-          ])
+    // Need to handle direct and related comments separately as you can have
+    // direct and related comments of the same type
+    const directCommentToShow = commentIdToShow
+        ? findCommentById(commentIdToShow, discussion?.directComments ?? [])
+        : null
+
+    const relatedCommentToShow = commentIdToShow
+        ? findCommentById(commentIdToShow, discussion?.directComments ?? [])
         : null
 
     const [commentContent, setCommentContent] = useState('')
-    const [selectedEntityType, setSelectedEntityType] = useState<CommentEntityType | undefined>(
-        commentToShow?.entity.__typename
-    )
-    const selectedEntityTypeWithFallback = selectedEntityType || discussionEntityType
+    const [selectedEntityType, setSelectedEntityType] = useState<
+        SelectedCommentSectionTuple | undefined
+    >()
+
+    const selectedEntityTypeWithFallback = selectedEntityType || [discussionEntityType, 'direct']
     const viewer = useContext(ViewerContext)
     const onToggleCollapsed = props.onToggleCollapsed
 
@@ -119,10 +123,12 @@ export function DiscussionView(props: {
     }, [showComments, onToggleCollapsed])
 
     useEffect(() => {
-        if (commentToShow && commentToShow.entity.__typename !== selectedEntityType) {
-            setSelectedEntityType(commentToShow.entity.__typename)
+        if (directCommentToShow) {
+            setSelectedEntityType([directCommentToShow.entity.__typename, 'direct'])
+        } else if (relatedCommentToShow) {
+            setSelectedEntityType([relatedCommentToShow.entity.__typename, 'related'])
         }
-    }, [commentToShow])
+    }, [directCommentToShow, relatedCommentToShow])
 
     const addComment = () => {
         onAddComment(commentContent)
@@ -162,21 +168,29 @@ export function DiscussionView(props: {
     }
 
     // Add direct comments to the start of the list of related comments
-    const directComments: [CommentEntityType, CommentThreadData[]][] =
+    const directComments: CommentSectionTuple[] =
         discussion && discussionEntityType
-            ? [[discussionEntityType, discussion.directComments]]
+            ? [[discussionEntityType, discussion.directComments, 'direct']]
             : []
 
-    const sortedGroupedRelatedComments: [CommentEntityType, CommentThreadData[]][] = [
+    const sortedGroupedRelatedComments: CommentSectionTuple[] = [
         ...directComments,
-        ...groupedRelatedComments.sort(
-            (a, b) => commentEntityOrder.indexOf(a[0]) - commentEntityOrder.indexOf(b[0])
-        ),
+        ...groupedRelatedComments
+            .sort((a, b) => commentEntityOrder.indexOf(a[0]) - commentEntityOrder.indexOf(b[0]))
+            .map(
+                ([commentEntity, comments]): CommentSectionTuple => [
+                    commentEntity,
+                    comments,
+                    'related',
+                ]
+            ),
     ]
 
     // Find which type of comment the user has selected
     const selectedComments = sortedGroupedRelatedComments.find(
-        ([entityType]) => entityType === selectedEntityTypeWithFallback
+        ([entityType, _comments, sectionType]) =>
+            entityType === selectedEntityTypeWithFallback[0] &&
+            sectionType === selectedEntityTypeWithFallback[1]
     )?.[1]
 
     // Determine stateful content rendering
@@ -206,10 +220,11 @@ export function DiscussionView(props: {
                     <Box flexGrow={1}>
                         {selectedEntityTypeWithFallback && (
                             <Typography variant={'h1'} fontSize={18} fontWeight={'bold'}>
-                                {commentHeading(
-                                    selectedEntityTypeWithFallback,
-                                    discussionEntityType
-                                )}
+                                {selectedEntityTypeWithFallback[0] &&
+                                    commentHeading(
+                                        selectedEntityTypeWithFallback[0],
+                                        selectedEntityTypeWithFallback[1]
+                                    )}
                             </Typography>
                         )}
                     </Box>
@@ -226,11 +241,11 @@ export function DiscussionView(props: {
                     <CommentThread
                         key={cc.id}
                         comment={cc}
-                        commentToShow={commentToShow ?? null}
+                        commentToShow={(directCommentToShow || relatedCommentToShow) ?? null}
                         prevComment={selectedComments[index - 1]}
                         canComment={canComment}
                         viewerUser={viewer?.username ?? null}
-                        showEntityInfo={selectedEntityTypeWithFallback !== discussionEntityType}
+                        showEntityInfo={selectedEntityTypeWithFallback[1] === 'related'}
                         projectName={projectName}
                     />
                 ))}
@@ -240,8 +255,8 @@ export function DiscussionView(props: {
                         <Box>
                             <Typography fontStyle={'italic'}>
                                 There are no comments on this{' '}
-                                {selectedEntityTypeWithFallback
-                                    ? commentEntityTypeMap[selectedEntityTypeWithFallback]?.name
+                                {selectedEntityTypeWithFallback[0]
+                                    ? commentEntityTypeMap[selectedEntityTypeWithFallback[0]]?.name
                                     : ''}
                                 , Add one below.
                             </Typography>
@@ -251,7 +266,7 @@ export function DiscussionView(props: {
                         </Box>
                     ))}
                 {/* Only show comment box if displaying direct comments */}
-                {selectedEntityTypeWithFallback === discussionEntityType && (
+                {selectedEntityTypeWithFallback[1] === 'direct' && (
                     <>
                         <Box>
                             <CommentEditor
@@ -318,12 +333,10 @@ export function DiscussionView(props: {
                         <ListItemIcon sx={{ justifyContent: 'center' }}>{commentIcon}</ListItemIcon>
                     </ListItemButton>
                 </ListItem>
-                {sortedGroupedRelatedComments.map(([entityType, comments]) => {
+                {sortedGroupedRelatedComments.map(([entityType, comments, sectionType]) => {
                     const Icon = commentEntityTypeMap[entityType].Icon
-
                     const count = countComments(comments)
-
-                    const tooltip = commentHeading(entityType, discussionEntityType)
+                    const tooltip = commentHeading(entityType, sectionType)
 
                     return (
                         <Tooltip placement={'left'} title={tooltip} arrow key={entityType}>
@@ -335,14 +348,15 @@ export function DiscussionView(props: {
                                 <ListItemButton
                                     sx={{ p: 0, py: 2 }}
                                     onClick={() => {
-                                        setSelectedEntityType(entityType)
+                                        setSelectedEntityType([entityType, sectionType])
                                         if (props.collapsed) {
                                             props.onToggleCollapsed(false)
                                         }
                                     }}
                                     style={{
                                         background:
-                                            entityType === selectedEntityTypeWithFallback &&
+                                            entityType === selectedEntityTypeWithFallback[0] &&
+                                            sectionType === selectedEntityTypeWithFallback[1] &&
                                             !props.collapsed
                                                 ? 'var(--color-border-color)'
                                                 : undefined,

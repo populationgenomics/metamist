@@ -195,7 +195,7 @@ export const Comment = forwardRef<
                             {updateCommentResult.error && (
                                 <Box my={1}>
                                     <Alert severity="error">
-                                        Error saving comment {updateCommentResult.error.message}
+                                        Error saving comment: {updateCommentResult.error.message}
                                     </Alert>
                                 </Box>
                             )}

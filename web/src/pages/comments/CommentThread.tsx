@@ -1,4 +1,4 @@
-import { AvatarGroup, Box, Button, Divider, Typography } from '@mui/material'
+import { Alert, AvatarGroup, Box, Button, Divider, Typography } from '@mui/material'
 
 import { useEffect, useRef, useState } from 'react'
 import { Comment } from './Comment'
@@ -183,6 +183,14 @@ export function CommentThread(props: {
                             </Button>
                         )}
                     </Box>
+
+                    {addCommentToThreadResult.error && (
+                        <Box my={1}>
+                            <Alert severity="error">
+                                Error saving comment: {addCommentToThreadResult.error.message}
+                            </Alert>
+                        </Box>
+                    )}
                 </Box>
             )}
             <Box my={3}>
