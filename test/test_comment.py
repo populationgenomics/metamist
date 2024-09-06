@@ -1,3 +1,6 @@
+# pylint: disable=missing-function-docstring, too-many-public-methods
+from typing import Any
+
 from db.python.layers.assay import AssayLayer
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
@@ -325,6 +328,166 @@ default_sequencing_meta = {
 class TestComment(DbIsolatedTest):
     """Test commenting functionality"""
 
+    async def add_comment_to_entity(
+        self, comment_query: str, entity_id: str | int, content: str
+    ) -> dict[str, Any]:
+        create_comment_query = f"""
+            {COMMENT_RESULT_FRAGMENTS}
+            {comment_query}
+        """
+
+        create_comment_variables = {'id': entity_id, 'content': content}
+
+        created_comment = await self.run_graphql_query_async(
+            create_comment_query, variables=create_comment_variables
+        )
+        return created_comment
+
+    async def get_discussion_on_entity(
+        self, comment_query: str, variables: dict[str, int | str]
+    ) -> dict[str, Any]:
+        get_discussion_query = f"""
+            {DISCUSSION_RESULT_FRAGMENTS}
+            {comment_query}
+        """
+
+        requested_comment = await self.run_graphql_query_async(
+            get_discussion_query, variables=variables
+        )
+        return requested_comment
+
+    async def add_comment_to_sample(self, sample_id: str, comment: str):
+        result = await self.add_comment_to_entity(
+            SAMPLE_ADD_COMMENT, sample_id, comment
+        )
+        return result['sample']['addComment']
+
+    async def get_discussion_on_sample(self, sample_id: str):
+        result = await self.get_discussion_on_entity(
+            SAMPLE_COMMENTS, {'sampleId': sample_id}
+        )
+        return result['sample'][0]['discussion']
+
+    async def add_comment_to_project(self, project_id: int, comment: str):
+        result = await self.add_comment_to_entity(
+            PROJECT_ADD_COMMENT, project_id, comment
+        )
+        return result['project']['addComment']
+
+    async def get_discussion_on_project(self, project_name: str):
+        result = await self.get_discussion_on_entity(
+            PROJECT_COMMENTS, {'projectName': project_name}
+        )
+        return result['project']['discussion']
+
+    async def add_comment_to_assay(self, assay_id: int, comment: str):
+        result = await self.add_comment_to_entity(ASSAY_ADD_COMMENT, assay_id, comment)
+        return result['assay']['addComment']
+
+    async def get_discussion_on_assay(self, assay_id: int):
+        result = await self.get_discussion_on_entity(
+            ASSAY_COMMENTS, {'assayId': assay_id}
+        )
+        return result['assay']['discussion']
+
+    async def add_comment_to_participant(self, participant_id: int, comment: str):
+        result = await self.add_comment_to_entity(
+            PARTICIPANT_ADD_COMMENT, participant_id, comment
+        )
+        return result['participant']['addComment']
+
+    async def get_discussion_on_participant(self, participant_id: int):
+        result = await self.get_discussion_on_entity(
+            PARTICIPANT_COMMENTS, {'participantId': participant_id}
+        )
+        return result['participant']['discussion']
+
+    async def add_comment_to_family(self, family_id: int, comment: str):
+        result = await self.add_comment_to_entity(
+            FAMILY_ADD_COMMENT, family_id, comment
+        )
+        return result['family']['addComment']
+
+    async def get_discussion_on_family(self, family_id: int):
+        result = await self.get_discussion_on_entity(
+            FAMILY_COMMENTS, {'familyId': family_id}
+        )
+        return result['family']['discussion']
+
+    async def add_comment_to_sequencing_group(
+        self, sequencing_group_id: str, comment: str
+    ):
+        result = await self.add_comment_to_entity(
+            SEQUENCING_GROUP_ADD_COMMENT, sequencing_group_id, comment
+        )
+        return result['sequencingGroup']['addComment']
+
+    async def get_discussion_on_sequencing_group(self, sequencing_group_id: int):
+        result = await self.get_discussion_on_entity(
+            SEQUENCING_GROUP_COMMENTS, {'sequencingGroupId': sequencing_group_id}
+        )
+        return result['sequencingGroups'][0]['discussion']
+
+    async def add_comment_to_thread(
+        self, parent_id: int, content: str
+    ) -> dict[str, Any]:
+        add_comment_to_thread_query = f"""
+            {COMMENT_RESULT_FRAGMENTS}
+            {ADD_COMMENT_TO_THREAD}
+        """
+
+        add_comment_to_thread_variables = {
+            'parentId': parent_id,
+            'content': content,
+        }
+
+        child_comment_result = await self.run_graphql_query_async(
+            add_comment_to_thread_query, variables=add_comment_to_thread_variables
+        )
+        return child_comment_result['comment']['addCommentToThread']
+
+    async def update_comment(self, id_: int, content: str) -> dict[str, Any]:
+        update_comment_query = f"""
+            {COMMENT_RESULT_FRAGMENTS}
+            {UPDATE_COMMENT}
+        """
+
+        update_comment_variables = {
+            'id': id_,
+            'content': content,
+        }
+
+        update_comment_result = await self.run_graphql_query_async(
+            update_comment_query, variables=update_comment_variables
+        )
+        return update_comment_result['comment']['updateComment']
+
+    async def delete_comment(self, id_: int) -> dict[str, Any]:
+        delete_comment_query = f"""
+            {COMMENT_RESULT_FRAGMENTS}
+            {DELETE_COMMENT}
+        """
+
+        delete_comment_variables = {'id': id_}
+
+        delete_comment_result = await self.run_graphql_query_async(
+            delete_comment_query, variables=delete_comment_variables
+        )
+        return delete_comment_result['comment']['deleteComment']
+
+    async def restore_comment(self, id_: int) -> dict[str, Any]:
+        restore_comment_query = f"""
+            {COMMENT_RESULT_FRAGMENTS}
+            {RESTORE_COMMENT}
+        """
+
+        restore_comment_variables = {'id': id_}
+
+        restore_comment_result = await self.run_graphql_query_async(
+            restore_comment_query, variables=restore_comment_variables
+        )
+        return restore_comment_result['comment']['restoreComment']
+
     # tests run in 'sorted by ascii' order
     @run_as_sync
     async def setUp(self) -> None:
@@ -352,42 +515,19 @@ class TestComment(DbIsolatedTest):
         sample_external = sample.to_external()
 
         comment_text = 'Sample Test Comment 1234'
-
-        create_comment_query = f"""
-            {COMMENT_RESULT_FRAGMENTS}
-            {SAMPLE_ADD_COMMENT}
-        """
-
-        create_comment_variables = {'id': sample_external.id, 'content': comment_text}
-        created_comment = await self.run_graphql_query_async(
-            create_comment_query, variables=create_comment_variables
+        created_comment = await self.add_comment_to_sample(
+            sample_external.id, comment_text
         )
 
         # Ensure that created comment has expected data
-        self.assertEqual(
-            created_comment['sample']['addComment']['content'], comment_text
-        )
-        self.assertEqual(created_comment['sample']['addComment']['status'], 'active')
-        self.assertEqual(
-            created_comment['sample']['addComment']['entity']['sampleId'],
-            sample_external.id,
-        )
+        self.assertEqual(created_comment['content'], comment_text)
+        self.assertEqual(created_comment['status'], 'active')
+        self.assertEqual(created_comment['entity']['sampleId'], sample_external.id)
 
-        get_comment_query = f"""
-            {DISCUSSION_RESULT_FRAGMENTS}
-            {SAMPLE_COMMENTS}
-        """
-
-        get_comment_variables = {'sampleId': sample_external.id}
-        requested_comment = await self.run_graphql_query_async(
-            get_comment_query, variables=get_comment_variables
-        )
+        discussion = await self.get_discussion_on_sample(sample_external.id)
 
         # Ensure that comment can be requested after creating it, and that it is the same
-        self.assertEqual(
-            created_comment['sample']['addComment'],
-            requested_comment['sample'][0]['discussion']['directComments'][0],
-        )
+        self.assertEqual(created_comment, discussion['directComments'][0])
 
     @run_as_sync
     async def test_add_comment_to_project(self):
@@ -397,39 +537,18 @@ class TestComment(DbIsolatedTest):
 
         comment_text = 'Project Test Comment 1234'
 
-        create_comment_query = f"""
-            {COMMENT_RESULT_FRAGMENTS}
-            {PROJECT_ADD_COMMENT}
-        """
+        created_comment = await self.add_comment_to_project(project.id, comment_text)
 
-        create_comment_variables = {'id': project.id, 'content': comment_text}
+        self.assertEqual(created_comment['content'], comment_text)
+        self.assertEqual(created_comment['status'], 'active')
+        self.assertEqual(created_comment['entity']['projectId'], project.id)
 
-        created_comment = await self.run_graphql_query_async(
-            create_comment_query, variables=create_comment_variables
-        )
-
-        self.assertEqual(
-            created_comment['project']['addComment']['content'], comment_text
-        )
-        self.assertEqual(created_comment['project']['addComment']['status'], 'active')
-        self.assertEqual(
-            created_comment['project']['addComment']['entity']['projectId'], project.id
-        )
-
-        get_comment_query = f"""
-            {DISCUSSION_RESULT_FRAGMENTS}
-            {PROJECT_COMMENTS}
-        """
-
-        get_comment_variables = {'projectName': project.name}
-        requested_comment = await self.run_graphql_query_async(
-            get_comment_query, variables=get_comment_variables
-        )
+        requested_comment = await self.get_discussion_on_project(project.name)
 
         # Ensure that comment can be requested after creating it, and that it is the same
         self.assertEqual(
-            created_comment['project']['addComment'],
-            requested_comment['project']['discussion']['directComments'][0],
+            created_comment,
+            requested_comment['directComments'][0],
         )
 
     @run_as_sync
@@ -450,43 +569,20 @@ class TestComment(DbIsolatedTest):
                 sample_id=sample.id, meta=default_sequencing_meta, type='sequencing'
             )
         )
+        assert assay.id
 
         comment_text = 'Assay Test Comment 1234'
 
-        create_comment_query = f"""
-            {COMMENT_RESULT_FRAGMENTS}
-            {ASSAY_ADD_COMMENT}
-        """
+        created_comment = await self.add_comment_to_assay(assay.id, comment_text)
 
-        create_comment_variables = {'id': assay.id, 'content': comment_text}
+        self.assertEqual(created_comment['content'], comment_text)
+        self.assertEqual(created_comment['status'], 'active')
+        self.assertEqual(created_comment['entity']['assayId'], assay.id)
 
-        created_comment = await self.run_graphql_query_async(
-            create_comment_query, variables=create_comment_variables
-        )
-
-        self.assertEqual(
-            created_comment['assay']['addComment']['content'], comment_text
-        )
-        self.assertEqual(created_comment['assay']['addComment']['status'], 'active')
-        self.assertEqual(
-            created_comment['assay']['addComment']['entity']['assayId'], assay.id
-        )
-
-        get_comment_query = f"""
-            {DISCUSSION_RESULT_FRAGMENTS}
-            {ASSAY_COMMENTS}
-        """
-
-        get_comment_variables = {'assayId': assay.id}
-        requested_comment = await self.run_graphql_query_async(
-            get_comment_query, variables=get_comment_variables
-        )
+        requested_comment = await self.get_discussion_on_assay(assay.id)
 
         # Ensure that comment can be requested after creating it, and that it is the same
-        self.assertEqual(
-            created_comment['assay']['addComment'],
-            requested_comment['assay']['discussion']['directComments'][0],
-        )
+        self.assertEqual(created_comment, requested_comment['directComments'][0])
 
     @run_as_sync
     async def test_add_comment_to_participant(self):
@@ -501,46 +597,22 @@ class TestComment(DbIsolatedTest):
                 karyotype='XX',
             )
         )
+        assert participant.id
 
         comment_text = 'Participant Test Comment 1234'
 
-        create_comment_query = f"""
-            {COMMENT_RESULT_FRAGMENTS}
-            {PARTICIPANT_ADD_COMMENT}
-        """
-
-        create_comment_variables = {'id': participant.id, 'content': comment_text}
-
-        created_comment = await self.run_graphql_query_async(
-            create_comment_query, variables=create_comment_variables
+        created_comment = await self.add_comment_to_participant(
+            participant.id, comment_text
         )
 
-        self.assertEqual(
-            created_comment['participant']['addComment']['content'], comment_text
-        )
-        self.assertEqual(
-            created_comment['participant']['addComment']['status'], 'active'
-        )
-        self.assertEqual(
-            created_comment['participant']['addComment']['entity']['participantId'],
-            participant.id,
-        )
+        self.assertEqual(created_comment['content'], comment_text)
+        self.assertEqual(created_comment['status'], 'active')
+        self.assertEqual(created_comment['entity']['participantId'], participant.id)
 
-        get_comment_query = f"""
-            {DISCUSSION_RESULT_FRAGMENTS}
-            {PARTICIPANT_COMMENTS}
-        """
-
-        get_comment_variables = {'participantId': participant.id}
-        requested_comment = await self.run_graphql_query_async(
-            get_comment_query, variables=get_comment_variables
-        )
+        requested_comment = await self.get_discussion_on_participant(participant.id)
 
         # Ensure that comment can be requested after creating it, and that it is the same
-        self.assertEqual(
-            created_comment['participant']['addComment'],
-            requested_comment['participant']['discussion']['directComments'][0],
-        )
+        self.assertEqual(created_comment, requested_comment['directComments'][0])
 
     @run_as_sync
     async def test_add_comment_to_family(self):
@@ -549,42 +621,16 @@ class TestComment(DbIsolatedTest):
         family = await self.flayer.create_family(external_id='f_external_id')
 
         comment_text = 'Family Test Comment 1234'
+        created_comment = await self.add_comment_to_family(family, comment_text)
 
-        create_comment_query = f"""
-            {COMMENT_RESULT_FRAGMENTS}
-            {FAMILY_ADD_COMMENT}
-        """
+        self.assertEqual(created_comment['content'], comment_text)
+        self.assertEqual(created_comment['status'], 'active')
+        self.assertEqual(created_comment['entity']['familyId'], family)
 
-        create_comment_variables = {'id': family, 'content': comment_text}
-
-        created_comment = await self.run_graphql_query_async(
-            create_comment_query, variables=create_comment_variables
-        )
-
-        self.assertEqual(
-            created_comment['family']['addComment']['content'], comment_text
-        )
-        self.assertEqual(created_comment['family']['addComment']['status'], 'active')
-        self.assertEqual(
-            created_comment['family']['addComment']['entity']['familyId'],
-            family,
-        )
-
-        get_comment_query = f"""
-            {DISCUSSION_RESULT_FRAGMENTS}
-            {FAMILY_COMMENTS}
-        """
-
-        get_comment_variables = {'familyId': family}
-        requested_comment = await self.run_graphql_query_async(
-            get_comment_query, variables=get_comment_variables
-        )
+        requested_comment = await self.get_discussion_on_family(family)
 
         # Ensure that comment can be requested after creating it, and that it is the same
-        self.assertEqual(
-            created_comment['family']['addComment'],
-            requested_comment['family']['discussion']['directComments'][0],
-        )
+        self.assertEqual(created_comment, requested_comment['directComments'][0])
 
     @run_as_sync
     async def test_add_comment_to_sequencing_group(self):
@@ -617,51 +663,28 @@ class TestComment(DbIsolatedTest):
             ]
         )
         sequencing_group = sequencing_groups[0]
+        sequencing_group_id = sequencing_group.to_external().id
+        assert sequencing_group_id
 
         comment_text = 'SequencingGroup Test Comment 1234'
 
-        create_comment_query = f"""
-            {COMMENT_RESULT_FRAGMENTS}
-            {SEQUENCING_GROUP_ADD_COMMENT}
-        """
-
-        create_comment_variables = {
-            'id': sequencing_group.to_external().id,
-            'content': comment_text,
-        }
-
-        created_comment = await self.run_graphql_query_async(
-            create_comment_query, variables=create_comment_variables
+        created_comment = await self.add_comment_to_sequencing_group(
+            sequencing_group_id, comment_text
         )
 
+        self.assertEqual(created_comment['content'], comment_text)
+        self.assertEqual(created_comment['status'], 'active')
         self.assertEqual(
-            created_comment['sequencingGroup']['addComment']['content'], comment_text
-        )
-        self.assertEqual(
-            created_comment['sequencingGroup']['addComment']['status'], 'active'
-        )
-        self.assertEqual(
-            created_comment['sequencingGroup']['addComment']['entity'][
-                'sequencingGroupId'
-            ],
-            sequencing_group.to_external().id,
+            created_comment['entity']['sequencingGroupId'],
+            sequencing_group_id,
         )
 
-        get_comment_query = f"""
-            {DISCUSSION_RESULT_FRAGMENTS}
-            {SEQUENCING_GROUP_COMMENTS}
-        """
-
-        get_comment_variables = {'sequencingGroupId': sequencing_group.to_external().id}
-        requested_comment = await self.run_graphql_query_async(
-            get_comment_query, variables=get_comment_variables
+        requested_comment = await self.get_discussion_on_sequencing_group(
+            sequencing_group_id
         )
 
         # Ensure that comment can be requested after creating it, and that it is the same
-        self.assertEqual(
-            created_comment['sequencingGroup']['addComment'],
-            requested_comment['sequencingGroups'][0]['discussion']['directComments'][0],
-        )
+        self.assertEqual(created_comment, requested_comment['directComments'][0])
 
     @run_as_sync
     async def test_add_comment_to_thread(self):
@@ -679,49 +702,21 @@ class TestComment(DbIsolatedTest):
         sample_external = sample.to_external()
         comment_text = 'Sample parent comment'
 
-        create_comment_query = f"""
-            {COMMENT_RESULT_FRAGMENTS}
-            {SAMPLE_ADD_COMMENT}
-        """
-
-        create_comment_variables = {'id': sample_external.id, 'content': comment_text}
-        parent_comment = await self.run_graphql_query_async(
-            create_comment_query, variables=create_comment_variables
+        parent_comment = await self.add_comment_to_sample(
+            sample_external.id, comment_text
         )
+        parent_id = parent_comment['id']
 
-        add_comment_to_thread_query = f"""
-            {COMMENT_RESULT_FRAGMENTS}
-            {ADD_COMMENT_TO_THREAD}
-        """
-        parent_id = parent_comment['sample']['addComment']['id']
-
-        add_comment_to_thread_variables = {
-            'parentId': parent_id,
-            'content': 'Child comment in thread',
-        }
-
-        child_comment_result = await self.run_graphql_query_async(
-            add_comment_to_thread_query, variables=add_comment_to_thread_variables
+        child_comment = await self.add_comment_to_thread(
+            parent_id=parent_id, content='Child comment in thread'
         )
-        child_comment = child_comment_result['comment']['addCommentToThread']
 
         # Ensure that the child comment has the correct parent ID
         self.assertEqual(child_comment['parentId'], parent_id)
 
-        get_comment_query = f"""
-            {DISCUSSION_RESULT_FRAGMENTS}
-            {SAMPLE_COMMENTS}
-        """
+        requested_comment = await self.get_discussion_on_sample(sample_external.id)
 
-        get_comment_variables = {'sampleId': sample_external.id}
-        requested_comment = await self.run_graphql_query_async(
-            get_comment_query, variables=get_comment_variables
-        )
-
-        parent_comment_with_thread = requested_comment['sample'][0]['discussion'][
-            'directComments'
-        ][0]
-
+        parent_comment_with_thread = requested_comment['directComments'][0]
         self.assertEqual(len(parent_comment_with_thread['thread']), 1)
         self.assertEqual(parent_comment_with_thread['thread'][0], child_comment)
 
@@ -741,78 +736,30 @@ class TestComment(DbIsolatedTest):
         sample_external = sample.to_external()
         initial_parent_comment_text = 'Sample parent comment'
 
-        create_comment_query = f"""
-            {COMMENT_RESULT_FRAGMENTS}
-            {SAMPLE_ADD_COMMENT}
-        """
-
-        create_comment_variables = {
-            'id': sample_external.id,
-            'content': initial_parent_comment_text,
-        }
-        parent_comment_result = await self.run_graphql_query_async(
-            create_comment_query, variables=create_comment_variables
+        parent_comment = await self.add_comment_to_sample(
+            sample_external.id, initial_parent_comment_text
         )
 
-        parent_comment = parent_comment_result['sample']['addComment']
+        initial_child_comment_text = 'Sample child comment'
 
-        add_comment_to_thread_query = f"""
-            {COMMENT_RESULT_FRAGMENTS}
-            {ADD_COMMENT_TO_THREAD}
-        """
-        initial_child_comment_text = 'Child comment in thread'
-        add_comment_to_thread_variables = {
-            'parentId': parent_comment['id'],
-            'content': initial_child_comment_text,
-        }
-
-        child_comment_result = await self.run_graphql_query_async(
-            add_comment_to_thread_query, variables=add_comment_to_thread_variables
+        child_comment = await self.add_comment_to_thread(
+            parent_id=parent_comment['id'], content=initial_child_comment_text
         )
-
-        child_comment = child_comment_result['comment']['addCommentToThread']
 
         updated_parent_comment_text = 'Updated Parent Comment Text'
         updated_child_comment_text = 'Updated Child Comment Text'
 
-        update_comment_query = f"""
-            {COMMENT_RESULT_FRAGMENTS}
-            {UPDATE_COMMENT}
-        """
         # Update child comment first so that we can check that parent comment update
         # contains the updated child comment
-        update_child_comment_result = await self.run_graphql_query_async(
-            update_comment_query,
-            variables={
-                'id': child_comment['id'],
-                'content': updated_child_comment_text,
-            },
+        updated_child_comment = await self.update_comment(
+            child_comment['id'], updated_child_comment_text
         )
 
-        updated_child_comment = update_child_comment_result['comment']['updateComment']
-
-        update_parent_comment_result = await self.run_graphql_query_async(
-            update_comment_query,
-            variables={
-                'id': parent_comment['id'],
-                'content': updated_parent_comment_text,
-            },
+        updated_parent_comment = await self.update_comment(
+            parent_comment['id'], updated_parent_comment_text
         )
 
-        updated_parent_comment = update_parent_comment_result['comment'][
-            'updateComment'
-        ]
-
-        sample_discussion_query = f"""
-            {DISCUSSION_RESULT_FRAGMENTS}
-            {SAMPLE_COMMENTS}
-        """
-
-        sample_discussion_result = await self.run_graphql_query_async(
-            sample_discussion_query, variables={'sampleId': sample_external.id}
-        )
-
-        sample_discussion = sample_discussion_result['sample'][0]['discussion']
+        sample_discussion = await self.get_discussion_on_sample(sample_external.id)
 
         self.assertEqual(updated_child_comment['content'], updated_child_comment_text)
         self.assertEqual(updated_parent_comment['content'], updated_parent_comment_text)
@@ -849,43 +796,17 @@ class TestComment(DbIsolatedTest):
         sample_external = sample.to_external()
         comment_text = 'Sample parent comment'
 
-        create_comment_query = f"""
-            {COMMENT_RESULT_FRAGMENTS}
-            {SAMPLE_ADD_COMMENT}
-        """
-
-        create_comment_variables = {'id': sample_external.id, 'content': comment_text}
-        create_comment_result = await self.run_graphql_query_async(
-            create_comment_query, variables=create_comment_variables
+        created_comment = await self.add_comment_to_sample(
+            sample_external.id, comment_text
         )
-
-        created_comment = create_comment_result['sample']['addComment']
         self.assertEqual(created_comment['status'], 'active')
 
-        delete_comment_query = f"""
-            {COMMENT_RESULT_FRAGMENTS}
-            {DELETE_COMMENT}
-        """
-
-        deleted_comment_result = await self.run_graphql_query_async(
-            delete_comment_query, variables={'id': created_comment['id']}
-        )
-
-        deleted_comment = deleted_comment_result['comment']['deleteComment']
+        deleted_comment = await self.delete_comment(created_comment['id'])
 
         self.assertEqual(deleted_comment['status'], 'deleted')
         self.assertEqual(len(deleted_comment['versions']), 1)
 
-        restore_comment_query = f"""
-            {COMMENT_RESULT_FRAGMENTS}
-            {RESTORE_COMMENT}
-        """
-
-        restore_comment_result = await self.run_graphql_query_async(
-            restore_comment_query, variables={'id': created_comment['id']}
-        )
-
-        restored_comment = restore_comment_result['comment']['restoreComment']
+        restored_comment = await self.restore_comment(created_comment['id'])
 
         self.assertEqual(restored_comment['status'], 'active')
         self.assertEqual(len(restored_comment['versions']), 2)
