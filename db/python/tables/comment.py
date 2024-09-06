@@ -9,7 +9,59 @@ from models.models.comment import (
     DiscussionInternal,
 )
 
-# @TODO document what the heck is going on here
+# These comment queries look a bit scary but aren't actually too bad
+#
+# As a bit of background – because metamist has a very relational structure with
+# lots of entities referencing other ones, discoverability of comments could be a
+# problem. ie. you might make a comment on a family, and then when you are looking at a
+# participant who is a member of that family you would want to see the comments made
+# on the family as it may provide important context when looking at the participant.
+#
+# This big object describes how to traverse the relational structure from a related
+# entity type back to the requested entity type so that comments on the related
+# entites can be found as part of the same query.
+#
+# It makes a bit more sense when you consider that each of the queries in this object
+# is prefixed with a query that can be derived from the comment entity type name, this
+# part of the query is not included as it would be way more verbose and very repetitive
+# to keep it in there.
+#
+# SELECT
+#    entity_ids.id as requested_entity_id,
+#    {comment_entity}_comment.comment_id,
+#    '{comment_entity}' AS comment_entity_type,
+#    {comment_entity}_comment.{comment_entity}_id AS comment_entity_id
+# FROM {comment_entity}_comment
+#
+# `comment_entity` is replaced with the _inner_ comment entity from the below dict
+# and the query string below is added onto the end. for example, for getting related
+# assay comments to a sample the full query would be:
+#
+# SELECT
+#    entity_ids.id as requested_entity_id,
+#    assay_comment.comment_id,
+#    'assay' AS comment_entity_type,
+#    assay_comment.assay_id AS comment_entity_id
+# FROM assay_comment
+# JOIN assay
+# ON assay.id = assay_comment.assay_id
+# JOIN entity_ids ON assay.sample_id = entity_ids.id
+#
+# the `entity_ids` table is a CTE that in this case would contain the ids of the
+# requested samples.
+#
+# So the query strings below basically need to describe the query part necessary to
+# traverse the relational database model _from_ the entity comments table, back to the
+# entity_ids table which contains the ids for the requested entity, which in our example
+# case is samples.
+#
+# All these queries are then combined into a bit UNION query that will return all the
+# related comments as well as the ones made directly on the requested entity.
+# The first item in each of the top level dicts describes how to get the direct comments
+# it should be pretty much the exact same for each entity, except for samples which have
+# a special case where samples can have subsamples, we want to include those comments
+# in the related comments
+
 comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
     CommentEntityType.project: {
         CommentEntityType.project: """
@@ -229,7 +281,7 @@ class CommentTable(DbBase):
 
         # In the below there are two entity ids queried, requested_entity_id and
         # comment_entity_id. requested_entity_id is the ID of the entity requested
-        # entity, whereas comment_entity_id is the id of the entity that the comment
+        # whereas comment_entity_id is the id of the entity that the comment
         # is attached to, they can be different because comments related to the
         # requested entity can be returned as well as those attached directly
         combined_comment_query = '\nUNION\n'.join(
