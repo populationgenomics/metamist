@@ -1,4 +1,4 @@
-# pylint: disable=missing-function-docstring, too-many-public-methods
+# pylint: disable=missing-function-docstring, too-many-public-methods, too-many-locals
 from typing import Any
 
 from db.python.layers.assay import AssayLayer
@@ -10,7 +10,11 @@ from models.models import PRIMARY_EXTERNAL_ORG, SampleUpsertInternal
 from models.models.assay import AssayUpsertInternal
 from models.models.participant import ParticipantUpsertInternal
 from models.models.sequencing_group import SequencingGroupUpsertInternal
+from test.test_participant import get_participant_to_insert
 from test.testbase import DbIsolatedTest, run_as_sync
+
+# @TODO would be good to add permissions testing to this, but first need a better
+# way of mocking the test user and their permissions to make that possible
 
 COMMENT_VERSION_FRAGMENT = """
     fragment CommentVersionFragment on GraphQLCommentVersion {
@@ -323,6 +327,10 @@ default_sequencing_meta = {
     'sequencing_platform': 'short-read',
     'sequencing_technology': 'illumina',
 }
+
+
+def comment_uniq(comment: dict[str, Any]):
+    return (comment['id'], comment['entity']['__typename'])
 
 
 class TestComment(DbIsolatedTest):
@@ -810,3 +818,160 @@ class TestComment(DbIsolatedTest):
 
         self.assertEqual(restored_comment['status'], 'active')
         self.assertEqual(len(restored_comment['versions']), 2)
+
+    @run_as_sync
+    async def test_sample_discussion_related_comments(self):
+        """Test getting related comments"""
+
+        family_id = await self.flayer.create_family(external_id='f_external_id')
+        # This will create participant, sample, assay, sequencing group
+        participant = await self.player.upsert_participant(get_participant_to_insert())
+
+        sample = participant.samples[0]
+        sequencing_group = sample.sequencing_groups[0]
+        assay = sequencing_group.assays[0]
+        project_id = self.connection.project_id
+        assert project_id
+        project_name = self.connection.project_id_map[project_id].name
+
+        pat_pid = (
+            await self.player.upsert_participant(
+                ParticipantUpsertInternal(
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'EX01_pat'}, reported_sex=1
+                )
+            )
+        ).id
+
+        mat_pid = (
+            await self.player.upsert_participant(
+                ParticipantUpsertInternal(
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'EX01_mat'}, reported_sex=2
+                )
+            )
+        ).id
+
+        await self.player.add_participant_to_family(
+            family_id=family_id,
+            participant_id=participant.id,
+            paternal_id=pat_pid,
+            maternal_id=mat_pid,
+            affected=2,
+        )
+
+        sample_comment = await self.add_comment_to_sample(
+            sample.to_external().id, 'Sample Comment'
+        )
+
+        assay_comment = await self.add_comment_to_assay(assay.id, 'Assay Comment')
+
+        family_comment = await self.add_comment_to_family(family_id, 'Family Comment')
+
+        participant_comment = await self.add_comment_to_participant(
+            participant.id, 'Participant Comment'
+        )
+
+        project_comment = await self.add_comment_to_project(
+            self.connection.project_id, 'Project Comment'
+        )
+
+        sequencing_group_comment = await self.add_comment_to_sequencing_group(
+            sequencing_group.to_external().id, 'Sg Comment'
+        )
+
+        all_comments = [
+            (sample_comment, 'Sample'),
+            (assay_comment, 'Assay'),
+            (family_comment, 'Family'),
+            (participant_comment, 'Participant'),
+            (project_comment, 'Project'),
+            (sequencing_group_comment, 'Sequencing Group'),
+        ]
+
+        # add some threaded comments to test those
+        for comment, entity in all_comments:
+            await self.add_comment_to_thread(
+                parent_id=comment['id'], content=f'{entity} threaded comment'
+            )
+
+        sample_discussion = await self.get_discussion_on_sample(sample.to_external().id)
+        assay_discussion = await self.get_discussion_on_assay(assay.id)
+        family_discussion = await self.get_discussion_on_family(family_id)
+        participant_discussion = await self.get_discussion_on_participant(
+            participant.id
+        )
+        project_discussion = await self.get_discussion_on_project(project_name)
+        sequencing_group_discussion = await self.get_discussion_on_sequencing_group(
+            sequencing_group.to_external().id
+        )
+
+        # Sample relatedness
+        sample_related_ids = set(
+            comment_uniq(d) for d in sample_discussion['relatedComments']
+        )
+        self.assertEqual(len(sample_discussion['directComments']), 1)
+        self.assertEqual(len(sample_discussion['relatedComments']), 4)
+        self.assertIn(comment_uniq(family_comment), sample_related_ids)
+        self.assertIn(comment_uniq(assay_comment), sample_related_ids)
+        self.assertIn(comment_uniq(participant_comment), sample_related_ids)
+        self.assertIn(comment_uniq(sequencing_group_comment), sample_related_ids)
+        self.assertNotIn(comment_uniq(project_comment), sample_related_ids)
+
+        # assay relatedness
+        assay_related_ids = set(
+            comment_uniq(d) for d in assay_discussion['relatedComments']
+        )
+        self.assertEqual(len(assay_discussion['directComments']), 1)
+        self.assertEqual(len(assay_discussion['relatedComments']), 4)
+        self.assertIn(comment_uniq(family_comment), assay_related_ids)
+        self.assertIn(comment_uniq(sample_comment), assay_related_ids)
+        self.assertIn(comment_uniq(participant_comment), assay_related_ids)
+        self.assertIn(comment_uniq(sequencing_group_comment), assay_related_ids)
+        self.assertNotIn(comment_uniq(project_comment), assay_related_ids)
+
+        # family relatedness
+        family_related_ids = set(
+            comment_uniq(d) for d in family_discussion['relatedComments']
+        )
+        self.assertEqual(len(family_discussion['directComments']), 1)
+        self.assertEqual(len(family_discussion['relatedComments']), 4)
+        self.assertIn(comment_uniq(assay_comment), family_related_ids)
+        self.assertIn(comment_uniq(sample_comment), family_related_ids)
+        self.assertIn(comment_uniq(participant_comment), family_related_ids)
+        self.assertIn(comment_uniq(sequencing_group_comment), family_related_ids)
+        self.assertNotIn(comment_uniq(project_comment), family_related_ids)
+
+        # participant relatedness
+        participant_related_ids = set(
+            comment_uniq(d) for d in participant_discussion['relatedComments']
+        )
+        self.assertEqual(len(participant_discussion['directComments']), 1)
+        self.assertEqual(len(participant_discussion['relatedComments']), 4)
+        self.assertIn(comment_uniq(assay_comment), participant_related_ids)
+        self.assertIn(comment_uniq(sample_comment), participant_related_ids)
+        self.assertIn(comment_uniq(family_comment), participant_related_ids)
+        self.assertIn(comment_uniq(sequencing_group_comment), participant_related_ids)
+        self.assertNotIn(comment_uniq(project_comment), participant_related_ids)
+
+        # project relatedness
+        project_related_ids = set(
+            comment_uniq(d) for d in project_discussion['relatedComments']
+        )
+        self.assertEqual(len(project_discussion['directComments']), 1)
+        self.assertEqual(len(project_discussion['relatedComments']), 5)
+        self.assertIn(comment_uniq(assay_comment), project_related_ids)
+        self.assertIn(comment_uniq(participant_comment), project_related_ids)
+        self.assertIn(comment_uniq(sample_comment), project_related_ids)
+        self.assertIn(comment_uniq(family_comment), project_related_ids)
+        self.assertIn(comment_uniq(sequencing_group_comment), project_related_ids)
+
+        # sg relatedness
+        sequencing_group_related_ids = set(
+            comment_uniq(d) for d in sequencing_group_discussion['relatedComments']
+        )
+        self.assertEqual(len(sequencing_group_discussion['directComments']), 1)
+        self.assertEqual(len(sequencing_group_discussion['relatedComments']), 4)
+        self.assertIn(comment_uniq(assay_comment), sequencing_group_related_ids)
+        self.assertIn(comment_uniq(sample_comment), sequencing_group_related_ids)
+        self.assertIn(comment_uniq(family_comment), sequencing_group_related_ids)
+        self.assertIn(comment_uniq(participant_comment), sequencing_group_related_ids)
+        self.assertNotIn(comment_uniq(project_comment), sequencing_group_related_ids)
