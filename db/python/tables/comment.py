@@ -99,13 +99,25 @@ comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
     },
     CommentEntityType.sample: {
         CommentEntityType.sample: """
-            JOIN sample
-            ON sample.id = sample_comment.sample_id
+            JOIN sample s
+            ON s.id = sample_comment.sample_id
 
-            -- Include comments on subsamples too
-            JOIN entity_ids ON sample.id = entity_ids.id
-            OR sample.sample_root_id = entity_ids.id
-            OR sample.sample_parent_id = entity_ids.id
+            -- collect the parent ids of the comments on the requested entity
+            -- this is used to fetch related comments on sample parents
+            JOIN (
+                select entity_ids.id, ss.sample_parent_id, ss.sample_root_id
+                from entity_ids
+                join sample ss
+                on ss.id = entity_ids.id
+            ) as entity_ids
+
+            ON entity_ids.id = s.id
+            OR entity_ids.id = s.sample_parent_id
+            OR entity_ids.id = s.sample_root_id
+
+            OR entity_ids.sample_parent_id = s.id
+            OR entity_ids.sample_root_id = s.id
+
         """,
         CommentEntityType.assay: """
             JOIN assay
