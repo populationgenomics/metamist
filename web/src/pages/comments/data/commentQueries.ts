@@ -26,7 +26,7 @@ export const COMMENT_FRAGMENT = gql(`
         versions {
             ... CommentVersionFragment
         }
-    }    
+    }
 `)
 
 export const COMMENT_ENTITY_FRAGMENT = gql(`
@@ -63,7 +63,7 @@ export const COMMENT_ENTITY_FRAGMENT = gql(`
             familyId: id
             familyExternalId: externalId
         }
-    }    
+    }
 `)
 
 export const DISCUSSION_FRAGMENT = gql(`

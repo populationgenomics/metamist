@@ -8,7 +8,7 @@
             "presetConfig": {
                 "gqlTagName": "gql",
                 "fragmentMasking": false
-                
+
             }
         }
     },
