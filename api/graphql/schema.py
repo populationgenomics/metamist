@@ -8,6 +8,7 @@ and defaults to decide the GraphQL schema, so it might not necessarily look corr
 
 import datetime
 from inspect import isclass
+from typing import Annotated, Union
 
 import strawberry
 from strawberry.extensions import QueryDepthLimiter
@@ -303,7 +304,10 @@ class GraphQLComment:
     @strawberry.field()
     async def entity(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLComment'
-    ) -> 'GraphQLSample | GraphQLAssay | GraphQLSequencingGroup | GraphQLProject | GraphQLParticipant | GraphQLFamily':
+    ) -> Annotated[
+        'Union[GraphQLSample , GraphQLAssay , GraphQLSequencingGroup , GraphQLProject , GraphQLParticipant , GraphQLFamily]',
+        strawberry.union('GraphQLCommentEntity'),
+    ]:
         entity_type = root.comment_entity_type
         entity_id = root.comment_entity_id
 
