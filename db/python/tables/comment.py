@@ -139,7 +139,7 @@ comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
             ON assay.sample_id = sample_comment.sample_id
             JOIN entity_ids ON assay.id = entity_ids.id
         """,
-        CommentEntityType.participant: """
+        CommentEntityType.family: """
             JOIN family_participant
             ON family_participant.family_id = family_comment.family_id
             JOIN sample
@@ -148,7 +148,7 @@ comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
             ON assay.sample_id = sample.id
             JOIN entity_ids ON assay.id = entity_ids.id
         """,
-        CommentEntityType.family: """
+        CommentEntityType.participant: """
             JOIN sample
             ON sample.participant_id = participant_comment.participant_id
             JOIN assay
@@ -410,10 +410,10 @@ class CommentTable(DbBase):
             ) {join_table_query}
         """
 
-        rows = await self.connection.fetch_all(query, {'comment_id': id})
+        rows = await self.connection.fetch_all(query, {'comment_id': comment_id})
 
         if len(rows) == 0:
-            raise NotFoundError(f'Comment with id {id} was not found')
+            raise NotFoundError(f'Comment with id {comment_id} was not found')
 
         comments = await self.get_comments_for_entity_ids(
             entity_ids=[rows[0]['entity_id']],
@@ -423,7 +423,7 @@ class CommentTable(DbBase):
         )
 
         if comment_id not in comments:
-            raise NotFoundError(f'Comment with id {id} was not found')
+            raise NotFoundError(f'Comment with id {comment_id} was not found')
 
         return comments[comment_id]
 
