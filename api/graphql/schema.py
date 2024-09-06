@@ -8,7 +8,10 @@ and defaults to decide the GraphQL schema, so it might not necessarily look corr
 
 import datetime
 from inspect import isclass
-from typing import Annotated, Union
+from typing import (  # pylint: disable=unused-import; Union is used, pylint just doesn't know about it
+    Annotated,
+    Union,
+)
 
 import strawberry
 from strawberry.extensions import QueryDepthLimiter

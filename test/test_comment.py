@@ -35,7 +35,7 @@ COMMENT_FRAGMENT = """
         versions {
             ... CommentVersionFragment
         }
-    }    
+    }
 """
 
 COMMENT_ENTITY_FRAGMENT = """
@@ -72,7 +72,7 @@ COMMENT_ENTITY_FRAGMENT = """
             familyId: id
             familyExternalId: externalId
         }
-    }    
+    }
 """
 
 DISCUSSION_FRAGMENT = """
@@ -110,6 +110,32 @@ UPDATE_COMMENT = """
     mutation UpdateComment($id: Int!, $content: String!) {
         comment {
             updateComment(id: $id, content: $content) {
+                ...CommentFragment
+                thread {
+                    ...CommentFragment
+                }
+            }
+        }
+    }
+"""
+
+DELETE_COMMENT = """
+    mutation DeleteComment($id: Int!) {
+        comment {
+            deleteComment(id: $id) {
+                ...CommentFragment
+                thread {
+                    ...CommentFragment
+                }
+            }
+        }
+    }
+"""
+
+RESTORE_COMMENT = """
+    mutation RestoreComment($id: Int!) {
+        comment {
+            restoreComment(id: $id) {
                 ...CommentFragment
                 thread {
                     ...CommentFragment
@@ -297,7 +323,7 @@ default_sequencing_meta = {
 
 
 class TestComment(DbIsolatedTest):
-    """Test sample class"""
+    """Test commenting functionality"""
 
     # tests run in 'sorted by ascii' order
     @run_as_sync
@@ -636,3 +662,230 @@ class TestComment(DbIsolatedTest):
             created_comment['sequencingGroup']['addComment'],
             requested_comment['sequencingGroups'][0]['discussion']['directComments'][0],
         )
+
+    @run_as_sync
+    async def test_add_comment_to_thread(self):
+        """Test adding a comment to a thread"""
+
+        sample = await self.slayer.upsert_sample(
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
+                type='blood',
+                active=True,
+                meta={'meta': 'meta ;)'},
+            )
+        )
+
+        sample_external = sample.to_external()
+        comment_text = 'Sample parent comment'
+
+        create_comment_query = f"""
+            {COMMENT_RESULT_FRAGMENTS}
+            {SAMPLE_ADD_COMMENT}
+        """
+
+        create_comment_variables = {'id': sample_external.id, 'content': comment_text}
+        parent_comment = await self.run_graphql_query_async(
+            create_comment_query, variables=create_comment_variables
+        )
+
+        add_comment_to_thread_query = f"""
+            {COMMENT_RESULT_FRAGMENTS}
+            {ADD_COMMENT_TO_THREAD}
+        """
+        parent_id = parent_comment['sample']['addComment']['id']
+
+        add_comment_to_thread_variables = {
+            'parentId': parent_id,
+            'content': 'Child comment in thread',
+        }
+
+        child_comment_result = await self.run_graphql_query_async(
+            add_comment_to_thread_query, variables=add_comment_to_thread_variables
+        )
+        child_comment = child_comment_result['comment']['addCommentToThread']
+
+        # Ensure that the child comment has the correct parent ID
+        self.assertEqual(child_comment['parentId'], parent_id)
+
+        get_comment_query = f"""
+            {DISCUSSION_RESULT_FRAGMENTS}
+            {SAMPLE_COMMENTS}
+        """
+
+        get_comment_variables = {'sampleId': sample_external.id}
+        requested_comment = await self.run_graphql_query_async(
+            get_comment_query, variables=get_comment_variables
+        )
+
+        parent_comment_with_thread = requested_comment['sample'][0]['discussion'][
+            'directComments'
+        ][0]
+
+        self.assertEqual(len(parent_comment_with_thread['thread']), 1)
+        self.assertEqual(parent_comment_with_thread['thread'][0], child_comment)
+
+    @run_as_sync
+    async def test_updating_comment(self):
+        """Test updating an existing parent comment"""
+
+        sample = await self.slayer.upsert_sample(
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
+                type='blood',
+                active=True,
+                meta={'meta': 'meta ;)'},
+            )
+        )
+
+        sample_external = sample.to_external()
+        initial_parent_comment_text = 'Sample parent comment'
+
+        create_comment_query = f"""
+            {COMMENT_RESULT_FRAGMENTS}
+            {SAMPLE_ADD_COMMENT}
+        """
+
+        create_comment_variables = {
+            'id': sample_external.id,
+            'content': initial_parent_comment_text,
+        }
+        parent_comment_result = await self.run_graphql_query_async(
+            create_comment_query, variables=create_comment_variables
+        )
+
+        parent_comment = parent_comment_result['sample']['addComment']
+
+        add_comment_to_thread_query = f"""
+            {COMMENT_RESULT_FRAGMENTS}
+            {ADD_COMMENT_TO_THREAD}
+        """
+        initial_child_comment_text = 'Child comment in thread'
+        add_comment_to_thread_variables = {
+            'parentId': parent_comment['id'],
+            'content': initial_child_comment_text,
+        }
+
+        child_comment_result = await self.run_graphql_query_async(
+            add_comment_to_thread_query, variables=add_comment_to_thread_variables
+        )
+
+        child_comment = child_comment_result['comment']['addCommentToThread']
+
+        updated_parent_comment_text = 'Updated Parent Comment Text'
+        updated_child_comment_text = 'Updated Child Comment Text'
+
+        update_comment_query = f"""
+            {COMMENT_RESULT_FRAGMENTS}
+            {UPDATE_COMMENT}
+        """
+        # Update child comment first so that we can check that parent comment update
+        # contains the updated child comment
+        update_child_comment_result = await self.run_graphql_query_async(
+            update_comment_query,
+            variables={
+                'id': child_comment['id'],
+                'content': updated_child_comment_text,
+            },
+        )
+
+        updated_child_comment = update_child_comment_result['comment']['updateComment']
+
+        update_parent_comment_result = await self.run_graphql_query_async(
+            update_comment_query,
+            variables={
+                'id': parent_comment['id'],
+                'content': updated_parent_comment_text,
+            },
+        )
+
+        updated_parent_comment = update_parent_comment_result['comment'][
+            'updateComment'
+        ]
+
+        sample_discussion_query = f"""
+            {DISCUSSION_RESULT_FRAGMENTS}
+            {SAMPLE_COMMENTS}
+        """
+
+        sample_discussion_result = await self.run_graphql_query_async(
+            sample_discussion_query, variables={'sampleId': sample_external.id}
+        )
+
+        sample_discussion = sample_discussion_result['sample'][0]['discussion']
+
+        self.assertEqual(updated_child_comment['content'], updated_child_comment_text)
+        self.assertEqual(updated_parent_comment['content'], updated_parent_comment_text)
+        self.assertEqual(
+            updated_parent_comment['versions'][0]['content'],
+            initial_parent_comment_text,
+        )
+        self.assertEqual(len(updated_parent_comment['versions']), 1)
+        self.assertEqual(len(updated_child_comment['versions']), 1)
+        self.assertEqual(
+            updated_child_comment['versions'][0]['content'], initial_child_comment_text
+        )
+        self.assertEqual(
+            # The child in the updated parent comment thread won't have a thread of its
+            # own, so add it in here, but they otherwise should be identical
+            updated_parent_comment['thread'][0] | {'thread': []},
+            updated_child_comment,
+        )
+        self.assertEqual(sample_discussion['directComments'][0], updated_parent_comment)
+
+    @run_as_sync
+    async def test_deleting_and_restoring_comment(self):
+        """Test deleting a comment and then restoring it"""
+
+        sample = await self.slayer.upsert_sample(
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
+                type='blood',
+                active=True,
+                meta={'meta': 'meta ;)'},
+            )
+        )
+
+        sample_external = sample.to_external()
+        comment_text = 'Sample parent comment'
+
+        create_comment_query = f"""
+            {COMMENT_RESULT_FRAGMENTS}
+            {SAMPLE_ADD_COMMENT}
+        """
+
+        create_comment_variables = {'id': sample_external.id, 'content': comment_text}
+        create_comment_result = await self.run_graphql_query_async(
+            create_comment_query, variables=create_comment_variables
+        )
+
+        created_comment = create_comment_result['sample']['addComment']
+        self.assertEqual(created_comment['status'], 'active')
+
+        delete_comment_query = f"""
+            {COMMENT_RESULT_FRAGMENTS}
+            {DELETE_COMMENT}
+        """
+
+        deleted_comment_result = await self.run_graphql_query_async(
+            delete_comment_query, variables={'id': created_comment['id']}
+        )
+
+        deleted_comment = deleted_comment_result['comment']['deleteComment']
+
+        self.assertEqual(deleted_comment['status'], 'deleted')
+        self.assertEqual(len(deleted_comment['versions']), 1)
+
+        restore_comment_query = f"""
+            {COMMENT_RESULT_FRAGMENTS}
+            {RESTORE_COMMENT}
+        """
+
+        restore_comment_result = await self.run_graphql_query_async(
+            restore_comment_query, variables={'id': created_comment['id']}
+        )
+
+        restored_comment = restore_comment_result['comment']['restoreComment']
+
+        self.assertEqual(restored_comment['status'], 'active')
+        self.assertEqual(len(restored_comment['versions']), 2)
