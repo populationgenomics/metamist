@@ -24,8 +24,12 @@ export function CommentThread(props: {
 }) {
     const { comment, prevComment, canComment, showEntityInfo, commentToShow, viewerUser } = props
 
+    const thread = comment.thread.filter(
+        (cc) => cc.author === viewerUser || comment.status === 'active'
+    )
+
     const threadContainsCommentToShow =
-        commentToShow && commentIdInComments(commentToShow.id, comment.thread)
+        commentToShow && commentIdInComments(commentToShow.id, thread)
 
     const [showThread, setShowThread] = useState(threadContainsCommentToShow)
     const [isReplying, setIsReplying] = useState(false)
@@ -35,9 +39,9 @@ export function CommentThread(props: {
 
     const [addCommentToThreadMutation, addCommentToThreadResult] = useAddCommentToThread(comment.id)
 
-    const replyCount = comment.thread.length
+    const replyCount = thread.length
     const hasReplies = replyCount > 0
-    const replyAuthors = [...new Set(comment.thread.flatMap((comment) => comment.author))]
+    const replyAuthors = [...new Set(thread.flatMap((comment) => comment.author))]
 
     // Only show the entity info if it wasn't already displayed on the previous comment
     const sameEntityAsPreviousComment =
@@ -93,6 +97,9 @@ export function CommentThread(props: {
             .catch((err) => console.error(err))
     }
 
+    // Don't show deleted comments to anyone other than the author of the comment
+    if (viewerUser !== comment.author && comment.status === 'deleted') return null
+
     return (
         <Box>
             {/* Show the entity that the comment is on for context's sake */}
@@ -107,6 +114,7 @@ export function CommentThread(props: {
             {/* The comment itself */}
             <Comment
                 comment={comment}
+                replyCount={replyCount}
                 canComment={canComment}
                 viewerUser={viewerUser}
                 highlighted={comment.id === commentToShow?.id}
@@ -116,7 +124,7 @@ export function CommentThread(props: {
             />
 
             {/* Comment thread */}
-            {hasReplies && (
+            {hasReplies && comment.status === 'active' && (
                 <>
                     <Box display={'flex'} onClick={onToggleReplies}>
                         <AvatarGroup max={4}>
@@ -136,10 +144,11 @@ export function CommentThread(props: {
                     </Box>
                     {showThread && (
                         <Box ml={2} pl={2} borderLeft={'2px solid var(--color-border-color)'}>
-                            {comment.thread.map((cc) => (
+                            {thread.map((cc) => (
                                 <Comment
                                     key={cc.id}
                                     comment={cc}
+                                    replyCount={0}
                                     highlighted={cc.id === commentToShow?.id}
                                     ref={cc.id === commentToShow?.id ? commentToShowRef : undefined}
                                     canComment={canComment}
@@ -172,7 +181,7 @@ export function CommentThread(props: {
                             {addCommentToThreadResult.loading ? 'Saving' : 'Save'}
                         </Button>
                         {/* Only show cancel button if there's no replies */}
-                        {comment.thread.length === 0 && (
+                        {thread.length === 0 && (
                             <Button
                                 variant="contained"
                                 sx={{ fontSize: 12 }}

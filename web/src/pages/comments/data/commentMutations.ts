@@ -61,6 +61,42 @@ export function useUpdateComment() {
     return useMutation(UPDATE_COMMENT)
 }
 
+const DELETE_COMMENT = gql(`
+    mutation DeleteComment($id: Int!) {
+        comment {
+            deleteComment(id: $id) {
+                ...CommentFragment
+
+                thread {
+                    ...CommentFragment
+                }
+            }
+        }
+    }
+`)
+
+export function useDeleteComment() {
+    return useMutation(DELETE_COMMENT)
+}
+
+const RESTORE_COMMENT = gql(`
+    mutation RestoreComment($id: Int!) {
+        comment {
+            restoreComment(id: $id) {
+                ...CommentFragment
+
+                thread {
+                    ...CommentFragment
+                }
+            }
+        }
+    }
+`)
+
+export function useRestoreComment() {
+    return useMutation(RESTORE_COMMENT)
+}
+
 export function useNewComment<TData, TVariables = OperationVariables>(
     query: DocumentNode | TypedDocumentNode<TData, TVariables>,
     cacheId: string | null,

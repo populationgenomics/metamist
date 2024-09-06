@@ -1,4 +1,4 @@
-import { Box, List, ListItem, ListItemButton, ListItemText } from '@mui/material'
+import { Box, List, ListItem, ListItemButton, ListItemText, Typography } from '@mui/material'
 import { DateTime } from 'luxon'
 import { useState } from 'react'
 import { CommentContent } from './CommentContent'
@@ -24,7 +24,9 @@ export function CommentHistory(props: { comment: CommentData; theme: 'light' | '
     ].reverse()
 
     const [selectedTimestamp, setSelectedTimestamp] = useState(comment.updatedAt)
-    const selectedVersion = versions.find((vv) => vv.timestamp === selectedTimestamp)
+    const selectedVersionIndex = versions.findIndex((vv) => vv.timestamp === selectedTimestamp)
+    const selectedVersion = versions[selectedVersionIndex]
+    const previousVersion = versions[selectedVersionIndex + 1]
 
     return (
         <Box
@@ -44,6 +46,16 @@ export function CommentHistory(props: { comment: CommentData; theme: 'light' | '
             }}
         >
             <Box mr={2} flexGrow={1} overflow={'auto'}>
+                {previousVersion &&
+                    selectedVersion &&
+                    selectedVersion.status !== previousVersion.status && (
+                        <Box mb={2}>
+                            <Typography fontStyle={'italic'}>
+                                Status changed from {previousVersion.status} to{' '}
+                                {selectedVersion.status}
+                            </Typography>
+                        </Box>
+                    )}
                 <CommentContent content={selectedVersion?.content} theme={props.theme} />
             </Box>
             <Box

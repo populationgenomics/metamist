@@ -2,6 +2,11 @@ import {
     Alert,
     Box,
     Button,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    DialogTitle,
     Modal,
     Link as MuiLink,
     LinkProps as MuiLinkProps,
@@ -18,7 +23,7 @@ import { CommentContent } from './CommentContent'
 import { CommentEditor } from './CommentEditor'
 import { CommentHistory } from './CommentHistory'
 import { getCommentLink, parseAuthor } from './commentUtils'
-import { useUpdateComment } from './data/commentMutations'
+import { useDeleteComment, useRestoreComment, useUpdateComment } from './data/commentMutations'
 
 function CommentAction(props: MuiLinkProps & { preventDefault?: boolean }) {
     const { preventDefault, ...otherProps } = props
@@ -42,6 +47,7 @@ export const Comment = forwardRef<
     HTMLDivElement,
     {
         comment: CommentData
+        replyCount: number
         highlighted: boolean
         canComment: boolean
         viewerUser: string | null
@@ -52,12 +58,14 @@ export const Comment = forwardRef<
     const { comment, canComment, viewerUser, isTopLevel, onReply } = props
     const author = parseAuthor(comment.author)
 
-    const canEdit = viewerUser === comment.author
+    const isAuthor = viewerUser === comment.author
     const [isEditing, setIsEditing] = useState(false)
     const [content, setContent] = useState(comment.content)
     const [copyLinkState, copyLinkToClipboard] = useCopyToClipboard()
     const [showCopiedState, setShowCopiedState] = useState(true)
     const [isShowingHistory, setIsShowingHistory] = useState(false)
+    const [isShowingDeletedComment, setIsShowingDeletedComment] = useState(false)
+    const [showingDeleteConfirmation, setShowingDeleteConfirmation] = useState(false)
     const location = useLocation()
 
     // Hide the "Copied!" notification after a couple of seconds
@@ -82,6 +90,10 @@ export const Comment = forwardRef<
     const isDarkMode = theme.theme === 'dark-mode'
 
     const [updateCommentMutation, updateCommentResult] = useUpdateComment()
+    const [deleteCommentMutation, deleteCommentResult] = useDeleteComment()
+    const [restoreCommentMutation, restoreCommentResult] = useRestoreComment()
+
+    const isDeleted = comment.status === 'deleted'
 
     const saveComment = () => {
         // Don't do anything if already loading
@@ -97,7 +109,44 @@ export const Comment = forwardRef<
         })
     }
 
+    const deleteComment = async () => {
+        // Don't do anything if already loading
+        if (deleteCommentResult.loading || isDeleted) return
+
+        await deleteCommentMutation({
+            variables: {
+                id: comment.id,
+            },
+        })
+    }
+
+    const restoreComment = async () => {
+        // Don't do anything if already loading
+        if (restoreCommentResult.loading || !isDeleted) return
+
+        await restoreCommentMutation({
+            variables: {
+                id: comment.id,
+            },
+        })
+
+        setIsShowingDeletedComment(false)
+    }
+
     const commentLink = getCommentLink(comment.id, location)
+
+    if (isDeleted && !isShowingDeletedComment) {
+        return (
+            <Box pl={5}>
+                <Typography sx={{ opacity: 0.5 }}>
+                    Comment deleted {updatedAt.toRelative()}
+                </Typography>
+                <CommentAction onClick={() => setIsShowingDeletedComment(true)}>
+                    Show comment
+                </CommentAction>
+            </Box>
+        )
+    }
 
     return (
         <Box
@@ -210,7 +259,7 @@ export const Comment = forwardRef<
                                 {isTopLevel && canComment && (
                                     <CommentAction onClick={() => onReply()}>Reply</CommentAction>
                                 )}
-                                {canEdit && (
+                                {isAuthor && (
                                     <CommentAction onClick={() => setIsEditing(!isEditing)}>
                                         Edit
                                     </CommentAction>
@@ -238,6 +287,28 @@ export const Comment = forwardRef<
                                         View Edits
                                     </CommentAction>
                                 )}
+                                {isAuthor && !isDeleted && (
+                                    <CommentAction
+                                        onClick={() => setShowingDeleteConfirmation(true)}
+                                        sx={{
+                                            color: 'var(--color-text-red)',
+                                        }}
+                                    >
+                                        Delete
+                                    </CommentAction>
+                                )}
+                                {isAuthor && isDeleted && (
+                                    <CommentAction onClick={() => restoreComment()}>
+                                        {restoreCommentResult.loading ? 'Restoring' : 'Restore'}
+                                    </CommentAction>
+                                )}
+                                {isAuthor && isDeleted && (
+                                    <CommentAction
+                                        onClick={() => setIsShowingDeletedComment(false)}
+                                    >
+                                        Hide
+                                    </CommentAction>
+                                )}
                             </Box>
                         </Box>
                     )}
@@ -252,6 +323,47 @@ export const Comment = forwardRef<
                     <CommentHistory comment={comment} theme={isDarkMode ? 'dark' : 'light'} />
                 </Box>
             </Modal>
+            <Dialog
+                open={showingDeleteConfirmation}
+                onClose={() => setShowingDeleteConfirmation(false)}
+            >
+                <DialogTitle>Delete this comment?</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Are you sure you want to delete this comment? It will be marked as deleted
+                        in the database and will no longer be visible to other users.
+                        <br />
+                        Only you will be able to restore it.{' '}
+                        <Typography fontWeight={'bold'}>
+                            If you need a comment permanently deleted for privacy or security
+                            reasons, please contact the software team.
+                        </Typography>
+                        {props.replyCount > 0 && (
+                            <Box mt={2}>
+                                <Alert severity="warning">
+                                    {props.replyCount} {props.replyCount > 1 ? 'replies' : 'reply'}{' '}
+                                    will no longer be visible if this comment is deleted
+                                </Alert>
+                            </Box>
+                        )}
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setShowingDeleteConfirmation(false)} color={'info'}>
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={() =>
+                            deleteComment().then(() => {
+                                setShowingDeleteConfirmation(false)
+                            })
+                        }
+                        color={'error'}
+                    >
+                        {deleteCommentResult.loading ? 'Deleting' : 'Delete'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     )
 })
