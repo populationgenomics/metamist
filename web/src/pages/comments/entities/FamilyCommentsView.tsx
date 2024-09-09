@@ -57,7 +57,7 @@ export function FamilyCommentsView(props: FamilyCommentsViewProps) {
 
     return (
         <DiscussionView
-            discussionEntityType={family?.__typename}
+            discussionEntityType={'GraphQLFamily'}
             discussionLoading={loading}
             discussionError={error}
             discussion={family?.discussion}

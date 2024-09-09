@@ -56,7 +56,7 @@ export function ParticipantCommentsView(props: ParticipantCommentsViewProps) {
 
     return (
         <DiscussionView
-            discussionEntityType={participant?.__typename}
+            discussionEntityType={'GraphQLParticipant'}
             discussionLoading={loading}
             discussionError={error}
             discussion={participant?.discussion}

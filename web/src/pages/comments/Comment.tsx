@@ -59,13 +59,21 @@ export const Comment = forwardRef<
     const author = parseAuthor(comment.author)
 
     const isAuthor = viewerUser === comment.author
+    // Toggle between comment viewer and editor
     const [isEditing, setIsEditing] = useState(false)
+    // Manage the state of the comment content as the user edits it
     const [content, setContent] = useState(comment.content)
+    // Allow copying a link to the comment to the clipboard
     const [copyLinkState, copyLinkToClipboard] = useCopyToClipboard()
+    // This state bit is used to hide the "Copied!" text after a few seconds of copying
     const [showCopiedState, setShowCopiedState] = useState(true)
+    // Handle showing/hiding the comment history modal
     const [isShowingHistory, setIsShowingHistory] = useState(false)
+    // Toggle between showing or hiding a deleted comment
     const [isShowingDeletedComment, setIsShowingDeletedComment] = useState(false)
+    // Handle showing/hiding delete confirmation dialog box
     const [showingDeleteConfirmation, setShowingDeleteConfirmation] = useState(false)
+    // Get the data for the current path from react router
     const location = useLocation()
 
     // Hide the "Copied!" notification after a couple of seconds
@@ -85,6 +93,7 @@ export const Comment = forwardRef<
     const createdAt = DateTime.fromISO(comment.createdAt)
     const updatedAt = DateTime.fromISO(comment.updatedAt)
     const hasBeenEdited = comment.versions.length > 0
+    const isDeleted = comment.status === 'deleted'
 
     const theme = useContext(ThemeContext)
     const isDarkMode = theme.theme === 'dark-mode'
@@ -92,8 +101,6 @@ export const Comment = forwardRef<
     const [updateCommentMutation, updateCommentResult] = useUpdateComment()
     const [deleteCommentMutation, deleteCommentResult] = useDeleteComment()
     const [restoreCommentMutation, restoreCommentResult] = useRestoreComment()
-
-    const isDeleted = comment.status === 'deleted'
 
     const saveComment = () => {
         // Don't do anything if already loading
@@ -118,6 +125,8 @@ export const Comment = forwardRef<
                 id: comment.id,
             },
         })
+
+        setShowingDeleteConfirmation(false)
     }
 
     const restoreComment = async () => {
@@ -352,14 +361,7 @@ export const Comment = forwardRef<
                     <Button onClick={() => setShowingDeleteConfirmation(false)} color={'info'}>
                         Cancel
                     </Button>
-                    <Button
-                        onClick={() =>
-                            deleteComment().then(() => {
-                                setShowingDeleteConfirmation(false)
-                            })
-                        }
-                        color={'error'}
-                    >
+                    <Button onClick={() => deleteComment()} color={'error'}>
                         {deleteCommentResult.loading ? 'Deleting' : 'Delete'}
                     </Button>
                 </DialogActions>

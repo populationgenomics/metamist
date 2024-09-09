@@ -55,7 +55,7 @@ export function ProjectCommentsView(props: ProjectCommentsViewProps) {
 
     return (
         <DiscussionView
-            discussionEntityType={data?.project.__typename}
+            discussionEntityType={'GraphQLProject'}
             discussionLoading={loading}
             discussionError={error}
             discussion={data?.project.discussion}

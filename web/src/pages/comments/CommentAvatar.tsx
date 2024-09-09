@@ -1,6 +1,7 @@
 import RobotIcon from '@mui/icons-material/SmartToy'
 import { Avatar, SxProps } from '@mui/material'
 
+// Generate a random unique colour from the users username
 const colorFromStr = (str: string) => {
     let hash = 0
     if (str.length === 0) return `hsl(0 0 50)`

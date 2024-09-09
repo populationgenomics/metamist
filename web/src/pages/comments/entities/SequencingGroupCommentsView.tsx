@@ -56,7 +56,7 @@ export function SequencingGroupCommentsView(props: SequencingGroupCommentsViewPr
 
     return (
         <DiscussionView
-            discussionEntityType={sequencingGroup?.__typename}
+            discussionEntityType={'GraphQLSequencingGroup'}
             discussionLoading={loading}
             discussionError={error}
             discussion={sequencingGroup?.discussion}

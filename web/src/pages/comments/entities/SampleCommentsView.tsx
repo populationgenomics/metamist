@@ -57,7 +57,7 @@ export function SampleCommentsView(props: SampleCommentsViewProps) {
 
     return (
         <DiscussionView
-            discussionEntityType={sample?.__typename}
+            discussionEntityType={'GraphQLSample'}
             discussionLoading={loading}
             discussionError={error}
             discussion={sample?.discussion}

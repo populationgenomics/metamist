@@ -15,6 +15,8 @@ function commentIdInComments(id: number, comments: CommentData[]) {
 
 export function CommentThread(props: {
     comment: CommentThreadData
+    // commentToShow is set when a deep link to a comment in the url, it is used
+    // to scroll to and highlight a specific comment in the list
     commentToShow: CommentThreadData | CommentData | null
     prevComment?: CommentThreadData
     canComment: boolean
@@ -28,13 +30,22 @@ export function CommentThread(props: {
         (cc) => cc.author === viewerUser || comment.status === 'active'
     )
 
+    // This is used to determine whether the thread needs to be expanded to show
+    // the linked comment
     const threadContainsCommentToShow =
         commentToShow && commentIdInComments(commentToShow.id, thread)
 
+    // Control state of whether thread is open or closed
     const [showThread, setShowThread] = useState(threadContainsCommentToShow)
+    // This is set after a user clicks the reply button and is used in an effect
+    // below to scroll to and focus the reply box
     const [isReplying, setIsReplying] = useState(false)
+    // Manage the state of the reply content before it is submitted
     const [replyContent, setReplyContent] = useState('')
+    // A reference to the reply form
     const replyFormRef = useRef<HTMLTextAreaElement>(null)
+    // A reference to the comment that should be highlighted as it is deep linked, this is used
+    // to scroll the pane down to the comment
     const commentToShowRef = useRef<HTMLDivElement>(null)
 
     const [addCommentToThreadMutation, addCommentToThreadResult] = useAddCommentToThread(comment.id)
@@ -48,31 +59,42 @@ export function CommentThread(props: {
         prevComment && getCommentEntityId(prevComment) === getCommentEntityId(comment)
     const shouldShowEntityInfo = showEntityInfo && !sameEntityAsPreviousComment
 
-    const onReply = () => {
-        setShowThread(true)
-        setIsReplying(true)
-
-        if (replyFormRef.current) {
-            replyFormRef.current.scrollIntoView({ block: 'center' })
-            replyFormRef.current.focus()
-        }
-    }
-
+    // Hide the thread and reset the replying state
     const onToggleReplies = () => {
         // If this is closing the thread, then set replying to false
         if (showThread) setIsReplying(false)
         setShowThread(!showThread)
     }
 
+    const scrollAndFocusReplyBox = () => {
+        if (replyFormRef.current) {
+            const rect = replyFormRef.current.getBoundingClientRect()
+            // only scroll into view if reply isn't already in view
+            if (rect.top <= 0 || rect.bottom >= window.innerHeight) {
+                replyFormRef.current.scrollIntoView({ block: 'center' })
+            }
+            replyFormRef.current.focus()
+        }
+    }
+
+    const onReply = () => {
+        setShowThread(true)
+        setIsReplying(true)
+
+        // Scroll to and focus the reply box, this works if the thread is already open
+        // the useEffect below is used to do the scroll in the case where the thread was
+        // closed as the ref won't exist when the thread is closed.
+        scrollAndFocusReplyBox()
+    }
+
     // Scroll down to the reply form after reply is clicked
     useEffect(() => {
-        if (replyFormRef.current && showThread && isReplying) {
-            replyFormRef.current.scrollIntoView({ block: 'center' })
-            replyFormRef.current.focus()
+        if (showThread && isReplying) {
+            scrollAndFocusReplyBox()
         }
     }, [showThread, isReplying])
 
-    // Scroll to the comment that is specified in the URL
+    // Scroll to the comment that is linked in the URL
     useEffect(() => {
         if (commentToShowRef.current) {
             commentToShowRef.current.scrollIntoView({ block: 'center' })
@@ -161,6 +183,7 @@ export function CommentThread(props: {
                     )}
                 </>
             )}
+            {/* Form to add a new comment */}
             {showThread && (
                 <Box ml={4}>
                     <CommentEditor
