@@ -75,6 +75,12 @@ jobs:
           files: ./coverage.xml
           token: ${{ secrets.CODECOV_TOKEN }}
 
+      - name: 'Save coverage report as an Artifact'
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: ./coverage.xml
+
       - name: 'build web front-end'
         run: |
           set -eo pipefail
