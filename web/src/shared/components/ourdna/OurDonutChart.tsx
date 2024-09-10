@@ -4,9 +4,13 @@ import { Card, Container } from 'semantic-ui-react'
 
 import { ourdnaColours } from './Colours'
 
+interface DonutChartData {
+    [key: string]: number
+}
+
 interface DonutChartProps {
     header: string
-    data: { [key: string]: number }
+    data: DonutChartData
     icon: React.ReactNode
 }
 
@@ -46,15 +50,17 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
         const g = svg.append('g').attr('transform', `translate(${width / 2},${height / 2})`)
 
         const color = d3
-            .scaleOrdinal()
+            .scaleOrdinal<string>()
             .domain(Object.keys(data))
             .range(Object.values(ourdnaColours) || d3.schemeCategory10)
 
-        const pie = d3.pie<any>().value((d: any) => d[1])
-        const data_ready = pie(Object.entries(data))
+        // Correctly map Object.entries to objects with { key, value } format
+        const formattedData = Object.entries(data).map(([key, value]) => ({ key, value }))
 
-        const arc = d3
-            .arc<any>()
+        const pie = d3.pie<{ key: string; value: number }>().value((d) => d.value)
+        const data_ready = pie(formattedData)
+
+        const arc = d3.arc<d3.PieArcDatum<{ key: string; value: number }>>()
             .innerRadius(radius * 0.4)
             .outerRadius(radius * 0.8)
 
@@ -75,12 +81,12 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
             .enter()
             .append('path')
             .attr('d', arc)
-            .attr('fill', (d) => color(d.data[0]))
+            .attr('fill', (d) => color(d.data.key)) // Correct reference to key
             .attr('stroke', 'white')
             .style('stroke-width', '2px')
             .style('opacity', 1)
             .on('mouseover', function (event, d) {
-                tooltip.text(`${d.data[0]}: ${d.data[1]}`)
+                tooltip.text(`${d.data.key}: ${d.data.value}`) // Correctly reference key and value
                 return tooltip.style('visibility', 'visible')
             })
             .on('mousemove', function (event) {
@@ -118,14 +124,14 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
             .append('rect')
             .attr('width', 18)
             .attr('height', 18)
-            .attr('fill', (d) => color(d.data[0]))
+            .attr('fill', (d) => color(d.data.key)) // Correct reference to key
 
         legendItems
             .append('text')
             .attr('x', 24)
             .attr('y', 9)
             .attr('dy', '0.35em')
-            .text((d) => d.data[0])
+            .text((d) => d.data.key) // Correct reference to key
             .style('font-size', '12px')
             .style('fill', 'var(--color-text-primary)')
     }, [data, dimensions])
