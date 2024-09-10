@@ -40,7 +40,7 @@ class SampleProcessMeta:
         Returns:
             datetime | None: A datetime object if parsing is successful, otherwise None.
         """
-        if not d:
+        if not d or d.strip() == '':
             return None
         try:
             return datetime.strptime(d, '%Y-%m-%d %H:%M:%S')
@@ -48,10 +48,17 @@ class SampleProcessMeta:
             # Optionally log the error message
             print(f'Datetime passed is not a str: {e}')
             return None
-        except ValueError as e:
+        except ValueError:
             # Optionally log the error message
-            print(f'Error parsing datetime: {e}')
-            return None
+            try:
+                return datetime.strptime(d, '%d/%m/%Y %H:%M:%S')
+            except TypeError as e:
+                # Optionally log the error message
+                print(f'Datetime passed is not a str: {e}')
+                return None
+            except ValueError as e:
+                print(f'Error parsing datetime: {e}')
+                return None
 
     @cached_property
     def collection_time(self) -> datetime | None:
@@ -347,11 +354,12 @@ class OurDnaDashboardLayer(BaseLayer):
                 hour_bucket = ceil(processing_time / 3600)
                 processing_times_by_site[processing_site][hour_bucket] += 1
 
-        for site in processing_times_by_site:
-            min_bucket = min(processing_times_by_site[site])
-            max_bucket = max(processing_times_by_site[site])
-            for i in range(min_bucket, max_bucket + 1):
-                processing_times_by_site[site].setdefault(i, 0)
+        # ENABLE THIS IF WE WANT VALUES FOR ALL HOURS
+        # for site in processing_times_by_site:
+        #     min_bucket = min(processing_times_by_site[site])
+        #     max_bucket = max(processing_times_by_site[site])
+        #     for i in range(min_bucket, max_bucket + 1):
+        #         processing_times_by_site[site].setdefault(i, 0)
 
         return processing_times_by_site
 
@@ -373,12 +381,12 @@ class OurDnaDashboardLayer(BaseLayer):
                 processing_times_by_collection_site[processing_collection_site][
                     hour_bucket
                 ] += 1
-
-        for site in processing_times_by_collection_site:
-            min_bucket = min(processing_times_by_collection_site[site])
-            max_bucket = max(processing_times_by_collection_site[site])
-            for i in range(min_bucket, max_bucket + 1):
-                processing_times_by_collection_site[site].setdefault(i, 0)
+        # ENABLE THIS IF WE WANT VALUES FOR ALL HOURS
+        # for site in processing_times_by_collection_site:
+        #     min_bucket = min(processing_times_by_collection_site[site])
+        #     max_bucket = max(processing_times_by_collection_site[site])
+        #     for i in range(min_bucket, max_bucket + 1):
+        #         processing_times_by_collection_site[site].setdefault(i, 0)
 
         return processing_times_by_collection_site
 
