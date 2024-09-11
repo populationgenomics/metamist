@@ -5,9 +5,6 @@ import Routes from './Routes'
 import NavBar from './shared/components/Header/NavBar'
 import { ViewerContext, useViewer } from './viewer'
 
-// this wasn't working, so added import to HTML
-// import 'bootstrap/dist/css/bootstrap.min.css'
-
 const App: React.FunctionComponent = () => {
     const { viewer, error } = useViewer()
     const [showAlert, setShowAlert] = React.useState(true)
