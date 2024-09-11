@@ -61,6 +61,7 @@ export function getCommentEntityId(comment: CommentThreadData): string {
 
         case 'GraphQLSample':
             return `sample:${comment.entity.sampleId}`
+
         case 'GraphQLSequencingGroup':
             return `sg:${comment.entity.sequencingGroupId}`
     }

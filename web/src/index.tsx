@@ -20,7 +20,9 @@ const client = new ApolloClient({
         possibleTypes: {
             // Not sure why apollo can't get this from the schema,
             // but this is required so that fields on the union
-            // types are retrievable.
+            // types are retrievable. If we have lots more of these
+            // in the future we can look to automatically generate
+            // them as is described here: https://www.apollographql.com/docs/react/data/fragments/#generating-possibletypes-automatically
             GraphQLCommentEntity: [
                 'GraphQLSample',
                 'GraphQLAssay',
