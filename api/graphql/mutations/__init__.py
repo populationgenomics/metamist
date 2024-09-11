@@ -28,29 +28,29 @@ class Mutation:
     # Assays
     @strawberry.field
     def assay(self) -> AssayMutations:
-        """Sample mutations"""
+        """Assay mutations"""
         return AssayMutations()
 
     # Participant
     @strawberry.field
     def participant(self) -> ParticipantMutations:
-        """Sample mutations"""
+        """Participant mutations"""
         return ParticipantMutations()
 
     # Family
     @strawberry.field
     def family(self) -> FamilyMutations:
-        """Sample mutations"""
+        """Family mutations"""
         return FamilyMutations()
 
     # Project
     @strawberry.field
     def project(self) -> ProjectMutations:
-        """Sample mutations"""
+        """Project mutations"""
         return ProjectMutations()
 
     # SequencingGroup
     @strawberry.field
     def sequencing_group(self) -> SequencingGroupMutations:
-        """Sample mutations"""
+        """Sequencing Group mutations"""
         return SequencingGroupMutations()
