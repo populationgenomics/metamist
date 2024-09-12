@@ -436,6 +436,32 @@ class TestFamily(DbIsolatedTest):
         self.flayer = FamilyLayer(self.connection)
 
     @run_as_sync
+    async def test_create_update(self):
+        """Exercise create_family() and update_family() methods"""
+        family_id = await self.flayer.create_family(
+            external_ids={PRIMARY_EXTERNAL_ORG: 'Smith'},
+            description='Blacksmiths',
+            coded_phenotype='burnt',
+        )
+
+        family = await self.flayer.get_family_by_internal_id(family_id)
+        self.assertDictEqual(family.external_ids, {PRIMARY_EXTERNAL_ORG: 'Smith'})
+        self.assertEqual(family.description, 'Blacksmiths')
+        self.assertEqual(family.coded_phenotype, 'burnt')
+
+        await self.flayer.update_family(family_id, external_ids={'foo': 'bar'})
+        family = await self.flayer.get_family_by_internal_id(family_id)
+        self.assertEqual(family.external_ids['foo'], 'bar')
+
+        await self.flayer.update_family(family_id, external_ids={'foo': 'baz'})
+        family = await self.flayer.get_family_by_internal_id(family_id)
+        self.assertEqual(family.external_ids['foo'], 'baz')
+
+        await self.flayer.update_family(family_id, external_ids={'foo': None})
+        family = await self.flayer.get_family_by_internal_id(family_id)
+        self.assertDictEqual(family.external_ids, {PRIMARY_EXTERNAL_ORG: 'Smith'})
+
+    @run_as_sync
     async def test_import_families(self):
         """Exercise import_families() method"""
         await self.flayer.import_families(

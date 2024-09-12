@@ -204,7 +204,7 @@ WHERE family_id = :id AND name IN :names
                 )
 
                 _delete_query = """
-DELETE FROM family_exernal_id
+DELETE FROM family_external_id
 WHERE family_id = :id AND name in :names
                 """
                 await self.connection.execute(
