@@ -185,42 +185,45 @@ class FamilyTable(DbBase):
     ) -> bool:
         """Update values for a family"""
         audit_log_id = await self.audit_log_id()
-        values: Dict[str, Any] = {'audit_log_id': audit_log_id}
 
-        if external_ids:
+        values: Dict[str, Any] = {'audit_log_id': audit_log_id}
+        if description:
+            values['description'] = description
+        if coded_phenotype:
+            values['coded_phenotype'] = coded_phenotype
+
+        async with self.connection.transaction():
+            if external_ids is None:
+                external_ids = {}
+
             to_delete = [k.lower() for k, v in external_ids.items() if v is None]
             to_update = {k.lower(): v for k, v in external_ids.items() if v is not None}
 
             if to_delete:
-                # Set audit_log_id to this transaction before deleting the rows
-                _audit_update_query = """
-UPDATE family_external_id
-SET audit_log_id = :audit_log_id
-WHERE family_id = :id AND name IN :names
-                """
                 await self.connection.execute(
-                    _audit_update_query,
+                    """
+                    -- Set audit_log_id to this transaction before deleting the rows
+                    UPDATE family_external_id
+                    SET audit_log_id = :audit_log_id
+                    WHERE family_id = :id AND name IN :names;
+
+                    DELETE FROM family_external_id
+                    WHERE family_id = :id AND name in :names
+                    """,
                     {'id': id_, 'names': to_delete, 'audit_log_id': audit_log_id},
                 )
 
-                _delete_query = """
-DELETE FROM family_external_id
-WHERE family_id = :id AND name in :names
-                """
-                await self.connection.execute(
-                    _delete_query, {'id': id_, 'names': to_delete}
+            if to_update:
+                project = await self.connection.fetch_val(
+                    'SELECT project FROM family WHERE id = :id',
+                    {'id': id_},
                 )
 
-            if to_update:
-                _query = 'SELECT project FROM family WHERE id = :id'
-                row = await self.connection.fetch_one(_query, {'id': id_})
-                project = row['project']
-
                 _update_query = """
-INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
-VALUES (:project, :id, :name, :external_id, :audit_log_id)
-ON DUPLICATE KEY UPDATE external_id = :external_id, audit_log_id = :audit_log_id
-                """
+                    INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
+                    VALUES (:project, :id, :name, :external_id, :audit_log_id)
+                    ON DUPLICATE KEY UPDATE external_id = :external_id, audit_log_id = :audit_log_id
+                    """
                 _update_values = [
                     {
                         'project': project,
@@ -233,18 +236,16 @@ ON DUPLICATE KEY UPDATE external_id = :external_id, audit_log_id = :audit_log_id
                 ]
                 await self.connection.execute_many(_update_query, _update_values)
 
-        if description:
-            values['description'] = description
-        if coded_phenotype:
-            values['coded_phenotype'] = coded_phenotype
+            setters = ', '.join(f'{field} = :{field}' for field in values)
+            await self.connection.execute(
+                f"""
+                UPDATE family
+                SET {setters}
+                WHERE id = :id
+                """,
+                {**values, 'id': id_},
+            )
 
-        setters = ', '.join(f'{field} = :{field}' for field in values)
-        _query = f"""
-UPDATE family
-SET {setters}
-WHERE id = :id
-        """
-        await self.connection.execute(_query, {**values, 'id': id_})
         return True
 
     async def create_family(
