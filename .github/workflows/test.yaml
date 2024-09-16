@@ -64,7 +64,7 @@ jobs:
       - name: 'Run unit tests'
         id: runtests
         run: |
-          coverage run -m pytest --doctest-modules --doctest-continue-on-failure test/
+          coverage run -m pytest --doctest-modules --doctest-continue-on-failure test/ --junitxml=test-execution.xml
           rc=$?
           coverage xml
 
@@ -77,10 +77,16 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: 'Save coverage report as an Artifact'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: ./coverage.xml
+
+      - name: 'Save execution report as an Artifact'
+        uses: actions/upload-artifact@v4
+        with:
+          name: execution-report
+          path: ./test-execution.xml
 
       - name: 'build web front-end'
         run: |
@@ -121,19 +127,16 @@ jobs:
           fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
 
       # Download the coverage report artifact
-      - name: 'Download coverage report'
-        uses: actions/download-artifact@v3
+      - name: 'Download coverage and execution report'
+        uses: actions/download-artifact@v4
         with:
-          name: coverage-report
+          pattern: '*-report'
 
       # Perform the SonarQube scan
       - uses: sonarsource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        with:
-          args: |
-            -Dsonar.python.coverage.reportPaths=coverage.xml
 
       # Optional: Fail the job if Quality Gate is red
       # If you wish to fail your job when the Quality Gate is red, uncomment the
