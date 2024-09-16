@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
+import { ProjectInsightsDetails, ProjectInsightsSummary } from '../../sm-api'
 import { ColumnKey } from './HeaderCell'
 
 interface FilterState {
@@ -12,7 +13,9 @@ interface GeneralFilteringResult<T> {
     getSelectedOptionsForColumn: (key: ColumnKey) => string[]
 }
 
-function filterData<T>(allData: T[]): GeneralFilteringResult<T> {
+function useFilterData<T extends ProjectInsightsSummary | ProjectInsightsDetails>(
+    allData: T[]
+): GeneralFilteringResult<T> {
     const [filterState, setFilterState] = useState<FilterState>({})
 
     const filteredData = useMemo(() => {
@@ -21,7 +24,9 @@ function filterData<T>(allData: T[]): GeneralFilteringResult<T> {
                 if (values.size === 0) return true
                 const itemValue = item[key as keyof T]
                 if (key === 'stripy' || key === 'mito') {
-                    const report = (item as any).web_reports?.[key]
+                    const projectInsightsItem = item as ProjectInsightsDetails
+                    const webReports = projectInsightsItem.web_reports
+                    const report = webReports?.[key]
                     return values.has(report ? 'Yes' : 'No')
                 }
                 if (typeof itemValue === 'boolean') {
@@ -49,7 +54,9 @@ function filterData<T>(allData: T[]): GeneralFilteringResult<T> {
                     )
                 ) {
                     if (key === 'stripy' || key === 'mito') {
-                        const report = (item as any).web_reports?.[key]
+                        const projectInsightsItem = item as ProjectInsightsDetails
+                        const webReports = projectInsightsItem.web_reports
+                        const report = webReports?.[key]
                         uniqueValues.add(report ? 'Yes' : 'No')
                     } else {
                         const value = item[key as keyof T]
@@ -90,4 +97,4 @@ function filterData<T>(allData: T[]): GeneralFilteringResult<T> {
     }
 }
 
-export default filterData
+export default useFilterData

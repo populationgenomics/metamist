@@ -8,6 +8,10 @@ and defaults to decide the GraphQL schema, so it might not necessarily look corr
 
 import datetime
 from inspect import isclass
+from typing import (  # pylint: disable=unused-import; Union is used, pylint just doesn't know about it
+    Annotated,
+    Union,
+)
 
 import strawberry
 from strawberry.extensions import QueryDepthLimiter
@@ -20,6 +24,7 @@ from api.graphql.filters import (
     graphql_meta_filter_to_internal_filter,
 )
 from api.graphql.loaders import GraphQLContext, LoaderKeys, get_context
+from api.graphql.mutations import Mutation
 from db.python import enum_tables
 from db.python.filters import GenericFilter
 from db.python.layers import (
@@ -55,9 +60,21 @@ from models.models import (
     SequencingGroupInternal,
 )
 from models.models.analysis_runner import AnalysisRunnerInternal
+from models.models.comment import (
+    CommentEntityType,
+    CommentInternal,
+    CommentStatus,
+    CommentVersionInternal,
+    DiscussionInternal,
+)
 from models.models.family import PedRowInternal
 from models.models.ourdna import OurDNADashboard, OurDNALostSample
-from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
+from models.models.project import (
+    FullWriteAccessRoles,
+    ProjectId,
+    ProjectMemberRole,
+    ReadAccessRoles,
+)
 from models.models.sample import sample_id_transform_to_raw
 from models.utils.cohort_id_format import cohort_id_format, cohort_id_transform_to_raw
 from models.utils.cohort_template_id_format import (
@@ -90,7 +107,7 @@ for enum in enum_tables.__dict__.values():
 
 GraphQLEnum = strawberry.type(type('GraphQLEnum', (object,), enum_methods))
 
-GraphQLAnalysisStatus = strawberry.enum(AnalysisStatus)
+GraphQLAnalysisStatus = strawberry.enum(AnalysisStatus)  # type: ignore
 
 
 @strawberry.experimental.pydantic.type(model=OurDNALostSample, all_fields=True)  # type: ignore
@@ -106,8 +123,10 @@ class GraphQLOurDNADashboard:
 
     collection_to_process_end_time: strawberry.scalars.JSON
     collection_to_process_end_time_statistics: strawberry.scalars.JSON
+    collection_to_process_end_time_bucket_statistics: strawberry.scalars.JSON
     collection_to_process_end_time_24h: strawberry.scalars.JSON
     processing_times_by_site: strawberry.scalars.JSON
+    processing_times_by_collection_site: strawberry.scalars.JSON
     total_samples_by_collection_event_name: strawberry.scalars.JSON
     samples_lost_after_collection: list[GraphQLOurDNALostSample]
     samples_concentration_gt_1ug: strawberry.scalars.JSON
@@ -230,6 +249,122 @@ class GraphQLCohortTemplate:
 
 
 @strawberry.type
+class GraphQLCommentVersion:
+    """A version of a comment's content"""
+
+    content: str
+    author: str
+    status: strawberry.enum(CommentStatus)  # type: ignore
+    timestamp: datetime.datetime
+
+    @staticmethod
+    def from_internal(internal: CommentVersionInternal) -> 'GraphQLCommentVersion':
+        return GraphQLCommentVersion(
+            content=internal.content,
+            author=internal.author,
+            timestamp=internal.timestamp,
+            status=internal.status,
+        )
+
+
+@strawberry.type
+class GraphQLDiscussion:
+    """A comment discussion, made up of flat lists of direct and related comments"""
+
+    direct_comments: list['GraphQLComment']
+    related_comments: list['GraphQLComment']
+
+    @staticmethod
+    def from_internal(
+        internal: DiscussionInternal | None,
+    ) -> 'GraphQLDiscussion':
+        direct_comments = internal.direct_comments if internal is not None else []
+        related_comments = internal.related_comments if internal is not None else []
+        return GraphQLDiscussion(
+            direct_comments=[GraphQLComment.from_internal(c) for c in direct_comments],
+            related_comments=[
+                GraphQLComment.from_internal(c) for c in related_comments
+            ],
+        )
+
+
+@strawberry.type
+class GraphQLComment:
+    """A comment made on a entity"""
+
+    id: int
+    parentId: int | None
+    content: str
+    author: str
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+    comment_entity_type: strawberry.Private[CommentEntityType]
+    comment_entity_id: strawberry.Private[int]
+    status: strawberry.enum(CommentStatus)  # type: ignore
+    thread: list['GraphQLComment']
+    versions: list[GraphQLCommentVersion]
+
+    @strawberry.field()
+    async def entity(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLComment'
+    ) -> Annotated[
+        'Union[GraphQLSample , GraphQLAssay , GraphQLSequencingGroup , GraphQLProject , GraphQLParticipant , GraphQLFamily]',
+        strawberry.union('GraphQLCommentEntity'),
+    ]:
+        entity_type = root.comment_entity_type
+        entity_id = root.comment_entity_id
+
+        match entity_type:
+            case CommentEntityType.sample:
+                loader = info.context['loaders'][LoaderKeys.SAMPLES_FOR_IDS]
+                sample = await loader.load(entity_id)
+                return GraphQLSample.from_internal(sample)
+
+            case CommentEntityType.sequencing_group:
+                loader = info.context['loaders'][LoaderKeys.SEQUENCING_GROUPS_FOR_IDS]
+                sg = await loader.load(entity_id)
+                return GraphQLSequencingGroup.from_internal(sg)
+
+            case CommentEntityType.project:
+                loader = info.context['loaders'][LoaderKeys.PROJECTS_FOR_IDS]
+                sg = await loader.load(entity_id)
+                return GraphQLProject.from_internal(sg)
+
+            case CommentEntityType.assay:
+                loader = info.context['loaders'][LoaderKeys.ASSAYS_FOR_IDS]
+                ay = await loader.load(entity_id)
+                return GraphQLAssay.from_internal(ay)
+
+            case CommentEntityType.participant:
+                loader = info.context['loaders'][LoaderKeys.PARTICIPANTS_FOR_IDS]
+                pt = await loader.load(entity_id)
+                return GraphQLParticipant.from_internal(pt)
+
+            case CommentEntityType.family:
+                loader = info.context['loaders'][LoaderKeys.FAMILIES_FOR_IDS]
+                fm = await loader.load(entity_id)
+                return GraphQLFamily.from_internal(fm)
+
+    @staticmethod
+    def from_internal(internal: CommentInternal) -> 'GraphQLComment':
+        return GraphQLComment(
+            id=internal.id,
+            parentId=internal.parent_id,
+            content=internal.content,
+            author=internal.author,
+            created_at=internal.created_at,
+            updated_at=internal.updated_at,
+            comment_entity_type=internal.comment_entity_type,
+            comment_entity_id=internal.comment_entity_id,
+            thread=[GraphQLComment.from_internal(c) for c in internal.thread],
+            status=internal.status,
+            versions=[
+                GraphQLCommentVersion.from_internal(v) for v in internal.versions
+            ],
+        )
+
+
+@strawberry.type
 class GraphQLProject:
     """Project GraphQL model"""
 
@@ -237,6 +372,7 @@ class GraphQLProject:
     name: str
     dataset: str
     meta: strawberry.scalars.JSON
+    roles: list[strawberry.enum(ProjectMemberRole)]  # type: ignore
 
     @staticmethod
     def from_internal(internal: Project) -> 'GraphQLProject':
@@ -245,6 +381,7 @@ class GraphQLProject:
             name=internal.name,
             dataset=internal.dataset,
             meta=internal.meta,
+            roles=list(internal.roles),
         )
 
     @strawberry.field()
@@ -497,6 +634,14 @@ class GraphQLProject:
         cohorts = await CohortLayer(connection).query(c_filter)
         return [GraphQLCohort.from_internal(c) for c in cohorts]
 
+    @strawberry.field()
+    async def discussion(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLProject'
+    ) -> GraphQLDiscussion:
+        loader = info.context['loaders'][LoaderKeys.COMMENTS_FOR_PROJECT_IDS]
+        discussion = await loader.load(root.id)
+        return GraphQLDiscussion.from_internal(discussion)
+
 
 @strawberry.type
 class GraphQLAuditLog:
@@ -627,6 +772,14 @@ class GraphQLFamily:
         return [
             GraphQLFamilyParticipant.from_internal(fp) for fp in family_participants
         ]
+
+    @strawberry.field()
+    async def discussion(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLFamily'
+    ) -> GraphQLDiscussion:
+        loader = info.context['loaders'][LoaderKeys.COMMENTS_FOR_FAMILY_IDS]
+        discussion = await loader.load(root.id)
+        return GraphQLDiscussion.from_internal(discussion)
 
 
 @strawberry.type
@@ -763,6 +916,14 @@ class GraphQLParticipant:
         loader = info.context['loaders'][LoaderKeys.AUDIT_LOGS_BY_IDS]
         audit_log = await loader.load(root.audit_log_id)
         return GraphQLAuditLog.from_internal(audit_log)
+
+    @strawberry.field()
+    async def discussion(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLParticipant'
+    ) -> GraphQLDiscussion:
+        loader = info.context['loaders'][LoaderKeys.COMMENTS_FOR_PARTICIPANT_IDS]
+        discussion = await loader.load(root.id)
+        return GraphQLDiscussion.from_internal(discussion)
 
 
 @strawberry.type
@@ -920,6 +1081,14 @@ class GraphQLSample:
         )
         return [GraphQLSample.from_internal(s) for s in nested_samples]
 
+    @strawberry.field()
+    async def discussion(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLSample'
+    ) -> GraphQLDiscussion:
+        loader = info.context['loaders'][LoaderKeys.COMMENTS_FOR_SAMPLE_IDS]
+        discussion = await loader.load(root.internal_id)
+        return GraphQLDiscussion.from_internal(discussion)
+
 
 @strawberry.type
 class GraphQLSequencingGroup:
@@ -1014,6 +1183,14 @@ class GraphQLSequencingGroup:
         assays = await loader.load(root.internal_id)
         return [GraphQLAssay.from_internal(assay) for assay in assays]
 
+    @strawberry.field()
+    async def discussion(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLSequencingGroup'
+    ) -> GraphQLDiscussion:
+        loader = info.context['loaders'][LoaderKeys.COMMENTS_FOR_SEQUENCING_GROUP_IDS]
+        discussion = await loader.load(root.internal_id)
+        return GraphQLDiscussion.from_internal(discussion)
+
 
 @strawberry.type
 class GraphQLAssay:
@@ -1047,6 +1224,14 @@ class GraphQLAssay:
         loader = info.context['loaders'][LoaderKeys.SAMPLES_FOR_IDS]
         sample = await loader.load(root.sample_id)
         return GraphQLSample.from_internal(sample)
+
+    @strawberry.field()
+    async def discussion(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLAssay'
+    ) -> GraphQLDiscussion:
+        loader = info.context['loaders'][LoaderKeys.COMMENTS_FOR_ASSAY_IDS]
+        discussion = await loader.load(root.id)
+        return GraphQLDiscussion.from_internal(discussion)
 
 
 @strawberry.type
@@ -1106,12 +1291,36 @@ class GraphQLAnalysisRunner:
 
 
 @strawberry.type
+class GraphQLViewer:
+    """
+    The "Viewer" construct is the current user and contains information about the
+    current user and their permissions
+    """
+
+    username: str
+    projects: list[GraphQLProject]
+
+
+@strawberry.type
 class Query:  # entry point to graphql.
     """GraphQL Queries"""
 
     @strawberry.field()
     def enum(self, info: Info[GraphQLContext, 'Query']) -> GraphQLEnum:  # type: ignore
         return GraphQLEnum()
+
+    @strawberry.field()
+    async def viewer(
+        self,
+        info: Info[GraphQLContext, 'Query'],
+    ) -> GraphQLViewer:
+        connection = info.context['connection']
+        return GraphQLViewer(
+            username=connection.author,
+            projects=[
+                GraphQLProject.from_internal(p) for p in connection.all_projects()
+            ],
+        )
 
     @strawberry.field()
     async def cohort_templates(
@@ -1407,7 +1616,7 @@ class Query:  # entry point to graphql.
 
 
 schema = strawberry.Schema(
-    query=Query, mutation=None, extensions=[QueryDepthLimiter(max_depth=10)]
+    query=Query, mutation=Mutation, extensions=[QueryDepthLimiter(max_depth=10)]
 )
 MetamistGraphQLRouter: GraphQLRouter = GraphQLRouter(
     schema, graphiql=True, context_getter=get_context

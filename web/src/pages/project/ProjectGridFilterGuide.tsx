@@ -49,7 +49,7 @@ export const ProjectGridFilterGuide: React.FC<IProjectGridFilterGuideProps> = ({
     filterValues,
     updateFilters,
 }) => {
-    const fullDictionary: { [key in keyof ProjectParticipantGridFilter]: any } = {}
+    const fullDictionary: { [key in keyof ProjectParticipantGridFilter]: unknown } = {}
 
     const keys: MetaSearchEntityPrefix[] = Object.keys(headerGroups) as MetaSearchEntityPrefix[]
     for (const key of keys) {
@@ -112,6 +112,7 @@ export const ProjectGridFilterGuide: React.FC<IProjectGridFilterGuideProps> = ({
                     <a
                         href="https://www.cloudbees.com/blog/yaml-tutorial-everything-you-need-get-started"
                         target="_blank"
+                        rel="noreferrer"
                     >
                         YAML
                     </a>{' '}
@@ -125,16 +126,16 @@ export const ProjectGridFilterGuide: React.FC<IProjectGridFilterGuideProps> = ({
                     <li>Sequencing group</li>
                     <li>Assay</li>
                 </ul>
-                <p>Let's start with an example, this query searches the:</p>
+                <p>Let&apos;s start with an example, this query searches the:</p>
                 <p>
                     <ul>
                         <li>
                             <code>participant.externalId</code> for a value that contains
-                            <code>'participant-id'</code>
+                            <code>&apos;participant-id&apos;</code>
                         </li>
                         <li>
                             <code>sample.meta.library</code> field for a value that starts with
-                            <code>'WGS'</code>
+                            <code>&apos;WGS&apos;</code>
                         </li>
                     </ul>
                 </p>

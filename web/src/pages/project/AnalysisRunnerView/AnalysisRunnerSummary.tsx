@@ -5,6 +5,7 @@ import * as React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Dropdown } from 'semantic-ui-react'
 import { gql } from '../../../__generated__/gql'
+import { PaddedPage } from '../../../shared/components/Layout/PaddedPage'
 import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
 import MuckError from '../../../shared/components/MuckError'
 import sanitiseValue from '../../../shared/utilities/sanitiseValue'
@@ -68,13 +69,6 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
         setSort({ column: null, direction: null })
     }
 
-    const projectSelectorOnClick = React.useCallback(
-        (__, { value }) => {
-            navigate(`/analysis-runner/${value}`)
-        },
-        [navigate]
-    )
-
     const handleOnClick = React.useCallback((p) => {
         setPageNumber(p)
     }, [])
@@ -120,7 +114,7 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
     )
 
     return (
-        <>
+        <PaddedPage>
             <ProjectSelector
                 onProjectSelect={(project) => navigate(`/analysis-runner/${project.name}`)}
             />
@@ -211,7 +205,7 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
                     />
                 </>
             )}
-        </>
+        </PaddedPage>
     )
 }
 

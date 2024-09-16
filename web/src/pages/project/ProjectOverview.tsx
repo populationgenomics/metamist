@@ -3,6 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom'
 
 import ProjectSelector, { IMetamistProject } from './ProjectSelector'
 
+import { Box } from '@mui/material'
+import { SplitPage } from '../../shared/components/Layout/SplitPage'
+import { ProjectCommentsView } from '../comments/entities/ProjectCommentsView'
 import { ProjectGridContainer } from './ProjectGridContainer'
 import { ProjectSummaryView } from './ProjectSummary'
 
@@ -21,22 +24,36 @@ const ProjectOverview: React.FunctionComponent = () => {
             <em>Please select a project</em>
         </p>
     )
-    if (!!projectName) {
+    if (projectName) {
         body = (
             <>
                 <ProjectSummaryView projectName={projectName} />
-
                 <ProjectGridContainer projectName={projectName} />
             </>
         )
     }
 
     return (
-        <>
-            <ProjectSelector onProjectSelect={onProjectSelect} />
-            <hr />
-            {body}
-        </>
+        <SplitPage
+            collapsedWidth={64}
+            collapsed={true}
+            main={() => (
+                <Box p={10} pt={5}>
+                    <ProjectSelector onProjectSelect={onProjectSelect} />
+                    <hr />
+                    {body}
+                </Box>
+            )}
+            side={({ collapsed, onToggleCollapsed }) =>
+                projectName ? (
+                    <ProjectCommentsView
+                        projectName={projectName}
+                        collapsed={collapsed}
+                        onToggleCollapsed={onToggleCollapsed}
+                    />
+                ) : null
+            }
+        />
     )
 }
 

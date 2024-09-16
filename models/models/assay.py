@@ -9,7 +9,7 @@ AssayId = int
 class AssayInternal(SMBase):
     """Internal model for Assay"""
 
-    id: AssayId | None
+    id: AssayId
     sample_id: int
     meta: dict[str, Any] | None
     type: str

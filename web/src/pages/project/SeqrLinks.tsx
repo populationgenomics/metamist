@@ -1,5 +1,5 @@
-import * as React from 'react'
 import capitalize from 'lodash/capitalize'
+import * as React from 'react'
 
 interface SeqrLinksProps {
     seqrLinks: Record<string, string>

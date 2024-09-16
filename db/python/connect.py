@@ -51,6 +51,13 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'analysis_cohort',
     'analysis_runner',
     'analysis_outputs',
+    'comment',
+    'sample_comment',
+    'project_comment',
+    'assay_comment',
+    'sequencing_group_comment',
+    'participant_comment',
+    'family_comment',
 ][::-1]
 
 

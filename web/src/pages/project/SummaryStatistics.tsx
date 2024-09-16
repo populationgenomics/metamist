@@ -1,5 +1,5 @@
-import * as React from 'react'
 import capitalize from 'lodash/capitalize'
+import * as React from 'react'
 import { Table as SUITable } from 'semantic-ui-react'
 import Table from '../../shared/components/Table'
 

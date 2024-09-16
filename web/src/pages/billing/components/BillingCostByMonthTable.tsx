@@ -1,8 +1,8 @@
-import { Header, Table as SUITable } from 'semantic-ui-react'
-import Table from '../../../shared/components/Table'
 import React from 'react'
-import formatMoney from '../../../shared/utilities/formatMoney'
+import { Header, Table as SUITable } from 'semantic-ui-react'
 import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
+import Table from '../../../shared/components/Table'
+import formatMoney from '../../../shared/utilities/formatMoney'
 
 const date2Month = (dt: string): string => {
     if (dt === undefined || dt === null) {
@@ -11,12 +11,13 @@ const date2Month = (dt: string): string => {
     const date = new Date(dt)
     return `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}`
 }
+type DataDict = { [key: string]: { [key: string]: { [key: string]: number } } }
 
 interface IBillingCostByMonthTableProps {
     start: string
     end: string
     isLoading: boolean
-    data: any
+    data: DataDict
     months: string[]
 }
 
@@ -36,7 +37,7 @@ const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
     }
     const compTypes = ['Compute Cost', 'Storage Cost']
 
-    const dataToBody = (data: any) => {
+    const dataToBody = (data: DataDict) => {
         const sortedKeys = Object.keys(data).sort()
         return sortedKeys.map((key) => (
             <>

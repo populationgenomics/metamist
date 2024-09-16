@@ -1,8 +1,14 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Grid, Input, Message, Table as SUITable } from 'semantic-ui-react'
-import CostByTimeChart from './components/CostByTimeChart'
-import FieldSelector from './components/FieldSelector'
+import { Button, Card, DropdownProps, Grid, Input, Message } from 'semantic-ui-react'
+import { BarChart, IData } from '../../shared/components/Graphs/BarChart'
+import { DonutChart } from '../../shared/components/Graphs/DonutChart'
+import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
+import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
+import { convertFieldName } from '../../shared/utilities/fieldName'
+import generateUrl from '../../shared/utilities/generateUrl'
+import { getMonthEndDate, getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
 import {
     BillingApi,
     BillingColumn,
@@ -10,15 +16,9 @@ import {
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 } from '../../sm-api'
-
-import { convertFieldName } from '../../shared/utilities/fieldName'
-import { getMonthStartDate, getMonthEndDate } from '../../shared/utilities/monthStartEndDate'
-import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
 import BillingCostByTimeTable from './components/BillingCostByTimeTable'
-import { BarChart, IData } from '../../shared/components/Graphs/BarChart'
-import { DonutChart } from '../../shared/components/Graphs/DonutChart'
-import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
-import generateUrl from '../../shared/utilities/generateUrl'
+import CostByTimeChart from './components/CostByTimeChart'
+import FieldSelector from './components/FieldSelector'
 
 const BillingCostByTime: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
@@ -68,15 +68,21 @@ const BillingCostByTime: React.FunctionComponent = () => {
         navigate(url)
     }
 
-    const onGroupBySelect = (event: any, data: any) => {
-        setGroupBy(data.value)
-        setSelectedData(undefined)
-        updateNav(data.value, undefined, start, end)
+    const onGroupBySelect = (event: unknown, data: DropdownProps) => {
+        const value = data.value
+        if (typeof value == 'string') {
+            setGroupBy(value as BillingColumn)
+            setSelectedData(undefined)
+            updateNav(value, undefined, start, end)
+        }
     }
 
-    const onSelect = (event: any, data: any) => {
-        setSelectedData(data.value)
-        updateNav(groupBy, data.value, start, end)
+    const onSelect = (event: unknown, data: DropdownProps) => {
+        const value = data.value
+        if (typeof value == 'string') {
+            setSelectedData(value)
+            updateNav(groupBy, value, start, end)
+        }
     }
 
     const changeDate = (name: string, value: string) => {
@@ -330,7 +336,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
     }, [start, end, groupBy, selectedData])
 
     return (
-        <>
+        <PaddedPage>
             <Card fluid style={{ padding: '20px' }} id="billing-container">
                 <h1
                     style={{
@@ -389,7 +395,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
             {messageComponent()}
 
             {dataComponent()}
-        </>
+        </PaddedPage>
     )
 }
 

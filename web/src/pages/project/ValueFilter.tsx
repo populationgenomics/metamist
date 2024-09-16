@@ -68,7 +68,6 @@ const getDisplayNameFromFilterType = (filterType: ProjectParticipantGridFilterTy
         case ProjectParticipantGridFilterType.Lte:
             return 'Less than or equal to'
     }
-    return filterType
 }
 
 export const ValueFilter: React.FC<IValueFilter> = ({
@@ -88,9 +87,11 @@ export const ValueFilter: React.FC<IValueFilter> = ({
 
     if (!field.filter_key) return <></>
 
+    /* eslint-disable react-hooks/rules-of-hooks*/
     const [_defaultFilterType, setDefaultFilterType] = React.useState<
         ProjectParticipantGridFilterType | undefined
     >()
+    /* eslint-enable react-hooks/rules-of-hooks*/
 
     const isMeta = field.filter_key?.startsWith('meta.')
     // set name to the filterKey without the .meta prefix
@@ -144,7 +145,10 @@ export const ValueFilter: React.FC<IValueFilter> = ({
 
     // @ts-ignore
     const _value = optionsToCheck?.[name]?.[operator]
+
+    /* eslint-disable react-hooks/rules-of-hooks*/
     const [_tempValue, setTempValue] = React.useState<string | undefined>(_value ?? '')
+    /* eslint-enable react-hooks/rules-of-hooks*/
     const tempValue = _tempValue ?? _value
 
     const updateQueryType = (newFilterType: ProjectParticipantGridFilterType) => {
@@ -155,7 +159,7 @@ export const ValueFilter: React.FC<IValueFilter> = ({
     }
 
     const postValue = (_operator: string, value: string | undefined) => {
-        const f: GenericFilterAny | undefined = !!value ? { [_operator]: value } : undefined
+        const f: GenericFilterAny | undefined = value ? { [_operator]: value } : undefined
 
         // deep copy
         const newFilter = JSON.parse(JSON.stringify(props.filterValues))

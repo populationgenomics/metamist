@@ -1,12 +1,12 @@
 import * as React from 'react'
 import ReactGoogleSlides from 'react-google-slides'
-
-import { IBillingPage, billingPages } from './BillingPages'
-import { ThemeContext } from '../../shared/components/ThemeProvider'
 import { Button, Menu, MenuItem, Segment, SemanticWIDTHS } from 'semantic-ui-react'
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
+import { ThemeContext } from '../../shared/components/ThemeProvider'
+import { IBillingPage, billingPages } from './BillingPages'
 
 // Google Slides
-const Slides = React.memo(({ link }: { link: string }) => {
+const Slides = React.memo(function ReactGoogleSlidesWrapper({ link }: { link: string }) {
     return <ReactGoogleSlides width="100%" slidesLink={link} position={2} showControls />
 })
 
@@ -14,7 +14,7 @@ const Slides = React.memo(({ link }: { link: string }) => {
 interface MenuProps {
     inverted: boolean
     activeItem: string
-    onItemSelect: (e: any, page: IBillingPage) => void
+    onItemSelect: (e: MouseEvent, page: IBillingPage) => void
 }
 
 const MenuItems = (props: MenuProps) => {
@@ -26,7 +26,7 @@ const MenuItems = (props: MenuProps) => {
                 {Object.values(billingPages).map(
                     (page) =>
                         page.name === activeItem && (
-                            <Segment attached="bottom" inverted={inverted}>
+                            <Segment attached="bottom" inverted={inverted} key={page.name}>
                                 <h3>
                                     <Button size="large" href={page.url}>
                                         {page.title}
@@ -52,10 +52,11 @@ const MenuItems = (props: MenuProps) => {
                 {Object.values(billingPages).map((page) => {
                     return (
                         <MenuItem
+                            key={page.name}
                             link
                             name={page.name}
                             active={activeItem === page.name}
-                            onMouseOver={(event: any) => onItemSelect(event, page)}
+                            onMouseOver={(event: MouseEvent) => onItemSelect(event, page)}
                         >
                             {page.icon}
                         </MenuItem>
@@ -67,14 +68,11 @@ const MenuItems = (props: MenuProps) => {
     )
 }
 
-interface IBillingHomeProps {}
-
-const BillingHome: React.FunctionComponent<IBillingHomeProps> = (props: IBillingHomeProps) => {
+const BillingHome = () => {
     const theme = React.useContext(ThemeContext)
     const isDarkMode = theme.theme === 'dark-mode'
     const [activeItem, setActiveItem] = React.useState('home')
-    const handleItemClick = (e: any, page: IBillingPage) => {
-        console.log('Click item', page.title)
+    const handleItemClick = (e: MouseEvent, page: IBillingPage) => {
         e.preventDefault()
         e.stopPropagation()
         setActiveItem(page.name)
@@ -86,21 +84,23 @@ const BillingHome: React.FunctionComponent<IBillingHomeProps> = (props: IBilling
     )
 
     return (
-        <div className="article">
-            <h1> Billing Homepage </h1>
-            <p>Welcome to the Billing Homepage</p>
+        <PaddedPage>
+            <div className="article">
+                <h1> Billing Homepage </h1>
+                <p>Welcome to the Billing Homepage</p>
 
-            <h2>Pages</h2>
-            <p>Here you can find an overview of the different pages in the Billing section</p>
-            <MenuItems
-                inverted={isDarkMode}
-                activeItem={activeItem}
-                onItemSelect={handleItemClick}
-            />
+                <h2>Pages</h2>
+                <p>Here you can find an overview of the different pages in the Billing section</p>
+                <MenuItems
+                    inverted={isDarkMode}
+                    activeItem={activeItem}
+                    onItemSelect={handleItemClick}
+                />
 
-            <h2>An overview of billing at the CPG</h2>
-            <Slides link={billingSlidesLink} />
-        </div>
+                <h2>An overview of billing at the CPG</h2>
+                <Slides link={billingSlidesLink} />
+            </div>
+        </PaddedPage>
     )
 }
 

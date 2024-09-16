@@ -223,7 +223,7 @@ const CategoryColumnOptions: React.FC<{
     ) => {
         setDraggedRowIndex(e.currentTarget.rowIndex)
     }
-    const dragEnd = (e: React.DragEvent<HTMLTableRowElement>) => {
+    const dragEnd = () => {
         setDraggedRowIndex(null)
         if (tempFields === null) return
         updateFields(tempFields)
@@ -264,6 +264,7 @@ const CategoryColumnOptions: React.FC<{
                 <tbody>
                     {_nonMetaFields?.map((field) => (
                         <HeaderRow
+                            key={field.key}
                             category={category}
                             field={field}
                             start={start}
@@ -294,6 +295,7 @@ const CategoryColumnOptions: React.FC<{
                         <tbody>
                             {_metaFields?.map((field) => (
                                 <HeaderRow
+                                    key={field.key}
                                     category={category}
                                     field={field}
                                     start={start}

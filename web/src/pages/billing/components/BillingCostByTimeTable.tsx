@@ -1,11 +1,9 @@
-import { Checkbox, Grid, Header, Table as SUITable } from 'semantic-ui-react'
-import Table from '../../../shared/components/Table'
 import React from 'react'
-import { BillingColumn } from '../../../sm-api'
-import { convertFieldName } from '../../../shared/utilities/fieldName'
-import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
+import { Checkbox, Header, Table as SUITable } from 'semantic-ui-react'
 import { IStackedAreaByDateChartData } from '../../../shared/components/Graphs/StackedAreaByDateChart'
-import orderBy from '../../../shared/utilities/orderBy'
+import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
+import Table from '../../../shared/components/Table'
+import { convertFieldName } from '../../../shared/utilities/fieldName'
 
 interface IBillingCostByTimeTableProps {
     heading: string
@@ -31,7 +29,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     React.useEffect(() => {
         setInternalData(
             data.map((p) => {
-                let newP = { ...p }
+                const newP = { ...p }
                 const total = Object.values(p.values).reduce((acc, cur) => acc + cur, 0)
                 newP.values['Daily Total'] = total
                 newP.values['Compute Cost'] = total - p.values['Cloud Storage']
