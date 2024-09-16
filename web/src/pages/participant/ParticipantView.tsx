@@ -10,7 +10,6 @@ import AnalysisLink from '../../shared/components/links/AnalysisLink'
 import { PedigreeEntry, PersonNode } from '../../shared/components/pedigree/TangledTree'
 import Table from '../../shared/components/Table'
 import { AnalysisGrid, IAnalysisGridAnalysis } from '../analysis/AnalysisGrid'
-import { AnalysisViewModal } from '../analysis/AnalysisView'
 
 interface IParticipantViewParticipant {
     id: number
@@ -47,7 +46,6 @@ export const ParticipantView: React.FC<IParticipantViewProps> = ({
     setHighlightedIndividual,
     showNonSingleSgAnalyses,
 }) => {
-    const [analysisIdToView, setAnalysisIdToView] = React.useState<number | null | undefined>()
     const isHighlighted = individualToHiglight == participant.externalId
 
     const sgsById = keyBy(
@@ -182,14 +180,7 @@ export const ParticipantView: React.FC<IParticipantViewProps> = ({
                                         {analyses.map((a) => (
                                             <tr key={`sg-analyses-row-${a.id}`}>
                                                 <td>
-                                                    <AnalysisLink
-                                                        id={a.id}
-                                                        onClick={(e) => {
-                                                            e.preventDefault()
-                                                            e.stopPropagation()
-                                                            setAnalysisIdToView(a.id)
-                                                        }}
-                                                    />
+                                                    <AnalysisLink id={a.id} />
                                                 </td>
                                                 <td>{a.type}</td>
                                                 <td>{a.timestampCompleted.split('T')[0]}</td>
@@ -203,17 +194,9 @@ export const ParticipantView: React.FC<IParticipantViewProps> = ({
                     </tbody>
                 </Table>
                 {extraAnalyses.length > 0 && (
-                    <AnalysisGrid
-                        analyses={extraAnalyses}
-                        setAnalysisIdToView={(aId) => setAnalysisIdToView(aId)}
-                        participantBySgId={participantBySgId}
-                    />
+                    <AnalysisGrid analyses={extraAnalyses} participantBySgId={participantBySgId} />
                 )}
             </div>
-            <AnalysisViewModal
-                analysisId={analysisIdToView}
-                onClose={() => setAnalysisIdToView(undefined)}
-            />
         </div>
     )
 }

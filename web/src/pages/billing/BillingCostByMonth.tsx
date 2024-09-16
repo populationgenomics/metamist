@@ -1,15 +1,7 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Grid, Message } from 'semantic-ui-react'
-import {
-    BillingApi,
-    BillingColumn,
-    BillingSource,
-    BillingTimePeriods,
-    BillingTotalCostQueryModel,
-    BillingTotalCostRecord,
-} from '../../sm-api'
-
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import {
     generateInvoiceMonths,
@@ -18,6 +10,14 @@ import {
     getCurrentInvoiceYearStart,
 } from '../../shared/utilities/formatDates'
 import generateUrl from '../../shared/utilities/generateUrl'
+import {
+    BillingApi,
+    BillingColumn,
+    BillingSource,
+    BillingTimePeriods,
+    BillingTotalCostQueryModel,
+    BillingTotalCostRecord,
+} from '../../sm-api'
 import BillingCostByMonthTable from './components/BillingCostByMonthTable'
 import FieldSelector from './components/FieldSelector'
 
@@ -243,7 +243,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
     /* eslint-enable react-hooks/exhaustive-deps */
 
     return (
-        <>
+        <PaddedPage>
             <Card fluid style={{ padding: '20px' }} id="billing-container">
                 <h1
                     style={{
@@ -277,7 +277,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
             {messageComponent()}
 
             {dataComponent()}
-        </>
+        </PaddedPage>
     )
 }
 

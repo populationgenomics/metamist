@@ -3,9 +3,12 @@ import * as React from 'react'
 import { gql } from '../../__generated__'
 
 import { useParams } from 'react-router-dom'
-import { Button, Message, Modal } from 'semantic-ui-react'
+import { Message } from 'semantic-ui-react'
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
+import { SplitPage } from '../../shared/components/Layout/SplitPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { IAnalysisGridAnalysis } from '../analysis/AnalysisGrid'
+import { ParticipantCommentsView } from '../comments/entities/ParticipantCommentsView'
 import { ParticipantView } from './ParticipantView'
 
 const GET_PARTICIPANT_VIEW_INFO = gql(`
@@ -17,6 +20,9 @@ query ParticipantViewInfo($participantId: Int!) {
     reportedGender
     phenotypes
     meta
+    project {
+      name
+    }
     samples {
       id
       externalId
@@ -79,36 +85,29 @@ export const ParticipantPage: React.FC<IParticipantPageProps> = (props) => {
                     sgs: an.sequencingGroups.map((sg) => sg.id),
                 }) as IAnalysisGridAnalysis
         )
-    return <ParticipantView participant={participant} analyses={analyses} showNonSingleSgAnalyses />
-}
+    const content = (
+        <ParticipantView participant={participant} analyses={analyses} showNonSingleSgAnalyses />
+    )
 
-interface IParticipantModalProps extends IParticipantPageProps {
-    isOpen?: boolean
-    onClose: () => void
-    size?: 'mini' | 'tiny' | 'small' | 'large' | 'fullscreen'
-}
-
-export const ParticipantModal: React.FC<IParticipantModalProps> = ({
-    isOpen,
-    onClose,
-    size,
-    ...viewProps
-}) => {
-    const _isOpen = isOpen !== undefined ? isOpen : !!viewProps.participantId
     return (
-        <Modal
-            size={size}
-            onClose={onClose}
-            open={_isOpen}
-            style={{ height: 'unset', top: '50px', left: 'unset' }}
-        >
-            <Modal.Header>Participant</Modal.Header>
-            <Modal.Content>
-                {!!viewProps.participantId && <ParticipantPage {...viewProps} />}
-            </Modal.Content>
-            <Modal.Actions>
-                <Button onClick={() => onClose()}>Close</Button>
-            </Modal.Actions>
-        </Modal>
+        <SplitPage
+            collapsed={true}
+            collapsedWidth={64}
+            main={() => <PaddedPage>{content}</PaddedPage>}
+            side={({ collapsed, onToggleCollapsed }) => {
+                const projectName = participant.project.name
+                const participantId = participant.id
+                if (!projectName || !participantId) return null
+
+                return (
+                    <ParticipantCommentsView
+                        projectName={projectName}
+                        participantId={participantId}
+                        collapsed={collapsed}
+                        onToggleCollapsed={onToggleCollapsed}
+                    />
+                )
+            }}
+        />
     )
 }

@@ -16,7 +16,23 @@ const httpLink = createHttpLink({
 
 const client = new ApolloClient({
     link: httpLink,
-    cache: new InMemoryCache(),
+    cache: new InMemoryCache({
+        possibleTypes: {
+            // Not sure why apollo can't get this from the schema,
+            // but this is required so that fields on the union
+            // types are retrievable. If we have lots more of these
+            // in the future we can look to automatically generate
+            // them as is described here: https://www.apollographql.com/docs/react/data/fragments/#generating-possibletypes-automatically
+            GraphQLCommentEntity: [
+                'GraphQLSample',
+                'GraphQLAssay',
+                'GraphQLSequencingGroup',
+                'GraphQLProject',
+                'GraphQLParticipant',
+                'GraphQLFamily',
+            ],
+        },
+    }),
 })
 
 const storedTheme = localStorage.getItem('theme') || 'light-mode'

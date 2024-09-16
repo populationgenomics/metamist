@@ -1,21 +1,35 @@
+import { Alert, Snackbar } from '@mui/material'
 import * as React from 'react'
 import { BrowserRouter as Router } from 'react-router-dom'
-
-// this wasn't working, so added import to HTML
-// import 'bootstrap/dist/css/bootstrap.min.css'
-
 import Routes from './Routes'
 import NavBar from './shared/components/Header/NavBar'
+import { ViewerContext, useViewer } from './viewer'
 
-const App: React.FunctionComponent = () => (
-    <Router>
-        <div className="App">
-            <NavBar />
-            <div className="body">
+const App: React.FunctionComponent = () => {
+    const { viewer, error } = useViewer()
+    const [showAlert, setShowAlert] = React.useState(true)
+
+    return (
+        <Router>
+            <ViewerContext.Provider value={viewer}>
+                <NavBar />
                 <Routes />
-            </div>
-        </div>
-    </Router>
-)
+                {error && (
+                    <Snackbar open={showAlert}>
+                        <Alert
+                            onClose={() => setShowAlert(false)}
+                            severity="error"
+                            variant="filled"
+                            sx={{ width: '100%' }}
+                        >
+                            Error loading current user permissions, some interactive actions may be
+                            unavailable.
+                        </Alert>
+                    </Snackbar>
+                )}
+            </ViewerContext.Provider>
+        </Router>
+    )
+}
 
 export default App

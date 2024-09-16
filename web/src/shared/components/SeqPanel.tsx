@@ -6,12 +6,14 @@ import { GraphQlSequencingGroup } from '../../__generated__/graphql'
 import iconStyle from '../iconStyle'
 import { DeepPartial } from '../utilities/deepPartial'
 import SequencingGroupInfo from './SequencingGroupInfo'
+import SequencingGroupLink from './links/SequencingGroupLink'
 
 const SeqPanel: React.FunctionComponent<{
     sequencingGroups: DeepPartial<GraphQlSequencingGroup>[]
+    sampleId: string
     highlighted?: string
     isOpen?: boolean
-}> = ({ sequencingGroups, isOpen = false, highlighted }) => (
+}> = ({ sequencingGroups, isOpen = false, highlighted, sampleId }) => (
     <Accordion
         styled
         className="accordionStyle"
@@ -19,14 +21,19 @@ const SeqPanel: React.FunctionComponent<{
             key: seq.id,
             title: {
                 content: (
-                    <h3
-                        style={{
-                            display: 'inline',
-                            color: seq.id === highlighted ? 'red' : 'black',
-                        }}
-                    >
-                        Sequencing Group ID: {seq.id}
-                    </h3>
+                    <SequencingGroupLink id={seq.id || ''} sampleId={sampleId}>
+                        <h3
+                            style={{
+                                display: 'inline',
+                                color:
+                                    seq.id === highlighted
+                                        ? 'var(--color-text-red)'
+                                        : 'var(--color-text-primary)',
+                            }}
+                        >
+                            Sequencing Group ID: {seq.id}
+                        </h3>
+                    </SequencingGroupLink>
                 ),
                 icon: <ScienceRoundedIcon sx={iconStyle} />,
             },

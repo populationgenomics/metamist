@@ -1,7 +1,7 @@
 import { useQuery } from '@apollo/client'
 import React from 'react'
 import { useParams } from 'react-router-dom'
-import { Accordion, Button, Card, Message, Modal, Table as SUITable } from 'semantic-ui-react'
+import { Accordion, Card, Message, Table as SUITable } from 'semantic-ui-react'
 import { gql } from '../../__generated__'
 import { KeyValueTable } from '../../shared/components/KeyValueTable'
 import AnalysisLink from '../../shared/components/links/AnalysisLink'
@@ -238,35 +238,5 @@ export const AuditLogHistory: React.FC<IAuditLogHistoryProps> = ({ auditLogs }) 
                 })}
             </SUITable.Body>
         </Table>
-    )
-}
-
-interface AnalysisViewModalProps {
-    analysisId?: number | null
-    onClose: () => void
-    size?: 'mini' | 'tiny' | 'small' | 'large' | 'fullscreen'
-}
-
-export const AnalysisViewModal: React.FC<AnalysisViewModalProps> = ({
-    analysisId,
-    onClose,
-    size,
-}) => {
-    const isOpen = !!analysisId
-    return (
-        <Modal
-            size={size}
-            onClose={onClose}
-            open={isOpen}
-            style={{ height: 'unset', top: '50px', left: 'unset' }}
-        >
-            <Modal.Header>Analysis</Modal.Header>
-            <Modal.Content>
-                {!!analysisId && <AnalysisView analysisId={analysisId!} />}
-            </Modal.Content>
-            <Modal.Actions>
-                <Button onClick={() => onClose()}>Close</Button>
-            </Modal.Actions>
-        </Modal>
     )
 }
