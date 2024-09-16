@@ -11,13 +11,15 @@ import { gql } from '../../__generated__/gql'
 import groupBy from 'lodash/groupBy'
 import keyBy from 'lodash/keyBy'
 import { GraphQlParticipant } from '../../__generated__/graphql'
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
+import { SplitPage } from '../../shared/components/Layout/SplitPage'
 import TangledTree, {
     PedigreeEntry,
     PersonNode,
 } from '../../shared/components/pedigree/TangledTree'
 import Table from '../../shared/components/Table'
 import { AnalysisGrid } from '../analysis/AnalysisGrid'
-import { AnalysisViewModal } from '../analysis/AnalysisView'
+import { FamilyCommentsView } from '../comments/entities/FamilyCommentsView'
 import { ParticipantView } from '../participant/ParticipantView'
 
 const getSeqrUrl = (projectGuid: string, familyGuid: string) =>
@@ -91,7 +93,6 @@ export const FamilyView: React.FC<IFamilyViewProps> = ({ familyId }) => {
         string | null | undefined
     >()
 
-    const [analysisIdToView, setAnalysisIdToView] = React.useState<number | null | undefined>(null)
     const invalidFamilyId = !familyId || isNaN(familyId)
 
     const { loading, error, data } = useQuery(GET_FAMILY_INFO, {
@@ -151,7 +152,7 @@ export const FamilyView: React.FC<IFamilyViewProps> = ({ familyId }) => {
     const familyAnalysis = Object.values(aById).filter((a) => a.sgs.length > 1)
     const pedEntryByParticipantId = keyBy(data?.family?.project.pedigree, (pr) => pr.individual_id)
 
-    return (
+    const content = (
         <div style={{ width: '100%' }}>
             <h2>
                 {data?.family?.externalId} ({data?.family?.project?.name})
@@ -207,19 +208,31 @@ export const FamilyView: React.FC<IFamilyViewProps> = ({ familyId }) => {
             <hr />
             <section id="family-analyses">
                 <h4>Family analyses</h4>
-                <AnalysisGrid
-                    analyses={familyAnalysis}
-                    participantBySgId={participantBySgId}
-                    setAnalysisIdToView={(aId) => setAnalysisIdToView(aId)}
-                />
+                <AnalysisGrid analyses={familyAnalysis} participantBySgId={participantBySgId} />
             </section>
-
-            <AnalysisViewModal
-                size="small"
-                analysisId={analysisIdToView}
-                onClose={() => setAnalysisIdToView(null)}
-            />
         </div>
+    )
+
+    return (
+        <SplitPage
+            collapsed={true}
+            collapsedWidth={64}
+            main={() => <PaddedPage>{content}</PaddedPage>}
+            side={({ collapsed, onToggleCollapsed }) => {
+                const projectName = data.family.project.name
+                const familyId = data.family.id
+                if (!projectName || !familyId) return null
+
+                return (
+                    <FamilyCommentsView
+                        projectName={projectName}
+                        familyId={familyId}
+                        collapsed={collapsed}
+                        onToggleCollapsed={onToggleCollapsed}
+                    />
+                )
+            }}
+        />
     )
 }
 

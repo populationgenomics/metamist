@@ -8,7 +8,11 @@ from db.python.layers.base import BaseLayer, Connection
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.sample import SampleFilter, SampleTable
 from db.python.utils import NoOpAenter, NotFoundError
-from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
+from models.models.project import (
+    FullWriteAccessRoles,
+    ProjectId,
+    ReadAccessRoles,
+)
 from models.models.sample import SampleInternal, SampleUpsertInternal
 from models.utils.sample_id_format import sample_id_format_list
 
@@ -18,7 +22,7 @@ class SampleLayer(BaseLayer):
 
     def __init__(self, connection: Connection):
         super().__init__(connection)
-        self.st: SampleTable = SampleTable(connection)
+        self.st = SampleTable(connection)
         self.connection = connection
 
     # GETS

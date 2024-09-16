@@ -338,10 +338,6 @@ class FamilyLayer(BaseLayer):
 
         return True
 
-    async def update_family_members(self, rows: list[PedRowInternal]):
-        """Update family members"""
-        await self.fptable.create_rows(rows)
-
     async def import_families(self, headers: list[str] | None, rows: list[list[str]]):
         """Import a family table"""
         ordered_headers = [

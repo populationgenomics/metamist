@@ -1,9 +1,9 @@
 import * as React from 'react'
 import ReactGoogleSlides from 'react-google-slides'
-
 import { Button, Menu, MenuItem, Segment, SemanticWIDTHS } from 'semantic-ui-react'
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
-import { billingPages, IBillingPage } from './BillingPages'
+import { IBillingPage, billingPages } from './BillingPages'
 
 // Google Slides
 const Slides = React.memo(function ReactGoogleSlidesWrapper({ link }: { link: string }) {
@@ -84,21 +84,23 @@ const BillingHome = () => {
     )
 
     return (
-        <div className="article">
-            <h1> Billing Homepage </h1>
-            <p>Welcome to the Billing Homepage</p>
+        <PaddedPage>
+            <div className="article">
+                <h1> Billing Homepage </h1>
+                <p>Welcome to the Billing Homepage</p>
 
-            <h2>Pages</h2>
-            <p>Here you can find an overview of the different pages in the Billing section</p>
-            <MenuItems
-                inverted={isDarkMode}
-                activeItem={activeItem}
-                onItemSelect={handleItemClick}
-            />
+                <h2>Pages</h2>
+                <p>Here you can find an overview of the different pages in the Billing section</p>
+                <MenuItems
+                    inverted={isDarkMode}
+                    activeItem={activeItem}
+                    onItemSelect={handleItemClick}
+                />
 
-            <h2>An overview of billing at the CPG</h2>
-            <Slides link={billingSlidesLink} />
-        </div>
+                <h2>An overview of billing at the CPG</h2>
+                <Slides link={billingSlidesLink} />
+            </div>
+        </PaddedPage>
     )
 }
 

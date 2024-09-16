@@ -1606,4 +1606,173 @@
 		<sql>ALTER TABLE `output_file` MODIFY dirname VARCHAR(255) NOT NULL;</sql>
 		<sql>ALTER TABLE `output_file` ADD SYSTEM VERSIONING;</sql>
 	</changeSet>
+
+	<changeSet id="2024-07-25_comment_table" author="dan.coates">
+		<createTable tableName="comment">
+			<column name="id" type="INT" autoIncrement="true">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+
+			<column
+				name="parent_id"
+				type="INT"
+			>
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_COMMENT_PARENT_COMMENT"
+					references="comment(id)"
+					deleteCascade="true"
+				/>
+			</column>
+
+			<column name="content" type="TEXT"></column>
+
+			<column name="status" type="ENUM('active', 'deleted')">
+				<constraints
+					nullable="false"
+				/>
+			</column>
+
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_COMMENT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+
+
+		</createTable>
+
+		<!-- Add fulltext search index -->
+		<sql>ALTER TABLE comment ADD FULLTEXT INDEX `COMMENT_CONTENT_FULLTEXT_INDEX` (content);</sql>
+		<sql>ALTER TABLE comment ADD SYSTEM VERSIONING;</sql>
+	</changeSet>
+
+	<changeSet id="2024-07-25_sample_comments" author="dan.coates">
+		<createTable tableName="sample_comment">
+			<column name="comment_id" type="INT">
+				<!--
+					Even though this is a foreign key, it is also the primary key of this table as
+					a comment should only ever be attached to a single sample
+				-->
+				<constraints primaryKey="true" nullable="false" foreignKeyName="FK_SAMPLE_COMMENT_COMMENT_ID"
+					references="comment(id)" />
+			</column>
+			<column name="sample_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_SAMPLE_COMMENT_SAMPLE_ID"
+					references="sample(id)" />
+			</column>
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_SAMPLE_COMMENT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+
+		<sql>ALTER TABLE sample_comment ADD SYSTEM VERSIONING;</sql>
+	</changeSet>
+
+	<changeSet id="2024-08-07_other_entity_comments" author="dan.coates">
+		<createTable tableName="project_comment">
+			<column name="comment_id" type="INT">
+				<constraints primaryKey="true" nullable="false" foreignKeyName="FK_PROJECT_COMMENT_COMMENT_ID"
+					references="comment(id)" />
+			</column>
+			<column name="project_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_PROJECT_COMMENT_PROJECT_ID"
+					references="project(id)" />
+			</column>
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_PROJECT_COMMENT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+
+		<sql>ALTER TABLE project_comment ADD SYSTEM VERSIONING;</sql>
+
+		<createTable tableName="assay_comment">
+			<column name="comment_id" type="INT">
+				<constraints primaryKey="true" nullable="false" foreignKeyName="FK_ASSAY_COMMENT_COMMENT_ID"
+					references="comment(id)" />
+			</column>
+			<column name="assay_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_ASSAY_COMMENT_ASSAY_ID"
+					references="assay(id)" />
+			</column>
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_ASSAY_COMMENT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+
+		<sql>ALTER TABLE assay_comment ADD SYSTEM VERSIONING;</sql>
+
+		<createTable tableName="sequencing_group_comment">
+			<column name="comment_id" type="INT">
+				<constraints primaryKey="true" nullable="false" foreignKeyName="FK_SEQUENCING_GROUP_COMMENT_COMMENT_ID"
+					references="comment(id)" />
+			</column>
+			<column name="sequencing_group_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_SEQUENCING_GROUP_COMMENT_SEQUENCING_GROUP_ID"
+					references="sequencing_group(id)" />
+			</column>
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_SEQUENCING_GROUP_COMMENT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+
+		<sql>ALTER TABLE sequencing_group_comment ADD SYSTEM VERSIONING;</sql>
+
+
+		<createTable tableName="participant_comment">
+			<column name="comment_id" type="INT">
+				<constraints primaryKey="true" nullable="false" foreignKeyName="FK_PARTICIPANT_COMMENT_COMMENT_ID"
+					references="comment(id)" />
+			</column>
+			<column name="participant_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_PARTICIPANT_COMMENT_PARTICIPANT_ID"
+					references="participant(id)" />
+			</column>
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_PARTICIPANT_COMMENT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+
+		<sql>ALTER TABLE participant_comment ADD SYSTEM VERSIONING;</sql>
+
+
+	</changeSet>
+
+	<changeSet id="2024-08-13_family_comments" author="dan.coates">
+		<createTable tableName="family_comment">
+			<column name="comment_id" type="INT">
+				<constraints primaryKey="true" nullable="false" foreignKeyName="FK_FAMILY_COMMENT_COMMENT_ID"
+					references="comment(id)" />
+			</column>
+			<column name="family_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_FAMILY_COMMENT_FAMILY_ID"
+					references="family(id)" />
+			</column>
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_FAMILY_COMMENT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+
+		<sql>ALTER TABLE family_comment ADD SYSTEM VERSIONING;</sql>
+	</changeSet>
+
 </databaseChangeLog>

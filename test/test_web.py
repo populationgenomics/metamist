@@ -176,6 +176,16 @@ DEFAULT_SEQ_GROUP_FIELDS = [
 
 DEFAULT_ASSAY_TYPES = [
     ProjectParticipantGridField(
+        key='id',
+        label='Assay ID',
+        is_visible=True,
+        filter_key='id',
+        filter_types=[
+            ProjectParticipantGridFilterType.eq,
+            ProjectParticipantGridFilterType.neq,
+        ],
+    ),
+    ProjectParticipantGridField(
         key='type', label='Type', is_visible=True, filter_key='type', filter_types=None
     ),
     ProjectParticipantGridField(

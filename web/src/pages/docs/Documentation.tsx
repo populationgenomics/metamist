@@ -6,6 +6,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { dracula, vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import remarkGfm from 'remark-gfm'
 import remarkToc from 'remark-toc'
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
 
 interface IDocumentationArticleProps {
@@ -109,4 +110,10 @@ const DocumentationArticle: React.FunctionComponent<IDocumentationArticleProps> 
     )
 }
 
-export default DocumentationArticle
+export default function DocumentationArticlePage(props: IDocumentationArticleProps) {
+    return (
+        <PaddedPage>
+            <DocumentationArticle {...props} />
+        </PaddedPage>
+    )
+}

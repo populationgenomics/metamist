@@ -15,16 +15,8 @@ export const AnalysisGrid: React.FC<{
     participantBySgId: { [sgId: string]: { externalId: string } }
     sgsById?: { [sgId: string]: { technology: string; platform: string } }
     highlightedIndividual?: string | null
-    setAnalysisIdToView: (analysisId?: number | null) => void
     showSequencingGroup?: boolean
-}> = ({
-    analyses,
-    participantBySgId,
-    sgsById,
-    highlightedIndividual,
-    setAnalysisIdToView,
-    showSequencingGroup,
-}) => {
+}> = ({ analyses, participantBySgId, sgsById, highlightedIndividual, showSequencingGroup }) => {
     return (
         <Table>
             <thead>
@@ -58,14 +50,7 @@ export const AnalysisGrid: React.FC<{
                             }}
                         >
                             <SUITable.Cell>
-                                <AnalysisLink
-                                    id={a.id}
-                                    onClick={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        setAnalysisIdToView(a.id)
-                                    }}
-                                />
+                                <AnalysisLink id={a.id} />
                             </SUITable.Cell>
                             {showSequencingGroup && (
                                 <SUITable.Cell>

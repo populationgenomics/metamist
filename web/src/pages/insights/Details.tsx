@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { Button } from 'semantic-ui-react'
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import { EnumsApi, ProjectApi, ProjectInsightsApi, ProjectInsightsDetails } from '../../sm-api'
 import DetailsTable from './DetailsTable'
 import filterData from './FilterData'
@@ -56,7 +57,7 @@ const Details: React.FC = () => {
     }, [])
 
     return (
-        <>
+        <PaddedPage>
             <ProjectAndSeqTypeSelector
                 projects={projectNames}
                 seqTypes={seqTypes}
@@ -78,7 +79,7 @@ const Details: React.FC = () => {
                 getUniqueOptionsForColumn={getUniqueOptionsForColumn}
                 getSelectedOptionsForColumn={getSelectedOptionsForColumn}
             ></DetailsTable>
-        </>
+        </PaddedPage>
     )
 }
 
