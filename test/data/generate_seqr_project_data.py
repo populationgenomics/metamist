@@ -72,6 +72,16 @@ LOCI = [
     'IJKL',
 ]
 
+QUERY_PROJECT_ID = gql(
+    """
+    query ProjectIdQuery($project: String!) {
+        project(name: $project) {
+            id
+        }
+    }
+    """
+)
+
 QUERY_PROJECT_SGS = gql(
     """
     query MyQuery($project: String!) {
@@ -385,7 +395,7 @@ async def generate_sample_entries(
 
 
 async def generate_cram_analyses(
-    project: str, analyses_to_insert: list[Analysis]
+    project: str, project_id: int, analyses_to_insert: list[Analysis]
 ) -> list[dict]:
     """
     Queries the list of sequencing groups for a project and randomly selects some
@@ -409,7 +419,17 @@ async def generate_cram_analyses(
                 sequencing_group_ids=[sg['id']],
                 type='cram',
                 status=AnalysisStatus('completed'),
-                output=f'FAKE://{project}/crams/{sg["id"]}.cram',
+                project=project_id,
+                output=f'gs://{project}/crams/{sg["id"]}.cram',
+                outputs={
+                    'path': f'gs://{project}/crams/{sg["id"]}.cram',
+                    'basename': f'{sg["id"]}.cram',
+                    'dirname': f'gs://{project}/cram',
+                    'nameroot': sg["id"],
+                    'nameext': '.cram',
+                    'valid': True,
+                    'secondary_files': {},
+                },
                 timestamp_completed=(
                     datetime.datetime.now()
                     - datetime.timedelta(days=random.randint(1, 15))
@@ -428,6 +448,7 @@ async def generate_cram_analyses(
 
 async def generate_web_report_analyses(
     project: str,
+    project_id: int,
     aligned_sequencing_groups: list[dict],
     analyses_to_insert: list[Analysis],
 ):
@@ -459,7 +480,17 @@ async def generate_web_report_analyses(
                     sequencing_group_ids=[sg['id']],
                     type='web',
                     status=AnalysisStatus('completed'),
-                    output=f'FAKE://{project}/stripy/{sg["id"]}.stripy.html',
+                    project=project_id,
+                    output=f'gs://{project}/stripy/{sg["id"]}.stripy.html',
+                    outputs={
+                        'path': f'gs://{project}/stripy/{sg["id"]}.stripy.html',
+                        'basename': f'{sg["id"]}.stripy.html',
+                        'dirname': f'gs://{project}/stripy',
+                        'nameroot': sg["id"],
+                        'nameext': '.stripy.html',
+                        'valid': True,
+                        'secondary_files': {},
+                    },
                     timestamp_completed=(
                         datetime.datetime.now()
                         - datetime.timedelta(days=random.randint(1, 15))
@@ -477,7 +508,17 @@ async def generate_web_report_analyses(
                     sequencing_group_ids=[sg['id']],
                     type='web',
                     status=AnalysisStatus('completed'),
-                    output=f'FAKE://{project}/mito/mitoreport-{sg["id"]}/index.html',
+                    project=project_id,
+                    output=f'gs://{project}/mito/mitoreport-{sg["id"]}/index.html',
+                    outputs={
+                        'path': f'gs://{project}/mito/mitoreport-{sg["id"]}/index.html',
+                        'basename': 'index.html',
+                        'dirname': f'gs://{project}/mito/mitoreport-{sg["id"]}',
+                        'nameroot': 'index',
+                        'nameext': '.html',
+                        'valid': True,
+                        'secondary_files': {},
+                    },
                     timestamp_completed=(
                         datetime.datetime.now()
                         - datetime.timedelta(days=random.randint(1, 15))
@@ -612,14 +653,17 @@ async def main():
                 body={'meta': {'is_seqr': 'true'}},
             )
             logging.info(f'Set {project} as seqr project')
+        
+        project_id_query_result = await query_async(QUERY_PROJECT_ID, {'project': project})
+        project_id = project_id_query_result['project']['id']
 
         participant_id_map = await generate_project_pedigree(project)
 
         await generate_sample_entries(project, participant_id_map, metamist_enums, sapi)
 
-        aligned_sgs = await generate_cram_analyses(project, analyses_to_insert)
+        aligned_sgs = await generate_cram_analyses(project, project_id, analyses_to_insert)
 
-        await generate_web_report_analyses(project, aligned_sgs, analyses_to_insert)
+        await generate_web_report_analyses(project, project_id, aligned_sgs, analyses_to_insert)
 
         await generate_joint_called_analyses(project, aligned_sgs, analyses_to_insert)
 
