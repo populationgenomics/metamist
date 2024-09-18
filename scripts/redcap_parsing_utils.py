@@ -61,6 +61,8 @@ VCGS_SEQTYPE_BY_LIBRARY_TYPE = {
     'SSXTLICREV2': SeqType.EXOME,
     'SSQXTCREV2': SeqType.EXOME,
     'TwistWES1VCGS1': SeqType.EXOME,
+    'TwistWES2VCGS2': SeqType.EXOME,
+    'TwistWES2VCGS2H': SeqType.EXOME,
     'TSStrmRNA': SeqType.MRNA,
     'TSStrtRNA': SeqType.TRNA,
     'TruSeq-Stranded-mRNA': SeqType.MRNA,
