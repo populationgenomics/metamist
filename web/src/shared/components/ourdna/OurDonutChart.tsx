@@ -60,7 +60,8 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
         const pie = d3.pie<{ key: string; value: number }>().value((d) => d.value)
         const data_ready = pie(formattedData)
 
-        const arc = d3.arc<d3.PieArcDatum<{ key: string; value: number }>>()
+        const arc = d3
+            .arc<d3.PieArcDatum<{ key: string; value: number }>>()
             .innerRadius(radius * 0.4)
             .outerRadius(radius * 0.8)
 
