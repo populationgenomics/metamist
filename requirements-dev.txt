@@ -43,12 +43,12 @@ black==24.8.0
     # via -r requirements-dev.in
 blinker==1.8.2
     # via flask
-boto3==1.35.12
+boto3==1.35.22
     # via
     #   -r requirements.in
     #   cloudpathlib
     #   cpg-utils
-botocore==1.35.12
+botocore==1.35.22
     # via
     #   -r requirements.in
     #   boto3
@@ -110,7 +110,7 @@ docker==7.1.0
     # via testcontainers
 email-validator==2.2.0
     # via fastapi
-fastapi[all]==0.112.2
+fastapi[all]==0.115.0
     # via
     #   -r requirements.in
     #   strawberry-graphql
@@ -149,14 +149,16 @@ google-auth==2.34.0
     #   cpg-utils
     #   google-api-core
     #   google-cloud-appengine-logging
+    #   google-cloud-bigquery
     #   google-cloud-core
+    #   google-cloud-pubsub
     #   google-cloud-secret-manager
     #   google-cloud-storage
 google-cloud-appengine-logging==1.4.5
     # via google-cloud-logging
 google-cloud-audit-log==0.3.0
     # via google-cloud-logging
-google-cloud-bigquery==3.11.4
+google-cloud-bigquery==3.25.0
     # via
     #   -r requirements-dev.in
     #   -r requirements.in
@@ -167,7 +169,7 @@ google-cloud-core==2.4.1
     #   google-cloud-storage
 google-cloud-logging==2.7.0
     # via -r requirements.in
-google-cloud-pubsub==2.18.3
+google-cloud-pubsub==2.23.1
     # via
     #   -r requirements-dev.in
     #   -r requirements.in
@@ -201,7 +203,6 @@ grpc-google-iam-v1==0.12.7
 grpcio==1.66.1
     # via
     #   google-api-core
-    #   google-cloud-bigquery
     #   google-cloud-pubsub
     #   googleapis-common-protos
     #   grpc-google-iam-v1
@@ -299,7 +300,6 @@ proto-plus==1.24.0
     # via
     #   google-api-core
     #   google-cloud-appengine-logging
-    #   google-cloud-bigquery
     #   google-cloud-logging
     #   google-cloud-pubsub
     #   google-cloud-secret-manager
@@ -308,7 +308,6 @@ protobuf==4.25.4
     #   google-api-core
     #   google-cloud-appengine-logging
     #   google-cloud-audit-log
-    #   google-cloud-bigquery
     #   google-cloud-pubsub
     #   google-cloud-secret-manager
     #   google-cloud-storage
@@ -350,13 +349,13 @@ pymysql[rsa]==1.1.1
     #   -r requirements-dev.in
     #   aiomysql
     #   testcontainers
-pytest==8.3.2
+pytest==8.3.3
     # via
     #   -r requirements-dev.in
     #   pytest-cov
 pytest-cov==5.0.0
     # via -r requirements-dev.in
-python-dateutil==2.8.2
+python-dateutil==2.9.0.post0
     # via
     #   -r requirements.in
     #   botocore
@@ -370,7 +369,7 @@ python-multipart==0.0.9
     # via
     #   fastapi
     #   strawberry-graphql
-pytz==2024.1
+pytz==2024.2
     # via -r requirements-dev.in
 pyyaml==6.0.2
     # via
@@ -403,7 +402,7 @@ six==1.16.0
     #   google-cloud-storage
     #   isodate
     #   python-dateutil
-slack-sdk==3.20.2
+slack-sdk==3.33.0
     # via -r requirements.in
 sniffio==1.3.1
     # via
@@ -417,7 +416,7 @@ starlette==0.38.4
     # via
     #   fastapi
     #   strawberry-graphql
-strawberry-graphql[debug-server,fastapi]==0.235.1
+strawberry-graphql[debug-server,fastapi]==0.241.0
     # via
     #   -r requirements-dev.in
     #   -r requirements.in
@@ -449,13 +448,13 @@ typing-extensions==4.12.2
     #   typer
 ujson==5.10.0
     # via fastapi
-urllib3==2.2.2
+urllib3==2.2.3
     # via
     #   botocore
     #   docker
     #   requests
     #   testcontainers
-uvicorn[standard]==0.29.0
+uvicorn[standard]==0.30.6
     # via
     #   -r requirements.in
     #   fastapi
