@@ -4,8 +4,6 @@
     "private": true,
     "dependencies": {
         "@apollo/client": "^3.7.3",
-        "@emotion/react": "^11.13.3",
-        "@emotion/styled": "^11.13.0",
         "@monaco-editor/react": "^4.6.0",
         "@mui/icons-material": "^5.10.9",
         "@mui/material": "^5.10.9",
