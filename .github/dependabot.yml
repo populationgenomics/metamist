@@ -5,11 +5,11 @@
 
 version: 2
 updates:
-  # For minor and patch updates, grouped together
+  # For minor and patch updates (all dependencies grouped)
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     allow:
       - dependency-type: "direct"
     ignore:
@@ -19,15 +19,18 @@ updates:
       - "minor-update"
       - "patch-update"
     groups:
-      minor-and-patch:
+      all-minor-and-patch:
         patterns:
-          - ".*"  # Groups all minor and patch updates into a single PR
+          - "requirements.in"
+          - "requirements.txt"
+          - "requirements-dev.in"
+          - "requirements-dev.txt"
 
-  # For major updates, grouped separately
+  # For major updates (all dependencies grouped)
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     allow:
       - dependency-type: "direct"
     ignore:
@@ -36,6 +39,10 @@ updates:
     labels:
       - "major-update"
     groups:
-      major:
+      all-major:
         patterns:
-          - ".*"  # Groups all major updates into a single PR
+          - "requirements.in"
+          - "requirements.txt"
+          - "requirements-dev.in"
+          - "requirements-dev.txt"
+
