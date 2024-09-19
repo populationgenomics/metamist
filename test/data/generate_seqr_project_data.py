@@ -420,16 +420,7 @@ async def generate_cram_analyses(
                 type='cram',
                 status=AnalysisStatus('completed'),
                 project=project_id,
-                output=f'gs://{project}/crams/{sg["id"]}.cram',
-                outputs={
-                    'path': f'gs://{project}/crams/{sg["id"]}.cram',
-                    'basename': f'{sg["id"]}.cram',
-                    'dirname': f'gs://{project}/cram',
-                    'nameroot': sg["id"],
-                    'nameext': '.cram',
-                    'valid': True,
-                    'secondary_files': {},
-                },
+                output=f'FAKE://{project}/crams/{sg["id"]}.cram',
                 timestamp_completed=(
                     datetime.datetime.now()
                     - datetime.timedelta(days=random.randint(1, 15))
@@ -481,16 +472,7 @@ async def generate_web_report_analyses(
                     type='web',
                     status=AnalysisStatus('completed'),
                     project=project_id,
-                    output=f'gs://{project}/stripy/{sg["id"]}.stripy.html',
-                    outputs={
-                        'path': f'gs://{project}/stripy/{sg["id"]}.stripy.html',
-                        'basename': f'{sg["id"]}.stripy.html',
-                        'dirname': f'gs://{project}/stripy',
-                        'nameroot': sg["id"],
-                        'nameext': '.stripy.html',
-                        'valid': True,
-                        'secondary_files': {},
-                    },
+                    output=f'FAKE://{project}/stripy/{sg["id"]}.stripy.html',
                     timestamp_completed=(
                         datetime.datetime.now()
                         - datetime.timedelta(days=random.randint(1, 15))
@@ -509,16 +491,7 @@ async def generate_web_report_analyses(
                     type='web',
                     status=AnalysisStatus('completed'),
                     project=project_id,
-                    output=f'gs://{project}/mito/mitoreport-{sg["id"]}/index.html',
-                    outputs={
-                        'path': f'gs://{project}/mito/mitoreport-{sg["id"]}/index.html',
-                        'basename': 'index.html',
-                        'dirname': f'gs://{project}/mito/mitoreport-{sg["id"]}',
-                        'nameroot': 'index',
-                        'nameext': '.html',
-                        'valid': True,
-                        'secondary_files': {},
-                    },
+                    output=f'FAKE://{project}/mito/mitoreport-{sg["id"]}/index.html',
                     timestamp_completed=(
                         datetime.datetime.now()
                         - datetime.timedelta(days=random.randint(1, 15))
