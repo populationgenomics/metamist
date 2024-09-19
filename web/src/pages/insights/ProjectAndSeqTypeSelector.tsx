@@ -27,7 +27,7 @@ const Selector: React.FC<SelectorProps> = ({
     specialSelectionLabel,
     specialSelectionItems,
 }) => {
-    const handleChange = (_: any, data: DropdownProps) => {
+    const handleChange = (data: DropdownProps) => {
         const value = data.value as string[] | undefined
         if (value) {
             onSelectionChange(value)
