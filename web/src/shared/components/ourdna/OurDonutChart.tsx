@@ -4,9 +4,13 @@ import { Card, Container } from 'semantic-ui-react'
 
 import { ourdnaColours } from './Colours'
 
+interface DonutChartData {
+    [key: string]: number
+}
+
 interface DonutChartProps {
     header: string
-    data: { [key: string]: number }
+    data: DonutChartData
     icon: React.ReactNode
 }
 
@@ -19,7 +23,6 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
     })
 
     React.useEffect(() => {
-        // Function to handle window resize events and update dimensions
         const handleResize = () => {
             if (svgRef.current) {
                 const { width, height } = svgRef.current.getBoundingClientRect()
@@ -27,13 +30,9 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
             }
         }
 
-        // Initial call to set dimensions
         handleResize()
 
-        // Add event listener for window resize
         window.addEventListener('resize', handleResize)
-
-        // Cleanup event listener on component unmount
         return () => window.removeEventListener('resize', handleResize)
     }, [])
 
@@ -51,15 +50,18 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
         const g = svg.append('g').attr('transform', `translate(${width / 2},${height / 2})`)
 
         const color = d3
-            .scaleOrdinal()
+            .scaleOrdinal<string>()
             .domain(Object.keys(data))
             .range(Object.values(ourdnaColours) || d3.schemeCategory10)
 
-        const pie = d3.pie()
-        const data_ready = pie(Object.values(data))
+        // Correctly map Object.entries to objects with { key, value } format
+        const formattedData = Object.entries(data).map(([key, value]) => ({ key, value }))
+
+        const pie = d3.pie<{ key: string; value: number }>().value((d) => d.value)
+        const data_ready = pie(formattedData)
 
         const arc = d3
-            .arc()
+            .arc<d3.PieArcDatum<{ key: string; value: number }>>()
             .innerRadius(radius * 0.4)
             .outerRadius(radius * 0.8)
 
@@ -79,16 +81,13 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
             .data(data_ready)
             .enter()
             .append('path')
-            // @ts-ignore
             .attr('d', arc)
-            // @ts-ignore
-            .attr('fill', (d) => color(d.data[0]))
+            .attr('fill', (d) => color(d.data.key)) // Correct reference to key
             .attr('stroke', 'white')
             .style('stroke-width', '2px')
             .style('opacity', 1)
             .on('mouseover', function (event, d) {
-                // @ts-ignore
-                tooltip.text(`${d.data[0]}: ${d.data[1]}`)
+                tooltip.text(`${d.data.key}: ${d.data.value}`) // Correctly reference key and value
                 return tooltip.style('visibility', 'visible')
             })
             .on('mousemove', function (event) {
@@ -100,32 +99,40 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
                 return tooltip.style('visibility', 'hidden')
             })
 
-        // Adding legends
+        // Remove any existing legend to avoid overlap
+        d3.selectAll('.legend').remove()
+
+        // Add legends at the bottom
         const legend = svg
             .append('g')
-            .attr('transform', `translate(${width / 2}, ${height / 2 + radius + 20})`)
+            .attr('class', 'legend')
+            .attr('transform', `translate(${0}, ${height / 2 + radius + 40})`)
 
+        // Calculate how many items fit per row dynamically based on width
+        const itemsPerRow = Math.floor(width / 120) // Estimate based on width
         const legendItems = legend
             .selectAll('g')
             .data(data_ready)
             .enter()
             .append('g')
-            .attr('transform', (d, i) => `translate(${i * 100 - width / 4}, 0)`)
+            .attr('transform', (d, i) => {
+                const row = Math.floor(i / itemsPerRow) // Wrap items based on available space
+                const col = i % itemsPerRow
+                return `translate(${col * 120}, ${row * 20})`
+            })
 
         legendItems
             .append('rect')
             .attr('width', 18)
             .attr('height', 18)
-            // @ts-ignore
-            .attr('fill', (d) => color(d.data[0]))
+            .attr('fill', (d) => color(d.data.key)) // Correct reference to key
 
         legendItems
             .append('text')
             .attr('x', 24)
             .attr('y', 9)
             .attr('dy', '0.35em')
-            // @ts-ignore
-            .text((d) => d.data[0])
+            .text((d) => d.data.key) // Correct reference to key
             .style('font-size', '12px')
             .style('fill', 'var(--color-text-primary)')
     }, [data, dimensions])
@@ -148,6 +155,8 @@ const OurDonutChart: React.FC<DonutChartProps> = ({ header, data, icon }) => {
                     <Container style={{ position: 'relative', height: '100%' }}>
                         <svg
                             ref={svgRef}
+                            viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
+                            preserveAspectRatio="xMidYMid meet"
                             style={{ width: '100%', height: '100%', minHeight: '300px' }}
                         ></svg>
                     </Container>

@@ -360,11 +360,12 @@ class OurDNADashboardTest(DbIsolatedTest):
             current_bucket = ceil(time_difference.total_seconds() / 3600)
             sample_tally[processing_site][current_bucket] += 1
 
-        for site in sample_tally:
-            min_bucket = min(sample_tally[site])
-            max_bucket = max(sample_tally[site])
-            for i in range(min_bucket, max_bucket + 1):
-                sample_tally[site].setdefault(i, 0)
+        # ENABLE THIS IF WE WANT VALUES FOR ALL HOURS
+        # for site in sample_tally:
+        #     min_bucket = min(sample_tally[site])
+        #     max_bucket = max(sample_tally[site])
+        #     for i in range(min_bucket, max_bucket + 1):
+        #         sample_tally[site].setdefault(i, 0)
 
         # Checks that we have identical dicts (by extension, keys and their values)
         self.assertDictEqual(processing_times_by_site, convert_to_dict(sample_tally))
@@ -396,11 +397,12 @@ class OurDNADashboardTest(DbIsolatedTest):
             current_bucket = ceil(time_difference.total_seconds() / 3600)
             sample_tally[collection_site][current_bucket] += 1
 
-        for site in sample_tally:
-            min_bucket = min(sample_tally[site])
-            max_bucket = max(sample_tally[site])
-            for i in range(min_bucket, max_bucket + 1):
-                sample_tally[site].setdefault(i, 0)
+        # ENABLE THIS IF WE WANT VALUES FOR ALL HOURS
+        # for site in sample_tally:
+        #     min_bucket = min(sample_tally[site])
+        #     max_bucket = max(sample_tally[site])
+        #     for i in range(min_bucket, max_bucket + 1):
+        #         sample_tally[site].setdefault(i, 0)
 
         # Checks that we have identical dicts (by extension, keys and their values)
         self.assertDictEqual(processing_times_by_collection_site, sample_tally)
