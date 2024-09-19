@@ -45,4 +45,3 @@ updates:
           - "requirements.txt"
           - "requirements-dev.in"
           - "requirements-dev.txt"
-
