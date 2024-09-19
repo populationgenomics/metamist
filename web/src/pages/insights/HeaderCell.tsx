@@ -164,7 +164,7 @@ export const DETAILS_TABLE_HEADER_CELL_CONFIGS: HeaderCellConfig[] = [
         key: 'cram',
         label: 'CRAM',
         sortable: true,
-        tooltip: 'Timestamp of the latest CRAM Analysis (YY-MM-DD)',
+        tooltip: 'Timestamp of the latest CRAM Analysis (DD-MM-YY)',
         filterable: true,
     },
     {

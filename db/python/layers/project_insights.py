@@ -375,7 +375,6 @@ GROUP BY analysis_id;
         )
         sg_cram = self.get_cram_record(sequencing_group_cram)
 
-        # participant_ext_ids = self.convert_to_external_ids(sequencing_group_details.participant_external_id)
         sample_ext_ids = self.convert_to_external_ids(
             sequencing_group_details.sample_external_ids
         )
@@ -393,8 +392,6 @@ GROUP BY analysis_id;
             sample_id=sequencing_group_details.sample_id,
             sample_ext_ids=sample_ext_ids,
             sequencing_group_id=sequencing_group_details.sequencing_group_id,
-            # completed_cram=sequencing_group_details.sequencing_group_id
-            # in sequencing_groups_crams,
             cram=sg_cram,
             in_latest_annotate_dataset=sequencing_group_details.sequencing_group_id
             in sgs_in_latest_annotate_dataset,
@@ -1063,7 +1060,6 @@ INNER JOIN (
             self._sequencing_group_details_by_project_and_seq_fields(
                 project_ids, sequencing_types
             ),
-            # self._crams_by_project_id_and_seq_fields(project_ids, sequencing_types),
             self._sg_crams_by_project_id_and_seq_fields(project_ids, sequencing_types),
             self._latest_annotate_dataset_by_project_id_and_seq_type(
                 project_ids, sequencing_types
