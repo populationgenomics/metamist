@@ -5,43 +5,35 @@
 
 version: 2
 updates:
-  # For minor and patch updates (all dependencies grouped)
+  # Handle all updates, but split them into separate PRs for major and minor/patch
   - package-ecosystem: "pip"
-    directory: "/"
+    directory: "/"  # Root directory where the Python dependency files are located
     schedule:
       interval: "daily"
-    allow:
-      - dependency-type: "direct"
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
     labels:
-      - "minor-update"
-      - "patch-update"
+      - "dependencies"
+    # Group major and minor updates separately
     groups:
-      all-minor-and-patch:
+      minor-updates:
         patterns:
-          - "requirements.in"
-          - "requirements.txt"
-          - "requirements-dev.in"
-          - "requirements-dev.txt"
+          - "requirements*.txt"
+          - "requirements*.in"
+          - "setup.py"
+          - "setup.cfg"
+          - "pyproject.toml"
+        labels:
+          - "minor-update"
+        ignore:
+          - update-types: ["version-update:semver-major"]  # Ignore major updates in this group
 
-  # For major updates (all dependencies grouped)
-  - package-ecosystem: "pip"
-    directory: "/"
-    schedule:
-      interval: "daily"
-    allow:
-      - dependency-type: "direct"
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-minor", "version-update:semver-patch"]
-    labels:
-      - "major-update"
-    groups:
-      all-major:
+      major-updates:
         patterns:
-          - "requirements.in"
-          - "requirements.txt"
-          - "requirements-dev.in"
-          - "requirements-dev.txt"
+          - "requirements*.txt"
+          - "requirements*.in"
+          - "setup.py"
+          - "setup.cfg"
+          - "pyproject.toml"
+        labels:
+          - "major-update"
+        ignore:
+          - update-types: ["version-update:semver-minor", "version-update:semver-patch"]  # Ignore minor/patch updates in this group
