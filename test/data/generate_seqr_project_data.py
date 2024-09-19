@@ -626,17 +626,23 @@ async def main():
                 body={'meta': {'is_seqr': 'true'}},
             )
             logging.info(f'Set {project} as seqr project')
-        
-        project_id_query_result = await query_async(QUERY_PROJECT_ID, {'project': project})
+
+        project_id_query_result = await query_async(
+            QUERY_PROJECT_ID, {'project': project}
+        )
         project_id = project_id_query_result['project']['id']
 
         participant_id_map = await generate_project_pedigree(project)
 
         await generate_sample_entries(project, participant_id_map, metamist_enums, sapi)
 
-        aligned_sgs = await generate_cram_analyses(project, project_id, analyses_to_insert)
+        aligned_sgs = await generate_cram_analyses(
+            project, project_id, analyses_to_insert
+        )
 
-        await generate_web_report_analyses(project, project_id, aligned_sgs, analyses_to_insert)
+        await generate_web_report_analyses(
+            project, project_id, aligned_sgs, analyses_to_insert
+        )
 
         await generate_joint_called_analyses(project, aligned_sgs, analyses_to_insert)
 

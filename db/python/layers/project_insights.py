@@ -276,14 +276,15 @@ GROUP BY analysis_id;
             }
 
         return report_links
-    
-    def get_cram_record(
-        self, cram_row: AnalysisRow | None
-    ):
+
+    def get_cram_record(self, cram_row: AnalysisRow | None):
+        """Get the CRAM record for a sequencing group"""
         return {
             'id': cram_row.id if cram_row else None,
             'output': cram_row.output if cram_row else None,
-            'timestamp_completed': cram_row.timestamp_completed.strftime('%d-%m-%y') if cram_row else None,
+            'timestamp_completed': cram_row.timestamp_completed.strftime('%d-%m-%y')
+            if cram_row
+            else None,
         }
 
     def get_analysis_stats_internal_from_record(
@@ -569,10 +570,12 @@ GROUP BY
         return self.parse_project_seqtype_technology_keyed_rows(
             _query_results, 'sequencing_group_ids'
         )
-        
+
     async def _sg_crams_by_project_id_and_seq_fields(
         self, project_ids: list[ProjectId], sequencing_types: list[str]
-    ) -> dict[ProjectSeqTypeTechnologyKey, dict[SequencingGroupInternalId, AnalysisRow]]:
+    ) -> dict[
+        ProjectSeqTypeTechnologyKey, dict[SequencingGroupInternalId, AnalysisRow]
+    ]:
         _query = """
 SELECT
     a.project,
@@ -613,9 +616,9 @@ WHERE
                 'sequencing_types': sequencing_types,
             },
         )
-        
+
         cram_timestamps_by_project_id_and_seq_fields: dict[
-            ProjectSeqTypeKey, dict[SequencingGroupInternalId, AnalysisRow]
+            ProjectSeqTypeTechnologyKey, dict[SequencingGroupInternalId, AnalysisRow]
         ] = {}
         for row in _query_results:
             key = ProjectSeqTypeTechnologyKey(
@@ -633,7 +636,6 @@ WHERE
                 cram_timestamps_by_project_id_and_seq_fields[key] = {}
             cram_timestamps_by_project_id_and_seq_fields[key][sg_id] = cram_row
         return cram_timestamps_by_project_id_and_seq_fields
-
 
     async def _latest_annotate_dataset_by_project_id_and_seq_type(
         self, project_ids: list[ProjectId], sequencing_types: list[str]
@@ -661,7 +663,7 @@ INNER JOIN (
 ) max_timestamps ON a.project = max_timestamps.project
 AND a.timestamp_completed = max_timestamps.max_timestamp
 AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) = max_timestamps.sequencing_type
-WHERE 
+WHERE
     a.type = 'CUSTOM'
     AND a.status = 'COMPLETED'
     AND a.project IN :projects
@@ -711,7 +713,7 @@ INNER JOIN (
 AND a.timestamp_completed = max_timestamps.max_timestamp
 AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) = max_timestamps.sequencing_type
 AND JSON_EXTRACT(a.meta, '$.stage') = max_timestamps.stage
-WHERE 
+WHERE
     a.project IN :projects
     AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) in :sequencing_types;
         """
@@ -1104,8 +1106,10 @@ INNER JOIN (
             ):
                 continue
 
-            sequencing_groups_crams: dict[SequencingGroupInternalId, AnalysisRow] = crams_by_project_id_and_seq_fields.get(
-                (project.id, seq_type, seq_tech), {}
+            sequencing_groups_crams: dict[SequencingGroupInternalId, AnalysisRow] = (
+                crams_by_project_id_and_seq_fields.get(
+                    (project.id, seq_type, seq_tech), {}
+                )
             )
             (
                 latest_annotate_dataset_row,
