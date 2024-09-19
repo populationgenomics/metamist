@@ -5,19 +5,15 @@
 
 version: 2
 updates:
-  # Update for setup.py and setup.cfg
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
-      interval: "daily"
-      time: "00:00"
-    allow:
-      - dependency-type: "all"
-    # Optionally ignore any major versions to prevent breaking changes
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+      interval: "weekly"
+    open-pull-requests-limit: 10
     groups:
-      all-dependencies:
+      python-packages:
         patterns:
-          - ".*"
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
