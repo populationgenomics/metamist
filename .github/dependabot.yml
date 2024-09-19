@@ -5,19 +5,38 @@
 
 version: 2
 updates:
-  # Update for setup.py and setup.cfg
+  # For minor and patch updates, grouped together
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
-      interval: "daily"
-      time: "00:00"
+      interval: "weekly"
     allow:
-      - dependency-type: "all"
-    # Optionally ignore any major versions to prevent breaking changes
+      - dependency-type: "direct"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+    labels:
+      - "minor-update"
+      - "patch-update"
     groups:
-      all-dependencies:
+      minor-and-patch:
         patterns:
-          - ".*"
+          - ".*"  # Groups all minor and patch updates into a single PR
+
+  # For major updates, grouped separately
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    allow:
+      - dependency-type: "direct"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-minor", "version-update:semver-patch"]
+    labels:
+      - "major-update"
+    groups:
+      major:
+        patterns:
+          - ".*"  # Groups all major updates into a single PR
+
