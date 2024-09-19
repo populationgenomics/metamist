@@ -1,5 +1,5 @@
 import React from 'react'
-import { Checkbox } from 'semantic-ui-react'
+import { Checkbox, Dropdown, DropdownProps } from 'semantic-ui-react'
 
 interface SelectorProps {
     items: string[]
@@ -27,8 +27,11 @@ const Selector: React.FC<SelectorProps> = ({
     specialSelectionLabel,
     specialSelectionItems,
 }) => {
-    const handleSelectAll = (selectAll: boolean) => {
-        onSelectionChange(selectAll ? [...items] : [])
+    const handleChange = (_: any, data: DropdownProps) => {
+        const value = data.value as string[] | undefined
+        if (value) {
+            onSelectionChange(value)
+        }
     }
 
     const handleSpecialSelection = () => {
@@ -46,57 +49,33 @@ const Selector: React.FC<SelectorProps> = ({
         }
     }
 
-    const handleItemChange = (item: string, isChecked: boolean) => {
-        if (isChecked) {
-            onSelectionChange([...selectedItems, item])
-        } else {
-            onSelectionChange(selectedItems.filter((i) => i !== item))
-        }
-    }
-
-    const isSpecialSelectionChecked = specialSelectionItems
-        ? specialSelectionItems.every((item) => selectedItems.includes(item))
-        : false
+    const options = items.map((item) => ({
+        key: item,
+        text: item,
+        value: item,
+    }))
 
     return (
         <div style={{ flex: '1', marginRight: '20px' }}>
             <h2 style={{ fontSize: '18px', marginBottom: '10px' }}>{title}</h2>
-            <div style={{ marginBottom: '10px' }}>
+            <Dropdown
+                placeholder={`Select ${title}`}
+                fluid
+                multiple
+                search
+                selection
+                options={options}
+                value={selectedItems}
+                onChange={handleChange}
+                style={{ marginBottom: '10px' }}
+            />
+            {specialSelectionLabel && (
                 <Checkbox
-                    className="seq-type-project-checkbox"
-                    label="Select All"
-                    checked={selectedItems.length === items.length}
-                    onChange={(_, data) => handleSelectAll(data.checked ?? false)}
+                    label={specialSelectionLabel}
+                    checked={specialSelectionItems?.every((item) => selectedItems.includes(item))}
+                    onChange={handleSpecialSelection}
                 />
-                {specialSelectionLabel && (
-                    <Checkbox
-                        className="seq-type-project-checkbox"
-                        style={{ marginLeft: '50px' }}
-                        label={specialSelectionLabel}
-                        checked={isSpecialSelectionChecked}
-                        onChange={handleSpecialSelection}
-                    />
-                )}
-            </div>
-            <div
-                style={{
-                    maxHeight: '200px',
-                    overflowY: 'auto',
-                    columns: title === 'Select Projects' ? 4 : 'auto',
-                    maxWidth: title === 'Select Projects' ? '400px' : 'auto',
-                }}
-            >
-                {items.map((item) => (
-                    <div key={item}>
-                        <Checkbox
-                            className="seq-type-project-checkbox"
-                            label={item}
-                            checked={selectedItems.includes(item)}
-                            onChange={(_, data) => handleItemChange(item, data.checked ?? false)}
-                        />
-                    </div>
-                ))}
-            </div>
+            )}
         </div>
     )
 }
@@ -115,13 +94,13 @@ const ProjectAndSeqTypeSelector: React.FC<ProjectAndSeqTypeSelectorProps> = ({
                 items={projects}
                 selectedItems={selectedProjects}
                 onSelectionChange={onProjectChange}
-                title="Select Projects"
+                title="Projects"
             />
             <Selector
                 items={seqTypes}
                 selectedItems={selectedSeqTypes}
                 onSelectionChange={onSeqTypeChange}
-                title="Select Sequencing Types"
+                title="Sequencing Types"
                 specialSelectionLabel="WGS & WES Only"
                 specialSelectionItems={['genome', 'exome']}
             />

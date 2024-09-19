@@ -58,6 +58,13 @@ function useFilterData<T extends ProjectInsightsSummary | ProjectInsightsDetails
                         const webReports = projectInsightsItem.web_reports
                         const report = webReports?.[key]
                         uniqueValues.add(report ? 'Yes' : 'No')
+                    }
+                    if (key === 'cram') {
+                        const itemValue = item[key as keyof T]
+                        const cram = itemValue as { timestamp_completed?: string }
+                        const value = cram?.timestamp_completed
+                        // const value = (item.cram as { timestamp_completed?: string })?.timestamp_completed
+                        uniqueValues.add(value || 'N/A')
                     } else {
                         const value = item[key as keyof T]
                         if (typeof value === 'boolean') {
@@ -70,7 +77,7 @@ function useFilterData<T extends ProjectInsightsSummary | ProjectInsightsDetails
                     }
                 }
             })
-            return Array.from(uniqueValues)
+            return Array.from(uniqueValues).sort()
         },
         [allData, filterState]
     )
