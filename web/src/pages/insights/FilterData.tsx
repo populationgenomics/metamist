@@ -63,7 +63,6 @@ function useFilterData<T extends ProjectInsightsSummary | ProjectInsightsDetails
                         const itemValue = item[key as keyof T]
                         const cram = itemValue as { timestamp_completed?: string }
                         const value = cram?.timestamp_completed
-                        // const value = (item.cram as { timestamp_completed?: string })?.timestamp_completed
                         uniqueValues.add(value || 'N/A')
                     } else {
                         const value = item[key as keyof T]
