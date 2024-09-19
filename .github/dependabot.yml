@@ -5,35 +5,15 @@
 
 version: 2
 updates:
-  # Handle all updates, but split them into separate PRs for major and minor/patch
   - package-ecosystem: "pip"
-    directory: "/"  # Root directory where the Python dependency files are located
+    directory: "/"
     schedule:
-      interval: "daily"
-    labels:
-      - "dependencies"
-    # Group major and minor updates separately
+      interval: "weekly"
+    open-pull-requests-limit: 10
     groups:
-      minor-updates:
+      python-packages:
         patterns:
-          - "requirements*.txt"
-          - "requirements*.in"
-          - "setup.py"
-          - "setup.cfg"
-          - "pyproject.toml"
-        labels:
-          - "minor-update"
-        ignore:
-          - update-types: ["version-update:semver-major"]  # Ignore major updates in this group
-
-      major-updates:
-        patterns:
-          - "requirements*.txt"
-          - "requirements*.in"
-          - "setup.py"
-          - "setup.cfg"
-          - "pyproject.toml"
-        labels:
-          - "major-update"
-        ignore:
-          - update-types: ["version-update:semver-minor", "version-update:semver-patch"]  # Ignore minor/patch updates in this group
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
