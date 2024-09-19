@@ -39,4 +39,3 @@ updates:
       major:
         patterns:
           - ".*"  # Groups all major updates into a single PR
-
