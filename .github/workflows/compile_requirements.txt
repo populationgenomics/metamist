@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [opened, synchronize]
     branches:
-      - main  # Or your default branch
+      - dev
   workflow_dispatch:  # Allows manual triggering
 
 jobs:
