@@ -1,0 +1,39 @@
+name: Compile Requirements with Docker
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+      - main  # Or your default branch
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  compile-requirements:
+    if: github.actor == 'dependabot[bot]' || github.event_name == 'workflow_dispatch'  # Run for Dependabot PRs or manual trigger
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run pip-compile in Docker
+        run: |
+          docker run --platform linux/amd64 \
+            -v ${{ github.workspace }}:/opt/metamist \
+            --workdir /opt/metamist \
+            --rm python:3.10-slim bash -c " \
+              pip install pip-tools && \
+              echo 'Installed pip-tools!'; \
+              echo 'Compiling from requirements.in'; \
+              pip-compile requirements.in > requirements.txt && \
+              echo 'Compiling from requirements-dev.in'; \
+              pip-compile --output-file=requirements-dev.txt requirements-dev.in requirements.in"
+      
+      - name: Commit updated requirements files
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git add requirements.txt requirements-dev.txt
+          git commit -m "Auto-compile requirements.txt and requirements-dev.txt"
+          git push
+        continue-on-error: true
