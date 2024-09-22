@@ -11,9 +11,17 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 10
     groups:
-      python-packages:
+      minor-and-patch:
         patterns:
-          - "*"
+          - "requirements.in"
+          - "requirements-dev.in"
         update-types:
           - "minor"
           - "patch"
+
+      major:
+        patterns:
+          - "requirements.in"
+          - "requirements-dev.in"
+        update-types:
+          - "major"
