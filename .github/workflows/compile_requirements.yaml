@@ -1,4 +1,4 @@
-name: Compile Requirements with Docker
+name: Compile Requirements
 
 on:
   pull_request:
@@ -14,20 +14,22 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }} # Checkout the branch from the pull request
 
       - name: Run pip-compile in Docker
         run: |
           docker run --platform linux/amd64 \
             -v ${{ github.workspace }}:/opt/metamist \
             --workdir /opt/metamist \
-            --rm python:3.10-slim bash -c " \
+            --rm python:3.11-slim bash -c " \
               pip install pip-tools && \
               echo 'Installed pip-tools!'; \
               echo 'Compiling from requirements.in'; \
-              pip-compile requirements.in > requirements.txt && \
+              pip-compile requirements.in && \
               echo 'Compiling from requirements-dev.in'; \
-              pip-compile --output-file=requirements-dev.txt requirements-dev.in requirements.in"
+              pip-compile requirements-dev.in"
 
       - name: Commit updated requirements files
         run: |
