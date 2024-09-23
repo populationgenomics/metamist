@@ -250,7 +250,7 @@ pygments==2.18.0
     # via rich
 pymysql==1.1.1
     # via aiomysql
-python-dateutil==2.8.2
+python-dateutil==2.9.0.post0
     # via
     #   -r requirements.in
     #   botocore
