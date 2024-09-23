@@ -321,7 +321,7 @@ typing-extensions==4.12.2
     #   typer
 ujson==5.10.0
     # via fastapi
-urllib3==2.2.2
+urllib3==2.2.3
     # via
     #   botocore
     #   requests
