@@ -131,6 +131,7 @@ async def update_analysis(
         analysis_id,
         status=analysis.status,
         output=analysis.output,
+        outputs=analysis.outputs,
         meta=analysis.meta,
         active=analysis.active,
     )
