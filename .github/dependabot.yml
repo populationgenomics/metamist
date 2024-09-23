@@ -5,6 +5,7 @@
 
 version: 2
 updates:
+  - target-branch: "dev"
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
@@ -13,15 +14,13 @@ updates:
     groups:
       minor-and-patch:
         patterns:
-          - "requirements.in"
-          - "requirements-dev.in"
+          - "*"
         update-types:
           - "minor"
           - "patch"
 
       major:
         patterns:
-          - "requirements.in"
-          - "requirements-dev.in"
+          - "*"
         update-types:
           - "major"
