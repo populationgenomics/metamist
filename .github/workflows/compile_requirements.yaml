@@ -1,4 +1,4 @@
-name: Compile Requirements with Docker
+name: Compile Requirements
 
 on:
   pull_request:
@@ -23,7 +23,7 @@ jobs:
           docker run --platform linux/amd64 \
             -v ${{ github.workspace }}:/opt/metamist \
             --workdir /opt/metamist \
-            --rm python:3.10-slim bash -c " \
+            --rm python:3.11-slim bash -c " \
               pip install pip-tools && \
               echo 'Installed pip-tools!'; \
               echo 'Compiling from requirements.in'; \
