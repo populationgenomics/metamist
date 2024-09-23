@@ -5,11 +5,11 @@ on:
     types: [opened, synchronize]
     branches:
       - dev
-  workflow_dispatch:  # Allows manual triggering
+  workflow_dispatch: # Allows manual triggering
 
 jobs:
   compile-requirements:
-    if: github.actor == 'dependabot[bot]' || github.event_name == 'workflow_dispatch'  # Run for Dependabot PRs or manual trigger
+    if: github.actor == 'dependabot[bot]' || github.event_name == 'workflow_dispatch' # Run for Dependabot PRs or manual trigger
     runs-on: ubuntu-latest
 
     steps:
@@ -28,7 +28,7 @@ jobs:
               pip-compile requirements.in > requirements.txt && \
               echo 'Compiling from requirements-dev.in'; \
               pip-compile --output-file=requirements-dev.txt requirements-dev.in requirements.in"
-      
+
       - name: Commit updated requirements files
         run: |
           git config --local user.name "github-actions[bot]"
