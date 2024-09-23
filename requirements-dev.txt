@@ -19,7 +19,7 @@ anyio==4.4.0
     #   httpx
     #   starlette
     #   watchfiles
-astroid==3.2.4
+astroid==3.3.3
     # via pylint
 async-lru==2.0.4
     # via -r requirements.in
@@ -343,7 +343,7 @@ pygments==2.18.0
     # via
     #   rich
     #   strawberry-graphql
-pylint==3.2.7
+pylint==3.3.0
     # via -r requirements-dev.in
 pymysql[rsa]==1.1.1
     # via
