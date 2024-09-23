@@ -514,7 +514,7 @@ export const PersonNode: React.FC<IPersonNodeProps> = ({
                     strokeLinecap={entry.sex === 1 ? 'square' : 'round'}
                 />
                 <path
-                    stroke={entry.affected === 1 ? colAffected : colUnaffected}
+                    stroke={entry.affected === 2 ? colAffected : colUnaffected}
                     strokeWidth={nodeSize * 0.65}
                     strokeLinecap={entry.sex === 1 ? 'square' : 'round'}
                     d={`M${node.x} ${node.y} L${node.x} ${node.y}`}
