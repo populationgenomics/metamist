@@ -143,7 +143,7 @@ google-api-core[grpc]==2.19.2
     #   google-cloud-pubsub
     #   google-cloud-secret-manager
     #   google-cloud-storage
-google-auth==2.34.0
+google-auth==2.35.0
     # via
     #   -r requirements.in
     #   cpg-utils
