@@ -4,7 +4,7 @@ from pymysql.err import IntegrityError
 
 from db.python.filters import GenericFilter
 from db.python.layers import FamilyLayer, ParticipantLayer, SampleLayer
-from db.python.tables.family import FamilyFilter
+from db.python.tables.family import FamilyFilter, FamilyTable
 from db.python.utils import NotFoundError
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
@@ -557,3 +557,17 @@ class TestFamily(DbIsolatedTest):
         self.assertEqual(family['Jones'].coded_phenotype, 'sings well')
         self.assertEqual(family['Taylor'].description, 'Post Norman')
         self.assertEqual(family['Taylor'].coded_phenotype, 'sews')
+
+    @run_as_sync
+    async def test_direct_get_id_map(self):
+        """Exercise the table's get_id_map_by_internal_ids() method"""
+        ftable = FamilyTable(self.connection)
+
+        result = await ftable.get_id_map_by_internal_ids([])
+        self.assertDictEqual(result, {})
+
+        result = await ftable.get_id_map_by_internal_ids([42], allow_missing=True)
+        self.assertDictEqual(result, {})
+
+        with self.assertRaises(NotFoundError):
+            _ = await ftable.get_id_map_by_internal_ids([42])
