@@ -10,9 +10,9 @@ cloudpathlib
 requests
 google-auth>=2.19.0
 google-cloud-bigquery==3.11.4
-google-cloud-logging==2.7.0
+google-cloud-logging==3.11.2
 google-cloud-pubsub==2.18.3
-google-cloud-storage==1.43.0
+google-cloud-storage==2.18.2
 uvicorn==0.29.0
 fastapi[all]==0.112.2
 strawberry-graphql[fastapi]==0.235.1
