@@ -121,7 +121,7 @@ class OutputFileTable(DbBase):
         """Add file to an analysis (through the join table)"""
         _query = dedent(
             """
-            INSERT INTO analysis_outputs
+            INSERT IGNORE INTO analysis_outputs
                 (analysis_id, file_id, json_structure, output)
             VALUES (:analysis_id, :file_id, :json_structure, :output)
         """
@@ -147,6 +147,7 @@ class OutputFileTable(DbBase):
         """
         files = await self.find_files_from_dict(json_dict=json_dict)  # type: ignore [arg-type]
         file_ids: list[int] = []
+        outputs: list[str] = []
 
         async with self.connection.transaction():
             if 'main_files' in files:
@@ -188,22 +189,50 @@ class OutputFileTable(DbBase):
                                 )
                                 if secondary_file_id:
                                     file_ids.append(secondary_file_id)
+                                else:
+                                    outputs.append(secondary_file['basename'])
                     if parent_file_id:
                         file_ids.append(parent_file_id)
+                    else:
+                        outputs.append(primary_file['basename'])
 
             # check that only the files in this json_dict should be in the analysis. Remove what isn't in this dict.
+            if not file_ids and not outputs:
+                # If both file_ids and outputs are empty, don't execute the query
+                pass
+
+            _update_query = dedent(
+                """
+                DELETE ao FROM analysis_outputs ao
+                WHERE ao.analysis_id = :analysis_id
+                """
+            )
+
+            query_params: dict[str, int | list[int] | list[str]] = {
+                'analysis_id': analysis_id
+            }
+
+            # Add the OR condition to include file_ids or outputs
+            conditions = []
+
+            # Add file_id condition if file_ids is not empty
             if file_ids:
-                _update_query = dedent(
-                    """
-                    DELETE ao FROM analysis_outputs ao
-                    WHERE (ao.analysis_id = :analysis_id)
-                    AND (ao.file_id NOT IN :file_ids)
-                    """
+                conditions.append(
+                    'ao.file_id IS NOT NULL AND ao.file_id NOT IN :file_ids'
                 )
-                await self.connection.execute(
-                    _update_query,
-                    {'analysis_id': analysis_id, 'file_ids': file_ids},
-                )
+                query_params['file_ids'] = file_ids  # Add file_ids to query parameters
+
+            # Add output condition if outputs is not empty
+            if outputs:
+                conditions.append('ao.output IS NOT NULL AND ao.output NOT IN :outputs')
+                query_params['outputs'] = outputs  # Add outputs to query parameters
+
+            # Join the conditions with OR since either can be valid
+            if conditions:
+                _update_query += ' AND (' + ' OR '.join(conditions) + ')'
+
+            # Execute the query only if either file_ids or outputs were provided
+            await self.connection.execute(_update_query, query_params)
 
     async def find_files_from_dict(
         self,
