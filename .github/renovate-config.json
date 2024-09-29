@@ -11,6 +11,7 @@
     "constraints": {
       "python": "==3.11"
     },
+    "platformCommit": "enabled",
     "pip-compile": {
       "fileMatch": ["^requirements\\.txt$", "^dev-requirements\\.txt$"],
       "lockFileMaintenance": {
