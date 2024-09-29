@@ -13,7 +13,7 @@
     },
     "platformCommit": "enabled",
     "pip-compile": {
-      "fileMatch": ["^requirements\\.txt$", "^dev-requirements\\.txt$"],
+      "fileMatch": ["^requirements\\.txt$", "^requirements-dev\\.txt$"],
       "lockFileMaintenance": {
         "enabled": true,
         "branchTopic": "pip-compile-refresh",
