@@ -1,0 +1,28 @@
+name: Renovate
+on:
+  schedule:
+    - cron: '0 0 * * Sun'
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  renovate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Self-hosted Renovate
+        uses: renovatebot/github-action@v40.2.10
+        with:
+          token: '${{ secrets.RENOVATE_TOKEN }}'
+          docker-user: root
+          configurationFile: .github/renovate-config.json
+        env:
+          LOG_LEVEL: 'debug'
