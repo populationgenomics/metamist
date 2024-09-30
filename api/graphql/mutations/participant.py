@@ -10,10 +10,12 @@ from strawberry.scalars import JSON
 from api.graphql.loaders import GraphQLContext
 from api.graphql.mutations.sample import SampleUpsertInput
 from api.graphql.types import ParticipantUpsertType, UpdateParticipantFamilyType
+from db.python.connect import Connection
 from db.python.layers.comment import CommentLayer
 from db.python.layers.participant import ParticipantLayer
 from models.models.comment import CommentEntityType
 from models.models.participant import ParticipantUpsertInternal
+from models.models.project import FullWriteAccessRoles
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLComment
@@ -64,8 +66,9 @@ class ParticipantMutations:
         Create a corresponding participant (if required)
         for each sample within a project, useful for then importing a pedigree
         """
-        # TODO: Reconfigure connection permissions as per `routes``
-        connection = info.context['connection']
+        connection: Connection = info.context['connection']
+        connection.check_access(FullWriteAccessRoles)
+
         participant_layer = ParticipantLayer(connection)
 
         return JSON({'success': await participant_layer.fill_in_missing_participants()})
@@ -111,7 +114,9 @@ class ParticipantMutations:
         Upserts a list of participants with samples and sequences
         Returns the list of internal sample IDs
         """
-        connection = info.context['connection']
+        connection: Connection = info.context['connection']
+        connection.check_access(FullWriteAccessRoles)
+
         pt = ParticipantLayer(connection)
         results = await pt.upsert_participants(
             [

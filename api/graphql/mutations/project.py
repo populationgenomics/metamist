@@ -92,6 +92,7 @@ class ProjectMutations:
         """Update a project by project name"""
         connection = info.context['connection']
         connection.check_access({ProjectMemberRole.project_admin})
+
         ptable = ProjectPermissionsTable(connection)
         await ptable.update_project(
             project_name=project,
@@ -112,6 +113,7 @@ class ProjectMutations:
         """
         connection = info.context['connection']
         connection.check_access({ProjectMemberRole.project_admin})
+
         ptable = ProjectPermissionsTable(connection)
         assert connection.project
 
@@ -134,9 +136,8 @@ class ProjectMutations:
         """
         connection = info.context['connection']
         connection.check_access({ProjectMemberRole.project_member_admin})
-        ptable = ProjectPermissionsTable(connection)
 
-        await ptable.check_member_admin_permissions(author=connection.author)
+        ptable = ProjectPermissionsTable(connection)
 
         for member in members:
             for role in member.roles:

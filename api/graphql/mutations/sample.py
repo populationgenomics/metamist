@@ -9,9 +9,11 @@ from api.graphql.loaders import GraphQLContext
 from api.graphql.mutations.assay import AssayUpsertInput
 from api.graphql.mutations.sequencing_group import SequencingGroupUpsertInput
 from api.graphql.types import SampleUpsertType
+from db.python.connect import Connection
 from db.python.layers.comment import CommentLayer
 from db.python.layers.sample import SampleLayer
 from models.models.comment import CommentEntityType
+from models.models.project import FullWriteAccessRoles
 from models.models.sample import SampleUpsert, SampleUpsertInternal
 from models.utils.sample_id_format import (  # Sample,
     sample_id_format,
@@ -69,7 +71,9 @@ class SampleMutations:
         info: Info[GraphQLContext, 'SampleMutations'],
     ) -> str | None:
         """Creates a new sample, and returns the internal sample ID"""
-        connection = info.context['connection']
+        connection: Connection = info.context['connection']
+        connection.check_access(FullWriteAccessRoles)
+
         st = SampleLayer(connection)
         internal_sid = await st.upsert_sample(sample.to_internal())
         if internal_sid.id:
@@ -88,7 +92,9 @@ class SampleMutations:
         """
 
         # Table interfaces
-        connection = info.context['connection']
+        connection: Connection = info.context['connection']
+        connection.check_access(FullWriteAccessRoles)
+
         st = SampleLayer(connection)
 
         internal_samples = [
