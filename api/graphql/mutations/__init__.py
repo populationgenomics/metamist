@@ -1,5 +1,7 @@
 import strawberry
 
+from api.graphql.mutations.analysis import AnalysisMutations
+from api.graphql.mutations.analysis_runner import AnalysisRunnerMutations
 from api.graphql.mutations.assay import AssayMutations
 from api.graphql.mutations.comment import CommentMutations
 from api.graphql.mutations.family import FamilyMutations
@@ -12,6 +14,18 @@ from api.graphql.mutations.sequencing_group import SequencingGroupMutations
 @strawberry.type
 class Mutation:
     """Mutation class"""
+
+    # Analysis Runner
+    @strawberry.field
+    def analysis_runner(self) -> AnalysisRunnerMutations:
+        """Analysis Runner mutations"""
+        return AnalysisRunnerMutations()
+
+    # Analysis
+    @strawberry.field
+    def analysis(self) -> AnalysisMutations:
+        """Analysis mutations"""
+        return AnalysisMutations()
 
     # Comments
     @strawberry.field
