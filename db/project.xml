@@ -1774,5 +1774,19 @@
 
 		<sql>ALTER TABLE family_comment ADD SYSTEM VERSIONING;</sql>
 	</changeSet>
+	<changeSet id="2024-09-25_add_unique_fcf_constraint" author="yash.pankhania">
+		<!-- Adding Unique Constraint to analysis_outputs table -->
+		<sql>ALTER TABLE `analysis_outputs` DROP SYSTEM VERSIONING;</sql>
+		<sql>
+        ALTER TABLE analysis_outputs
+		ADD CONSTRAINT unique_analysis_file
+    	UNIQUE (analysis_id, file_id, json_structure);</sql>
+		<sql>
+		ALTER TABLE analysis_outputs
+		ADD CONSTRAINT unique_analysis_output
+    	UNIQUE (analysis_id, output, json_structure);
+		</sql>
+		<sql>ALTER TABLE `analysis_outputs` ADD SYSTEM VERSIONING;</sql>
+	</changeSet>
 
 </databaseChangeLog>
