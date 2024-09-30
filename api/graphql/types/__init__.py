@@ -7,17 +7,6 @@ from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
 
 
-@strawberry.input  # type: ignore [misc]
-class AssayUpsertInput:
-    """Assay upsert input"""
-
-    id: int | None
-    type: str | None
-    external_ids: strawberry.scalars.JSON | None
-    sample_id: str | None
-    meta: strawberry.scalars.JSON | None
-
-
 @strawberry.type  # type: ignore [misc]
 class AssayUpsertType:
     """Assay upsert type"""

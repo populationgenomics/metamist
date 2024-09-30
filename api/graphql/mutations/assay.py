@@ -6,7 +6,7 @@ import strawberry
 from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
-from api.graphql.types import AssayUpsertInput, AssayUpsertType
+from api.graphql.types import AssayUpsertType
 from db.python.layers.assay import AssayLayer
 from db.python.layers.comment import CommentLayer
 from models.models.assay import AssayUpsertInternal
@@ -14,6 +14,17 @@ from models.models.comment import CommentEntityType
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLComment
+
+
+@strawberry.input  # type: ignore [misc]
+class AssayUpsertInput:
+    """Assay upsert input"""
+
+    id: int | None
+    type: str | None
+    external_ids: strawberry.scalars.JSON | None
+    sample_id: str | None
+    meta: strawberry.scalars.JSON | None
 
 
 @strawberry.type

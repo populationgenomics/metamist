@@ -7,10 +7,21 @@ from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
 from db.python.layers.comment import CommentLayer
+from db.python.layers.family import FamilyLayer
 from models.models.comment import CommentEntityType
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLComment
+
+
+@strawberry.input
+class FamilyUpdateInput:
+    """Family update type"""
+
+    id: int
+    external_id: str
+    description: str
+    coded_phenotype: str
 
 
 @strawberry.type
@@ -34,3 +45,19 @@ class FamilyMutations:
             entity=CommentEntityType.family, entity_id=id, content=content
         )
         return GraphQLComment.from_internal(result)
+
+    @strawberry.mutation
+    async def update_family(
+        self,
+        family: FamilyUpdateInput,
+        info: Info,
+    ) -> bool:
+        """Update information for a single family"""
+        connection = info.context['connection']
+        family_layer = FamilyLayer(connection)
+        return await family_layer.update_family(
+            id_=family.id,
+            external_id=family.external_id,
+            description=family.description,
+            coded_phenotype=family.coded_phenotype,
+        )
