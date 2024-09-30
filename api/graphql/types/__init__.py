@@ -1,11 +1,15 @@
 import strawberry
 
+from models.enums.analysis import AnalysisStatus
 from models.models.assay import AssayUpsert, AssayUpsertInternal
 from models.models.participant import ParticipantUpsertInternal
 from models.models.sample import SampleUpsertInternal
 from models.models.sequencing_group import SequencingGroupUpsertInternal
 from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
+
+
+AnalysisStatusType = strawberry.enum(AnalysisStatus)  # type: ignore [misc]
 
 
 @strawberry.type  # type: ignore [misc]
