@@ -4,8 +4,6 @@ from typing import TYPE_CHECKING, Annotated
 
 import strawberry
 from strawberry.types import Info
-from strawberry.scalars import JSON
-
 
 from api.graphql.loaders import GraphQLContext
 from api.graphql.mutations.sample import SampleUpsertInput
@@ -56,35 +54,6 @@ class ParticipantMutations:
             entity=CommentEntityType.participant, entity_id=id, content=content
         )
         return GraphQLComment.from_internal(result)
-
-    @strawberry.mutation
-    async def fill_in_missing_participants(
-        self,
-        info: Info,
-    ) -> JSON:
-        """
-        Create a corresponding participant (if required)
-        for each sample within a project, useful for then importing a pedigree
-        """
-        connection: Connection = info.context['connection']
-        connection.check_access(FullWriteAccessRoles)
-
-        participant_layer = ParticipantLayer(connection)
-
-        return JSON({'success': await participant_layer.fill_in_missing_participants()})
-
-    @strawberry.mutation
-    async def update_many_participant_external_ids(
-        self,
-        internal_to_external_id: JSON,
-        info: Info,
-    ) -> bool:
-        """Update external_ids of participants by providing an update map"""
-        connection = info.context['connection']
-        player = ParticipantLayer(connection)
-        return await player.update_many_participant_external_ids(
-            internal_to_external_id  # type: ignore [arg-type]
-        )
 
     @strawberry.mutation
     async def update_participant(

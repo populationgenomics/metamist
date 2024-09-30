@@ -12,7 +12,7 @@ testcontainers[mysql]>=4.8.1
 types-PyMySQL
 pymysql==1.1.1
 # some strawberry dependency
-strawberry-graphql[debug-server]
+strawberry-graphql[fastapi]
 # following required to unit test etl functions
 functions_framework
 google-cloud-bigquery

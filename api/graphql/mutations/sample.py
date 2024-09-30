@@ -21,7 +21,7 @@ from models.utils.sample_id_format import (  # Sample,
 )
 
 if TYPE_CHECKING:
-    from api.graphql.schema import GraphQLComment, GraphQLSample
+    from api.graphql.schema import GraphQLComment
 
 
 @strawberry.input  # type: ignore [misc]
@@ -122,28 +122,5 @@ class SampleMutations:
         sample.id = id_
         await st.upsert_sample(sample.to_internal())
         return SampleUpsertType.from_upsert_internal(sample.to_internal())
-
-    @strawberry.mutation
-    async def merge_samples(
-        self,
-        id_keep: str,
-        id_merge: str,
-        info: Info[GraphQLContext, 'SampleMutations'],
-    ) -> Annotated['GraphQLSample', strawberry.lazy('api.graphql.schema')]:
-        """
-        Merge one sample into another, this function achieves the merge
-        by rewriting all sample_ids of {id_merge} with {id_keep}. You must
-        carefully consider if analysis objects need to be deleted, or other
-        implications BEFORE running this method.
-        """
-        from api.graphql.schema import GraphQLSample
-
-        connection = info.context['connection']
-        st = SampleLayer(connection)
-        result = await st.merge_samples(
-            id_keep=sample_id_transform_to_raw(id_keep),
-            id_merge=sample_id_transform_to_raw(id_merge),
-        )
-        return GraphQLSample.from_internal(result)
 
     # endregion OTHER
