@@ -6,6 +6,8 @@ import strawberry
 from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
+from api.graphql.mutations.assay import AssayUpsertInput
+from api.graphql.mutations.sequencing_group import SequencingGroupUpsertInput
 from api.graphql.types import SampleUpsertType
 from db.python.layers.comment import CommentLayer
 from db.python.layers.sample import SampleLayer
@@ -18,6 +20,21 @@ from models.utils.sample_id_format import (  # Sample,
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLComment, GraphQLSample
+
+
+@strawberry.input  # type: ignore [misc]
+class SampleUpsertInput:
+    """Sample upsert input"""
+
+    id: int | None = None
+    external_ids: strawberry.scalars.JSON | None = None
+    meta: strawberry.scalars.JSON | None = None
+    project: int | None = None
+    type: str | None = None
+    participant_id: int | None = None
+    active: bool | None = None
+    sequencing_groups: list[SequencingGroupUpsertInput] | None = None
+    non_sequencing_assays: list[AssayUpsertInput] | None = None
 
 
 @strawberry.type

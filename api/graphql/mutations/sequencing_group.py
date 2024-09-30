@@ -5,12 +5,28 @@ import strawberry
 from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
+from api.graphql.mutations.assay import AssayUpsertInput
 from db.python.layers.comment import CommentLayer
 from models.models.comment import CommentEntityType
 from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLComment
+
+
+@strawberry.input  # type: ignore [misc]
+class SequencingGroupUpsertInput:
+    """Sequencing group upsert input"""
+
+    id: str  # should really be int | str | None but strawberry throws an error "Type `int` cannot be used in a GraphQL Union"
+    type: str | None
+    technology: str | None
+    platform: str | None
+    meta: strawberry.scalars.JSON | None
+    sample_id: str | None
+    external_ids: strawberry.scalars.JSON | None
+
+    assays: list[AssayUpsertInput] | None
 
 
 @strawberry.type

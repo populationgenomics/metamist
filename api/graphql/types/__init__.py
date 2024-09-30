@@ -1,6 +1,7 @@
 import strawberry
 
 from models.models.assay import AssayUpsert, AssayUpsertInternal
+from models.models.participant import ParticipantUpsertInternal
 from models.models.sample import SampleUpsertInternal
 from models.models.sequencing_group import SequencingGroupUpsertInternal
 from models.utils.sample_id_format import sample_id_format
@@ -24,11 +25,11 @@ class AssayUpsertType:
         return AssayUpsertType(
             id=internal.id,  # type: ignore [arg-type]
             type=internal.type,  # type: ignore [arg-type]
-            external_ids=internal.external_ids,
+            external_ids=internal.external_ids,  # type: ignore [arg-type]
             sample_id=(
                 sample_id_format(internal.sample_id) if internal.sample_id else None  # type: ignore [arg-type]
             ),
-            meta=internal.meta,
+            meta=internal.meta,  # type: ignore [arg-type]
         )
 
     @staticmethod
@@ -37,11 +38,11 @@ class AssayUpsertType:
         return AssayUpsertType(
             id=internal.id,
             type=internal.type,
-            external_ids=internal.external_ids,
+            external_ids=internal.external_ids,  # type: ignore [arg-type]
             sample_id=(
                 sample_id_format(internal.sample_id) if internal.sample_id else None
             ),
-            meta=internal.meta,
+            meta=internal.meta,  # type: ignore [arg-type]
         )
 
 
@@ -77,9 +78,9 @@ class SequencingGroupUpsertType:
             type=internal.type,
             technology=internal.technology,
             platform=internal.platform,
-            meta=internal.meta,
+            meta=internal.meta,  # type: ignore [arg-type]
             sample_id=_sample_id,
-            external_ids=internal.external_ids,
+            external_ids=internal.external_ids,  # type: ignore [arg-type]
             assays=[
                 AssayUpsertType.from_upsert_internal(a) for a in internal.assays or []
             ],
@@ -109,8 +110,8 @@ class SampleUpsertType:
 
         return SampleUpsertType(
             id=_id,
-            external_ids=sample.external_ids,
-            meta=sample.meta,
+            external_ids=sample.external_ids,  # type: ignore [arg-type]
+            meta=sample.meta,  # type: ignore [arg-type]
             project=sample.project,
             type=sample.type,
             participant_id=sample.participant_id,
@@ -125,3 +126,47 @@ class SampleUpsertType:
                 for a in sample.non_sequencing_assays or []
             ],
         )
+
+
+@strawberry.type
+class ParticipantUpsertType:
+    """Participant upsert input"""
+
+    id: int | None = None
+    external_ids: strawberry.scalars.JSON | None = None
+    reported_sex: int | None = None
+    reported_gender: str | None = None
+    karyotype: str | None = None
+    meta: strawberry.scalars.JSON | None = None
+
+    samples: list[SampleUpsertType] | None = None
+
+    @staticmethod
+    def from_upsert_internal(
+        internal: ParticipantUpsertInternal,
+    ) -> 'ParticipantUpsertType':
+        """Returns graphql model from upsert internal model"""
+        return ParticipantUpsertType(
+            id=internal.id,
+            external_ids=internal.external_ids,  # type: ignore [arg-type]
+            meta=internal.meta,  # type: ignore [arg-type]
+            reported_sex=internal.reported_sex,
+            reported_gender=internal.reported_gender,
+            karyotype=internal.karyotype,
+            samples=[
+                SampleUpsertType.from_upsert_internal(s) for s in internal.samples or []
+            ],
+        )
+
+
+@strawberry.type
+class UpdateParticipantFamilyType:
+    """Update participant family type"""
+
+    family_id: int
+    participant_id: int
+
+    @staticmethod
+    def from_tuple(t: tuple[int, int]) -> 'UpdateParticipantFamilyType':
+        """Returns graphql model from tuple"""
+        return UpdateParticipantFamilyType(family_id=t[0], participant_id=t[1])
