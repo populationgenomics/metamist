@@ -417,7 +417,7 @@ starlette==0.38.4
     # via
     #   fastapi
     #   strawberry-graphql
-strawberry-graphql[debug-server,fastapi]==0.235.1
+strawberry-graphql[debug-server,fastapi]==0.243.0
     # via
     #   -r requirements-dev.in
     #   -r requirements.in
