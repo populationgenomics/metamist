@@ -2,11 +2,16 @@ import strawberry
 
 from models.enums.analysis import AnalysisStatus
 from models.models.assay import AssayUpsert, AssayUpsertInternal
+from models.models.cohort import NewCohortInternal
 from models.models.participant import ParticipantUpsertInternal
 from models.models.sample import SampleUpsertInternal
 from models.models.sequencing_group import SequencingGroupUpsertInternal
+from models.utils.cohort_id_format import cohort_id_format
 from models.utils.sample_id_format import sample_id_format
-from models.utils.sequencing_group_id_format import sequencing_group_id_format
+from models.utils.sequencing_group_id_format import (
+    sequencing_group_id_format,
+    sequencing_group_id_format_list,
+)
 
 
 AnalysisStatusType = strawberry.enum(AnalysisStatus)  # type: ignore [misc]
@@ -174,3 +179,29 @@ class UpdateParticipantFamilyType:
     def from_tuple(t: tuple[int, int]) -> 'UpdateParticipantFamilyType':
         """Returns graphql model from tuple"""
         return UpdateParticipantFamilyType(family_id=t[0], participant_id=t[1])
+
+
+@strawberry.type
+class NewCohortType:
+    """Represents a cohort, which is a collection of sequencing groups."""
+
+    dry_run: bool
+    cohort_id: str
+    sequencing_group_ids: list[str]
+
+    @staticmethod
+    def from_internal(internal: NewCohortInternal) -> 'NewCohortType':
+        """Returns graphql model from internal model"""
+        return NewCohortType(
+            dry_run=internal.dry_run,
+            cohort_id=(
+                cohort_id_format(internal.cohort_id)
+                if internal.cohort_id
+                else 'CREATE NEW'
+            ),
+            sequencing_group_ids=(
+                sequencing_group_id_format_list(internal.sequencing_group_ids)
+                if internal.sequencing_group_ids
+                else []
+            ),
+        )
