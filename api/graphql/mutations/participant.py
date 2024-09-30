@@ -12,7 +12,7 @@ from db.python.connect import Connection
 from db.python.layers.comment import CommentLayer
 from db.python.layers.participant import ParticipantLayer
 from models.models.comment import CommentEntityType
-from models.models.participant import ParticipantUpsertInternal
+from models.models.participant import ParticipantUpsert
 from models.models.project import FullWriteAccessRoles
 
 if TYPE_CHECKING:
@@ -69,7 +69,7 @@ class ParticipantMutations:
         participant.id = participant_id
 
         updated_participant = await participant_layer.upsert_participant(
-            ParticipantUpsertInternal.from_dict(strawberry.asdict(participant))
+            ParticipantUpsert.from_dict(strawberry.asdict(participant)).to_internal()
         )
         return ParticipantUpsertType.from_upsert_internal(updated_participant)
 
@@ -89,7 +89,7 @@ class ParticipantMutations:
         pt = ParticipantLayer(connection)
         results = await pt.upsert_participants(
             [
-                ParticipantUpsertInternal.from_dict(strawberry.asdict(p))
+                ParticipantUpsert.from_dict(strawberry.asdict(p)).to_internal()
                 for p in participants
             ]
         )

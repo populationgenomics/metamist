@@ -2,6 +2,7 @@ import datetime
 
 import strawberry
 from strawberry.types import Info
+from strawberry.scalars import JSON
 
 from db.python.connect import Connection
 from db.python.layers.analysis_runner import AnalysisRunnerLayer
@@ -27,7 +28,7 @@ class AnalysisRunnerMutations:
         environment: str,
         batch_url: str,
         submitting_user: str,
-        meta: dict[str, str],
+        meta: JSON,
         output_path: str,
         hail_version: str | None,
         cwd: str | None,
@@ -57,7 +58,7 @@ class AnalysisRunnerMutations:
                 hail_version=hail_version,
                 batch_url=batch_url,
                 submitting_user=submitting_user,
-                meta=meta,
+                meta=meta,  # type: ignore [arg-type]
                 project=connection.project_id,  # type: ignore [arg-type]
                 audit_log_id=None,
                 output_path=output_path,

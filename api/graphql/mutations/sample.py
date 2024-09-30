@@ -14,7 +14,7 @@ from db.python.layers.comment import CommentLayer
 from db.python.layers.sample import SampleLayer
 from models.models.comment import CommentEntityType
 from models.models.project import FullWriteAccessRoles
-from models.models.sample import SampleUpsert, SampleUpsertInternal
+from models.models.sample import SampleUpsert
 from models.utils.sample_id_format import (  # Sample,
     sample_id_format,
     sample_id_transform_to_raw,
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 class SampleUpsertInput:
     """Sample upsert input"""
 
-    id: int | None = None
+    id: str | None = None
     external_ids: strawberry.scalars.JSON | None = None
     meta: strawberry.scalars.JSON | None = None
     project: int | None = None
@@ -67,7 +67,7 @@ class SampleMutations:
     @strawberry.mutation
     async def create_sample(
         self,
-        sample: SampleUpsert,
+        sample: SampleUpsertInput,
         info: Info[GraphQLContext, 'SampleMutations'],
     ) -> str | None:
         """Creates a new sample, and returns the internal sample ID"""
@@ -75,7 +75,9 @@ class SampleMutations:
         connection.check_access(FullWriteAccessRoles)
 
         st = SampleLayer(connection)
-        internal_sid = await st.upsert_sample(sample.to_internal())
+        sample_upsert = SampleUpsert.from_dict(strawberry.asdict(sample))
+        internal_sid = await st.upsert_sample(sample_upsert.to_internal())
+
         if internal_sid.id:
             return sample_id_format(internal_sid.id)
         return None
@@ -83,7 +85,7 @@ class SampleMutations:
     @strawberry.mutation
     async def upsert_samples(
         self,
-        samples: list[SampleUpsert],
+        samples: list[SampleUpsertInput],
         info: Info[GraphQLContext, 'SampleMutations'],
     ) -> list[SampleUpsertType] | None:
         """
@@ -98,7 +100,7 @@ class SampleMutations:
         st = SampleLayer(connection)
 
         internal_samples = [
-            SampleUpsertInternal.from_dict(strawberry.asdict(sample))
+            SampleUpsert.from_dict(strawberry.asdict(sample)).to_internal()
             for sample in samples
         ]
         upserted = await st.upsert_samples(internal_samples)
@@ -113,14 +115,16 @@ class SampleMutations:
     async def update_sample(
         self,
         id_: str,
-        sample: SampleUpsert,
+        sample: SampleUpsertInput,
         info: Info[GraphQLContext, 'SampleMutations'],
     ) -> SampleUpsertType:
         """Update sample with id"""
         connection = info.context['connection']
         st = SampleLayer(connection)
         sample.id = id_
-        await st.upsert_sample(sample.to_internal())
-        return SampleUpsertType.from_upsert_internal(sample.to_internal())
+        upserted = await st.upsert_sample(
+            SampleUpsert.from_dict(strawberry.asdict(sample)).to_internal()
+        )
+        return SampleUpsertType.from_upsert_internal(upserted)
 
     # endregion OTHER

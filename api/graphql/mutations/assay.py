@@ -9,7 +9,7 @@ from api.graphql.loaders import GraphQLContext
 from api.graphql.types import AssayUpsertType
 from db.python.layers.assay import AssayLayer
 from db.python.layers.comment import CommentLayer
-from models.models.assay import AssayUpsertInternal
+from models.models.assay import AssayUpsert
 from models.models.comment import CommentEntityType
 
 if TYPE_CHECKING:
@@ -57,7 +57,7 @@ class AssayMutations:
         connection = info.context['connection']
         assay_layer = AssayLayer(connection)
         upserted = await assay_layer.upsert_assay(
-            AssayUpsertInternal.from_dict(strawberry.asdict(assay))
+            AssayUpsert.from_dict(strawberry.asdict(assay)).to_internal()
         )
         return AssayUpsertType.from_upsert_internal(upserted)
 
@@ -73,7 +73,7 @@ class AssayMutations:
         connection = info.context['connection']
         assay_layer = AssayLayer(connection)
         await assay_layer.upsert_assay(
-            AssayUpsertInternal.from_dict(strawberry.asdict(assay))
+            AssayUpsert.from_dict(strawberry.asdict(assay)).to_internal()
         )
 
         return assay.id
