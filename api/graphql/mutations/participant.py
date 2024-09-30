@@ -73,7 +73,7 @@ class ParticipantMutations:
     @strawberry.mutation
     async def update_many_participant_external_ids(
         self,
-        internal_to_external_id: strawberry.scalars.JSON,
+        internal_to_external_id: JSON,
         info: Info,
     ) -> bool:
         """Update external_ids of participants by providing an update map"""
