@@ -251,6 +251,8 @@ jmespath==1.0.1
     # via
     #   boto3
     #   botocore
+libcst==1.4.0
+    # via strawberry-graphql
 markdown-it-py==3.0.0
     # via rich
 markupsafe==2.1.5
@@ -338,7 +340,9 @@ pydantic-settings==2.4.0
 pyflakes==3.2.0
     # via flake8
 pygments==2.18.0
-    # via rich
+    # via
+    #   rich
+    #   strawberry-graphql
 pylint==3.2.7
     # via -r requirements-dev.in
 pymysql[rsa]==1.1.1
@@ -371,6 +375,7 @@ pytz==2024.1
 pyyaml==6.0.2
     # via
     #   fastapi
+    #   libcst
     #   pre-commit
     #   uvicorn
 requests==2.32.3
@@ -383,7 +388,9 @@ requests==2.32.3
     #   google-cloud-bigquery
     #   google-cloud-storage
 rich==13.8.0
-    # via typer
+    # via
+    #   strawberry-graphql
+    #   typer
 rsa==4.9
     # via google-auth
 s3transfer==0.10.2
@@ -407,8 +414,10 @@ sqlalchemy==2.0.34
     #   databases
     #   testcontainers
 starlette==0.38.4
-    # via fastapi
-strawberry-graphql[fastapi]==0.243.0
+    # via
+    #   fastapi
+    #   strawberry-graphql
+strawberry-graphql[debug-server,fastapi]==0.243.0
     # via
     #   -r requirements-dev.in
     #   -r requirements.in
@@ -421,7 +430,9 @@ toml==0.10.2
 tomlkit==0.13.2
     # via pylint
 typer==0.12.5
-    # via fastapi-cli
+    # via
+    #   fastapi-cli
+    #   strawberry-graphql
 types-pymysql==1.1.0.20240524
     # via -r requirements-dev.in
 typing-extensions==4.12.2
@@ -449,6 +460,7 @@ uvicorn[standard]==0.29.0
     #   -r requirements.in
     #   fastapi
     #   fastapi-cli
+    #   strawberry-graphql
 uvloop==0.20.0
     # via uvicorn
 virtualenv==20.26.3
