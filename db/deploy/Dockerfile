@@ -62,4 +62,4 @@ COPY . ./
 RUN python3 -m pip install --no-cache-dir --break-system-packages -r requirements.txt
 
 # Run the FastAPI app on container startup
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
