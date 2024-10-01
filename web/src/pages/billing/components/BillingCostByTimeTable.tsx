@@ -4,6 +4,7 @@ import { IStackedAreaByDateChartData } from '../../../shared/components/Graphs/S
 import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
 import Table from '../../../shared/components/Table'
 import { convertFieldName } from '../../../shared/utilities/fieldName'
+import formatMoney from '../../../shared/utilities/formatMoney'
 
 interface IBillingCostByTimeTableProps {
     heading: string
@@ -105,14 +106,6 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         return undefined
     }
 
-    const currencyFormat = (num: number): string => {
-        if (num === undefined || num === null) {
-            return ''
-        }
-
-        return `$${num.toFixed(2).replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')}`
-    }
-
     if (isLoading) {
         return (
             <div>
@@ -133,13 +126,13 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                         const [p1, p2] =
                             orders && orders[i] === 'desc'
                                 ? [
-                                      b.values[prop as keyof typeof b],
-                                      a.values[prop as keyof typeof a],
-                                  ]
+                                    b.values[prop as keyof typeof b],
+                                    a.values[prop as keyof typeof a],
+                                ]
                                 : [
-                                      a.values[prop as keyof typeof a],
-                                      b.values[prop as keyof typeof b],
-                                  ]
+                                    a.values[prop as keyof typeof a],
+                                    b.values[prop as keyof typeof b],
+                                ]
                         acc = p1 > p2 ? 1 : p1 < p2 ? -1 : 0
                     }
                     return acc
@@ -160,7 +153,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                         </SUITable.Cell>
                         {headerFields().map((k) => (
                             <SUITable.Cell key={`${p.date.toISOString()} - ${k.category}`}>
-                                {currencyFormat(p.values[k.category])}
+                                {formatMoney(p.values[k.category])}
                             </SUITable.Cell>
                         ))}
                     </SUITable.Row>
@@ -224,7 +217,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                         {headerFields().map((k) => (
                             <SUITable.Cell key={`Total ${k.category}`}>
                                 <b>
-                                    {currencyFormat(
+                                    {formatMoney(
                                         internalData.reduce(
                                             (acc, cur) => acc + cur.values[k.category],
                                             0

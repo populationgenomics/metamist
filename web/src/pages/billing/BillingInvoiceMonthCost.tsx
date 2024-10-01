@@ -129,14 +129,6 @@ const BillingCurrentCost = () => {
         }
     }
 
-    function currencyFormat(num: number | undefined | null): string {
-        if (num === undefined || num === null) {
-            return ''
-        }
-
-        return `$${num.toFixed(2).replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')}`
-    }
-
     function percFormat(num: number | undefined | null): string {
         if (num === undefined || num === null) {
             return ''
@@ -406,15 +398,15 @@ const BillingCurrentCost = () => {
                                                 )
                                             default:
                                                 switch (
-                                                    k.show_always ||
-                                                    invoiceMonth === thisMonth
+                                                k.show_always ||
+                                                invoiceMonth === thisMonth
                                                 ) {
                                                     case true:
                                                         return (
                                                             <SUITable.Cell>
                                                                 {
                                                                     // @ts-ignore
-                                                                    currencyFormat(p[k.category])
+                                                                    formatMoney(p[k.category])
                                                                 }
                                                             </SUITable.Cell>
                                                         )
@@ -425,7 +417,7 @@ const BillingCurrentCost = () => {
                                     })}
 
                                     {groupBy === BillingColumn.GcpProject &&
-                                    invoiceMonth === thisMonth ? (
+                                        invoiceMonth === thisMonth ? (
                                         <SUITable.Cell>
                                             {
                                                 // @ts-ignore
@@ -456,14 +448,14 @@ const BillingCurrentCost = () => {
                                                     {invoiceMonth === thisMonth ? (
                                                         <React.Fragment>
                                                             <SUITable.Cell>
-                                                                {currencyFormat(dk.daily_cost)}
+                                                                {formatMoney(dk.daily_cost)}
                                                             </SUITable.Cell>
 
                                                             <SUITable.Cell colSpan="2" />
                                                         </React.Fragment>
                                                     ) : null}
                                                     <SUITable.Cell>
-                                                        {currencyFormat(dk.monthly_cost)}
+                                                        {formatMoney(dk.monthly_cost)}
                                                     </SUITable.Cell>
                                                     <SUITable.Cell colSpan="2" />
                                                 </React.Fragment>
@@ -473,14 +465,14 @@ const BillingCurrentCost = () => {
                                                     {invoiceMonth === thisMonth ? (
                                                         <React.Fragment>
                                                             <SUITable.Cell>
-                                                                {currencyFormat(dk.daily_cost)}
+                                                                {formatMoney(dk.daily_cost)}
                                                             </SUITable.Cell>
 
                                                             <SUITable.Cell colSpan="2" />
                                                         </React.Fragment>
                                                     ) : null}
                                                     <SUITable.Cell>
-                                                        {currencyFormat(dk.monthly_cost)}
+                                                        {formatMoney(dk.monthly_cost)}
                                                     </SUITable.Cell>
                                                     <SUITable.Cell />
                                                 </React.Fragment>

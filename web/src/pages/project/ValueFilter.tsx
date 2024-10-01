@@ -85,13 +85,11 @@ export const ValueFilter: React.FC<IValueFilter> = ({
     //  So check if the filterKey starts with 'meta.' to determine if it is a meta key, and
     //  then check the [category].meta object for the value
 
-    if (!field.filter_key) return <></>
-
-    /* eslint-disable react-hooks/rules-of-hooks*/
     const [_defaultFilterType, setDefaultFilterType] = React.useState<
         ProjectParticipantGridFilterType | undefined
     >()
-    /* eslint-enable react-hooks/rules-of-hooks*/
+
+    if (!field.filter_key) return <></>
 
     const isMeta = field.filter_key?.startsWith('meta.')
     // set name to the filterKey without the .meta prefix
