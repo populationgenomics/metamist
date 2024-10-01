@@ -89,13 +89,19 @@ export const ValueFilter: React.FC<IValueFilter> = ({
         ProjectParticipantGridFilterType | undefined
     >()
 
+    let optionsToCheck = props?.filterValues?.[category] || {}
+    const name = (field.filter_key ?? '').replace(/^meta\./, '')
+
+    // @ts-ignore
+    const _value = optionsToCheck?.[name]?.[operator]
+    const [_tempValue, setTempValue] = React.useState<string | undefined>(_value ?? '')
+    const tempValue = _tempValue ?? _value
+
     if (!field.filter_key) return <></>
 
     const isMeta = field.filter_key?.startsWith('meta.')
     // set name to the filterKey without the .meta prefix
-    const name = field.filter_key.replace(/^meta\./, '')
 
-    let optionsToCheck = props?.filterValues?.[category] || {}
 
     if (isMeta) {
         // get the meta bit from the filterValues
@@ -140,14 +146,6 @@ export const ValueFilter: React.FC<IValueFilter> = ({
         queryType = _defaultFilterType || options[0] || ProjectParticipantGridFilterType.Icontains
         operator = getOperatorFromFilterType(queryType)
     }
-
-    // @ts-ignore
-    const _value = optionsToCheck?.[name]?.[operator]
-
-    /* eslint-disable react-hooks/rules-of-hooks*/
-    const [_tempValue, setTempValue] = React.useState<string | undefined>(_value ?? '')
-    /* eslint-enable react-hooks/rules-of-hooks*/
-    const tempValue = _tempValue ?? _value
 
     const updateQueryType = (newFilterType: ProjectParticipantGridFilterType) => {
         setDefaultFilterType(newFilterType)
