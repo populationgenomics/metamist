@@ -16,6 +16,7 @@ import { convertFieldName } from '../../shared/utilities/fieldName'
 import generateUrl from '../../shared/utilities/generateUrl'
 import { BillingApi, BillingColumn, BillingCostBudgetRecord } from '../../sm-api'
 import FieldSelector from './components/FieldSelector'
+import formatMoney from '../../shared/utilities/formatMoney'
 
 const BillingCurrentCost = () => {
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
