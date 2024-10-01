@@ -27,11 +27,9 @@ const Selector: React.FC<SelectorProps> = ({
     specialSelectionLabel,
     specialSelectionItems,
 }) => {
-    const handleChange = (data: DropdownProps) => {
-        const value = data.value as string[] | undefined
-        if (value) {
-            onSelectionChange(value)
-        }
+    const handleChange = (event: React.SyntheticEvent<HTMLElement>, data: DropdownProps) => {
+        const value = data.value as string[]
+        onSelectionChange(value)
     }
 
     const handleSpecialSelection = () => {
@@ -95,6 +93,9 @@ const ProjectAndSeqTypeSelector: React.FC<ProjectAndSeqTypeSelectorProps> = ({
                 selectedItems={selectedProjects}
                 onSelectionChange={onProjectChange}
                 title="Projects"
+                // Special selection for all projects without "-test" suffix
+                specialSelectionLabel="All Projects (excluding test)"
+                specialSelectionItems={projects.filter((project) => !project.endsWith('-test'))}
             />
             <Selector
                 items={seqTypes}
