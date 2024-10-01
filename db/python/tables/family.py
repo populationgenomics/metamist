@@ -370,12 +370,12 @@ class FamilyTable(DbBase):
         if not family_ids:
             return {}
 
-        _query = """\
-SELECT external_id, family_id AS id FROM family_external_id
-WHERE external_id in :external_ids AND project = :project
-        """
         results = await self.connection.fetch_all(
-            _query, {'external_ids': family_ids, 'project': project or self.project_id}
+            """
+            SELECT external_id, family_id AS id FROM family_external_id
+            WHERE external_id in :external_ids AND project = :project
+            """,
+            {'external_ids': family_ids, 'project': project or self.project_id},
         )
         id_map = {r['external_id']: r['id'] for r in results}
 
