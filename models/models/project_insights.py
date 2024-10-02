@@ -59,7 +59,7 @@ class ProjectInsightsDetailsInternal:
     sample_id: int
     sample_ext_ids: list[str]
     sequencing_group_id: int
-    completed_cram: bool
+    cram: dict[str, Any]
     in_latest_annotate_dataset: bool
     in_latest_snv_es_index: bool
     in_latest_sv_es_index: bool
@@ -83,7 +83,7 @@ class ProjectInsightsDetailsInternal:
             sequencing_group_id=sequencing_group_id_format.sequencing_group_id_format(
                 self.sequencing_group_id
             ),
-            completed_cram=self.completed_cram,
+            cram=self.cram,
             in_latest_annotate_dataset=self.in_latest_annotate_dataset,
             in_latest_snv_es_index=self.in_latest_snv_es_index,
             in_latest_sv_es_index=self.in_latest_sv_es_index,
@@ -107,7 +107,7 @@ class ProjectInsightsDetails(SMBase):
     sample_id: str
     sample_ext_ids: list[str]
     sequencing_group_id: str
-    completed_cram: bool
+    cram: dict[str, Any]
     in_latest_annotate_dataset: bool
     in_latest_snv_es_index: bool
     in_latest_sv_es_index: bool

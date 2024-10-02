@@ -295,7 +295,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         """Fetches all output files for a list of analysis IDs"""
 
         _query = """
-        SELECT ao.analysis_id, f.*, ao.json_structure, ao.output
+        SELECT DISTINCT ao.analysis_id, f.*, ao.json_structure, ao.output
         FROM analysis_outputs ao
         LEFT JOIN output_file f ON ao.file_id = f.id
         WHERE ao.analysis_id IN :analysis_ids
@@ -304,7 +304,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
         # Preparing to accumulate analysis files
         analysis_files: dict[
-            int, dict[str, list[Tuple[OutputFileInternal, str]] | str]
+            int, dict[str, list[Tuple[OutputFileInternal, str] | str] | str]
         ] = defaultdict(lambda: defaultdict(list))
 
         for row in rows:
@@ -319,6 +319,11 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 else:
                     analysis_files[row['analysis_id']]['output'] = ''
 
+                # if analysis_files[row['analysis_id']]['outputs'] is a str, we set it to a list and append the str to it:
+                if isinstance(analysis_files[row['analysis_id']]['outputs'], str):
+                    analysis_files[row['analysis_id']]['outputs'] = [
+                        analysis_files[row['analysis_id']]['outputs']  # type: ignore [list-item]
+                    ]
                 analysis_files[row['analysis_id']]['outputs'].append(  # type: ignore [union-attr]
                     (file_internal, row['json_structure'])
                 )

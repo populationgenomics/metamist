@@ -177,13 +177,12 @@ class OutputFileInternal(SMBase):
                 if not blobs and not isinstance(blobs, list):
                     blobs = OutputFileInternal.list_blobs(
                         bucket=params['bucket'],
-                        prefix=(
-                            params['path_after_bucket'] if params['prefix'] else None
-                        ),
+                        prefix=params['blob_name'],
                         delimiter=params['delimiter'],
                         client=client,
                         versions=False,
                     )
+
                 for blob in blobs:
                     if blob.name == params['blob_name']:
                         # .mt files present as folders on gcs so calculating checksums is not avail.
@@ -191,6 +190,7 @@ class OutputFileInternal(SMBase):
                             file_checksum = blob.crc32c  # pylint: disable=E1101
                             valid = True
                             size = blob.size  # pylint: disable=E1101
+                            break
 
             return OutputFileInternal.from_db(
                 **{
