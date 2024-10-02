@@ -19,9 +19,9 @@ import {
 } from '@mui/material'
 import { useContext, useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
+import { DiscussionFragmentFragment, ProjectMemberRole } from '../../__generated__/graphql'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { ViewerContext } from '../../viewer'
-import { DiscussionFragmentFragment, ProjectMemberRole } from '../../__generated__/graphql'
 import {
     commentEntityOrder,
     CommentEntityType,

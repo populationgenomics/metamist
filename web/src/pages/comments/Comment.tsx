@@ -7,9 +7,9 @@ import {
     DialogContent,
     DialogContentText,
     DialogTitle,
+    Modal,
     Link as MuiLink,
     LinkProps as MuiLinkProps,
-    Modal,
     Typography,
 } from '@mui/material'
 import { DateTime } from 'luxon'

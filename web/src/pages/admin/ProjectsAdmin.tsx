@@ -4,10 +4,10 @@
 import { useQuery } from '@apollo/client'
 import * as React from 'react'
 import { Button, Checkbox, Input, InputProps, Message } from 'semantic-ui-react'
+import { gql } from '../../__generated__/gql'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import Table from '../../shared/components/Table'
 import { Project, ProjectApi } from '../../sm-api'
-import { gql } from '../../__generated__/gql'
 
 const GET_SEQUENCING_TYPES = gql(`
 query GetSequencingTypes {

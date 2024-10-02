@@ -10,6 +10,7 @@ import { gql } from '../../__generated__/gql'
 
 import groupBy from 'lodash/groupBy'
 import keyBy from 'lodash/keyBy'
+import { GraphQlParticipant } from '../../__generated__/graphql'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import { SplitPage } from '../../shared/components/Layout/SplitPage'
 import TangledTree, {
@@ -17,7 +18,6 @@ import TangledTree, {
     PersonNode,
 } from '../../shared/components/pedigree/TangledTree'
 import Table from '../../shared/components/Table'
-import { GraphQlParticipant } from '../../__generated__/graphql'
 import { AnalysisGrid } from '../analysis/AnalysisGrid'
 import { FamilyCommentsView } from '../comments/entities/FamilyCommentsView'
 import { ParticipantView } from '../participant/ParticipantView'

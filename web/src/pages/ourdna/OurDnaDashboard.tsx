@@ -1,5 +1,6 @@
 import { useQuery } from '@apollo/client'
 import { Container, Grid, GridColumn, GridRow } from 'semantic-ui-react'
+import { gql } from '../../__generated__'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import MuckError from '../../shared/components/MuckError'
@@ -18,7 +19,6 @@ import StatTile from '../../shared/components/ourdna/StatTile'
 import TableTile from '../../shared/components/ourdna/TableTile'
 import Tile from '../../shared/components/ourdna/Tile'
 import OurDNALogo from '../../shared/components/OurDNALogo'
-import { gql } from '../../__generated__'
 
 const GET_OURDNA_DASHBOARD = gql(`
     query DashboardQuery($project: String!) {
