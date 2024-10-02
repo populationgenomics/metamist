@@ -5,7 +5,6 @@ import { Button, Card, Dropdown, Grid, Input, Message } from 'semantic-ui-react'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import generateUrl from '../../shared/utilities/generateUrl'
-import { getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
 import { AnalysisCostRecord, BillingApi } from '../../sm-api'
 import BatchGrid from './components/BatchGrid'
 

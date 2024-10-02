@@ -13,10 +13,10 @@ import { HorizontalStackedBarChart } from '../../shared/components/Graphs/Horizo
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import Table from '../../shared/components/Table'
 import { convertFieldName } from '../../shared/utilities/fieldName'
+import formatMoney from '../../shared/utilities/formatMoney'
 import generateUrl from '../../shared/utilities/generateUrl'
 import { BillingApi, BillingColumn, BillingCostBudgetRecord } from '../../sm-api'
 import FieldSelector from './components/FieldSelector'
-import formatMoney from '../../shared/utilities/formatMoney'
 
 const BillingCurrentCost = () => {
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
@@ -399,8 +399,8 @@ const BillingCurrentCost = () => {
                                                 )
                                             default:
                                                 switch (
-                                                k.show_always ||
-                                                invoiceMonth === thisMonth
+                                                    k.show_always ||
+                                                    invoiceMonth === thisMonth
                                                 ) {
                                                     case true:
                                                         return (
@@ -418,7 +418,7 @@ const BillingCurrentCost = () => {
                                     })}
 
                                     {groupBy === BillingColumn.GcpProject &&
-                                        invoiceMonth === thisMonth ? (
+                                    invoiceMonth === thisMonth ? (
                                         <SUITable.Cell>
                                             {
                                                 // @ts-ignore

@@ -120,18 +120,18 @@ html[data-theme='dark-mode'] .ui.selection.dropdown {
     z-index: 10;
 }
 
-html[data-theme='dark-mode'] .ui.selection.visible.dropdown>.text:not(.default) {
+html[data-theme='dark-mode'] .ui.selection.visible.dropdown > .text:not(.default) {
     color: rgba(255, 255, 255, 0.87);
 }
 
-html[data-theme='dark-mode'] .ui.dropdown .menu>.item {
+html[data-theme='dark-mode'] .ui.dropdown .menu > .item {
     background-color: #353535;
     color: rgba(255, 255, 255, 0.87);
     border: none;
     z-index: 10;
 }
 
-html[data-theme='dark-mode'] .ui.dropdown .menu>.item:hover {
+html[data-theme='dark-mode'] .ui.dropdown .menu > .item:hover {
     background-color: #2c2c2c;
     z-index: 10;
 }
@@ -199,16 +199,16 @@ blockquote {
     border: 1px solid var(--color-border-default);
 }
 
-.ui .modal>.content {
+.ui .modal > .content {
     background: var(--color-bg-card);
 }
 
-.ui .modal>.header {
+.ui .modal > .header {
     background: var(--color-bg-card);
     color: var(--color-text-primary);
 }
 
-.ui .modal>.actions {
+.ui .modal > .actions {
     background: var(--color-bg-card);
     color: var(--color-text-primary);
 }
@@ -301,7 +301,7 @@ html[data-theme='dark-mode'] .ui.table {
     color: var(--color-text-primary);
 }
 
-.ui.input>input {
+.ui.input > input {
     color: var(--color-text-primary);
     background: var(--color-bg-card);
 }
@@ -310,8 +310,8 @@ html[data-theme='dark-mode'] .ui.table {
     color: var(--color-text-primary);
 }
 
-.ui.toggle.checkbox input:checked~.box,
-.ui.toggle.checkbox input:checked~label {
+.ui.toggle.checkbox input:checked ~ .box,
+.ui.toggle.checkbox input:checked ~ label {
     color: var(--color-text-primary) !important;
 }
 
@@ -486,6 +486,6 @@ html[data-theme='dark-mode'] .ui.table {
     border: 1px solid #555 !important;
 }
 
-.dimmed.dimmable>.ui.modals.dimmer.visible {
+.dimmed.dimmable > .ui.modals.dimmer.visible {
     display: flex !important;
 }

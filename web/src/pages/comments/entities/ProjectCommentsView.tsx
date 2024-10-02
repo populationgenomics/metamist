@@ -1,7 +1,7 @@
 import { useQuery } from '@apollo/client'
 import { gql } from '../../../__generated__'
-import { DiscussionView } from '../DiscussionView'
 import { useNewComment } from '../data/commentMutations'
+import { DiscussionView } from '../DiscussionView'
 
 export const PROJECT_COMMENTS = gql(`
     query ProjectComments($projectName: String!) {

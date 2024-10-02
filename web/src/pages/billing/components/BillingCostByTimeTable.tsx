@@ -126,13 +126,13 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                         const [p1, p2] =
                             orders && orders[i] === 'desc'
                                 ? [
-                                    b.values[prop as keyof typeof b],
-                                    a.values[prop as keyof typeof a],
-                                ]
+                                      b.values[prop as keyof typeof b],
+                                      a.values[prop as keyof typeof a],
+                                  ]
                                 : [
-                                    a.values[prop as keyof typeof a],
-                                    b.values[prop as keyof typeof b],
-                                ]
+                                      a.values[prop as keyof typeof a],
+                                      b.values[prop as keyof typeof b],
+                                  ]
                         acc = p1 > p2 ? 1 : p1 < p2 ? -1 : 0
                     }
                     return acc

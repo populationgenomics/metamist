@@ -237,7 +237,7 @@ const constructTangleLayout = (levels: NodeList[], options: ITangleLayoutOptions
                     (a, b) =>
                         a.x - b.x ||
                         oldLevel.findIndex((c) => a.id === c.id) -
-                        oldLevel.findIndex((c) => b.id === c.id)
+                            oldLevel.findIndex((c) => b.id === c.id)
                 )
                 if (movedIndex < level.nodes.length - 1) {
                     // not the last node
@@ -519,7 +519,7 @@ export const PersonNode: React.FC<IPersonNodeProps> = ({
                     strokeLinecap={entry.sex === 1 ? 'square' : 'round'}
                     d={`M${node.x} ${node.y} L${node.x} ${node.y}`}
                     onClick={() => onClick?.(entry)}
-                // on highlight
+                    // on highlight
                 />
                 {/* if deceased, show diagonal bar through node */}
                 {isDeceased && (

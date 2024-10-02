@@ -102,7 +102,6 @@ export const ValueFilter: React.FC<IValueFilter> = ({
     const isMeta = field.filter_key?.startsWith('meta.')
     // set name to the filterKey without the .meta prefix
 
-
     if (isMeta) {
         // get the meta bit from the filterValues
         optionsToCheck = optionsToCheck?.meta || {}

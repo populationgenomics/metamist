@@ -1,10 +1,10 @@
-import { DiscussionFragmentFragment } from '../../__generated__/graphql'
 import AssayIcon from '../../shared/components/icons/AssayIcon'
 import FamilyIcon from '../../shared/components/icons/FamilyIcon'
 import ParticipantIcon from '../../shared/components/icons/ParticipantIcon'
 import ProjectIcon from '../../shared/components/icons/ProjectIcon'
 import SampleIcon from '../../shared/components/icons/SampleIcon'
 import SequencingGroupIcon from '../../shared/components/icons/SequencingGroupIcon'
+import { DiscussionFragmentFragment } from '../../__generated__/graphql'
 
 export type CommentEntityType = CommentThreadData['entity']['__typename']
 export type CommentThreadData = DiscussionFragmentFragment['directComments'][number]

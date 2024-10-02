@@ -3,7 +3,7 @@ import ReactGoogleSlides from 'react-google-slides'
 import { Button, Menu, MenuItem, Segment, SemanticWIDTHS } from 'semantic-ui-react'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
-import { IBillingPage, billingPages } from './BillingPages'
+import { billingPages, IBillingPage } from './BillingPages'
 
 // Google Slides
 const Slides = React.memo(function ReactGoogleSlidesWrapper({ link }: { link: string }) {

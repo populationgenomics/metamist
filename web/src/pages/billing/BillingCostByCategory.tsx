@@ -29,7 +29,9 @@ const BillingCostByCategory: React.FunctionComponent = () => {
     const inputCostCategory: string | undefined = searchParams.get('costCategory') ?? undefined
     const inputPeriod: string | undefined = searchParams.get('period') ?? BillingTimePeriods.Month
 
-    const [start, setStart] = React.useState<string>(searchParams.get('start') ?? getMonthStartDate())
+    const [start, setStart] = React.useState<string>(
+        searchParams.get('start') ?? getMonthStartDate()
+    )
     const [end, setEnd] = React.useState<string>(searchParams.get('end') ?? getMonthEndDate())
 
     const [selectedGroup, setSelectedGroup] = React.useState<string | undefined>(inputSelectedGroup)
