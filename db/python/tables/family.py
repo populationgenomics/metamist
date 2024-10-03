@@ -396,12 +396,18 @@ class FamilyTable(DbBase):
     async def get_id_map_by_internal_ids(
         self, family_ids: List[int], allow_missing=False
     ):
-        """Get map of {internal_id: external_id} for a family"""
+        """Get map of {internal_id: primary_external_id} for a family"""
         if len(family_ids) == 0:
             return {}
-        # FIXME needs to be uniqueified!!
-        _query = 'SELECT family_id, external_id FROM family_external_id WHERE family_id in :ids'
-        results = await self.connection.fetch_all(_query, {'ids': family_ids})
+
+        results = await self.connection.fetch_all(
+            """
+            SELECT family_id, external_id
+            FROM family_external_id
+            WHERE family_id in :ids AND name = :PRIMARY_EXTERNAL_ORG
+            """,
+            {'ids': family_ids, 'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG},
+        )
         id_map = {r['family_id']: r['external_id'] for r in results}
         if not allow_missing and len(id_map) != len(family_ids):
             provided_internal_ids = set(family_ids)
