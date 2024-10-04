@@ -13,6 +13,7 @@ import { HorizontalStackedBarChart } from '../../shared/components/Graphs/Horizo
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import Table from '../../shared/components/Table'
 import { convertFieldName } from '../../shared/utilities/fieldName'
+import formatMoney from '../../shared/utilities/formatMoney'
 import generateUrl from '../../shared/utilities/generateUrl'
 import { BillingApi, BillingColumn, BillingCostBudgetRecord } from '../../sm-api'
 import FieldSelector from './components/FieldSelector'
@@ -127,14 +128,6 @@ const BillingCurrentCost = () => {
         } else {
             setOpenRows(openRows.filter((i) => i !== field))
         }
-    }
-
-    function currencyFormat(num: number | undefined | null): string {
-        if (num === undefined || num === null) {
-            return ''
-        }
-
-        return `$${num.toFixed(2).replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')}`
     }
 
     function percFormat(num: number | undefined | null): string {
@@ -414,7 +407,7 @@ const BillingCurrentCost = () => {
                                                             <SUITable.Cell>
                                                                 {
                                                                     // @ts-ignore
-                                                                    currencyFormat(p[k.category])
+                                                                    formatMoney(p[k.category])
                                                                 }
                                                             </SUITable.Cell>
                                                         )
@@ -456,14 +449,14 @@ const BillingCurrentCost = () => {
                                                     {invoiceMonth === thisMonth ? (
                                                         <React.Fragment>
                                                             <SUITable.Cell>
-                                                                {currencyFormat(dk.daily_cost)}
+                                                                {formatMoney(dk.daily_cost)}
                                                             </SUITable.Cell>
 
                                                             <SUITable.Cell colSpan="2" />
                                                         </React.Fragment>
                                                     ) : null}
                                                     <SUITable.Cell>
-                                                        {currencyFormat(dk.monthly_cost)}
+                                                        {formatMoney(dk.monthly_cost)}
                                                     </SUITable.Cell>
                                                     <SUITable.Cell colSpan="2" />
                                                 </React.Fragment>
@@ -473,14 +466,14 @@ const BillingCurrentCost = () => {
                                                     {invoiceMonth === thisMonth ? (
                                                         <React.Fragment>
                                                             <SUITable.Cell>
-                                                                {currencyFormat(dk.daily_cost)}
+                                                                {formatMoney(dk.daily_cost)}
                                                             </SUITable.Cell>
 
                                                             <SUITable.Cell colSpan="2" />
                                                         </React.Fragment>
                                                     ) : null}
                                                     <SUITable.Cell>
-                                                        {currencyFormat(dk.monthly_cost)}
+                                                        {formatMoney(dk.monthly_cost)}
                                                     </SUITable.Cell>
                                                     <SUITable.Cell />
                                                 </React.Fragment>

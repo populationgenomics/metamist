@@ -5,7 +5,6 @@ import { Button, Card, Dropdown, Grid, Input, Message } from 'semantic-ui-react'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import generateUrl from '../../shared/utilities/generateUrl'
-import { getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
 import { AnalysisCostRecord, BillingApi } from '../../sm-api'
 import BatchGrid from './components/BatchGrid'
 
@@ -22,9 +21,6 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
     const [error, setError] = React.useState<string | undefined>()
     const [data, setData] = React.useState<AnalysisCostRecord[] | undefined>()
-    const [start, setStart] = React.useState<string>(
-        searchParams.get('start') ?? getMonthStartDate()
-    )
 
     const setBillingRecord = (records: AnalysisCostRecord[]) => {
         setIsLoading(false)
@@ -138,7 +134,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
                 <Message negative onDismiss={() => setError(undefined)}>
                     {error}
                     <br />
-                    <Button negative onClick={() => setStart(start)}>
+                    <Button negative onClick={() => window.location.reload()}>
                         Retry
                     </Button>
                 </Message>

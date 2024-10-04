@@ -68,3 +68,5 @@ profiles
 
 # sonarqube
 .scannerwork/
+
+latest_backup/

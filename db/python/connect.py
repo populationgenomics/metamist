@@ -23,7 +23,7 @@ from db.python.utils import (
 )
 from models.models.project import Project, ProjectId, ProjectMemberRole
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 TABLES_ORDERED_BY_FK_DEPS = [

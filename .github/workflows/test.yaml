@@ -1,11 +1,10 @@
 name: Test
-on: push
+on:
+  push:
 
 jobs:
   unittests:
     name: Run unit tests
-    # Run on merge to main, where the commit name starts with "Bump version:" (for bump2version)
-    #    if: "startsWith(github.event.head_commit.message, 'Bump version:')"
     runs-on: ubuntu-latest
     env:
       DOCKER_BUILDKIT: 1
