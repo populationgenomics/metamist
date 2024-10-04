@@ -33,22 +33,6 @@ USER appuser
 # Set the working directory
 WORKDIR /home/appuser
 
-# Add any additional commands here, such as copying application files, installing Python dependencies, etc.
-# COPY requirements.txt .
-# RUN pip install -r requirements.txt
-
-# Entry point or command to run your application
-# ENTRYPOINT ["python", "your_script.py"]
-
-# Download and install Liquibase
-RUN wget https://github.com/liquibase/liquibase/releases/download/v${LIQUIBASE_VERSION}/liquibase-${LIQUIBASE_VERSION}.zip \
-    && unzip liquibase-${LIQUIBASE_VERSION}.zip -d /opt/liquibase \
-    && chmod +x /opt/liquibase/liquibase \
-    # Clean up to reduce layer size
-    && rm liquibase-${LIQUIBASE_VERSION}.zip \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
 # Download the MariaDB JDBC driver
 RUN wget https://downloads.mariadb.com/Connectors/java/connector-java-${MARIADB_JDBC_VERSION}/mariadb-java-client-${MARIADB_JDBC_VERSION}.jar
 RUN mv mariadb-java-client-${MARIADB_JDBC_VERSION}.jar /opt/
@@ -62,4 +46,4 @@ COPY . ./
 RUN python3 -m pip install --no-cache-dir --break-system-packages -r requirements.txt
 
 # Run the FastAPI app on container startup
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]

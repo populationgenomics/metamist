@@ -1,13 +1,10 @@
 name: Test
 on:
   push:
-  merge_group:
 
 jobs:
   unittests:
     name: Run unit tests
-    # Run on merge to main, where the commit name starts with "Bump version:" (for bump2version)
-    #    if: "startsWith(github.event.head_commit.message, 'Bump version:')"
     runs-on: ubuntu-latest
     env:
       DOCKER_BUILDKIT: 1
@@ -134,17 +131,9 @@ jobs:
         with:
           pattern: '*-report'
 
-      # Get the code version from setup.py
-      - name: 'Get code version'
-        id: version
-        run: |
-            VERSION=$(python -c "import re; print(re.search(r'version\s*=\s*[\'\"]([^\'\"]+)[\'\"]', open('setup.py').read()).group(1))")
-            echo "VERSION=$VERSION" >> $GITHUB_ENV
-
       # Perform the SonarQube scan
       - uses: sonarsource/sonarqube-scan-action@master
         env:
-          SONAR_PROJECT_VERSION: ${{ env.VERSION }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
