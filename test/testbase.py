@@ -317,8 +317,8 @@ class DbTest(unittest.TestCase):
             query,
             variable_values=variables,
             context_value=await get_context(
+                request=None,
                 connection=self.connection,
-                request=None,  # pylint: disable
             ),
         )
         if value.errors:

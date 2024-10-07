@@ -1,10 +1,10 @@
 # pylint: disable=no-value-for-parameter,redefined-builtin
 # ^ Do this because of the loader decorator
-import copy
 import dataclasses
 import enum
 from collections import defaultdict
-from typing import Any, TypedDict
+from typing import Any, TypedDict, Callable, Tuple
+import copy
 
 from fastapi import Request
 from strawberry.dataloader import DataLoader
@@ -111,7 +111,30 @@ def connected_data_loader(id_: LoaderKeys, cache: bool = True):
 
 
 def _get_connected_data_loader_partial_key(kwargs) -> tuple:
+    """Return a hashable value of the dict, excluding the id"""
     return get_hashable_value({k: v for k, v in kwargs.items() if k != 'id'})  # type: ignore
+
+
+def validate_query(query: list[dict[str, Any]]):
+    """Validate the query to ensure it's in the correct format"""
+    if any('connection' in q for q in query):
+        raise ValueError('Cannot pass connection in query')
+    if any('id' not in q for q in query):
+        raise ValueError('Must pass id in query')
+
+
+async def process_group(
+    fn: Callable, connection: Connection, chunk: list[dict[str, Any]], copy_args: bool
+) -> dict[Tuple, Any]:
+    """Process a group of queries, calling the function and returning the results"""
+    ids = [row['id'] for row in chunk]
+    kwargs = {
+        k: copy.copy(v) if copy_args else v for k, v in chunk[0].items() if k != 'id'
+    }
+    value_map = await fn(connection=connection, ids=ids, **kwargs)
+    if not isinstance(value_map, dict):
+        raise ValueError(f'Expected dict from {fn.__name__}, got {type(value_map)}')
+    return value_map
 
 
 def connected_data_loader_with_params(
@@ -124,28 +147,13 @@ def connected_data_loader_with_params(
     def connected_data_loader_caller(fn):
         def inner(connection: Connection):
             async def wrapped(query: list[dict[str, Any]]) -> list[Any]:
-                by_key: dict[tuple, Any] = {}
+                by_key: dict[Tuple, Any] = {}
 
-                if any('connection' in q for q in query):
-                    raise ValueError('Cannot pass connection in query')
-                if any('id' not in q for q in query):
-                    raise ValueError('Must pass id in query')
-
-                # group by all last fields (except the first which is always ID
+                validate_query(query)
                 grouped = group_by(query, _get_connected_data_loader_partial_key)
+
                 for extra_args, chunk in grouped.items():
-                    # ie: matrix transform
-                    ids = [row['id'] for row in chunk]
-                    kwargs = {
-                        k: copy.copy(v) if copy_args else v
-                        for k, v in chunk[0].items()
-                        if k != 'id'
-                    }
-                    value_map = await fn(connection=connection, ids=ids, **kwargs)
-                    if not isinstance(value_map, dict):
-                        raise ValueError(
-                            f'Expected dict from {fn.__name__}, got {type(value_map)}'
-                        )
+                    value_map = await process_group(fn, connection, chunk, copy_args)
                     for returned_id, value in value_map.items():
                         by_key[(returned_id, *extra_args)] = value
 
@@ -617,10 +625,11 @@ class GraphQLContext(TypedDict):
 
 
 async def get_context(
-    request: Request,  # pylint: disable=unused-argument
+    request: Request,
     connection: Connection = get_projectless_db_connection,
 ) -> GraphQLContext:
     """Get loaders / cache context for strawberyy GraphQL"""
+    _ = request  # Indicate that request is intentionally unused
     mapped_loaders = {k: fn(connection) for k, fn in loaders.items()}
 
     return {
