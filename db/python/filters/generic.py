@@ -6,11 +6,12 @@ from typing import Any, Callable, Generic, Sequence, TypeVar
 from db.python.utils import escape_like_term
 from models.base import SMBase
 
-NONFIELD_CHARS_REGEX = re.compile(r'[^a-zA-Z0-9_]')
+NONFIELD_CHARS_REGEX = re.compile(r'\W')
 
 
 T = TypeVar('T')
 X = TypeVar('X')
+OPERATOR_MAP = dict[str, dict[str, str | bool]]
 
 
 def get_hashable_value(value):
@@ -134,24 +135,62 @@ class GenericFilter(SMBase, Generic[T]):
         Returns:
             tuple[str, dict[str, T | list[T]]]: (condition, prepared_values)
         """
-        conditionals = []
-        values: dict[str, T | list[T]] = {}
         _column_name = column_name or column
 
+        # Validate the column name
         if not isinstance(column, str):
             raise ValueError(f'Column {_column_name!r} must be a string')
-        if self.eq is not None:
-            k = self.generate_field_name(_column_name + '_eq')
-            conditionals.append(f'{column} = :{k}')
-            values[k] = self._sql_value_prep(self.eq)
-        if self.neq is not None:
-            k = self.generate_field_name(_column_name + '_neq')
-            conditionals.append(f'{column} != :{k}')
-            values[k] = self._sql_value_prep(self.neq)
+
+        conditionals, values = self._process_simple_operators(column, _column_name)
+        conditionals += self._process_string_operators(column, _column_name)
+        conditionals += self._process_in_operators(column, _column_name)
+        conditionals += self._process_isnull_operator(column)
+
+        return ' AND '.join(conditionals), values
+
+    def _process_simple_operators(self, column, _column_name):
+        conditionals = []
+        values = {}
+        simple_operators: OPERATOR_MAP = {
+            'eq': {'column_suffix': '_eq', 'op': '='},
+            'neq': {'column_suffix': '_neq', 'op': '!='},
+            'gt': {'column_suffix': '_gt', 'op': '>'},
+            'gte': {'column_suffix': '_gte', 'op': '>='},
+            'lt': {'column_suffix': '_lt', 'op': '<'},
+            'lte': {'column_suffix': '_lte', 'op': '<='},
+        }
+        for prop_key, operator in simple_operators.items():
+            if value := getattr(self, prop_key):
+                k = self.generate_field_name(_column_name + operator['column_suffix'])
+                conditionals.append(f'{column} {operator["op"]} :{k}')
+                values[k] = self._sql_value_prep(value)
+        return conditionals, values
+
+    def _process_string_operators(self, column, _column_name):
+        conditionals = []
+        values = {}
+        string_operators: OPERATOR_MAP = {
+            'contains': {'column_suffix': '_contains', 'lower': False},
+            'icontains': {'column_suffix': '_icontains', 'lower': True},
+            'startswith': {'column_suffix': '_startswith', 'lower': False},
+        }
+        for prop_key, operator in string_operators.items():
+            if value := getattr(self, prop_key):
+                search_term = escape_like_term(str(value))
+                k = self.generate_field_name(_column_name + operator['column_suffix'])
+                if operator['lower']:
+                    conditionals.append(f'LOWER({column}) LIKE LOWER(:{k})')
+                else:
+                    conditionals.append(f'{column} LIKE :{k}')
+                values[k] = self._sql_value_prep(f'%{search_term}%')
+        return conditionals, values
+
+    def _process_in_operators(self, column, _column_name):
+        conditionals = []
+        values = {}
         if self.in_ is not None:
             if len(self.in_) == 0:
-                # in an empty list is always false
-                return 'FALSE', {}
+                return ['FALSE'], {}
             if not isinstance(self.in_, list):
                 raise ValueError('IN filter must be a list')
             if len(self.in_) == 1:
@@ -163,50 +202,21 @@ class GenericFilter(SMBase, Generic[T]):
                 conditionals.append(f'{column} IN :{k}')
                 values[k] = self._sql_value_prep(self.in_)
         if self.nin is not None and len(self.nin) > 0:
-            # not in an empty list is always true
             if not isinstance(self.nin, list):
                 raise ValueError('NIN filter must be a list')
             k = self.generate_field_name(column + '_nin')
             conditionals.append(f'{column} NOT IN :{k}')
             values[k] = self._sql_value_prep(self.nin)
-        if self.gt is not None:
-            k = self.generate_field_name(column + '_gt')
-            conditionals.append(f'{column} > :{k}')
-            values[k] = self._sql_value_prep(self.gt)
-        if self.gte is not None:
-            k = self.generate_field_name(column + '_gte')
-            conditionals.append(f'{column} >= :{k}')
-            values[k] = self._sql_value_prep(self.gte)
-        if self.lt is not None:
-            k = self.generate_field_name(column + '_lt')
-            conditionals.append(f'{column} < :{k}')
-            values[k] = self._sql_value_prep(self.lt)
-        if self.lte is not None:
-            k = self.generate_field_name(column + '_lte')
-            conditionals.append(f'{column} <= :{k}')
-            values[k] = self._sql_value_prep(self.lte)
-        if self.contains is not None:
-            search_term = escape_like_term(str(self.contains))
-            k = self.generate_field_name(column + '_contains')
-            conditionals.append(f'{column} LIKE :{k}')
-            values[k] = self._sql_value_prep(f'%{search_term}%')
-        if self.icontains is not None:
-            search_term = escape_like_term(str(self.icontains))
-            k = self.generate_field_name(column + '_icontains')
-            conditionals.append(f'LOWER({column}) LIKE LOWER(:{k})')
-            values[k] = self._sql_value_prep(f'%{search_term}%')
-        if self.startswith is not None:
-            search_term = escape_like_term(str(self.startswith))
-            k = self.generate_field_name(column + '_startswith')
-            conditionals.append(f'{column} LIKE :{k}')
-            values[k] = self._sql_value_prep(escape_like_term(search_term) + '%')
+        return conditionals, values
+
+    def _process_isnull_operator(self, column):
+        conditionals = []
         if self.isnull is not None:
             if self.isnull:
                 conditionals.append(f'{column} IS NULL')
             else:
                 conditionals.append(f'{column} IS NOT NULL')
-
-        return ' AND '.join(conditionals), values
+        return conditionals
 
     @staticmethod
     def _sql_value_prep(value):
