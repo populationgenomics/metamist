@@ -1,6 +1,6 @@
 # pylint: disable=too-many-nested-blocks
 from collections import defaultdict
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 import logging
 from textwrap import dedent
 
@@ -13,6 +13,21 @@ from models.models.output_file import OutputFileInternal, RecursiveDict
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
+
+
+@dataclass
+class Files:
+    """Dataclass for storing filepaths during the find_files_from_dict method"""
+
+    main_files: list[dict[str, str]]
+    secondary_files_grouped: dict[str, list[dict[str, str]]]
+
+    def to_dict(self) -> dict:
+        """Convert Files dataclass to dictionary"""
+        return {
+            'main_files': self.main_files,
+            'secondary_files_grouped': self.secondary_files_grouped,
+        }
 
 
 class OutputFileTable(DbBase):
@@ -226,13 +241,6 @@ class OutputFileTable(DbBase):
                 # Execute the query only if either file_ids or outputs were provided
                 await self.connection.execute(_update_query, query_params)
 
-    @dataclass
-    class Files:
-        """Dataclass for storing filepaths during the find_files_from_dict method"""
-
-        main_files: list[dict[str, str]]
-        secondary_files_grouped: dict[str, list[dict[str, str]]]
-
     async def find_files_from_dict(
         self,
         json_dict: dict,
@@ -241,9 +249,7 @@ class OutputFileTable(DbBase):
     ) -> dict:
         """Retrieve filepaths from a dict of outputs"""
         if collected is None:
-            collected = self.Files(
-                main_files=[], secondary_files_grouped=defaultdict(list)
-            )
+            collected = Files(main_files=[], secondary_files_grouped=defaultdict(list))
 
         if json_path is None:
             json_path = []  # Initialize path for tracking key path
@@ -251,7 +257,7 @@ class OutputFileTable(DbBase):
         if isinstance(json_dict, str):
             # If the data is a plain string, return it as the basename with None as its keypath
             collected.main_files.append({'json_path': None, 'basename': json_dict})
-            return collected
+            return collected.to_dict()
 
         if isinstance(json_dict, dict) and (basename := json_dict.get('basename')):
             # Add current item to main_files
@@ -283,4 +289,4 @@ class OutputFileTable(DbBase):
             for item in json_dict:
                 await self.find_files_from_dict(item, json_path, collected)
 
-        return asdict(collected)
+        return collected.to_dict()

@@ -141,10 +141,13 @@ class GenericFilter(SMBase, Generic[T]):
         if not isinstance(column, str):
             raise ValueError(f'Column {_column_name!r} must be a string')
 
-        conditionals, values = self._process_simple_operators(column, _column_name)
-        conditionals += self._process_string_operators(column, _column_name)
-        conditionals += self._process_in_operators(column, _column_name)
-        conditionals += self._process_isnull_operator(column)
+        conditionals1, values1 = self._process_simple_operators(column, _column_name)
+        conditionals2, values2 = self._process_string_operators(column, _column_name)
+        conditionals3, values3 = self._process_in_operators(column, _column_name)
+        conditionals4 = self._process_isnull_operator(column)
+
+        conditionals = conditionals1 + conditionals2 + conditionals3 + conditionals4
+        values = {**values1, **values2, **values3}
 
         return ' AND '.join(conditionals), values
 

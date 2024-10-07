@@ -319,8 +319,8 @@ class SampleLayer(BaseLayer):
                 )
 
                 # Collect all sequencing_groups and assays
-                sequencing_groups.extend(getattr(sample, 'sequencing_groups', []))
-                assays.extend(getattr(sample, 'non_sequencing_assays', []))
+                sequencing_groups.extend(getattr(sample, 'sequencing_groups', []) or [])
+                assays.extend(getattr(sample, 'non_sequencing_assays', []) or [])
 
             # Upsert all sequencing_groups (in turn relevant assays)
             await seqglayer.upsert_sequencing_groups(sequencing_groups)
