@@ -99,10 +99,11 @@ class AnalysisQueryModel(BaseModel):
 @router.put('/{project}/', operation_id='createAnalysis', response_model=int)
 async def create_analysis(
     analysis: Analysis,
-    connection: Connection = get_project_db_connection(FullWriteAccessRoles),
+    connection: Connection = None,
 ) -> int:
     """Create a new analysis"""
-
+    if not connection:
+        connection = get_project_db_connection(FullWriteAccessRoles)
     atable = AnalysisLayer(connection)
 
     if analysis.author:
@@ -330,7 +331,6 @@ async def get_sample_reads_map(
 @router.post(
     '/cram-proportionate-map',
     operation_id='getProportionateMap',
-    # response_model=list[ProportionalDateModel] # don't uncomment this, breaks python API
 )
 async def get_proportionate_map(
     start: str,
