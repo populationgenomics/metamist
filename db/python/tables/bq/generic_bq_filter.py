@@ -34,55 +34,48 @@ class GenericBQFilter(GenericFilter[T]):
         Convert to SQL, and avoid SQL injection
 
         """
-        conditionals = []
+        conditionals: list[str] = []
         values: dict[str, T | list[T] | Any | list[Any]] = {}
         _column_name = column_name or column
 
         if not isinstance(column, str):
             raise ValueError(f'Column {_column_name!r} must be a string')
-        if self.eq is not None:
-            k = self.generate_field_name(_column_name + '_eq')
-            conditionals.append(f'{column} = {self._sql_cond_prep(k, self.eq)}')
-            values[k] = self._sql_value_prep(k, self.eq)
-        if self.in_ is not None:
-            if not isinstance(self.in_, list):
-                raise ValueError('IN filter must be a list')
-            if len(self.in_) == 1:
-                k = self.generate_field_name(_column_name + '_in_eq')
-                conditionals.append(f'{column} = {self._sql_cond_prep(k, self.in_[0])}')
-                values[k] = self._sql_value_prep(k, self.in_[0])
-            else:
-                k = self.generate_field_name(_column_name + '_in')
-                conditionals.append(
-                    f'{column} IN UNNEST({self._sql_cond_prep(k, self.in_)})'
-                )
-                values[k] = self._sql_value_prep(k, self.in_)
-        if self.nin is not None:
-            if not isinstance(self.nin, list):
-                raise ValueError('NIN filter must be a list')
-            k = self.generate_field_name(column + '_nin')
-            conditionals.append(
-                f'{column} NOT IN UNNEST({self._sql_cond_prep(k, self.nin)})'
-            )
-            values[k] = self._sql_value_prep(k, self.nin)
-        if self.gt is not None:
-            k = self.generate_field_name(column + '_gt')
-            conditionals.append(f'{column} > {self._sql_cond_prep(k, self.gt)}')
-            values[k] = self._sql_value_prep(k, self.gt)
-        if self.gte is not None:
-            k = self.generate_field_name(column + '_gte')
-            conditionals.append(f'{column} >= {self._sql_cond_prep(k, self.gte)}')
-            values[k] = self._sql_value_prep(k, self.gte)
-        if self.lt is not None:
-            k = self.generate_field_name(column + '_lt')
-            conditionals.append(f'{column} < {self._sql_cond_prep(k, self.lt)}')
-            values[k] = self._sql_value_prep(k, self.lt)
-        if self.lte is not None:
-            k = self.generate_field_name(column + '_lte')
-            conditionals.append(f'{column} <= {self._sql_cond_prep(k, self.lte)}')
-            values[k] = self._sql_value_prep(k, self.lte)
+
+        # IN conditions
+        self._add_in_condition(self.in_, column, _column_name, conditionals, values)
+        self._add_condition(
+            'nin', column, _column_name, 'NOT IN UNNEST', conditionals, values
+        )
+
+        # Simple conditions
+        self._add_condition('eq', column, _column_name, '=', conditionals, values)
+        self._add_condition('gt', column, _column_name, '>', conditionals, values)
+        self._add_condition('gte', column, _column_name, '>=', conditionals, values)
+        self._add_condition('lt', column, _column_name, '<', conditionals, values)
+        self._add_condition('lte', column, _column_name, '<=', conditionals, values)
 
         return ' AND '.join(conditionals), values
+
+    def _add_condition(self, op, column, column_name, operator, conditionals, values):
+        if attr := getattr(self, op) is not None:
+            k = self.generate_field_name(column_name + '_' + op)
+            conditionals.append(f'{column} {operator} {self._sql_cond_prep(k, attr)}')
+            values[k] = self._sql_value_prep(k, attr)
+
+    def _add_in_condition(self, attr, column, column_name, conditionals, values):
+        if attr is not None:
+            if not isinstance(attr, list):
+                raise ValueError('IN filter must be a list')
+            if len(attr) == 1:
+                k = self.generate_field_name(column_name + '_in_eq')
+                conditionals.append(f'{column} = {self._sql_cond_prep(k, attr[0])}')
+                values[k] = self._sql_value_prep(k, attr[0])
+            else:
+                k = self.generate_field_name(column_name + '_in')
+                conditionals.append(
+                    f'{column} IN UNNEST({self._sql_cond_prep(k, attr)})'
+                )
+                values[k] = self._sql_value_prep(k, attr)
 
     @staticmethod
     def _sql_cond_prep(key, value) -> str:
