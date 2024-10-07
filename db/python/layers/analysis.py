@@ -292,26 +292,6 @@ class AnalysisLayer(BaseLayer):
     ) -> list[ProportionalDateModel]:
         """
         Calculate the prop map for es-indices.
-
-        This one works a bit different, we start with the es-indices, and progressively
-        add samples into this list as we see new samples.
-
-        We'll do this in three steps:
-
-            1. Prepare the crams into a format where it's easier for us to find:
-                "What cram size is appropriate for this day"
-
-            2. Get all SGs inside any es-index (* or joint call) before the start date
-                (that forms our baseline crams)
-
-            3. Get all es-indices between the start and end date
-                We'll do some processing on these analysis objects so we just get the
-                SGs that are new on a specific day.
-
-            4. Iterate over the days, and add the most appropriate cram size for each
-                SG for that day.
-                    * We can't progressively sum, because the cram size might change
-                        between days, so get it on each day.
         """
         sizes_by_sg = await self.get_cram_sizes_between_range(
             crams=crams,
@@ -319,28 +299,7 @@ class AnalysisLayer(BaseLayer):
             end_date=end_date,
         )
 
-        def get_cram_size_for(sg_id: SequencingGroupInternalId, date):
-            """
-            From the list of crams, return the most appropriate cram size for a
-            sequencing group on a specific day.
-            """
-            if sg_id not in sizes_by_sg:
-                return None
-            sg_sizes = sizes_by_sg[sg_id]
-            if len(sg_sizes) == 1:
-                # probably shouldn't just return it, but it's the only cram size
-                # and for some reason it's in the es-index, so we'll just use it
-                return sg_sizes[0][1]
-            for dt, size in sg_sizes[::-1]:
-                if dt <= date:
-                    return size
-            logger.warning(f'Could not find size for {sg_id} on {date}')
-            return None
-
-        sg_to_project: dict[SequencingGroupInternalId, ProjectId] = {
-            sg.id: sg.project for sg in sg_by_id.values()
-        }
-
+        sg_to_project = self.map_sg_to_project(sg_by_id)
         sgs_added_by_day = await self.get_sgs_added_by_day_by_es_indices(
             start=start_date,
             end=end_date,
@@ -349,19 +308,11 @@ class AnalysisLayer(BaseLayer):
         sgs_seen: set[SequencingGroupInternalId] = set()
 
         ordered_days = sorted(sgs_added_by_day.items(), key=lambda el: el[0])
-        prop_map: list[ProportionalDateModel] = []
+        prop_map = []
         for day, sgs_for_day in ordered_days:
-            by_project: dict[ProjectId, int] = defaultdict(int)
-            sgs_seen |= sgs_for_day
-            for sg in sgs_seen:
-                if sg not in sg_to_project:
-                    # it's a sg that was in an es-index, but not in the projects
-                    # we care about, so happily skip. It's _probably_ quicker to do
-                    # it this way, rather than only querying for the SGs we care about
-                    continue
-                if cram_size := get_cram_size_for(sg, day):
-                    by_project[sg_to_project[sg]] += cram_size
-
+            by_project = self.calculate_cram_size_by_project(
+                sgs_seen, sgs_for_day, sg_to_project, sizes_by_sg, day
+            )
             total_size = sum(by_project.values())
             prop_map.append(
                 ProportionalDateModel(
@@ -378,6 +329,47 @@ class AnalysisLayer(BaseLayer):
             )
 
         return prop_map
+
+    def map_sg_to_project(
+        self, sg_by_id: dict[SequencingGroupInternalId, SequencingGroupInternal]
+    ) -> dict[SequencingGroupInternalId, ProjectId]:
+        """Map the sequencing group id to project"""
+        return {sg.id: sg.project for sg in sg_by_id.values()}
+
+    def calculate_cram_size_by_project(
+        self,
+        sgs_seen: set,
+        sgs_for_day: set,
+        sg_to_project: dict,
+        sizes_by_sg: dict,
+        day: datetime.date,
+    ) -> dict[ProjectId, int]:
+        """Calculate the cram size by project for a day"""
+        by_project: dict[ProjectId, int] = defaultdict(int)
+        sgs_seen |= sgs_for_day
+        for sg in sgs_seen:
+            if sg not in sg_to_project:
+                continue
+            if cram_size := self.get_cram_size_for_squencing_group(
+                sg, sizes_by_sg, day
+            ):
+                by_project[sg_to_project[sg]] += cram_size
+        return by_project
+
+    def get_cram_size_for_squencing_group(
+        self, sg_id: SequencingGroupInternalId, sizes_by_sg: dict, date: datetime.date
+    ) -> int | None:
+        """Get the cram size for a sequencing group"""
+        if sg_id not in sizes_by_sg:
+            return None
+        sg_sizes = sizes_by_sg[sg_id]
+        if len(sg_sizes) == 1:
+            return sg_sizes[0][1]
+        for dt, size in sg_sizes[::-1]:
+            if dt <= date:
+                return size
+        logger.warning(f'Could not find size for {sg_id} on {date}')
+        return None
 
     async def calculate_delta_of_crams_by_project_for_day(
         self,
@@ -399,30 +391,58 @@ class AnalysisLayer(BaseLayer):
         )
 
         for sg_id, analyses in crams.items():
-            for idx, cram in enumerate(analyses):
-                project = project_name_map.get(sg_by_id[sg_id].project)
-                delta = None
-                if idx == 0:
-                    # use the sample_create_date for the first analysis
-                    sg_start_date = sample_create_dates[sg_id]
-                    delta = cram.meta.get('size') or 0
-                else:
-                    # replace with the current analyses timestamp_completed
-                    sg_start_date = check_or_parse_date(cram.timestamp_completed)
-                    if new_cram_size := cram.meta.get('size'):
-                        delta = new_cram_size - analyses[idx - 1].meta.get('size', 0)
-                if not delta:
-                    continue
-                if end_date and sg_start_date > end_date:
-                    continue
-
-                # this will eventually get the "best" cram size correctly by applying
-                # deltas for multiple crams before the start datetime.date, so the
-                # clamping here is fine.
-                clamped_date = max(sg_start_date, start_date)
-                by_date_diff[clamped_date][project] += delta
+            await self._process_crams_for_sg(
+                sg_id,
+                sg_by_id[sg_id].project,
+                analyses,
+                sample_create_dates,
+                project_name_map,
+                by_date_diff,
+                start_date,
+                end_date,
+            )
 
         return by_date_diff
+
+    async def _process_crams_for_sg(
+        self,
+        sg_id: SequencingGroupInternalId,
+        project_id: ProjectId,
+        analyses: list[AnalysisInternal],
+        sample_create_dates: dict[SequencingGroupInternalId, datetime.date],
+        project_name_map: dict[int, str],
+        by_date_diff: dict[datetime.date, dict[str, int]],
+        start_date: datetime.date | None,
+        end_date: datetime.date | None,
+    ):
+        """Process the crams for a sequencing group and add to the by_date_diff"""
+
+        for idx, cram in enumerate(analyses):
+            project = project_name_map.get(project_id)
+            delta, sg_start_date = self._calculate_delta_and_start_date(
+                idx, cram, analyses, sample_create_dates[sg_id]
+            )
+            if not delta or (end_date and sg_start_date > end_date):
+                continue
+            clamped_date = max(sg_start_date, start_date)
+            by_date_diff[clamped_date][project] += delta
+
+    def _calculate_delta_and_start_date(
+        self,
+        idx: int,
+        cram: AnalysisInternal,
+        analyses: list[AnalysisInternal],
+        sample_create_date: datetime.date,
+    ) -> tuple[int | None, datetime.date]:
+        """Calculate the delta and start date for a cram"""
+        if idx == 0:
+            return cram.meta.get('size') or 0, sample_create_date
+        sg_start_date = check_or_parse_date(cram.timestamp_completed)
+        new_cram_size = cram.meta.get('size')
+        if new_cram_size:
+            delta = new_cram_size - analyses[idx - 1].meta.get('size', 0)
+            return delta, sg_start_date
+        return None, sg_start_date
 
     async def get_cram_sizes_between_range(
         self,
@@ -442,36 +462,47 @@ class AnalysisLayer(BaseLayer):
         )
 
         for sg_id, analyses in crams.items():
-            if len(analyses) == 1:
-                # it does resolve the same, but most cases come through here
-                by_date[sg_id] = [
-                    (
-                        max(sample_create_dates[sg_id], start_date),
-                        analyses[0].meta.get('size') or 0,
-                    )
-                ]
-            else:
-                for idx, cram in enumerate(
-                    sorted(analyses, key=lambda a: a.timestamp_completed)
-                ):
-                    if idx == 0:
-                        # use the sample_create_date for the first analysis
-                        sg_start_date = sample_create_dates[sg_id]
-                    else:
-                        # replace with the current analyses timestamp_completed
-                        sg_start_date = cram.timestamp_completed.date()
+            # For each cram, get the date range and size from each analysis object by
+            # sequencing group id
+            by_date[sg_id] = self._get_list_of_dates_and_sizes(
+                sg_id, analyses, sample_create_dates[sg_id], start_date, end_date
+            )
 
-                    if end_date and sg_start_date > end_date:
-                        continue
+        return by_date
 
-                    clamped_date = (
-                        max(sg_start_date, start_date) if start_date else sg_start_date
-                    )
+    def _get_list_of_dates_and_sizes(
+        self, sg_id, analyses, default_start_date, start_date, end_date
+    ):
+        """Given a list of analyses, get the list of tuple (date, size)"""
+        if len(analyses) == 1:
+            # it does resolve the same, but most cases come through here
+            return [
+                (
+                    max(default_start_date, start_date),
+                    analyses[0].meta.get('size') or 0,
+                )
+            ]
 
-                    if 'size' not in cram.meta:
-                        continue
+        by_date: list[tuple[datetime.date, int]] = []
+        for idx, cram in enumerate(
+            sorted(analyses, key=lambda a: a.timestamp_completed)
+        ):
+            # use the default_start_date for the first analysis
+            # replace with the current analyses timestamp_completed for the rest
+            sg_start_date = (
+                default_start_date if idx == 0 else cram.timestamp_completed.date()
+            )
 
-                    by_date[sg_id].append((clamped_date, cram.meta.get('size') or 0))
+            # If the start is after the end, we can skip
+            if end_date and sg_start_date > end_date:
+                continue
+
+            # Take the latest of the sg_start_date and the start_date
+            clamped_date = (
+                max(sg_start_date, start_date) if start_date else sg_start_date
+            )
+
+            by_date[sg_id].append((clamped_date, cram.meta.get('size', 0)))
 
         return by_date
 
