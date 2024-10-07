@@ -143,7 +143,6 @@ async def not_found(request, exc):
 @app.exception_handler(Exception)
 async def exception_handler(request: Request, e: Exception):
     """Generic exception handler"""
-    add_stacktrace = True
     description: str
 
     if isinstance(e, HTTPException):
@@ -162,9 +161,9 @@ async def exception_handler(request: Request, e: Exception):
 
     base_params = {'name': name, 'description': description}
 
-    if add_stacktrace:
-        st = traceback.format_exc()
-        base_params['stacktrace'] = st
+    # Allways add stacktrace
+    st = traceback.format_exc()
+    base_params['stacktrace'] = st
 
     response = JSONResponse(
         status_code=code,
