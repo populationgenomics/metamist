@@ -186,7 +186,7 @@ class SequencingGroupLayer(BaseLayer):
             raise ValueError('Sequences were not attached to any project')
 
         assay_types = set(a.type for a in assays)
-        if not len(assay_types) == 1 and 'sequencing' in assay_types:
+        if len(assay_types) != 1 and 'sequencing' in assay_types:
             raise ValueError(
                 f'Assays must be all of type "sequencing", got: {assay_types}'
             )
@@ -279,24 +279,41 @@ class SequencingGroupLayer(BaseLayer):
         """Upsert a list of sequence groups"""
         if not isinstance(sequencing_groups, list):
             raise ValueError('Sequencing groups is not a list')
-        # first determine if any groups have different sequences
+
         slayer = AssayLayer(self.connection)
+        assays = self._collect_assays(sequencing_groups)
+        await self._upsert_assays_if_needed(slayer, assays)
+
+        to_insert, to_update, to_replace = await self._classify_sequencing_groups(
+            sequencing_groups
+        )
+
+        await self._insert_sequencing_groups(to_insert)
+        await self._update_sequencing_groups(to_update)
+        await self._replace_sequencing_groups(to_replace)
+
+        return sequencing_groups
+
+    def _collect_assays(self, sequencing_groups):
         assays = []
         for sg in sequencing_groups:
             for assay in sg.assays or []:
                 assay.sample_id = sg.sample_id
                 assays.append(assay)
+        return assays
+
+    async def _upsert_assays_if_needed(self, slayer, assays):
         if assays:
             if not all(a.sample_id for a in assays):
                 raise ValueError(
                     'Upserting sequencing-groups with assays requires a sample_id to be set for every sequencing-group'
                 )
-
             await slayer.upsert_assays(assays, open_transaction=False)
 
+    async def _classify_sequencing_groups(self, sequencing_groups):
         to_insert = [sg for sg in sequencing_groups if not sg.id]
         to_update = []
-        to_replace: list[SequencingGroupUpsertInternal] = []
+        to_replace = []
 
         sequencing_groups_that_exist = [sg for sg in sequencing_groups if sg.id]
         if sequencing_groups_that_exist:
@@ -307,25 +324,20 @@ class SequencingGroupLayer(BaseLayer):
 
             for sg in sequencing_groups_that_exist:
                 if not sg.assays:
-                    # treat it as an update
                     to_update.append(sg)
-                    continue
-
-                # if we need to insert any assays, then the group will have to change
-                if any(not sq.id for sq in sg.assays):
+                elif any(not sq.id for sq in sg.assays):
                     to_replace.append(sg)
-                    continue
-
-                existing_sequences = set(sequence_to_group.get(int(sg.id), []))
-                new_assay_ids = set(sq.id for sq in sg.assays)
-                if new_assay_ids == existing_sequences:
-                    to_update.append(sg)
                 else:
-                    to_replace.append(sg)
+                    existing_sequences = set(sequence_to_group.get(int(sg.id), []))
+                    new_assay_ids = set(sq.id for sq in sg.assays)
+                    if new_assay_ids == existing_sequences:
+                        to_update.append(sg)
+                    else:
+                        to_replace.append(sg)
 
-        # You can't write to the same connections multiple times in parallel,
-        # but we're inside a transaction, so it's not actually committing anything
-        # so should be quick to "write" in serial
+        return to_insert, to_update, to_replace
+
+    async def _insert_sequencing_groups(self, to_insert):
         for sg in to_insert:
             assay_ids = [a.id for a in sg.assays]
             sg.id = await self.seqgt.create_sequencing_group(
@@ -338,11 +350,13 @@ class SequencingGroupLayer(BaseLayer):
                 open_transaction=False,
             )
 
+    async def _update_sequencing_groups(self, to_update):
         for sg in to_update:
             await self.seqgt.update_sequencing_group(
                 int(sg.id), meta=sg.meta, platform=sg.platform
             )
 
+    async def _replace_sequencing_groups(self, to_replace):
         for sg in to_replace:
             await self.recreate_sequencing_group_with_new_assays(
                 sequencing_group_id=int(sg.id),
@@ -350,7 +364,5 @@ class SequencingGroupLayer(BaseLayer):
                 open_transaction=False,
                 meta=sg.meta,
             )
-
-        return sequencing_groups
 
     # endregion
