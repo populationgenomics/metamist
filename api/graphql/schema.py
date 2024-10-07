@@ -97,7 +97,6 @@ for enum in enum_tables.__dict__.values():
             return await _enum(info.context['connection']).get()
 
         m.__name__ = _enum.get_enum_name()
-        # m.__annotations__ = {'return': list[str]}
         return m
 
     enum_methods[enum.get_enum_name()] = strawberry.field(
