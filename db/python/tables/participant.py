@@ -52,13 +52,57 @@ class ParticipantTable(DbBase):
         group_result_by_id: bool = True,
     ) -> tuple[str, dict[str, Any]]:
         """Construct a participant query"""
-        needs_family = False
-        needs_participant_eid = True  # always join, query optimiser can figure it out
-        needs_sample = False
-        needs_sample_eid = False
-        needs_sequencing_group = False
-        needs_assay = False
 
+        # Get the wheres, values and needs for every part of the query filter_
+        wheres, values, needs = ParticipantTable._initialize_query_parts(filter_)
+        ParticipantTable._add_family_filter(filter_, wheres, values, needs)
+        ParticipantTable._add_sample_filter(filter_, wheres, values, needs)
+        ParticipantTable._add_sequencing_group_filter(filter_, wheres, values, needs)
+        ParticipantTable._add_assay_filter(filter_, wheres, values, needs)
+
+        # This constructs the query based off the the parts we need
+        query_lines = ParticipantTable._build_query_lines(needs)
+
+        # Add where, limit and skip clauses
+        if wheres:
+            query_lines.append('WHERE \n' + ' AND '.join(wheres))
+        if limit or skip:
+            query_lines.append('ORDER BY pp.id')
+        if limit:
+            query_lines.append('LIMIT :limit')
+            values['limit'] = limit
+        if skip:
+            query_lines.append('OFFSET :offset')
+            values['offset'] = skip
+
+        # Now we actually construct the query into a single string
+        query = '\n'.join('  ' + line.strip() for line in query_lines)
+
+        ex_table_join = (
+            f"""
+        LEFT JOIN participant_external_id {participant_eid_table_alias}
+            ON p.id = {participant_eid_table_alias}.participant_id
+        """
+            if participant_eid_table_alias
+            else ''
+        )
+
+        outer_query = f"""
+            SELECT {', '.join(keys)}
+            FROM participant p
+            {ex_table_join}
+            INNER JOIN (
+            {query}
+            ) as inner_query ON inner_query.id = p.id
+            {"GROUP BY p.id" if group_result_by_id else ""}
+        """
+
+        return outer_query, values
+
+    @staticmethod
+    def _initialize_query_parts(
+        filter_: ParticipantFilter,
+    ) -> tuple[list[str], dict[str, Any], dict[str, bool]]:
         _wheres, values = filter_.to_sql(
             {
                 'project': 'pp.project',
@@ -69,9 +113,24 @@ class ParticipantTable(DbBase):
             exclude=['family', 'sample', 'sequencing_group', 'assay'],
         )
         wheres = [_wheres]
+        needs = {
+            'family': False,
+            'sample': False,
+            'sample_eid': False,
+            'sequencing_group': False,
+            'assay': False,
+        }
+        return wheres, values, needs
 
+    @staticmethod
+    def _add_family_filter(
+        filter_: ParticipantFilter,
+        wheres: list[str],
+        values: dict[str, Any],
+        needs: dict[str, bool],
+    ):
         if filter_.family:
-            needs_family = True
+            needs['family'] = True
             fwheres, fvalues = filter_.family.to_sql(
                 {
                     'id': 'f.id',
@@ -83,8 +142,15 @@ class ParticipantTable(DbBase):
             if fwheres:
                 wheres.append(fwheres)
 
+    @staticmethod
+    def _add_sample_filter(
+        filter_: ParticipantFilter,
+        wheres: list[str],
+        values: dict[str, Any],
+        needs: dict[str, bool],
+    ):
         if filter_.sample:
-            needs_sample = True
+            needs['sample'] = True
             swheres, svalues = filter_.sample.to_sql(
                 {
                     'id': 's.id',
@@ -96,21 +162,26 @@ class ParticipantTable(DbBase):
                 exclude=['external_id'],
             )
             if filter_.sample.external_id:
-                needs_sample_eid = True
+                needs['sample_eid'] = True
                 seid_wheres, seid_values = filter_.sample.to_sql(
                     {'external_id': 'seid.external_id'}, only=['external_id']
                 )
-
                 wheres.append(seid_wheres)
                 svalues.update(seid_values)
-
             values.update(svalues)
             if swheres:
                 wheres.append(swheres)
 
+    @staticmethod
+    def _add_sequencing_group_filter(
+        filter_: ParticipantFilter,
+        wheres: list[str],
+        values: dict[str, Any],
+        needs: dict[str, bool],
+    ):
         if filter_.sequencing_group:
-            needs_sample = True
-            needs_sequencing_group = True
+            needs['sample'] = True
+            needs['sequencing_group'] = True
             swheres, svalues = filter_.sequencing_group.to_sql(
                 {
                     'id': 'sg.id',
@@ -124,14 +195,16 @@ class ParticipantTable(DbBase):
             if swheres:
                 wheres.append(swheres)
 
+    @staticmethod
+    def _add_assay_filter(
+        filter_: ParticipantFilter,
+        wheres: list[str],
+        values: dict[str, Any],
+        needs: dict[str, bool],
+    ):
         if filter_.assay:
-            # 2024-06-13 mfranklin
-            #   This is explicitly NOT searching assays through the active sequencing
-            #   group, so it could return a result here, but not in the web, as the web
-            #   doesn't show non-sequencing-assays as of writing
-            needs_sample = True
-            needs_assay = True
-
+            needs['sample'] = True
+            needs['assay'] = True
             awheres, avalues = filter_.assay.to_sql(
                 {
                     'id': 'a.id',
@@ -143,65 +216,31 @@ class ParticipantTable(DbBase):
             if awheres:
                 wheres.append(awheres)
 
+    @staticmethod
+    def _build_query_lines(needs: dict[str, bool]) -> list[str]:
         query_lines = [
             'SELECT DISTINCT pp.id',
             'FROM participant pp',
         ]
-
-        if needs_participant_eid:
-            query_lines.append(
-                'INNER JOIN participant_external_id peid ON pp.id = peid.participant_id'
-            )
-
-        if needs_sample:
+        query_lines.append(
+            'INNER JOIN participant_external_id peid ON pp.id = peid.participant_id'
+        )
+        if needs['sample']:
             query_lines.append('INNER JOIN sample s ON s.participant_id = pp.id')
-        if needs_sample_eid:
+        if needs['sample_eid']:
             query_lines.append(
                 'INNER JOIN sample_external_id seid ON seid.sample_id = s.id'
             )
-        if needs_sequencing_group:
+        if needs['sequencing_group']:
             query_lines.append('INNER JOIN sequencing_group sg ON sg.sample_id = s.id')
-        if needs_assay:
-            # see above for a quick note in assays from participant query
+        if needs['assay']:
             query_lines.append('INNER JOIN assay a ON a.sample_id = s.id')
-        if needs_family:
+        if needs['family']:
             query_lines.append(
                 'INNER JOIN family_participant fp ON fp.participant_id = pp.id\n'
                 'INNER JOIN family f ON f.id = fp.family_id'
             )
-
-        if wheres:
-            query_lines.append('WHERE \n' + ' AND '.join(wheres))
-
-        if limit or skip:
-            query_lines.append('ORDER BY pp.id')
-
-        if limit:
-            query_lines.append('LIMIT :limit')
-            values['limit'] = limit
-
-        if skip:
-            query_lines.append('OFFSET :offset')
-            values['offset'] = skip
-
-        query = '\n'.join('  ' + line.strip() for line in query_lines)
-        ex_table_join = ''
-        if participant_eid_table_alias:
-            ex_table_join = f"""
-            LEFT JOIN participant_external_id {participant_eid_table_alias}
-                ON p.id = {participant_eid_table_alias}.participant_id
-            """
-        outer_query = f"""
-            SELECT {', '.join(keys)}
-            FROM participant p
-            {ex_table_join}
-            INNER JOIN (
-            {query}
-            ) as inner_query ON inner_query.id = p.id
-            {"GROUP BY p.id" if group_result_by_id else ""}
-        """
-
-        return outer_query, values
+        return query_lines
 
     async def query(
         self,
