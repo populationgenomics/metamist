@@ -157,47 +157,34 @@ class CohortLayer(BaseLayer):
         Create a new cohort from the given parameters. Returns the newly created cohort_id.
         """
 
-        create_cohort_template = True
-
-        # Input validation
         if not cohort_criteria and not template_id:
             raise ValueError(
                 'A cohort must have either criteria or be derived from a template'
             )
 
-        template: CohortTemplateInternal | None = None
-        # Get template from ID
+        template = None
         if template_id:
             template = await self.ct.get_cohort_template(template_id)
             if not template:
                 raise ValueError(f'Cohort template with ID {template_id} not found')
 
         if template and cohort_criteria:
-            # TODO: Perhaps handle this case in future. For now, not supported.
             raise ValueError(
                 'A cohort cannot have both criteria and be derived from a template'
             )
 
-        # Only provide a template id
-        if template and not cohort_criteria:
-            create_cohort_template = False
+        if template:
             cohort_criteria = template.criteria
 
         if not cohort_criteria:
             raise ValueError('Cohort criteria must be set')
 
-        sample_ids: list[int] = []
+        sample_ids = []
         if cohort_criteria.sample_type:
-            # Get sample IDs with sample type
             sample_filter = SampleFilter(
                 project=GenericFilter(in_=cohort_criteria.projects),
-                type=(
-                    GenericFilter(in_=cohort_criteria.sample_type)
-                    if cohort_criteria.sample_type
-                    else None
-                ),
+                type=GenericFilter(in_=cohort_criteria.sample_type),
             )
-
             _, samples = await self.sampt.query(sample_filter)
             sample_ids = [s.id for s in samples]
 
@@ -215,14 +202,13 @@ class CohortLayer(BaseLayer):
 
         if dry_run:
             sg_ids = [sg.id for sg in sgs if sg.id] if sgs else []
-
             return NewCohortInternal(
                 dry_run=True,
                 cohort_id=None,
                 sequencing_group_ids=sg_ids,
             )
-        # 2. Create cohort template, if required.
-        if create_cohort_template:
+
+        if not template_id:
             cohort_template = CohortTemplateInternal(
                 id=None,
                 name=cohort_name,
@@ -237,7 +223,6 @@ class CohortLayer(BaseLayer):
         if not template_id:
             raise ValueError('Template ID must be set')
 
-        # 3. Create Cohort
         return await self.ct.create_cohort(
             project=project_to_write,
             cohort_name=cohort_name,
