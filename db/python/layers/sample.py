@@ -40,7 +40,7 @@ class SampleLayer(BaseLayer):
         """Query samples"""
         projects, samples = await self.st.query(filter_)
         if not samples:
-            return samples
+            return []
 
         self.connection.check_access_to_projects_for_ids(
             projects, allowed_roles=ReadAccessRoles
