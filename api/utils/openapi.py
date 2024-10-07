@@ -21,6 +21,24 @@ else:
     URLS.append(f'http://localhost:{port}')
 
 
+def handle_any_of(yaml_dict: dict):
+    """Handle anyOf in the yaml dict"""
+    if 'anyOf' in yaml_dict and isinstance((any_of := yaml_dict['anyOf']), list):
+        for i, item in enumerate(any_of):
+            if isinstance(item, dict) and item.get('type') == 'null':
+                any_of.pop(i)
+                yaml_dict['nullable'] = True
+
+
+def handle_examples(yaml_dict: dict):
+    """Handle examples in the yaml dict"""
+    if 'examples' in yaml_dict:
+        examples = yaml_dict['examples']
+        del yaml_dict['examples']
+        if isinstance(examples, list) and len(examples):
+            yaml_dict['example'] = examples[0]
+
+
 def convert_3_dot_1_to_3_dot_0_inplace(json: dict[str, Json]):
     """
     Will attempt to convert version 3.1.0 of some openAPI json into 3.0.2
@@ -47,16 +65,8 @@ def convert_3_dot_1_to_3_dot_0_inplace(json: dict[str, Json]):
 
     def inner(yaml_dict: Json):
         if isinstance(yaml_dict, dict):
-            if 'anyOf' in yaml_dict and isinstance((anyOf := yaml_dict['anyOf']), list):
-                for i, item in enumerate(anyOf):
-                    if isinstance(item, dict) and item.get('type') == 'null':
-                        anyOf.pop(i)
-                        yaml_dict['nullable'] = True
-            if 'examples' in yaml_dict:
-                examples = yaml_dict['examples']
-                del yaml_dict['examples']
-                if isinstance(examples, list) and len(examples):
-                    yaml_dict['example'] = examples[0]
+            handle_any_of(yaml_dict)
+            handle_examples(yaml_dict)
             for value in yaml_dict.values():
                 inner(value)
         elif isinstance(yaml_dict, list):
