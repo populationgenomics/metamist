@@ -264,9 +264,11 @@ GROUP BY analysis_id;
                     if stripy_report.outlier_loci
                     else None
                 ),
-                'timestamp_completed': stripy_report.timestamp_completed.isoformat()
-                if stripy_report.timestamp_completed
-                else None,
+                'timestamp_completed': (
+                    stripy_report.timestamp_completed.isoformat()
+                    if stripy_report.timestamp_completed
+                    else None
+                ),
             }
 
         if mito_report := sequencing_group_mito_reports.get(report_key):
@@ -274,9 +276,11 @@ GROUP BY analysis_id;
                 'url': self.get_report_url(
                     project.name, sequencing_group_id, mito_report.output, 'MitoReport'
                 ),
-                'timestamp_completed': mito_report.timestamp_completed.isoformat()
-                if mito_report.timestamp_completed
-                else None,
+                'timestamp_completed': (
+                    mito_report.timestamp_completed.isoformat()
+                    if mito_report.timestamp_completed
+                    else None
+                ),
             }
 
         return report_links
@@ -286,9 +290,9 @@ GROUP BY analysis_id;
         return {
             'id': cram_row.id if cram_row else None,
             'output': cram_row.output if cram_row else None,
-            'timestamp_completed': cram_row.timestamp_completed.strftime('%d-%m-%y')
-            if cram_row
-            else None,
+            'timestamp_completed': (
+                cram_row.timestamp_completed.strftime('%d-%m-%y') if cram_row else None
+            ),
         }
 
     def get_analysis_stats_internal_from_record(
@@ -1126,6 +1130,9 @@ INNER JOIN (
                 latest_es_indices_by_project_id_and_seq_type_and_stage,
             )
 
+            def get_id(row):
+                return row.id if row else None
+
             for details_row in details_rows:
                 if not details_row:
                     continue
@@ -1139,21 +1146,9 @@ INNER JOIN (
                         sequencing_group_details=details_row,
                         sequencing_group_cram=sequencing_groups_crams.get(sg_id),
                         analysis_sequencing_groups=analysis_sequencing_groups,
-                        latest_annotate_dataset_id=(
-                            latest_annotate_dataset_row.id
-                            if latest_annotate_dataset_row
-                            else None
-                        ),
-                        latest_snv_es_index_id=(
-                            latest_snv_es_index_row.id
-                            if latest_snv_es_index_row
-                            else None
-                        ),
-                        latest_sv_es_index_id=(
-                            latest_sv_es_index_row.id
-                            if latest_sv_es_index_row
-                            else None
-                        ),
+                        latest_annotate_dataset_id=get_id(latest_annotate_dataset_row),
+                        latest_snv_es_index_id=get_id(latest_snv_es_index_row),
+                        latest_sv_es_index_id=get_id(latest_sv_es_index_row),
                         stripy_reports=sequencing_group_stripy_reports,
                         mito_reports=sequencing_group_mito_reports,
                     )
