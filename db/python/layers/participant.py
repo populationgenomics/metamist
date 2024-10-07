@@ -442,9 +442,6 @@ class ParticipantLayer(BaseLayer):  # pylint: disable=too-many-public-methods
             )
 
             external_participant_ids = {row[participant_id_field_idx] for row in rows}
-            # TODO: determine better way to add persons if they're not here, if we add them here
-            #       we risk when the samples are added, we might not link them correctly.
-            # will throw if missing external ids
 
             # Get the external participant id map. Minimally this will be those listed
             # in the external_participant_ids, but if we're going to add them, we'll need
