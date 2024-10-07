@@ -12,6 +12,8 @@ from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
 from models.models import BillingColumn, BillingTotalCostQueryModel
 
+DATE_FORMAT = '%Y-%m-%d'
+
 
 class BillingGcpDailyTable(BillingBaseTable):
     """Billing GCP Daily Big Query table"""
@@ -37,21 +39,25 @@ class BillingGcpDailyTable(BillingBaseTable):
 
         # initial partition filter
         billing_filter.part_time = GenericBQFilter[datetime](
-            gte=datetime.strptime(query.start_date, '%Y-%m-%d')
-            if query.start_date
-            else None,
-            lte=(datetime.strptime(query.end_date, '%Y-%m-%d') + timedelta(days=7))
-            if query.end_date
-            else None,
+            gte=datetime.strptime(query.start_date, '') if query.start_date else None,
+            lte=(
+                (datetime.strptime(query.end_date, DATE_FORMAT) + timedelta(days=7))
+                if query.end_date
+                else None
+            ),
         )
         # add day filter after partition filter is applied
         billing_filter.day = GenericBQFilter[datetime](
-            gte=datetime.strptime(query.start_date, '%Y-%m-%d')
-            if query.start_date
-            else None,
-            lte=datetime.strptime(query.end_date, '%Y-%m-%d')
-            if query.end_date
-            else None,
+            gte=(
+                datetime.strptime(query.start_date, DATE_FORMAT)
+                if query.start_date
+                else None
+            ),
+            lte=(
+                datetime.strptime(query.end_date, DATE_FORMAT)
+                if query.end_date
+                else None
+            ),
         )
         return billing_filter
 
