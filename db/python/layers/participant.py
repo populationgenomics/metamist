@@ -237,7 +237,7 @@ class SeqrMetadataKeys(Enum):
         return terms
 
 
-class ParticipantLayer(BaseLayer):
+class ParticipantLayer(BaseLayer):  # pylint: disable=too-many-public-methods
     """Layer for more complex sample logic"""
 
     def __init__(self, connection: Connection):
@@ -419,18 +419,24 @@ class ParticipantLayer(BaseLayer):
 
         # filter to non-comment rows
         async with self.connection.connection.transaction():
+            # Connection is required to have a project_id
+            # Then use connection to to create a ParticipantPhenotypeTable
+            assert self.connection.project_id
             ppttable = ParticipantPhenotypeTable(self.connection)
+            ftable = FamilyTable(self.connection)
+            fpttable = FamilyParticipantTable(self.connection)
 
-            self._validate_individual_metadata_headers(headers)
-
+            # Get the index of headers
             lheaders_to_idx_map = {h.lower(): idx for idx, h in enumerate(headers)}
-
             participant_id_field_idx = lheaders_to_idx_map[
                 SeqrMetadataKeys.INDIVIDUAL_ID.value.lower()
             ]
             family_id_field_indx = lheaders_to_idx_map.get(
                 SeqrMetadataKeys.FAMILY_ID.value.lower()
             )
+
+            # Validate headers and metadata participant ids
+            self._validate_individual_metadata_headers(headers)
             self._validate_individual_metadata_participant_ids(
                 rows=rows, participant_id_field_indx=participant_id_field_idx
             )
@@ -440,30 +446,15 @@ class ParticipantLayer(BaseLayer):
             #       we risk when the samples are added, we might not link them correctly.
             # will throw if missing external ids
 
-            # we'll allow missing (from the db) participants if we're going to add them
-            allow_missing_participants = (
-                extra_participants_method != ExtraParticipantImporterHandler.FAIL
+            # Get the external participant id map. Minimally this will be those listed
+            # in the external_participant_ids, but if we're going to add them, we'll need
+            # to get the full list
+            external_pid_map = await self.get_external_participant_ids_map(
+                external_participant_ids, extra_participants_method
             )
-            assert self.connection.project_id
-            external_pid_map = await self.get_id_map_by_external_ids(
-                list(external_participant_ids),
-                project=self.connection.project_id,
-                allow_missing=allow_missing_participants,
-            )
-            if extra_participants_method == ExtraParticipantImporterHandler.ADD:
-                missing_participant_eids = external_participant_ids - set(
-                    external_pid_map.keys()
-                )
-                for ex_pid in missing_participant_eids:
-                    external_pid_map[ex_pid] = await self.pttable.create_participant(
-                        external_ids={PRIMARY_EXTERNAL_ORG: ex_pid},
-                        reported_sex=None,
-                        reported_gender=None,
-                        karyotype=None,
-                        meta=None,
-                        project=self.connection.project_id,
-                    )
-            elif extra_participants_method == ExtraParticipantImporterHandler.IGNORE:
+
+            # If we're ignoring extra participants, we'll filter them out
+            if extra_participants_method == ExtraParticipantImporterHandler.IGNORE:
                 rows = [
                     row
                     for row in rows
@@ -473,12 +464,8 @@ class ParticipantLayer(BaseLayer):
             internal_to_external_pid_map = {v: k for k, v in external_pid_map.items()}
             pids = list(external_pid_map.values())
 
-            # we're going to verify the family identifier if specified (and known) is correct
+            # We're going to verify the family identifier if specified (and known) is correct
             # then we'll insert a row in the FamilyParticipant if unknown (by SM) and specified
-
-            ftable = FamilyTable(self.connection)
-            fpttable = FamilyParticipantTable(self.connection)
-
             provided_pid_to_external_family = {
                 external_pid_map[row[participant_id_field_idx]]: row[
                     family_id_field_indx
@@ -488,7 +475,8 @@ class ParticipantLayer(BaseLayer):
             }
 
             external_family_ids = set(provided_pid_to_external_family.values())
-            # check that all the family ids actually line up
+
+            # Check that all the family ids actually line up
             _, pid_to_internal_family = await fpttable.get_participant_family_map(pids)
             fids = set(pid_to_internal_family.values())
             fmap_by_internal = await ftable.get_id_map_by_internal_ids(list(fids))
@@ -523,8 +511,8 @@ class ParticipantLayer(BaseLayer):
 
             if len(incompatible_familes) > 0:
                 raise ValueError(
-                    'Specified family IDs for participants did not match what SM '
-                    'already knows,please update these in the SM database before '
+                    "Specified family IDs for participants did not match what SM "
+                    "already knows,please update these in the SM database before "
                     f'proceeding: {", ".join(incompatible_familes)}'
                 )
 
@@ -565,6 +553,47 @@ class ParticipantLayer(BaseLayer):
 
             await ppttable.add_key_value_rows(insertable_rows)
             return True
+
+    async def get_external_participant_ids_map(
+        self,
+        external_participant_ids: set[str],
+        extra_participants_method: ExtraParticipantImporterHandler,
+    ):
+        """
+        Gets the external participant id map taking into account the extra
+        participants method. If the extra participants need to be added, they
+        will be added and the map will be returned.
+
+        If it's supposed to fail, it will raise a NotFoundError if any of the
+        external_participant_ids are not found.
+        """
+        # Get the external participant id map
+        # we'll allow missing (from the db) participants if we're going to add them
+        allow_missing_participants = (
+            extra_participants_method != ExtraParticipantImporterHandler.FAIL
+        )
+        external_pid_map = await self.get_id_map_by_external_ids(
+            list(external_participant_ids),
+            project=self.connection.project_id,
+            allow_missing=allow_missing_participants,
+        )
+
+        # Then, handle the extra participants
+        if extra_participants_method == ExtraParticipantImporterHandler.ADD:
+            missing_participant_eids = external_participant_ids - set(
+                external_pid_map.keys()
+            )
+            for ex_pid in missing_participant_eids:
+                external_pid_map[ex_pid] = await self.pttable.create_participant(
+                    external_ids={PRIMARY_EXTERNAL_ORG: ex_pid},
+                    reported_sex=None,
+                    reported_gender=None,
+                    karyotype=None,
+                    meta=None,
+                    project=self.connection.project_id,
+                )
+
+        return external_pid_map
 
     async def get_participants_by_families(
         self, family_ids: list[int]
@@ -925,55 +954,68 @@ class ParticipantLayer(BaseLayer):
         pid_map: dict[str, int],
         rows: list[list[str]],
     ):
-        # do all the matching in lowercase space, but store in regular case space
-        # pylint: disable=invalid-name
-        storeable_header_col_number_tuples: list[tuple[str, int]] = [
+        storeable_header_col_number_tuples = [
             (k, lheaders_to_idx_map[k.lower()])
             for k in storeable_keys
             if k.lower() in lheaders_to_idx_map
         ]
-
-        # list of (PersonId, Key, value) to insert into the participant_phenotype table
-        insertable_rows: list[tuple[int, str, Any]] = []
-        parsers = {k.value: v for k, v in SeqrMetadataKeys.get_key_parsers().items()}
-
         hpo_col_indices = [
             lheaders_to_idx_map.get(h.lower())
             for h in SeqrMetadataKeys.get_hpo_keys()
             if h.lower() in lheaders_to_idx_map
         ]
 
+        parsers = {k.value: v for k, v in SeqrMetadataKeys.get_key_parsers().items()}
+
+        insertable_rows = []
         for row in rows:
             external_participant_id = row[participant_id_field_idx]
             participant_id = pid_map[external_participant_id]
-
-            for header_key, col_number in storeable_header_col_number_tuples:
-                if header_key == SeqrMetadataKeys.HPO_TERMS_PRESENT.value:
-                    continue
-                if col_number >= len(row):
-                    continue
-                value = row[col_number]
-                if header_key in parsers:
-                    # use custom parse declared in SeqrMetadataKeys.get_key_parsers
-                    value = parsers[header_key](value)
-
-                if value:
-                    insertable_rows.append((participant_id, header_key, value))
-
-            hpo_terms = []
-            for idx in hpo_col_indices:
-                hpo_terms.extend(SeqrMetadataKeys.parse_hpo_terms(row[idx]))
-
-            if hpo_terms:
-                insertable_rows.append(
-                    (
-                        participant_id,
-                        SeqrMetadataKeys.HPO_TERMS_PRESENT.value,
-                        ','.join(hpo_terms),
-                    )
+            insertable_rows.extend(
+                ParticipantLayer._get_insertable_rows_for_row(
+                    row, participant_id, storeable_header_col_number_tuples, parsers
                 )
+            )
+            insertable_rows.extend(
+                ParticipantLayer._get_hpo_insertable_rows(
+                    row, participant_id, hpo_col_indices
+                )
+            )
 
         return insertable_rows
+
+    @staticmethod
+    def _get_insertable_rows_for_row(
+        row, participant_id, storeable_header_col_number_tuples, parsers
+    ):
+        insertable_rows = []
+        for header_key, col_number in storeable_header_col_number_tuples:
+            if (
+                col_number >= len(row)
+                or header_key == SeqrMetadataKeys.HPO_TERMS_PRESENT.value
+            ):
+                continue
+            value = row[col_number]
+            if header_key in parsers:
+                value = parsers[header_key](value)
+            if value:
+                insertable_rows.append((participant_id, header_key, value))
+        return insertable_rows
+
+    @staticmethod
+    def _get_hpo_insertable_rows(row, participant_id, hpo_col_indices):
+        hpo_terms = []
+        for idx in hpo_col_indices:
+            hpo_terms.extend(SeqrMetadataKeys.parse_hpo_terms(row[idx]))
+        if hpo_terms:
+            return [
+                (
+                    participant_id,
+                    SeqrMetadataKeys.HPO_TERMS_PRESENT.value,
+                    ','.join(hpo_terms),
+                )
+            ]
+        return []
 
     # endregion PHENOTYPES / SEQR
 
