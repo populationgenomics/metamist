@@ -150,7 +150,6 @@ class SeqrLayer(BaseLayer):
             )
 
         seqlayer = SequencingGroupLayer(self.connection)
-
         pid_to_sid_map = (
             await seqlayer.get_participant_ids_sequencing_group_ids_for_sequencing_type(
                 sequencing_type
@@ -169,7 +168,6 @@ class SeqrLayer(BaseLayer):
         if not family_ids and not participant_ids:
             raise ValueError('No families / participants to synchronize')
 
-        messages = []
         async with aiohttp.ClientSession() as session:
             params = {
                 'headers': {'Authorization': f'Bearer {token}'},
@@ -177,70 +175,33 @@ class SeqrLayer(BaseLayer):
                 'session': session,
             }
 
-            promises = []
-
-            # Sync pedigree separately AND first, and don't continue if there's an error
-            if sync_individuals:
-                try:
-                    messages.extend(
-                        await self.sync_pedigree(family_ids=family_ids, **params)
-                    )
-                except Exception as e:
-                    _errors = [
-                        ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-                    ]
-                    if post_slack_notification:
-                        _errors.extend(
-                            self.send_slack_notification(
-                                project_name=project.name,
-                                sequencing_type=sequencing_type,
-                                errors=_errors,
-                                messages=messages,
-                                seqr_guid=seqr_guid,
-                            )
-                        )
-                        messages.append('Sent a notification to slack')
-                    return {'errors': _errors, 'messages': messages}
-
-            if sync_families:
-                promises.append(self.sync_families(family_ids=family_ids, **params))
-
-            if sync_individual_metadata:
-                promises.append(
-                    self.sync_individual_metadata(
-                        participant_ids=participant_ids, **params
-                    )
-                )
-            if sync_es_index:
-                promises.append(
-                    self.update_es_index(
-                        sequencing_type=sequencing_type,
-                        sequencing_group_ids=sequencing_group_ids,
-                        es_index_types=es_index_types,
-                        **params,
-                    )
-                )
-            if sync_saved_variants:
-                promises.append(self.update_saved_variants(**params))
-            if sync_cram_map:
-                promises.append(
-                    self.sync_cram_map(
-                        sequencing_type=sequencing_type,
-                        participant_ids=participant_ids,
-                        **params,
-                    )
-                )
-
-            _messages = await asyncio.gather(
-                *promises,
-                return_exceptions=True,
+            sync_options = {
+                'individuals': sync_individuals,
+                'families': sync_families,
+                'individual_metadata': sync_individual_metadata,
+                'es_index': sync_es_index,
+                'saved_variants': sync_saved_variants,
+                'cram_map': sync_cram_map,
+            }
+            inputs = {
+                'family_ids': family_ids,
+                'participant_ids': participant_ids,
+                'sequencing_type': sequencing_type,
+                'sequencing_group_ids': sequencing_group_ids,
+                'es_index_types': es_index_types,
+                'project': project,
+                'seqr_guid': seqr_guid,
+                'params': params,
+            }
+            promises, messages = await self.create_sync_promises(
+                sync_options,
+                inputs,
+                post_slack_notification,
             )
-            errors = []
-            for m in _messages:
-                if isinstance(m, BaseException):
-                    errors.append(m)
-                else:
-                    messages.extend(m)
+
+            _messages = await asyncio.gather(*promises)
+            errors = [m for m in _messages if isinstance(m, BaseException)]
+            messages.extend(m for m in _messages if not isinstance(m, BaseException))
 
         _errors = [
             ''.join(traceback.format_exception(type(e), e, e.__traceback__))
@@ -258,9 +219,85 @@ class SeqrLayer(BaseLayer):
             )
             messages.append('Sent a notification to slack')
 
-        if _errors:
-            return {'errors': _errors, 'messages': messages}
-        return {'messages': messages}
+        return (
+            {'errors': _errors, 'messages': messages}
+            if _errors
+            else {'messages': messages}
+        )
+
+    async def create_sync_promises(
+        self,
+        sync_options,
+        inputs,
+        post_slack_notification,
+    ):
+        """Create a list of promises for syncing based on the options provided"""
+        promises = []
+        messages = []
+
+        # Unpac the sync function inputs
+        family_ids = inputs['family_ids']
+        participant_ids = inputs['participant_ids']
+        sequencing_type = inputs['sequencing_type']
+        sequencing_group_ids = inputs['sequencing_group_ids']
+        es_index_types = inputs['es_index_types']
+        project = inputs['project']
+        seqr_guid = inputs['seqr_guid']
+        params = inputs['params']
+
+        if sync_options['individuals']:
+            try:
+                messages.extend(
+                    await self.sync_pedigree(family_ids=family_ids, **params)
+                )
+            except Exception as e:
+                _errors = [
+                    ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                ]
+                if post_slack_notification:
+                    _errors.extend(
+                        self.send_slack_notification(
+                            project_name=project.name,
+                            sequencing_type=sequencing_type,
+                            errors=_errors,
+                            messages=messages,
+                            seqr_guid=seqr_guid,
+                        )
+                    )
+                    messages.append('Sent a notification to slack')
+                return {'errors': _errors, 'messages': messages}
+
+        if sync_options['families']:
+            promises.append(self.sync_families(family_ids=family_ids, **params))
+
+        if sync_options['individual_metadata']:
+            promises.append(
+                self.sync_individual_metadata(participant_ids=participant_ids, **params)
+            )
+
+        if sync_options['es_index']:
+            promises.append(
+                self.update_es_index(
+                    sequencing_type=sequencing_type,
+                    sequencing_group_ids=sequencing_group_ids,
+                    es_index_types=es_index_types,
+                    **params,
+                )
+            )
+
+        if sync_options['saved_variants']:
+            promises.append(self.update_saved_variants(**params))
+
+        if sync_options['cram_map']:
+            promises.append(
+                self.sync_cram_map(
+                    sequencing_type=sequencing_type,
+                    participant_ids=participant_ids,
+                    **params,
+                )
+            )
+
+        return promises, messages
 
     def generate_seqr_auth_token(self):
         """Generate an OAUTH2 token for talking to seqr"""
@@ -689,40 +726,11 @@ class SeqrLayer(BaseLayer):
         if len(json_rows) == 0:
             return None
 
-        def _process_hpo_terms(terms: str):
-            return [t.strip() for t in terms.split(',')]
-
-        def _parse_affected(affected):
-            affected = str(affected).upper()
-            if affected in ('1', 'U', 'UNAFFECTED'):
-                return 'N'
-            if affected == '2' or affected.startswith('A'):
-                return 'A'
-            if not affected or affected in ('0', 'UNKNOWN'):
-                return 'U'
-
-            return None
-
-        def _parse_consanguity(consanguity):
-            if not consanguity:
-                return None
-
-            if isinstance(consanguity, bool):
-                return consanguity
-
-            if consanguity.lower() in ('t', 'true', 'yes', 'y', '1'):
-                return True
-
-            if consanguity.lower() in ('f', 'false', 'no', 'n', '0'):
-                return False
-
-            return None
-
         key_processor = {
-            'hpo_terms_present': _process_hpo_terms,
-            'hpo_terms_absent': _process_hpo_terms,
-            'affected': _parse_affected,
-            'consanguinity': _parse_consanguity,
+            'hpo_terms_present': self._process_hpo_terms,
+            'hpo_terms_absent': self._process_hpo_terms,
+            'affected': self._parse_affected,
+            'consanguinity': self._parse_consanguity,
         }
 
         seqr_map = {
@@ -740,10 +748,6 @@ class SeqrLayer(BaseLayer):
             'consanguinity': 'consanguinity',
             'affected_relatives': 'affected_relatives',
             'expected_inheritance': 'expected_inheritance',
-            # 'assigned_analyst',
-            # 'disorders',
-            # 'rejected_genes',
-            # 'candidate_genes',
         }
 
         def process_row(row):
@@ -758,6 +762,35 @@ class SeqrLayer(BaseLayer):
             }
 
         return list(map(process_row, json_rows))
+
+    def _process_hpo_terms(self, terms: str):
+        return [t.strip() for t in terms.split(',')]
+
+    def _parse_affected(self, affected):
+        affected = str(affected).upper()
+        if affected in ('1', 'U', 'UNAFFECTED'):
+            return 'N'
+        if affected == '2' or affected.startswith('A'):
+            return 'A'
+        if not affected or affected in ('0', 'UNKNOWN'):
+            return 'U'
+
+        return None
+
+    def _parse_consanguity(self, consanguity):
+        if not consanguity:
+            return None
+
+        if isinstance(consanguity, bool):
+            return consanguity
+
+        if consanguity.lower() in ('t', 'true', 'yes', 'y', '1'):
+            return True
+
+        if consanguity.lower() in ('f', 'false', 'no', 'n', '0'):
+            return False
+
+        return None
 
     def send_slack_notification(
         self,
