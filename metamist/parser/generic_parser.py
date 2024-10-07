@@ -958,7 +958,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
         """
 
         if not assays:
-            return assays
+            return []
 
         values = await query_async(
             QUERY_MATCH_ASSAYS, variables={'project': self.project}
@@ -990,7 +990,6 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
 
         def _map_assay(assay: ParsedAssay):
             # put it in a function so we can return early
-
             # external IDs match
             for exid in (assay.external_ids or {}).values():
                 if exid in assay_eid_map:
