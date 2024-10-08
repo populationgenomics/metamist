@@ -41,25 +41,31 @@ class GenericBQFilter(GenericFilter[T]):
         if not isinstance(column, str):
             raise ValueError(f'Column {_column_name!r} must be a string')
 
-        # IN conditions
-        self._add_in_condition(self.in_, column, _column_name, conditionals, values)
-        self._add_condition(
-            'nin', column, _column_name, 'NOT IN UNNEST', conditionals, values
-        )
-
         # Simple conditions
         self._add_condition('eq', column, _column_name, '=', conditionals, values)
         self._add_condition('gt', column, _column_name, '>', conditionals, values)
         self._add_condition('gte', column, _column_name, '>=', conditionals, values)
         self._add_condition('lt', column, _column_name, '<', conditionals, values)
         self._add_condition('lte', column, _column_name, '<=', conditionals, values)
+        self._add_condition(
+            'nin', column, _column_name, 'NOT IN UNNEST', conditionals, values
+        )
+
+        # IN conditions
+        self._add_in_condition(self.in_, column, _column_name, conditionals, values)
 
         return ' AND '.join(conditionals), values
 
     def _add_condition(self, op, column, column_name, operator, conditionals, values):
-        if attr := getattr(self, op) is not None:
+        if (attr := getattr(self, op)) is not None:
             k = self.generate_field_name(column_name + '_' + op)
-            conditionals.append(f'{column} {operator} {self._sql_cond_prep(k, attr)}')
+
+            # Add brackets for IN operator
+            b1, b2 = ('(', ')') if 'IN' in operator else (' ', '')
+
+            conditionals.append(
+                f'{column} {operator}{b1}{self._sql_cond_prep(k, attr)}{b2}'
+            )
             values[k] = self._sql_value_prep(k, attr)
 
     def _add_in_condition(self, attr, column, column_name, conditionals, values):
