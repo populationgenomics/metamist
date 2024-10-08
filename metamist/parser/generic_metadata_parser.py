@@ -11,6 +11,7 @@ import click
 from metamist.parser.generic_parser import (  # noqa
     DefaultSequencing,
     GenericParser,
+    GenericParserDefaults,
     GroupedRow,
     ParsedAnalysis,
     ParsedAssay,
@@ -207,10 +208,12 @@ class GenericMetadataParser(GenericParser):
             path_prefix=None,
             search_paths=search_locations,
             project=project,
-            default_sample_type=default_sample_type,
-            default_sequencing=default_sequencing,
-            default_read_end_type=default_read_end_type,
-            default_read_length=default_read_length,
+            defaults=GenericParserDefaults(
+                default_sample_type=default_sample_type,
+                default_sequencing=default_sequencing,
+                default_read_end_type=default_read_end_type,
+                default_read_length=default_read_length,
+            ),
             **kwargs,
         )
 

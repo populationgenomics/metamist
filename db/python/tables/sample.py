@@ -28,6 +28,33 @@ class SampleTable(DbBase):
         """
         Construct a nested sample query
         """
+        wheres, values, needs_eid, needs_sequencing_group, needs_assay = (
+            SampleTable._construct_wheres_and_values(filter_)
+        )
+
+        query_lines, values = SampleTable._construct_query_lines(
+            needs_eid, needs_sequencing_group, needs_assay, wheres, limit, skip, values
+        )
+
+        query = '\n'.join('  ' + line.strip() for line in query_lines)
+        sample_eid_join = ''
+        if sample_eid_table_alias:
+            sample_eid_join = f'INNER JOIN sample_external_id {sample_eid_table_alias} ON {sample_eid_table_alias}.sample_id = s.id'
+
+        outer_query = f"""
+            SELECT {', '.join(keys)}
+            FROM sample s
+            {sample_eid_join}
+            INNER JOIN (
+            {query}
+            ) as inner_query ON inner_query.id = s.id
+            GROUP BY s.id
+        """
+
+        return outer_query, values
+
+    @staticmethod
+    def _construct_wheres_and_values(filter_: SampleFilter):
         needs_eid = False
         needs_sequencing_group = False
         needs_assay = False
@@ -86,6 +113,12 @@ class SampleTable(DbBase):
             if awheres:
                 wheres.append(awheres)
 
+        return wheres, values, needs_eid, needs_sequencing_group, needs_assay
+
+    @staticmethod
+    def _construct_query_lines(
+        needs_eid, needs_sequencing_group, needs_assay, wheres, limit, skip, values
+    ):
         query_lines = [
             'SELECT DISTINCT ss.id',
             'FROM sample ss',
@@ -116,22 +149,7 @@ class SampleTable(DbBase):
             query_lines.append('OFFSET :offset')
             values['offset'] = skip
 
-        query = '\n'.join('  ' + line.strip() for line in query_lines)
-        sample_eid_join = ''
-        if sample_eid_table_alias:
-            sample_eid_join = f'INNER JOIN sample_external_id {sample_eid_table_alias} ON {sample_eid_table_alias}.sample_id = s.id'
-
-        outer_query = f"""
-            SELECT {', '.join(keys)}
-            FROM sample s
-            {sample_eid_join}
-            INNER JOIN (
-            {query}
-            ) as inner_query ON inner_query.id = s.id
-            GROUP BY s.id
-        """
-
-        return outer_query, values
+        return query_lines, values
 
     # region GETS
 

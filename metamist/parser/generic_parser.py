@@ -7,18 +7,14 @@ import logging
 import os
 import re
 import sys
-from abc import abstractmethod
 from collections import defaultdict
 from functools import wraps
 from io import StringIO
 from typing import (
     Any,
-    Coroutine,
-    Hashable,
     Iterable,
     Iterator,
     Match,
-    Sequence,
     TypeVar,
 )
 
@@ -473,6 +469,18 @@ def run_as_sync(f):
     return wrapper
 
 
+@dataclasses.dataclass
+class GenericParserDefaults:
+    """Defaults for the GenericParser"""
+
+    default_sample_type: str | None = None
+    default_sequencing: DefaultSequencing = DefaultSequencing()
+    default_read_end_type: str | None = None
+    default_read_length: str | int | None = None
+    default_analysis_type: str | None = None
+    default_analysis_status: str = 'completed'
+
+
 class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too-many-arguments
     """Parser for ingesting rows of metadata"""
 
@@ -481,12 +489,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
         path_prefix: str | None,
         search_paths: list[str],
         project: str,
-        default_sample_type: str | None = None,
-        default_sequencing: DefaultSequencing = DefaultSequencing(),
-        default_read_end_type: str | None = None,
-        default_read_length: str | int | None = None,
-        default_analysis_type: str | None = None,
-        default_analysis_status: str = 'completed',
+        defaults: GenericParserDefaults = GenericParserDefaults(),
         key_map: dict[str, str] | None = None,
         required_keys: set[str] | None = None,
         ignore_extra_keys=False,
@@ -506,12 +509,12 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
 
         self.project = project
 
-        self.default_sequencing = default_sequencing
-        self.default_read_end_type: str | None = default_read_end_type
-        self.default_read_length: str | int | None = default_read_length
-        self.default_sample_type: str | None = default_sample_type
-        self.default_analysis_type: str | None = default_analysis_type
-        self.default_analysis_status: str | None = default_analysis_status
+        self.default_sequencing = defaults.default_sequencing
+        self.default_read_end_type: str | None = defaults.default_read_end_type
+        self.default_read_length: str | int | None = defaults.default_read_length
+        self.default_sample_type: str | None = defaults.default_sample_type
+        self.default_analysis_type: str | None = defaults.default_analysis_type
+        self.default_analysis_status: str | None = defaults.default_analysis_status
 
         # gs specific
         self.default_bucket: str | None = None
@@ -559,11 +562,11 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
         dry_run=False,
     ):
         """Parse manifest from path, and return result of parsing manifest"""
-        file = self.file_path(manifest)
+        file_ = self.file_path(manifest)
 
-        _delimiter = delimiter or self.guess_delimiter_from_filename(file)
+        _delimiter = delimiter or self.guess_delimiter_from_filename(file_)
 
-        file_contents = await self.file_contents(file)
+        file_contents = await self.file_contents(file_)
         return await self.parse_manifest(
             StringIO(file_contents),
             delimiter=_delimiter,
@@ -596,68 +599,12 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
 
         await self.validate_rows(rows)
 
-        # one participant with no value
-        participants = []
-        if self.has_participants(rows):
-            # start with participants
-            participants = await self.group_participants(rows)
-            await self.match_participant_ids(participants)
+        participants, samples = await self.process_participants_and_samples(rows)
+        sequencing_groups, assays = await self.process_sequencing_groups_and_assays(
+            samples
+        )
 
-            samples: list[ParsedSample] = []
-            for pchunk in chunk(participants):
-                samples_for_chunk = await asyncio.gather(
-                    *[self.group_samples(p, p.rows) for p in pchunk]
-                )
-
-                for participant, psamples in zip(pchunk, samples_for_chunk):
-                    participant.samples = psamples
-                    samples.extend(psamples)
-
-        else:
-            samples = await self.group_samples(None, rows=rows)
-
-        await self.match_sample_ids(samples)
-
-        sequencing_groups: list[ParsedSequencingGroup] = []
-        for schunk in chunk(samples):
-            seq_groups_for_chunk = await asyncio.gather(
-                *map(self.get_sample_sequencing_groups, schunk)
-            )
-
-            for sample, seqgroups in zip(schunk, seq_groups_for_chunk):
-                sample.sequencing_groups = seqgroups
-                sequencing_groups.extend(seqgroups)
-
-        assays: list[ParsedAssay] = []
-        for sgchunk in chunk(sequencing_groups):
-            assays_for_chunk = await asyncio.gather(
-                *map(self.get_assays_from_group, sgchunk)
-            )
-            analyses_for_chunk = await asyncio.gather(
-                *map(self.get_analyses_from_sequencing_group, sgchunk)
-            )
-
-            for sequencing_group, chunked_assays, analyses in zip(
-                sgchunk, assays_for_chunk, analyses_for_chunk
-            ):
-                if not chunked_assays:
-                    # mark for removal
-                    sequencing_group.assays = None
-                    continue
-                sequencing_group.assays = chunked_assays
-                assays.extend(chunked_assays)
-                sequencing_group.analyses = analyses
-
-        # remove sequencing groups with no assays
-        sequencing_groups = [sg for sg in sequencing_groups if sg.assays]
-        for sample in ParsedSample.get_all_samples_from(samples):
-            sample.sequencing_groups = [
-                sg for sg in sample.sequencing_groups if sg.assays
-            ]
-
-        # match assay ids after sequencing groups
         await self.match_assay_ids(assays)
-        # match sequencing group ids after assays
         await self.match_sequencing_group_ids(sequencing_groups)
 
         summary = self.prepare_summary(participants, samples, sequencing_groups, assays)
@@ -677,16 +624,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
         else:
             logger.info(message)
 
-        if participants:
-            result = await self.papi.upsert_participants_async(
-                self.project,
-                [p.to_sm() for p in participants],
-            )
-        else:
-            result = await self.sapi.upsert_samples_async(
-                self.project,
-                [s.to_sm() for s in samples],
-            )
+        result = await self.upsert_metadata(participants, samples)
 
         if self.verbose:
             logger.info(json.dumps(result, indent=2))
@@ -694,6 +632,79 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
             self.prepare_detail(samples)
 
         return result
+
+    async def process_participants_and_samples(self, rows):
+        """Process participants and samples from rows"""
+        participants = []
+        if self.has_participants(rows):
+            participants = await self.group_participants(rows)
+            await self.match_participant_ids(participants)
+            samples = await self.group_samples_from_participants(participants)
+        else:
+            samples = await self.group_samples(None, rows=rows)
+        await self.match_sample_ids(samples)
+        return participants, samples
+
+    async def group_samples_from_participants(self, participants):
+        """Group samples from participants"""
+        samples = []
+        for pchunk in chunk(participants):
+            samples_for_chunk = await asyncio.gather(
+                *[self.group_samples(p, p.rows) for p in pchunk]
+            )
+            for participant, psamples in zip(pchunk, samples_for_chunk):
+                participant.samples = psamples
+                samples.extend(psamples)
+        return samples
+
+    async def process_sequencing_groups_and_assays(self, samples):
+        """Process sequencing groups and assays from samples"""
+        sequencing_groups = []
+        for schunk in chunk(samples):
+            seq_groups_for_chunk = await asyncio.gather(
+                *map(self.get_sample_sequencing_groups, schunk)
+            )
+            for sample, seqgroups in zip(schunk, seq_groups_for_chunk):
+                sample.sequencing_groups = seqgroups
+                sequencing_groups.extend(seqgroups)
+
+        assays = []
+        for sgchunk in chunk(sequencing_groups):
+            assays_for_chunk = await asyncio.gather(
+                *map(self.get_assays_from_group, sgchunk)
+            )
+            analyses_for_chunk = await asyncio.gather(
+                *map(self.get_analyses_from_sequencing_group, sgchunk)
+            )
+            for sequencing_group, chunked_assays, analyses in zip(
+                sgchunk, assays_for_chunk, analyses_for_chunk
+            ):
+                if not chunked_assays:
+                    sequencing_group.assays = None
+                    continue
+                sequencing_group.assays = chunked_assays
+                assays.extend(chunked_assays)
+                sequencing_group.analyses = analyses
+
+        sequencing_groups = [sg for sg in sequencing_groups if sg.assays]
+        for sample in ParsedSample.get_all_samples_from(samples):
+            sample.sequencing_groups = [
+                sg for sg in sample.sequencing_groups if sg.assays
+            ]
+
+        return sequencing_groups, assays
+
+    async def upsert_metadata(self, participants, samples):
+        """Upsert metadata to SM"""
+        if participants:
+            return await self.papi.upsert_participants_async(
+                self.project,
+                [p.to_sm() for p in participants],
+            )
+        return await self.sapi.upsert_samples_async(
+            self.project,
+            [s.to_sm() for s in samples],
+        )
 
     def _get_dict_reader(self, file_pointer, delimiter: str):
         """
@@ -962,14 +973,23 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
             QUERY_MATCH_ASSAYS, variables={'project': self.project}
         )
 
-        assay_eid_map = {
+        assay_eid_map = self._create_assay_eid_map(values)
+        filename_meta_map = self._create_filename_meta_map(values)
+
+        for assay in assays:
+            assay.internal_id = self._map_assay(assay, assay_eid_map, filename_meta_map)
+
+        return assays
+
+    def _create_assay_eid_map(self, values):
+        return {
             external_id: assay['id']
             for sample in values['project']['samples']
             for assay in sample['assays']
             for external_id in assay['externalIds'].values()
         }
 
-        # map filenames of reads to assay IDs as that's the most likely way we'll map
+    def _create_filename_meta_map(self, values):
         def reads_to_key(reads):
             if isinstance(reads, list):
                 return tuple(sorted(map(reads_to_key, reads)))
@@ -979,32 +999,35 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
                 raise TypeError(f'Unformmatted reads (expected file object): {reads}')
             raise ValueError(f'Unknown type {reads}')
 
-        filename_meta_map = {
+        return {
             reads_to_key(assay['meta']['reads']): assay['id']
             for sample in values['project']['samples']
             for assay in sample['assays']
             if assay['meta'].get('reads')
         }
 
-        def _map_assay(assay: ParsedAssay):
-            # put it in a function so we can return early
-            # external IDs match
-            for exid in (assay.external_ids or {}).values():
-                if exid in assay_eid_map:
-                    return assay_eid_map.get(exid)
+    def _map_assay(self, assay: ParsedAssay, assay_eid_map, filename_meta_map):
+        # external IDs match
+        for exid in (assay.external_ids or {}).values():
+            if exid in assay_eid_map:
+                return assay_eid_map.get(exid)
 
-            # reads match
-            if assay.meta.get('reads'):
-                key = reads_to_key(assay.meta['reads'])
-                if key in filename_meta_map:
-                    return filename_meta_map.get(key)
+        # reads match
+        if assay.meta.get('reads'):
+            key = self._reads_to_key(assay.meta['reads'])
+            if key in filename_meta_map:
+                return filename_meta_map.get(key)
 
-            return None
+        return None
 
-        for assay in assays:
-            assay.internal_id = _map_assay(assay)
-
-        return assays
+    def _reads_to_key(self, reads):
+        if isinstance(reads, list):
+            return tuple(sorted(map(self._reads_to_key, reads)))
+        if isinstance(reads, dict):
+            return reads['location']
+        if isinstance(reads, str):
+            raise TypeError(f'Unformmatted reads (expected file object): {reads}')
+        raise ValueError(f'Unknown type {reads}')
 
     # endregion MATCHING
 
@@ -1019,57 +1042,51 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
 
     # endregion
 
-    @abstractmethod
     def get_primary_sample_id(self, row: SingleRow) -> str:
         """
         Get primary external sample ID from row, used to group rows together
         """
 
-    @abstractmethod
     def get_sample_external_ids(self, row: GroupedRow) -> dict[str, str]:
         """
+        _ = row # Not used by default
         Get a dictionary of {name: ex_id} from a list of rows
         You should NOT return the primary sample ID here anywhere
         """
-
+        _ = row  # Not used by default
         return {}
 
-    @abstractmethod
     def get_assay_id(self, row: GroupedRow) -> dict[str, str] | None:
         """Get external sequence ID from row"""
-        return None
+        _ = row  # Not used by default
 
-    @abstractmethod
     def get_primary_participant_id(self, row: SingleRow) -> str | None:
         """Get external participant ID from row"""
 
-    @abstractmethod
     def get_participant_external_ids(self, row: GroupedRow) -> dict[str, str]:
         """
+        _ = row # Not used by default
         Get a dictionary of {name: ex_id} from a list of rows
         You should NOT return the primary participant ID here anywhere
         """
-
+        _ = row  # Not used by default
         return {}
 
-    @abstractmethod
     def get_reported_sex(self, row: GroupedRow) -> int | None:
         """Get reported sex from grouped row"""
-        return None
+        _ = row  # Not used by default
 
-    @abstractmethod
     def get_reported_gender(self, row: GroupedRow) -> str | None:
         """Get reported gender from grouped row"""
-        return None
+        _ = row  # Not used by default
 
-    @abstractmethod
     def get_karyotype(self, row: GroupedRow) -> str | None:
         """Get karyotype from grouped row"""
-        return None
+        _ = row  # Not used by default
 
-    @abstractmethod
     def has_participants(self, rows: list[SingleRow]) -> bool:
         """Returns True if the file has a Participants column"""
+        _ = rows  # Not used by default
         return False
 
     async def group_participants(
@@ -1102,9 +1119,9 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
 
         return participant_groups
 
-    @abstractmethod
     async def get_participant_meta_from_group(self, rows: GroupedRow) -> dict:
         """From a list of rows, get any relevant participant meta"""
+        _ = rows  # Not used by default
         return {}
 
     async def group_samples(
@@ -1132,12 +1149,12 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
 
         return samples
 
-    @abstractmethod
     async def get_sample_meta_from_group(self, rows: GroupedRow) -> dict:
         """From a list of rows, get any relevant sample meta"""
+        _ = rows  # Not used by default
         return {}
 
-    def get_sequencing_group_key(self, row: SingleRow) -> Hashable:
+    def get_sequencing_group_key(self, row: SingleRow) -> tuple:
         """
         Get a key to group sequencing group rows by.
         """
@@ -1185,13 +1202,13 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
 
         return sequencing_groups
 
-    @abstractmethod
     async def get_sequencing_group_meta(
         self, sequencing_group: ParsedSequencingGroup
     ) -> dict:
         """
         From a list of rows, get any relevant sequencing group meta
         """
+        _ = sequencing_group  # Not used by default
         return {}
 
     async def get_analyses_from_sequencing_group(
@@ -1203,7 +1220,6 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
         """
         return []
 
-    @abstractmethod
     async def get_assays_from_group(
         self, sequencing_group: ParsedSequencingGroup
     ) -> list[ParsedAssay]:
@@ -1245,65 +1261,65 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
                     meta[key] = assay.meta[key]
         return meta
 
-    @abstractmethod
     def get_sample_type(self, row: GroupedRow) -> str:
         """Get sample type from row"""
+        _ = row  # Not used by default
         return self.default_sample_type
 
-    @abstractmethod
     def get_sequencing_group_id(self, row: SingleRow) -> str | None:
         """
+        _ = row # Not used by default
         External sequencing_group identifier. Odds are you don't want this.
             Unless you have a "library ID" or something similar"
 
         There are few cases where the collaborator actually generates a sequencing
         group identifier (more of a CPG concept), but you can probably proxy it.
         """
-        return None
+        _ = row  # Not used by default
 
-    @abstractmethod
     def get_sequencing_type(self, row: SingleRow) -> str:
         """Get sequence types from row"""
+        _ = row  # Not used by default
         return self.default_sequencing.seq_type
 
-    @abstractmethod
     def get_sequencing_technology(self, row: SingleRow) -> str:
         """Get sequencing technology from row"""
+        _ = row  # Not used by default
         return self.default_sequencing.technology
 
-    @abstractmethod
     def get_sequencing_platform(self, row: SingleRow) -> str | None:
         """Get sequencing platform from row"""
+        _ = row  # Not used by default
         return self.default_sequencing.platform
 
-    @abstractmethod
     def get_sequencing_facility(self, row: SingleRow) -> str | None:
         """Get sequencing facility from row"""
+        _ = row  # Not used by default
         return self.default_sequencing.facility
 
-    @abstractmethod
     def get_sequencing_library(self, row: SingleRow) -> str | None:
         """Get library type from row"""
+        _ = row  # Not used by default
         return self.default_sequencing.library
 
-    @abstractmethod
     def get_read_end_type(self, row: SingleRow) -> str | None:
         """Get read end type from row"""
+        _ = row  # Not used by default
         return self.default_read_end_type
 
-    @abstractmethod
     def get_read_length(self, row: SingleRow) -> str | None:
         """Get read length from row"""
+        _ = row  # Not used by default
         return self.default_read_length
 
-    @abstractmethod
     def get_analysis_type(self, sample_id: str, row: GroupedRow) -> str:
         """Get analysis type from row"""
+        _ = sample_id, row  # Not used by default
         return str(self.default_analysis_type)
 
-    @abstractmethod
     def get_analysis_status(self, sample_id: str, row: GroupedRow) -> AnalysisStatus:
         """Get analysis status from row"""
+        _ = sample_id, row  # Not used by default
         return AnalysisStatus(self.default_analysis_status)
 
     def get_existing_external_sequence_ids(
@@ -1359,8 +1375,6 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
         for chunked_analysis in chunk(unwrapped_analysis_to_add):
             promises = []
             for external_id, analysis in chunked_analysis:
-                # TODO: resolve this external_to_internal_id_map
-                # this one is going to be slightly harder :
                 analysis.sequencing_group_ids = [
                     external_to_internal_id_map[external_id]
                 ]
@@ -1381,49 +1395,60 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
         1. single / list-of CWL file object(s), based on the extensions of the reads
         2. parsed type (fastq, cram, bam)
         """
-        _reads: list[str]
+        _reads = self._normalize_reads(reads)
+        read_to_checksum = self._map_reads_to_checksums(_reads, checksums)
+        file_by_type = defaultdict(lambda: defaultdict(list))
+
+        await self._process_fastqs(_reads, read_to_checksum, file_by_type)
+        await self._process_crams(_reads, file_by_type)
+        await self._process_bams(_reads, file_by_type)
+        gvcfs = await self._process_gvcfs(_reads, file_by_type)
+        await self._process_vcfs(_reads, file_by_type, gvcfs)
+        self._log_unhandled_files(_reads, sample_id)
+
+        return file_by_type
+
+    def _normalize_reads(self, reads: list[str] | str) -> list[str]:
         if not isinstance(reads, list):
-            _reads = [reads]
-        else:
-            _reads = reads
+            return [reads]
+        return reads
 
+    def _map_reads_to_checksums(
+        self, reads: list[str], checksums: list[str] = None
+    ) -> dict[str, str | None]:
         if not checksums:
-            checksums = [None] * len(_reads)
-
-        if len(checksums) != len(_reads):
+            checksums = [None] * len(reads)
+        if len(checksums) != len(reads):
             raise ValueError(
                 'Expected length of reads to match length of provided checksums'
             )
+        return dict(zip(reads, checksums))
 
-        read_to_checksum: dict[str, str | None] = dict(zip(_reads, checksums))
-
-        file_by_type: dict[SUPPORTED_FILE_TYPE, dict[str, list]] = defaultdict(
-            lambda: defaultdict(list)
-        )
-
+    async def _process_fastqs(
+        self,
+        reads: list[str],
+        read_to_checksum: dict[str, str | None],
+        file_by_type: dict,
+    ):
         fastqs = [
-            r
-            for r in _reads
-            if any(r.lower().endswith(ext) for ext in FASTQ_EXTENSIONS)
+            r for r in reads if any(r.lower().endswith(ext) for ext in FASTQ_EXTENSIONS)
         ]
         if fastqs:
             structured_fastqs = self.parse_fastqs_structure(fastqs)
-            fastq_files: list[Sequence[Coroutine | BaseException]] = []  # type: ignore
+            fastq_files = []
             for fastq_group in structured_fastqs:
-                create_file_futures: list[Coroutine] = [
+                create_file_futures = [
                     self.create_file_object(f, checksum=read_to_checksum.get(f))
                     for f in fastq_group
                 ]
-                fastq_files.append(asyncio.gather(*create_file_futures))  # type: ignore
-
-            grouped_fastqs = list(await asyncio.gather(*fastq_files))  # type: ignore
+                fastq_files.append(asyncio.gather(*create_file_futures))
+            grouped_fastqs = list(await asyncio.gather(*fastq_files))
             file_by_type['reads']['fastq'].extend(grouped_fastqs)
 
+    async def _process_crams(self, reads: list[str], file_by_type: dict):
         crams = [
-            r for r in _reads if any(r.lower().endswith(ext) for ext in CRAM_EXTENSIONS)
+            r for r in reads if any(r.lower().endswith(ext) for ext in CRAM_EXTENSIONS)
         ]
-        file_promises: list[Coroutine]
-
         if crams:
             file_promises = []
             sec_format = ['.crai', '^.crai']
@@ -1436,10 +1461,11 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
                 file_promises.append(
                     self.create_file_object(r, secondary_files=secondaries)
                 )
-            file_by_type['reads']['cram'] = await asyncio.gather(*file_promises)  # type: ignore
+            file_by_type['reads']['cram'] = await asyncio.gather(*file_promises)
 
+    async def _process_bams(self, reads: list[str], file_by_type: dict):
         bams = [
-            r for r in _reads if any(r.lower().endswith(ext) for ext in BAM_EXTENSIONS)
+            r for r in reads if any(r.lower().endswith(ext) for ext in BAM_EXTENSIONS)
         ]
         if bams:
             file_promises = []
@@ -1453,18 +1479,12 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
                 file_promises.append(
                     self.create_file_object(r, secondary_files=secondaries)
                 )
+            file_by_type['reads']['bam'] = await asyncio.gather(*file_promises)
 
-            file_by_type['reads']['bam'] = await asyncio.gather(*file_promises)  # type: ignore
-
+    async def _process_gvcfs(self, reads: list[str], file_by_type: dict):
         gvcfs = [
-            r for r in _reads if any(r.lower().endswith(ext) for ext in GVCF_EXTENSIONS)
+            r for r in reads if any(r.lower().endswith(ext) for ext in GVCF_EXTENSIONS)
         ]
-        vcfs = [
-            r
-            for r in _reads
-            if any(r.lower().endswith(ext) for ext in VCF_EXTENSIONS) and r not in gvcfs
-        ]
-
         if gvcfs:
             file_promises = []
             sec_format = ['.tbi']
@@ -1477,19 +1497,26 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
                 file_promises.append(
                     self.create_file_object(r, secondary_files=secondaries)
                 )
+            file_by_type['variants']['gvcf'] = await asyncio.gather(*file_promises)
 
-            file_by_type['variants']['gvcf'] = await asyncio.gather(*file_promises)  # type: ignore
+        return gvcfs
 
+    async def _process_vcfs(
+        self, reads: list[str], file_by_type: dict, gvcfs: list[str]
+    ):
+        vcfs = [
+            r
+            for r in reads
+            if any(r.lower().endswith(ext) for ext in VCF_EXTENSIONS) and r not in gvcfs
+        ]
         if vcfs:
-            file_promises = []
-            for r in vcfs:
-                file_promises.append(self.create_file_object(r))
+            file_promises = [self.create_file_object(r) for r in vcfs]
+            file_by_type['variants']['vcf'] = await asyncio.gather(*file_promises)
 
-            file_by_type['variants']['vcf'] = await asyncio.gather(*file_promises)  # type: ignore
-
+    def _log_unhandled_files(self, reads: list[str], sample_id: str):
         unhandled_files = [
             r
-            for r in _reads
+            for r in reads
             if not any(r.lower().endswith(ext) for ext in ALL_EXTENSIONS)
         ]
         if unhandled_files:
@@ -1499,8 +1526,6 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
             logger.warning(
                 f'There were files with extensions that were skipped ({sample_id}): {joined_reads}'
             )
-
-        return file_by_type
 
     @staticmethod
     def parse_fastqs_structure(fastqs: list[str]) -> list[list[str]]:
@@ -1570,7 +1595,6 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
 
         invalid_fastq_groups = [grp for grp in fastq_groups.values() if len(grp) != 2]
         if invalid_fastq_groups:
-            # TODO: implement handling for single-ended reads
             raise ValueError(f'Invalid fastq group {invalid_fastq_groups}')
 
         sorted_groups = sorted(

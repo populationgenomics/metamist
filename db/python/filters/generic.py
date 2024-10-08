@@ -289,22 +289,16 @@ class GenericFilterModel:
     def __post_init__(self):
         for field in dataclasses.fields(self):
             value = getattr(self, field.name)
-            if value is None:
+            if value is None or isinstance(value, (GenericFilter, GenericFilterModel)):
                 continue
 
-            if isinstance(value, tuple) and len(value) == 1 and value[0] is None:
+            if isinstance(value, tuple) and len(value) == 1 and None in value:
                 raise ValueError(
                     f'There is very likely a trailing comma on the end of '
                     f'{self.__class__.__name__}.{field.name}. If you actually want a '
                     f'tuple of length one with the value = (None,), then use '
                     f'dataclasses.field(default_factory=lambda: (None,))'
                 )
-            if isinstance(value, GenericFilter):
-                continue
-
-            if isinstance(value, GenericFilterModel):
-                # allow nested GenericFilterModels
-                continue
 
             if isinstance(value, dict):
                 # make sure each field is a GenericFilter, or set it to be one,
@@ -319,8 +313,8 @@ class GenericFilterModel:
             # lazily provided a value, which we'll correct
             if isinstance(value, list):
                 setattr(self, field.name, GenericFilter(in_=value))
-            else:
-                setattr(self, field.name, GenericFilter(eq=value))
+
+            setattr(self, field.name, GenericFilter(eq=value))
 
     def to_sql(
         self,
@@ -346,35 +340,42 @@ class GenericFilterModel:
         fields = dataclasses.fields(self)
         conditionals, values = [], {}
         for field in fields:
-            if only and field.name not in only:
-                continue
-            if exclude and field.name in exclude:
+            if (only and field.name not in only) or (exclude and field.name in exclude):
                 continue
 
             fcolumn = _foverrides.get(field.name, field.name)
-            if filter_ := getattr(self, field.name):
-                if isinstance(filter_, dict):
-                    meta_conditionals, meta_values = prepare_query_from_dict_field(
-                        filter_=filter_, field_name=field.name, column_name=fcolumn
-                    )
-                    conditionals.extend(meta_conditionals)
-                    values.update(meta_values)
-                elif isinstance(filter_, GenericFilter):
-                    fconditionals, fvalues = filter_.to_sql(fcolumn)
-                    conditionals.append(fconditionals)
-                    values.update(fvalues)
-                elif not isinstance(field.type, (GenericFilter, dict)):
-                    values.update({fcolumn: filter_})
-                    conditionals.append(f'{fcolumn} = :{fcolumn}')
-                else:
-                    raise ValueError(
-                        f'Filter {field.name} must be a GenericFilter or dict[str, GenericFilter]'
-                    )
+            filter_ = getattr(self, field.name)
+            fconditionals, fvalues = self._prepare_conditionals_and_values(
+                filter_, field, fcolumn
+            )
+            conditionals.extend(fconditionals)
+            values.update(fvalues)
 
         if not conditionals:
             return 'True', {}
 
         return ' AND '.join(filter(None, conditionals)), values
+
+    def _prepare_conditionals_and_values(self, filter_, field, fcolumn):
+        if not filter_:
+            return [], {}
+
+        if isinstance(filter_, dict):
+            meta_conditionals, meta_values = prepare_query_from_dict_field(
+                filter_=filter_, field_name=field.name, column_name=fcolumn
+            )
+            return meta_conditionals, meta_values
+
+        if isinstance(filter_, GenericFilter):
+            fconditionals, fvalues = filter_.to_sql(fcolumn)
+            return [fconditionals], fvalues
+
+        if not isinstance(field.type, (GenericFilter, dict)):
+            return [f'{fcolumn} = :{fcolumn}'], {fcolumn: filter_}
+
+        raise ValueError(
+            f'Filter {field.name} must be a GenericFilter or dict[str, GenericFilter]'
+        )
 
 
 def prepare_query_from_dict_field(

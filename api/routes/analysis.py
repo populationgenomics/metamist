@@ -99,9 +99,12 @@ class AnalysisQueryModel(BaseModel):
 @router.put('/{project}/', operation_id='createAnalysis')
 async def create_analysis(
     analysis: Analysis,
-    connection: Connection = get_project_db_connection(FullWriteAccessRoles),
+    connection: Connection = None,
 ) -> int:
     """Create a new analysis"""
+    if not connection:
+        connection = get_project_db_connection(FullWriteAccessRoles)
+
     atable = AnalysisLayer(connection)
 
     if analysis.author:
