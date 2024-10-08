@@ -368,7 +368,7 @@ class SampleLayer(BaseLayer):
         ] = [(None, None, sample, 0) for sample in samples]
 
         while stack:
-            root, parent, sample, depth = stack.pop()
+            root, parent, sample, depth = stack.pop(0)
             if depth > max_depth:
                 raise SampleLayer.SampleUnwrapMaxDepthError(
                     f'Exceeded max depth of {max_depth} for nested samples. '
