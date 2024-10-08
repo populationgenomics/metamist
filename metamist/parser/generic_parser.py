@@ -384,7 +384,6 @@ class ParsedAssay:
             id=self.internal_id,
             type=self.assay_type,
             external_ids=self.external_ids,
-            # sample_id=self.s,
             meta=self.meta,
         )
 
@@ -1026,6 +1025,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
         Get primary external sample ID from row, used to group rows together
         """
 
+    @abstractmethod
     def get_sample_external_ids(self, row: GroupedRow) -> dict[str, str]:
         """
         Get a dictionary of {name: ex_id} from a list of rows
@@ -1034,7 +1034,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
 
         return {}
 
-    # @abstractmethod
+    @abstractmethod
     def get_assay_id(self, row: GroupedRow) -> dict[str, str] | None:
         """Get external sequence ID from row"""
         return None
@@ -1043,6 +1043,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
     def get_primary_participant_id(self, row: SingleRow) -> str | None:
         """Get external participant ID from row"""
 
+    @abstractmethod
     def get_participant_external_ids(self, row: GroupedRow) -> dict[str, str]:
         """
         Get a dictionary of {name: ex_id} from a list of rows
@@ -1051,18 +1052,22 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
 
         return {}
 
+    @abstractmethod
     def get_reported_sex(self, row: GroupedRow) -> int | None:
         """Get reported sex from grouped row"""
         return None
 
+    @abstractmethod
     def get_reported_gender(self, row: GroupedRow) -> str | None:
         """Get reported gender from grouped row"""
         return None
 
+    @abstractmethod
     def get_karyotype(self, row: GroupedRow) -> str | None:
         """Get karyotype from grouped row"""
         return None
 
+    @abstractmethod
     def has_participants(self, rows: list[SingleRow]) -> bool:
         """Returns True if the file has a Participants column"""
         return False
@@ -1097,6 +1102,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
 
         return participant_groups
 
+    @abstractmethod
     async def get_participant_meta_from_group(self, rows: GroupedRow) -> dict:
         """From a list of rows, get any relevant participant meta"""
         return {}
@@ -1126,6 +1132,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
 
         return samples
 
+    @abstractmethod
     async def get_sample_meta_from_group(self, rows: GroupedRow) -> dict:
         """From a list of rows, get any relevant sample meta"""
         return {}
@@ -1178,6 +1185,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
 
         return sequencing_groups
 
+    @abstractmethod
     async def get_sequencing_group_meta(
         self, sequencing_group: ParsedSequencingGroup
     ) -> dict:
@@ -1237,10 +1245,12 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
                     meta[key] = assay.meta[key]
         return meta
 
+    @abstractmethod
     def get_sample_type(self, row: GroupedRow) -> str:
         """Get sample type from row"""
         return self.default_sample_type
 
+    @abstractmethod
     def get_sequencing_group_id(self, row: SingleRow) -> str | None:
         """
         External sequencing_group identifier. Odds are you don't want this.
@@ -1251,38 +1261,47 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
         """
         return None
 
+    @abstractmethod
     def get_sequencing_type(self, row: SingleRow) -> str:
         """Get sequence types from row"""
         return self.default_sequencing.seq_type
 
+    @abstractmethod
     def get_sequencing_technology(self, row: SingleRow) -> str:
         """Get sequencing technology from row"""
         return self.default_sequencing.technology
 
+    @abstractmethod
     def get_sequencing_platform(self, row: SingleRow) -> str | None:
         """Get sequencing platform from row"""
         return self.default_sequencing.platform
 
+    @abstractmethod
     def get_sequencing_facility(self, row: SingleRow) -> str | None:
         """Get sequencing facility from row"""
         return self.default_sequencing.facility
 
+    @abstractmethod
     def get_sequencing_library(self, row: SingleRow) -> str | None:
         """Get library type from row"""
         return self.default_sequencing.library
 
+    @abstractmethod
     def get_read_end_type(self, row: SingleRow) -> str | None:
         """Get read end type from row"""
         return self.default_read_end_type
 
+    @abstractmethod
     def get_read_length(self, row: SingleRow) -> str | None:
         """Get read length from row"""
         return self.default_read_length
 
+    @abstractmethod
     def get_analysis_type(self, sample_id: str, row: GroupedRow) -> str:
         """Get analysis type from row"""
         return str(self.default_analysis_type)
 
+    @abstractmethod
     def get_analysis_status(self, sample_id: str, row: GroupedRow) -> AnalysisStatus:
         """Get analysis status from row"""
         return AnalysisStatus(self.default_analysis_status)
