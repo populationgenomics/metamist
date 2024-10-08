@@ -358,7 +358,7 @@ class SampleLayer(BaseLayer):
 
         retval: list[SampleLayer.UnwrappedSample] = []
         seen_samples = set()
-        stack: list[
+        queue: list[
             tuple[
                 SampleUpsertInternal | None,
                 SampleUpsertInternal | None,
@@ -367,8 +367,8 @@ class SampleLayer(BaseLayer):
             ]
         ] = [(None, None, sample, 0) for sample in samples]
 
-        while stack:
-            root, parent, sample, depth = stack.pop(0)
+        while queue:
+            root, parent, sample, depth = queue.pop(0)
             if depth > max_depth:
                 raise SampleLayer.SampleUnwrapMaxDepthError(
                     f'Exceeded max depth of {max_depth} for nested samples. '
@@ -385,7 +385,7 @@ class SampleLayer(BaseLayer):
 
             if sample.nested_samples:
                 for nested_sample in sample.nested_samples:
-                    stack.append((root or sample, sample, nested_sample, depth + 1))
+                    queue.append((root or sample, sample, nested_sample, depth + 1))
 
         return retval
 
