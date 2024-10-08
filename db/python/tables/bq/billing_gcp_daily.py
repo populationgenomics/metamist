@@ -39,7 +39,9 @@ class BillingGcpDailyTable(BillingBaseTable):
 
         # initial partition filter
         billing_filter.part_time = GenericBQFilter[datetime](
-            gte=datetime.strptime(query.start_date, '') if query.start_date else None,
+            gte=datetime.strptime(query.start_date, DATE_FORMAT)
+            if query.start_date
+            else None,
             lte=(
                 (datetime.strptime(query.end_date, DATE_FORMAT) + timedelta(days=7))
                 if query.end_date
