@@ -16,7 +16,7 @@ from db.python.utils import NotFoundError
 from models.models import PRIMARY_EXTERNAL_ORG
 from models.models.family import FamilyInternal, PedRow, PedRowInternal
 from models.models.participant import ParticipantUpsertInternal
-from models.models.project import ProjectId, ReadAccessRoles
+from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
 
 
 class FamilyLayer(BaseLayer):
@@ -138,7 +138,7 @@ class FamilyLayer(BaseLayer):
         project_ids = await self.ftable.get_projects_by_family_ids([id_])
 
         self.connection.check_access_to_projects_for_ids(
-            project_ids, allowed_roles=ReadAccessRoles
+            project_ids, allowed_roles=FullWriteAccessRoles
         )
 
         return await self.ftable.update_family(

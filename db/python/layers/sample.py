@@ -438,7 +438,7 @@ class SampleLayer(BaseLayer):
 
         projects = set(r.project for r in rows)
         self.connection.check_access_to_projects_for_ids(
-            projects, allowed_roles=FullWriteAccessRoles
+            projects, allowed_roles=ReadAccessRoles
         )
 
         return rows
