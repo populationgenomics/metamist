@@ -42,6 +42,7 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'sample_external_id',
     'sequencing_group_external_id',
     'family',
+    'family_external_id',
     'family_participant',
     'participant_phenotypes',
     'group_member',

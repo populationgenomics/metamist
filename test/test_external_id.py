@@ -2,7 +2,9 @@ from test.testbase import DbIsolatedTest, run_as_sync
 
 from pymysql.err import IntegrityError
 
+from db.python.filters import GenericFilter
 from db.python.layers import FamilyLayer, ParticipantLayer, SampleLayer
+from db.python.tables.family import FamilyFilter, FamilyTable
 from db.python.utils import NotFoundError
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
@@ -170,7 +172,7 @@ class TestParticipant(DbIsolatedTest):
     async def test_get_by_families(self):
         """Exercise get_participants_by_families() method"""
         flayer = FamilyLayer(self.connection)
-        fid = await flayer.create_family(external_id='Jones')
+        fid = await flayer.create_family(external_ids={'org': 'Jones'})
 
         child = await self.player.upsert_participant(
             ParticipantUpsertInternal(
@@ -192,6 +194,35 @@ class TestParticipant(DbIsolatedTest):
         self.assertDictEqual(
             result[fid][0].external_ids, {PRIMARY_EXTERNAL_ORG: 'P20', 'd': 'D20'}
         )
+
+    @run_as_sync
+    async def test_get_families_by_participants(self):
+        """Exercise FamilyLayer's get_families_by_participants() method"""
+        flayer = FamilyLayer(self.connection)
+        fid = await flayer.create_family(
+            external_ids={PRIMARY_EXTERNAL_ORG: 'Smith'},
+            description='Blacksmiths',
+            coded_phenotype='burnt',
+        )
+
+        child = await self.player.upsert_participant(
+            ParticipantUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'P20', 'd': 'D20'}
+            ),
+        )
+
+        await self.player.add_participant_to_family(
+            family_id=fid,
+            participant_id=child.id,
+            paternal_id=self.p1.id,
+            maternal_id=self.p2.id,
+            affected=2,
+        )
+
+        result = await flayer.get_families_by_participants([child.id, self.p1.id])
+        self.assertEqual(len(result), 1)
+        self.assertEqual(len(result[child.id]), 1)
+        self.assertEqual(result[child.id][0].description, 'Blacksmiths')
 
     @run_as_sync
     async def test_update_many(self):
@@ -423,3 +454,120 @@ class TestSample(DbIsolatedTest):
         self.assertDictEqual(result[1].meta, {'foo': 'bar'})
         self.assertDictEqual(result[2].meta, {'foo': 'bar', 'fruit': 'banana'})
         self.assertDictEqual(result[2].meta, sample.meta)
+
+
+class TestFamily(DbIsolatedTest):
+    """Test family external ids"""
+
+    @run_as_sync
+    async def setUp(self):
+        super().setUp()
+        self.flayer = FamilyLayer(self.connection)
+
+    @run_as_sync
+    async def test_create_update(self):
+        """Exercise create_family() and update_family() methods"""
+        family_id = await self.flayer.create_family(
+            external_ids={PRIMARY_EXTERNAL_ORG: 'Smith'},
+            description='Blacksmiths',
+            coded_phenotype='burnt',
+        )
+
+        family = await self.flayer.get_family_by_internal_id(family_id)
+        self.assertDictEqual(family.external_ids, {PRIMARY_EXTERNAL_ORG: 'Smith'})
+        self.assertEqual(family.description, 'Blacksmiths')
+        self.assertEqual(family.coded_phenotype, 'burnt')
+
+        await self.flayer.update_family(family_id, external_ids={'foo': 'bar'})
+        family = await self.flayer.get_family_by_internal_id(family_id)
+        self.assertEqual(family.external_ids['foo'], 'bar')
+
+        await self.flayer.update_family(family_id, external_ids={'foo': 'baz'})
+        family = await self.flayer.get_family_by_internal_id(family_id)
+        self.assertEqual(family.external_ids['foo'], 'baz')
+
+        await self.flayer.update_family(family_id, external_ids={'foo': None})
+        family = await self.flayer.get_family_by_internal_id(family_id)
+        self.assertDictEqual(family.external_ids, {PRIMARY_EXTERNAL_ORG: 'Smith'})
+
+        await self.flayer.update_family(family_id, description='Goldsmiths')
+        family = await self.flayer.get_family_by_internal_id(family_id)
+        self.assertEqual(family.description, 'Goldsmiths')
+        self.assertEqual(family.coded_phenotype, 'burnt')
+
+        await self.flayer.update_family(family_id, coded_phenotype='gilt')
+        family = await self.flayer.get_family_by_internal_id(family_id)
+        self.assertEqual(family.description, 'Goldsmiths')
+        self.assertEqual(family.coded_phenotype, 'gilt')
+
+    @run_as_sync
+    async def test_bad_query(self):
+        """Exercise invalid query() usage"""
+        with self.assertRaises(ValueError):
+            await self.flayer.query(FamilyFilter())
+
+    @run_as_sync
+    async def test_none_by_participants(self):
+        """Exercise get_families_by_participants() method"""
+        result = await self.flayer.get_families_by_participants([])
+        self.assertDictEqual(result, {})
+
+    @run_as_sync
+    async def test_import_families(self):
+        """Exercise import_families() method"""
+        await self.flayer.import_families(
+            ['familyid', 'description', 'phenotype'],
+            [
+                ['Smith', 'Blacksmiths', 'burnt'],
+                ['Jones', 'From Wales', 'sings well'],
+                ['Taylor', 'Post Norman', 'sews'],
+            ],
+        )
+
+        result = await self.flayer.query(
+            FamilyFilter(project=GenericFilter(eq=self.project_id))
+        )
+        self.assertEqual(len(result), 3)
+        family = {f.external_ids[PRIMARY_EXTERNAL_ORG]: f for f in result}
+        self.assertEqual(family['Smith'].description, 'Blacksmiths')
+        self.assertEqual(family['Smith'].coded_phenotype, 'burnt')
+        self.assertEqual(family['Jones'].description, 'From Wales')
+        self.assertEqual(family['Jones'].coded_phenotype, 'sings well')
+        self.assertEqual(family['Taylor'].description, 'Post Norman')
+        self.assertEqual(family['Taylor'].coded_phenotype, 'sews')
+
+        await self.flayer.import_families(
+            ['familyid', 'description', 'phenotype'],
+            [
+                ['Smith', 'Goldsmiths actually', 'gilt'],
+                ['Brown', 'From Jamaica', 'brunette'],
+            ],
+        )
+
+        result = await self.flayer.query(
+            FamilyFilter(project=GenericFilter(eq=self.project_id))
+        )
+        self.assertEqual(len(result), 4)
+        family = {f.external_ids[PRIMARY_EXTERNAL_ORG]: f for f in result}
+        self.assertEqual(family['Smith'].description, 'Goldsmiths actually')
+        self.assertEqual(family['Smith'].coded_phenotype, 'gilt')
+        self.assertEqual(family['Brown'].description, 'From Jamaica')
+        self.assertEqual(family['Brown'].coded_phenotype, 'brunette')
+        self.assertEqual(family['Jones'].description, 'From Wales')
+        self.assertEqual(family['Jones'].coded_phenotype, 'sings well')
+        self.assertEqual(family['Taylor'].description, 'Post Norman')
+        self.assertEqual(family['Taylor'].coded_phenotype, 'sews')
+
+    @run_as_sync
+    async def test_direct_get_id_map(self):
+        """Exercise the table's get_id_map_by_internal_ids() method"""
+        ftable = FamilyTable(self.connection)
+
+        result = await ftable.get_id_map_by_internal_ids([])
+        self.assertDictEqual(result, {})
+
+        result = await ftable.get_id_map_by_internal_ids([42], allow_missing=True)
+        self.assertDictEqual(result, {})
+
+        with self.assertRaises(NotFoundError):
+            _ = await ftable.get_id_map_by_internal_ids([42])

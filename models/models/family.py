@@ -1,27 +1,27 @@
 import logging
 
-from pydantic import BaseModel
+from models.base import SMBase, parse_sql_dict
 
 
-class FamilySimpleInternal(BaseModel):
+class FamilySimpleInternal(SMBase):
     """Simple family model for internal use"""
 
     id: int
-    external_id: str
+    external_ids: dict[str, str]
 
     def to_external(self):
         """Convert to external model"""
         return FamilySimple(
             id=self.id,
-            external_id=self.external_id,
+            external_ids=self.external_ids,
         )
 
 
-class FamilyInternal(BaseModel):
+class FamilyInternal(SMBase):
     """Family model"""
 
     id: int
-    external_id: str
+    external_ids: dict[str, str]
     project: int
     description: str | None = None
     coded_phenotype: str | None = None
@@ -29,31 +29,32 @@ class FamilyInternal(BaseModel):
     @staticmethod
     def from_db(d):
         """From DB fields"""
-        return FamilyInternal(**d)
+        external_ids = parse_sql_dict(d.pop('external_ids', {}))
+        return FamilyInternal(**d, external_ids=external_ids)
 
     def to_external(self):
         """Convert to external model"""
         return Family(
             id=self.id,
-            external_id=self.external_id,
+            external_ids=self.external_ids,
             project=self.project,
             description=self.description,
             coded_phenotype=self.coded_phenotype,
         )
 
 
-class FamilySimple(BaseModel):
+class FamilySimple(SMBase):
     """Simple family model, mostly for web access"""
 
     id: int
-    external_id: str
+    external_ids: dict[str, str]
 
 
-class Family(BaseModel):
+class Family(SMBase):
     """Family model"""
 
     id: int | None
-    external_id: str
+    external_ids: dict[str, str]
     project: int
     description: str | None = None
     coded_phenotype: str | None = None
@@ -62,7 +63,7 @@ class Family(BaseModel):
         """Convert to internal model"""
         return FamilyInternal(
             id=self.id,
-            external_id=self.external_id,
+            external_ids=self.external_ids,
             project=self.project,
             description=self.description,
             coded_phenotype=self.coded_phenotype,

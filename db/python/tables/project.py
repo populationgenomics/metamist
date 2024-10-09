@@ -242,6 +242,7 @@ DELETE FROM participant_phenotypes where participant_id IN (
 DELETE FROM family_participant WHERE family_id IN (
     SELECT id FROM family where project = :project
 );
+DELETE FROM family_external_id WHERE project = :project;
 DELETE FROM family WHERE project = :project;
 DELETE FROM sequencing_group_external_id WHERE project = :project;
 DELETE FROM sample_external_id WHERE project = :project;

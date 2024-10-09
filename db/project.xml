@@ -1789,4 +1789,80 @@
 		<sql>ALTER TABLE `analysis_outputs` ADD SYSTEM VERSIONING;</sql>
 	</changeSet>
 
+	<changeSet id="2024-07-25-family-external-ids" author="john.marshall">
+		<createTable tableName="family_external_id">
+			<column name="project" type="INT">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_PROJECT_FAMILY_EXTERNAL_ID"
+					references="project(id)" />
+			</column>
+			<column name="family_id" type="INT">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_FAMILY_FAMILY_EXTERNAL_ID"
+					references="family(id)" />
+			</column>
+			<column name="name" type="VARCHAR(255)" />
+			<column name="external_id" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="meta" type="LONGTEXT" />
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_FAMILY_EXTERNAL_ID_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+		<addPrimaryKey
+			tableName="family_external_id"
+			columnNames="family_id,name"
+			constraintName="PK_FAMILY_EXTERNAL_ID"
+			validate="true"
+		/>
+		<addUniqueConstraint
+			tableName="family_external_id"
+			columnNames="project,external_id"
+			constraintName="UK_FAMILY_EXTERNAL_ID_UNIQUE_EIDS"
+			validate="true"
+		/>
+		<createIndex tableName="family" indexName="fk_project_family">
+			<column name="project" />
+		</createIndex>
+		<dropUniqueConstraint
+			tableName="family"
+			constraintName="UK_FAMILY_PROJECT_EXTERNALID"
+		/>
+
+		<sql>ALTER TABLE family_external_id ADD SYSTEM VERSIONING;</sql>
+
+		<!-- Migrate existing external_ids to the new tables, keyed by PRIMARY_EXTERNAL_ORG, i.e. '' -->
+		<sql>INSERT INTO audit_log (author, on_behalf_of, ar_guid, comment, auth_project, meta)
+		     VALUES ('liquibase', NULL, NULL, 'family external_id migration', NULL, NULL)
+		     RETURNING @audit_log_id := id;
+
+		     INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
+		       SELECT project, id, '', external_id, @audit_log_id
+		       FROM family;
+		</sql>
+	</changeSet>
+
+	<changeSet id="2024-07-26-drop-old-external-id-columns" author="john.marshall">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+
+		<dropNotNullConstraint
+			tableName="family"
+			columnName="external_id"
+			columnDataType="VARCHAR(255)"
+		/>
+		<sql>UPDATE family SET external_id = NULL</sql>
+		<renameColumn
+			tableName="family"
+			oldColumnName="external_id"
+			newColumnName="_external_id_unused"
+			columnDataType="VARCHAR(255)"
+			remarks="Migration of family external IDs to separate table"
+		/>
+	</changeSet>
 </databaseChangeLog>

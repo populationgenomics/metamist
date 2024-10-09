@@ -16,8 +16,10 @@ class TestParticipantFamily(DbIsolatedTest):
 
         fl = FamilyLayer(self.connection)
 
-        self.fid_1 = await fl.create_family(external_id='FAM01')
-        self.fid_2 = await fl.create_family(external_id='FAM02')
+        self.fid_1 = await fl.create_family(external_ids={'forg': 'FAM01'})
+        self.fid_2 = await fl.create_family(external_ids={'forg': 'FAM02'})
+        # Also exercise update_family()
+        await fl.update_family(self.fid_2, external_ids={'otherorg': 'OFAM02'})
 
         pl = ParticipantLayer(self.connection)
         self.pid = (

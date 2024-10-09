@@ -626,7 +626,9 @@ class TestComment(DbIsolatedTest):
     async def test_add_comment_to_family(self):
         """Test adding a comment to an family"""
 
-        family = await self.flayer.create_family(external_id='f_external_id')
+        family = await self.flayer.create_family(
+            external_ids={PRIMARY_EXTERNAL_ORG: 'f_external_id'},
+        )
 
         comment_text = 'Family Test Comment 1234'
         created_comment = await self.add_comment_to_family(family, comment_text)
@@ -823,7 +825,9 @@ class TestComment(DbIsolatedTest):
     async def test_sample_discussion_related_comments(self):
         """Test getting related comments"""
 
-        family_id = await self.flayer.create_family(external_id='f_external_id')
+        family_id = await self.flayer.create_family(
+            external_ids={PRIMARY_EXTERNAL_ORG: 'f_external_id'},
+        )
         # This will create participant, sample, assay, sequencing group
         participant = await self.player.upsert_participant(get_participant_to_insert())
 

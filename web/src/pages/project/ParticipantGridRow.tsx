@@ -83,7 +83,7 @@ const FamilyCells: React.FC<{
                                   key={`family-${participant.id}-${f.id}`}
                                   id={`${f.id ?? ''}`}
                               >
-                                  {f.external_id}
+                                  {prepareExternalIds(f.external_ids || {})}
                               </FamilyLink>
                           ))
                         : participant.families
