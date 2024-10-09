@@ -13,6 +13,18 @@ from models.models.sequencing_group import (
     SequencingGroupInternalId,
 )
 
+KEYS = [
+    'sg.id',
+    's.project',
+    'JSON_OBJECTAGG(sgexid.name, sgexid.external_id) as external_ids',
+    'sg.sample_id',
+    'sg.type',
+    'sg.technology',
+    'sg.platform',
+    'sg.meta',
+    'sg.archived',
+]
+
 
 class SequencingGroupTable(DbBase):
     """
@@ -187,21 +199,9 @@ class SequencingGroupTable(DbBase):
         if filter_.is_false():
             return set(), []
 
-        keys = [
-            'sg.id',
-            's.project',
-            'JSON_OBJECTAGG(sgexid.name, sgexid.external_id) as external_ids',
-            'sg.sample_id',
-            'sg.type',
-            'sg.technology',
-            'sg.platform',
-            'sg.meta',
-            'sg.archived',
-        ]
-
         query, query_values = SequencingGroupTable.construct_query(
             filter_,
-            keys=keys,
+            keys=KEYS,
             external_id_table_alias='sgexid',
             limit=limit,
             skip=skip,
@@ -354,19 +354,8 @@ class SequencingGroupTable(DbBase):
         self, analysis_ids: list[int]
     ) -> tuple[set[ProjectId], dict[int, list[SequencingGroupInternal]]]:
         """Get map of samples by analysis_ids"""
-        keys = [
-            'sg.id',
-            's.project',
-            'JSON_OBJECTAGG(sgexid.name, sgexid.external_id) as external_ids',
-            'sg.sample_id',
-            'sg.type',
-            'sg.technology',
-            'sg.platform',
-            'sg.meta',
-            'sg.archived',
-        ]
         _query = f"""
-        SELECT {', '.join(keys)}, asg.analysis_id
+        SELECT {', '.join(KEYS)}, asg.analysis_id
         FROM analysis_sequencing_group asg
         INNER JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
         INNER JOIN sample s ON s.id = sg.sample_id
