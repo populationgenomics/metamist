@@ -272,9 +272,7 @@ class GenericMetadataParser(GenericParser):
 
     def get_sample_type(self, row: GroupedRow) -> str:
         """Get sample type from row"""
-        if self.default_sample_type:
-            return self.default_sample_type
-        return None
+        return self.default_sample_type
 
     def get_sequencing_types(self, row: GroupedRow) -> list[str]:
         """
@@ -564,57 +562,63 @@ class GenericMetadataParser(GenericParser):
         if not key_map or not row:
             return {}
 
-        def unstring_value(value: Any) -> bool:
-            """Convert strings to boolean or number if possible"""
-            if not isinstance(value, str):
-                return value
-            if value.lower() == 'true':
-                return True
-            if value.lower() == 'false':
-                return False
-            try:
-                return int(value)
-            except ValueError:
-                try:
-                    return float(value)
-                except ValueError:
-                    return value
-
-        def prepare_dict_from_keys(key_parts: list[str], val):
-            """Recursive production of dictionary"""
-            if len(key_parts) == 1:
-                return {key_parts[0]: val}
-            return {key_parts[0]: prepare_dict_from_keys(key_parts[1:], val)}
-
         dicts = [{}]
         for row_key, dict_key in key_map.items():
-            if isinstance(row, list):
-                if len(row) == 1:
-                    value = unstring_value(row[0].get(row_key))
-                else:
-                    inner_values = [
-                        unstring_value(r[row_key])
-                        for r in row
-                        if r.get(row_key) is not None
-                    ]
-                    if any(isinstance(inner, list) for inner in inner_values):
-                        # lists are unhashable
-                        value = inner_values
-                    else:
-                        value = sorted(
-                            set(inner_values), key=str
-                        )  # sorted for unit test consistency
-                        if len(value) == 0:
-                            continue
-                        if len(value) == 1:
-                            value = unstring_value(value[0])
-            else:
-                if row_key not in row:
-                    continue
-                value = unstring_value(row[row_key])
-            dicts.append(prepare_dict_from_keys(dict_key.split('.'), value))
+            value = GenericMetadataParser.extract_value_from_row(row, row_key)
+            if value is None:
+                continue
+
+            value = GenericMetadataParser.unstring_value(value)
+            dicts.append(
+                GenericMetadataParser.prepare_dict_from_keys(dict_key.split('.'), value)
+            )
 
         return reduce(GenericMetadataParser.merge_dicts, dicts)
+
+    @staticmethod
+    def extract_value_from_row(row: GroupedRow, row_key: str):
+        """Extract value from row based on row_key"""
+        if isinstance(row, list):
+            if len(row) == 1:
+                return row[0].get(row_key)
+            inner_values = [
+                GenericMetadataParser.unstring_value(r[row_key])
+                for r in row
+                if r.get(row_key) is not None
+            ]
+            if any(isinstance(inner, list) for inner in inner_values):
+                return inner_values
+            sorted_values = sorted(set(inner_values), key=str)
+            return sorted_values[0] if sorted_values else None
+        return row.get(row_key)
+
+    @staticmethod
+    def unstring_value(value: Any) -> bool | int | float:
+        """Convert strings to boolean or number if possible"""
+        if not isinstance(value, str):
+            return value
+        if value.lower() == 'true':
+            return True
+        if value.lower() == 'false':
+            return False
+        try:
+            return int(value)
+        except ValueError:
+            try:
+                return float(value)
+            except ValueError:
+                return value
+
+    @staticmethod
+    def prepare_dict_from_keys(key_parts: list[str], val):
+        """Recursive production of dictionary"""
+        if len(key_parts) == 1:
+            return {key_parts[0]: val}
+        return {
+            key_parts[0]: GenericMetadataParser.prepare_dict_from_keys(
+                key_parts[1:], val
+            )
+        }
 
     @staticmethod
     def process_filename_value(string: str | list[str]) -> list[str]:
@@ -660,6 +664,7 @@ class GenericMetadataParser(GenericParser):
         self, sample_id: str | None, row: SingleRow
     ) -> list[str]:
         """Get paths to reads from a row"""
+        _ = sample_id  # unused
         if not self.reads_column or self.reads_column not in row:
             return []
         # more post-processing
@@ -675,6 +680,7 @@ class GenericMetadataParser(GenericParser):
 
         Each element should be a string or None.
         """
+        _ = sample_id, read_filenames  # unused
         if not self.checksum_column or self.checksum_column not in row:
             return []
 
@@ -682,6 +688,8 @@ class GenericMetadataParser(GenericParser):
 
     async def get_gvcf_filenames(self, sample_id: str, row: GroupedRow) -> list[str]:
         """Get paths to gvcfs from a row"""
+        _ = sample_id  # unused
+
         if not self.gvcf_column:
             return []
 
@@ -820,8 +828,6 @@ class GenericMetadataParser(GenericParser):
 
         collapsed_assay_meta = self.collapse_arbitrary_meta(self.assay_meta_map, rows)
 
-        assays = []
-
         (
             read_filenames,
             read_checksums,
@@ -830,30 +836,18 @@ class GenericMetadataParser(GenericParser):
             sample.primary_external_id, rows
         )
 
-        # strip in case collaborator put "file1, file2"
-        full_read_filenames: list[str] = []
-        if read_filenames:
-            full_read_filenames.extend(
-                self.file_path(f.strip()) for f in read_filenames if f.strip()
-            )
-        read_file_types: dict[str, dict[str, list]] = await self.parse_files(
+        full_read_filenames = [
+            self.file_path(f.strip()) for f in read_filenames if f.strip()
+        ]
+        reads = await self.parse_files(
             sample.primary_external_id, full_read_filenames, read_checksums
         )
-        reads: dict[str, list] = read_file_types.get('reads')
+        reads = reads.get('reads', {})
         if not reads:
             return []
 
-        keys = list(reads.keys())
-        if len(keys) > 1:
-            # 2021-12-14 mfranklin: In future we should return multiple
-            #       assay meta, and handle that in the generic parser
-            raise ValueError(
-                f'Multiple types of reads found ({", ".join(keys)}), currently not supported'
-            )
-
-        reads_type = keys[0]
+        reads_type = self.get_reads_type(reads)
         collapsed_assay_meta['reads_type'] = reads_type
-        # collapsed_assay_meta['reads'] = reads[reads_type]
 
         if reads_type == 'cram':
             collapsed_assay_meta.update(
@@ -863,14 +857,37 @@ class GenericMetadataParser(GenericParser):
         if self.batch_number is not None:
             collapsed_assay_meta['batch'] = self.batch_number
 
+        self.update_collapsed_assay_meta(collapsed_assay_meta, sequencing_group, rows)
+
+        assays = self.create_assays(sequencing_group, reads, collapsed_assay_meta)
+
+        if not sequencing_group.meta:
+            sequencing_group.meta = self.get_sequencing_group_meta_from_assays(assays)
+
+        return assays
+
+    def get_reads_type(self, reads: dict[str, list]) -> str:
+        """Get reads type"""
+        keys = list(reads.keys())
+        if len(keys) > 1:
+            raise ValueError(
+                f'Multiple types of reads found ({", ".join(keys)}), currently not supported'
+            )
+        return keys[0]
+
+    def update_collapsed_assay_meta(
+        self,
+        collapsed_assay_meta: dict,
+        sequencing_group: ParsedSequencingGroup,
+        rows: GroupedRow,
+    ):
+        """Update collapsed assay meta"""
         if sequencing_group.sequencing_type in [
             'exome',
             'polyarna',
             'totalrna',
             'singlecellrna',
         ]:
-            rows = sequencing_group.rows
-            # Exome / RNA should have facility and library, allow missing for exomes - for now
             if self.get_sequencing_facility(rows[0]):
                 collapsed_assay_meta['sequencing_facility'] = (
                     self.get_sequencing_facility(rows[0])
@@ -879,43 +896,43 @@ class GenericMetadataParser(GenericParser):
                 collapsed_assay_meta['sequencing_library'] = (
                     self.get_sequencing_library(rows[0])
                 )
-            # RNA requires read end type and length as well
             if sequencing_group.sequencing_type != 'exome':
                 collapsed_assay_meta['read_end_type'] = self.get_read_end_type(rows[0])
                 collapsed_assay_meta['read_length'] = self.get_read_length(rows[0])
-                # if any of the above fields are not set for an RNA assay, raise an error
                 if not all(collapsed_assay_meta.values()):
                     raise ValueError(
-                        f'Not all required fields were set for RNA sample {sample.primary_external_id}:\n'
+                        f'Not all required fields were set for RNA sample {sequencing_group.sample.primary_external_id}:\n'
                         f'{collapsed_assay_meta}\n'
                         f'Use the default value arguments if they are not present in the manifest.'
                     )
 
-        for read in reads[reads_type]:
+    def create_assays(
+        self,
+        sequencing_group: ParsedSequencingGroup,
+        reads: dict[str, list],
+        collapsed_assay_meta: dict,
+    ) -> list[ParsedAssay]:
+        """Create assays from reads and meta"""
+        assays = []
+        for read in reads[self.get_reads_type(reads)]:
             assays.append(
                 ParsedAssay(
                     group=sequencing_group,
-                    # we don't determine which set of rows belong to a assay,
-                    # as we grab all reads, and then determine assay
-                    # grouping from there.
                     rows=sequencing_group.rows,
                     internal_assay_id=None,
                     external_assay_ids={},
-                    # unfortunately hard to break them up by row in the current format
-                    # assay_status=self.get_assay_status(rows),
                     assay_type='sequencing',
                     meta={
                         **collapsed_assay_meta,
                         'reads': read,
-                        'sequencing_type': self.get_sequencing_type(rows[0]),
+                        'sequencing_type': self.get_sequencing_type(
+                            sequencing_group.rows[0]
+                        ),
                         'sequencing_technology': sequencing_group.sequencing_technology,
                         'sequencing_platform': sequencing_group.sequencing_platform,
                     },
                 )
             )
-        if not sequencing_group.meta:
-            sequencing_group.meta = self.get_sequencing_group_meta_from_assays(assays)
-
         return assays
 
     async def get_analyses_from_sequencing_group(
