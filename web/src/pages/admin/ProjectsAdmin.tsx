@@ -1,12 +1,13 @@
 /* eslint-disable */
 // Since this is for admin only
 
-import * as React from 'react'
-import { Message, Button, Checkbox, Input, InputProps } from 'semantic-ui-react'
-import Table from '../../shared/components/Table'
-import { ProjectApi, Project } from '../../sm-api'
-import { gql } from '../../__generated__/gql'
 import { useQuery } from '@apollo/client'
+import * as React from 'react'
+import { Button, Checkbox, Input, InputProps, Message } from 'semantic-ui-react'
+import { gql } from '../../__generated__/gql'
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
+import Table from '../../shared/components/Table'
+import { Project, ProjectApi } from '../../sm-api'
 
 const GET_SEQUENCING_TYPES = gql(`
 query GetSequencingTypes {
@@ -153,4 +154,10 @@ const ProjectsAdmin = () => {
     )
 }
 
-export default ProjectsAdmin
+export default function ProjectsAdminPage() {
+    return (
+        <PaddedPage>
+            <ProjectsAdmin />
+        </PaddedPage>
+    )
+}

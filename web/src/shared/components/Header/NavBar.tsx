@@ -6,23 +6,22 @@ import { BillingApi } from '../../../sm-api'
 
 // this wasn't working, so added import to HTML
 // import 'bootstrap/dist/css/bootstrap.min.css'
+import AnalyticsIcon from '@mui/icons-material/Analytics'
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney'
 import DescriptionIcon from '@mui/icons-material/Description'
-import PeopleIcon from '@mui/icons-material/People'
+import DisplaySettingsIcon from '@mui/icons-material/DisplaySettings'
 import ExploreIcon from '@mui/icons-material/Explore'
 import InsightsIcon from '@mui/icons-material/Insights'
-import TableRowsIcon from '@mui/icons-material/TableRows'
-import TroubleshootIcon from '@mui/icons-material/Troubleshoot'
-import AnalyticsIcon from '@mui/icons-material/Analytics'
-import DisplaySettingsIcon from '@mui/icons-material/DisplaySettings'
+import PeopleIcon from '@mui/icons-material/People'
 import SummarizeIcon from '@mui/icons-material/Summarize'
+import TroubleshootIcon from '@mui/icons-material/Troubleshoot'
 import MuckTheDuck from '../MuckTheDuck'
 import SwaggerIcon from '../SwaggerIcon'
 import DarkModeTriButton from './DarkModeTriButton/DarkModeTriButton'
 import Searchbar from './Search'
 
+import { billingPages } from '../../../pages/billing/BillingPages'
 import { ThemeContext } from '../ThemeProvider'
-import { IBillingPage, billingPages } from '../../../pages/billing/BillingPages'
 
 import './NavBar.css'
 
@@ -112,11 +111,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
     )
 }
 
-interface NavBarProps {
-    fixed?: boolean
-}
-
-const NavBar: React.FC<NavBarProps> = ({ fixed }) => {
+const NavBar = () => {
     const [menuItems, setMenuItems] = React.useState<MenuItem[]>([
         {
             title: 'Explore',
@@ -154,7 +149,11 @@ const NavBar: React.FC<NavBarProps> = ({ fixed }) => {
     React.useEffect(() => {
         new BillingApi().isBillingEnabled().then((response) => {
             if (response.status === 200 && response.data === true) {
-                setMenuItems([...menuItems.slice(0, 2), billingPagesMenu, ...menuItems.slice(2)])
+                setMenuItems((menuItems) => [
+                    ...menuItems.slice(0, 2),
+                    billingPagesMenu,
+                    ...menuItems.slice(2),
+                ])
             }
         })
     }, [])

@@ -34,7 +34,7 @@ const parseString = (str: string) => {
     } catch (yamlErr) {
         try {
             return JSON.parse(str)
-        } catch (jsonErr) {
+        } catch (_jsonErr) {
             throw yamlErr
         }
     }
@@ -58,10 +58,11 @@ export const DictEditor: React.FunctionComponent<DictEditorProps> = ({
     const handleChange = (value: string) => {
         setInnerTextValue(value)
         try {
-            const _ = parseString(value)
+            parseString(value)
             setError(undefined)
-        } catch (e: any) {
-            setError(e.message)
+        } catch (e) {
+            const err = e as unknown as { message: string }
+            setError(err.message)
         }
     }
 
@@ -69,15 +70,16 @@ export const DictEditor: React.FunctionComponent<DictEditorProps> = ({
         try {
             const newJson = parseString(textValue)
             onChange?.(newJson)
-        } catch (e: any) {
-            setError(e.message)
+        } catch (e) {
+            const err = e as unknown as { message: string }
+            setError(err.message)
         }
     }
 
     return (
         <div
             style={{
-                border: !!error ? '3px solid var(--color-border-red)' : '1px solid #ccc',
+                border: error ? '3px solid var(--color-border-red)' : '1px solid #ccc',
             }}
         >
             <Editor

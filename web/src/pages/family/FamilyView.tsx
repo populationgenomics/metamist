@@ -10,15 +10,18 @@ import { gql } from '../../__generated__/gql'
 
 import groupBy from 'lodash/groupBy'
 import keyBy from 'lodash/keyBy'
-import orderBy from 'lodash/orderBy'
 import { GraphQlParticipant } from '../../__generated__/graphql'
-import TangledTree, { PersonNode } from '../../shared/components/pedigree/TangledTree'
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
+import { SplitPage } from '../../shared/components/Layout/SplitPage'
+import TangledTree, {
+    PedigreeEntry,
+    PersonNode,
+} from '../../shared/components/pedigree/TangledTree'
 import Table from '../../shared/components/Table'
 import { AnalysisGrid } from '../analysis/AnalysisGrid'
-import { AnalysisViewModal } from '../analysis/AnalysisView'
+import { FamilyCommentsView } from '../comments/entities/FamilyCommentsView'
 import { ParticipantView } from '../participant/ParticipantView'
 
-const sampleFieldsToDisplay = ['active', 'type']
 const getSeqrUrl = (projectGuid: string, familyGuid: string) =>
     `https://seqr.populationgenomics.org.au/project/${projectGuid}/family_page/${familyGuid}`
 
@@ -90,24 +93,20 @@ export const FamilyView: React.FC<IFamilyViewProps> = ({ familyId }) => {
         string | null | undefined
     >()
 
-    const [analysisIdToView, setAnalysisIdToView] = React.useState<number | null | undefined>(null)
-
-    if (!familyId || isNaN(familyId)) return <em>Invalid family ID</em>
+    const invalidFamilyId = !familyId || isNaN(familyId)
 
     const { loading, error, data } = useQuery(GET_FAMILY_INFO, {
         variables: { family_id: familyId },
+        skip: invalidFamilyId,
     })
+
+    if (invalidFamilyId) return <em>Invalid family ID</em>
 
     if (loading) return <LoadingDucks />
     if (error) return <>Error! {error.message}</>
     if (!data) return <>No data!</>
 
-    const sgs = data?.family?.familyParticipants.flatMap((fp) =>
-        fp.participant.samples.flatMap((s) => s.sequencingGroups)
-    )
-    const sgsById = keyBy(sgs, (s) => s.id)
-
-    const participantBySgId: { [sgId: string]: any } = data?.family?.familyParticipants.reduce(
+    const participantBySgId = data?.family?.familyParticipants.reduce(
         (acc, fp) => {
             for (const s of fp.participant.samples) {
                 for (const sg of s.sequencingGroups) {
@@ -122,15 +121,15 @@ export const FamilyView: React.FC<IFamilyViewProps> = ({ familyId }) => {
     const aById: {
         [id: number]: {
             id: number
-            timestampCompleted?: any | null
+            timestampCompleted?: number | null
             type: string
             sgs: string[]
-            meta?: any | null
+            meta?: Record<string, unknown> | null
             output?: string | null
         }
     } = {}
 
-    for (const fp of data?.family?.familyParticipants) {
+    for (const fp of data?.family?.familyParticipants ?? []) {
         for (const s of fp.participant.samples) {
             for (const sg of s.sequencingGroups) {
                 for (const a of sg.analyses) {
@@ -151,10 +150,9 @@ export const FamilyView: React.FC<IFamilyViewProps> = ({ familyId }) => {
         (a) => participantBySgId[a.sgs[0]]?.externalId
     )
     const familyAnalysis = Object.values(aById).filter((a) => a.sgs.length > 1)
-    const analyses = orderBy(Object.values(aById), (a) => a.timestampCompleted)
     const pedEntryByParticipantId = keyBy(data?.family?.project.pedigree, (pr) => pr.individual_id)
 
-    return (
+    const content = (
         <div style={{ width: '100%' }}>
             <h2>
                 {data?.family?.externalId} ({data?.family?.project?.name})
@@ -210,24 +208,36 @@ export const FamilyView: React.FC<IFamilyViewProps> = ({ familyId }) => {
             <hr />
             <section id="family-analyses">
                 <h4>Family analyses</h4>
-                <AnalysisGrid
-                    analyses={familyAnalysis}
-                    participantBySgId={participantBySgId}
-                    setAnalysisIdToView={(aId) => setAnalysisIdToView(aId)}
-                />
+                <AnalysisGrid analyses={familyAnalysis} participantBySgId={participantBySgId} />
             </section>
-
-            <AnalysisViewModal
-                size="small"
-                analysisId={analysisIdToView}
-                onClose={() => setAnalysisIdToView(null)}
-            />
         </div>
+    )
+
+    return (
+        <SplitPage
+            collapsed={true}
+            collapsedWidth={64}
+            main={() => <PaddedPage>{content}</PaddedPage>}
+            side={({ collapsed, onToggleCollapsed }) => {
+                const projectName = data.family.project.name
+                const familyId = data.family.id
+                if (!projectName || !familyId) return null
+
+                return (
+                    <FamilyCommentsView
+                        projectName={projectName}
+                        familyId={familyId}
+                        collapsed={collapsed}
+                        onToggleCollapsed={onToggleCollapsed}
+                    />
+                )
+            }}
+        />
     )
 }
 
 const PedigreeTable: React.FC<{
-    pedigree: any
+    pedigree: (PedigreeEntry & { notes?: string })[]
     highlightedIndividual?: string | null
     setHighlightedIndividual?: (individualId?: string | null) => void
 }> = ({ pedigree, highlightedIndividual, setHighlightedIndividual }) => {
@@ -244,7 +254,7 @@ const PedigreeTable: React.FC<{
                 </SUITable.Row>
             </thead>
             <tbody>
-                {pedigree?.map((pr: any) => {
+                {pedigree?.map((pr) => {
                     const isHighlighted = highlightedIndividual == pr.individual_id
                     return (
                         <SUITable.Row
@@ -286,7 +296,7 @@ const PedigreeTable: React.FC<{
 const getFamilyEidKeyForSeqrSeqType = (seqType: string) => `seqr-${seqType}`
 
 const SeqrUrls: React.FC<{
-    project: { meta: any }
+    project: { meta: Record<string, unknown> }
     family: { externalIds: { [key: string]: string } }
 }> = ({ project, family }) => {
     // meta keys for seqr projectGuids follow the format: seqr-project-{sequencing_type}

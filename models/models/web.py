@@ -358,11 +358,21 @@ class ProjectParticipantGridResponse(SMBase):
         )
         assay_fields = [
             Field(
+                key='id',
+                label='Assay ID',
+                is_visible=True,
+                filter_key='id',
+                filter_types=[
+                    ProjectParticipantGridFilterType.eq,
+                    ProjectParticipantGridFilterType.neq,
+                ],
+            ),
+            Field(
                 key='type',
                 label='Type',
                 is_visible=has_assays,
                 filter_key='type',
-            )
+            ),
         ]
         assay_fields.extend(
             Field(

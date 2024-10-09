@@ -3,8 +3,8 @@ import * as React from 'react'
 import { Table as SUITable } from 'semantic-ui-react'
 import { GraphQlAnalysis } from '../../__generated__/graphql'
 
-import Table from '../../shared/components/Table'
 import AnalysisLink from '../../shared/components/links/AnalysisLink'
+import Table from '../../shared/components/Table'
 
 export interface IAnalysisGridAnalysis extends Partial<GraphQlAnalysis> {
     sgs?: string[]
@@ -15,16 +15,8 @@ export const AnalysisGrid: React.FC<{
     participantBySgId: { [sgId: string]: { externalId: string } }
     sgsById?: { [sgId: string]: { technology: string; platform: string } }
     highlightedIndividual?: string | null
-    setAnalysisIdToView: (analysisId?: number | null) => void
     showSequencingGroup?: boolean
-}> = ({
-    analyses,
-    participantBySgId,
-    sgsById,
-    highlightedIndividual,
-    setAnalysisIdToView,
-    showSequencingGroup,
-}) => {
+}> = ({ analyses, participantBySgId, sgsById, highlightedIndividual, showSequencingGroup }) => {
     return (
         <Table>
             <thead>
@@ -58,21 +50,14 @@ export const AnalysisGrid: React.FC<{
                             }}
                         >
                             <SUITable.Cell>
-                                <AnalysisLink
-                                    id={a.id}
-                                    onClick={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        setAnalysisIdToView(a.id)
-                                    }}
-                                />
+                                <AnalysisLink id={a.id} />
                             </SUITable.Cell>
                             {showSequencingGroup && (
                                 <SUITable.Cell>
                                     {sg
                                         ? sgId
                                         : a.sgs?.map((sg) => (
-                                              <li>
+                                              <li key={sg}>
                                                   {sg}{' '}
                                                   {participantBySgId && sg in participantBySgId
                                                       ? `(${participantBySgId[sg]?.externalId})`

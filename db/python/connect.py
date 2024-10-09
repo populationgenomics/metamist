@@ -23,7 +23,7 @@ from db.python.utils import (
 )
 from models.models.project import Project, ProjectId, ProjectMemberRole
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 TABLES_ORDERED_BY_FK_DEPS = [
@@ -52,6 +52,13 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'analysis_cohort',
     'analysis_runner',
     'analysis_outputs',
+    'comment',
+    'sample_comment',
+    'project_comment',
+    'assay_comment',
+    'sequencing_group_comment',
+    'participant_comment',
+    'family_comment',
 ][::-1]
 
 

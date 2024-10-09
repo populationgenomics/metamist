@@ -1,16 +1,7 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Grid, Message } from 'semantic-ui-react'
-import {
-    BillingApi,
-    BillingColumn,
-    BillingSource,
-    BillingTimePeriods,
-    BillingTotalCostQueryModel,
-    BillingTotalCostRecord,
-} from '../../sm-api'
-
-import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import {
     generateInvoiceMonths,
@@ -19,6 +10,14 @@ import {
     getCurrentInvoiceYearStart,
 } from '../../shared/utilities/formatDates'
 import generateUrl from '../../shared/utilities/generateUrl'
+import {
+    BillingApi,
+    BillingColumn,
+    BillingSource,
+    BillingTimePeriods,
+    BillingTotalCostQueryModel,
+    BillingTotalCostRecord,
+} from '../../sm-api'
 import BillingCostByMonthTable from './components/BillingCostByMonthTable'
 import FieldSelector from './components/FieldSelector'
 
@@ -27,6 +26,7 @@ enum CloudSpendCategory {
     COMPUTE_COST = 'Compute Cost',
 }
 
+/* eslint-disable @typescript-eslint/no-explicit-any  -- too many anys in the file to fix right now but would be good to sort out when we can */
 const BillingCostByTime: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
 
@@ -66,7 +66,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
         updateNav(start_update, end_update)
     }
 
-    const convertInvoiceMonth = (invoiceMonth: string, start: Boolean) => {
+    const convertInvoiceMonth = (invoiceMonth: string, start: boolean) => {
         const year = invoiceMonth.substring(0, 4)
         const month = invoiceMonth.substring(4, 6)
         if (start) return `${year}-${month}-01`
@@ -150,7 +150,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 <Message negative onDismiss={() => setError(undefined)}>
                     {error}
                     <br />
-                    <Button negative onClick={() => setStart(start)}>
+                    <Button negative onClick={() => window.location.reload()}>
                         Retry
                     </Button>
                 </Message>
@@ -213,6 +213,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
         changeDate('end', data.value)
     }
 
+    /* eslint-disable react-hooks/exhaustive-deps */
     React.useEffect(() => {
         if (Boolean(start) && Boolean(end)) {
             // valid selection, retrieve data
@@ -239,9 +240,10 @@ const BillingCostByTime: React.FunctionComponent = () => {
             }
         }
     }, [start, end])
+    /* eslint-enable react-hooks/exhaustive-deps */
 
     return (
-        <>
+        <PaddedPage>
             <Card fluid style={{ padding: '20px' }} id="billing-container">
                 <h1
                     style={{
@@ -275,8 +277,10 @@ const BillingCostByTime: React.FunctionComponent = () => {
             {messageComponent()}
 
             {dataComponent()}
-        </>
+        </PaddedPage>
     )
 }
 
 export default BillingCostByTime
+
+/* eslint-enable @typescript-eslint/no-explicit-any  */

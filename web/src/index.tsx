@@ -1,12 +1,12 @@
+import { ApolloClient, ApolloProvider, createHttpLink, InMemoryCache } from '@apollo/client'
 import React from 'react'
 import ReactDOM from 'react-dom'
-import { ApolloProvider, ApolloClient, createHttpLink, InMemoryCache } from '@apollo/client'
 import App from './App'
 import reportWebVitals from './reportWebVitals'
 
 // make sure our stylesheet is last
-import 'swagger-ui-react/swagger-ui.css'
 import 'semantic-ui-css/semantic.min.css'
+import 'swagger-ui-react/swagger-ui.css'
 import './index.css'
 import { ThemeProvider } from './shared/components/ThemeProvider'
 
@@ -16,7 +16,23 @@ const httpLink = createHttpLink({
 
 const client = new ApolloClient({
     link: httpLink,
-    cache: new InMemoryCache(),
+    cache: new InMemoryCache({
+        possibleTypes: {
+            // Not sure why apollo can't get this from the schema,
+            // but this is required so that fields on the union
+            // types are retrievable. If we have lots more of these
+            // in the future we can look to automatically generate
+            // them as is described here: https://www.apollographql.com/docs/react/data/fragments/#generating-possibletypes-automatically
+            GraphQLCommentEntity: [
+                'GraphQLSample',
+                'GraphQLAssay',
+                'GraphQLSequencingGroup',
+                'GraphQLProject',
+                'GraphQLParticipant',
+                'GraphQLFamily',
+            ],
+        },
+    }),
 })
 
 const storedTheme = localStorage.getItem('theme') || 'light-mode'

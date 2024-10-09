@@ -20,7 +20,11 @@ from db.python.utils import NoOpAenter, NotFoundError, split_generic_terms
 from models.models import PRIMARY_EXTERNAL_ORG
 from models.models.family import PedRowInternal
 from models.models.participant import ParticipantInternal, ParticipantUpsertInternal
-from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
+from models.models.project import (
+    FullWriteAccessRoles,
+    ProjectId,
+    ReadAccessRoles,
+)
 
 HPO_REGEX_MATCHER = re.compile(r'HP\:\d+$')
 

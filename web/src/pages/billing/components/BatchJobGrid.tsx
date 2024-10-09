@@ -46,20 +46,24 @@ const ExpandableRow: React.FC<{ item: AnalysisCostRecordBatchJob }> = ({ item, .
 }
 
 const TblComponents: TableComponents = {
-    Scroller: React.forwardRef((props, ref) => (
-        <TableContainer
-            component={Paper}
-            // @ts-ignore
-            ref={ref}
-            {...props}
-        />
-    )),
+    Scroller: React.forwardRef(function TableContainerWrapper(props, ref) {
+        return (
+            <TableContainer
+                component={Paper}
+                // @ts-ignore
+                ref={ref}
+                {...props}
+            />
+        )
+    }),
     Table: (props: TableProps) => <Table {...props} style={{ borderCollapse: 'separate' }} />,
     TableHead: TableHead,
     // @ts-ignore
     TableRow: ExpandableRow,
     // @ts-ignore
-    TableBody: React.forwardRef((props: TableBodyProps, ref) => <TableBody ref={ref} {...props} />),
+    TableBody: React.forwardRef(function TableBodyWrapper(props: TableBodyProps, ref) {
+        return <TableBody ref={ref} {...props} />
+    }),
 }
 
 export const BatchJobsTable: React.FC<{ batch: AnalysisCostRecordBatch }> = ({ batch }) => {

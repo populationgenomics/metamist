@@ -37,6 +37,7 @@ build/
 test/*.sh
 .coverage
 coverage.xml
+test-execution.xml
 temp.json
 data-dump.sql
 local.py
@@ -64,3 +65,8 @@ Pulumi*.yaml
 
 # performance profile files
 profiles
+
+# sonarqube
+.scannerwork/
+
+latest_backup/

@@ -68,7 +68,6 @@ const getDisplayNameFromFilterType = (filterType: ProjectParticipantGridFilterTy
         case ProjectParticipantGridFilterType.Lte:
             return 'Less than or equal to'
     }
-    return filterType
 }
 
 export const ValueFilter: React.FC<IValueFilter> = ({
@@ -86,17 +85,22 @@ export const ValueFilter: React.FC<IValueFilter> = ({
     //  So check if the filterKey starts with 'meta.' to determine if it is a meta key, and
     //  then check the [category].meta object for the value
 
-    if (!field.filter_key) return <></>
-
     const [_defaultFilterType, setDefaultFilterType] = React.useState<
         ProjectParticipantGridFilterType | undefined
     >()
 
+    let optionsToCheck = props?.filterValues?.[category] || {}
+    const name = (field.filter_key ?? '').replace(/^meta\./, '')
+
+    // @ts-ignore
+    const _value = optionsToCheck?.[name]?.[operator]
+    const [_tempValue, setTempValue] = React.useState<string | undefined>(_value ?? '')
+    const tempValue = _tempValue ?? _value
+
+    if (!field.filter_key) return <></>
+
     const isMeta = field.filter_key?.startsWith('meta.')
     // set name to the filterKey without the .meta prefix
-    const name = field.filter_key.replace(/^meta\./, '')
-
-    let optionsToCheck = props?.filterValues?.[category] || {}
 
     if (isMeta) {
         // get the meta bit from the filterValues
@@ -142,11 +146,6 @@ export const ValueFilter: React.FC<IValueFilter> = ({
         operator = getOperatorFromFilterType(queryType)
     }
 
-    // @ts-ignore
-    const _value = optionsToCheck?.[name]?.[operator]
-    const [_tempValue, setTempValue] = React.useState<string | undefined>(_value ?? '')
-    const tempValue = _tempValue ?? _value
-
     const updateQueryType = (newFilterType: ProjectParticipantGridFilterType) => {
         setDefaultFilterType(newFilterType)
         const newOperator = getOperatorFromFilterType(newFilterType)
@@ -155,7 +154,7 @@ export const ValueFilter: React.FC<IValueFilter> = ({
     }
 
     const postValue = (_operator: string, value: string | undefined) => {
-        const f: GenericFilterAny | undefined = !!value ? { [_operator]: value } : undefined
+        const f: GenericFilterAny | undefined = value ? { [_operator]: value } : undefined
 
         // deep copy
         const newFilter = JSON.parse(JSON.stringify(props.filterValues))

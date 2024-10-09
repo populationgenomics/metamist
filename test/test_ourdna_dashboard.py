@@ -21,6 +21,13 @@ def str_to_datetime(timestamp_str):
     return datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
 
 
+def convert_to_dict(d):
+    """Converts a defaultdict into a dict recursively"""
+    if isinstance(d, defaultdict):
+        d = {k: convert_to_dict(v) for k, v in d.items()}
+    return d
+
+
 class OurDNADashboardTest(DbIsolatedTest):
     """Test sample class"""
 
@@ -121,6 +128,93 @@ class OurDNADashboardTest(DbIsolatedTest):
                                 'processing-site': 'Garvan',
                                 # 'process-start-time': '2022-07-03 16:28:00',
                                 # 'process-end-time': '2022-07-03 19:28:00',
+                                'received-time': '2022-07-03 14:28:00',
+                                'received-by': 'YP',
+                                'collection-lab': 'XYZ LAB',
+                                'courier': 'ABC COURIERS',
+                                'courier-tracking-number': 'ABCDEF12562',
+                                'courier-scheduled-pickup-time': '2022-07-03 13:28:00',
+                                'courier-actual-pickup-time': '2022-07-03 13:28:00',
+                                'courier-scheduled-dropoff-time': '2022-07-03 13:28:00',
+                                'courier-actual-dropoff-time': '2022-07-03 13:28:00',
+                                'concentration': 1.66,
+                            },
+                            type='ebld',
+                            active=True,
+                        )
+                    ],
+                ),
+                ParticipantUpsertInternal(
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'EX04'},
+                    reported_sex=2,
+                    karyotype='XX',
+                    meta={'consent': True, 'field': 3},
+                    samples=[
+                        SampleUpsertInternal(
+                            external_ids={PRIMARY_EXTERNAL_ORG: 'Test04'},
+                            meta={
+                                'collection-time': '2022-07-03 13:28:00',
+                                'processing-site': 'Garvan',
+                                'process-start-time': '2022-07-03 16:28:00',
+                                'process-end-time': '2022-07-04 19:28:00',
+                                'received-time': '2022-07-03 14:28:00',
+                                'received-by': 'YP',
+                                'collection-lab': 'XYZ LAB',
+                                'courier': 'ABC COURIERS',
+                                'courier-tracking-number': 'ABCDEF12562',
+                                'courier-scheduled-pickup-time': '2022-07-03 13:28:00',
+                                'courier-actual-pickup-time': '2022-07-03 13:28:00',
+                                'courier-scheduled-dropoff-time': '2022-07-03 13:28:00',
+                                'courier-actual-dropoff-time': '2022-07-03 13:28:00',
+                                'concentration': 1.66,
+                            },
+                            type='ebld',
+                            active=True,
+                        )
+                    ],
+                ),
+                ParticipantUpsertInternal(
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'EX05'},
+                    reported_sex=2,
+                    karyotype='XX',
+                    meta={'consent': True, 'field': 3},
+                    samples=[
+                        SampleUpsertInternal(
+                            external_ids={PRIMARY_EXTERNAL_ORG: 'Test05'},
+                            meta={
+                                'collection-time': '2022-07-03 13:28:00',
+                                'processing-site': 'Garvan',
+                                'process-start-time': '2022-07-03 16:28:00',
+                                'process-end-time': '2022-07-05 19:28:00',
+                                'received-time': '2022-07-03 14:28:00',
+                                'received-by': 'YP',
+                                'collection-lab': 'XYZ LAB',
+                                'courier': 'ABC COURIERS',
+                                'courier-tracking-number': 'ABCDEF12562',
+                                'courier-scheduled-pickup-time': '2022-07-03 13:28:00',
+                                'courier-actual-pickup-time': '2022-07-03 13:28:00',
+                                'courier-scheduled-dropoff-time': '2022-07-03 13:28:00',
+                                'courier-actual-dropoff-time': '2022-07-03 13:28:00',
+                                'concentration': 1.66,
+                            },
+                            type='ebld',
+                            active=True,
+                        )
+                    ],
+                ),
+                ParticipantUpsertInternal(
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'EX06'},
+                    reported_sex=2,
+                    karyotype='XX',
+                    meta={'consent': True, 'field': 3},
+                    samples=[
+                        SampleUpsertInternal(
+                            external_ids={PRIMARY_EXTERNAL_ORG: 'Test06'},
+                            meta={
+                                'collection-time': '2022-07-03 13:28:00',
+                                'processing-site': 'Garvan',
+                                'process-start-time': '2022-07-03 16:28:00',
+                                'process-end-time': '2022-07-06 11:28:00',
                                 'received-time': '2022-07-03 14:28:00',
                                 'received-by': 'YP',
                                 'collection-lab': 'XYZ LAB',
@@ -251,7 +345,7 @@ class OurDNADashboardTest(DbIsolatedTest):
         self.assertTrue(processing_times_by_site)
         self.assertIsInstance(processing_times_by_site, dict)
 
-        sample_tally: dict[str, dict[int, int]] = defaultdict()
+        sample_tally: dict[str, dict[int, int]] = defaultdict(lambda: defaultdict(int))
         for sample in self.sample_external_objects:
             assert isinstance(sample.meta, dict)
             processing_site = sample.meta.get('processing-site', 'Unknown')
@@ -264,14 +358,54 @@ class OurDNADashboardTest(DbIsolatedTest):
                 process_start_time
             )
             current_bucket = ceil(time_difference.total_seconds() / 3600)
-            if processing_site in sample_tally:
-                sample_tally[processing_site][current_bucket] += 1
-            else:
-                sample_tally[processing_site] = {}
-                sample_tally[processing_site][current_bucket] = 1
+            sample_tally[processing_site][current_bucket] += 1
+
+        # ENABLE THIS IF WE WANT VALUES FOR ALL HOURS
+        # for site in sample_tally:
+        #     min_bucket = min(sample_tally[site])
+        #     max_bucket = max(sample_tally[site])
+        #     for i in range(min_bucket, max_bucket + 1):
+        #         sample_tally[site].setdefault(i, 0)
 
         # Checks that we have identical dicts (by extension, keys and their values)
-        self.assertDictEqual(processing_times_by_site, sample_tally)
+        self.assertDictEqual(processing_times_by_site, convert_to_dict(sample_tally))
+
+    @run_as_sync
+    async def test_processing_times_per_collection_site(self):
+        """I want to know how long it took to process samples collected at each site"""
+        dashboard = await self.odd.query(project_id=self.project_id)
+        processing_times_by_collection_site = (
+            dashboard.processing_times_by_collection_site
+        )
+
+        # Check that processing_times_per_site is not empty and is a dict
+        self.assertTrue(processing_times_by_collection_site)
+        self.assertIsInstance(processing_times_by_collection_site, dict)
+
+        sample_tally: dict[str, dict[int, int]] = defaultdict(lambda: defaultdict(int))
+        for sample in self.sample_external_objects:
+            assert isinstance(sample.meta, dict)
+            collection_site = sample.meta.get('collection-lab', 'Unknown')
+            process_start_time = sample.meta.get('process-start-time')
+            process_end_time = sample.meta.get('process-end-time')
+            # Skip samples that don't have process_start_time or process_end_time
+            if not process_start_time or not process_end_time:
+                continue
+            time_difference = str_to_datetime(process_end_time) - str_to_datetime(
+                process_start_time
+            )
+            current_bucket = ceil(time_difference.total_seconds() / 3600)
+            sample_tally[collection_site][current_bucket] += 1
+
+        # ENABLE THIS IF WE WANT VALUES FOR ALL HOURS
+        # for site in sample_tally:
+        #     min_bucket = min(sample_tally[site])
+        #     max_bucket = max(sample_tally[site])
+        #     for i in range(min_bucket, max_bucket + 1):
+        #         sample_tally[site].setdefault(i, 0)
+
+        # Checks that we have identical dicts (by extension, keys and their values)
+        self.assertDictEqual(processing_times_by_collection_site, sample_tally)
 
     @run_as_sync
     async def test_total_samples_by_collection_event_name(self):
@@ -414,3 +548,46 @@ class OurDNADashboardTest(DbIsolatedTest):
                 participants_filtered.append(participant.id)
 
         self.assertCountEqual(participants_signed_not_consented, participants_filtered)
+
+    @run_as_sync
+    async def test_collection_to_process_end_time_bucket_statistics(self):
+        """Bucket the number of samples processed within 24, 48 and 72 hours"""
+        dashboard = await self.odd.query(project_id=self.project_id)
+        collection_to_process_end_time_bucket_statistics = (
+            dashboard.collection_to_process_end_time_bucket_statistics
+        )
+
+        # Check that collection_to_process_end_time_bucket_statistics is not empty and is a dict
+        self.assertTrue(collection_to_process_end_time_bucket_statistics)
+        self.assertIsInstance(collection_to_process_end_time_bucket_statistics, dict)
+
+        # Check that the number of samples in the list is correct
+        samples_filtered: dict[str, int] = {
+            '24h': 0,
+            '48h': 0,
+            '72h': 0,
+            '>72h': 0,
+        }
+        for sample in self.sample_external_objects:
+            assert isinstance(sample.meta, dict)
+            collection_time = sample.meta.get('collection-time')
+            process_end_time = sample.meta.get('process-end-time')
+            # Skip samples that don't have collection_time or process_end_time
+            if not collection_time or not process_end_time:
+                continue
+            time_difference = str_to_datetime(process_end_time) - str_to_datetime(
+                collection_time
+            )
+            current_bucket = ceil(time_difference.total_seconds() / 3600)
+            if current_bucket <= 24:
+                samples_filtered['24h'] += 1
+            elif current_bucket <= 48:
+                samples_filtered['48h'] += 1
+            elif current_bucket <= 72:
+                samples_filtered['72h'] += 1
+            else:
+                samples_filtered['>72h'] += 1
+
+        self.assertDictEqual(
+            collection_to_process_end_time_bucket_statistics, samples_filtered
+        )

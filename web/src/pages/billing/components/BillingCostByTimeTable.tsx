@@ -1,11 +1,10 @@
-import { Checkbox, Grid, Header, Table as SUITable } from 'semantic-ui-react'
-import Table from '../../../shared/components/Table'
 import React from 'react'
-import { BillingColumn } from '../../../sm-api'
-import { convertFieldName } from '../../../shared/utilities/fieldName'
-import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
+import { Checkbox, Header, Table as SUITable } from 'semantic-ui-react'
 import { IStackedAreaByDateChartData } from '../../../shared/components/Graphs/StackedAreaByDateChart'
-import orderBy from '../../../shared/utilities/orderBy'
+import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
+import Table from '../../../shared/components/Table'
+import { convertFieldName } from '../../../shared/utilities/fieldName'
+import formatMoney from '../../../shared/utilities/formatMoney'
 
 interface IBillingCostByTimeTableProps {
     heading: string
@@ -31,7 +30,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     React.useEffect(() => {
         setInternalData(
             data.map((p) => {
-                let newP = { ...p }
+                const newP = { ...p }
                 const total = Object.values(p.values).reduce((acc, cur) => acc + cur, 0)
                 newP.values['Daily Total'] = total
                 newP.values['Compute Cost'] = total - p.values['Cloud Storage']
@@ -107,14 +106,6 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         return undefined
     }
 
-    const currencyFormat = (num: number): string => {
-        if (num === undefined || num === null) {
-            return ''
-        }
-
-        return `$${num.toFixed(2).replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')}`
-    }
-
     if (isLoading) {
         return (
             <div>
@@ -162,7 +153,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                         </SUITable.Cell>
                         {headerFields().map((k) => (
                             <SUITable.Cell key={`${p.date.toISOString()} - ${k.category}`}>
-                                {currencyFormat(p.values[k.category])}
+                                {formatMoney(p.values[k.category])}
                             </SUITable.Cell>
                         ))}
                     </SUITable.Row>
@@ -226,7 +217,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                         {headerFields().map((k) => (
                             <SUITable.Cell key={`Total ${k.category}`}>
                                 <b>
-                                    {currencyFormat(
+                                    {formatMoney(
                                         internalData.reduce(
                                             (acc, cur) => acc + cur.values[k.category],
                                             0

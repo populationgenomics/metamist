@@ -1,27 +1,24 @@
-import React from 'react'
-import { Container, Grid, GridRow, GridColumn } from 'semantic-ui-react'
 import { useQuery } from '@apollo/client'
+import { Container, Grid, GridColumn, GridRow } from 'semantic-ui-react'
 import { gql } from '../../__generated__'
-
-import Tile from '../../shared/components/ourdna/Tile'
-import TableTile from '../../shared/components/ourdna/TableTile'
-import StatTile from '../../shared/components/ourdna/StatTile'
-
-import OurDNALogo from '../../shared/components/OurDNALogo'
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import MuckError from '../../shared/components/MuckError'
-import OurDonutChart from '../../shared/components/ourdna/OurDonutChart'
 import BarChart from '../../shared/components/ourdna/BarChart'
 import { ourdnaColours } from '../../shared/components/ourdna/Colours'
-
-import ClipboardIcon from '../../shared/components/ourdna/dashboardIcons/ClipboardIcon'
-import SyringeIcon from '../../shared/components/ourdna/dashboardIcons/SyringeIcon'
-import TestTubeIcon from '../../shared/components/ourdna/dashboardIcons/TestTubeIcon'
+import AlarmIcon from '../../shared/components/ourdna/dashboardIcons/AlarmIcon'
 import BloodSampleIcon from '../../shared/components/ourdna/dashboardIcons/BloodSampleIcon'
-import TruckIcon from '../../shared/components/ourdna/dashboardIcons/TruckIcon'
+import ClipboardIcon from '../../shared/components/ourdna/dashboardIcons/ClipboardIcon'
 import ClockIcon from '../../shared/components/ourdna/dashboardIcons/ClockIcon'
 import RocketIcon from '../../shared/components/ourdna/dashboardIcons/RocketIcon'
-import AlarmIcon from '../../shared/components/ourdna/dashboardIcons/AlarmIcon'
+import SyringeIcon from '../../shared/components/ourdna/dashboardIcons/SyringeIcon'
+import TestTubeIcon from '../../shared/components/ourdna/dashboardIcons/TestTubeIcon'
+import TruckIcon from '../../shared/components/ourdna/dashboardIcons/TruckIcon'
+import OurDonutChart from '../../shared/components/ourdna/OurDonutChart'
+import StatTile from '../../shared/components/ourdna/StatTile'
+import TableTile from '../../shared/components/ourdna/TableTile'
+import Tile from '../../shared/components/ourdna/Tile'
+import OurDNALogo from '../../shared/components/OurDNALogo'
 
 const GET_OURDNA_DASHBOARD = gql(`
     query DashboardQuery($project: String!) {
@@ -30,9 +27,11 @@ const GET_OURDNA_DASHBOARD = gql(`
                 collectionToProcessEndTime
                 collectionToProcessEndTime24h
                 collectionToProcessEndTimeStatistics
+                collectionToProcessEndTimeBucketStatistics
                 participantsConsentedNotCollected
                 participantsSignedNotConsented
                 processingTimesBySite
+                processingTimesByCollectionSite
                 samplesConcentrationGt1ug
                 samplesLostAfterCollection {
                     collectionLab
@@ -73,8 +72,9 @@ const Dashboard = () => {
 
     const samplesLostAfterCollections =
         data.project.ourdnaDashboard.samplesLostAfterCollection.reduce(
-            (rr: Record<string, any>, sample) => {
-                rr[sample.sampleId] = sample.timeSinceCollection / 3600
+            (rr: Record<string, number>, sample) => {
+                rr[sample.sampleId] =
+                    sample.timeSinceCollection != null ? sample.timeSinceCollection / 3600 : 0
                 return rr
             },
             {}
@@ -200,11 +200,58 @@ const Dashboard = () => {
                 <GridRow centered>
                     <GridColumn width={10}>
                         <BarChart
-                            header="Processing time per site"
+                            header="Processing time per Processing Site"
                             data={data.project.ourdnaDashboard.processingTimesBySite}
                             icon={
                                 <ClockIcon fill={ourdnaColours.yellow} style={{ ...iconStyle }} />
                             }
+                        />
+                    </GridColumn>
+                    <GridColumn width={6}>
+                        <Grid stackable columns={1}>
+                            <GridColumn>
+                                <StatTile
+                                    header="Collection to Processing by 24h buckets"
+                                    stats={[
+                                        {
+                                            value: `${data.project.ourdnaDashboard.collectionToProcessEndTimeBucketStatistics['24h']}`,
+                                            units: '24 hours',
+                                            unitsColour: 'ourdna-green-transparent',
+                                        },
+                                        {
+                                            value: `${data.project.ourdnaDashboard.collectionToProcessEndTimeBucketStatistics['48h']}`,
+                                            units: '48 hours',
+                                            unitsColour: 'ourdna-red-transparent',
+                                        },
+                                        {
+                                            value: `${data.project.ourdnaDashboard.collectionToProcessEndTimeBucketStatistics['72h']}`,
+                                            units: '72 hours',
+                                            unitsColour: 'ourdna-blue-transparent',
+                                        },
+                                        {
+                                            value: `${data.project.ourdnaDashboard.collectionToProcessEndTimeBucketStatistics['>72h']}`,
+                                            units: '> 72 hours',
+                                            unitsColour: 'ourdna-yellow-transparent',
+                                        },
+                                    ]}
+                                    description="Count of samples processed within each 24h bucket."
+                                    icon={
+                                        <TruckIcon
+                                            fill={ourdnaColours.green}
+                                            style={{ ...iconStyle }}
+                                        />
+                                    }
+                                />
+                            </GridColumn>
+                        </Grid>
+                    </GridColumn>
+                </GridRow>
+                <GridRow centered>
+                    <GridColumn width={10}>
+                        <BarChart
+                            header="Processing time per Collection Site"
+                            data={data.project.ourdnaDashboard.processingTimesByCollectionSite}
+                            icon={<ClockIcon fill={ourdnaColours.green} style={{ ...iconStyle }} />}
                         />
                     </GridColumn>
                     <GridColumn width={6}>
@@ -243,4 +290,10 @@ const Dashboard = () => {
     )
 }
 
-export default Dashboard
+export default function DashboardPage() {
+    return (
+        <PaddedPage>
+            <Dashboard />
+        </PaddedPage>
+    )
+}

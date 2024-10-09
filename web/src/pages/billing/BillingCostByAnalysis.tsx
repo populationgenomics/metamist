@@ -2,19 +2,18 @@ import SearchIcon from '@mui/icons-material/Search'
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Dropdown, Grid, Input, Message } from 'semantic-ui-react'
-
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
+import generateUrl from '../../shared/utilities/generateUrl'
 import { AnalysisCostRecord, BillingApi } from '../../sm-api'
 import BatchGrid from './components/BatchGrid'
-
-import generateUrl from '../../shared/utilities/generateUrl'
-import { getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
 
 enum SearchType {
     Ar_guid,
     Batch_id,
 }
 
+/* eslint-disable @typescript-eslint/no-explicit-any  -- too many anys in the file to fix right now but would be good to sort out when we can */
 const BillingCostByAnalysis: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
 
@@ -22,9 +21,6 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
     const [error, setError] = React.useState<string | undefined>()
     const [data, setData] = React.useState<AnalysisCostRecord[] | undefined>()
-    const [start, setStart] = React.useState<string>(
-        searchParams.get('start') ?? getMonthStartDate()
-    )
 
     const setBillingRecord = (records: AnalysisCostRecord[]) => {
         setIsLoading(false)
@@ -126,9 +122,11 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         return dropdownOptions[0].value
     }
 
+    /* eslint-disable react-hooks/exhaustive-deps */
     React.useEffect(() => {
         handleSearch()
     }, [])
+    /* eslint-enable react-hooks/exhaustive-deps */
 
     const errorComponent = () => {
         if (error) {
@@ -136,7 +134,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
                 <Message negative onDismiss={() => setError(undefined)}>
                     {error}
                     <br />
-                    <Button negative onClick={() => setStart(start)}>
+                    <Button negative onClick={() => window.location.reload()}>
                         Retry
                     </Button>
                 </Message>
@@ -251,13 +249,14 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
     }
 
     return (
-        <>
+        <PaddedPage>
             {searchCard()}
             {errorComponent()}
             {loadingComponent()}
             {dataComponent()}
-        </>
+        </PaddedPage>
     )
 }
 
 export default BillingCostByAnalysis
+/* eslint-enable @typescript-eslint/no-explicit-any */

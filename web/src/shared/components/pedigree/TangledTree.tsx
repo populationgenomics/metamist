@@ -98,7 +98,7 @@ function formObjectFromIdAndParents(
 }
 
 const constructTangleLayout = (levels: NodeList[], options: ITangleLayoutOptions) => {
-    const nodes_index: Record<string, any> = {}
+    const nodes_index: Record<string, Node> = {}
 
     const nodeDiameter = options.nodeDiameter ?? defaultNodeDiameter
     const _horizontalSpacing = options.horizontalSpacing ?? nodeDiameter * 2.5
@@ -118,7 +118,7 @@ const constructTangleLayout = (levels: NodeList[], options: ITangleLayoutOptions
 
     // precompute bundles
     levels.forEach((l, i) => {
-        const index: Record<string, any> = {}
+        const index: Record<string, Node> = {}
         l.nodes.forEach((n) => {
             if (!n.parents || n.parents.length === 0) {
                 return
@@ -133,6 +133,11 @@ const constructTangleLayout = (levels: NodeList[], options: ITangleLayoutOptions
                 index[id] = {
                     id,
                     parents: n.parents.slice(),
+                    parentsList: [],
+                    bundles: [],
+                    links: [],
+                    x: 0,
+                    y: 0,
                     level: i,
                     span: i - (min(n.parents, (p) => p.level) ?? 0),
                 }
@@ -502,14 +507,14 @@ export const PersonNode: React.FC<IPersonNodeProps> = ({
             >
                 <path
                     data-id={`${entry.individual_id}`}
-                    stroke={isHighlighted ? colPersonBorder : colPersonBorder}
+                    stroke={colPersonBorder}
                     strokeWidth={isHighlighted ? nodeSize * 0.9 : nodeSize * 0.75}
                     z="-1"
                     d={`M${node.x} ${node.y} L${node.x} ${node.y}`}
                     strokeLinecap={entry.sex === 1 ? 'square' : 'round'}
                 />
                 <path
-                    stroke={entry.affected === 1 ? colAffected : colUnaffected}
+                    stroke={entry.affected === 2 ? colAffected : colUnaffected}
                     strokeWidth={nodeSize * 0.65}
                     strokeLinecap={entry.sex === 1 ? 'square' : 'round'}
                     d={`M${node.x} ${node.y} L${node.x} ${node.y}`}
@@ -569,7 +574,7 @@ const calculateDepth = (
 // };
 
 /* eslint-disable no-restricted-syntax */
-const findInHeirarchy = (id: string | null | undefined, heirarchy: Record<string, any>) => {
+const findInHeirarchy = (id: string | null | undefined, heirarchy: NodeParentsList[][]) => {
     for (const [index, level] of heirarchy.entries()) {
         for (const person of level) {
             if (person.id === id) {
@@ -691,16 +696,17 @@ const formatData = (data: PedigreeEntry[]) => {
                     keyedData[next].paternal_id,
                     keyedData[next].maternal_id,
                 ])
-                toReturn[min(levels) - 1] = [...toReturn[min(levels) - 1], nextObj]
+                toReturn[(min(levels) || 0) - 1] = [...toReturn[(min(levels) || 0) - 1], nextObj]
                 yetToSee.delete(next)
                 updatedList = true
                 break
             }
             // try add child below parents
-            const parentLevel = max([
-                findInHeirarchy(keyedData[next].maternal_id, toReturn),
-                findInHeirarchy(keyedData[next].paternal_id, toReturn),
-            ])
+            const parentLevel =
+                max([
+                    findInHeirarchy(keyedData[next].maternal_id, toReturn),
+                    findInHeirarchy(keyedData[next].paternal_id, toReturn),
+                ]) || 0
             if (parentLevel > -1) {
                 const nextObj: NodeParentsList = formObjectFromIdAndParents(next, [
                     keyedData[next].paternal_id,

@@ -1,13 +1,13 @@
-import * as React from 'react'
 import sortBy from 'lodash/sortBy'
+import * as React from 'react'
 
-import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
-import { AnalysisApi, Project, ProjectApi, ProportionalDateTemporalMethod } from '../../../sm-api'
 import { Grid, Message, Select } from 'semantic-ui-react'
 import {
     IStackedAreaByDateChartData,
     StackedAreaByDateChart,
 } from '../../../shared/components/Graphs/StackedAreaByDateChart'
+import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
+import { AnalysisApi, Project, ProjectApi, ProportionalDateTemporalMethod } from '../../../sm-api'
 
 interface IProportionalDateProjectModel {
     project: string
@@ -99,7 +99,7 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
                 )
 
                 // convert end to date if exists, or use current date
-                const graphEnd = !!end ? new Date(end) : new Date()
+                const graphEnd = end ? new Date(end) : new Date()
 
                 // If the graph isn't at endDate, add a second entry at the endDate
                 // so it finishes at endDate for a better visual graph
@@ -119,7 +119,7 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
             })
             .catch((er: Error) => {
                 // @ts-ignore
-                let message = er.response?.data?.description || er?.message
+                const message = er.response?.data?.description || er?.message
                 setError(message)
                 setIsLoading(false)
             })
@@ -145,6 +145,7 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
     }
 
     // on first load
+    /* eslint-disable react-hooks/exhaustive-deps -- this is likely buggy but needs a refactor to fix  */
     React.useEffect(() => {
         if (!projectSelections) {
             getSeqrProjects()
@@ -156,6 +157,7 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
             loadPropMap(projectSelections)
         }
     }, [start, end])
+    /* eslint-enable react-hooks/exhaustive-deps */
 
     if (!allPropMapData && !isLoading && !error) {
         return <Message negative>No data found</Message>
