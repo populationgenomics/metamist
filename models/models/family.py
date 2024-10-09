@@ -109,7 +109,7 @@ class PedRow:
     ALLOWED_SEX_VALUES = [0, 1, 2]
     ALLOWED_AFFECTED_VALUES = [-9, 0, 1, 2]
 
-    PedRowKeys = {
+    PED_ROW_KEYS = {
         # seqr individual template:
         # Family ID, Individual ID, Paternal ID, Maternal ID, Sex, Affected, Status, Notes
         'family_id': {'familyid', 'family id', 'family', 'family_id'},
@@ -356,20 +356,15 @@ class PedRow:
         """
         ordered_init_keys = []
         unmatched = []
-        for item in header:
-            litem = item.lower().strip().strip('#')
-            found = False
-            for h, options in PedRow.PedRowKeys.items():
-                for potential_key in options:
-                    if potential_key == litem:
-                        ordered_init_keys.append(h)
-                        found = True
-                        break
-                if found:
-                    break
+        header_set = {item.lower().strip().strip('#') for item in header}
 
-            if not found:
-                unmatched.append(item)
+        for h, options in PedRow.PED_ROW_KEYS.items():
+            matched_keys = header_set.intersection(options)
+            if matched_keys:
+                ordered_init_keys.append(h)
+            header_set -= matched_keys
+
+        unmatched = list(header_set)
 
         if unmatched:
             # repr casts to string and quotes if applicable
