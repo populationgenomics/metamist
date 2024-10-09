@@ -26,9 +26,11 @@ class NoOpAenter:
     """
 
     async def __aenter__(self):
+        # Do nothing on enter
         pass
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
+        # Do nothing on exit
         pass
 
 
