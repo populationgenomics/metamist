@@ -1,3 +1,4 @@
+# pylint: disable=too-many-public-methods
 import asyncio
 from datetime import date
 from typing import Any, Iterable
@@ -324,79 +325,93 @@ class SampleTable(DbBase):
             fields.append('participant_id = :participant_id')
 
         if external_ids:
-            to_delete = [k.lower() for k, v in external_ids.items() if v is None]
-            to_update = {k.lower(): v for k, v in external_ids.items() if v is not None}
+            to_delete = []
+            to_update = {}
+            for k, v in external_ids.items():
+                if v is None:
+                    to_delete.append(k.lower())
+                else:
+                    to_update[k.lower()] = v
 
             if PRIMARY_EXTERNAL_ORG in to_delete:
                 raise ValueError("Can't remove sample's primary external_id")
 
-            if to_delete:
-                # Set audit_log_id to this transaction before deleting the rows
-                _audit_update_query = """
-                UPDATE sample_external_id
-                SET audit_log_id = :audit_log_id
-                WHERE sample_id = :id AND name IN :names
-                """
-                await self.connection.execute(
-                    _audit_update_query,
-                    {'id': id_, 'names': to_delete, 'audit_log_id': audit_log_id},
-                )
+            # Do the update and deletes
+            await self.delete_sample_query(to_delete, id_, audit_log_id)
+            await self.update_sample_query(to_update, id_, audit_log_id)
 
-                _delete_query = """
-                DELETE FROM sample_external_id
-                WHERE sample_id = :id AND name IN :names
-                """
-                await self.connection.execute(
-                    _delete_query, {'id': id_, 'names': to_delete}
-                )
-
-            if to_update:
-                _query = 'SELECT project FROM sample WHERE id = :id'
-                row = await self.connection.fetch_one(_query, {'id': id_})
-                project = row['project']
-
-                _update_query = """
-                INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
-                VALUES (:project, :id, :name, :external_id, :audit_log_id)
-                ON DUPLICATE KEY UPDATE external_id = :external_id, audit_log_id = :audit_log_id
-                """
-                _eid_values = [
-                    {
-                        'project': project,
-                        'id': id_,
-                        'name': name,
-                        'external_id': eid,
-                        'audit_log_id': audit_log_id,
-                    }
-                    for name, eid in to_update.items()
-                ]
-                await self.connection.execute_many(_update_query, _eid_values)
-
-        if type_:
-            values['type'] = type_
-            fields.append('type = :type')
+        # Add variable values and fields to the query
+        variables = zip(
+            ['type', 'active', 'sample_parent_id', 'sample_root_id'],
+            [type_, active, sample_parent_id, sample_root_id],
+        )
+        for name, value in variables:
+            if value is None:
+                continue
+            values[name] = value
+            fields.append(f'{name} = :{name}')
 
         if meta is not None and len(meta) > 0:
             values['meta'] = to_db_json(meta)
             fields.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
-
-        if active is not None:
-            values['active'] = 1 if active else 0
-            fields.append('active = :active')
-
-        if sample_parent_id is not None:
-            values['sample_parent_id'] = sample_parent_id
-            fields.append('sample_parent_id = :sample_parent_id')
-
-        if sample_root_id is not None:
-            values['sample_root_id'] = sample_root_id
-            fields.append('sample_root_id = :sample_root_id')
 
         # means you can't set to null
         fields_str = ', '.join(fields)
         _query = f'UPDATE sample SET {fields_str} WHERE id = :id'
         await self.connection.execute(_query, {**values, 'id': id_})
         return id_
+
+    async def delete_sample_query(
+        self, to_delete: list[str], id_: int, audit_log_id: int
+    ):
+        """Delete external_ids from a sample"""
+        if not to_delete:
+            return
+
+        # Set audit_log_id to this transaction before deleting the rows
+        _audit_update_query = """
+            UPDATE sample_external_id
+            SET audit_log_id = :audit_log_id
+            WHERE sample_id = :id AND name IN :names
+        """
+        await self.connection.execute(
+            _audit_update_query,
+            {'id': id_, 'names': to_delete, 'audit_log_id': audit_log_id},
+        )
+
+        _delete_query = """
+            DELETE FROM sample_external_id
+            WHERE sample_id = :id AND name IN :names
+        """
+        await self.connection.execute(_delete_query, {'id': id_, 'names': to_delete})
+
+    async def update_sample_query(
+        self, to_update: dict[str, str], id_: int, audit_log_id: int
+    ):
+        """Update external_ids for a sample"""
+        if not to_update:
+            return
+
+        _query = 'SELECT project FROM sample WHERE id = :id'
+        row = await self.connection.fetch_one(_query, {'id': id_})
+        project = row['project']
+
+        _update_query = """
+        INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
+        VALUES (:project, :id, :name, :external_id, :audit_log_id)
+        ON DUPLICATE KEY UPDATE external_id = :external_id, audit_log_id = :audit_log_id
+        """
+        _eid_values = [
+            {
+                'project': project,
+                'id': id_,
+                'name': name,
+                'external_id': eid,
+                'audit_log_id': audit_log_id,
+            }
+            for name, eid in to_update.items()
+        ]
+        await self.connection.execute_many(_update_query, _eid_values)
 
     async def merge_samples(
         self,
@@ -410,38 +425,12 @@ class SampleTable(DbBase):
             self.get_sample_by_id(id_merge),
         )
 
-        def list_merge(l1: Any, l2: Any) -> list:
-            if l1 is None:
-                return l2
-            if l2 is None:
-                return l1
-            if l1 == l2:
-                return l1
-            if isinstance(l1, list) and isinstance(l2, list):
-                return l1 + l2
-            if isinstance(l1, list):
-                return l1 + [l2]
-            if isinstance(l2, list):
-                return [l1] + l2
-            return [l1, l2]
-
-        def dict_merge(meta1, meta2):
-            d = dict(meta1)
-            d.update(meta2)
-            for key, value in meta2.items():
-                if key not in meta1 or meta1[key] is None or value is None:
-                    continue
-
-                d[key] = list_merge(meta1[key], value)
-
-            return d
-
         # this handles merging a sample that has already been merged
         meta_original = sample_keep.meta
-        meta_original['merged_from'] = list_merge(
+        meta_original['merged_from'] = SampleTable.list_merge(
             meta_original.get('merged_from'), sid_merge
         )
-        meta: dict[str, Any] = dict_merge(meta_original, sample_merge.meta)
+        meta: dict[str, Any] = SampleTable.dict_merge(meta_original, sample_merge.meta)
         audit_log_id = await self.audit_log_id()
         values: dict[str, Any] = {
             'sample': {
@@ -467,7 +456,6 @@ class SampleTable(DbBase):
             SET sample_id = :id_keep, audit_log_id = :audit_log_id
             WHERE sample_id = :id_merge
         """
-        # TODO: merge sequencing groups I guess?
         _query_analyses = """
             UPDATE analysis_sequencing_group
             SET sample_id = :id_keep, audit_log_id = :audit_log_id
@@ -499,6 +487,36 @@ class SampleTable(DbBase):
         new_sample.project = project
 
         return new_sample
+
+    @staticmethod
+    def list_merge(l1: Any, l2: Any) -> list:
+        """Merge two lists"""
+        if l1 is None:
+            return l2
+        if l2 is None:
+            return l1
+        if l1 == l2:
+            return l1
+        if isinstance(l1, list) and isinstance(l2, list):
+            return l1 + l2
+        if isinstance(l1, list):
+            return l1 + [l2]
+        if isinstance(l2, list):
+            return [l1] + l2
+        return [l1, l2]
+
+    @staticmethod
+    def dict_merge(meta1, meta2):
+        """Merge two dictionaries"""
+        d = dict(meta1)
+        d.update(meta2)
+        for key, value in meta2.items():
+            if key not in meta1 or meta1[key] is None or value is None:
+                continue
+
+            d[key] = SampleTable.list_merge(meta1[key], value)
+
+        return d
 
     async def update_many_participant_ids(
         self, ids: list[int], participant_ids: list[int]
@@ -627,9 +645,6 @@ class SampleTable(DbBase):
 
     async def get_history_of_sample(self, id_: int):
         """Get all versions (history) of a sample"""
-        # TODO Re-implement this for the separate sample_external_id table. Doing a join and/or aggregating
-        # the external_ids wreaks havoc with FOR SYSTEM_TIME ALL queries, collapsing the history we want to
-        # see into one aggregate record. For now, leave the query as is, with external_ids unavailable.
         keys = [
             'id',
             """'{"(not available)": "(not available)"}' AS external_ids""",
