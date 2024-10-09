@@ -97,10 +97,10 @@ class CloudHelper:
         # this was super slow to perform, do don't do this atm
         # return [os.path.join(path, p.name) for p in AnyPath(path).iterdir()]
 
-        if path.startswith('gs://'):
+        if path.startswith(self.GCS_PREFIX):
             return self._list_gcs_directory(path)
 
-        if path.startswith('/'):
+        if path.startswith(self.LOCAL_PREFIX):
             return [os.path.join(path, f) for f in os.listdir(path)]
 
         raise ValueError(f'Could not handle listing directory of {directory_name!r}')
@@ -114,7 +114,7 @@ class CloudHelper:
     async def file_exists(self, filename: str) -> bool:
         """Determines whether a file exists"""
         path = self.file_path(filename)
-        if path.startswith('gs://'):
+        if path.startswith(self.GCS_PREFIX):
             # add a specific case for GCS as the AnyPath implementation calls
             # bucket.get_blob which triggers a read (which humans are not permitted)
             blob = await self.get_gcs_blob(path)
@@ -129,7 +129,7 @@ class CloudHelper:
     async def datetime_added(self, filename) -> datetime | None:
         """Get the date and time the file was created"""
         path = self.file_path(filename)
-        if path.startswith('gs://'):
+        if path.startswith(self.GCS_PREFIX):
             # add a specific case for GCS as the AnyPath implementation calls
             # bucket.get_blob which triggers a read (which humans are not permitted)
             blob = await self.get_gcs_blob(path)
@@ -150,15 +150,15 @@ class CloudHelper:
         fn_map: dict[str, str] = {}
         for directory in search_locations:
             directory_list = self.list_directory(directory)
-            for file in directory_list:
-                file = file.strip()
-                file_base = os.path.basename(file)
+            for file_ in directory_list:
+                file_ = file_.strip()
+                file_base = os.path.basename(file_)
                 if file_base in fn_map:
                     logging.warning(
-                        f'File {file!r} from {directory!r} already exists in directory map: {fn_map[file_base]}'
+                        f'File {file_!r} from {directory!r} already exists in directory map: {fn_map[file_base]}'
                     )
                     continue
-                fn_map[file_base] = file
+                fn_map[file_base] = file_
 
         return fn_map
 
