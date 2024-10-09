@@ -25,7 +25,6 @@ from metamist_infrastructure.slack_notification import (
 
 # this gets moved around during the pip install
 ETL_FOLDER = Path(__file__).parent / 'etl'
-# ETL_FOLDER = Path(__file__).parent.parent / 'etl'
 PATH_TO_ETL_BQ_SCHEMA = ETL_FOLDER / 'bq_schema.json'
 PATH_TO_ETL_BQ_LOG_SCHEMA = ETL_FOLDER / 'bq_log_schema.json'
 
@@ -56,7 +55,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
 
     def main(self):
         """Driver for the metamist infrastructure as code plugin"""
-        # todo, eventually configure metamist cloud run server
+        # TODO, eventually configure metamist cloud run server
         # to be deployed here, but for now it's manually deployed
 
     def on_group_finalisation(self):
@@ -193,6 +192,13 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         return self._etl_function_account('load-')
 
     @cached_property
+    def etl_load_prefixed_service_account(self):
+        """Service account to run load/transform functionality"""
+        return pulumi.Output.concat(
+            'serviceAccount:', self.etl_load_service_account.email
+        )
+
+    @cached_property
     def etl_extract_service_account(self):
         """Service account to run extract functionality"""
         return self._etl_function_account('extract-')
@@ -323,9 +329,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             project=self.config.metamist.gcp.project,
             secret_id=self.etl_configuration_secret.id,
             role='roles/secretmanager.secretAccessor',
-            member=pulumi.Output.concat(
-                'serviceAccount:', self.etl_load_service_account.email
-            ),
+            member=self.etl_load_prefixed_service_account,
         )
 
     @cached_property
@@ -443,7 +447,6 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             friendly_name='metamist bigquery dataset',
             description='Metamist related bigquery tables',
             location=self.config.gcp.region,
-            # default_table_expiration_ms=3600000,
             labels={
                 'project': 'metamist',
             },
@@ -540,27 +543,21 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             'metamist-etl-bq-job-user-role',
             project=self.config.metamist.gcp.project,
             role='roles/bigquery.jobUser',
-            member=pulumi.Output.concat(
-                'serviceAccount:', self.etl_load_service_account.email
-            ),
+            member=self.etl_load_prefixed_service_account,
         )
         # give the etl_extract_service_account ability to push to pub/sub
         gcp.projects.IAMMember(
             'metamist-etl-extract-editor-role',
             project=self.config.metamist.gcp.project,
             role='roles/editor',
-            member=pulumi.Output.concat(
-                'serviceAccount:', self.etl_extract_service_account.email
-            ),
+            member=self.etl_load_prefixed_service_account,
         )
         # give the etl_load_service_account ability to push to pub/sub
         gcp.projects.IAMMember(
             'metamist-etl-load-editor-role',
             project=self.config.metamist.gcp.project,
             role='roles/editor',
-            member=pulumi.Output.concat(
-                'serviceAccount:', self.etl_load_service_account.email
-            ),
+            member=self.etl_load_prefixed_service_account,
         )
         # give the etl_load_service_account ability
         # to access accessor-configuration in secretmanager
@@ -568,9 +565,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             'metamist-etl-load-secret-accessor-role',
             project=self.config.metamist.gcp.project,
             role='roles/secretmanager.secretAccessor',
-            member=pulumi.Output.concat(
-                'serviceAccount:', self.etl_load_service_account.email
-            ),
+            member=self.etl_load_prefixed_service_account,
         )
 
         # serverless-robot-prod.iam.gserviceaccount.com is used
@@ -599,7 +594,6 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         """
         setup_etl_functions
         """
-        # TODO is this the best way to do this?
         return pulumi.ResourceOptions(
             depends_on=[self.etl_extract_function, self.etl_load_function],
         )
