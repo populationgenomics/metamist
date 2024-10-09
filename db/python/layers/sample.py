@@ -287,7 +287,7 @@ class SampleLayer(BaseLayer):
         if sids:
             pjcts = await self.st.get_project_ids_for_sample_ids(sids)
             self.connection.check_access_to_projects_for_ids(
-                pjcts, allowed_roles=ReadAccessRoles
+                pjcts, allowed_roles=FullWriteAccessRoles
             )
 
         async with with_function():
@@ -438,7 +438,7 @@ class SampleLayer(BaseLayer):
 
         projects = set(r.project for r in rows)
         self.connection.check_access_to_projects_for_ids(
-            projects, allowed_roles=FullWriteAccessRoles
+            projects, allowed_roles=ReadAccessRoles
         )
 
         return rows
