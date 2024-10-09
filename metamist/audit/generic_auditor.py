@@ -188,60 +188,88 @@ class GenericAuditor(AuditHelper):
         2. { assay_id    : sg_id }
         3. { assay_id    : (read_filepath, read_filesize,) }
         """
+        sample_sgs = self._get_sample_sgs(participants)
+        sg_sample_id_map, assay_sg_id_map, assay_filepaths_filesizes = (
+            self._process_sample_sgs(sample_sgs)
+        )
+        return sg_sample_id_map, assay_sg_id_map, assay_filepaths_filesizes
 
-        sg_sample_id_map = {}
-        assay_sg_id_map = {}
-        assay_filepaths_filesizes = defaultdict(list)
-
-        sample_sgs = {
+    def _get_sample_sgs(self, participants: list[dict]) -> dict[str, list[dict]]:
+        """Return a map of {sample_id : sequencing_groups} for all samples in the dataset"""
+        return {
             sample['id']: sample['sequencingGroups']
             for participant in participants
             for sample in participant['samples']
         }
+
+    def _process_sample_sgs(
+        self, sample_sgs: dict[str, list[dict]]
+    ) -> tuple[dict[str, str], dict[int, str], dict[Any, list[tuple[Any, Any]]]]:
+        """Return a map of {sg_id : sample_id}, {assay_id : sg_id}, and {assay_id : (read_filepath, read_filesize)}"""
+        sg_sample_id_map = {}
+        assay_sg_id_map = {}
+        assay_filepaths_filesizes = defaultdict(list)
+
         for sample_id, sgs in sample_sgs.items():
             for sg in sgs:
                 if sg['type'].lower() not in self.sequencing_types:
                     continue
 
                 sg_sample_id_map[sg['id']] = sample_id
-                for assay in sg['assays']:
-                    reads = assay['meta'].get('reads')
-                    if not reads:
-                        logging.warning(
-                            f'{self.dataset} :: SG {sg["id"]} assay {assay["id"]} has no reads field'
-                        )
-                        continue
-
-                    if assay_sg_id_map.get(assay['id']):
-                        raise ValueError(
-                            f'{self.dataset} :: Assay {assay["id"]} has multiple SGs: {assay_sg_id_map[assay["id"]]} and {sg["id"]}'
-                        )
-                    assay_sg_id_map[assay['id']] = sg['id']
-
-                    if isinstance(reads, dict):
-                        assay_filepaths_filesizes[assay['id']].append(
-                            (
-                                reads.get('location'),
-                                reads.get('size'),
-                            )
-                        )
-                        continue
-
-                    for read in reads:
-                        if not isinstance(read, dict):
-                            logging.error(
-                                f'{self.dataset} :: Got {type(read)} read for SG {sg["id"]}, expected dict: {read}'
-                            )
-                            continue
-
-                        assay_filepaths_filesizes[assay['id']].append(
-                            (
-                                read.get('location'),
-                                read.get('size'),
-                            )
-                        )
+                self._process_assays(sg, assay_sg_id_map, assay_filepaths_filesizes)
 
         return sg_sample_id_map, assay_sg_id_map, assay_filepaths_filesizes
+
+    def _process_assays(
+        self,
+        sg: dict,
+        assay_sg_id_map: dict[int, str],
+        assay_filepaths_filesizes: dict[int, list[tuple[str, int]]],
+    ):
+        """For each assay in a sequencing group, process the reads and add to the assay_filepaths_filesizes dict"""
+        for assay in sg['assays']:
+            reads = assay['meta'].get('reads')
+            if not reads:
+                logging.warning(
+                    f'{self.dataset} :: SG {sg["id"]} assay {assay["id"]} has no reads field'
+                )
+                continue
+
+            if assay_sg_id_map.get(assay['id']):
+                raise ValueError(
+                    f'{self.dataset} :: Assay {assay["id"]} has multiple SGs: {assay_sg_id_map[assay["id"]]} and {sg["id"]}'
+                )
+            assay_sg_id_map[assay['id']] = sg['id']
+
+            self._process_reads(assay, assay_filepaths_filesizes)
+
+    def _process_reads(
+        self, assay: dict, assay_filepaths_filesizes: dict[int, list[tuple[str, int]]]
+    ):
+        """Add the read filepaths and sizes to the assay_filepaths_filesizes dict"""
+        reads = assay['meta'].get('reads')
+        if isinstance(reads, dict):
+            assay_filepaths_filesizes[assay['id']].append(
+                (
+                    reads.get('location'),
+                    reads.get('size'),
+                )
+            )
+            return
+
+        for read in reads:
+            if not isinstance(read, dict):
+                logging.error(
+                    f'{self.dataset} :: Got {type(read)} read for assay {assay["id"]}, expected dict: {read}'
+                )
+                continue
+
+            assay_filepaths_filesizes[assay['id']].append(
+                (
+                    read.get('location'),
+                    read.get('size'),
+                )
+            )
 
     async def get_analysis_cram_paths_for_dataset_sgs(
         self,
@@ -396,30 +424,75 @@ class GenericAuditor(AuditHelper):
                     their original location to a new location.
                  3. The assay read files that have been deleted/moved.
         """
-        # Get all the paths to assay data anywhere in the main-upload bucket
         assay_paths_in_bucket = self.find_assay_files_in_gcs_bucket(
             bucket_name, self.file_types
         )
-
-        # Flatten all the Metamist assay file paths and sizes into a single list
-        assay_paths_sizes_in_metamist: list[tuple[str, int]] = []
-        for assay in assay_filepaths_filesizes.values():
-            assay_paths_sizes_in_metamist.extend(assay)
-
-        # Find the paths that exist in the bucket and not in metamist
+        assay_paths_sizes_in_metamist = self._flatten_assay_paths_sizes(
+            assay_filepaths_filesizes
+        )
         assay_paths_in_metamist = [
             path_size[0] for path_size in assay_paths_sizes_in_metamist
         ]
+
+        uningested_assay_paths, metamist_paths_to_nowhere = self._compare_paths(
+            assay_paths_in_bucket, assay_paths_in_metamist
+        )
+
+        metamist_assay_file_size_map, metamist_assay_file_path_map = (
+            self._map_metamist_paths(assay_paths_sizes_in_metamist)
+        )
+
+        (
+            ingested_and_moved_filepaths,
+            new_assay_path_sizes,
+        ) = await self._identify_moved_files(
+            uningested_assay_paths,
+            metamist_assay_file_size_map,
+            metamist_assay_file_path_map,
+        )
+
+        uningested_assay_paths -= {
+            bucket_path for bucket_path, _ in ingested_and_moved_filepaths
+        }
+
+        uningested_reads = self._check_uningested_paths(
+            uningested_assay_paths,
+            completed_sgs,
+            sg_sample_id_map,
+            sample_internal_external_id_map,
+        )
+
+        reads_assays = self._flip_assay_reads_mapping(assay_filepaths_filesizes)
+
+        assays_moved_paths = self._collect_moved_assays(
+            ingested_and_moved_filepaths,
+            reads_assays,
+            assay_sg_id_map,
+            completed_sgs,
+            new_assay_path_sizes,
+        )
+
+        return uningested_reads, assays_moved_paths, metamist_paths_to_nowhere
+
+    def _flatten_assay_paths_sizes(self, assay_filepaths_filesizes):
+        """Flatten the assay filepaths and sizes into a list of tuples"""
+        assay_paths_sizes_in_metamist = []
+        for assay in assay_filepaths_filesizes.values():
+            assay_paths_sizes_in_metamist.extend(assay)
+        return assay_paths_sizes_in_metamist
+
+    def _compare_paths(self, assay_paths_in_bucket, assay_paths_in_metamist):
+        """Compare the assay filepaths in the bucket to the assay filepaths in Metamist"""
         uningested_assay_paths = set(assay_paths_in_bucket).difference(
             set(assay_paths_in_metamist)
         )
-        # Find the paths that exist in metamist and not in the bucket
         metamist_paths_to_nowhere = set(assay_paths_in_metamist).difference(
             set(assay_paths_in_bucket)
         )
+        return uningested_assay_paths, metamist_paths_to_nowhere
 
-        # Strip the metamist paths into just filenames
-        # Map each file name to its file size and path
+    def _map_metamist_paths(self, assay_paths_sizes_in_metamist):
+        """Map the Metamist assay filepaths to their sizes"""
         metamist_assay_file_size_map = {
             os.path.basename(path_size[0]): path_size[1]
             for path_size in assay_paths_sizes_in_metamist
@@ -428,14 +501,19 @@ class GenericAuditor(AuditHelper):
             os.path.basename(path_size[0]): path_size[0]
             for path_size in assay_paths_sizes_in_metamist
         }
+        return metamist_assay_file_size_map, metamist_assay_file_path_map
 
-        # Identify if any paths are to files that have actually just been moved
-        # by checking if they are in the bucket but not metamist
+    async def _identify_moved_files(
+        self,
+        uningested_assay_paths,
+        metamist_assay_file_size_map,
+        metamist_assay_file_path_map,
+    ):
+        """Identify the assay files that have been moved from their original location"""
         ingested_and_moved_filepaths = []
         new_assay_path_sizes = {}
         for path in uningested_assay_paths:
             filename = os.path.basename(path)
-            # If the file in the bucket has the exact same name and size as one in metamist, assume its the same
             if filename in metamist_assay_file_size_map.keys():
                 filesize = await self.file_size(path)
                 if filesize == metamist_assay_file_size_map.get(filename):
@@ -446,18 +524,17 @@ class GenericAuditor(AuditHelper):
         logging.info(
             f'Found {len(ingested_and_moved_filepaths)} ingested files that have been moved'
         )
+        return ingested_and_moved_filepaths, new_assay_path_sizes
 
-        # If the file has just been moved, we consider it ingested
-        uningested_assay_paths -= {
-            bucket_path for bucket_path, _ in ingested_and_moved_filepaths
-        }
-
-        # Check the list of uningested paths to see if any of them contain sample ids for ingested samples
-        # This could happen when we ingest a fastq read pair for a sample, and additional read files were provided
-        # but not ingested, such as bams and vcfs.
-        uningested_reads: dict[str, list[tuple[str, str, str]]] = defaultdict(
-            list, {k: [] for k in uningested_assay_paths}
-        )
+    def _check_uningested_paths(
+        self,
+        uningested_assay_paths,
+        completed_sgs,
+        sg_sample_id_map,
+        sample_internal_external_id_map,
+    ):
+        """Check for uningested assay data that may be hiding"""
+        uningested_reads = defaultdict(list, {k: [] for k in uningested_assay_paths})
         for sg_id, analysis_ids in completed_sgs.items():
             try:
                 sample_id = sg_sample_id_map[sg_id]
@@ -472,14 +549,25 @@ class GenericAuditor(AuditHelper):
                 logging.warning(
                     f'{sg_id} from analyses: {analysis_ids} not found in SG-sample map.'
                 )
+        return uningested_reads
 
-        # flip the assay id : reads mapping to identify assays by their reads
+    def _flip_assay_reads_mapping(self, assay_filepaths_filesizes):
+        """Flip the assay filepaths and sizes mapping to a size:assay mapping"""
         reads_assays = {}
         for assay_id, reads_sizes in assay_filepaths_filesizes.items():
             for read_size in reads_sizes:
                 reads_assays[read_size[0]] = assay_id
+        return reads_assays
 
-        # Collect the assays for files that have been ingested and moved to a different bucket location
+    def _collect_moved_assays(
+        self,
+        ingested_and_moved_filepaths,
+        reads_assays,
+        assay_sg_id_map,
+        completed_sgs,
+        new_assay_path_sizes,
+    ):
+        """Collect the assay files that have been moved from their original location"""
         assays_moved_paths = []
         for bucket_path, metamist_path in ingested_and_moved_filepaths:
             assay_id = reads_assays.get(metamist_path)
@@ -496,8 +584,7 @@ class GenericAuditor(AuditHelper):
                         filesize=filesize,
                     )
                 )
-
-        return uningested_reads, assays_moved_paths, metamist_paths_to_nowhere
+        return assays_moved_paths
 
     async def get_reads_to_delete_or_ingest(
         self,
