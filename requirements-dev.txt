@@ -4,9 +4,9 @@
 #
 #    pip-compile requirements-dev.in
 #
-aiohappyeyeballs==2.4.0
+aiohappyeyeballs==2.4.3
     # via aiohttp
-aiohttp==3.10.5
+aiohttp==3.10.9
     # via -r requirements.in
 aiomysql==0.2.0
     # via databases
@@ -14,12 +14,12 @@ aiosignal==1.3.1
     # via aiohttp
 annotated-types==0.7.0
     # via pydantic
-anyio==4.4.0
+anyio==4.6.0
     # via
     #   httpx
     #   starlette
     #   watchfiles
-astroid==3.2.4
+astroid==3.3.5
     # via pylint
 async-lru==2.0.4
     # via -r requirements.in
@@ -27,28 +27,28 @@ attrs==24.2.0
     # via
     #   aiohttp
     #   flake8-bugbear
-azure-core==1.30.2
+azure-core==1.31.0
     # via
     #   azure-storage-blob
     #   azure-storage-file-datalake
-azure-storage-blob==12.22.0
+azure-storage-blob==12.23.1
     # via
     #   azure-storage-file-datalake
     #   cloudpathlib
-azure-storage-file-datalake==12.16.0
+azure-storage-file-datalake==12.17.0
     # via cloudpathlib
 backoff==2.2.1
     # via -r requirements.in
-black==24.8.0
+black==24.10.0
     # via -r requirements-dev.in
 blinker==1.8.2
     # via flask
-boto3==1.35.12
+boto3==1.35.37
     # via
     #   -r requirements.in
     #   cloudpathlib
     #   cpg-utils
-botocore==1.35.12
+botocore==1.35.37
     # via
     #   -r requirements.in
     #   boto3
@@ -67,7 +67,7 @@ cffi==1.17.1
     # via cryptography
 cfgv==3.4.0
     # via pre-commit
-charset-normalizer==3.3.2
+charset-normalizer==3.4.0
     # via requests
 click==8.1.7
     # via
@@ -83,7 +83,7 @@ cloudpathlib[all,azure,gs,s3]==0.19.0
     # via
     #   -r requirements.in
     #   cpg-utils
-coverage[toml]==7.6.1
+coverage[toml]==7.6.2
     # via
     #   -r requirements-dev.in
     #   pytest-cov
@@ -100,11 +100,11 @@ deprecated==1.2.14
     # via cpg-utils
 deprecation==2.1.0
     # via cloudevents
-dill==0.3.8
+dill==0.3.9
     # via pylint
-distlib==0.3.8
+distlib==0.3.9
     # via virtualenv
-dnspython==2.6.1
+dnspython==2.7.0
     # via email-validator
 docker==7.1.0
     # via testcontainers
@@ -116,7 +116,7 @@ fastapi[all]==0.112.2
     #   strawberry-graphql
 fastapi-cli[standard]==0.0.5
     # via fastapi
-filelock==3.15.4
+filelock==3.16.1
     # via virtualenv
 flake8==7.1.1
     # via
@@ -126,7 +126,7 @@ flake8-bugbear==24.8.19
     # via -r requirements-dev.in
 flask==3.0.3
     # via functions-framework
-frozendict==2.4.4
+frozendict==2.4.5
     # via cpg-utils
 frozenlist==1.4.1
     # via
@@ -134,7 +134,7 @@ frozenlist==1.4.1
     #   aiosignal
 functions-framework==3.8.1
     # via -r requirements-dev.in
-google-api-core[grpc]==2.19.2
+google-api-core[grpc]==2.21.0
     # via
     #   google-cloud-appengine-logging
     #   google-cloud-bigquery
@@ -143,7 +143,7 @@ google-api-core[grpc]==2.19.2
     #   google-cloud-pubsub
     #   google-cloud-secret-manager
     #   google-cloud-storage
-google-auth==2.34.0
+google-auth==2.35.0
     # via
     #   -r requirements.in
     #   cpg-utils
@@ -191,14 +191,14 @@ googleapis-common-protos[grpc]==1.65.0
     #   grpcio-status
 graphql-core==3.2.4
     # via strawberry-graphql
-greenlet==3.0.3
+greenlet==3.1.1
     # via sqlalchemy
 grpc-google-iam-v1==0.12.7
     # via
     #   google-cloud-logging
     #   google-cloud-pubsub
     #   google-cloud-secret-manager
-grpcio==1.66.1
+grpcio==1.66.2
     # via
     #   google-api-core
     #   google-cloud-bigquery
@@ -216,15 +216,15 @@ h11==0.14.0
     # via
     #   httpcore
     #   uvicorn
-httpcore==1.0.5
+httpcore==1.0.6
     # via httpx
 httptools==0.6.1
     # via uvicorn
 httpx==0.27.2
     # via fastapi
-identify==2.6.0
+identify==2.6.1
     # via pre-commit
-idna==3.8
+idna==3.10
     # via
     #   anyio
     #   email-validator
@@ -233,7 +233,7 @@ idna==3.8
     #   yarl
 iniconfig==2.0.0
     # via pytest
-isodate==0.6.1
+isodate==0.7.2
     # via
     #   azure-storage-blob
     #   azure-storage-file-datalake
@@ -255,7 +255,7 @@ libcst==1.4.0
     # via strawberry-graphql
 markdown-it-py==3.0.0
     # via rich
-markupsafe==2.1.5
+markupsafe==3.0.1
     # via
     #   jinja2
     #   werkzeug
@@ -265,7 +265,7 @@ mccabe==0.7.0
     #   pylint
 mdurl==0.1.2
     # via markdown-it-py
-multidict==6.0.5
+multidict==6.1.0
     # via
     #   aiohttp
     #   yarl
@@ -286,15 +286,17 @@ packaging==24.1
     #   pytest
 pathspec==0.12.1
     # via black
-platformdirs==4.2.2
+platformdirs==4.3.6
     # via
     #   black
     #   pylint
     #   virtualenv
 pluggy==1.5.0
     # via pytest
-pre-commit==3.8.0
+pre-commit==4.0.1
     # via -r requirements-dev.in
+propcache==0.2.0
+    # via yarl
 proto-plus==1.24.0
     # via
     #   google-api-core
@@ -303,7 +305,7 @@ proto-plus==1.24.0
     #   google-cloud-logging
     #   google-cloud-pubsub
     #   google-cloud-secret-manager
-protobuf==4.25.4
+protobuf==4.25.5
     # via
     #   google-api-core
     #   google-cloud-appengine-logging
@@ -316,26 +318,26 @@ protobuf==4.25.4
     #   grpc-google-iam-v1
     #   grpcio-status
     #   proto-plus
-pyasn1==0.6.0
+pyasn1==0.6.1
     # via
     #   pyasn1-modules
     #   rsa
-pyasn1-modules==0.4.0
+pyasn1-modules==0.4.1
     # via google-auth
 pycodestyle==2.12.1
     # via flake8
 pycparser==2.22
     # via cffi
-pydantic==2.8.2
+pydantic==2.9.2
     # via
     #   fastapi
     #   pydantic-extra-types
     #   pydantic-settings
-pydantic-core==2.20.1
+pydantic-core==2.23.4
     # via pydantic
 pydantic-extra-types==2.9.0
     # via fastapi
-pydantic-settings==2.4.0
+pydantic-settings==2.5.2
     # via fastapi
 pyflakes==3.2.0
     # via flake8
@@ -343,14 +345,14 @@ pygments==2.18.0
     # via
     #   rich
     #   strawberry-graphql
-pylint==3.2.7
+pylint==3.3.1
     # via -r requirements-dev.in
 pymysql[rsa]==1.1.1
     # via
     #   -r requirements-dev.in
     #   aiomysql
     #   testcontainers
-pytest==8.3.2
+pytest==8.3.3
     # via
     #   -r requirements-dev.in
     #   pytest-cov
@@ -366,11 +368,11 @@ python-dotenv==1.0.1
     # via
     #   pydantic-settings
     #   uvicorn
-python-multipart==0.0.9
+python-multipart==0.0.12
     # via
     #   fastapi
     #   strawberry-graphql
-pytz==2024.1
+pytz==2024.2
     # via -r requirements-dev.in
 pyyaml==6.0.2
     # via
@@ -387,13 +389,13 @@ requests==2.32.3
     #   google-api-core
     #   google-cloud-bigquery
     #   google-cloud-storage
-rich==13.8.0
+rich==13.9.2
     # via
     #   strawberry-graphql
     #   typer
 rsa==4.9
     # via google-auth
-s3transfer==0.10.2
+s3transfer==0.10.3
     # via boto3
 shellingham==1.5.4
     # via typer
@@ -401,7 +403,6 @@ six==1.16.0
     # via
     #   azure-core
     #   google-cloud-storage
-    #   isodate
     #   python-dateutil
 slack-sdk==3.20.2
     # via -r requirements.in
@@ -409,11 +410,11 @@ sniffio==1.3.1
     # via
     #   anyio
     #   httpx
-sqlalchemy==2.0.34
+sqlalchemy==2.0.35
     # via
     #   databases
     #   testcontainers
-starlette==0.38.4
+starlette==0.38.6
     # via
     #   fastapi
     #   strawberry-graphql
@@ -449,7 +450,7 @@ typing-extensions==4.12.2
     #   typer
 ujson==5.10.0
     # via fastapi
-urllib3==2.2.2
+urllib3==2.2.3
     # via
     #   botocore
     #   docker
@@ -463,13 +464,13 @@ uvicorn[standard]==0.29.0
     #   strawberry-graphql
 uvloop==0.20.0
     # via uvicorn
-virtualenv==20.26.3
+virtualenv==20.26.6
     # via pre-commit
-watchdog==5.0.2
+watchdog==5.0.3
     # via functions-framework
 watchfiles==0.24.0
     # via uvicorn
-websockets==13.0.1
+websockets==13.1
     # via uvicorn
 werkzeug==3.0.4
     # via
@@ -479,5 +480,5 @@ wrapt==1.16.0
     # via
     #   deprecated
     #   testcontainers
-yarl==1.9.10
+yarl==1.14.0
     # via aiohttp
