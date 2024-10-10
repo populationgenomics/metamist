@@ -137,6 +137,20 @@ class FacilityFastq:  # pylint: disable=too-many-instance-attributes
                 lane,
                 read,
             ) = base.split('_')
+        elif len(self.path.name.split('_')) == 10:
+            # modern VCGS format with extra fields
+            (
+                extra,
+                date,
+                a,
+                b,
+                library_id,
+                sample_id,
+                library_prep_id,
+                library_type,
+                lane,
+                read,
+            ) = base.split('_')
         else:
             raise AssertionError(
                 f'Unexpected number of fields in filename {self.path.name}'

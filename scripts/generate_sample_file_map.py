@@ -76,7 +76,7 @@ def main(search_path: str, id_map_path: str, garvan: bool, sample_id_column):
                 sample_ids_found.add(line[sample_id_column])
     
     if no_match_samples := sample_ids_in_manifest - sample_ids_found:
-        raise ValueError(f'No matches found for samples: {no_match_samples}')
+        raise ValueError(f'Found matches for {len(sample_ids_found)}/{len(sample_ids_in_manifest)}. No matches found for {len(no_match_samples)} samples: {no_match_samples}')
 
 
 if __name__ == '__main__':
