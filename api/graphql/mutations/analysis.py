@@ -1,11 +1,16 @@
+from typing import TYPE_CHECKING
 import strawberry
 from strawberry.types import Info
 
+from api.graphql.loaders import GraphQLContext
 from api.graphql.types import AnalysisStatusType
 from db.python.connect import Connection
 from db.python.layers.analysis import AnalysisLayer
 from models.models import AnalysisInternal
 from models.models.project import FullWriteAccessRoles
+
+if TYPE_CHECKING:
+    from api.graphql.mutations.project import ProjectMutations
 
 
 @strawberry.input
@@ -14,14 +19,14 @@ class AnalysisInput:
 
     type: str
     status: AnalysisStatusType  # type: ignore [assignment]
-    id: int | None
-    output: str | None
-    sequencing_group_ids: list[str] | None
-    cohort_ids: list[str] | None
-    author: str | None
-    timestamp_completed: str | None
+    output: str | None = None
+    outputs: strawberry.scalars.JSON | None = None
+    sequencing_group_ids: list[str] | None = None
+    cohort_ids: list[str] | None = None
+    author: str | None = None
+    timestamp_completed: str | None = None
     project: int
-    active: bool | None
+    active: bool | None = None
     meta: strawberry.scalars.JSON
 
 
@@ -40,15 +45,20 @@ class AnalysisUpdateInput:
 class AnalysisMutations:
     """Analysis mutations"""
 
+    project_id: strawberry.Private[int]
+
     @strawberry.mutation
     async def create_analysis(
         self,
         analysis: AnalysisInput,
-        info: Info,
+        info: Info[GraphQLContext, 'AnalysisMutations'],
+        root: 'ProjectMutations',
     ) -> int:
         """Create a new analysis"""
         connection: Connection = info.context['connection']
-        connection.get_and_check_access_to_projects_for_ids(
+
+        # Should be moved to the analysis layer
+        connection.check_access_to_projects_for_ids(
             project_ids=[analysis.project], allowed_roles=FullWriteAccessRoles
         )
         atable = AnalysisLayer(connection)
@@ -62,6 +72,7 @@ class AnalysisMutations:
 
         analysis_id = await atable.create_analysis(
             AnalysisInternal.from_db(**strawberry.asdict(analysis)),
+            project=root.project_id,
         )
 
         return analysis_id
@@ -71,7 +82,7 @@ class AnalysisMutations:
         self,
         analysis_id: int,
         analysis: AnalysisUpdateInput,
-        info: Info,
+        info: Info[GraphQLContext, 'AnalysisMutations'],
     ) -> bool:
         """Update status of analysis"""
         connection = info.context['connection']

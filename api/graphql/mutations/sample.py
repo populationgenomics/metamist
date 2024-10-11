@@ -13,7 +13,6 @@ from db.python.connect import Connection
 from db.python.layers.comment import CommentLayer
 from db.python.layers.sample import SampleLayer
 from models.models.comment import CommentEntityType
-from models.models.project import FullWriteAccessRoles
 from models.models.sample import SampleUpsert
 from models.utils.sample_id_format import (  # Sample,
     sample_id_format,
@@ -22,6 +21,7 @@ from models.utils.sample_id_format import (  # Sample,
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLComment
+    from api.graphql.mutations.project import ProjectMutations
 
 
 @strawberry.input  # type: ignore [misc]
@@ -42,6 +42,8 @@ class SampleUpsertInput:
 @strawberry.type
 class SampleMutations:
     """Sample mutations"""
+
+    project_id: strawberry.Private[int]
 
     @strawberry.mutation
     async def add_comment(
@@ -69,14 +71,16 @@ class SampleMutations:
         self,
         sample: SampleUpsertInput,
         info: Info[GraphQLContext, 'SampleMutations'],
+        root: 'ProjectMutations',
     ) -> str | None:
         """Creates a new sample, and returns the internal sample ID"""
         connection: Connection = info.context['connection']
-        connection.check_access(FullWriteAccessRoles)
-
         st = SampleLayer(connection)
+
         sample_upsert = SampleUpsert.from_dict(strawberry.asdict(sample))
-        internal_sid = await st.upsert_sample(sample_upsert.to_internal())
+        internal_sid = await st.upsert_sample(
+            sample_upsert.to_internal(), project=root.project_id
+        )
 
         if internal_sid.id:
             return sample_id_format(internal_sid.id)
@@ -87,23 +91,20 @@ class SampleMutations:
         self,
         samples: list[SampleUpsertInput],
         info: Info[GraphQLContext, 'SampleMutations'],
+        root: 'ProjectMutations',
     ) -> list[SampleUpsertType] | None:
         """
         Upserts a list of samples with sequencing-groups,
         and returns the list of internal sample IDs
         """
-
-        # Table interfaces
         connection: Connection = info.context['connection']
-        connection.check_access(FullWriteAccessRoles)
-
         st = SampleLayer(connection)
 
         internal_samples = [
             SampleUpsert.from_dict(strawberry.asdict(sample)).to_internal()
             for sample in samples
         ]
-        upserted = await st.upsert_samples(internal_samples)
+        upserted = await st.upsert_samples(internal_samples, project=root.project_id)
 
         return [SampleUpsertType.from_upsert_internal(s) for s in upserted]
 
@@ -121,6 +122,7 @@ class SampleMutations:
         """Update sample with id"""
         connection = info.context['connection']
         st = SampleLayer(connection)
+
         sample.id = id_
         upserted = await st.upsert_sample(
             SampleUpsert.from_dict(strawberry.asdict(sample)).to_internal()

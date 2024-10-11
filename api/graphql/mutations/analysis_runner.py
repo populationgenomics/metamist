@@ -1,4 +1,5 @@
 import datetime
+from typing import TYPE_CHECKING
 
 import strawberry
 from strawberry.types import Info
@@ -9,10 +10,15 @@ from db.python.layers.analysis_runner import AnalysisRunnerLayer
 from models.models.analysis_runner import AnalysisRunnerInternal
 from models.models.project import FullWriteAccessRoles
 
+if TYPE_CHECKING:
+    from api.graphql.mutations.project import ProjectMutations
+
 
 @strawberry.type
 class AnalysisRunnerMutations:
     """Analysis Runner mutations"""
+
+    project_id: strawberry.Private[int]
 
     @strawberry.mutation
     async def create_analysis_runner_log(  # pylint: disable=too-many-arguments
@@ -33,14 +39,16 @@ class AnalysisRunnerMutations:
         hail_version: str | None,
         cwd: str | None,
         info: Info,
+        root: 'ProjectMutations',
     ) -> str:
         """Create a new analysis runner log"""
         connection: Connection = info.context['connection']
-        connection.check_access(FullWriteAccessRoles)
-        alayer = AnalysisRunnerLayer(connection)
 
-        if not connection.project:
-            raise ValueError('Project not set')
+        # Should be moved to the analysis runner layer
+        connection.check_access_to_projects_for_ids(
+            [root.project_id], FullWriteAccessRoles
+        )
+        alayer = AnalysisRunnerLayer(connection)
 
         analysis_id = await alayer.insert_analysis_runner_entry(
             AnalysisRunnerInternal(

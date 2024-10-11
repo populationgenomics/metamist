@@ -16,26 +16,29 @@ from models.utils.sequencing_group_id_format import sequencing_group_id_transfor
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLComment
+    from api.graphql.mutations.project import ProjectMutations
 
 
 @strawberry.input  # type: ignore [misc]
 class SequencingGroupUpsertInput:
     """Sequencing group upsert input"""
 
-    id: str  # should really be int | str | None but strawberry throws an error "Type `int` cannot be used in a GraphQL Union"
-    type: str | None
-    technology: str | None
-    platform: str | None
-    meta: strawberry.scalars.JSON | None
-    sample_id: str | None
-    external_ids: strawberry.scalars.JSON | None
+    id: str | None = None
+    type: str | None = None
+    technology: str | None = None
+    platform: str | None = None
+    meta: strawberry.scalars.JSON | None = None
+    sample_id: str | None = None
+    external_ids: strawberry.scalars.JSON | None = None
 
-    assays: list[AssayUpsertInput] | None
+    assays: list[AssayUpsertInput] | None = None
 
 
 @strawberry.type
 class SequencingGroupMutations:
     """Sequencing Group Mutations"""
+
+    project_id: strawberry.Private[int]
 
     @strawberry.mutation
     async def add_comment(
@@ -63,10 +66,15 @@ class SequencingGroupMutations:
         sequencing_group_id: str,
         sequencing_group: strawberry.scalars.JSON,
         info: Info,
+        root: 'ProjectMutations',
     ) -> bool:
         """Update the meta fields of a sequencing group"""
         connection: Connection = info.context['connection']
-        connection.check_access(FullWriteAccessRoles)
+
+        # Should be moved to the sequencing group layer
+        connection.check_access_to_projects_for_ids(
+            [root.project_id], FullWriteAccessRoles
+        )
 
         st = SequencingGroupLayer(connection)
         await st.upsert_sequencing_groups(

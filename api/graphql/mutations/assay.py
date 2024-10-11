@@ -20,11 +20,11 @@ if TYPE_CHECKING:
 class AssayUpsertInput:
     """Assay upsert input"""
 
-    id: int | None
-    type: str | None
-    external_ids: strawberry.scalars.JSON | None
-    sample_id: str | None
-    meta: strawberry.scalars.JSON | None
+    id: int | None = None
+    type: str | None = None
+    external_ids: strawberry.scalars.JSON | None = None
+    sample_id: str | None = None
+    meta: strawberry.scalars.JSON | None = None
 
 
 @strawberry.type
