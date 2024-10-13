@@ -5,11 +5,14 @@ and sequencing groups that have no aligned CRAM.
 """
 
 import asyncio
+import csv
 import logging
 import os
 import sys
 from datetime import datetime
 from functools import cache
+from typing import Any
+from cloudpathlib import AnyPath
 
 import click
 
@@ -123,7 +126,13 @@ class UploadBucketAuditor(GenericAuditor):
         """
         today = datetime.today().strftime('%Y-%m-%d')
 
-        report_path = f'gs://{bucket_name}/audit_results/{today}/'
+        # report_path = f'gs://{bucket_name}/audit_results/{today}/'
+        report_path = f'/Users/edwfor/Code/metamist/audit_results/{today}/'
+        
+        # Create the report file and directory if it doesn't exist
+        report_path = AnyPath(report_path)
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        logging.info(f'Writing reports to {report_path}')
 
         if set(sequencing_types) == set(get_sequencing_types()):
             sequencing_types_str = 'all'
@@ -143,9 +152,14 @@ class UploadBucketAuditor(GenericAuditor):
             logging.info('No assay read files to delete found. Skipping report...')
         else:
             assays_to_delete_file = f'{report_prefix}_assay_files_to_delete_{today}.csv'
-            self.write_csv_report_to_cloud(
+            file_to_write = AnyPath(os.path.join(report_path, assays_to_delete_file))
+            file_to_write.parent.mkdir(parents=True, exist_ok=True)
+            file_to_write.touch(exist_ok=True)
+            # self.write_csv_report_to_cloud(
+            write_csv_report_to_local(
                 data_to_write=assay_files_to_delete,
-                report_path=os.path.join(report_path, assays_to_delete_file),
+                # report_path=os.path.join(report_path, assays_to_delete_file),
+                report_path=file_to_write,
                 header_row=[
                     'SG_ID',
                     'Assay_ID',
@@ -160,7 +174,8 @@ class UploadBucketAuditor(GenericAuditor):
             logging.info('No assay reads to ingest found. Skipping report...')
         else:
             assays_to_ingest_file = f'{report_prefix}_assay_files_to_ingest_{today}.csv'
-            self.write_csv_report_to_cloud(
+            # self.write_csv_report_to_cloud(
+            write_csv_report_to_local(
                 data_to_write=assay_files_to_ingest,
                 report_path=os.path.join(report_path, assays_to_ingest_file),
                 header_row=[
@@ -178,12 +193,24 @@ class UploadBucketAuditor(GenericAuditor):
             logging.info('No sequencing groups without crams found. Skipping report...')
         else:
             unaligned_sgs_file = f'{report_prefix}_unaligned_sgs_{today}.csv'
-            self.write_csv_report_to_cloud(
+            # self.write_csv_report_to_cloud(
+            write_csv_report_to_local(
                 data_to_write=unaligned_sgs,
                 report_path=os.path.join(report_path, unaligned_sgs_file),
                 header_row=['SG_ID', 'Sample_ID', 'Sample_External_ID'],
             )
 
+def write_csv_report_to_local(
+    data_to_write: list[Any], report_path: AnyPath, header_row: list[str] | None
+):
+    """Write a csv report to the local filesystem."""
+    with open(report_path, 'w', newline='') as report_file:
+        writer = csv.writer(report_file)
+        if header_row:
+            writer.writerow(header_row)
+        for row in data_to_write:
+            writer.writerow(row)
+    logging.info(f'Wrote report to {report_path}')
 
 async def audit_upload_bucket_async(
     dataset: str,

@@ -145,7 +145,14 @@ class AuditHelper(CloudHelper):
         Writes a csv report to the cloud bucket containing the data to write
         at the report path, with an optional header row
         """
-        with AnyPath(report_path).open('w+') as f:  # pylint: disable=E1101
+        # Create the report file and directory if it doesn't exist
+        report_path = AnyPath(report_path)
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.touch(exist_ok=True)
+        logging.info(f'Writing report to {report_path}')
+        
+        # with report_path.open('w+') as f:  # pylint: disable=E1101
+        with open(report_path, 'w+') as f:
             writer = csv.writer(f)
             if header_row:
                 writer.writerow(header_row)
