@@ -153,7 +153,7 @@ class DbTest(unittest.TestCase):
                 lcon_string = f'jdbc:mariadb://{db.get_container_host_ip()}:{port_to_expose}/{db_name}'
                 # apply the liquibase schema
                 command = [
-                    '/opt/homebrew/bin/liquibase',
+                    'liquibase',
                     *('--changeLogFile', db_prefix + '/project.xml'),
                     *('--defaultsFile', db_prefix + '/liquibase.properties'),
                     *('--url', lcon_string),
