@@ -21,3 +21,4 @@ google-cloud-pubsub
 pytz
 pytest
 pytest-cov
+pyinstrument

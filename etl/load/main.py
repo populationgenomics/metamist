@@ -73,7 +73,6 @@ def call_parser(parser_obj, row_json) -> tuple[str, str]:
     # we call it from sync, so we need to wrap it in coroutine
     async def run_parser_capture_result(parser_obj, row_data, res, status):
         try:
-            # TODO better error handling
             r = await parser_obj.from_json(row_data, confirm=False, dry_run=False)
             res.append(r)
             status.append(ParsingStatus.SUCCESS)
@@ -97,90 +96,102 @@ def process_rows(
     Process BQ results rows, should be only one row
     """
     source_type = bq_row.type
-    # source_type should be in the format /ParserName/Version e.g.: /bbv/v1
-
-    if isinstance(bq_row.body, str):
-        # body field is a string, convert to JSON
-        try:
-            row_json = json.loads(bq_row.body)
-        except json.JSONDecodeError as e:
-            return ParsingStatus.FAILED, f'Failed to decode JSON: {e}', bq_row
-    else:
-        # body field is already a JSON type
-        row_json = bq_row.body
+    row_json = parse_body(bq_row.body)
+    if row_json is None:
+        return ParsingStatus.FAILED, 'Failed to decode JSON', bq_row
 
     submitting_user = bq_row.submitting_user
+    config, record_data = extract_config_and_data(row_json)
 
-    # get config from payload and merge with the default
-    config = {}
-    record_data = row_json
-    if isinstance(row_json, dict):
-        if payload_config_data := row_json.get('config'):
-            config.update(payload_config_data)
-
-        # get data from payload or use payload as data
-        record_data = row_json.get('data', row_json)
-
-    (parser_obj, err_msg) = get_parser_instance(
+    parser_obj, err_msg = get_parser_instance(
         submitting_user=submitting_user, request_type=source_type, init_params=config
     )
 
     if parser_obj:
-        # Parse bq_row.body -> Model and upload to metamist database
         status, parsing_result = call_parser(parser_obj, record_data)
     else:
         status = ParsingStatus.FAILED
         parsing_result = f'Error: {err_msg} when parsing record with id: {request_id}'
 
     if delivery_attempt == 1:
-        # log only at the first attempt,
-        # pub/sub min try is 5x and we do not want to spam slack with errors
-        log_details = {
-            'source_type': source_type,
-            'submitting_user': bq_row.submitting_user,
-            'result': str(parsing_result),
-        }
-
-        # log results to BIGQUERY_LOG_TABLE
-        log_record = {
-            'request_id': request_id,
-            'timestamp': datetime.datetime.utcnow().isoformat(),
-            'status': status,
-            'details': json.dumps(log_details),
-        }
-
-        if BIGQUERY_LOG_TABLE is None:
-            logging.error('BIGQUERY_LOG_TABLE is not set')
-            return status, parsing_result, row_json
-
-        errors = bq_client.insert_rows_json(
-            BIGQUERY_LOG_TABLE,
-            [log_record],
+        log_and_notify(
+            bq_row, request_id, status, parsing_result, bq_client, source_type
         )
-        if errors:
-            logging.error(f'Failed to log to BQ: {errors}')
-
-        if NOTIFICATION_PUBSUB_TOPIC is None:
-            logging.error('NOTIFICATION_PUBSUB_TOPIC is not set')
-            return status, parsing_result, row_json
-
-        if status == ParsingStatus.FAILED:
-            # publish to notification pubsub
-            msg_title = 'Metamist ETL Load Failed'
-            try:
-                # limit result to max 100 characters, to avoid spamming slack
-                # sometimes the details can be huge, the whole stacktrace
-                log_details['result'] = str(parsing_result)[:100]
-                log_record['details'] = json.dumps(log_details)
-                pubsub_client = _get_pubsub_client()
-                pubsub_client.publish(
-                    NOTIFICATION_PUBSUB_TOPIC,
-                    json.dumps({'title': msg_title} | log_record).encode(),
-                )
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                logging.error(f'Failed to publish to pubsub: {e}')
 
     return status, parsing_result, row_json
+
+
+def parse_body(body: Any) -> Any:
+    """JSON decode body if it is a string"""
+    if isinstance(body, str):
+        try:
+            return json.loads(body)
+        except json.JSONDecodeError as e:
+            logging.error(f'Failed to decode JSON: {e}')
+            return None
+    return body
+
+
+def extract_config_and_data(row_json: dict) -> tuple[dict, Any]:
+    """Extract config and data from row_json"""
+    config = {}
+    record_data = row_json
+    if isinstance(row_json, dict):
+        if payload_config_data := row_json.get('config'):
+            config.update(payload_config_data)
+        record_data = row_json.get('data', row_json)
+    return config, record_data
+
+
+def log_and_notify(
+    bq_row: bq.table.Row,
+    request_id: str,
+    status: str,
+    parsing_result: Any,
+    bq_client: bq.Client,
+    source_type: str,
+):
+    """Log and notify about the parsing result"""
+    log_details = {
+        'source_type': source_type,
+        'submitting_user': bq_row.submitting_user,
+        'result': str(parsing_result),
+    }
+
+    log_record = {
+        'request_id': request_id,
+        'timestamp': datetime.datetime.utcnow().isoformat(),
+        'status': status,
+        'details': json.dumps(log_details),
+    }
+
+    if BIGQUERY_LOG_TABLE is None:
+        logging.error('BIGQUERY_LOG_TABLE is not set')
+        return
+
+    errors = bq_client.insert_rows_json(
+        BIGQUERY_LOG_TABLE,
+        [log_record],
+    )
+    if errors:
+        logging.error(f'Failed to log to BQ: {errors}')
+
+    if NOTIFICATION_PUBSUB_TOPIC is None:
+        logging.error('NOTIFICATION_PUBSUB_TOPIC is not set')
+        return
+
+    if status == ParsingStatus.FAILED:
+        msg_title = 'Metamist ETL Load Failed'
+        try:
+            log_details['result'] = str(parsing_result)[:100]
+            log_record['details'] = json.dumps(log_details)
+            pubsub_client = _get_pubsub_client()
+            pubsub_client.publish(
+                NOTIFICATION_PUBSUB_TOPIC,
+                json.dumps({'title': msg_title} | log_record).encode(),
+            )
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logging.error(f'Failed to publish to pubsub: {e}')
 
 
 @functions_framework.http
@@ -280,7 +291,6 @@ def process_request(
         bq_job_result, delivery_attempt, request_id, bq_client
     )
 
-    # return success
     if status == ParsingStatus.SUCCESS:
         return {
             'id': request_id,
@@ -361,7 +371,7 @@ def get_parser_instance(
         ],
     ] = get_accessor_config()
 
-    parser_config = accessor_config['by_type'].get(request_type)
+    parser_config = accessor_config.get('by_type', {}).get(request_type)
     if not parser_config:
         return None, (
             f'Submitting user {submitting_user} requested type {request_type}, '

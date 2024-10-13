@@ -6,6 +6,9 @@ from unittest.mock import MagicMock, patch
 import etl.load.main
 from metamist.parser.generic_metadata_parser import GenericMetadataParser
 
+TEST_USER_EMAIL = 'user@mail.com'
+TEST_ENDPOINT = 'test/v1'
+
 
 class TestGetParserInstance(GenericMetadataParser):
     """
@@ -104,7 +107,7 @@ class TestEtlLoad(TestCase):
         self.get_query_job_result(
             mock_bq,
             request_type='/bbv/v1',
-            submitting_user='user@mail.com',
+            submitting_user=TEST_USER_EMAIL,
             body=json.dumps(record),
         )
 
@@ -146,7 +149,7 @@ class TestEtlLoad(TestCase):
             'request_id': '6dc4b9ae-74ee-42ee-9298-b0a51d5c6836',
             'timestamp': '2023-08-22T00:59:43.485926',
             'type': '/',
-            'submitting_user': 'user@mail.com',
+            'submitting_user': TEST_USER_EMAIL,
         }
         data_base64 = base64.b64encode(json.dumps(data).encode())
         pubsub_payload_example = {
@@ -172,7 +175,7 @@ class TestEtlLoad(TestCase):
         self.get_query_job_result(
             mock_bq=mock_bq,
             request_type='/gmp/v1',
-            submitting_user='user@mail.com',
+            submitting_user=TEST_USER_EMAIL,
             body=json.dumps(record),
         )
 
@@ -200,10 +203,10 @@ class TestEtlLoad(TestCase):
         """Test get_parser_instance success"""
 
         mock_get_accessor_config.return_value = {
-            'user@test.com': {
+            TEST_USER_EMAIL: {
                 'parsers': [
                     {
-                        'name': 'test/v1',
+                        'name': TEST_ENDPOINT,
                         'default_parameters': {},
                         # 'parser_name': 'test',
                     }
@@ -212,13 +215,13 @@ class TestEtlLoad(TestCase):
         }
 
         mock_prepare_parser_map.return_value = {
-            'test/v1': TestGetParserInstance,
+            TEST_ENDPOINT: TestGetParserInstance,
         }
 
         parser, _ = etl.load.main.get_parser_instance(
-            submitting_user='user@test.com',
+            submitting_user=TEST_USER_EMAIL,
             # note the leading slash should be stripped
-            request_type='/test/v1',
+            request_type=TEST_ENDPOINT,
             init_params={'project': 'not-overriden'},
         )
         self.assertIsNotNone(parser)
@@ -236,10 +239,10 @@ class TestEtlLoad(TestCase):
         """Test get_parser_instance success"""
 
         mock_get_accessor_config.return_value = {
-            'user@test.com': {
+            TEST_USER_EMAIL: {
                 'parsers': [
                     {
-                        'name': 'test/v1',
+                        'name': TEST_ENDPOINT,
                         'default_parameters': {'project': 'test'},
                         'parser_name': 'different_parser/name',
                     }
@@ -252,8 +255,8 @@ class TestEtlLoad(TestCase):
         }
 
         parser, _ = etl.load.main.get_parser_instance(
-            submitting_user='user@test.com',
-            request_type='/test/v1',
+            submitting_user=TEST_USER_EMAIL,
+            request_type='/' + TEST_ENDPOINT,
             init_params={'project': 'to_override'},
         )
         self.assertIsNotNone(parser)
@@ -267,11 +270,11 @@ class TestEtlLoad(TestCase):
     def test_get_parser_instance_fail_no_user(self, mock_get_accessor_config):
         """Test get_parser_instance success"""
 
-        mock_get_accessor_config.return_value = {'user@test.com': []}
+        mock_get_accessor_config.return_value = {TEST_USER_EMAIL: []}
 
         parser, error = etl.load.main.get_parser_instance(
             submitting_user='non-existent-user@different.com',
-            request_type='/test/v1',
+            request_type='/' + TEST_ENDPOINT,
             init_params={'project': 'to_override'},
         )
         self.assertIsNone(parser)
@@ -288,10 +291,10 @@ class TestEtlLoad(TestCase):
         """Test get_parser_instance success"""
 
         mock_get_accessor_config.return_value = {
-            'user@test.com': {
+            TEST_USER_EMAIL: {
                 'parsers': [
                     {
-                        'name': 'test/v1',
+                        'name': TEST_ENDPOINT,
                         'default_parameters': {'project': 'test'},
                     }
                 ]
@@ -300,11 +303,11 @@ class TestEtlLoad(TestCase):
 
         # this doesn't need to be mocked as it fails before here
         mock_prepare_parser_map.return_value = {
-            'test/v1': TestGetParserInstance,
+            TEST_ENDPOINT: TestGetParserInstance,
         }
 
         parser, error = etl.load.main.get_parser_instance(
-            submitting_user='user@test.com',
+            submitting_user=TEST_USER_EMAIL,
             request_type='test/v2',
             init_params={'project': 'to_override'},
         )

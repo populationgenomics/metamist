@@ -34,6 +34,8 @@ TimeGroupingDetails = namedtuple(
 STORAGE = 'S'
 COMPUTE = 'C'
 
+DATE_FORMAT = '%Y-%m-%d'
+
 
 def abbrev_cost_category(cost_category: str) -> str:
     """abbreviate cost category"""
@@ -49,8 +51,8 @@ def prepare_time_periods(
     # Based on specified time period, add the corresponding column
     if query.time_periods == BillingTimePeriods.DAY:
         return TimeGroupingDetails(
-            field=f'FORMAT_DATE("%Y-%m-%d", {time_column.value}) as day',
-            formula='PARSE_DATE("%Y-%m-%d", day) as day',
+            field=f'FORMAT_DATE("{DATE_FORMAT}", {time_column.value}) as day',
+            formula=f'PARSE_DATE("{DATE_FORMAT}", day) as day',
             separator=',',
         )
 
@@ -150,12 +152,12 @@ class BillingBaseTable(BqDbBase):
         # initial partition filter
         billing_filter.day = GenericBQFilter[datetime](
             gte=(
-                datetime.strptime(query.start_date, '%Y-%m-%d')
+                datetime.strptime(query.start_date, DATE_FORMAT)
                 if query.start_date
                 else None
             ),
             lte=(
-                datetime.strptime(query.end_date, '%Y-%m-%d')
+                datetime.strptime(query.end_date, DATE_FORMAT)
                 if query.end_date
                 else None
             ),
@@ -290,8 +292,8 @@ class BillingBaseTable(BqDbBase):
         # This is to optimise the query, BQ view is partitioned by day
         # and not by invoice month
         start_day_date, last_day_date = get_invoice_month_range(invoice_month_date)
-        start_day = start_day_date.strftime('%Y-%m-%d')
-        last_day = last_day_date.strftime('%Y-%m-%d')
+        start_day = start_day_date.strftime(DATE_FORMAT)
+        last_day = last_day_date.strftime(DATE_FORMAT)
 
         # start_day and last_day are in to optimise the query
         query_params = [
@@ -299,7 +301,7 @@ class BillingBaseTable(BqDbBase):
             bigquery.ScalarQueryParameter('last_day', 'STRING', last_day),
         ]
 
-        current_day = datetime.now().strftime('%Y-%m-%d')
+        current_day = datetime.now().strftime(DATE_FORMAT)
         is_current_month = last_day >= current_day
         last_loaded_day = None
 

@@ -6,11 +6,12 @@ from typing import Any, Callable, Generic, Sequence, TypeVar
 from db.python.utils import escape_like_term
 from models.base import SMBase
 
-NONFIELD_CHARS_REGEX = re.compile(r'[^a-zA-Z0-9_]')
+NONFIELD_CHARS_REGEX = re.compile(r'\W')
 
 
 T = TypeVar('T')
 X = TypeVar('X')
+OPERATOR_MAP = dict[str, dict[str, str | bool]]
 
 
 def get_hashable_value(value):
@@ -134,24 +135,65 @@ class GenericFilter(SMBase, Generic[T]):
         Returns:
             tuple[str, dict[str, T | list[T]]]: (condition, prepared_values)
         """
-        conditionals = []
-        values: dict[str, T | list[T]] = {}
         _column_name = column_name or column
 
+        # Validate the column name
         if not isinstance(column, str):
             raise ValueError(f'Column {_column_name!r} must be a string')
-        if self.eq is not None:
-            k = self.generate_field_name(_column_name + '_eq')
-            conditionals.append(f'{column} = :{k}')
-            values[k] = self._sql_value_prep(self.eq)
-        if self.neq is not None:
-            k = self.generate_field_name(_column_name + '_neq')
-            conditionals.append(f'{column} != :{k}')
-            values[k] = self._sql_value_prep(self.neq)
+
+        conditionals1, values1 = self._process_simple_operators(column, _column_name)
+        conditionals2, values2 = self._process_string_operators(column, _column_name)
+        conditionals3, values3 = self._process_in_operators(column, _column_name)
+        conditionals4 = self._process_isnull_operator(column)
+
+        conditionals = conditionals1 + conditionals2 + conditionals3 + conditionals4
+        values = {**values1, **values2, **values3}
+
+        return ' AND '.join(conditionals), values
+
+    def _process_simple_operators(self, column, _column_name):
+        conditionals = []
+        values = {}
+        simple_operators: OPERATOR_MAP = {
+            'eq': {'column_suffix': '_eq', 'op': '='},
+            'neq': {'column_suffix': '_neq', 'op': '!='},
+            'gt': {'column_suffix': '_gt', 'op': '>'},
+            'gte': {'column_suffix': '_gte', 'op': '>='},
+            'lt': {'column_suffix': '_lt', 'op': '<'},
+            'lte': {'column_suffix': '_lte', 'op': '<='},
+        }
+        for prop_key, operator in simple_operators.items():
+            if value := getattr(self, prop_key):
+                k = self.generate_field_name(_column_name + operator['column_suffix'])
+                conditionals.append(f'{column} {operator["op"]} :{k}')
+                values[k] = self._sql_value_prep(value)
+        return conditionals, values
+
+    def _process_string_operators(self, column, _column_name):
+        conditionals = []
+        values = {}
+        string_operators: OPERATOR_MAP = {
+            'contains': {'column_suffix': '_contains', 'lower': False},
+            'icontains': {'column_suffix': '_icontains', 'lower': True},
+            'startswith': {'column_suffix': '_startswith', 'lower': False},
+        }
+        for prop_key, operator in string_operators.items():
+            if value := getattr(self, prop_key):
+                search_term = escape_like_term(str(value))
+                k = self.generate_field_name(_column_name + operator['column_suffix'])
+                if operator['lower']:
+                    conditionals.append(f'LOWER({column}) LIKE LOWER(:{k})')
+                else:
+                    conditionals.append(f'{column} LIKE :{k}')
+                values[k] = self._sql_value_prep(f'%{search_term}%')
+        return conditionals, values
+
+    def _process_in_operators(self, column, _column_name):
+        conditionals = []
+        values = {}
         if self.in_ is not None:
             if len(self.in_) == 0:
-                # in an empty list is always false
-                return 'FALSE', {}
+                return ['FALSE'], {}
             if not isinstance(self.in_, list):
                 raise ValueError('IN filter must be a list')
             if len(self.in_) == 1:
@@ -163,50 +205,21 @@ class GenericFilter(SMBase, Generic[T]):
                 conditionals.append(f'{column} IN :{k}')
                 values[k] = self._sql_value_prep(self.in_)
         if self.nin is not None and len(self.nin) > 0:
-            # not in an empty list is always true
             if not isinstance(self.nin, list):
                 raise ValueError('NIN filter must be a list')
             k = self.generate_field_name(column + '_nin')
             conditionals.append(f'{column} NOT IN :{k}')
             values[k] = self._sql_value_prep(self.nin)
-        if self.gt is not None:
-            k = self.generate_field_name(column + '_gt')
-            conditionals.append(f'{column} > :{k}')
-            values[k] = self._sql_value_prep(self.gt)
-        if self.gte is not None:
-            k = self.generate_field_name(column + '_gte')
-            conditionals.append(f'{column} >= :{k}')
-            values[k] = self._sql_value_prep(self.gte)
-        if self.lt is not None:
-            k = self.generate_field_name(column + '_lt')
-            conditionals.append(f'{column} < :{k}')
-            values[k] = self._sql_value_prep(self.lt)
-        if self.lte is not None:
-            k = self.generate_field_name(column + '_lte')
-            conditionals.append(f'{column} <= :{k}')
-            values[k] = self._sql_value_prep(self.lte)
-        if self.contains is not None:
-            search_term = escape_like_term(str(self.contains))
-            k = self.generate_field_name(column + '_contains')
-            conditionals.append(f'{column} LIKE :{k}')
-            values[k] = self._sql_value_prep(f'%{search_term}%')
-        if self.icontains is not None:
-            search_term = escape_like_term(str(self.icontains))
-            k = self.generate_field_name(column + '_icontains')
-            conditionals.append(f'LOWER({column}) LIKE LOWER(:{k})')
-            values[k] = self._sql_value_prep(f'%{search_term}%')
-        if self.startswith is not None:
-            search_term = escape_like_term(str(self.startswith))
-            k = self.generate_field_name(column + '_startswith')
-            conditionals.append(f'{column} LIKE :{k}')
-            values[k] = self._sql_value_prep(escape_like_term(search_term) + '%')
+        return conditionals, values
+
+    def _process_isnull_operator(self, column):
+        conditionals = []
         if self.isnull is not None:
             if self.isnull:
                 conditionals.append(f'{column} IS NULL')
             else:
                 conditionals.append(f'{column} IS NOT NULL')
-
-        return ' AND '.join(conditionals), values
+        return conditionals
 
     @staticmethod
     def _sql_value_prep(value):
@@ -276,22 +289,16 @@ class GenericFilterModel:
     def __post_init__(self):
         for field in dataclasses.fields(self):
             value = getattr(self, field.name)
-            if value is None:
+            if value is None or isinstance(value, (GenericFilter, GenericFilterModel)):
                 continue
 
-            if isinstance(value, tuple) and len(value) == 1 and value[0] is None:
+            if isinstance(value, tuple) and len(value) == 1 and None in value:
                 raise ValueError(
                     f'There is very likely a trailing comma on the end of '
                     f'{self.__class__.__name__}.{field.name}. If you actually want a '
                     f'tuple of length one with the value = (None,), then use '
                     f'dataclasses.field(default_factory=lambda: (None,))'
                 )
-            if isinstance(value, GenericFilter):
-                continue
-
-            if isinstance(value, GenericFilterModel):
-                # allow nested GenericFilterModels
-                continue
 
             if isinstance(value, dict):
                 # make sure each field is a GenericFilter, or set it to be one,
@@ -306,8 +313,8 @@ class GenericFilterModel:
             # lazily provided a value, which we'll correct
             if isinstance(value, list):
                 setattr(self, field.name, GenericFilter(in_=value))
-            else:
-                setattr(self, field.name, GenericFilter(eq=value))
+
+            setattr(self, field.name, GenericFilter(eq=value))
 
     def to_sql(
         self,
@@ -333,35 +340,42 @@ class GenericFilterModel:
         fields = dataclasses.fields(self)
         conditionals, values = [], {}
         for field in fields:
-            if only and field.name not in only:
-                continue
-            if exclude and field.name in exclude:
+            if (only and field.name not in only) or (exclude and field.name in exclude):
                 continue
 
             fcolumn = _foverrides.get(field.name, field.name)
-            if filter_ := getattr(self, field.name):
-                if isinstance(filter_, dict):
-                    meta_conditionals, meta_values = prepare_query_from_dict_field(
-                        filter_=filter_, field_name=field.name, column_name=fcolumn
-                    )
-                    conditionals.extend(meta_conditionals)
-                    values.update(meta_values)
-                elif isinstance(filter_, GenericFilter):
-                    fconditionals, fvalues = filter_.to_sql(fcolumn)
-                    conditionals.append(fconditionals)
-                    values.update(fvalues)
-                elif not isinstance(field.type, (GenericFilter, dict)):
-                    values.update({fcolumn: filter_})
-                    conditionals.append(f'{fcolumn} = :{fcolumn}')
-                else:
-                    raise ValueError(
-                        f'Filter {field.name} must be a GenericFilter or dict[str, GenericFilter]'
-                    )
+            filter_ = getattr(self, field.name)
+            fconditionals, fvalues = self._prepare_conditionals_and_values(
+                filter_, field, fcolumn
+            )
+            conditionals.extend(fconditionals)
+            values.update(fvalues)
 
         if not conditionals:
             return 'True', {}
 
         return ' AND '.join(filter(None, conditionals)), values
+
+    def _prepare_conditionals_and_values(self, filter_, field, fcolumn):
+        if not filter_:
+            return [], {}
+
+        if isinstance(filter_, dict):
+            meta_conditionals, meta_values = prepare_query_from_dict_field(
+                filter_=filter_, field_name=field.name, column_name=fcolumn
+            )
+            return meta_conditionals, meta_values
+
+        if isinstance(filter_, GenericFilter):
+            fconditionals, fvalues = filter_.to_sql(fcolumn)
+            return [fconditionals], fvalues
+
+        if not isinstance(field.type, (GenericFilter, dict)):
+            return [f'{fcolumn} = :{fcolumn}'], {fcolumn: filter_}
+
+        raise ValueError(
+            f'Filter {field.name} must be a GenericFilter or dict[str, GenericFilter]'
+        )
 
 
 def prepare_query_from_dict_field(

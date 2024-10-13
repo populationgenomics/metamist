@@ -179,68 +179,104 @@ def prepare_participants_for_export(
     """Prepare participants for export"""
     _fields = fields.fields if fields else None
     if not _fields:
-        # empty field, because we don't really care about the fields
         _fields = ProjectParticipantGridResponse.get_entity_keys(
             participants, ProjectParticipantGridFilter()
         )
 
-    def get_visible_fields(key: MetaSearchEntityPrefix):
-        fs = _fields.get(key, [])
-        return [f for f in fs if f.is_visible]
+    family_keys, participant_keys, sample_keys, sequencing_group_keys, assay_keys = (
+        get_visible_fields(_fields, MetaSearchEntityPrefix.FAMILY),
+        get_visible_fields(_fields, MetaSearchEntityPrefix.PARTICIPANT),
+        get_visible_fields(_fields, MetaSearchEntityPrefix.SAMPLE),
+        get_visible_fields(_fields, MetaSearchEntityPrefix.SEQUENCING_GROUP),
+        get_visible_fields(_fields, MetaSearchEntityPrefix.ASSAY),
+    )
 
-    family_keys = get_visible_fields(MetaSearchEntityPrefix.FAMILY)
-    participant_keys = get_visible_fields(MetaSearchEntityPrefix.PARTICIPANT)
-    sample_keys = get_visible_fields(MetaSearchEntityPrefix.SAMPLE)
-    sequencing_group_keys = get_visible_fields(MetaSearchEntityPrefix.SEQUENCING_GROUP)
-    assay_keys = get_visible_fields(MetaSearchEntityPrefix.ASSAY)
+    header = generate_header(
+        family_keys, participant_keys, sample_keys, sequencing_group_keys, assay_keys
+    )
+    yield header
 
-    header = (
+    for participant in participants:
+        yield from generate_participant_rows(
+            participant,
+            family_keys,
+            participant_keys,
+            sample_keys,
+            sequencing_group_keys,
+            assay_keys,
+        )
+
+
+def get_visible_fields(_fields, key: MetaSearchEntityPrefix):
+    """Get visible fields"""
+    fs = _fields.get(key, [])
+    return [f for f in fs if f.is_visible]
+
+
+def generate_header(
+    family_keys, participant_keys, sample_keys, sequencing_group_keys, assay_keys
+):
+    """Generate header from keys"""
+    return (
         *('family.' + fk.key for fk in family_keys),
         *('participant.' + pk.key for pk in participant_keys),
         *('sample.' + sk.key for sk in sample_keys),
         *('sequencing_group.' + sgk.key for sgk in sequencing_group_keys),
         *('assay.' + ak.key for ak in assay_keys),
     )
-    yield header
-    for participant in participants:
-        prow = []
-        for field in family_keys:
-            prow.append(
-                ', '.join(
-                    prepare_field_for_export(get_field_from_obj(f, field))
-                    for f in participant.families
+
+
+def generate_row_from_obj(obj, keys):
+    """Generate row from object"""
+    row = []
+    for field in keys:
+        row.append(prepare_field_for_export(get_field_from_obj(obj, field)))
+    return row
+
+
+def generate_family_and_participant_rows(participant, family_keys, participant_keys):
+    """Generate family and participant rows"""
+    prow = []
+    for field in family_keys:
+        prow.append(
+            ', '.join(
+                prepare_field_for_export(get_field_from_obj(f, field))
+                for f in participant.families
+            )
+        )
+    for field in participant_keys:
+        prow.append(prepare_field_for_export(get_field_from_obj(participant, field)))
+    return prow
+
+
+def generate_participant_rows(
+    participant,
+    family_keys,
+    participant_keys,
+    sample_keys,
+    sequencing_group_keys,
+    assay_keys,
+):
+    """Generate participant rows from all of the keys and participant data"""
+    prow = generate_family_and_participant_rows(
+        participant, family_keys, participant_keys
+    )
+
+    for sample in participant.samples:
+        srow = generate_row_from_obj(sample, sample_keys)
+
+        for sg in sample.sequencing_groups or []:
+            sgrow = generate_row_from_obj(sg, sequencing_group_keys)
+
+            for assay in sg.assays or []:
+                arow = generate_row_from_obj(assay, assay_keys)
+
+                yield (
+                    *prow,
+                    *srow,
+                    *sgrow,
+                    *arow,
                 )
-            )
-        for field in participant_keys:
-            prow.append(
-                prepare_field_for_export(get_field_from_obj(participant, field))
-            )
-
-        for sample in participant.samples:
-            srow = []
-            for field in sample_keys:
-                srow.append(prepare_field_for_export(get_field_from_obj(sample, field)))
-
-            for sg in sample.sequencing_groups or []:
-                sgrow = []
-                for field in sequencing_group_keys:
-                    sgrow.append(
-                        prepare_field_for_export(get_field_from_obj(sg, field))
-                    )
-
-                for assay in sg.assays or []:
-                    arow = []
-                    for field in assay_keys:
-                        arow.append(
-                            prepare_field_for_export(get_field_from_obj(assay, field))
-                        )
-
-                    yield (
-                        *prow,
-                        *srow,
-                        *sgrow,
-                        *arow,
-                    )
 
 
 @router.get(
@@ -253,7 +289,6 @@ async def search_by_keyword(
     This searches the keyword, in families, participants + samples in the projects
     that you are a part of (automatically).
     """
-    # raise ValueError("Test")
     projects = connection.all_projects()
     pmap = {p.id: p for p in projects}
     responses = await SearchLayer(connection).search(
@@ -306,4 +341,3 @@ async def sync_seqr_project(
         return {'success': 'errors' not in data, **data}
     except Exception as e:
         raise ConnectionError(f'Failed to synchronise seqr project: {str(e)}') from e
-        # return {'success': False, 'message': str(e)}

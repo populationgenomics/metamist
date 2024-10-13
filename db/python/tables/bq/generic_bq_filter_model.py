@@ -40,7 +40,7 @@ class GenericBQFilterModel(GenericFilterModel):
     def __post_init__(self):
         for field in dataclasses.fields(self):
             value = getattr(self, field.name)
-            if value is None:
+            if value is None or isinstance(value, GenericBQFilter):
                 continue
 
             if isinstance(value, tuple) and len(value) == 1 and value[0] is None:
@@ -50,8 +50,6 @@ class GenericBQFilterModel(GenericFilterModel):
                     'tuple of length one with the value = (None,), then use '
                     'dataclasses.field(default_factory=lambda: (None,))'
                 )
-            if isinstance(value, GenericBQFilter):
-                continue
 
             if isinstance(value, dict):
                 # make sure each field is a GenericFilter, or set it to be one,
@@ -72,11 +70,14 @@ class GenericBQFilterModel(GenericFilterModel):
     def to_sql(
         self,
         field_overrides: dict[str, str] = None,
-        only: list[str] | None = None,
-        exclude: list[str] | None = None,
+        only: list[str] = None,
+        exclude: list[str] = None,
     ) -> tuple[str, dict[str, Any]]:
         """Convert the model to SQL, and avoid SQL injection"""
         _foverrides = field_overrides or {}
+
+        # Unused values, but required by the parent class
+        _ = only, exclude
 
         # check for bad field_overrides
         bad_field_overrides = set(_foverrides.keys()) - set(
