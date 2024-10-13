@@ -1,8 +1,8 @@
+from collections import defaultdict
 import os
 
-# from pathlib import Path
 import re
-from typing import TypeAlias
+from typing import Iterable, TypeAlias
 
 from google.cloud.storage import Blob, Client
 from google.api_core.exceptions import NotFound
@@ -164,33 +164,17 @@ class OutputFileInternal(SMBase):
             if not client:
                 client = get_gcs_client()
 
-            file_checksum = None
-            valid = False
-            size = 0
-
-            params = OutputFileInternal.extract_bucket_params(
-                path=path,
-            )
+            params = OutputFileInternal.extract_bucket_params(path=path)
             if not params:
                 return None
-            if path.startswith('gs://') and client:
-                if not blobs and not isinstance(blobs, list):
-                    blobs = OutputFileInternal.list_blobs(
-                        bucket=params['bucket'],
-                        prefix=params['blob_name'],
-                        delimiter=params['delimiter'],
-                        client=client,
-                        versions=False,
-                    )
 
-                for blob in blobs:
-                    if blob.name == params['blob_name']:
-                        # .mt files present as folders on gcs so calculating checksums is not avail.
-                        if params['file_extension'] != '.mt':
-                            file_checksum = blob.crc32c  # pylint: disable=E1101
-                            valid = True
-                            size = blob.size  # pylint: disable=E1101
-                            break
+            if path.startswith('gs://') and client:
+                blobs = OutputFileInternal._get_blobs_if_needed(client, params, blobs)
+                file_checksum, valid, size = OutputFileInternal._get_blob_info(
+                    params, blobs
+                )
+            else:
+                file_checksum, valid, size = None, False, 0
 
             return OutputFileInternal.from_db(
                 **{
@@ -211,6 +195,33 @@ class OutputFileInternal(SMBase):
             return None
 
     @staticmethod
+    def _get_blobs_if_needed(client, params, blobs):
+        """Helper function to get blobs if needed."""
+        if not blobs and not isinstance(blobs, list):
+            blobs = OutputFileInternal.list_blobs(
+                bucket=params['bucket'],
+                prefix=params['blob_name'],
+                delimiter=params['delimiter'],
+                client=client,
+                versions=False,
+            )
+        return blobs
+
+    @staticmethod
+    def _get_blob_info(params, blobs):
+        """Helper function to get blob info."""
+        file_checksum, valid, size = None, False, 0
+        for blob in blobs:
+            if blob.name == params['blob_name']:
+                # .mt files present as folders on gcs so calculating checksums is not avail.
+                if params['file_extension'] != '.mt':
+                    file_checksum = blob.crc32c  # pylint: disable=E1101
+                    valid = True
+                    size = blob.size  # pylint: disable=E1101
+                    break
+        return file_checksum, valid, size
+
+    @staticmethod
     def reconstruct_json(data: list | str) -> str | dict:
         """Reconstruct JSON structure from provided data.
 
@@ -221,42 +232,11 @@ class OutputFileInternal(SMBase):
         Returns:
             dict: Should return the JSON structure based on the input data.
         """
-        root: dict = {}
+        root: dict[str, list] = defaultdict(list)
 
         # If the data is a string, it may not be a valid file object, so return it as is.
         if isinstance(data, str):
             return data
-
-        # If the data is a list, it may not be a valid file object, so we should
-        # reconstruct the JSON from this.
-        def add_to_structure(current: dict, path: list[str], content: dict):
-            """Helper function to add content to the correct place in the JSON structure."""
-
-            # We ensure the necessary keys exist in the current dictionary before adding the content.
-            for key in path[:-1]:
-                if key.isdigit():
-                    key = int(key)  # type: ignore [assignment]
-                    if key not in current:
-                        current[key] = {}
-                    current = current[key]
-                else:
-                    if key not in current:
-                        current[key] = {}
-                    current = current[key]
-
-            # We add the content to the final key in the current dictionary.
-            final_key = path[-1]
-            if final_key.isdigit():
-                final_key = int(final_key)  # type: ignore [assignment]
-                current[final_key] = content
-            else:
-                if final_key in current:
-                    if isinstance(current[final_key], dict):
-                        current[final_key].update(content)
-                    else:
-                        current[final_key] = content
-                else:
-                    current[final_key] = content
 
         for file in data:
             # We initialize the file_root dictionary to store the file information.
@@ -266,11 +246,11 @@ class OutputFileInternal(SMBase):
             if isinstance(file, tuple):
                 file_obj, json_structure = file
                 file_obj = file_obj.dict()
-                fields = OutputFileInternal.model_fields.keys()  # type:ignore[attr-defined]
+                fields = OutputFileInternal.model_fields.keys()
 
                 # Populate the file_root dictionary with the fields from the file_obj.
-                for field in fields:
-                    file_root[field] = file_obj.get(field)
+                filtered_file_obj = OutputFileInternal.keep_keys(file_obj, fields)
+                file_root.update(filtered_file_obj)
 
                 # If json_structure is not None, we assume it is a list of strings representing the path to the desired JSON structure.
                 if json_structure:
@@ -279,19 +259,48 @@ class OutputFileInternal(SMBase):
                     path = json_structure
 
                     # We add the file_root dictionary to the root dictionary based on the path.
-                    add_to_structure(root, path, file_root)
+                    OutputFileInternal.add_to_structure(root, path, file_root)
                 else:
                     root.update(file_root)
 
             # If the file variable is not a tuple, we assume it is a string representing the output of the file.
             else:
                 file_root['output'] = file
-                if 'output' in root:
-                    root['output'].append(file)
-                else:
-                    root['output'] = [file]
+                root['output'].append(file)
 
         return root
+
+    @staticmethod
+    def keep_keys(data: dict, keys: Iterable[str]) -> dict:
+        """Keep only the keys in the data dictionary that are in the keys list."""
+        return {key: value for key, value in data.items() if key in keys}
+
+    @staticmethod
+    def add_to_structure(current: dict, path: list[str], content: dict):
+        """Helper function to add content to the correct place in the JSON structure."""
+
+        # We ensure the necessary keys exist in the current dictionary before adding the content.
+        for key in path[:-1]:
+            try:
+                key = int(key)  # type: ignore [assignment]
+            finally:
+                if key not in current:
+                    current[key] = {}
+                current = current[key]
+
+        # We add the content to the final key in the current dictionary.
+        final_key = path[-1]
+        if final_key.isdigit():
+            final_key = int(final_key)  # type: ignore [assignment]
+            current[final_key] = content
+        else:
+            if final_key in current:
+                if isinstance(current[final_key], dict):
+                    current[final_key].update(content)
+                else:
+                    current[final_key] = content
+            else:
+                current[final_key] = content
 
 
 class OutputFile(BaseModel):
