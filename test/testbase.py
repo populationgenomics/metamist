@@ -28,6 +28,8 @@ from db.python.connect import (
 from db.python.tables.project import ProjectPermissionsTable
 from models.models.project import Project, ProjectId, ProjectMemberUpdate
 
+TEST_PROJECT_NAME = 'test'
+
 # use this to determine where the db directory is relatively,
 # as pycharm runs in "test/" folder, and GH runs them in git root
 am_i_in_test_environment = os.getcwd().endswith('test')
@@ -151,7 +153,7 @@ class DbTest(unittest.TestCase):
                 lcon_string = f'jdbc:mariadb://{db.get_container_host_ip()}:{port_to_expose}/{db_name}'
                 # apply the liquibase schema
                 command = [
-                    'liquibase',
+                    '/opt/homebrew/bin/liquibase',
                     *('--changeLogFile', db_prefix + '/project.xml'),
                     *('--defaultsFile', db_prefix + '/liquibase.properties'),
                     *('--url', lcon_string),
@@ -202,7 +204,7 @@ class DbTest(unittest.TestCase):
                 ppt = ProjectPermissionsTable(
                     connection=formed_connection,
                 )
-                cls.project_name = 'test'
+                cls.project_name = TEST_PROJECT_NAME
                 cls.project_id = await ppt.create_project(
                     project_name=cls.project_name,
                     dataset_name=cls.project_name,

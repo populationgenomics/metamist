@@ -11,7 +11,6 @@ from api.graphql.loaders import GraphQLContext
 from api.graphql.mutations.analysis import AnalysisMutations
 from api.graphql.mutations.analysis_runner import AnalysisRunnerMutations
 from api.graphql.mutations.assay import AssayMutations
-from api.graphql.mutations.comment import CommentMutations
 from api.graphql.mutations.family import FamilyMutations
 from api.graphql.mutations.participant import ParticipantMutations
 from api.graphql.mutations.sequencing_group import SequencingGroupMutations
@@ -184,12 +183,6 @@ class ProjectMutations:
     def analysis(self, root) -> AnalysisMutations:
         """Analysis mutations"""
         return AnalysisMutations(project_id=root.project_id)
-
-    # Comments
-    @strawberry.field
-    def comment(self) -> CommentMutations:
-        """Comment mutations"""
-        return CommentMutations()
 
     # Family
     @strawberry.field

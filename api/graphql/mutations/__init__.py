@@ -3,6 +3,7 @@ from strawberry.types import Info
 
 
 from api.graphql.loaders import GraphQLContext
+from api.graphql.mutations.comment import CommentMutations
 from api.graphql.mutations.project import ProjectMutations
 from models.models.project import FullWriteAccessRoles
 
@@ -23,3 +24,9 @@ class Mutation:
         )
         project_id = next(p for p in projects).id
         return ProjectMutations(project_id=project_id)
+
+    # Comments
+    @strawberry.field
+    def comment(self) -> CommentMutations:
+        """Comment mutations"""
+        return CommentMutations()
