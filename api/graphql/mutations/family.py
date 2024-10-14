@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import strawberry
 from strawberry.types import Info
+from strawberry.scalars import JSON
 
 from api.graphql.loaders import GraphQLContext
 from db.python.layers.comment import CommentLayer
@@ -19,9 +20,9 @@ class FamilyUpdateInput:
     """Family update type"""
 
     id: int
-    external_id: str
-    description: str
-    coded_phenotype: str
+    external_id: JSON | None = None
+    description: str | None = None
+    coded_phenotype: str | None = None
 
 
 @strawberry.type
@@ -57,7 +58,7 @@ class FamilyMutations:
         family_layer = FamilyLayer(connection)
         return await family_layer.update_family(
             id_=family.id,
-            external_id=family.external_id,
+            external_ids=family.external_id,
             description=family.description,
             coded_phenotype=family.coded_phenotype,
         )
