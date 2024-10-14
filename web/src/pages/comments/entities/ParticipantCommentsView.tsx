@@ -15,13 +15,15 @@ export const PARTICIPANT_COMMENTS = gql(`
 `)
 
 export const PARTICIPANT_ADD_COMMENT = gql(`
-    mutation AddCommentToParticipant($id: Int!, $content: String!) {
-        participant {
-            addComment(id: $id, content: $content) {
-                ...CommentFragment
-
-                thread {
+    mutation AddCommentToParticipant($id: Int!, $content: String!, $project: String!) {
+        project(name: $project) {
+            participant {
+                addComment(id: $id, content: $content) {
                     ...CommentFragment
+
+                    thread {
+                        ...CommentFragment
+                    }
                 }
             }
         }
@@ -32,7 +34,7 @@ export function useNewCommentOnParticipant(id: number | null) {
     return useNewComment(
         PARTICIPANT_ADD_COMMENT,
         id ? `GraphQLParticipant:${id}` : null,
-        (data) => data.participant.addComment
+        (data) => data.project.participant.addComment
     )
 }
 
@@ -74,6 +76,7 @@ export function ParticipantCommentsView(props: ParticipantCommentsViewProps) {
                         variables: {
                             content,
                             id: participant.id,
+                            project: props.projectName,
                         },
                     })
                 }

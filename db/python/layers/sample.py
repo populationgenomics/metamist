@@ -223,6 +223,18 @@ class SampleLayer(BaseLayer):
         with_function = (
             self.connection.connection.transaction if open_transaction else NoOpAenter
         )
+        if sample.id:
+            pjcts = await self.st.get_project_ids_for_sample_ids([sample.id])
+            self.connection.check_access_to_projects_for_ids(
+                pjcts, allowed_roles=FullWriteAccessRoles
+            )
+
+        # Needed for the create_sample mutation
+        if project:
+            self.connection.check_access_to_projects_for_ids(
+                [project], allowed_roles=FullWriteAccessRoles
+            )
+
         # safely ignore nested samples here
         async with with_function():
             for r in self.unwrap_nested_samples([sample]):

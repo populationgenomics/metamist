@@ -15,13 +15,15 @@ export const SEQUENCING_GROUP_COMMENTS = gql(`
 `)
 
 export const SEQUENCING_GROUP_ADD_COMMENT = gql(`
-    mutation AddCommentToSequencingGroup($id: String!, $content: String!) {
-        sequencingGroup {
-            addComment(id: $id, content: $content) {
-                ...CommentFragment
-
-                thread {
+    mutation AddCommentToSequencingGroup($id: String!, $content: String!, $project: String!) {
+        project(name: $project) {
+            sequencingGroup {
+                addComment(id: $id, content: $content) {
                     ...CommentFragment
+
+                    thread {
+                        ...CommentFragment
+                    }
                 }
             }
         }
@@ -32,7 +34,7 @@ export function useNewCommentOnSequencingGroup(id: string | null) {
     return useNewComment(
         SEQUENCING_GROUP_ADD_COMMENT,
         id ? `GraphQLSequencingGroup:${id}` : null,
-        (data) => data.sequencingGroup.addComment
+        (data) => data.project.sequencingGroup.addComment
     )
 }
 
@@ -74,6 +76,7 @@ export function SequencingGroupCommentsView(props: SequencingGroupCommentsViewPr
                         variables: {
                             content,
                             id: sequencingGroup.id,
+                            project: props.projectName,
                         },
                     })
                 }

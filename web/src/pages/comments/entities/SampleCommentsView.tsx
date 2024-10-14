@@ -15,13 +15,15 @@ export const SAMPLE_COMMENTS = gql(`
 `)
 
 export const SAMPLE_ADD_COMMENT = gql(`
-    mutation AddCommentToSample($id: String!, $content: String!) {
-        sample {
-            addComment(id: $id, content: $content) {
-                ...CommentFragment
-
-                thread {
+    mutation AddCommentToSample($id: String!, $content: String!, $project: String!) {
+        project(name: $project) {
+            sample {
+                addComment(id: $id, content: $content) {
                     ...CommentFragment
+
+                    thread {
+                        ...CommentFragment
+                    }
                 }
             }
         }
@@ -32,7 +34,7 @@ export function useNewCommentOnSample(id: string | null) {
     return useNewComment(
         SAMPLE_ADD_COMMENT,
         id ? `GraphQLSample:${id}` : null,
-        (data) => data.sample.addComment
+        (data) => data.project.sample.addComment
     )
 }
 
@@ -75,6 +77,7 @@ export function SampleCommentsView(props: SampleCommentsViewProps) {
                         variables: {
                             content,
                             id: sample.id,
+                            project: props.projectName,
                         },
                     })
                 }

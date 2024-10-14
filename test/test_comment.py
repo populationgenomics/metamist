@@ -11,7 +11,7 @@ from models.models.assay import AssayUpsertInternal
 from models.models.participant import ParticipantUpsertInternal
 from models.models.sequencing_group import SequencingGroupUpsertInternal
 from test.test_participant import get_participant_to_insert
-from test.testbase import DbIsolatedTest, run_as_sync
+from test.testbase import TEST_PROJECT_NAME, DbIsolatedTest, run_as_sync
 
 # @TODO would be good to add permissions testing to this, but first need a better
 # way of mocking the test user and their permissions to make that possible
@@ -165,12 +165,14 @@ SAMPLE_COMMENTS = """
 """
 
 SAMPLE_ADD_COMMENT = """
-    mutation AddCommentToSample($id: String!, $content: String!) {
-        sample {
-            addComment(id: $id, content: $content) {
-                ...CommentFragment
-                thread {
+    mutation AddCommentToSample($id: String!, $content: String!, $project: String!) {
+        project(name: $project) {
+            sample {
+                addComment(id: $id, content: $content) {
                     ...CommentFragment
+                    thread {
+                        ...CommentFragment
+                    }
                 }
             }
         }
@@ -191,8 +193,8 @@ PROJECT_COMMENTS = """
 """
 
 PROJECT_ADD_COMMENT = """
-    mutation AddCommentToProject($id: Int!, $content: String!) {
-        project {
+    mutation AddCommentToProject($id: Int!, $content: String!, $project: String!) {
+        project(name: $project) {
             addComment(id: $id, content: $content) {
                 ...CommentFragment
 
@@ -217,13 +219,15 @@ ASSAY_COMMENTS = """
 """
 
 ASSAY_ADD_COMMENT = """
-    mutation AddCommentToAssay($id: Int!, $content: String!) {
-        assay {
-            addComment(id: $id, content: $content) {
-                ...CommentFragment
-
-                thread {
+    mutation AddCommentToAssay($id: Int!, $content: String!, $project: String!) {
+        project(name: $project) {
+            assay {
+                addComment(id: $id, content: $content) {
                     ...CommentFragment
+
+                    thread {
+                        ...CommentFragment
+                    }
                 }
             }
         }
@@ -243,13 +247,15 @@ PARTICIPANT_COMMENTS = """
 """
 
 PARTICIPANT_ADD_COMMENT = """
-    mutation AddCommentToParticipant($id: Int!, $content: String!) {
-        participant {
-            addComment(id: $id, content: $content) {
-                ...CommentFragment
-
-                thread {
+    mutation AddCommentToParticipant($id: Int!, $content: String!, $project: String!) {
+        project(name: $project) {
+            participant {
+                addComment(id: $id, content: $content) {
                     ...CommentFragment
+
+                    thread {
+                        ...CommentFragment
+                    }
                 }
             }
         }
@@ -269,13 +275,15 @@ FAMILY_COMMENTS = """
 """
 
 FAMILY_ADD_COMMENT = """
-    mutation AddCommentToFamily($id: Int!, $content: String!) {
-        family {
-            addComment(id: $id, content: $content) {
-                ...CommentFragment
-
-                thread {
+    mutation AddCommentToFamily($id: Int!, $content: String!, $project: String!) {
+        project(name: $project) {
+            family {
+                addComment(id: $id, content: $content) {
                     ...CommentFragment
+
+                    thread {
+                        ...CommentFragment
+                    }
                 }
             }
         }
@@ -295,13 +303,15 @@ SEQUENCING_GROUP_COMMENTS = """
 """
 
 SEQUENCING_GROUP_ADD_COMMENT = """
-    mutation AddCommentToSequencingGroup($id: String!, $content: String!) {
-        sequencingGroup {
-            addComment(id: $id, content: $content) {
-                ...CommentFragment
-
-                thread {
+    mutation AddCommentToSequencingGroup($id: String!, $content: String!, $project: String!) {
+        project(name: $project) {
+            sequencingGroup {
+                addComment(id: $id, content: $content) {
                     ...CommentFragment
+
+                    thread {
+                        ...CommentFragment
+                    }
                 }
             }
         }
@@ -344,7 +354,11 @@ class TestComment(DbIsolatedTest):
             {comment_query}
         """
 
-        create_comment_variables = {'id': entity_id, 'content': content}
+        create_comment_variables = {
+            'id': entity_id,
+            'content': content,
+            'project': TEST_PROJECT_NAME,
+        }
 
         created_comment = await self.run_graphql_query_async(
             create_comment_query, variables=create_comment_variables
@@ -368,7 +382,7 @@ class TestComment(DbIsolatedTest):
         result = await self.add_comment_to_entity(
             SAMPLE_ADD_COMMENT, sample_id, comment
         )
-        return result['sample']['addComment']
+        return result['project']['sample']['addComment']
 
     async def get_discussion_on_sample(self, sample_id: str):
         result = await self.get_discussion_on_entity(
@@ -390,7 +404,7 @@ class TestComment(DbIsolatedTest):
 
     async def add_comment_to_assay(self, assay_id: int, comment: str):
         result = await self.add_comment_to_entity(ASSAY_ADD_COMMENT, assay_id, comment)
-        return result['assay']['addComment']
+        return result['project']['assay']['addComment']
 
     async def get_discussion_on_assay(self, assay_id: int):
         result = await self.get_discussion_on_entity(
@@ -402,7 +416,7 @@ class TestComment(DbIsolatedTest):
         result = await self.add_comment_to_entity(
             PARTICIPANT_ADD_COMMENT, participant_id, comment
         )
-        return result['participant']['addComment']
+        return result['project']['participant']['addComment']
 
     async def get_discussion_on_participant(self, participant_id: int):
         result = await self.get_discussion_on_entity(
@@ -414,7 +428,7 @@ class TestComment(DbIsolatedTest):
         result = await self.add_comment_to_entity(
             FAMILY_ADD_COMMENT, family_id, comment
         )
-        return result['family']['addComment']
+        return result['project']['family']['addComment']
 
     async def get_discussion_on_family(self, family_id: int):
         result = await self.get_discussion_on_entity(
@@ -428,7 +442,7 @@ class TestComment(DbIsolatedTest):
         result = await self.add_comment_to_entity(
             SEQUENCING_GROUP_ADD_COMMENT, sequencing_group_id, comment
         )
-        return result['sequencingGroup']['addComment']
+        return result['project']['sequencingGroup']['addComment']
 
     async def get_discussion_on_sequencing_group(self, sequencing_group_id: int):
         result = await self.get_discussion_on_entity(
