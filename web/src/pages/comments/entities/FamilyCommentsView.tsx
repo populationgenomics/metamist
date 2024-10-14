@@ -15,13 +15,15 @@ export const FAMILY_COMMENTS = gql(`
 `)
 
 export const FAMILY_ADD_COMMENT = gql(`
-    mutation AddCommentToFamily($id: Int!, $content: String!) {
-        family {
-            addComment(id: $id, content: $content) {
-                ...CommentFragment
-
-                thread {
+    mutation AddCommentToFamily($id: Int!, $content: String!, $project: String!) {
+        project(name: $project) {
+            family {
+                addComment(id: $id, content: $content) {
                     ...CommentFragment
+
+                    thread {
+                        ...CommentFragment
+                    }
                 }
             }
         }
@@ -32,7 +34,7 @@ export function useNewCommentOnFamily(id: number | null) {
     return useNewComment(
         FAMILY_ADD_COMMENT,
         id ? `GraphQLFamily:${id}` : null,
-        (data) => data.family.addComment
+        (data) => data.project.family.addComment
     )
 }
 
@@ -75,6 +77,7 @@ export function FamilyCommentsView(props: FamilyCommentsViewProps) {
                         variables: {
                             content,
                             id: family.id,
+                            project: props.projectName,
                         },
                     })
                 }
