@@ -264,7 +264,9 @@ GROUP BY analysis_id;
                     if stripy_report.outlier_loci
                     else None
                 ),
-                'timestamp_completed': stripy_report.timestamp_completed.isoformat(),
+                'timestamp_completed': stripy_report.timestamp_completed.isoformat()
+                if stripy_report.timestamp_completed
+                else None,
             }
 
         if mito_report := sequencing_group_mito_reports.get(report_key):
@@ -272,7 +274,9 @@ GROUP BY analysis_id;
                 'url': self.get_report_url(
                     project.name, sequencing_group_id, mito_report.output, 'MitoReport'
                 ),
-                'timestamp_completed': mito_report.timestamp_completed.isoformat(),
+                'timestamp_completed': mito_report.timestamp_completed.isoformat()
+                if mito_report.timestamp_completed
+                else None,
             }
 
         return report_links
@@ -705,6 +709,7 @@ INNER JOIN (
         JSON_UNQUOTE(JSON_EXTRACT(meta, '$.stage')) as stage
     FROM analysis
     WHERE type='es-index'
+    AND status='COMPLETED'
     GROUP BY project, JSON_EXTRACT(meta, '$.sequencing_type'), JSON_EXTRACT(meta, '$.stage')
 ) max_timestamps ON a.project = max_timestamps.project
 AND a.timestamp_completed = max_timestamps.max_timestamp
@@ -829,6 +834,7 @@ INNER JOIN (
     FROM analysis a
     LEFT JOIN analysis_sequencing_group asg on asg.analysis_id=a.id
     WHERE type='web'
+    AND status='COMPLETED'
     AND project IN :projects
     AND JSON_EXTRACT(meta, '$.stage') = 'Stripy'
     GROUP BY asg.sequencing_group_id
@@ -875,6 +881,7 @@ INNER JOIN (
     FROM analysis a
     LEFT JOIN analysis_sequencing_group asg on asg.analysis_id=a.id
     WHERE type='web'
+    AND status='COMPLETED'
     AND project IN :projects
     AND JSON_EXTRACT(meta, '$.stage') = 'MitoReport'
     GROUP BY asg.sequencing_group_id

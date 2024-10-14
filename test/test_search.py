@@ -188,7 +188,7 @@ class TestSample(DbIsolatedTest):
         Search family by External ID
         should only return one result
         """
-        f_id = await self.flayer.create_family(external_id='FAMXX01')
+        f_id = await self.flayer.create_family(external_ids={'forg': 'FAMXX01'})
         results = await self.schlay.search(
             query='FAMXX01', project_ids=[self.project_id]
         )
@@ -208,7 +208,7 @@ class TestSample(DbIsolatedTest):
         p = await self.player.upsert_participant(
             ParticipantUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'X:PART01'})
         )
-        f_id = await self.flayer.create_family(external_id='X:FAM01')
+        f_id = await self.flayer.create_family(external_ids={'famxorg': 'X:FAM01'})
         await fptable.create_rows(
             [
                 PedRowInternal(

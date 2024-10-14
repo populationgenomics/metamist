@@ -5,8 +5,8 @@ import { Accordion } from 'semantic-ui-react'
 import { GraphQlSequencingGroup } from '../../__generated__/graphql'
 import iconStyle from '../iconStyle'
 import { DeepPartial } from '../utilities/deepPartial'
-import SequencingGroupInfo from './SequencingGroupInfo'
 import SequencingGroupLink from './links/SequencingGroupLink'
+import SequencingGroupInfo from './SequencingGroupInfo'
 
 const SeqPanel: React.FunctionComponent<{
     sequencingGroups: DeepPartial<GraphQlSequencingGroup>[]

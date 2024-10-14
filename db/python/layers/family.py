@@ -16,7 +16,7 @@ from db.python.utils import NotFoundError
 from models.models import PRIMARY_EXTERNAL_ORG
 from models.models.family import FamilyInternal, PedRow, PedRowInternal
 from models.models.participant import ParticipantUpsertInternal
-from models.models.project import ProjectId, ReadAccessRoles
+from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
 
 
 class FamilyLayer(BaseLayer):
@@ -29,11 +29,14 @@ class FamilyLayer(BaseLayer):
         self.fptable = FamilyParticipantTable(self.connection)
 
     async def create_family(
-        self, external_id: str, description: str = None, coded_phenotype: str = None
+        self,
+        external_ids: dict[str, str],
+        description: str | None = None,
+        coded_phenotype: str | None = None,
     ):
         """Create a family"""
         return await self.ftable.create_family(
-            external_id=external_id,
+            external_ids=external_ids,
             description=description,
             coded_phenotype=coded_phenotype,
         )
@@ -127,7 +130,7 @@ class FamilyLayer(BaseLayer):
     async def update_family(
         self,
         id_: int,
-        external_id: str = None,
+        external_ids: dict[str, str] | None = None,
         description: str = None,
         coded_phenotype: str = None,
     ) -> bool:
@@ -135,12 +138,12 @@ class FamilyLayer(BaseLayer):
         project_ids = await self.ftable.get_projects_by_family_ids([id_])
 
         self.connection.check_access_to_projects_for_ids(
-            project_ids, allowed_roles=ReadAccessRoles
+            project_ids, allowed_roles=FullWriteAccessRoles
         )
 
         return await self.ftable.update_family(
             id_=id_,
-            external_id=external_id,
+            external_ids=external_ids,
             description=description,
             coded_phenotype=coded_phenotype,
         )
@@ -303,7 +306,7 @@ class FamilyLayer(BaseLayer):
 
             for external_family_id in missing_external_family_ids:
                 internal_family_id = await self.ftable.create_family(
-                    external_id=external_family_id,
+                    external_ids={PRIMARY_EXTERNAL_ORG: external_family_id},
                     description=None,
                     coded_phenotype=None,
                 )

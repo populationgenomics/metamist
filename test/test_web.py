@@ -362,7 +362,7 @@ SINGLE_PARTICIPANT_QUERY_RESULT = ProjectParticipantGridResponse(
     fields={
         MetaSearchEntityPrefix.FAMILY: [
             ProjectParticipantGridField(
-                key='external_id', label='Family ID', is_visible=True
+                key='external_ids', label='Family ID', is_visible=True
             )
         ],
         MetaSearchEntityPrefix.PARTICIPANT: [
@@ -756,7 +756,7 @@ class WebNonDBTests(unittest.TestCase):
             id=1,
             external_ids={PRIMARY_EXTERNAL_ORG: 'pex1'},
             meta={'pkey': 'value'},
-            families=[FamilySimple(id=-2, external_id='fex1')],
+            families=[FamilySimple(id=-2, external_ids={'family_org': 'fex1'})],
             samples=[
                 NestedSample(
                     id='xpgA',
@@ -800,7 +800,7 @@ class WebNonDBTests(unittest.TestCase):
             fields={
                 MetaSearchEntityPrefix.FAMILY: [
                     ProjectParticipantGridField(
-                        key='external_id', label='', is_visible=True
+                        key='external_ids', label='', is_visible=True
                     )
                 ],
                 MetaSearchEntityPrefix.PARTICIPANT: [
@@ -840,7 +840,7 @@ class WebNonDBTests(unittest.TestCase):
         self.assertTupleEqual(
             headers,
             (
-                'family.external_id',
+                'family.external_ids',
                 'participant.external_ids',
                 'participant.meta.pkey',
                 'sample.meta.skey',
@@ -852,7 +852,7 @@ class WebNonDBTests(unittest.TestCase):
             ),
         )
         non_sg_keys = (
-            'fex1',
+            'family_org: fex1',
             'pex1',
             'value',
             'svalue',

@@ -35,6 +35,7 @@ from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.project import Project
 from models.enums import AnalysisStatus
 from models.enums.web import SeqrDatasetType
+from models.models import PRIMARY_EXTERNAL_ORG
 
 # literally the most temporary thing ever, but for complete
 # automation need to have sample inclusion / exclusion
@@ -282,8 +283,8 @@ class SeqrLayer(BaseLayer):
             return ['No families to synchronise']
         family_data = [
             {
-                'familyId': fam.external_id,
-                'displayName': fam.external_id,
+                'familyId': fam.external_ids[PRIMARY_EXTERNAL_ORG],
+                'displayName': fam.external_ids[PRIMARY_EXTERNAL_ORG],
                 'description': fam.description,
                 'codedPhenotype': fam.coded_phenotype,
             }

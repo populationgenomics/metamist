@@ -86,7 +86,7 @@ def main(delete_field_name, delete_file_path):
 
 if __name__ == '__main__':
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.WARNING,
         format='%(asctime)s %(levelname)s %(module)s:%(lineno)d - %(message)s',
         datefmt='%Y-%M-%d %H:%M:%S',
         stream=sys.stderr,

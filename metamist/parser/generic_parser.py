@@ -43,9 +43,8 @@ if sys.version_info >= (3, 8):
 else:
     from typing_extensions import Literal
 
-logging.basicConfig()
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__file__)
-logger.setLevel(logging.INFO)
 
 PRIMARY_EXTERNAL_ORG = ''
 

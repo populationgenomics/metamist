@@ -30,7 +30,7 @@ class FamilyUpdateModel(BaseModel):
     """Model for updating a family"""
 
     id: int
-    external_id: str | None = None
+    external_ids: dict[str, str] | None = None
     description: str | None = None
     coded_phenotype: str | None = None
 
@@ -171,7 +171,7 @@ async def update_family(
     return {
         'success': await family_layer.update_family(
             id_=family.id,
-            external_id=family.external_id,
+            external_ids=family.external_ids,
             description=family.description,
             coded_phenotype=family.coded_phenotype,
         )

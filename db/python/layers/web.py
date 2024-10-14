@@ -343,7 +343,7 @@ class WebDb(DbBase):
             families = []
             for family in families_by_pid.get(participant.id, []):
                 families.append(
-                    FamilySimpleInternal(id=family.id, external_id=family.external_id)
+                    FamilySimpleInternal(id=family.id, external_ids=family.external_ids)
                 )
             nested_participant = NestedParticipantInternal(
                 id=participant.id,
