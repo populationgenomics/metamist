@@ -20,9 +20,9 @@ ANALYSIS_TYPES_QUERY = gql(
     """
 )
 
-QUERY_PARTICIPANTS_SAMPLES_SGS_ASSAYS = gql(
+QUERY_PARTICIPANTS_SAMPLES_SGS = gql(
     """
-        query DatasetData($datasetName: String!) {
+        query DatasetData($datasetName: String!, $seqTypes: [String!]) {
             project(name: $datasetName) {
                 participants {
                     id
@@ -30,14 +30,27 @@ QUERY_PARTICIPANTS_SAMPLES_SGS_ASSAYS = gql(
                     samples {
                         id
                         externalId
-                        sequencingGroups {
+                        sequencingGroups(type: {in_: $seqTypes}) {
                             id
                             type
-                            assays {
-                                id
-                                meta
-                            }
                         }
+                    }
+                }
+            }
+        }
+    """
+)
+
+QUERY_SG_ASSAYS = gql(
+    """
+        query DatasetData($datasetName: String!, $seqTypes: [String!]) {
+            project(name: $datasetName) {
+                sequencingGroups(type: {in_: $seqTypes}) {
+                    id
+                    type
+                    assays {
+                        id
+                        meta
                     }
                 }
             }
@@ -118,10 +131,18 @@ class GenericAuditor(AuditHelper):
 
         logging.getLogger().setLevel(logging.WARN)
         participant_query_results = await query_async(
-            QUERY_PARTICIPANTS_SAMPLES_SGS_ASSAYS, {'datasetName': self.dataset}
+            QUERY_PARTICIPANTS_SAMPLES_SGS, {'datasetName': self.dataset, 'seqTypes': self.sequencing_types}
+        )
+        sg_assays_query_results = await query_async(
+            QUERY_SG_ASSAYS, {'datasetName': self.dataset, 'seqTypes': self.sequencing_types}
         )
         logging.getLogger().setLevel(logging.INFO)
 
+        sg_assays = {}
+        for sg in sg_assays_query_results['project']['sequencingGroups']:
+            sg_id = sg['id']
+            sg_assays[sg_id] = sg['assays']
+    
         participant_data = participant_query_results['project']['participants']
 
         filtered_participants = []
@@ -131,6 +152,20 @@ class GenericAuditor(AuditHelper):
                     f'{self.dataset} :: Filtering participant {participant["id"]} ({participant["externalId"]}) as it has no samples.'
                 )
                 continue
+            for sample in participant['samples']:
+                if not sample['sequencingGroups']:
+                    logging.info(
+                        f'{self.dataset} :: Filtering sample {sample["id"]} ({sample["externalId"]}) as it has no sequencing groups.'
+                    )
+                    continue
+                for sg in sample['sequencingGroups']:
+                    if sg['id'] not in sg_assays:
+                        logging.info(
+                            f'{self.dataset} :: Filtering SG {sg["id"]} as it has no assays.'
+                        )
+                        continue
+                    sg['assays'] = sg_assays[sg['id']]
+                    
             filtered_participants.append(participant)
 
         return filtered_participants
@@ -252,6 +287,7 @@ class GenericAuditor(AuditHelper):
         Returns a dict mapping {sg_id : (analysis_id, cram_path) }
         """
         sg_ids = list(assay_sg_id_map.values())
+        logging.info(f'{self.dataset} :: Fetching CRAM analyses for {len(sg_ids)} SGs')
 
         logging.getLogger().setLevel(logging.WARN)
         analyses_query_result = await query_async(
