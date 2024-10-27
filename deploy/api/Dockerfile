@@ -29,4 +29,9 @@ USER appuser
 EXPOSE $PORT
 
 # Command to run the FastAPI app
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "$PORT"]
+# execute in shell form rather than exec form to allow for variable substitution
+# @see https://docs.docker.com/reference/dockerfile/#shell-and-exec-form
+# some linting tools recomment exec form with a JSON array but the docker docs suggest the
+# only way to get variable substitution with exec form is by prefixing with `sh -c` which
+# is the exact same as using shell form, so ergonimcally this is much nicer
+CMD uvicorn --port ${PORT} --host 0.0.0.0 api.server:app
