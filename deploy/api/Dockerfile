@@ -19,6 +19,9 @@ RUN pip install --no-cache-dir --no-deps -r requirements.txt
 
 # Copy the application code
 COPY api api
+COPY db db/
+COPY models models/
+
 
 # Change ownership of the application directory to the non-root user
 RUN chown -R appuser:appuser /app/sample_metadata/
