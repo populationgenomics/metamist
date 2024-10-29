@@ -507,7 +507,7 @@ export const PersonNode: React.FC<IPersonNodeProps> = ({
             >
                 <path
                     data-id={`${entry.individual_id}`}
-                    stroke={isHighlighted ? colPersonBorder : colPersonBorder}
+                    stroke={colPersonBorder}
                     strokeWidth={isHighlighted ? nodeSize * 0.9 : nodeSize * 0.75}
                     z="-1"
                     d={`M${node.x} ${node.y} L${node.x} ${node.y}`}

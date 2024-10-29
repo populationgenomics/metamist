@@ -3,7 +3,7 @@ import * as React from 'react'
 import { BrowserRouter as Router } from 'react-router-dom'
 import Routes from './Routes'
 import NavBar from './shared/components/Header/NavBar'
-import { ViewerContext, useViewer } from './viewer'
+import { useViewer, ViewerContext } from './viewer'
 
 const App: React.FunctionComponent = () => {
     const { viewer, error } = useViewer()

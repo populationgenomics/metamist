@@ -23,7 +23,7 @@ from db.python.utils import (
 )
 from models.models.project import Project, ProjectId, ProjectMemberRole
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 TABLES_ORDERED_BY_FK_DEPS = [
@@ -42,6 +42,7 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'sample_external_id',
     'sequencing_group_external_id',
     'family',
+    'family_external_id',
     'family_participant',
     'participant_phenotypes',
     'group_member',

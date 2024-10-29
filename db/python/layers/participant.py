@@ -532,7 +532,7 @@ class ParticipantLayer(BaseLayer):
                 # they might not be missing
                 for external_family_id in missing_family_ids:
                     new_pid = await ftable.create_family(
-                        external_id=external_family_id,
+                        external_ids={PRIMARY_EXTERNAL_ORG: external_family_id},
                         description=None,
                         coded_phenotype=None,
                     )

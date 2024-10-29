@@ -1,8 +1,8 @@
 import { Box, List, ListItem, ListItemButton, ListItemText, Typography } from '@mui/material'
 import { DateTime } from 'luxon'
 import { useState } from 'react'
-import { CommentContent } from './CommentContent'
 import { CommentData } from './commentConfig'
+import { CommentContent } from './CommentContent'
 import { parseAuthor } from './commentUtils'
 
 export function CommentHistory(props: { comment: CommentData; theme: 'light' | 'dark' }) {
