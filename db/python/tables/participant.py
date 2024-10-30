@@ -53,6 +53,7 @@ class ParticipantTable(DbBase):
     ) -> tuple[str, dict[str, Any]]:
         """Construct a participant query"""
         needs_family = False
+        needs_family_eid = False
         needs_participant_eid = True  # always join, query optimiser can figure it out
         needs_sample = False
         needs_sample_eid = False
@@ -68,6 +69,7 @@ class ParticipantTable(DbBase):
             },
             exclude=['family', 'sample', 'sequencing_group', 'assay'],
         )
+
         wheres = [_wheres]
 
         if filter_.family:
@@ -75,13 +77,21 @@ class ParticipantTable(DbBase):
             fwheres, fvalues = filter_.family.to_sql(
                 {
                     'id': 'f.id',
-                    'external_id': 'f.external_id',
                     'meta': 'f.meta',
-                }
+                },
+                exclude=['external_id'],
             )
             values.update(fvalues)
             if fwheres:
                 wheres.append(fwheres)
+
+            if filter_.family.external_id:
+                needs_family_eid = True
+                feid_wheres, feid_values = filter_.family.to_sql(
+                    {'external_id': 'feid.external_id'}, only=['external_id']
+                )
+                wheres.append(feid_wheres)
+                values.update(feid_values)
 
         if filter_.sample:
             needs_sample = True
@@ -168,6 +178,10 @@ class ParticipantTable(DbBase):
             query_lines.append(
                 'INNER JOIN family_participant fp ON fp.participant_id = pp.id\n'
                 'INNER JOIN family f ON f.id = fp.family_id'
+            )
+        if needs_family_eid:
+            query_lines.append(
+                'INNER JOIN family_external_id feid ON feid.family_id = f.id'
             )
 
         if wheres:
