@@ -42,7 +42,10 @@ def main(vds: str):
         sequencing_group_ids=get_sg_ids(vds),
         meta={},
     )
-    aapi.create_analysis(project=config_retrieve(['workflow', 'dataset']), analysis=am)
+    dataset: str = config_retrieve(['workflow', 'dataset'])
+    if config_retrieve(['workflow', 'access_level']) == 'test':
+        dataset += '-test'
+    aapi.create_analysis(project=dataset, analysis=am)
 
 
 if __name__ == '__main__':
