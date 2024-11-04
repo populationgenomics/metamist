@@ -40,7 +40,7 @@ def main(vds: str, dataset: str):
         output=vds,
         status=AnalysisStatus('completed'),
         sequencing_group_ids=get_sg_ids(vds),
-        meta=None,
+        meta={},
     )
     aapi.create_analysis(project=dataset, analysis=am)
 
