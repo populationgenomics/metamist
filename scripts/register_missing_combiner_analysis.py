@@ -9,7 +9,7 @@ from argparse import ArgumentParser
 
 from hail.vds import read_vds
 
-from cpg_utils.hail_batch import dataset_path, init_batch
+from cpg_utils.hail_batch import config_retrieve, dataset_path, init_batch
 from metamist.apis import AnalysisApi
 from metamist.models import Analysis, AnalysisStatus
 
@@ -26,7 +26,7 @@ def get_sg_ids(vds: str) -> list[str]:
     return read_vds(dataset_path(vds)).variant_data.s.collect()
 
 
-def main(vds: str, dataset: str):
+def main(vds: str):
     """Create and register a missing combiner analysis
 
     Args:
@@ -42,12 +42,11 @@ def main(vds: str, dataset: str):
         sequencing_group_ids=get_sg_ids(vds),
         meta={},
     )
-    aapi.create_analysis(project=dataset, analysis=am)
+    aapi.create_analysis(project=config_retrieve(['workflow', 'dataset']), analysis=am)
 
 
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--vds', help='VDS to register analysis for.')
-    parser.add_argument('--dataset', help='Dataset to register analysis in.')
     args = parser.parse_args()
-    main(args.vds, args.dataset)
+    main(args.vds)
