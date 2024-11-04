@@ -15,10 +15,24 @@ from metamist.models import Analysis, AnalysisStatus
 
 
 def get_sg_ids(vds: str) -> list[str]:
+    """Gets all sequencing group IDs from a VDS
+
+    Args:
+        vds (str): The VDS to extract the sequencing group IDs from
+
+    Returns:
+        list[str]: A list of sequencing group IDs.
+    """
     return read_vds(to_path(vds)).variant_data.s.collect()
 
 
 def main(vds: str, dataset: str):
+    """Create and register a missing combiner analysis
+
+    Args:
+        vds (str): The existing VDS that needs to be registered
+        dataset (str): The project / dataset to register the analysis in
+    """
     aapi = AnalysisApi()
     am = Analysis(
         type='combiner',
