@@ -1,3 +1,10 @@
+"""Register a missing combiner analysis in Metamist
+
+Ad-hoc script to register a missing combiner analysis in Metamist.
+Is supremely inflexible since there is a short timeframe for combining previous
+VDS' for the OurDNA browser release.
+"""
+
 from argparse import ArgumentParser
 
 from hail.vds import read_vds
