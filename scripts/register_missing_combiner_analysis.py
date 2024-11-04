@@ -9,7 +9,6 @@ from argparse import ArgumentParser
 
 from hail.vds import read_vds
 
-from cpg_utils import to_path
 from cpg_utils.hail_batch import dataset_path, init_batch
 from metamist.apis import AnalysisApi
 from metamist.models import Analysis, AnalysisStatus
@@ -24,7 +23,7 @@ def get_sg_ids(vds: str) -> list[str]:
     Returns:
         list[str]: A list of sequencing group IDs.
     """
-    return read_vds(to_path(dataset_path(vds))).variant_data.s.collect()
+    return read_vds(dataset_path(vds)).variant_data.s.collect()
 
 
 def main(vds: str, dataset: str):
