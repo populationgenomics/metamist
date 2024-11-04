@@ -10,6 +10,7 @@ from argparse import ArgumentParser
 from hail.vds import read_vds
 
 from cpg_utils import to_path
+from cpg_utils.hail_batch import init_batch
 from metamist.apis import AnalysisApi
 from metamist.models import Analysis, AnalysisStatus
 
@@ -33,6 +34,7 @@ def main(vds: str, dataset: str):
         vds (str): The existing VDS that needs to be registered
         dataset (str): The project / dataset to register the analysis in
     """
+    init_batch()
     aapi = AnalysisApi()
     am = Analysis(
         type='combiner',
