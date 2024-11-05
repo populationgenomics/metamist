@@ -127,10 +127,9 @@ class TestSequencingGroup(DbIsolatedTest):
                             type='sequencing',
                             external_ids={'second-key': 'second-sequencing-object'},
                             meta={
-                                'second-sequencing-object' 'sequencing_type': 'genome',
+                                'sequencing_type': 'genome',
                                 'sequencing_platform': 'short-read',
                                 'sequencing_technology': 'illumina',
-                                'sequencing_type': 'genome',
                             },
                         ),
                     ],
