@@ -30,7 +30,7 @@ QUERY_PARTICIPANTS_SAMPLES_SGS = gql(
                     samples {
                         id
                         externalId
-                        sequencingGroups(type: {in_: $seqTypes}) {
+                        sequencingGroups(type: {in_: $seqTypes}, technology: {eq: "short-read"}) {
                             id
                             type
                         }
@@ -45,7 +45,7 @@ QUERY_SG_ASSAYS = gql(
     """
         query DatasetData($datasetName: String!, $seqTypes: [String!]) {
             project(name: $datasetName) {
-                sequencingGroups(type: {in_: $seqTypes}) {
+                sequencingGroups(type: {in_: $seqTypes}, technology: {eq: "short-read"}) {
                     id
                     type
                     assays {
@@ -61,7 +61,7 @@ QUERY_SG_ASSAYS = gql(
 QUERY_SG_ANALYSES = gql(
     """
         query sgAnalyses($dataset: String!, $sgIds: [String!], $analysisTypes: [String!]) {
-          sequencingGroups(id: {in_: $sgIds}, project: {eq: $dataset}) {
+          sequencingGroups(id: {in_: $sgIds}, project: {eq: $dataset}, technology: {eq: "short-read"}) {
             id
             analyses(status: {eq: COMPLETED}, type: {in_: $analysisTypes}, project: {eq: $dataset}) {
               id
@@ -287,7 +287,7 @@ class GenericAuditor(AuditHelper):
         Returns a dict mapping {sg_id : (analysis_id, cram_path) }
         """
         sg_ids = list(assay_sg_id_map.values())
-        logging.info(f'{self.dataset} :: Fetching CRAM analyses for {len(sg_ids)} SGs')
+        logging.info(f'{self.dataset} :: Fetching CRAM analyses for {len(set(sg_ids))} SGs')
 
         logging.getLogger().setLevel(logging.WARN)
         analyses_query_result = await query_async(
