@@ -13,154 +13,16 @@ permissions:
 
 jobs:
   unittests:
-    name: Run unit tests
-    # Run on merge to main, where the commit name starts with "Bump version:" (for bump2version)
-    #    if: "startsWith(github.event.head_commit.message, 'Bump version:')"
-    runs-on: ubuntu-latest
-    env:
-      DOCKER_BUILDKIT: 1
-      BUILDKIT_PROGRESS: plain
-      CLOUDSDK_CORE_DISABLE_PROMPTS: 1
-      # used for generating API
-      SM_DOCKER: samplemetadata:dev
-    defaults:
-      run:
-        shell: bash -eo pipefail -l {0}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin' # See 'Supported distributions' for available options
-          java-version: '17'
-
-      - name: Setup build env
-        run: |
-          set -euxo pipefail
-
-          pip install --no-deps -r requirements-dev.txt
-
-          # openapi-generator
-          wget https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/5.3.0/openapi-generator-cli-5.3.0.jar -O openapi-generator-cli.jar
-
-          # liquibase connector
-          pushd db/
-          wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.0.3/mariadb-java-client-3.0.3.jar
-          popd
-          # liquibase
-          VERSION=4.28.0
-          curl -L https://github.com/liquibase/liquibase/releases/download/v${VERSION}/liquibase-${VERSION}.zip --output liquibase-${VERSION}.zip
-          unzip -o -d liquibase liquibase-${VERSION}.zip
-          echo "$(pwd)/liquibase" >> $GITHUB_PATH
-
-      - name: 'build image'
-        run: |
-          docker build \
-            --build-arg SM_ENVIRONMENT=local \
-            --tag $SM_DOCKER \
-            -f deploy/api/Dockerfile \
-            .
-
-      - name: 'build deployable API'
-        run: |
-          export OPENAPI_COMMAND="java -jar openapi-generator-cli.jar"
-          python regenerate_api.py
-          pip install .
-
-      - name: 'Run unit tests'
-        id: runtests
-        run: |
-          coverage run -m pytest --doctest-modules --doctest-continue-on-failure test/ --junitxml=test-execution.xml
-          rc=$?
-          coverage xml
-
-          echo "rc=$rc" >> $GITHUB_OUTPUT
-
-      - name: 'Upload coverage report'
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./coverage.xml
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-      - name: 'Save coverage report as an Artifact'
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: ./coverage.xml
-
-      - name: 'Save execution report as an Artifact'
-        uses: actions/upload-artifact@v4
-        with:
-          name: execution-report
-          path: ./test-execution.xml
-
-      - name: 'build web front-end'
-        run: |
-          set -eo pipefail
-          pushd web
-          # installs package-lock, not what it thinks it should be
-          npm ci
-          npm run build
-          rc=$?
-
-          echo "web_rc=$rc" >> $GITHUB_OUTPUT
-          # eventually run web front-end tests
-          popd
-
-      - name: Fail if unit tests are not passing
-        if: ${{ steps.runtests.outputs.rc != 0}}
-        uses: actions/github-script@v6
-        with:
-          script: |
-            core.setFailed('Unittests failed with rc = ${{ steps.runtests.outputs.rc }}')
-
-      - name: Fail if web build fails
-        if: ${{ steps.runtests.outputs.rc != 0}}
-        uses: actions/github-script@v6
-        with:
-          script: |
-            core.setFailed('Web failed to build with rc = ${{ steps.runtests.outputs.web_rc }}')
-
-  sonarqube:
-    name: SonarQube scan
-    runs-on: ubuntu-latest
-    needs: unittests
-    environment: production
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
-
-      # Download the coverage report artifact
-      - name: 'Download coverage and execution report'
-        uses: actions/download-artifact@v4
-        with:
-          pattern: '*-report'
-
-      # Perform the SonarQube scan
-      - uses: sonarsource/sonarqube-scan-action@master
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
-      # Optional: Fail the job if Quality Gate is red
-      # If you wish to fail your job when the Quality Gate is red, uncomment the
-      # following lines. This would typically be used to fail a deployment.
-      # - uses: sonarsource/sonarqube-quality-gate-action@master
-      #   timeout-minutes: 5
-      #   env:
-      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      #     SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+    uses: './.github/workflows/test.yaml'
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
-    needs: sonarqube
+    needs: unittests
     environment: production
     env:
       DOCKER_BUILDKIT: 1
