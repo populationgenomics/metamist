@@ -13,9 +13,10 @@ from models.models.comment import CommentEntityType
 from models.models.project import FullWriteAccessRoles
 from models.models.sequencing_group import SequencingGroupUpsertInternal
 from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
+from models.utils.sample_id_format import sample_id_transform_to_raw
 
 if TYPE_CHECKING:
-    from api.graphql.schema import GraphQLComment
+    from api.graphql.schema import GraphQLComment, GraphQLSequencingGroup
     from api.graphql.mutations.project import ProjectMutations
 
 
@@ -63,12 +64,13 @@ class SequencingGroupMutations:
     @strawberry.mutation
     async def update_sequencing_group(
         self,
-        sequencing_group_id: str,
-        sequencing_group: strawberry.scalars.JSON,
+        sequencing_group: SequencingGroupUpsertInput,
         info: Info,
         root: 'ProjectMutations',
-    ) -> bool:
+    ) -> Annotated['GraphQLSequencingGroup', strawberry.lazy('api.graphql.schema')]:
         """Update the meta fields of a sequencing group"""
+        from api.graphql.schema import GraphQLSequencingGroup
+
         connection: Connection = info.context['connection']
 
         # Should be moved to the sequencing group layer
@@ -76,13 +78,27 @@ class SequencingGroupMutations:
             [root.project_id], FullWriteAccessRoles
         )
 
-        st = SequencingGroupLayer(connection)
-        await st.upsert_sequencing_groups(
-            [
-                SequencingGroupUpsertInternal(
-                    id=sequencing_group_id_transform_to_raw(sequencing_group_id),
-                    meta=sequencing_group,  # type: ignore [arg-type]
-                )
-            ]
-        )
-        return True
+        if not sequencing_group.id:
+            raise ValueError('Sequencing group ID must be provided for update')
+
+        # TODO: Review this against the route endpoint
+        slayer = SequencingGroupLayer(connection)
+        updated_sg: SequencingGroupUpsertInternal = (
+            await slayer.upsert_sequencing_groups(
+                [
+                    SequencingGroupUpsertInternal(
+                        id=sequencing_group_id_transform_to_raw(sequencing_group.id),
+                        type=sequencing_group.type,
+                        technology=sequencing_group.technology,
+                        platform=sequencing_group.platform,
+                        meta=sequencing_group.meta,  # type: ignore [arg-type]
+                        sample_id=sample_id_transform_to_raw(sequencing_group.sample_id)
+                        if sequencing_group.sample_id
+                        else None,
+                        external_ids=sequencing_group.external_ids,  # type: ignore [arg-type]
+                        assays=sequencing_group.assays,  # type: ignore [arg-type]
+                    )
+                ]
+            )
+        )[0]
+        return GraphQLSequencingGroup.from_internal(updated_sg)

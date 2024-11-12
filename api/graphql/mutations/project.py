@@ -8,13 +8,6 @@ from strawberry.types import Info
 from strawberry.scalars import JSON
 
 from api.graphql.loaders import GraphQLContext
-from api.graphql.mutations.analysis import AnalysisMutations
-from api.graphql.mutations.analysis_runner import AnalysisRunnerMutations
-from api.graphql.mutations.assay import AssayMutations
-from api.graphql.mutations.family import FamilyMutations
-from api.graphql.mutations.participant import ParticipantMutations
-from api.graphql.mutations.sequencing_group import SequencingGroupMutations
-
 from db.python.layers.comment import CommentLayer
 from db.python.tables.project import ProjectPermissionsTable
 from models.models.project import (
@@ -23,7 +16,6 @@ from models.models.project import (
     project_member_role_names,
 )
 from models.models.comment import CommentEntityType
-from api.graphql.mutations.sample import SampleMutations
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLComment
@@ -165,45 +157,3 @@ class ProjectMutations:
         )
 
         return JSON({'success': True})
-
-    # Assays
-    @strawberry.field
-    def assay(self) -> AssayMutations:
-        """Assay mutations"""
-        return AssayMutations()
-
-    # Analysis Runner
-    @strawberry.field
-    def analysis_runner(self, root) -> AnalysisRunnerMutations:
-        """Analysis Runner mutations"""
-        return AnalysisRunnerMutations(project_id=root.project_id)
-
-    # Analysis
-    @strawberry.field
-    def analysis(self, root) -> AnalysisMutations:
-        """Analysis mutations"""
-        return AnalysisMutations(project_id=root.project_id)
-
-    # Family
-    @strawberry.field
-    def family(self) -> FamilyMutations:
-        """Family mutations"""
-        return FamilyMutations()
-
-    # Participant
-    @strawberry.field
-    def participant(self) -> ParticipantMutations:
-        """Participant mutations"""
-        return ParticipantMutations()
-
-    # Samples
-    @strawberry.field
-    def sample(self, root) -> SampleMutations:
-        """Sample mutations"""
-        return SampleMutations(project_id=root.project_id)
-
-    # SequencingGroup
-    @strawberry.field
-    def sequencing_group(self, root) -> SequencingGroupMutations:
-        """Sequencing Group mutations"""
-        return SequencingGroupMutations(project_id=root.project_id)

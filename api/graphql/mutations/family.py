@@ -12,7 +12,7 @@ from db.python.layers.family import FamilyLayer
 from models.models.comment import CommentEntityType
 
 if TYPE_CHECKING:
-    from api.graphql.schema import GraphQLComment
+    from api.graphql.schema import GraphQLComment, GraphQLFamily
 
 
 @strawberry.input
@@ -52,13 +52,18 @@ class FamilyMutations:
         self,
         family: FamilyUpdateInput,
         info: Info,
-    ) -> bool:
+    ) -> Annotated['GraphQLFamily', strawberry.lazy('api.graphql.schema')]:
         """Update information for a single family"""
+        from api.graphql.schema import GraphQLFamily
+
         connection = info.context['connection']
-        family_layer = FamilyLayer(connection)
-        return await family_layer.update_family(
+        flayer = FamilyLayer(connection)
+        await flayer.update_family(
             id_=family.id,
-            external_ids=family.external_id,
-            description=family.description,
-            coded_phenotype=family.coded_phenotype,
+            external_ids=family.external_id,  # type: ignore [arg-type]
+            description=family.description,  # type: ignore [arg-type]
+            coded_phenotype=family.coded_phenotype,  # type: ignore [arg-type]
         )
+        updated_family = await flayer.get_family_by_internal_id(family.id)  # type: ignore [arg-type]
+
+        return GraphQLFamily.from_internal(updated_family)

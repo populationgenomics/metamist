@@ -8,19 +8,17 @@ from strawberry.types import Info
 from api.graphql.loaders import GraphQLContext
 from api.graphql.mutations.assay import AssayUpsertInput
 from api.graphql.mutations.sequencing_group import SequencingGroupUpsertInput
-from api.graphql.types import SampleUpsertType
 from db.python.connect import Connection
 from db.python.layers.comment import CommentLayer
 from db.python.layers.sample import SampleLayer
 from models.models.comment import CommentEntityType
 from models.models.sample import SampleUpsert
 from models.utils.sample_id_format import (  # Sample,
-    sample_id_format,
     sample_id_transform_to_raw,
 )
 
 if TYPE_CHECKING:
-    from api.graphql.schema import GraphQLComment
+    from api.graphql.schema import GraphQLComment, GraphQLSample
     from api.graphql.mutations.project import ProjectMutations
 
 
@@ -72,19 +70,20 @@ class SampleMutations:
         sample: SampleUpsertInput,
         info: Info[GraphQLContext, 'SampleMutations'],
         root: 'ProjectMutations',
-    ) -> str | None:
+    ) -> Annotated['GraphQLSample', strawberry.lazy('api.graphql.schema')]:
         """Creates a new sample, and returns the internal sample ID"""
+        from api.graphql.schema import GraphQLSample
+
         connection: Connection = info.context['connection']
-        st = SampleLayer(connection)
+        slayer = SampleLayer(connection)
 
         sample_upsert = SampleUpsert.from_dict(strawberry.asdict(sample))
-        internal_sid = await st.upsert_sample(
+        internal_sid = await slayer.upsert_sample(
             sample_upsert.to_internal(), project=root.project_id
         )
+        created_sample = await slayer.get_sample_by_id(internal_sid.id)  # type: ignore [arg-type]
 
-        if internal_sid.id:
-            return sample_id_format(internal_sid.id)
-        return None
+        return GraphQLSample.from_internal(created_sample)
 
     @strawberry.mutation
     async def upsert_samples(
@@ -92,21 +91,28 @@ class SampleMutations:
         samples: list[SampleUpsertInput],
         info: Info[GraphQLContext, 'SampleMutations'],
         root: 'ProjectMutations',
-    ) -> list[SampleUpsertType] | None:
+    ) -> list[Annotated['GraphQLSample', strawberry.lazy('api.graphql.schema')]] | None:
         """
         Upserts a list of samples with sequencing-groups,
         and returns the list of internal sample IDs
         """
+        from api.graphql.schema import GraphQLSample
+
         connection: Connection = info.context['connection']
-        st = SampleLayer(connection)
+        slayer = SampleLayer(connection)
 
         internal_samples = [
             SampleUpsert.from_dict(strawberry.asdict(sample)).to_internal()
             for sample in samples
         ]
-        upserted = await st.upsert_samples(internal_samples, project=root.project_id)
+        upserted = await slayer.upsert_samples(
+            internal_samples, project=root.project_id
+        )
+        upserted_samples = await slayer.get_samples_by(
+            sample_ids=[s.id for s in upserted]  # type: ignore [arg-type]
+        )
 
-        return [SampleUpsertType.from_upsert_internal(s) for s in upserted]
+        return [GraphQLSample.from_internal(s) for s in upserted_samples]
 
     # endregion CREATES
 
@@ -115,18 +121,19 @@ class SampleMutations:
     @strawberry.mutation
     async def update_sample(
         self,
-        id_: str,
         sample: SampleUpsertInput,
         info: Info[GraphQLContext, 'SampleMutations'],
-    ) -> SampleUpsertType:
+    ) -> Annotated['GraphQLSample', strawberry.lazy('api.graphql.schema')]:
         """Update sample with id"""
-        connection = info.context['connection']
-        st = SampleLayer(connection)
+        from api.graphql.schema import GraphQLSample
 
-        sample.id = id_
-        upserted = await st.upsert_sample(
+        connection = info.context['connection']
+        slayer = SampleLayer(connection)
+        upserted = await slayer.upsert_sample(
             SampleUpsert.from_dict(strawberry.asdict(sample)).to_internal()
         )
-        return SampleUpsertType.from_upsert_internal(upserted)
+        updated_sample = await slayer.get_sample_by_id(upserted.id)  # type: ignore [arg-type]
+
+        return GraphQLSample.from_internal(updated_sample)
 
     # endregion OTHER

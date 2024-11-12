@@ -1,15 +1,21 @@
+# pylint: disable=redefined-builtin, import-outside-toplevel, ungrouped-imports
+
+from typing import TYPE_CHECKING, Annotated
 import strawberry
 from strawberry.types import Info
 
-from api.graphql.types import NewCohortType
 from db.python.connect import Connection
+from db.python.filters.generic import GenericFilter
 from db.python.layers.cohort import CohortLayer
+from db.python.tables.cohort import CohortFilter
 from models.models.cohort import CohortCriteria, CohortTemplate
 from models.models.project import ProjectId, ProjectMemberRole, ReadAccessRoles
 from models.utils.cohort_template_id_format import (
-    cohort_template_id_format,
     cohort_template_id_transform_to_raw,
 )
+
+if TYPE_CHECKING:
+    from api.graphql.schema import GraphQLCohort, GraphQLCohortTemplate
 
 
 @strawberry.input
@@ -55,15 +61,17 @@ class CohortMutations:
         cohort_spec: CohortBodyInput,
         cohort_criteria: CohortCriteriaInput | None = None,
         dry_run: bool = False,
-    ) -> NewCohortType:
+    ) -> Annotated['GraphQLCohort', strawberry.lazy('api.graphql.schema')]:
         """
         Create a cohort with the given name and sample/sequencing group IDs.
         """
+        from api.graphql.schema import GraphQLCohort
+
         connection: Connection = info.context['connection']
         connection.check_access(
             {ProjectMemberRole.writer, ProjectMemberRole.contributor}
         )
-        cohort_layer = CohortLayer(connection)
+        clayer = CohortLayer(connection)
 
         if not connection.project:
             raise ValueError('A cohort must belong to a project')
@@ -88,7 +96,7 @@ class CohortMutations:
             else None
         )
         assert connection.project_id
-        cohort_output = await cohort_layer.create_cohort_from_criteria(
+        cohort_output = await clayer.create_cohort_from_criteria(
             project_to_write=connection.project_id,
             description=cohort_spec.description,
             cohort_name=cohort_spec.name,
@@ -102,23 +110,30 @@ class CohortMutations:
             ),
             template_id=template_id_raw,
         )
+        created_cohort = (
+            await clayer.query(
+                CohortFilter(id=GenericFilter(eq=cohort_output.cohort_id))
+            )
+        )[0]
 
-        return NewCohortType.from_internal(cohort_output)
+        return GraphQLCohort.from_internal(created_cohort)
 
     @strawberry.mutation
     async def create_cohort_template(
         self,
         template: CohortTemplateInput,
         info: Info,
-    ) -> str:
+    ) -> Annotated['GraphQLCohortTemplate', strawberry.lazy('api.graphql.schema')]:
         """
         Create a cohort template with the given name and sample/sequencing group IDs.
         """
+        from api.graphql.schema import GraphQLCohortTemplate
+
         connection: Connection = info.context['connection']
         connection.check_access(
             {ProjectMemberRole.writer, ProjectMemberRole.contributor}
         )
-        cohort_layer = CohortLayer(connection)
+        clayer = CohortLayer(connection)
 
         if not connection.project:
             raise ValueError('A cohort template must belong to a project')
@@ -135,7 +150,7 @@ class CohortMutations:
             criteria_project_ids = [p.id for p in projects_for_criteria if p.id]
 
         assert connection.project_id
-        cohort_raw_id = await cohort_layer.create_cohort_template(
+        cohort_raw_id = await clayer.create_cohort_template(
             cohort_template=CohortTemplate.from_dict(
                 strawberry.asdict(template)
             ).to_internal(
@@ -145,4 +160,12 @@ class CohortMutations:
             project=connection.project_id,
         )
 
-        return cohort_template_id_format(cohort_raw_id)
+        created_cohort_template = await clayer.get_template_by_cohort_id(cohort_raw_id)  # type: ignore [arg-type]
+        template_projects = connection.get_and_check_access_to_projects_for_ids(
+            project_ids=created_cohort_template.criteria.projects or [],
+            allowed_roles=ReadAccessRoles,
+        )
+        template_project_names = [p.name for p in template_projects if p.name]
+        return GraphQLCohortTemplate.from_internal(
+            created_cohort_template, project_names=template_project_names
+        )

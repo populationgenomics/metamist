@@ -6,14 +6,13 @@ import strawberry
 from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
-from api.graphql.types import AssayUpsertType
 from db.python.layers.assay import AssayLayer
 from db.python.layers.comment import CommentLayer
 from models.models.assay import AssayUpsert
 from models.models.comment import CommentEntityType
 
 if TYPE_CHECKING:
-    from api.graphql.schema import GraphQLComment
+    from api.graphql.schema import GraphQLComment, GraphQLAssay
 
 
 @strawberry.input  # type: ignore [misc]
@@ -52,28 +51,34 @@ class AssayMutations:
     @strawberry.mutation
     async def create_assay(
         self, assay: AssayUpsertInput, info: Info
-    ) -> AssayUpsertType:
+    ) -> Annotated['GraphQLAssay', strawberry.lazy('api.graphql.schema')]:
         """Create new assay, attached to a sample"""
+        from api.graphql.schema import GraphQLAssay
+
         connection = info.context['connection']
-        assay_layer = AssayLayer(connection)
-        upserted = await assay_layer.upsert_assay(
+        alayer = AssayLayer(connection)
+        upserted = await alayer.upsert_assay(
             AssayUpsert.from_dict(strawberry.asdict(assay)).to_internal()
         )
-        return AssayUpsertType.from_upsert_internal(upserted)
+        created_assay = await alayer.get_assay_by_id(upserted.id)  # type: ignore [arg-type]
+        return GraphQLAssay.from_internal(created_assay)
 
     @strawberry.mutation
     async def update_assay(
         self,
         assay: AssayUpsertInput,
         info: Info,
-    ) -> int:
+    ) -> Annotated['GraphQLAssay', strawberry.lazy('api.graphql.schema')]:
         """Update assay for ID"""
+        from api.graphql.schema import GraphQLAssay
+
         if not assay.id:
             raise ValueError('Assay must have an ID to update')
         connection = info.context['connection']
-        assay_layer = AssayLayer(connection)
-        await assay_layer.upsert_assay(
+        alayer = AssayLayer(connection)
+        upserted = await alayer.upsert_assay(
             AssayUpsert.from_dict(strawberry.asdict(assay)).to_internal()
         )
+        updated_assay = await alayer.get_assay_by_id(upserted.id)  # type: ignore [arg-type]
 
-        return assay.id
+        return GraphQLAssay.from_internal(updated_assay)

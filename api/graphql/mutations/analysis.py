@@ -1,16 +1,21 @@
-from typing import TYPE_CHECKING
+# pylint: disable=redefined-builtin, import-outside-toplevel
+
+from typing import TYPE_CHECKING, Annotated
 import strawberry
 from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
-from api.graphql.types import AnalysisStatusType
 from db.python.connect import Connection
 from db.python.layers.analysis import AnalysisLayer
-from models.models import AnalysisInternal
+from models.enums.analysis import AnalysisStatus
+from models.models.analysis import Analysis
 from models.models.project import FullWriteAccessRoles
 
 if TYPE_CHECKING:
     from api.graphql.mutations.project import ProjectMutations
+    from api.graphql.schema import GraphQLAnalysis
+
+AnalysisStatusType = strawberry.enum(AnalysisStatus)  # type: ignore [misc]
 
 
 @strawberry.input
@@ -25,7 +30,6 @@ class AnalysisInput:
     cohort_ids: list[str] | None = None
     author: str | None = None
     timestamp_completed: str | None = None
-    project: int
     active: bool | None = None
     meta: strawberry.scalars.JSON
 
@@ -35,10 +39,10 @@ class AnalysisUpdateInput:
     """Analysis update input"""
 
     status: AnalysisStatusType  # type: ignore [assignment]
-    output: str | None
-    outputs: strawberry.scalars.JSON | None
-    meta: strawberry.scalars.JSON | None
-    active: bool | None
+    output: str | None = None
+    outputs: strawberry.scalars.JSON | None = None
+    meta: strawberry.scalars.JSON | None = None
+    active: bool | None = None
 
 
 @strawberry.type
@@ -53,15 +57,17 @@ class AnalysisMutations:
         analysis: AnalysisInput,
         info: Info[GraphQLContext, 'AnalysisMutations'],
         root: 'ProjectMutations',
-    ) -> int:
+    ) -> Annotated['GraphQLAnalysis', strawberry.lazy('api.graphql.schema')]:
         """Create a new analysis"""
+        from api.graphql.schema import GraphQLAnalysis
+
         connection: Connection = info.context['connection']
 
         # Should be moved to the analysis layer
         connection.check_access_to_projects_for_ids(
-            project_ids=[analysis.project], allowed_roles=FullWriteAccessRoles
+            project_ids=[root.project_id], allowed_roles=FullWriteAccessRoles
         )
-        atable = AnalysisLayer(connection)
+        alayer = AnalysisLayer(connection)
 
         if analysis.author:
             # special tracking here, if we can't catch it through the header
@@ -70,12 +76,12 @@ class AnalysisMutations:
         if not analysis.sequencing_group_ids and not analysis.cohort_ids:
             raise ValueError('Must specify "sequencing_group_ids" or "cohort_ids"')
 
-        analysis_id = await atable.create_analysis(
-            AnalysisInternal.from_db(**strawberry.asdict(analysis)),
+        analysis_id = await alayer.create_analysis(
+            Analysis(**analysis.__dict__).to_internal(),
             project=root.project_id,
         )
-
-        return analysis_id
+        created_analysis = await alayer.get_analysis_by_id(analysis_id)
+        return GraphQLAnalysis.from_internal(created_analysis)
 
     @strawberry.mutation
     async def update_analysis(
@@ -83,11 +89,13 @@ class AnalysisMutations:
         analysis_id: int,
         analysis: AnalysisUpdateInput,
         info: Info[GraphQLContext, 'AnalysisMutations'],
-    ) -> bool:
+    ) -> Annotated['GraphQLAnalysis', strawberry.lazy('api.graphql.schema')]:
         """Update status of analysis"""
+        from api.graphql.schema import GraphQLAnalysis
+
         connection = info.context['connection']
-        atable = AnalysisLayer(connection)
-        await atable.update_analysis(
+        alayer = AnalysisLayer(connection)
+        await alayer.update_analysis(
             analysis_id,
             status=analysis.status,
             output=analysis.output,
@@ -95,4 +103,5 @@ class AnalysisMutations:
             meta=analysis.meta,  # type: ignore [arg-type]
             active=analysis.active,
         )
-        return True
+        updated_analysis = await alayer.get_analysis_by_id(analysis_id)
+        return GraphQLAnalysis.from_internal(updated_analysis)
