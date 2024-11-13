@@ -22,9 +22,7 @@ def _create_route(e: Type[EnumTable]):
         return await e(connection).get()
 
     @router.post('/' + hyphenated_name, operation_id='post' + camel_case_name + 's')
-    async def post(
-        new_type: str, connection=get_projectless_db_connection
-    ) -> list[str]:
+    async def post(new_type: str, connection=get_projectless_db_connection) -> str:
         return await e(connection).insert(new_type)
 
 
