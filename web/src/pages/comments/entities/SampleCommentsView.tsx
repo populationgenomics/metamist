@@ -73,6 +73,7 @@ export function SampleCommentsView(props: SampleCommentsViewProps) {
                 if (sample?.id) {
                     await addCommentToSampleMutation({
                         variables: {
+                            project: props.projectName,
                             content,
                             id: sample.id,
                         },
