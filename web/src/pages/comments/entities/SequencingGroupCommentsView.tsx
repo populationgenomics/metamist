@@ -72,6 +72,7 @@ export function SequencingGroupCommentsView(props: SequencingGroupCommentsViewPr
                 if (sequencingGroup?.id) {
                     await addCommentToSequencingGroupMutation({
                         variables: {
+                            project: props.projectName,
                             content,
                             id: sequencingGroup.id,
                         },

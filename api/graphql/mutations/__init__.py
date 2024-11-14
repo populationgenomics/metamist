@@ -3,6 +3,7 @@ from strawberry.types import Info
 
 
 from api.graphql.loaders import GraphQLContext
+from api.graphql.mutations.cohort import CohortMutations
 from api.graphql.mutations.comment import CommentMutations
 from api.graphql.mutations.project import ProjectMutations
 from api.graphql.mutations.analysis import AnalysisMutations
@@ -108,3 +109,9 @@ class Mutation:
         )
         project_id = next(p for p in projects).id
         return SequencingGroupMutations(project_id=project_id)
+
+    # Cohort
+    @strawberry.field()
+    def cohort(self) -> CohortMutations:
+        """Cohort mutations"""
+        return CohortMutations()

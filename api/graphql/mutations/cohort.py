@@ -22,13 +22,13 @@ if TYPE_CHECKING:
 class CohortCriteriaInput:
     """Cohort criteria"""
 
-    projects: list[str] | None
-    sg_ids_internal: list[str] | None
-    excluded_sgs_internal: list[str] | None
-    sg_technology: list[str] | None
-    sg_platform: list[str] | None
-    sg_type: list[str] | None
-    sample_type: list[str] | None
+    projects: list[str] | None = None
+    sg_ids_internal: list[str] | None = None
+    excluded_sgs_internal: list[str] | None = None
+    sg_technology: list[str] | None = None
+    sg_platform: list[str] | None = None
+    sg_type: list[str] | None = None
+    sample_type: list[str] | None = None
 
 
 @strawberry.input
@@ -37,14 +37,14 @@ class CohortBodyInput:
 
     name: str
     description: str
-    template_id: str | None
+    template_id: str | None = None
 
 
 @strawberry.input
 class CohortTemplateInput:
     """Cohort template input"""
 
-    id: int | None
+    id: int | None = None
     name: str
     description: str
     criteria: CohortCriteriaInput
