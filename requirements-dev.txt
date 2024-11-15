@@ -413,7 +413,7 @@ sqlalchemy==2.0.34
     # via
     #   databases
     #   testcontainers
-starlette==0.38.4
+starlette==0.40.0
     # via
     #   fastapi
     #   strawberry-graphql
@@ -471,7 +471,7 @@ watchfiles==0.24.0
     # via uvicorn
 websockets==13.0.1
     # via uvicorn
-werkzeug==3.0.4
+werkzeug==3.0.6
     # via
     #   flask
     #   functions-framework
