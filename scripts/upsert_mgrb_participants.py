@@ -163,9 +163,7 @@ def main(project: str, participant_meta: str, sample_meta: str):
     participant_upserts = []
     for peid, sample_upserts in participant_sample_map.items():
         participant_upserts.append(
-            create_participant(
-                sample_upserts, peid, participant_sex_map[peid]
-            )
+            create_participant(sample_upserts, peid, participant_sex_map[peid])
         )
 
     # Upsert participants
