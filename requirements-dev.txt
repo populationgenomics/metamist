@@ -110,7 +110,7 @@ docker==7.1.0
     # via testcontainers
 email-validator==2.2.0
     # via fastapi
-fastapi[all]==0.112.2
+fastapi[all]==0.115.5
     # via
     #   -r requirements.in
     #   strawberry-graphql
@@ -413,7 +413,7 @@ sqlalchemy==2.0.34
     # via
     #   databases
     #   testcontainers
-starlette==0.40.0
+starlette==0.41.2
     # via
     #   fastapi
     #   strawberry-graphql
