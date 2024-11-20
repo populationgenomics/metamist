@@ -60,12 +60,12 @@ PARTICIPANT_QUERY = gql(
 papi = ParticipantApi()
 
 
-def map_sample_eid_to_sample_data(data):
+def map_sample_eid_to_sample_data(data: Dict[str, list]):
     """Map sample external ID to sample data"""
     return {sample['externalId']: sample for sample in data['sample']}
 
 
-def get_sample_data(project):
+def get_sample_data(project: str):
     """Get sample data from metamist"""
     response = query(SAMPLE_QUERY, {'project': project})
     if not isinstance(response, dict):
@@ -95,7 +95,7 @@ def create_sample(project_id: int, seid: str, siid: str):
     )
 
 
-def read_files_from_gcs(bucket_name, file_path):
+def read_files_from_gcs(bucket_name: str, file_path: str):
     """Read files from GCS"""
     client = storage.Client()
     bucket = client.get_bucket(bucket_name)
