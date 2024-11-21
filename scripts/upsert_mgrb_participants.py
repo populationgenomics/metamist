@@ -105,16 +105,16 @@ def read_files_from_gcs(bucket_name: str, file_path: str):
 
 
 @click.command()
-@click.option('--test', is_flag=True, help='Run in test mode.')
+@click.option('--test-bucket', is_flag=True, help='Run in test mode.')
 @click.option('--project', help='Project name to upsert participants to.')
 @click.option('--participant-meta', help='Path to participant metadata CSV.')
 @click.option('--sample-meta', help='Path to sample metadata CSV.')
-def main(test: bool, project: str, participant_meta: str, sample_meta: str):
+def main(test_bucket: bool, project: str, participant_meta: str, sample_meta: str):
     """Upsert participants to metamist"""
     # Query metamist
     data_response = get_sample_data(project)
     project_id = data_response.get('project')['id']
-    bucket_name = f'cpg-{project}-{'test' if test else 'main'}-upload'
+    bucket_name = f'cpg-{project}-{'test' if test_bucket else 'main'}-upload'
 
     sample_eid_mapping = map_sample_eid_to_sample_data(data_response)
 
