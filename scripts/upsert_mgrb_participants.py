@@ -75,15 +75,12 @@ def get_sample_data(project: str):
 
 def create_participant(sample_data: list, peid: str, sex: int):
     """Create participant upsert object"""
-    participant_upsert = [
-        ParticipantUpsert(
-            id=None,
-            external_ids={'': peid},
-            reported_sex=sex,
-            samples=sample_data,
-        ),
-    ]
-    return participant_upsert
+    return ParticipantUpsert(
+        id=None,
+        external_ids={'': peid},
+        reported_sex=sex,
+        samples=sample_data,
+    )
 
 
 def create_sample(project_id: int, seid: str, siid: str):
@@ -169,9 +166,8 @@ def main(test_bucket: bool, project: str, participant_meta: str, sample_meta: st
         )
 
     # Upsert participants
-    for participant_upsert in participant_upserts:
-        api_response = papi.upsert_participants(project, participant_upsert)
-        print(api_response)
+    api_response = papi.upsert_participants(project, participant_upserts)
+    print(api_response)
 
 
 if __name__ == '__main__':
