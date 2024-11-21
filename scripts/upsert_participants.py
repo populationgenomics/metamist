@@ -110,13 +110,17 @@ def main(
     participant_meta: str,
     sample_meta: str,
     sample_external_id_column: str,
-    external_org_name: str = '',
+    external_org_name: str | None = None,
 ):  # pylint: disable=too-many-locals
     """Upsert participants to metamist"""
     # Query metamist
     project = bucket.split('-')[1]  # project name derived from bucket name
     data_response = get_sample_data(project)
     project_id = data_response.get('project')['id']
+
+    # allow empty external_org_name for backwards compatibility
+    if external_org_name is None:
+        external_org_name = ''
 
     sample_eid_mapping = map_sample_eid_to_sample_data(data_response)
 
