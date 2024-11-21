@@ -105,14 +105,16 @@ def read_files_from_gcs(bucket_name: str, file_path: str):
 
 
 @click.command()
+@click.option('--test', is_flag=True, help='Run in test mode.')
 @click.option('--project', help='Project name to upsert participants to.')
 @click.option('--participant-meta', help='Path to participant metadata CSV.')
 @click.option('--sample-meta', help='Path to sample metadata CSV.')
-def main(project: str, participant_meta: str, sample_meta: str):
+def main(test: bool, project: str, participant_meta: str, sample_meta: str):
     """Upsert participants to metamist"""
     # Query metamist
     data_response = get_sample_data(project)
     project_id = data_response.get('project')['id']
+    bucket_name = f'cpg-{project}-{'test' if test else 'main'}-upload'
 
     sample_eid_mapping = map_sample_eid_to_sample_data(data_response)
 
@@ -120,8 +122,8 @@ def main(project: str, participant_meta: str, sample_meta: str):
     logging.basicConfig(level=logging.INFO)
 
     # Read in csv
-    participant_data_io = read_files_from_gcs(BUCKET_NAME, participant_meta)
-    sample_data_io = read_files_from_gcs(BUCKET_NAME, sample_meta)
+    participant_data_io = read_files_from_gcs(bucket_name, participant_meta)
+    sample_data_io = read_files_from_gcs(bucket_name, sample_meta)
 
     participant_data_list = list(csv.DictReader(participant_data_io))
     sample_data_list = list(csv.DictReader(sample_data_io, delimiter='\t'))
