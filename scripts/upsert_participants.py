@@ -71,21 +71,21 @@ def get_sample_data(project: str):
     return response
 
 
-def create_participant(sample_data: list, peid: str, sex: int):
+def create_participant(sample_data: list, peid: str, sex: int, external_org_name: str):
     """Create participant upsert object"""
     return ParticipantUpsert(
         id=None,
-        external_ids={'': peid},
+        external_ids={external_org_name: peid},
         reported_sex=sex,
         samples=sample_data,
     )
 
 
-def create_sample(project_id: int, seid: str, siid: str):
+def create_sample(project_id: int, seid: str, siid: str, external_org_name: str):
     """Create sample upsert object"""
     return SampleUpsert(
         id=siid,
-        external_ids={'': seid},
+        external_ids={external_org_name: seid},
         project=project_id,
     )
 
@@ -104,15 +104,18 @@ def read_files_from_gcs(bucket_name: str, file_path: str):
 @click.option('--participant-meta', help='Path to participant metadata CSV.')
 @click.option('--sample-meta', help='Path to sample metadata CSV.')
 @click.option('--sample-external-id-column', help='Column name for sample external ID.')
+@click.option('--external-org-name', help='External organization name.')
 def main(
     bucket: str,
     participant_meta: str,
     sample_meta: str,
     sample_external_id_column: str,
+    external_org_name: str,
 ):
     """Upsert participants to metamist"""
     # Query metamist
-    project = bucket.split('-')[1]
+    project = bucket.split('-')[1] # project name derived from bucket name
+    project = 'mgrb-dev'
     data_response = get_sample_data(project)
     project_id = data_response.get('project')['id']
 
@@ -160,12 +163,12 @@ def main(
         if peid not in participant_sample_map:
             participant_sample_map[peid] = []
             participant_sex_map[peid] = sex
-        participant_sample_map[peid].append(create_sample(project_id, seid, siid))
+        participant_sample_map[peid].append(create_sample(project_id, seid, siid, external_org_name))
 
     participant_upserts = []
     for peid, sample_upserts in participant_sample_map.items():
         participant_upserts.append(
-            create_participant(sample_upserts, peid, participant_sex_map[peid])
+            create_participant(sample_upserts, peid, participant_sex_map[peid], external_org_name)
         )
 
     # Upsert participants
