@@ -6,7 +6,7 @@
 #
 aiohappyeyeballs==2.4.0
     # via aiohttp
-aiohttp==3.10.5
+aiohttp==3.10.*
     # via -r requirements.in
 aiomysql==0.2.0
     # via databases
@@ -110,7 +110,7 @@ docker==7.1.0
     # via testcontainers
 email-validator==2.2.0
     # via fastapi
-fastapi[all]==0.112.2
+fastapi[all]==0.115.5
     # via
     #   -r requirements.in
     #   strawberry-graphql
@@ -413,7 +413,7 @@ sqlalchemy==2.0.34
     # via
     #   databases
     #   testcontainers
-starlette==0.38.4
+starlette==0.41.2
     # via
     #   fastapi
     #   strawberry-graphql
@@ -471,7 +471,7 @@ watchfiles==0.24.0
     # via uvicorn
 websockets==13.0.1
     # via uvicorn
-werkzeug==3.0.4
+werkzeug==3.0.6
     # via
     #   flask
     #   functions-framework
@@ -479,5 +479,5 @@ wrapt==1.16.0
     # via
     #   deprecated
     #   testcontainers
-yarl==1.9.10
+yarl==1.12.*
     # via aiohttp
