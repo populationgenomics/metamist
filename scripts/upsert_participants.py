@@ -110,7 +110,7 @@ def main(
     participant_meta: str,
     sample_meta: str,
     sample_external_id_column: str,
-    external_org_name: str,
+    external_org_name: str | None = None,
 ):  # pylint: disable=too-many-locals
     """Upsert participants to metamist"""
     # Query metamist
