@@ -44,8 +44,8 @@ _sg_assays_query = gql(
 # VCGS fastq
 # This is the current name format
 vcgs_fastq_regex = (
-    r'(?P<run_date>\d{6})_(?P<g2>[A-Z\d]+)_(?P<g3>\d{4})_'
-    r'(?P<g4>[A-Z]{2}\d+)_(?P<sample_id>[\w\d-]+)_(?P<library_id>[A-Z\d-]+)_'
+    r'(?P<run_date>\d{6,8})_(?P<g2>[A-Z\d]+)_(?P<g3>\d{4})_'
+    r'(?P<g4>[A-Z]{2}\d+)_(?P<sample_id>[\w\d-]+)_(?P<library_id>[A-Z\d-]+\D?)_'
     r'(?P<library_type>[\w\d]+)_(?P<lane>L\d+)_(?P<read>R[12])\.fastq\.gz'
 )
 # Pre mid 2018 the library id was not included:
