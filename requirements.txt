@@ -6,7 +6,7 @@
 #
 aiohappyeyeballs==2.4.0
     # via aiohttp
-aiohttp==3.10.5
+aiohttp==3.10.*
     # via -r requirements.in
 aiomysql==0.2.0
     # via databases
@@ -338,5 +338,5 @@ websockets==13.0.1
     # via uvicorn
 wrapt==1.16.0
     # via deprecated
-yarl==1.9.10
+yarl==1.12.*
     # via aiohttp
