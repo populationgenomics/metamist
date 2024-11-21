@@ -114,7 +114,7 @@ def main(test_bucket: bool, project: str, participant_meta: str, sample_meta: st
     # Query metamist
     data_response = get_sample_data(project)
     project_id = data_response.get('project')['id']
-    bucket_name = f'cpg-{project}-{'test' if test_bucket else 'main'}-upload'
+    bucket_name = f'cpg-{project}-{"test" if test_bucket else "main"}-upload'
 
     sample_eid_mapping = map_sample_eid_to_sample_data(data_response)
 
