@@ -106,7 +106,14 @@ def read_files_from_gcs(bucket_name: str, file_path: str):
 @click.option('--project', help='Project name to upsert participants to.')
 @click.option('--participant-meta', help='Path to participant metadata CSV.')
 @click.option('--sample-meta', help='Path to sample metadata CSV.')
-def main(test_bucket: bool, project: str, participant_meta: str, sample_meta: str):
+@click.option('--sample-external-id-column', help='Column name for sample external ID.')
+def main(
+    test_bucket: bool,
+    project: str,
+    participant_meta: str,
+    sample_meta: str,
+    sample_external_id_column: str,
+):
     """Upsert participants to metamist"""
     # Query metamist
     data_response = get_sample_data(project)
@@ -141,7 +148,7 @@ def main(test_bucket: bool, project: str, participant_meta: str, sample_meta: st
         # Get the external ID
         seid = '.'.join(name_row['CRAM'].split('.')[:2])
 
-        meta_row = metadata_map.get(name_row['RGSM (SampleID)'])
+        meta_row = metadata_map.get(name_row[sample_external_id_column])
         # Get participant external ID
         peid = meta_row['externalID']
 
