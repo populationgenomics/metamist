@@ -104,7 +104,7 @@ def read_files_from_gcs(bucket_name: str, file_path: str):
 @click.option('--participant-meta', help='Path to participant metadata CSV.')
 @click.option('--sample-meta', help='Path to sample metadata CSV.')
 @click.option('--sample-external-id-column', help='Column name for sample external ID.')
-@click.option('--external-org-name', help='External organization name.')
+@click.option('--external-org-name', required=False, help='External organization name.')
 def main(
     bucket: str,
     participant_meta: str,
@@ -117,6 +117,10 @@ def main(
     project = bucket.split('-')[1]  # project name derived from bucket name
     data_response = get_sample_data(project)
     project_id = data_response.get('project')['id']
+
+    # allow empty external_org_name for backwards compatibility
+    if external_org_name is None:
+        external_org_name = ''
 
     sample_eid_mapping = map_sample_eid_to_sample_data(data_response)
 
