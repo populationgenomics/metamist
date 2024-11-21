@@ -6,7 +6,7 @@
 #
 aiohappyeyeballs==2.4.0
     # via aiohttp
-aiohttp==3.10.5
+aiohttp==3.10.11
     # via -r requirements.in
 aiomysql==0.2.0
     # via databases
@@ -206,6 +206,8 @@ orjson==3.10.7
     # via fastapi
 packaging==24.1
     # via google-cloud-bigquery
+propcache==0.2.0
+    # via yarl
 proto-plus==1.24.0
     # via
     #   google-api-core
@@ -338,5 +340,5 @@ websockets==13.0.1
     # via uvicorn
 wrapt==1.16.0
     # via deprecated
-yarl==1.9.10
+yarl==1.17.2
     # via aiohttp
