@@ -14,8 +14,6 @@ from metamist.models import (
     SampleUpsert,
 )
 
-BUCKET_NAME = 'cpg-mgrb-test-upload'
-
 SAMPLE_QUERY = gql(
     """
     query getSampleData($project: String!) {
@@ -102,23 +100,21 @@ def read_files_from_gcs(bucket_name: str, file_path: str):
 
 
 @click.command()
-@click.option('--test-bucket', is_flag=True, help='Run in test mode.')
-@click.option('--project', help='Project name to upsert participants to.')
+@click.option('--bucket', help='Bucket containing files. e.g. cpg-bucket-test-upload')
 @click.option('--participant-meta', help='Path to participant metadata CSV.')
 @click.option('--sample-meta', help='Path to sample metadata CSV.')
 @click.option('--sample-external-id-column', help='Column name for sample external ID.')
 def main(
-    test_bucket: bool,
-    project: str,
+    bucket: str,
     participant_meta: str,
     sample_meta: str,
     sample_external_id_column: str,
 ):
     """Upsert participants to metamist"""
     # Query metamist
+    project = bucket.split('-')[1]
     data_response = get_sample_data(project)
     project_id = data_response.get('project')['id']
-    bucket_name = f'cpg-{project}-{"test" if test_bucket else "main"}-upload'
 
     sample_eid_mapping = map_sample_eid_to_sample_data(data_response)
 
@@ -126,8 +122,8 @@ def main(
     logging.basicConfig(level=logging.INFO)
 
     # Read in csv
-    participant_data_io = read_files_from_gcs(bucket_name, participant_meta)
-    sample_data_io = read_files_from_gcs(bucket_name, sample_meta)
+    participant_data_io = read_files_from_gcs(bucket, participant_meta)
+    sample_data_io = read_files_from_gcs(bucket, sample_meta)
 
     participant_data_list = list(csv.DictReader(participant_data_io))
     sample_data_list = list(csv.DictReader(sample_data_io, delimiter='\t'))
