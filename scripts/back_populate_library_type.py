@@ -114,6 +114,12 @@ def check_assay_meta_fields(assays: list[dict], update_sequencing_groups: bool):
             assay_meta_fields_to_update['library_type'] = assay['meta'].get(
                 'design_description'
             )
+        
+        # Some fastq files are not named in the standard format, but contain the word 'TWIST'
+        # which we can use to label then with the generic 'TWIST' library type from VCGS
+        elif 'TWIST' in fastq_filename:
+            assay_meta_fields_to_update['facility'] = 'vcgs'
+            assay_meta_fields_to_update['library_type'] = 'TWIST'
 
         else:
             logging.warning(
