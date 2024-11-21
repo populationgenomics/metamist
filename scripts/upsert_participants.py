@@ -111,11 +111,10 @@ def main(
     sample_meta: str,
     sample_external_id_column: str,
     external_org_name: str,
-):
+):  # pylint: disable=too-many-locals
     """Upsert participants to metamist"""
     # Query metamist
-    project = bucket.split('-')[1] # project name derived from bucket name
-    project = 'mgrb-dev'
+    project = bucket.split('-')[1]  # project name derived from bucket name
     data_response = get_sample_data(project)
     project_id = data_response.get('project')['id']
 
@@ -163,12 +162,16 @@ def main(
         if peid not in participant_sample_map:
             participant_sample_map[peid] = []
             participant_sex_map[peid] = sex
-        participant_sample_map[peid].append(create_sample(project_id, seid, siid, external_org_name))
+        participant_sample_map[peid].append(
+            create_sample(project_id, seid, siid, external_org_name)
+        )
 
     participant_upserts = []
     for peid, sample_upserts in participant_sample_map.items():
         participant_upserts.append(
-            create_participant(sample_upserts, peid, participant_sex_map[peid], external_org_name)
+            create_participant(
+                sample_upserts, peid, participant_sex_map[peid], external_org_name
+            )
         )
 
     # Upsert participants
