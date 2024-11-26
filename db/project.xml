@@ -1865,4 +1865,28 @@
 			remarks="Migration of family external IDs to separate table"
 		/>
 	</changeSet>
+	<changeSet author="dan.coates" id="2024-11-27_clean_up_project_table">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+
+		<dropForeignKeyConstraint baseTableName="project"
+			constraintName="FK_PROJECT_READ_GROUP_GROUP_ID" />
+		<dropForeignKeyConstraint baseTableName="project"
+			constraintName="FK_PROJECT_WRITE_GROUP_GROUP_ID" />
+		<dropColumn
+			tableName="project"
+			columnName="read_group_id"
+		/>
+		<dropColumn
+			tableName="project"
+			columnName="write_group_id"
+		/>
+		<dropColumn
+			tableName="project"
+			columnName="read_group_name"
+		/>
+		<dropColumn
+			tableName="project"
+			columnName="write_group_name"
+		/>
+	</changeSet>
 </databaseChangeLog>
