@@ -11,7 +11,7 @@ from models.models.assay import AssayUpsertInternal
 from models.models.participant import ParticipantUpsertInternal
 from models.models.sequencing_group import SequencingGroupUpsertInternal
 from test.test_participant import get_participant_to_insert
-from test.testbase import DbIsolatedTest, run_as_sync
+from test.testbase import TEST_PROJECT_NAME, DbIsolatedTest, run_as_sync
 
 # @TODO would be good to add permissions testing to this, but first need a better
 # way of mocking the test user and their permissions to make that possible
@@ -165,8 +165,8 @@ SAMPLE_COMMENTS = """
 """
 
 SAMPLE_ADD_COMMENT = """
-    mutation AddCommentToSample($id: String!, $content: String!) {
-        sample {
+    mutation AddCommentToSample($id: String!, $content: String!, $project: String!) {
+        sample(projectName: $project) {
             addComment(id: $id, content: $content) {
                 ...CommentFragment
                 thread {
@@ -191,8 +191,8 @@ PROJECT_COMMENTS = """
 """
 
 PROJECT_ADD_COMMENT = """
-    mutation AddCommentToProject($id: Int!, $content: String!) {
-        project {
+    mutation AddCommentToProject($id: Int!, $content: String!, $project: String!) {
+        project(name: $project) {
             addComment(id: $id, content: $content) {
                 ...CommentFragment
 
@@ -295,8 +295,8 @@ SEQUENCING_GROUP_COMMENTS = """
 """
 
 SEQUENCING_GROUP_ADD_COMMENT = """
-    mutation AddCommentToSequencingGroup($id: String!, $content: String!) {
-        sequencingGroup {
+    mutation AddCommentToSequencingGroup($id: String!, $content: String!, $project: String!) {
+        sequencingGroup(projectName: $project) {
             addComment(id: $id, content: $content) {
                 ...CommentFragment
 
@@ -344,7 +344,11 @@ class TestComment(DbIsolatedTest):
             {comment_query}
         """
 
-        create_comment_variables = {'id': entity_id, 'content': content}
+        create_comment_variables = {
+            'id': entity_id,
+            'content': content,
+            'project': TEST_PROJECT_NAME,
+        }
 
         created_comment = await self.run_graphql_query_async(
             create_comment_query, variables=create_comment_variables

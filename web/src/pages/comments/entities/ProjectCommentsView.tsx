@@ -16,8 +16,8 @@ export const PROJECT_COMMENTS = gql(`
 `)
 
 export const PROJECT_ADD_COMMENT = gql(`
-    mutation AddCommentToProject($id: Int!, $content: String!) {
-        project {
+    mutation AddCommentToProject($project_name: String!, $id: Int!, $content: String!) {
+        project(name: $project_name) {
             addComment(id: $id, content: $content) {
                 ...CommentFragment
 
@@ -71,6 +71,7 @@ export function ProjectCommentsView(props: ProjectCommentsViewProps) {
                 if (data?.project.id) {
                     await addCommentToProjectMutation({
                         variables: {
+                            project_name: props.projectName,
                             content,
                             id: data.project.id,
                         },

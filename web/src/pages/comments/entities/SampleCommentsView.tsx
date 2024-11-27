@@ -15,8 +15,8 @@ export const SAMPLE_COMMENTS = gql(`
 `)
 
 export const SAMPLE_ADD_COMMENT = gql(`
-    mutation AddCommentToSample($id: String!, $content: String!) {
-        sample {
+    mutation AddCommentToSample($id: String!, $content: String!, $project: String!) {
+        sample(projectName: $project) {
             addComment(id: $id, content: $content) {
                 ...CommentFragment
 
@@ -73,6 +73,7 @@ export function SampleCommentsView(props: SampleCommentsViewProps) {
                 if (sample?.id) {
                     await addCommentToSampleMutation({
                         variables: {
+                            project: props.projectName,
                             content,
                             id: sample.id,
                         },
