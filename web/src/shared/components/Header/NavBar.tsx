@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Link } from 'react-router-dom'
+import { Link, LinkProps } from 'react-router-dom'
 import { Dropdown, Menu, Popup } from 'semantic-ui-react'
 
 import { BillingApi } from '../../../sm-api'
@@ -55,15 +55,25 @@ interface MenuItem {
     url: string
     icon: JSX.Element
     submenu?: MenuItem[]
+    reloadDocument?: boolean
 }
 interface MenuItemProps {
     index: number
     item: MenuItem
 }
 
+// A link component that reloads the document when clicked
+// This is used for the graphiql link which doesn't render
+// properly without a reload
+const ReloadingLink = (props: LinkProps) => {
+    return <Link reloadDocument={true} {...props} />
+}
+
 const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
     const theme = React.useContext(ThemeContext)
     const isDarkMode = theme.theme === 'dark-mode'
+
+    const MenuLinkComponent = item.reloadDocument ? ReloadingLink : Link
 
     const dropdown = (item: MenuItem) => (
         <Dropdown id="navDrop" text={item.title} key={index} inverted={isDarkMode}>
@@ -72,7 +82,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
                     item.submenu.map((subitem, subindex) => (
                         <Dropdown.Item
                             id="navDropMenuItem"
-                            as={Link}
+                            as={MenuLinkComponent}
                             to={subitem.url}
                             key={subindex}
                         >
@@ -105,7 +115,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
     return item.submenu ? (
         <Menu.Item className="headerMenuItem">{popup(dropdown(item), item.icon)}</Menu.Item>
     ) : (
-        <Menu.Item className="headerMenuItem" as={Link} to={item.url} key={index}>
+        <Menu.Item className="headerMenuItem" as={MenuLinkComponent} to={item.url} key={index}>
             {popup(item.title, item.icon)}
         </Menu.Item>
     )
@@ -141,6 +151,7 @@ const NavBar = () => {
         {
             title: 'GraphQL',
             url: '/graphql',
+            reloadDocument: true,
             icon: <TroubleshootIcon />,
         },
         InsightsPages,
