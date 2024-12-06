@@ -1,10 +1,11 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from api.utils.db import (
     Connection,
     get_project_db_connection,
     get_projectless_db_connection,
 )
+from api.utils.parquet_route import parquet_table_route
 from db.python.layers.sample import SampleLayer
 from models.base import SMBase
 from models.models.project import FullWriteAccessRoles, ReadAccessRoles
@@ -233,3 +234,19 @@ async def get_history_of_sample(
 
 
 # endregion OTHER
+
+
+@parquet_table_route(
+    router=router,
+    path='/{project}/export/sample_table.parquet',
+    operation_id='exportSamples',
+)
+async def export_samples(
+    request: Request,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
+):
+    """Export the sample table as a parquet file"""
+    slayer = SampleLayer(connection)
+    assert connection.project_id
+    table_bytes = await slayer.sample_table_export(project=connection.project_id)
+    return (request, table_bytes)

@@ -5,6 +5,7 @@ from typing import Any, Iterable
 from db.python.filters import GenericFilter
 from db.python.filters.sample import SampleFilter
 from db.python.tables.base import DbBase
+from db.python.tables.meta_table import MetaTable
 from db.python.utils import NotFoundError, escape_like_term, to_db_json
 from models.models import PRIMARY_EXTERNAL_ORG, ProjectId
 from models.models.sample import SampleInternal, sample_id_format
@@ -216,6 +217,41 @@ class SampleTable(DbBase):
 
         rows = await self.connection.fetch_all(_query, {'project_ids': project_ids})
         return {row['id']: row['project'] for row in rows}
+
+    async def sample_table_export(self, project: int):
+        """Export the sample table, joined with external_ids"""
+        mt = MetaTable(self._connection)
+        query = f"""
+            SELECT
+                s.id,
+                s.participant_id,
+                s.active,
+                s.type,
+                s.sample_root_id,
+                s.sample_parent_id,
+                s.meta,
+                {mt.external_id_query('sid')}
+            FROM sample s
+            LEFT JOIN sample_external_id sid
+            ON sid.sample_id = s.id
+            WHERE s.project = :project
+            GROUP BY s.id
+        """
+
+        return await mt.entity_meta_table(
+            project=project,
+            query=query,
+            row_getter=lambda row: {
+                'id': row['id'],
+                'participant_id': row['participant_id'],
+                'type': row['type'],
+                'active': row['active'],
+                'sample_root_id': row['sample_root_id'],
+                'sample_parent_id': row['sample_parent_id'],
+            },
+            has_external_ids=True,
+            has_meta=True,
+        )
 
     # endregion GETS
 

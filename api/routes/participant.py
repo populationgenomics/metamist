@@ -2,7 +2,7 @@ import csv
 import io
 from datetime import date
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.params import Query
 from starlette.responses import JSONResponse, StreamingResponse
 
@@ -12,6 +12,7 @@ from api.utils.db import (
     get_projectless_db_connection,
 )
 from api.utils.export import ExportType
+from api.utils.parquet_route import parquet_table_route
 from db.python.layers.participant import ParticipantLayer
 from models.base import SMBase
 from models.models.participant import ParticipantUpsert
@@ -253,3 +254,19 @@ async def update_participant_family(
         old_family_id=old_family_id,
         new_family_id=new_family_id,
     )
+
+
+@parquet_table_route(
+    router=router,
+    path='/{project}/export/participant_table.parquet',
+    operation_id='exportParticipants',
+)
+async def export_participants(
+    request: Request,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
+):
+    """Return a parquet table of participants"""
+    player = ParticipantLayer(connection)
+    assert connection.project_id
+    table_bytes = await player.participant_table_export(project=connection.project_id)
+    return (request, table_bytes)
