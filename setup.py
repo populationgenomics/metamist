@@ -35,7 +35,6 @@ setup(
         'urllib3 >= 1.25.3',
         'python-dateutil',
         'requests',
-        'typing-extensions',
         # for get id-token
         'cpg-utils >= 5.0.5',
         'gql[aiohttp,requests]',
