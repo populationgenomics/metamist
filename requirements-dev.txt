@@ -374,7 +374,7 @@ python-dotenv==1.0.1
     # via
     #   pydantic-settings
     #   uvicorn
-python-multipart==0.0.9
+python-multipart==0.0.19
     # via
     #   fastapi
     #   strawberry-graphql
