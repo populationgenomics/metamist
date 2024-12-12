@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 
 from api.utils.db import (
     Connection,
@@ -242,11 +242,10 @@ async def get_history_of_sample(
     operation_id='exportSamples',
 )
 async def export_samples(
-    request: Request,
     connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """Export the sample table as a parquet file"""
     slayer = SampleLayer(connection)
     assert connection.project_id
     table_bytes = await slayer.sample_table_export(project=connection.project_id)
-    return (request, table_bytes)
+    return table_bytes

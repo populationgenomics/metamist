@@ -2,7 +2,7 @@ import csv
 import io
 from datetime import date
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 from fastapi.params import Query
 from starlette.responses import JSONResponse, StreamingResponse
 
@@ -262,11 +262,10 @@ async def update_participant_family(
     operation_id='exportParticipants',
 )
 async def export_participants(
-    request: Request,
     connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):
     """Return a parquet table of participants"""
     player = ParticipantLayer(connection)
     assert connection.project_id
     table_bytes = await player.participant_table_export(project=connection.project_id)
-    return (request, table_bytes)
+    return table_bytes
