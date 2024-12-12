@@ -242,7 +242,7 @@ class SampleTable(DbBase):
             project=project,
             query=query,
             row_getter=lambda row: {
-                'id': row['id'],
+                'sample_id': sample_id_format(row['id']),
                 'participant_id': row['participant_id'],
                 'type': row['type'],
                 'active': row['active'],

@@ -307,7 +307,7 @@ class ParticipantTable(DbBase):
             project=project,
             query=query,
             row_getter=lambda row: {
-                'id': row['id'],
+                'participant_id': row['id'],
                 'reported_sex': row['reported_sex'],
                 'reported_gender': row['reported_gender'],
                 'karyotype': row['karyotype'],
