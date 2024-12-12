@@ -11,6 +11,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pypa/gh-action-pip-audit@v1.1.0
+        name: Pip Audit Dependencies
         with:
-          inputs: requirements.txt requirements-dev.txt
+          inputs: requirements.txt
+          summary: true
+      - uses: pypa/gh-action-pip-audit@v1.1.0
+        name: Pip Audit Dev Dependencies
+        with:
+          inputs: requirements-dev.txt
           summary: true
