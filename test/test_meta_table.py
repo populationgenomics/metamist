@@ -88,6 +88,15 @@ class TestMetaTable(DbIsolatedTest):
         self.assertEqual('OTHER1', result[0]['external_id_other'])
 
     @run_as_sync
+    async def test_export_empty_table(self):
+        """
+        Test that exporting an empty table returns none
+        """
+
+        pts = await self.pl.participant_table_export(self.project_id)
+        self.assertIsNone(pts)
+
+    @run_as_sync
     async def test_export_samples(self):
         """
         Test getting a sample table from the export layer
