@@ -7,6 +7,7 @@ from db.python.filters.sample import SampleFilter
 from db.python.tables.base import DbBase
 from db.python.tables.meta_table import MetaTable
 from db.python.utils import NotFoundError, escape_like_term, to_db_json
+from models.base import parse_sql_bool
 from models.models import PRIMARY_EXTERNAL_ORG, ProjectId
 from models.models.sample import SampleInternal, sample_id_format
 
@@ -245,9 +246,13 @@ class SampleTable(DbBase):
                 'sample_id': sample_id_format(row['id']),
                 'participant_id': row['participant_id'],
                 'type': row['type'],
-                'active': row['active'],
-                'sample_root_id': row['sample_root_id'],
-                'sample_parent_id': row['sample_parent_id'],
+                'active': parse_sql_bool(row['active']),
+                'sample_root_id': sample_id_format(row['sample_root_id'])
+                if row['sample_root_id']
+                else None,
+                'sample_parent_id': sample_id_format(row['sample_parent_id'])
+                if row['sample_parent_id']
+                else None,
             },
             has_external_ids=True,
             has_meta=True,
