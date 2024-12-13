@@ -134,6 +134,8 @@ frozenlist==1.4.1
     # via
     #   aiohttp
     #   aiosignal
+fsspec==2024.10.0
+    # via -r requirements.in
 functions-framework==3.8.1
     # via -r requirements-dev.in
 google-api-core[grpc]==2.19.2
