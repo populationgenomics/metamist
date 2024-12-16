@@ -345,4 +345,4 @@ if __name__ == '__main__':
         stream=sys.stderr,
     )
 
-    main()  # pylint: disable=no-value-for-parameter
+    asyncio.run(main())  # pylint: disable=no-value-for-parameter
