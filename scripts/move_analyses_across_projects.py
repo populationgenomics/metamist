@@ -31,6 +31,7 @@ logging.basicConfig(
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
+logger.propagate = False
 
 # Define the query to get the analysis records that need to be moved
 ANALYSES_QUERY = gql(
