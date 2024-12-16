@@ -1,4 +1,4 @@
-# pylint: disable=invalid-name,too-many-lines
+# pylint: disable=invalid-name,too-many-lines,too-many-public-methods
 import re
 from collections import defaultdict
 from enum import Enum
@@ -619,6 +619,10 @@ class ParticipantLayer(BaseLayer):
         return await self.pttable.get_external_participant_id_to_internal_sequencing_group_id_map(
             project=project, sequencing_type=sequencing_type
         )
+
+    async def participant_table_export(self, project: int):
+        """Export a parquet table of participants"""
+        return await self.pttable.participant_table_export(project)
 
     # region UPSERTS / UPDATES
 
