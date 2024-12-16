@@ -48,56 +48,56 @@ ANALYSIS_TYPES = ['cram', 'gvcf', 'web', 'sv']
 
 UNRECORDED_ANALYSIS_FILES = [
     # Mito CRAM files
-    'gs://cpg-{dataset}-{bucket_access_level}/mito/{sg_id}.base_level_coverage.tsv',
-    'gs://cpg-{dataset}-{bucket_access_level}/mito/{sg_id}.mito.cram',
-    'gs://cpg-{dataset}-{bucket_access_level}/mito/{sg_id}.mito.cram.crai',
-    'gs://cpg-{dataset}-{bucket_access_level}/mito/{sg_id}.mito.vcf.bgz',
-    'gs://cpg-{dataset}-{bucket_access_level}/mito/{sg_id}.mito.vcf.bgz.tbi',
-    'gs://cpg-{dataset}-{bucket_access_level}/mito/{sg_id}.mito.vep.vcf.gz',
-    'gs://cpg-{dataset}-{bucket_access_level}/mito/{sg_id}.mito.vep.vcf.gz.tbi',
-    'gs://cpg-{dataset}-{bucket_access_level}/mito/{sg_id}.shifted_mito.cram',
-    'gs://cpg-{dataset}-{bucket_access_level}/mito/{sg_id}.shifted_mito.cram.crai',
+    'gs://{bucket_name}/mito/{sg_id}.base_level_coverage.tsv',
+    'gs://{bucket_name}/mito/{sg_id}.mito.cram',
+    'gs://{bucket_name}/mito/{sg_id}.mito.cram.crai',
+    'gs://{bucket_name}/mito/{sg_id}.mito.vcf.bgz',
+    'gs://{bucket_name}/mito/{sg_id}.mito.vcf.bgz.tbi',
+    'gs://{bucket_name}/mito/{sg_id}.mito.vep.vcf.gz',
+    'gs://{bucket_name}/mito/{sg_id}.mito.vep.vcf.gz.tbi',
+    'gs://{bucket_name}/mito/{sg_id}.shifted_mito.cram',
+    'gs://{bucket_name}/mito/{sg_id}.shifted_mito.cram.crai',
     # CramQc stage files
-    'gs://cpg-{dataset}-{bucket_access_level}/qc/{sg_id}.variant_calling_detail_metrics',
-    'gs://cpg-{dataset}-{bucket_access_level}/qc/{sg_id}.variant_calling_summary_metrics',
-    'gs://cpg-{dataset}-{bucket_access_level}/qc/{sg_id}_fastqc.html',
-    'gs://cpg-{dataset}-{bucket_access_level}/qc/{sg_id}_fastqc.zip',
-    'gs://cpg-{dataset}-{bucket_access_level}/qc/{sg_id}_picard_wgs_metrics.csv',
-    'gs://cpg-{dataset}-{bucket_access_level}/qc/{sg_id}_samtools_stats.txt',
-    'gs://cpg-{dataset}-{bucket_access_level}/qc/{sg_id}_verify_bamid.selfSM',
-    'gs://cpg-{dataset}-{bucket_access_level}/qc/verify_bamid/{sg_id}.verify-bamid.selfSM',
-    'gs://cpg-{dataset}-{bucket_access_level}/qc/samtools_stats/{sg_id}.samtools-stats',
-    'gs://cpg-{dataset}-{bucket_access_level}/qc/alignment_summary_metrics/{sg_id}.alignment_summary_metrics',
-    'gs://cpg-{dataset}-{bucket_access_level}/qc/base_distribution_by_cycle_metrics/{sg_id}.base_distribution_by_cycle_metrics',
-    'gs://cpg-{dataset}-{bucket_access_level}/qc/insert_size_metrics/{sg_id}.insert_size_metrics',
-    'gs://cpg-{dataset}-{bucket_access_level}/qc/quality_by_cycle_metrics/{sg_id}.quality_by_cycle_metrics',
-    'gs://cpg-{dataset}-{bucket_access_level}/qc/quality_yield_metrics/{sg_id}.quality_yield_metrics',
-    'gs://cpg-{dataset}-{bucket_access_level}/qc/picard_wgs_metrics/{sg_id}.picard-wgs-metrics',
+    'gs://{bucket_name}/qc/{sg_id}.variant_calling_detail_metrics',
+    'gs://{bucket_name}/qc/{sg_id}.variant_calling_summary_metrics',
+    'gs://{bucket_name}/qc/{sg_id}_fastqc.html',
+    'gs://{bucket_name}/qc/{sg_id}_fastqc.zip',
+    'gs://{bucket_name}/qc/{sg_id}_picard_wgs_metrics.csv',
+    'gs://{bucket_name}/qc/{sg_id}_samtools_stats.txt',
+    'gs://{bucket_name}/qc/{sg_id}_verify_bamid.selfSM',
+    'gs://{bucket_name}/qc/verify_bamid/{sg_id}.verify-bamid.selfSM',
+    'gs://{bucket_name}/qc/samtools_stats/{sg_id}.samtools-stats',
+    'gs://{bucket_name}/qc/alignment_summary_metrics/{sg_id}.alignment_summary_metrics',
+    'gs://{bucket_name}/qc/base_distribution_by_cycle_metrics/{sg_id}.base_distribution_by_cycle_metrics',
+    'gs://{bucket_name}/qc/insert_size_metrics/{sg_id}.insert_size_metrics',
+    'gs://{bucket_name}/qc/quality_by_cycle_metrics/{sg_id}.quality_by_cycle_metrics',
+    'gs://{bucket_name}/qc/quality_yield_metrics/{sg_id}.quality_yield_metrics',
+    'gs://{bucket_name}/qc/picard_wgs_metrics/{sg_id}.picard-wgs-metrics',
     # Single Sample SV stage files
-    'gs://cpg-{dataset}-{bucket_access_level}/sv_evidence/{sg_id}.coverage_counts.tsv.gz',
-    'gs://cpg-{dataset}-{bucket_access_level}/sv_evidence/{sg_id}.pe.txt.gz',
-    'gs://cpg-{dataset}-{bucket_access_level}/sv_evidence/{sg_id}.pe.txt.gz.tbi',
-    'gs://cpg-{dataset}-{bucket_access_level}/sv_evidence/{sg_id}.sd.txt.gz',
-    'gs://cpg-{dataset}-{bucket_access_level}/sv_evidence/{sg_id}.sd.txt.gz.tbi',
-    'gs://cpg-{dataset}-{bucket_access_level}/sv_evidence/{sg_id}.sr.txt.gz',
-    'gs://cpg-{dataset}-{bucket_access_level}/sv_evidence/{sg_id}.sr.txt.gz.tbi',
+    'gs://{bucket_name}/sv_evidence/{sg_id}.coverage_counts.tsv.gz',
+    'gs://{bucket_name}/sv_evidence/{sg_id}.pe.txt.gz',
+    'gs://{bucket_name}/sv_evidence/{sg_id}.pe.txt.gz.tbi',
+    'gs://{bucket_name}/sv_evidence/{sg_id}.sd.txt.gz',
+    'gs://{bucket_name}/sv_evidence/{sg_id}.sd.txt.gz.tbi',
+    'gs://{bucket_name}/sv_evidence/{sg_id}.sr.txt.gz',
+    'gs://{bucket_name}/sv_evidence/{sg_id}.sr.txt.gz.tbi',
     # Somalier stage files
-    'gs://cpg-{dataset}-{bucket_access_level}/cram/{sg_id}.cram.somalier',
-    'gs://cpg-{dataset}-{bucket_access_level}/gvcf/{sg_id}.g.vcf.gz.somalier',
+    'gs://{bucket_name}/cram/{sg_id}.cram.somalier',
+    'gs://{bucket_name}/gvcf/{sg_id}.g.vcf.gz.somalier',
     # Stripy stage files
-    'gs://cpg-{dataset}-{bucket_access_level}-analysis/stripy/{sg_id}.stripy.json',
-    'gs://cpg-{dataset}-{bucket_access_level}-analysis/stripy/{sg_id}.stripy.log.txt',
+    'gs://{bucket_name}-analysis/stripy/{sg_id}.stripy.json',
+    'gs://{bucket_name}-analysis/stripy/{sg_id}.stripy.log.txt',
     # MitoReport stage files
-    'gs://cpg-{dataset}-{bucket_access_level}-analysis/mito/{sg_id}.coverage_mean.txt',
-    'gs://cpg-{dataset}-{bucket_access_level}-analysis/mito/{sg_id}.coverage_median.txt',
-    'gs://cpg-{dataset}-{bucket_access_level}-analysis/mito/{sg_id}.coverage_metrics.txt',
-    'gs://cpg-{dataset}-{bucket_access_level}-analysis/mito/{sg_id}.haplocheck.txt',
-    'gs://cpg-{dataset}-{bucket_access_level}-analysis/mito/{sg_id}.theoretical_sensitivity.txt',
+    'gs://{bucket_name}-analysis/mito/{sg_id}.coverage_mean.txt',
+    'gs://{bucket_name}-analysis/mito/{sg_id}.coverage_median.txt',
+    'gs://{bucket_name}-analysis/mito/{sg_id}.coverage_metrics.txt',
+    'gs://{bucket_name}-analysis/mito/{sg_id}.haplocheck.txt',
+    'gs://{bucket_name}-analysis/mito/{sg_id}.theoretical_sensitivity.txt',
 ]
 
 UNRECORDED_ANALYSIS_FOLDERS = [
     # MitoReport stage folder
-    'gs://cpg-{dataset}-{bucket_access_level}-web/mito/mitoreport-{sg_id}/',
+    'gs://{bucket_name}-web/mito/mitoreport-{sg_id}/',
 ]
 
 
@@ -280,9 +280,12 @@ async def main(
 
     access_level = config_retrieve(['workflow', 'access_level'])
     bucket_access_level = 'main' if access_level == 'full' else 'test'
+    
+    old_bucket_name = f'cpg-{old_dataset}-{bucket_access_level}'.replace('-test-test', '-test')
+    new_bucket_name = f'cpg-{new_dataset}-{bucket_access_level}'.replace('-test-test', '-test')
 
     logging.info(
-        f'Will copy files from cpg-{old_dataset}-{bucket_access_level} to cpg-{new_dataset}-{bucket_access_level}'
+        f'Will copy files from {old_bucket_name} to {new_bucket_name}'
     )
 
     # Get the analyses to update
@@ -296,13 +299,11 @@ async def main(
     for sequencing_group_id in sequencing_group_ids:
         for old_path_template in UNRECORDED_ANALYSIS_FILES:
             old_path = old_path_template.format(
-                dataset=old_dataset,
-                bucket_access_level=bucket_access_level,
+                bucket_name=old_bucket_name,
                 sg_id=sequencing_group_id,
             )
             new_path = old_path_template.format(
-                dataset=new_dataset,
-                bucket_access_level=bucket_access_level,
+                bucket_name=new_bucket_name,
                 sg_id=sequencing_group_id,
             )
 
@@ -312,11 +313,9 @@ async def main(
     for sequencing_group_id in sequencing_group_ids:
         for old_folder_template in UNRECORDED_ANALYSIS_FOLDERS:
             old_folder = old_folder_template.format(
-                dataset=old_dataset,
-                bucket_access_level=bucket_access_level,
+                bucket_name=old_bucket_name,
                 sg_id=sequencing_group_id,
             )
-
             old_bucket = storage_client.bucket(old_folder.split('/')[2])
             blobs = storage_client.list_blobs(
                 old_bucket,
