@@ -1,23 +1,21 @@
 """
-This script is used to update analysis records associated with sequencing groups
-that have been moved to a new project / dataset, as well as copy the files
-associated with the analysis to the new project's cloud storage bucket.
+This script is used to
+  - Copy analysis files from one project's cloud storage bucket to another
+  - Copy extra, untracked files from the source bucket to the destination bucket
+  - Update analysis records associated with the moved files
 
-The script is designed to be run via analysis-runner using a service account
-that has access to both the source and destination project's buckets.
+It should be run via analysis-runner, using a service account that has access to
+both the source and destination project's buckets, using full or test access level.
 
-The script assumes that the sequencing group and analysis records have been
-updated in the database with the new project id.
-
-Note that not every file that needs to be moved to the new cloud storage
-bucket will be associated with an analysis record. This script also checks
-for the existence of files in the source bucket that are not associated with
-an analysis record, and copies them to the destination bucket.
+This script assumes that the project field for all the sequencing group and
+analysis records has been updated in the database with the new project id.
 """
 
 import logging
+from typing import Any
 import sys
 
+import asyncio
 import click
 
 from cpg_utils.config import config_retrieve
@@ -25,6 +23,7 @@ from google.cloud import storage
 from metamist.apis import AnalysisApi
 from metamist.models import AnalysisUpdateModel, AnalysisStatus
 from metamist.graphql import gql, query
+from metamist.parser.generic_metadata_parser import run_as_sync
 
 # Define the query to get the analysis records that need to be moved
 ANALYSES_QUERY = gql(
@@ -106,7 +105,7 @@ def get_analyses_to_update_and_files_to_move(
     sequencing_group_ids: list[str],
     old_dataset: str,
     new_dataset: str,
-) -> tuple[list[tuple[str, AnalysisUpdateModel]], list[tuple[str, str]]]:
+) -> tuple[list[dict[str, Any]], list[tuple[str, str]]]:
     """
     Returns the analyses to update and the files to move.
     """
@@ -130,9 +129,7 @@ def get_analyses_to_update_and_files_to_move(
                 # Skip the SV analyses that are not the GatherSampleEvidence stage
                 continue
 
-            analysis_id = analysis['id']
-
-            current_outputs = analysis['outputs']
+            current_outputs: dict = analysis['outputs']
 
             new_outputs = current_outputs.copy()
             new_outputs['path'] = current_outputs['path'].replace(
@@ -153,18 +150,19 @@ def get_analyses_to_update_and_files_to_move(
                     (current_outputs['path'] + '.tbi', new_outputs['path'] + '.tbi')
                 )
 
-            new_meta = analysis['meta'].copy()
+            old_meta: dict = analysis['meta']
+            new_meta = old_meta.copy()
             new_meta['dataset'] = new_dataset
 
             analyses_to_update.append(
-                (
-                    analysis_id,
-                    AnalysisUpdateModel(
-                        status=AnalysisStatus('COMPLETED'),
-                        outputs=new_outputs,
-                        meta=new_meta,
-                    ),
-                )
+                {
+                    'id': analysis['id'],
+                    'status': 'COMPLETED',
+                    'new_outputs': new_outputs,
+                    'new_meta': new_meta,
+                    'old_outputs': current_outputs,
+                    'old_meta': old_meta,
+                }
             )
 
     return analyses_to_update, files_to_move
@@ -172,6 +170,7 @@ def get_analyses_to_update_and_files_to_move(
 
 def move_files(
     files_to_move: list[tuple[str, str]],
+    dry_run: bool,
 ):
     """
     Moves the files from the old path to the new path.
@@ -179,6 +178,9 @@ def move_files(
     storage_client = storage.Client()
 
     for old_path, new_path in files_to_move:
+        if dry_run:
+            logging.info(f'DRY RUN :: Would have copied {old_path} to {new_path}')
+            continue
         logging.info(f'Copying {old_path} to {new_path}')
 
         source_bucket_name = old_path.split('/')[2]
@@ -188,38 +190,64 @@ def move_files(
         destination_bucket = storage_client.bucket(destination_bucket_name)
 
         source_blob = source_bucket.blob(old_path[len(f'gs://{source_bucket_name}/') :])
+        destination_blob_name = new_path[len(f'gs://{destination_bucket_name}/') :]
+
+        if destination_bucket.get_blob(destination_blob_name):
+            logging.error(
+                f'Blob {destination_blob_name} already exists in bucket {destination_bucket_name}'
+            )
+            continue
+
+        # Assume the destination blob does not exist
+        destination_generation_match_precondition = 0
+
         try:
             blob_copy = source_bucket.copy_blob(
-                source_blob, 
+                source_blob,
                 destination_bucket,
-                new_path[len(f'gs://{destination_bucket_name}/'):]
+                destination_blob_name,
+                if_generation_match=destination_generation_match_precondition,
             )
             source_bucket.delete_blob(source_blob)
             print(
-                "Blob {} in bucket {} moved to blob {} in bucket {}.".format(
+                'Blob {} in bucket {} moved to blob {} in bucket {}.'.format(  # pylint: disable=consider-using-f-string
                     source_blob.name,
                     source_bucket.name,
                     blob_copy.name,
                     destination_bucket.name,
                 )
             )
-        except storage.blob.CopyBlobError as e:
-            logging.error(f'Blob {source_blob.name} not found in bucket {source_bucket.name}')
+        except Exception as e:  # pylint: disable=broad-except
+            logging.error(f'{e}: Blob {source_blob.name} failed to copy.')
 
 
 def update_analyses(
-    analyses_to_update: list[tuple[str, AnalysisUpdateModel]],
+    analyses_to_update: list[dict[str, Any]],
+    dry_run: bool,
 ):
     """
     Updates the analyses with the new outputs and meta data.
     """
     analysis_api = AnalysisApi()
 
-    for analysis_id, update_model in analyses_to_update:
-        logging.info(
-            f'Updating analysis {analysis_id} with new outputs and meta fields'
+    promises = []
+    for analysis in analyses_to_update:
+        logging.info(f'Analysis {analysis["id"]} - new outputs and meta fields:')
+        logging.info(f'    New outputs path: {analysis["outputs"]["path"]}')
+        logging.info(f'    New meta dataset: {analysis["meta"]["dataset"]}')
+        if dry_run:
+            logging.info(f'DRY RUN :: Skipping updating analysis {analysis["id"]}')
+            continue
+        update_model = AnalysisUpdateModel(
+            status=AnalysisStatus(analysis['status']),
+            outputs=analysis['new_outputs'],
+            meta=analysis['new_meta'],
         )
-        analysis_api.update_analysis(analysis_id, update_model)
+        promises.append(
+            analysis_api.update_analysis_async(analysis['id'], update_model)
+        )
+
+    return asyncio.gather(*promises)
 
 
 @click.command()
@@ -232,13 +260,21 @@ def update_analyses(
 )
 @click.option('--old-dataset', '-o', required=True, help='The old dataset name')
 @click.option('--new-dataset', '-n', required=True, help='The new dataset name')
-def main(
+@click.option('--dry-run', '-d', is_flag=True, help='Dry run mode')
+@run_as_sync
+async def main(
     sequencing_group_ids: tuple[str],
     old_dataset: str,
     new_dataset: str,
+    dry_run: bool,
 ):
+    """
+    Moves analysis files from one project to another and update the analysis records.
+    """
+    if dry_run:
+        logging.info('Dry run mode enabled. No changes will be made.\n')
     logging.info(
-        f'Running move analyses across projects script for sequencing group(s): {sequencing_group_ids}'
+        f'Move analyses across projects for sequencing group(s): {sorted(sequencing_group_ids)}'
     )
     logging.info(f'Moving analyses from dataset {old_dataset} to dataset {new_dataset}')
 
@@ -295,12 +331,11 @@ def main(
                 )
 
     # Move the files
-    move_files(files_to_move)
+    move_files(files_to_move, dry_run)
     logging.info(f'{len(files_to_move)} Files moved successfully')
 
     # Update the analyses
-    update_analyses(analyses_to_update)
-    logging.info(f'{len(analyses_to_update)} Analyses updated successfully')
+    await update_analyses(analyses_to_update, dry_run)
 
 
 if __name__ == '__main__':
