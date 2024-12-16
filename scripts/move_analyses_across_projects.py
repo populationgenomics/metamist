@@ -27,11 +27,9 @@ from metamist.parser.generic_metadata_parser import run_as_sync
 logging.basicConfig(
     format='%(asctime)s %(levelname)s %(module)s:%(lineno)d - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
+    level=logging.INFO,
 )
-logger = logging.getLogger(__file__)
-logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.INFO)
-logger.propagate = False
+logger = logging.getLogger(__name__)
 
 # Define the query to get the analysis records that need to be moved
 ANALYSES_QUERY = gql(
