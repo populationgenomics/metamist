@@ -178,28 +178,94 @@ def get_analyses_to_update_and_files_to_move(
     return analyses_to_update, files_to_move
 
 
+def get_unrecorded_analysis_files(
+    sequencing_group_id: str,
+    old_dataset: str,
+    new_dataset: str,
+    old_bucket_name: str,
+    gcp_project: str,
+    storage_client: storage.Client,
+):
+    """
+    Returns the list of files which are unrecorded in
+    analysis records, but still need to be moved
+    """
+    files_to_move = []
+    for old_path_template in UNRECORDED_ANALYSIS_FILES + UNRECORDED_ANALYSIS_FOLDERS:
+        old_path = old_path_template.format(
+            bucket_name=old_bucket_name,
+            sg_id=sequencing_group_id,
+        )
+        if old_path.endswith('/'):  # If the path is a folder
+            old_bucket = storage_client.bucket(
+                bucket_name=old_bucket_name, user_project=gcp_project
+            )
+            blobs = storage_client.list_blobs(
+                old_bucket,
+                prefix=old_path.removeprefix(f'gs://{old_bucket.name}/'),
+            )
+            file_paths = [blob.path for blob in blobs]
+        else:
+            file_paths = [old_path]
+
+        for path in file_paths:
+            new_path = path.replace(old_dataset, new_dataset)
+            files_to_move.append((old_path, new_path))
+
+    return files_to_move
+
+
 def move_files(
     files_to_move: list[tuple[str, str]],
+    storage_client: storage.Client,
+    gcp_project: str,
+    unarchive: bool,
     dry_run: bool,
 ):
     """
     Moves the files from the old path to the new path.
+
+    GCP project should have access to both the source and destination buckets.
+
+    If unarchive is True, the storage class of the source blob will be updated to NEARLINE.
     """
-    storage_client = storage.Client()
-
     for old_path, new_path in files_to_move:
-        if dry_run:
-            logger.info(f'DRY RUN :: Would have copied {old_path} to {new_path}')
-            continue
-        logger.info(f'Copying {old_path} to {new_path}')
-
         source_bucket_name = old_path.split('/')[2]
         destination_bucket_name = new_path.split('/')[2]
 
-        source_bucket = storage_client.bucket(source_bucket_name)
-        destination_bucket = storage_client.bucket(destination_bucket_name)
+        source_bucket = storage_client.bucket(
+            source_bucket_name, user_project=gcp_project
+        )
+        destination_bucket = storage_client.bucket(
+            destination_bucket_name, user_project=gcp_project
+        )
 
         source_blob = source_bucket.blob(old_path[len(f'gs://{source_bucket_name}/') :])
+        if not source_blob.exists():
+            logger.error(f'Blob {old_path} not found, skipping...')
+            continue
+        source_blob.reload()
+        source_blob_size = source_blob.size
+        source_blob_size = f'{source_blob_size / 1024**3:.2f} GB'
+        if source_blob.storage_class in ['COLDLINE', 'ARCHIVE'] and unarchive:
+            logger.info(
+                f'{old_path} ({source_blob_size}) in {source_bucket_name} is in {source_blob.storage_class} storage class'
+            )
+            if dry_run:
+                logger.info(
+                    f'DRY RUN :: Would have updated storage class of {old_path} to NEARLINE'
+                )
+                continue
+            logger.info(f'Updating storage class of {old_path} to NEARLINE')
+            source_blob.update_storage_class('NEARLINE')
+
+        if dry_run:
+            logger.info(
+                f'DRY RUN :: Would have copied {old_path} ({source_blob_size}) to {new_path}'
+            )
+            continue
+        logger.info(f'Copying {old_path} ({source_blob_size}) to {new_path}')
+
         destination_blob_name = new_path[len(f'gs://{destination_bucket_name}/') :]
 
         if destination_bucket.get_blob(destination_blob_name):
@@ -208,15 +274,11 @@ def move_files(
             )
             continue
 
-        # Assume the destination blob does not exist
-        destination_generation_match_precondition = 0
-
         try:
             blob_copy = source_bucket.copy_blob(
                 source_blob,
                 destination_bucket,
                 destination_blob_name,
-                if_generation_match=destination_generation_match_precondition,
             )
             source_bucket.delete_blob(source_blob)
             print(
@@ -245,7 +307,7 @@ def update_analyses(
 
     promises = []
     for analysis in analyses_to_update:
-        logger.info(f'Analysis {analysis["id"]} - new outputs and meta fields:')
+        logger.info(f'Analysis {analysis["id"]}')
         logger.info(f'    New outputs path: {analysis["outputs"]["path"]}')
         logger.info(f'    New meta dataset: {analysis["meta"]["dataset"]}')
         if dry_run:
@@ -273,12 +335,14 @@ def update_analyses(
 )
 @click.option('--old-dataset', '-o', required=True, help='The old dataset name')
 @click.option('--new-dataset', '-n', required=True, help='The new dataset name')
+@click.option('--unarchive', '-u', is_flag=True, help='Unarchive the source files')
 @click.option('--dry-run', '-d', is_flag=True, help='Dry run mode')
 @run_as_sync
 async def main(
     sequencing_group_ids: tuple[str],
     old_dataset: str,
     new_dataset: str,
+    unarchive: bool,
     dry_run: bool,
 ):
     """
@@ -291,61 +355,34 @@ async def main(
     )
     logger.info(f'From dataset: {old_dataset} To dataset: {new_dataset}')
 
+    storage_client = storage.Client()
+    gcp_project = config_retrieve(['workflow', 'dataset_gcp_project'])
     access_level = config_retrieve(['workflow', 'access_level'])
     bucket_access_level = 'main' if access_level == 'full' else 'test'
 
-    old_bucket_name = f'cpg-{old_dataset}-{bucket_access_level}'.replace(
-        '-test-test', '-test'
-    )
-    new_bucket_name = f'cpg-{new_dataset}-{bucket_access_level}'.replace(
-        '-test-test', '-test'
-    )
+    old_bucket_name = f'cpg-{old_dataset.replace("-test", "")}-{bucket_access_level}'
+    new_bucket_name = f'cpg-{new_dataset.replace("-test", "")}-{bucket_access_level}'
 
-    logger.info(f'Moving files primarily from {old_bucket_name} to {new_bucket_name}')
+    logger.info(f'Moving files from {old_bucket_name} to {new_bucket_name}')
 
     # Get the analyses to update
     analyses_to_update, files_to_move = get_analyses_to_update_and_files_to_move(
         list(sequencing_group_ids), old_dataset, new_dataset
     )
 
-    storage_client = storage.Client()
-
     # Add the unrecorded analysis files to the files to move
-    for sequencing_group_id in sequencing_group_ids:
-        for old_path_template in UNRECORDED_ANALYSIS_FILES:
-            old_path = old_path_template.format(
-                bucket_name=old_bucket_name,
-                sg_id=sequencing_group_id,
-            )
-            new_path = old_path_template.format(
-                bucket_name=new_bucket_name,
-                sg_id=sequencing_group_id,
-            )
-
-            files_to_move.append((old_path, new_path))
-
-    # Add the unrecored analysis folders to the files to move
-    for sequencing_group_id in sequencing_group_ids:
-        for old_folder_template in UNRECORDED_ANALYSIS_FOLDERS:
-            old_folder = old_folder_template.format(
-                bucket_name=old_bucket_name,
-                sg_id=sequencing_group_id,
-            )
-            old_bucket = storage_client.bucket(old_folder.split('/')[2])
-            blobs = storage_client.list_blobs(
-                old_bucket,
-                prefix=old_folder.removeprefix(f'gs://{old_bucket.name}/'),
-            )
-            for source_blob in blobs:
-                files_to_move.append(
-                    (
-                        source_blob.name,
-                        source_blob.name.replace(old_dataset, new_dataset),
-                    )
-                )
+    for sg_id in sequencing_group_ids:
+        files_to_move += get_unrecorded_analysis_files(
+            sg_id,
+            old_dataset,
+            new_dataset,
+            old_bucket_name,
+            gcp_project,
+            storage_client,
+        )
 
     # Move the files
-    move_files(files_to_move, dry_run)
+    move_files(files_to_move, storage_client, gcp_project, unarchive, dry_run)
 
     # Update the analyses
     await update_analyses(analyses_to_update, dry_run)
