@@ -229,6 +229,7 @@ def move_files(
 
     If unarchive is True, the storage class of the source blob will be updated to NEARLINE.
     """
+    total_size = 0
     for old_path, new_path in files_to_move:
         source_bucket_name = old_path.split('/')[2]
         destination_bucket_name = new_path.split('/')[2]
@@ -245,8 +246,8 @@ def move_files(
             logger.error(f'Blob {old_path} not found, skipping...')
             continue
         source_blob.reload()
-        source_blob_size = source_blob.size
-        source_blob_size = f'{source_blob_size / 1024**3:.2f} GB'
+        total_size += source_blob.size
+        source_blob_size = convert_size(source_blob.size)
         if source_blob.storage_class in ['COLDLINE', 'ARCHIVE'] and unarchive:
             logger.info(
                 f'{old_path} ({source_blob_size}) in {source_bucket_name} is in {source_blob.storage_class} storage class'
@@ -292,6 +293,7 @@ def move_files(
         except Exception as e:  # pylint: disable=broad-except
             logger.error(f'{e}: Blob {source_blob.name} failed to copy.')
 
+    logger.info(f'{len(files_to_move)} ({convert_size(total_size)}) files to move')
     if not dry_run:
         logger.info(f'{len(files_to_move)} files moved successfully')
 
@@ -323,6 +325,17 @@ def update_analyses(
         )
 
     return asyncio.gather(*promises)
+
+
+def convert_size(
+    size: int,  # size in bytes
+) -> str:
+    """
+    Converts the size in bytes to a human readable format.
+    """
+    if size > 1024**3:
+        return f'{size / 1024**3:.3f} GB'
+    return f'{size / 1024**2:.2f} MB'
 
 
 @click.command()
