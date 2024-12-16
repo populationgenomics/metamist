@@ -26,14 +26,14 @@ from metamist.parser.generic_metadata_parser import run_as_sync
 
 handler = logging.StreamHandler()
 formatter = logging.Formatter(
-    fmt='%(asctime)s %(levelname)s %(module)s:%(lineno)d - %(message)s',
+    fmt='%(asctime)s %(levelname)s:%(lineno)d - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
 )
 handler.setFormatter(formatter)
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
-# logger.propagate = False
+logger.propagate = False
 
 # Define the query to get the analysis records that need to be moved
 ANALYSES_QUERY = gql(
@@ -233,6 +233,7 @@ def move_files(
     if not dry_run:
         logger.info(f'{len(files_to_move)} files moved successfully')
 
+
 def update_analyses(
     analyses_to_update: list[dict[str, Any]],
     dry_run: bool,
@@ -286,9 +287,9 @@ async def main(
     if dry_run:
         logger.info('Dry run mode enabled. No changes will be made.\n')
     logger.info(
-        f'Move analyses across projects for sequencing group(s): {sorted(sequencing_group_ids)}'
+        f'Moving analyses across projects for sequencing group(s): {sorted(sequencing_group_ids)}'
     )
-    logger.info(f'Moving analyses from dataset {old_dataset} to dataset {new_dataset}')
+    logger.info(f'From dataset: {old_dataset} To dataset: {new_dataset}')
 
     access_level = config_retrieve(['workflow', 'access_level'])
     bucket_access_level = 'main' if access_level == 'full' else 'test'
@@ -300,7 +301,7 @@ async def main(
         '-test-test', '-test'
     )
 
-    logger.info(f'Will copy files from {old_bucket_name} to {new_bucket_name}')
+    logger.info(f'Moving files primarily from {old_bucket_name} to {new_bucket_name}')
 
     # Get the analyses to update
     analyses_to_update, files_to_move = get_analyses_to_update_and_files_to_move(
