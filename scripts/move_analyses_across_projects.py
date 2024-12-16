@@ -227,6 +227,8 @@ def move_files(
         except Exception as e:  # pylint: disable=broad-except
             logger.error(f'{e}: Blob {source_blob.name} failed to copy.')
 
+    if not dry_run:
+        logger.info(f'{len(files_to_move)} files moved successfully')
 
 def update_analyses(
     analyses_to_update: list[dict[str, Any]],
@@ -340,7 +342,6 @@ async def main(
 
     # Move the files
     move_files(files_to_move, dry_run)
-    logger.info(f'{len(files_to_move)} Files moved successfully')
 
     # Update the analyses
     await update_analyses(analyses_to_update, dry_run)
