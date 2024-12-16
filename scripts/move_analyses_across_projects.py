@@ -117,7 +117,8 @@ def get_analyses_to_update_and_files_to_move(
     new_dataset: str,
 ) -> tuple[list[dict[str, Any]], list[tuple[str, str]]]:
     """
-    Returns the analyses to update and the files to move.
+    Queries Metamist for the analyses that need to be updated
+    and extracts the filepaths that need to be moved.
     """
     analysis_query_result = query(
         ANALYSES_QUERY,
@@ -167,11 +168,8 @@ def get_analyses_to_update_and_files_to_move(
             analyses_to_update.append(
                 {
                     'id': analysis['id'],
-                    'status': 'COMPLETED',
                     'outputs': new_outputs,
                     'meta': new_meta,
-                    'old_outputs': current_outputs,
-                    'old_meta': old_meta,
                 }
             )
 
@@ -187,7 +185,7 @@ def get_unrecorded_analysis_files(
     storage_client: storage.Client,
 ):
     """
-    Returns the list of files which are unrecorded in
+    Returns the list of filepaths which are unrecorded in the
     analysis records, but still need to be moved
     """
     files_to_move = []
@@ -225,9 +223,10 @@ def move_files(
     """
     Moves the files from the old path to the new path.
 
-    GCP project should have access to both the source and destination buckets.
+    gcp_project should have access to both the source and destination buckets.
 
-    If unarchive is True, the storage class of the source blob will be updated to NEARLINE.
+    If unarchive is True, and the file is in COLDLINE or ARCHIVE storage class,
+    it will be updated to NEARLINE storage class before moving.
     """
     total_size = 0
     for old_path, new_path in files_to_move:
@@ -286,7 +285,7 @@ def move_files(
         except Exception as e:  # pylint: disable=broad-except
             logger.error(f'{e}: Blob {source_blob.name} failed to copy.')
 
-    logger.info(f'{len(files_to_move)} ({convert_size(total_size)}) files to move')
+    logger.info(f'{len(files_to_move)} files, total size: ({convert_size(total_size)})')
     if not dry_run:
         logger.info(f'{len(files_to_move)} files moved successfully')
 
@@ -309,7 +308,7 @@ def update_analyses(
             logger.info(f'DRY RUN :: Skipping updating analysis {analysis["id"]}')
             continue
         update_model = AnalysisUpdateModel(
-            status=AnalysisStatus(analysis['status']),
+            status=AnalysisStatus('COMPLETED'),
             outputs=analysis['outputs'],
             meta=analysis['meta'],
         )
