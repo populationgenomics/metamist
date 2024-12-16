@@ -41,7 +41,7 @@ def parquet_table_route(router: APIRouter, path: str, operation_id: str):
             if table_bytes is None:
                 return JSONResponse(
                     status_code=404,
-                    content={'error': 'Table empty or not found'},
+                    content=TableError(error='Table empty or not found'),
                 )
 
             headers = {
