@@ -28,7 +28,7 @@ from metamist.parser.generic_metadata_parser import run_as_sync
 # Define the query to get the analysis records that need to be moved
 ANALYSES_QUERY = gql(
     """
-    query sgAnalyses($sequencingGroupIds: [String]!, $dataset: String!, $analysisTypes: [String!]) {
+    query sgAnalyses($sequencingGroupIds: [String!], $dataset: String!, $analysisTypes: [String!]) {
         project(name: $dataset) {
             sequencingGroups(id: {in_: $sequencingGroupIds}) {
                 id
