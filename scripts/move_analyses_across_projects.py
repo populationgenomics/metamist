@@ -13,7 +13,6 @@ analysis records has been updated in the database with the new project id.
 
 import logging
 from typing import Any
-import sys
 
 import asyncio
 import click
@@ -24,6 +23,14 @@ from metamist.apis import AnalysisApi
 from metamist.models import AnalysisUpdateModel, AnalysisStatus
 from metamist.graphql import gql, query
 from metamist.parser.generic_metadata_parser import run_as_sync
+
+logger = logging.getLogger(__file__)
+logger.addHandler(logging.StreamHandler())
+logging.basicConfig(
+    format='%(asctime)s %(levelname)s %(module)s:%(lineno)d - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+)
+logger.setLevel(logging.INFO)
 
 # Define the query to get the analysis records that need to be moved
 ANALYSES_QUERY = gql(
@@ -179,9 +186,9 @@ def move_files(
 
     for old_path, new_path in files_to_move:
         if dry_run:
-            logging.info(f'DRY RUN :: Would have copied {old_path} to {new_path}')
+            logger.info(f'DRY RUN :: Would have copied {old_path} to {new_path}')
             continue
-        logging.info(f'Copying {old_path} to {new_path}')
+        logger.info(f'Copying {old_path} to {new_path}')
 
         source_bucket_name = old_path.split('/')[2]
         destination_bucket_name = new_path.split('/')[2]
@@ -193,7 +200,7 @@ def move_files(
         destination_blob_name = new_path[len(f'gs://{destination_bucket_name}/') :]
 
         if destination_bucket.get_blob(destination_blob_name):
-            logging.error(
+            logger.error(
                 f'Blob {destination_blob_name} already exists in bucket {destination_bucket_name}'
             )
             continue
@@ -218,7 +225,7 @@ def move_files(
                 )
             )
         except Exception as e:  # pylint: disable=broad-except
-            logging.error(f'{e}: Blob {source_blob.name} failed to copy.')
+            logger.error(f'{e}: Blob {source_blob.name} failed to copy.')
 
 
 def update_analyses(
@@ -232,11 +239,11 @@ def update_analyses(
 
     promises = []
     for analysis in analyses_to_update:
-        logging.info(f'Analysis {analysis["id"]} - new outputs and meta fields:')
-        logging.info(f'    New outputs path: {analysis["outputs"]["path"]}')
-        logging.info(f'    New meta dataset: {analysis["meta"]["dataset"]}')
+        logger.info(f'Analysis {analysis["id"]} - new outputs and meta fields:')
+        logger.info(f'    New outputs path: {analysis["outputs"]["path"]}')
+        logger.info(f'    New meta dataset: {analysis["meta"]["dataset"]}')
         if dry_run:
-            logging.info(f'DRY RUN :: Skipping updating analysis {analysis["id"]}')
+            logger.info(f'DRY RUN :: Skipping updating analysis {analysis["id"]}')
             continue
         update_model = AnalysisUpdateModel(
             status=AnalysisStatus(analysis['status']),
@@ -272,21 +279,23 @@ async def main(
     Moves analysis files from one project to another and update the analysis records.
     """
     if dry_run:
-        logging.info('Dry run mode enabled. No changes will be made.\n')
-    logging.info(
+        logger.info('Dry run mode enabled. No changes will be made.\n')
+    logger.info(
         f'Move analyses across projects for sequencing group(s): {sorted(sequencing_group_ids)}'
     )
-    logging.info(f'Moving analyses from dataset {old_dataset} to dataset {new_dataset}')
+    logger.info(f'Moving analyses from dataset {old_dataset} to dataset {new_dataset}')
 
     access_level = config_retrieve(['workflow', 'access_level'])
     bucket_access_level = 'main' if access_level == 'full' else 'test'
-    
-    old_bucket_name = f'cpg-{old_dataset}-{bucket_access_level}'.replace('-test-test', '-test')
-    new_bucket_name = f'cpg-{new_dataset}-{bucket_access_level}'.replace('-test-test', '-test')
 
-    logging.info(
-        f'Will copy files from {old_bucket_name} to {new_bucket_name}'
+    old_bucket_name = f'cpg-{old_dataset}-{bucket_access_level}'.replace(
+        '-test-test', '-test'
     )
+    new_bucket_name = f'cpg-{new_dataset}-{bucket_access_level}'.replace(
+        '-test-test', '-test'
+    )
+
+    logger.info(f'Will copy files from {old_bucket_name} to {new_bucket_name}')
 
     # Get the analyses to update
     analyses_to_update, files_to_move = get_analyses_to_update_and_files_to_move(
@@ -331,18 +340,11 @@ async def main(
 
     # Move the files
     move_files(files_to_move, dry_run)
-    logging.info(f'{len(files_to_move)} Files moved successfully')
+    logger.info(f'{len(files_to_move)} Files moved successfully')
 
     # Update the analyses
     await update_analyses(analyses_to_update, dry_run)
 
 
 if __name__ == '__main__':
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s %(levelname)s %(module)s:%(lineno)d - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
-        stream=sys.stderr,
-    )
-
     asyncio.run(main())  # pylint: disable=no-value-for-parameter
