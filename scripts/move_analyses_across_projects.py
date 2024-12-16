@@ -168,8 +168,8 @@ def get_analyses_to_update_and_files_to_move(
                 {
                     'id': analysis['id'],
                     'status': 'COMPLETED',
-                    'new_outputs': new_outputs,
-                    'new_meta': new_meta,
+                    'outputs': new_outputs,
+                    'meta': new_meta,
                     'old_outputs': current_outputs,
                     'old_meta': old_meta,
                 }
@@ -253,8 +253,8 @@ def update_analyses(
             continue
         update_model = AnalysisUpdateModel(
             status=AnalysisStatus(analysis['status']),
-            outputs=analysis['new_outputs'],
-            meta=analysis['new_meta'],
+            outputs=analysis['outputs'],
+            meta=analysis['meta'],
         )
         promises.append(
             analysis_api.update_analysis_async(analysis['id'], update_model)
