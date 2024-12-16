@@ -24,12 +24,12 @@ from metamist.models import AnalysisUpdateModel, AnalysisStatus
 from metamist.graphql import gql, query
 from metamist.parser.generic_metadata_parser import run_as_sync
 
-logger = logging.getLogger(__file__)
-logger.addHandler(logging.StreamHandler())
 logging.basicConfig(
     format='%(asctime)s %(levelname)s %(module)s:%(lineno)d - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
 )
+logger = logging.getLogger(__file__)
+logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 
 # Define the query to get the analysis records that need to be moved
