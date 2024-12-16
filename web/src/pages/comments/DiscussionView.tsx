@@ -35,6 +35,8 @@ import { CommentThread } from './CommentThread'
 function countComments(comments: CommentThreadData[]) {
     return comments.reduce(
         (rr: { topLevel: number; total: number }, cc) => {
+            // Don't count deleted comments
+            if (cc.status === 'deleted') return rr
             return {
                 topLevel: rr.topLevel + 1,
                 total: rr.total + 1 + cc.thread.length,
