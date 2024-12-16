@@ -250,28 +250,26 @@ def move_files(
         source_blob_size = convert_size(source_blob.size)
         if source_blob.storage_class in ['COLDLINE', 'ARCHIVE'] and unarchive:
             logger.info(
-                f'{old_path} ({source_blob_size}) in {source_bucket_name} is in {source_blob.storage_class} storage class'
+                f'Blob {old_path} ({source_blob_size}) in {source_bucket_name} is in {source_blob.storage_class} storage class'
             )
             if dry_run:
                 logger.info(
-                    f'DRY RUN :: Would have updated storage class of {old_path} to NEARLINE'
+                    f'DRY RUN :: Would have updated storage class of {old_path} to NEARLINE\n'
                 )
                 continue
-            logger.info(f'Updating storage class of {old_path} to NEARLINE')
+            logger.info(f'Updating storage class of {old_path} to NEARLINE\n')
             source_blob.update_storage_class('NEARLINE')
 
         if dry_run:
             logger.info(
-                f'DRY RUN :: Would have copied {old_path} ({source_blob_size}) to {new_path}'
+                f'DRY RUN :: Would have copied {old_path} ({source_blob_size}) to {new_path}\n'
             )
             continue
-        logger.info(f'Copying {old_path} ({source_blob_size}) to {new_path}')
 
         destination_blob_name = new_path[len(f'gs://{destination_bucket_name}/') :]
-
         if destination_bucket.get_blob(destination_blob_name):
             logger.error(
-                f'Blob {destination_blob_name} already exists in bucket {destination_bucket_name}'
+                f'Blob {destination_blob_name} already exists in bucket {destination_bucket_name}\n'
             )
             continue
 
@@ -282,13 +280,8 @@ def move_files(
                 destination_blob_name,
             )
             source_bucket.delete_blob(source_blob)
-            print(
-                'Blob {} in bucket {} moved to blob {} in bucket {}.'.format(  # pylint: disable=consider-using-f-string
-                    source_blob.name,
-                    source_bucket.name,
-                    blob_copy.name,
-                    destination_bucket.name,
-                )
+            logger.info(
+                f'Moved {old_path} ({convert_size(blob_copy.size)}) to {new_path} successfully\n'
             )
         except Exception as e:  # pylint: disable=broad-except
             logger.error(f'{e}: Blob {source_blob.name} failed to copy.')
@@ -366,7 +359,8 @@ async def main(
     logger.info(
         f'Moving analyses across projects for sequencing group(s): {sorted(sequencing_group_ids)}'
     )
-    logger.info(f'From dataset: {old_dataset} To dataset: {new_dataset}')
+    logger.info(f'From dataset: {old_dataset}')
+    logger.info(f'To dataset:   {new_dataset}\n')
 
     storage_client = storage.Client()
     gcp_project = config_retrieve(['workflow', 'dataset_gcp_project'])
@@ -376,7 +370,7 @@ async def main(
     old_bucket_name = f'cpg-{old_dataset.replace("-test", "")}-{bucket_access_level}'
     new_bucket_name = f'cpg-{new_dataset.replace("-test", "")}-{bucket_access_level}'
 
-    logger.info(f'Moving files from {old_bucket_name} to {new_bucket_name}')
+    logger.info(f'Moving files from {old_bucket_name} to {new_bucket_name}\n')
 
     # Get the analyses to update
     analyses_to_update, files_to_move = get_analyses_to_update_and_files_to_move(
