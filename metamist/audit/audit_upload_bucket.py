@@ -126,8 +126,7 @@ class UploadBucketAuditor(GenericAuditor):
         """
         today = datetime.today().strftime('%Y-%m-%d')
 
-        # report_path = f'gs://{bucket_name}/audit_results/{today}/'
-        report_path = f'/Users/edwfor/Code/metamist/audit_results/{today}/'
+        report_path = f'gs://{bucket_name}/audit_results/{today}/'
         
         # Create the report file and directory if it doesn't exist
         report_path = AnyPath(report_path)
