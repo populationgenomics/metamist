@@ -168,6 +168,8 @@ def get_analyses_to_update_and_files_to_move(
             analyses_to_update.append(
                 {
                     'id': analysis['id'],
+                    'sg_id': sg['id'],
+                    'type': analysis['type'],
                     'outputs': new_outputs,
                     'meta': new_meta,
                 }
@@ -301,7 +303,9 @@ def update_analyses(
 
     promises = []
     for analysis in analyses_to_update:
-        logger.info(f'Analysis {analysis["id"]}')
+        logger.info(
+            f'Analysis: {analysis["id"]}. SG: {analysis["sg_id"]}. Type: {analysis["type"]}.'
+        )
         logger.info(f'    New outputs path: {analysis["outputs"]["path"]}')
         logger.info(f'    New meta dataset: {analysis["meta"]["dataset"]}')
         if dry_run:
