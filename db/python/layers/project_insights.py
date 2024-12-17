@@ -750,7 +750,7 @@ SELECT
     sg.technology as sequencing_technology,
     s.type as sample_type,
     f.id as family_id,
-    f.external_id as family_external_id,
+    fext.external_id as family_external_id,
     fp.participant_id as participant_id,
     pext.external_id as participant_external_id,
     s.id as sample_id,
@@ -759,6 +759,7 @@ SELECT
 FROM
     family f
     LEFT JOIN family_participant fp ON f.id = fp.family_id
+    LEFT JOIN family_external_id fext ON f.id = fext.family_id
     LEFT JOIN participant_external_id pext ON fp.participant_id = pext.participant_id
     LEFT JOIN sample s ON fp.participant_id = s.participant_id
     LEFT JOIN sample_external_id sext ON s.id = sext.sample_id
