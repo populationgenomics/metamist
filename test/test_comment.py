@@ -165,8 +165,8 @@ SAMPLE_COMMENTS = """
 """
 
 SAMPLE_ADD_COMMENT = """
-    mutation AddCommentToSample($id: String!, $content: String!, $project: String!) {
-        sample(projectName: $project) {
+    mutation AddCommentToSample($id: String!, $content: String!) {
+        sample {
             addComment(id: $id, content: $content) {
                 ...CommentFragment
                 thread {
@@ -191,8 +191,8 @@ PROJECT_COMMENTS = """
 """
 
 PROJECT_ADD_COMMENT = """
-    mutation AddCommentToProject($id: Int!, $content: String!, $project: String!) {
-        project(name: $project) {
+    mutation AddCommentToProject($id: Int!, $content: String!) {
+        project {
             addComment(id: $id, content: $content) {
                 ...CommentFragment
 
@@ -295,8 +295,8 @@ SEQUENCING_GROUP_COMMENTS = """
 """
 
 SEQUENCING_GROUP_ADD_COMMENT = """
-    mutation AddCommentToSequencingGroup($id: String!, $content: String!, $project: String!) {
-        sequencingGroup(projectName: $project) {
+    mutation AddCommentToSequencingGroup($id: String!, $content: String!) {
+        sequencingGroup {
             addComment(id: $id, content: $content) {
                 ...CommentFragment
 

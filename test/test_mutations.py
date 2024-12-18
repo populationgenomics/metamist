@@ -24,8 +24,8 @@ from api.graphql.mutations.analysis import AnalysisStatusType
 
 CREATE_ANALYSIS_MUTATION = """
     mutation createAnalysis($project: String!, $sequencingGroupIds: [String!], $status: AnalysisStatus!, $type: String!) {
-        analysis(projectName: $project) {
-            createAnalysis(analysis: {
+        analysis {
+            createAnalysis(project: $project, analysis: {
                 type: $type,
                 status: $status,
                 meta:{},
@@ -44,8 +44,8 @@ CREATE_ANALYSIS_MUTATION = """
 """
 
 UPDATE_ANALYSIS_MUTATION = """
-    mutation updateAnalysis($project: String!, $analysisId: Int!, $status: AnalysisStatus!, $meta: JSON) {
-        analysis(projectName: $project) {
+    mutation updateAnalysis($analysisId: Int!, $status: AnalysisStatus!, $meta: JSON) {
+        analysis {
             updateAnalysis(analysisId: $analysisId, analysis: {
                 status: $status,
                 meta: $meta,
@@ -268,7 +268,6 @@ class TestMutations(DbIsolatedTest):
             await self.run_graphql_query_async(
                 UPDATE_ANALYSIS_MUTATION,
                 variables={
-                    'project': self.project_name,
                     'analysisId': analysis,
                     'status': AnalysisStatusType.COMPLETED.name,
                     'meta': {'test': 'test'},
