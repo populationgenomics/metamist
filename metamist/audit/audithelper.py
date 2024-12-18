@@ -1,31 +1,105 @@
 # pylint: disable=no-member
 import csv
 import logging
-import os
 from collections import defaultdict
+from io import StringIO
 from typing import Any
 
-from cloudpathlib import AnyPath
-
 from cpg_utils.cloud import get_path_components_from_gcp_path
+from cpg_utils.config import config_retrieve, get_gcp_project
 
+from metamist.graphql import gql, query
 from metamist.parser.cloudhelper import CloudHelper
+
+from google.cloud import storage
+
+FASTQ_EXTENSIONS = ('.fq.gz', '.fastq.gz', '.fq', '.fastq')
+BAM_EXTENSIONS = ('.bam',)
+CRAM_EXTENSIONS = ('.cram',)
+READ_EXTENSIONS = FASTQ_EXTENSIONS + BAM_EXTENSIONS + CRAM_EXTENSIONS
+GVCF_EXTENSIONS = ('.g.vcf.gz',)
+VCF_EXTENSIONS = ('.vcf', '.vcf.gz')
+ALL_EXTENSIONS = (
+    FASTQ_EXTENSIONS
+    + BAM_EXTENSIONS
+    + CRAM_EXTENSIONS
+    + GVCF_EXTENSIONS
+    + VCF_EXTENSIONS
+)
+
+FILE_TYPES_MAP = {
+    'fastq': FASTQ_EXTENSIONS,
+    'bam': BAM_EXTENSIONS,
+    'cram': CRAM_EXTENSIONS,
+    'all_reads': READ_EXTENSIONS,
+    'gvcf': GVCF_EXTENSIONS,
+    'vcf': VCF_EXTENSIONS,
+    'all': ALL_EXTENSIONS,
+}
+
+HAIL_EXTENSIONS = ['.ht', '.mt', '.vds']
+
+ANALYSIS_TYPES_QUERY = gql(
+    """
+    query analysisTypes {
+        enum {
+            analysisType
+        }
+    }
+    """
+)
+
+SEQUENCING_TYPES_QUERY = gql(
+    """
+    query seqTypes {
+        enum {
+            sequencingType
+        }
+    }
+    """
+)
+
+def get_analysis_types():
+    """Return the list of analysis types from the enum table."""
+    analysis_types_query_result = query(ANALYSIS_TYPES_QUERY)
+    return analysis_types_query_result['enum']['analysisType']
+
+def get_sequencing_types():
+    """Return the list of sequencing types from the enum table."""
+    sequencing_types_query_result: dict[str, dict[str, list[str]]] = query(SEQUENCING_TYPES_QUERY)
+    return sequencing_types_query_result['enum']['sequencingType']
 
 
 class AuditHelper(CloudHelper):
     """General helper class for bucket auditing"""
+    def __init__(
+        self,
+        gcp_project: str,
+        all_analysis_types: list[str] = None,
+        all_sequencing_types: list[str] = None,
+        excluded_sequencing_groups: list[str] = None,
+    ):
+        # Initialize GCP project
+        self.gcp_project = gcp_project or get_gcp_project() or config_retrieve(['workflow', 'gcp_project']) 
+        if not self.gcp_project:
+            raise ValueError('GCP project is required')
+        
+        self.all_analysis_types = all_analysis_types or get_analysis_types()
+        self.all_sequencing_types = all_sequencing_types or get_sequencing_types()
+        
+        self.excluded_sequencing_groups = excluded_sequencing_groups or config_retrieve(['workflow', 'audit', 'excluded_sequencing_groups'])
 
-    EXCLUDED_SGS: set[str] = set(
-        sg for sg in os.getenv('SM_AUDIT_EXCLUDED_SGS', '').split(',') if sg
-    )
+        super().__init__(
+            gcp_project=self.gcp_project,
+        )
 
     @staticmethod
-    def get_gcs_bucket_subdirs_to_search(paths: list[str]) -> defaultdict[str, list]:
+    def get_gcs_buckets_and_prefixes_from_paths(paths: list[str]) -> defaultdict[str, list]:
         """
-        Takes a list of paths and extracts the bucket name and subdirectory, returning all unique pairs
-        of buckets/subdirectories
+        Takes a list of paths and extracts the bucket names and prefix, returning all unique pairs
+        of buckets and prefixes. Does not make any calls to GCS.
         """
-        buckets_subdirs_to_search: defaultdict[str, list] = defaultdict(list)
+        buckets_prefixes: defaultdict[str, list] = defaultdict(list)
         for path in paths:
             try:
                 pc = get_path_components_from_gcp_path(path)
@@ -33,133 +107,146 @@ class AuditHelper(CloudHelper):
                 logging.warning(f'{path} invalid')
                 continue
             bucket = pc['bucket']
-            subdir = pc['suffix']
-            if subdir and subdir not in buckets_subdirs_to_search[bucket]:
-                buckets_subdirs_to_search[bucket].append(subdir)
+            prefix = pc['suffix'] # This is the prefix (i.e. the "subdirectory" in the bucket)
+            if prefix and prefix not in buckets_prefixes[bucket]:
+                buckets_prefixes[bucket].append(prefix)
 
-        return buckets_subdirs_to_search
+        return buckets_prefixes
 
-    def get_gcs_paths_for_subdir(
-        self, bucket_name: str, subdirectory: str, file_extension: tuple[str]
+    def get_all_files_in_gcs_bucket_with_prefix_and_extensions(
+        self, bucket_name: str, prefix: str, file_extension: tuple[str]
     ):
-        """Iterate through a gcp bucket/subdir and get all the blobs with the specified file extension(s)"""
-        files_in_bucket_subdir = []
+        """Iterate through a gcp bucket/prefix and get all the blobs with the specified file extension(s)"""
+        bucket = self.gcs_client.bucket(bucket_name, user_project=self.user_project)
+        
+        files_in_bucket_prefix = []
         for blob in self.gcs_client.list_blobs(
-            bucket_name, prefix=subdirectory, delimiter='/'
+            bucket, prefix=prefix, delimiter='/'
         ):
             # Check if file ends with specified analysis type
             if not blob.name.endswith(file_extension):
                 continue
-            files_in_bucket_subdir.append(f'gs://{bucket_name}/{blob.name}')
+            files_in_bucket_prefix.append(f'gs://{bucket_name}/{blob.name}')
 
-        return files_in_bucket_subdir
+        return files_in_bucket_prefix
 
-    def find_files_in_gcs_buckets_subdirs(
-        self, buckets_subdirs: defaultdict[str, list], file_types: tuple[str]
+    def find_files_in_gcs_buckets_prefixes(
+        self, buckets_prefixes: defaultdict[str, list[str]], file_types: tuple[str]
     ):
         """
-        Takes a list of (bucket,subdirectory) tuples and finds all the files contained in that directory
-        with filetypes defined with an input list
+        Takes a dict of {bucket: [prefix1, prefix2, ...]} tuples and finds all the files contained in that bucket/prefix
+        that end with the specified file type extensions. Skips hailtable, matrixtable, and vds paths.
         """
         files_in_bucket = []
-        for bucket, subdirs in buckets_subdirs.items():
-            for subdir in subdirs:
-                # matrixtable / hailtable subdirectories should not appear in main-upload buckets,
+        for bucket_name, prefixes in buckets_prefixes.items():
+            for prefix in prefixes:
+                # matrixtable / hailtable / vds prefix should not appear in main-upload buckets,
                 # but handle them just in case. These directories are too large to search.
-                if '.mt' in subdir or '.ht' in subdir:
+                if any(hl_extension in prefix for hl_extension in HAIL_EXTENSIONS):
                     continue
                 files_in_bucket.extend(
-                    self.get_gcs_paths_for_subdir(bucket, subdir, file_types)
+                    self.get_all_files_in_gcs_bucket_with_prefix_and_extensions(bucket_name, prefix, file_types)
                 )
 
         return files_in_bucket
 
     def find_assay_files_in_gcs_bucket(
         self, bucket_name: str, file_extensions: tuple[str]
-    ) -> list[str]:
-        """Gets all the gs paths to fastq files in the datasets upload bucket"""
-        if bucket_name.startswith('gs://'):
-            bucket_name = bucket_name.removeprefix('gs://')
-        assay_paths = []
+    ) -> dict[str, int]:
+        """
+        Gets all the paths and sizes to assay files in the dataset's upload bucket.
+        Calls list_blobs on the bucket with the specified file extensions, returning a dict of paths and sizes.
+        """
+        bucket_name = bucket_name.removeprefix('gs://').removesuffix('/')
         if 'upload' not in bucket_name:
             # No prefix means it will get all blobs in the bucket (regardless of path)
             # This can be a dangerous call outside of the upload buckets
             raise NameError(
                 'Call to list_blobs without prefix only valid for upload buckets'
             )
-
-        for blob in self.gcs_client.list_blobs(bucket_name, prefix=''):
-            if blob.name.endswith(file_extensions):
-                assay_paths.append(f'gs://{bucket_name}/{blob.name}')
-            continue
-
-        return assay_paths
-
-    @staticmethod
-    def get_sequencing_group_ids_from_analysis(analysis) -> list[str]:
-        """Tries a number of different field names to retrieve the sg ids from an analysis"""
-        while True:
-            try:
-                sg_ids = analysis['meta']['sample']
-                break
-            except KeyError:
-                pass
-
-            try:
-                sg_ids = analysis['meta']['samples']
-                break
-            except KeyError:
-                pass
-
-            try:
-                sg_ids = analysis['meta']['sample_ids']
-                break
-            except KeyError:
-                pass
-
-            try:
-                sg_ids = analysis['meta']['sequencing_group']
-                break
-            except KeyError:
-                pass
-
-            try:
-                sg_ids = analysis['meta']['sequencing_groups']
-                break
-            except KeyError as exc:
-                raise ValueError(
-                    f'Analysis {analysis["id"]} missing sample or sequencing group field.'
-                ) from exc
-
-        if isinstance(sg_ids, str):
-            return [
-                sg_ids,
-            ]
-        return sg_ids
-
-    @staticmethod
-    def write_csv_report_to_cloud(
-        data_to_write: list[Any], report_path: AnyPath, header_row: list[str] | None
-    ):
-        """
-        Writes a csv report to the cloud bucket containing the data to write
-        at the report path, with an optional header row
-        """
-        # Create the report file and directory if it doesn't exist
-        report_path = AnyPath(report_path)
-        report_path.parent.mkdir(parents=True, exist_ok=True)
-        report_path.touch(exist_ok=True)
-        logging.info(f'Writing report to {report_path}')
+        bucket = self.gcs_client.bucket(bucket_name, user_project=self.user_project)
         
-        # with report_path.open('w+') as f:  # pylint: disable=E1101
-        with open(report_path, 'w+') as f:
-            writer = csv.writer(f)
-            if header_row:
-                writer.writerow(header_row)
-            for row in data_to_write:
-                if isinstance(row, str):
-                    writer.writerow([row])
-                    continue
-                writer.writerow(row)
+        assay_paths_sizes = {}
+        for blob in self.gcs_client.list_blobs(bucket, prefix=''):
+            if not blob.name.endswith(file_extensions):
+                continue
+            blob.reload()
+            assay_paths_sizes[blob.name] = blob.size
 
-        logging.info(f'Wrote {len(data_to_write)} lines to report: {report_path}')
+        return assay_paths_sizes
+    
+    def get_audit_report_prefix(
+        self,
+        seq_types: str,
+        file_types: str,
+    ):
+        """Get the prefix for the report file based on the sequencing and file types audited"""
+        if set(seq_types) == set(self.all_sequencing_types):
+            sequencing_types_str = 'all_seq_types'
+        else:
+            sequencing_types_str = ('_').join(self.sequencing_types) + '_seq_types'
+            
+        if set(file_types) == set(ALL_EXTENSIONS):
+            file_types_str = 'all_file_types'
+        elif set(file_types) == set(READ_EXTENSIONS):
+            file_types_str = 'all_reads_file_types'
+        else:
+            file_types_str = ('_').join(self.file_types) + '_file_types'
+            
+        return f'{file_types_str}_{sequencing_types_str}'
+
+
+    def write_report_to_cloud(
+        self,
+        data_to_write: list[dict[str, Any]] | None,
+        bucket_name: str,
+        blob_path: str,
+    ) -> None:
+        """
+        Writes a CSV/TSV report directly to Google Cloud Storage.
+
+        Args:
+            data_to_write: List of data rows to write to the CSV/TSV
+            bucket_name: Name of the GCS bucket
+            blob_path: Path where the blob should be stored in the bucket (with either .tsv or .csv extension)
+
+        Raises:
+            ValueError: If the blob path doesn't end with .csv or .tsv
+            google.cloud.exceptions.NotFound: If the bucket doesn't exist
+            google.cloud.exceptions.Forbidden: If permissions are insufficient
+        """
+        if not data_to_write:
+            logging.info('No data to write to report')
+            return
+        
+        logging.info(f'Writing report to gs://{bucket_name}/{blob_path}')
+
+        # Create a string buffer to hold the data
+        if blob_path.endswith('.csv'):
+            delimiter = ','
+            content_type = 'text/csv'
+        elif blob_path.endswith('.tsv'):
+            delimiter = '\t'
+            content_type = 'text/tab-separated-values'
+        else:
+            raise ValueError('Blob path must end with either .csv or .tsv')
+        
+        buffer = StringIO()
+        writer = csv.DictWriter(buffer, fieldnames=data_to_write[0].keys(), delimiter=delimiter)
+
+        writer.writeheader()
+        writer.writerows(data_to_write)
+        
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name, user_project=self.user_project)
+        blob = bucket.blob(blob_path)
+
+        # Upload the TSV content
+        blob.upload_from_string(
+            buffer.getvalue(),
+            content_type=content_type,
+        )
+
+        buffer.close()
+        logging.info(f'Wrote {len(data_to_write)} lines to gs://{bucket_name}/{blob_path}')
+        return

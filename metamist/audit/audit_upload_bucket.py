@@ -5,66 +5,16 @@ and sequencing groups that have no aligned CRAM.
 """
 
 import asyncio
-import csv
 import logging
-import os
 import sys
 from datetime import datetime
-from functools import cache
-from typing import Any
-from cloudpathlib import AnyPath
 
 import click
 
-from cpg_utils.config import get_config
+from cpg_utils.config import config_retrieve, dataset_path
 
-from metamist.audit.generic_auditor import GenericAuditor
-from metamist.graphql import gql, query
-
-FASTQ_EXTENSIONS = ('.fq.gz', '.fastq.gz', '.fq', '.fastq')
-BAM_EXTENSIONS = ('.bam',)
-CRAM_EXTENSIONS = ('.cram',)
-READ_EXTENSIONS = FASTQ_EXTENSIONS + BAM_EXTENSIONS + CRAM_EXTENSIONS
-GVCF_EXTENSIONS = ('.g.vcf.gz',)
-VCF_EXTENSIONS = ('.vcf', '.vcf.gz')
-ALL_EXTENSIONS = (
-    FASTQ_EXTENSIONS
-    + BAM_EXTENSIONS
-    + CRAM_EXTENSIONS
-    + GVCF_EXTENSIONS
-    + VCF_EXTENSIONS
-)
-
-FILE_TYPES_MAP = {
-    'fastq': FASTQ_EXTENSIONS,
-    'bam': BAM_EXTENSIONS,
-    'cram': CRAM_EXTENSIONS,
-    'all_reads': READ_EXTENSIONS,
-    'gvcf': GVCF_EXTENSIONS,
-    'vcf': VCF_EXTENSIONS,
-    'all': ALL_EXTENSIONS,
-}
-
-SEQUENCING_TYPES_QUERY = gql(
-    """
-    query seqTypes {
-        enum {
-            sequencingType
-        }
-    }
-    """
-)
-
-
-@cache
-def get_sequencing_types():
-    """Return the list of sequencing types from the enum table."""
-    logging.getLogger().setLevel(logging.WARN)
-    sequencing_types = query(SEQUENCING_TYPES_QUERY)
-    logging.getLogger().setLevel(logging.INFO)
-    return sequencing_types['enum'][  # pylint: disable=unsubscriptable-object
-        'sequencingType'
-    ]
+from metamist.audit.audithelper import FILE_TYPES_MAP, get_sequencing_types
+from metamist.audit.generic_auditor import GenericAuditor, SequencingGroupData
 
 
 def audit_upload_bucket(
@@ -111,11 +61,11 @@ class UploadBucketAuditor(GenericAuditor):
     async def write_upload_bucket_audit_reports(
         self,
         bucket_name: str,
-        sequencing_types: list[str],
-        file_types: list[str],
-        assay_files_to_delete: list[tuple[str, int, str, list[int]]],
-        assay_files_to_ingest: list[tuple[str, str, str, int, str]],
-        unaligned_sgs: list[tuple[str, str]],
+        # audit_report_assay_files_to_delete,
+        # audit_report_assay_files_to_ingest,
+        # audit_report_unaligned_sgs,
+        audit_reports: dict[str, list[dict[str, str]]],
+        report_extension: str = 'tsv',
     ):
         """
         Writes the 'assay files to delete/ingest' csv reports and upload them to the bucket.
@@ -125,91 +75,16 @@ class UploadBucketAuditor(GenericAuditor):
         The report names include the file types, sequencing types, and date of the audit.
         """
         today = datetime.today().strftime('%Y-%m-%d')
-
-        report_path = f'gs://{bucket_name}/audit_results/{today}/'
-        
-        # Create the report file and directory if it doesn't exist
-        report_path = AnyPath(report_path)
-        report_path.parent.mkdir(parents=True, exist_ok=True)
-        logging.info(f'Writing reports to {report_path}')
-
-        if set(sequencing_types) == set(get_sequencing_types()):
-            sequencing_types_str = 'all'
-        else:
-            sequencing_types_str = ('_').join(sequencing_types)
-
-        if set(file_types) == set(ALL_EXTENSIONS):
-            file_types_str = 'all'
-        elif set(file_types) == set(READ_EXTENSIONS):
-            file_types_str = 'all_reads'
-        else:
-            file_types_str = ('_').join(file_types)
-
-        report_prefix = f'{self.dataset}_{file_types_str}_{sequencing_types_str}'
-
-        if not assay_files_to_delete:
-            logging.info('No assay read files to delete found. Skipping report...')
-        else:
-            assays_to_delete_file = f'{report_prefix}_assay_files_to_delete_{today}.csv'
-            file_to_write = AnyPath(os.path.join(report_path, assays_to_delete_file))
-            file_to_write.parent.mkdir(parents=True, exist_ok=True)
-            file_to_write.touch(exist_ok=True)
-            # self.write_csv_report_to_cloud(
-            write_csv_report_to_local(
-                data_to_write=assay_files_to_delete,
-                # report_path=os.path.join(report_path, assays_to_delete_file),
-                report_path=file_to_write,
-                header_row=[
-                    'SG_ID',
-                    'Assay_ID',
-                    'Assay_Read_File_Path',
-                    'CRAM_Analysis_ID',
-                    'Filesize',
-                ],
+        report_prefix = self.get_audit_report_prefix(
+            seq_types=self.sequencing_types, file_types=self.file_types
+        )
+        for audit_report_type, audit_report in audit_reports.items():
+            self.write_report_to_cloud(
+                data_to_write=audit_report,
+                bucket_name=bucket_name,
+                blob_path=f'audit_results/{today}/{report_prefix}_{audit_report_type}.{report_extension}',
             )
 
-        # 'Sequences to ingest' report contains paths to the (possibly) uningested files - and any samples/SGs that might be related
-        if not assay_files_to_ingest:
-            logging.info('No assay reads to ingest found. Skipping report...')
-        else:
-            assays_to_ingest_file = f'{report_prefix}_assay_files_to_ingest_{today}.csv'
-            # self.write_csv_report_to_cloud(
-            write_csv_report_to_local(
-                data_to_write=assay_files_to_ingest,
-                report_path=os.path.join(report_path, assays_to_ingest_file),
-                header_row=[
-                    'Assay_File_Path',
-                    'SG_ID',
-                    'Sample_ID',
-                    'Sample_External_ID',
-                    'CRAM_Analysis_ID',
-                    'CRAM_Path',
-                ],
-            )
-
-        # Write the sequencing groups without any completed cram to a csv
-        if not unaligned_sgs:
-            logging.info('No sequencing groups without crams found. Skipping report...')
-        else:
-            unaligned_sgs_file = f'{report_prefix}_unaligned_sgs_{today}.csv'
-            # self.write_csv_report_to_cloud(
-            write_csv_report_to_local(
-                data_to_write=unaligned_sgs,
-                report_path=os.path.join(report_path, unaligned_sgs_file),
-                header_row=['SG_ID', 'Sample_ID', 'Sample_External_ID'],
-            )
-
-def write_csv_report_to_local(
-    data_to_write: list[Any], report_path: AnyPath, header_row: list[str] | None
-):
-    """Write a csv report to the local filesystem."""
-    with open(report_path, 'w', newline='') as report_file:
-        writer = csv.writer(report_file)
-        if header_row:
-            writer.writerow(header_row)
-        for row in data_to_write:
-            writer.writerow(row)
-    logging.info(f'Wrote report to {report_path}')
 
 async def audit_upload_bucket_async(
     dataset: str,
@@ -230,6 +105,15 @@ async def audit_upload_bucket_async(
         default_analysis_type: The default analysis type to audit
         default_analysis_status: The default analysis status to audit
     """
+    
+    # Initialise the auditor
+    auditor = UploadBucketAuditor(
+        dataset=dataset,
+        sequencing_types=sequencing_types,
+        file_types=file_types,
+        default_analysis_type=default_analysis_type,
+        default_analysis_status=default_analysis_status,
+    )
 
     # Validate user inputs
     allowed_sequencing_types = get_sequencing_types()
@@ -250,59 +134,60 @@ async def audit_upload_bucket_async(
     else:
         file_types = FILE_TYPES_MAP[file_types[0]]
 
-    config = get_config()
     if not dataset:
-        dataset = config['workflow']['dataset']
-    bucket = config['storage'][dataset]['upload']
+        dataset = config_retrieve(['workflow', 'dataset'])
+    bucket_name = dataset_path(dataset=dataset, category='upload')
 
-    # Initialise the auditor
-    auditor = UploadBucketAuditor(
-        dataset=dataset,
-        sequencing_types=sequencing_types,
-        file_types=file_types,
-        default_analysis_type=default_analysis_type,
-        default_analysis_status=default_analysis_status,
-    )
 
-    participant_data = await auditor.get_participant_data_for_dataset()
-    sample_internal_external_id_map = auditor.map_internal_to_external_sample_ids(
-        participant_data
-    )
-    (
-        sg_sample_id_map,
-        assay_sg_id_map,
-        assay_filepaths_filesizes,
-    ) = auditor.get_assay_map_from_participants(participant_data)
+
+    # participant_data = await auditor.get_participant_data_for_dataset()
+    # sample_internal_external_id_map = auditor.map_internal_to_external_sample_ids(
+    #     participant_data
+    # )
+    # (
+    #     sg_sample_id_map,
+    #     assay_sg_id_map,
+    #     assay_filepaths_filesizes,
+    # ) = auditor.get_assay_map_from_participants(participant_data)
+    
+    sequencing_groups: list[SequencingGroupData] = await auditor.get_sg_assays_for_dataset()
 
     # Get all completed cram output paths for the samples in the dataset and validate them
     sg_cram_paths = await auditor.get_analysis_cram_paths_for_dataset_sgs(
-        assay_sg_id_map
+        sequencing_groups
     )
 
     # Identify sgs with and without completed crams
     sg_completion = await auditor.get_complete_and_incomplete_sgs(
-        assay_sg_id_map, sg_cram_paths
+        sequencing_groups, sg_cram_paths
     )
-
-    unaligned_sgs = [
-        (
-            sg_id,
-            sg_sample_id_map[sg_id],
-            sample_internal_external_id_map.get(sg_sample_id_map[sg_id]),
-        )
-        for sg_id in sg_completion.get('incomplete')
-    ]
-
+    
+    # Get the unaligned sequencing groups
+    unaligned_sgs = []
+    for sg in sequencing_groups:
+        if sg.id in sg_completion.get('incomplete'):
+            unaligned_sgs.append(
+                {
+                    'sg_id': sg.id,
+                    'sample_id': sg.sample.id,
+                    'sample_external_id': sg.sample.external_id,
+                    'participant_id': sg.sample.participant.id,
+                    'participant_external_id': sg.sample.participant.external_id,
+                }
+            )
+        
+    # Extract the assay file paths and sizes for the dataset's SGs
+    assay_id_to_paths_sizes = {assay.id: assay.read_files_paths_sizes for sg in sequencing_groups for assay in sg.assays}
+    
+    # Get the assay files to delete and ingest
     (
         reads_to_delete,
         reads_to_ingest,
     ) = await auditor.get_reads_to_delete_or_ingest(
-        bucket,
-        sg_completion.get('complete'),
-        assay_filepaths_filesizes,
-        sg_sample_id_map,
-        assay_sg_id_map,
-        sample_internal_external_id_map,
+        bucket_name=bucket_name,
+        sequencing_groups=sequencing_groups,
+        completed_sgs=sg_completion.get('complete'),
+        assay_id_to_paths_sizes=assay_id_to_paths_sizes,
     )
 
     possible_assay_ingests = auditor.find_crams_for_reads_to_ingest(
@@ -311,7 +196,7 @@ async def audit_upload_bucket_async(
 
     # Write the reads to delete, reads to ingest, and unaligned SGs reports
     await auditor.write_upload_bucket_audit_reports(
-        bucket,
+        bucket_name=bucket_name,
         sequencing_types=sequencing_types,
         file_types=file_types,
         assay_files_to_delete=reads_to_delete,
