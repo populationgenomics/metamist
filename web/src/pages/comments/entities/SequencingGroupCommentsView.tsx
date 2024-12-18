@@ -15,8 +15,8 @@ export const SEQUENCING_GROUP_COMMENTS = gql(`
 `)
 
 export const SEQUENCING_GROUP_ADD_COMMENT = gql(`
-    mutation AddCommentToSequencingGroup($id: String!, $content: String!, $project: String!) {
-        sequencingGroup(projectName: $project) {
+    mutation AddCommentToSequencingGroup($id: String!, $content: String!) {
+        sequencingGroup {
             addComment(id: $id, content: $content) {
                 ...CommentFragment
 
@@ -72,7 +72,6 @@ export function SequencingGroupCommentsView(props: SequencingGroupCommentsViewPr
                 if (sequencingGroup?.id) {
                     await addCommentToSequencingGroupMutation({
                         variables: {
-                            project: props.projectName,
                             content,
                             id: sequencingGroup.id,
                         },
