@@ -491,7 +491,7 @@ SELECT
     a.id as id, a.type as type, a.status as status,
     a.project as project,
     a_sg.sequencing_group_id as sequencing_group_id,
-    a.timestamp_completed as timestamp_completed, a.meta as meta
+    a.timestamp_completed as timestamp_completed, a.meta as meta, a.active as active
 FROM analysis a
 LEFT JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
 WHERE a.id = :analysis_id
