@@ -42,7 +42,7 @@ class AnalysisRunnerMutations:
     project_id: strawberry.Private[int]
 
     @strawberry.mutation
-    async def create_analysis_runner_log(  # pylint: disable=too-many-arguments
+    async def create_analysis_runner_log(
         self,
         analysis_runner: AnalysisRunnerInput,
         info: Info,

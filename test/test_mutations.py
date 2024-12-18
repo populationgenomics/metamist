@@ -114,9 +114,10 @@ UPDATE_ASSAY_MUTATION = """
 # region COHORT MUTATIONS
 
 CREATE_COHORT_FROM_CRITERIA_MUTATION = """
-    mutation CreateCohortFromCriteria($cohortSpec: CohortBodyInput!, $cohortCriteria: CohortCriteriaInput!, $dryRun: Boolean) {
+    mutation CreateCohortFromCriteria($project: String!, $cohortSpec: CohortBodyInput!, $cohortCriteria: CohortCriteriaInput!, $dryRun: Boolean) {
         cohort{
             createCohortFromCriteria(
+                project: $project
                 cohortSpec: $cohortSpec
                 cohortCriteria: $cohortCriteria
                 dryRun: $dryRun
@@ -397,6 +398,7 @@ class TestMutations(DbIsolatedTest):
             await self.run_graphql_query_async(
                 CREATE_COHORT_FROM_CRITERIA_MUTATION,
                 variables={
+                    'project': self.project_name,
                     'cohortSpec': {
                         'name': 'TestCohort1',
                         'description': 'TestCohortDescription',

@@ -7,8 +7,11 @@ from strawberry.types import Info
 from db.python.connect import Connection
 from db.python.filters.generic import GenericFilter
 from db.python.layers.cohort import CohortLayer
-from db.python.tables.cohort import CohortFilter
-from models.models.cohort import CohortCriteria, CohortTemplate
+from db.python.tables.cohort import CohortFilter, CohortTemplateFilter
+from models.models.cohort import (
+    CohortCriteria,
+    CohortTemplate,
+)
 from models.models.project import ProjectId, ProjectMemberRole, ReadAccessRoles
 from models.utils.cohort_template_id_format import (
     cohort_template_id_transform_to_raw,
@@ -58,6 +61,7 @@ class CohortMutations:
     async def create_cohort_from_criteria(
         self,
         info: Info,
+        project: str,
         cohort_spec: CohortBodyInput,
         cohort_criteria: CohortCriteriaInput | None = None,
         dry_run: bool = False,
@@ -68,13 +72,11 @@ class CohortMutations:
         from api.graphql.schema import GraphQLCohort
 
         connection: Connection = info.context['connection']
-        connection.check_access(
-            {ProjectMemberRole.writer, ProjectMemberRole.contributor}
+        (target_project,) = connection.get_and_check_access_to_projects_for_names(
+            [project], {ProjectMemberRole.writer, ProjectMemberRole.contributor}
         )
-        clayer = CohortLayer(connection)
 
-        if not connection.project:
-            raise ValueError('A cohort must belong to a project')
+        clayer = CohortLayer(connection)
 
         if not cohort_criteria and not cohort_spec.template_id:
             raise ValueError(
@@ -95,9 +97,9 @@ class CohortMutations:
             if cohort_spec.template_id
             else None
         )
-        assert connection.project_id
+
         cohort_output = await clayer.create_cohort_from_criteria(
-            project_to_write=connection.project_id,
+            project_to_write=target_project.id,
             description=cohort_spec.description,
             cohort_name=cohort_spec.name,
             dry_run=dry_run,
@@ -110,6 +112,15 @@ class CohortMutations:
             ),
             template_id=template_id_raw,
         )
+        if dry_run:
+            return GraphQLCohort(
+                id='CREATE NEW',
+                name=cohort_spec.name,
+                description=cohort_spec.description,
+                author=connection.author,
+                project_id=target_project.id,
+            )
+
         created_cohort = (
             await clayer.query(
                 CohortFilter(id=GenericFilter(eq=cohort_output.cohort_id))
@@ -121,6 +132,7 @@ class CohortMutations:
     @strawberry.mutation
     async def create_cohort_template(
         self,
+        project: str,
         template: CohortTemplateInput,
         info: Info,
     ) -> Annotated['GraphQLCohortTemplate', strawberry.lazy('api.graphql.schema')]:
@@ -130,13 +142,15 @@ class CohortMutations:
         from api.graphql.schema import GraphQLCohortTemplate
 
         connection: Connection = info.context['connection']
-        connection.check_access(
-            {ProjectMemberRole.writer, ProjectMemberRole.contributor}
+        (target_project,) = connection.get_and_check_access_to_projects_for_names(
+            [project], {ProjectMemberRole.writer, ProjectMemberRole.contributor}
         )
         clayer = CohortLayer(connection)
 
-        if not connection.project:
-            raise ValueError('A cohort template must belong to a project')
+        if not target_project:
+            raise ValueError(
+                'A cohort template must belong to a valid project that you have access to.'
+            )
 
         criteria_project_ids: list[ProjectId] = []
 
@@ -149,18 +163,21 @@ class CohortMutations:
             )
             criteria_project_ids = [p.id for p in projects_for_criteria if p.id]
 
-        assert connection.project_id
         cohort_raw_id = await clayer.create_cohort_template(
             cohort_template=CohortTemplate.from_dict(
                 strawberry.asdict(template)
             ).to_internal(
                 criteria_projects=criteria_project_ids,
-                template_project=connection.project_id,
+                template_project=target_project.id,
             ),
-            project=connection.project_id,
+            project=target_project.id,
         )
 
-        created_cohort_template = await clayer.get_template_by_cohort_id(cohort_raw_id)  # type: ignore [arg-type]
+        created_cohort_template = (
+            await clayer.query_cohort_templates(
+                CohortTemplateFilter(id=GenericFilter(eq=cohort_raw_id))
+            )
+        )[0]
         template_projects = connection.get_and_check_access_to_projects_for_ids(
             project_ids=created_cohort_template.criteria.projects or [],
             allowed_roles=ReadAccessRoles,
