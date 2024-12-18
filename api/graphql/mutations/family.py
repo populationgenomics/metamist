@@ -20,7 +20,7 @@ class FamilyUpdateInput:
     """Family update type"""
 
     id: int
-    external_id: JSON | None = None
+    external_ids: JSON | None = None
     description: str | None = None
     coded_phenotype: str | None = None
 
@@ -60,7 +60,7 @@ class FamilyMutations:
         flayer = FamilyLayer(connection)
         await flayer.update_family(
             id_=family.id,
-            external_ids=family.external_id,  # type: ignore [arg-type]
+            external_ids=family.external_ids,  # type: ignore [arg-type]
             description=family.description,  # type: ignore [arg-type]
             coded_phenotype=family.coded_phenotype,  # type: ignore [arg-type]
         )

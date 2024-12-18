@@ -12,7 +12,6 @@ from models.models.analysis import Analysis
 from models.models.project import FullWriteAccessRoles
 
 if TYPE_CHECKING:
-    from api.graphql.mutations.project import ProjectMutations
     from api.graphql.schema import GraphQLAnalysis
 
 AnalysisStatusType = strawberry.enum(AnalysisStatus)  # type: ignore [misc]
@@ -49,14 +48,12 @@ class AnalysisUpdateInput:
 class AnalysisMutations:
     """Analysis mutations"""
 
-    project_id: strawberry.Private[int]
-
     @strawberry.mutation
     async def create_analysis(
         self,
+        project: str,
         analysis: AnalysisInput,
         info: Info[GraphQLContext, 'AnalysisMutations'],
-        root: 'ProjectMutations',
     ) -> Annotated['GraphQLAnalysis', strawberry.lazy('api.graphql.schema')]:
         """Create a new analysis"""
         from api.graphql.schema import GraphQLAnalysis
@@ -64,8 +61,8 @@ class AnalysisMutations:
         connection: Connection = info.context['connection']
 
         # Should be moved to the analysis layer
-        connection.check_access_to_projects_for_ids(
-            project_ids=[root.project_id], allowed_roles=FullWriteAccessRoles
+        (target_project,) = connection.get_and_check_access_to_projects_for_names(
+            [project], FullWriteAccessRoles
         )
         alayer = AnalysisLayer(connection)
 
@@ -78,7 +75,7 @@ class AnalysisMutations:
 
         analysis_id = await alayer.create_analysis(
             Analysis(**analysis.__dict__).to_internal(),
-            project=root.project_id,
+            project=target_project.id,
         )
         created_analysis = await alayer.get_analysis_by_id(analysis_id)
         return GraphQLAnalysis.from_internal(created_analysis)

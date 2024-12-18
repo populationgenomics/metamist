@@ -23,16 +23,9 @@ class Mutation:
 
     # Project
     @strawberry.field
-    def project(
-        self, name: str, info: Info[GraphQLContext, 'Mutation']
-    ) -> ProjectMutations:
+    def project(self) -> ProjectMutations:
         """Project mutations"""
-        connection = info.context['connection']
-        projects = connection.get_and_check_access_to_projects_for_names(
-            project_names=[name], allowed_roles=FullWriteAccessRoles
-        )
-        project_id = next(p for p in projects).id
-        return ProjectMutations(project_id=project_id)
+        return ProjectMutations()
 
     # Comments
     @strawberry.field
@@ -48,29 +41,15 @@ class Mutation:
 
     # Analysis Runner
     @strawberry.field
-    def analysis_runner(
-        self, project_name: str, info: Info[GraphQLContext, 'Mutation']
-    ) -> AnalysisRunnerMutations:
+    def analysis_runner(self) -> AnalysisRunnerMutations:
         """Analysis Runner mutations"""
-        connection = info.context['connection']
-        projects = connection.get_and_check_access_to_projects_for_names(
-            project_names=[project_name], allowed_roles=FullWriteAccessRoles
-        )
-        project_id = next(p for p in projects).id
-        return AnalysisRunnerMutations(project_id=project_id)
+        return AnalysisRunnerMutations()
 
     # Analysis
     @strawberry.field
-    def analysis(
-        self, project_name: str, info: Info[GraphQLContext, 'Mutation']
-    ) -> AnalysisMutations:
+    def analysis(self) -> AnalysisMutations:
         """Analysis mutations"""
-        connection = info.context['connection']
-        projects = connection.get_and_check_access_to_projects_for_names(
-            project_names=[project_name], allowed_roles=FullWriteAccessRoles
-        )
-        project_id = next(p for p in projects).id
-        return AnalysisMutations(project_id=project_id)
+        return AnalysisMutations()
 
     # Family
     @strawberry.field
@@ -86,29 +65,15 @@ class Mutation:
 
     # Samples
     @strawberry.field
-    def sample(
-        self, project_name: str, info: Info[GraphQLContext, 'Mutation']
-    ) -> SampleMutations:
+    def sample(self) -> SampleMutations:
         """Sample mutations"""
-        connection = info.context['connection']
-        projects = connection.get_and_check_access_to_projects_for_names(
-            project_names=[project_name], allowed_roles=FullWriteAccessRoles
-        )
-        project_id = next(p for p in projects).id
-        return SampleMutations(project_id=project_id)
+        return SampleMutations()
 
     # SequencingGroup
     @strawberry.field
-    def sequencing_group(
-        self, project_name: str, info: Info[GraphQLContext, 'Mutation']
-    ) -> SequencingGroupMutations:
+    def sequencing_group(self) -> SequencingGroupMutations:
         """Sequencing Group mutations"""
-        connection = info.context['connection']
-        projects = connection.get_and_check_access_to_projects_for_names(
-            project_names=[project_name], allowed_roles=FullWriteAccessRoles
-        )
-        project_id = next(p for p in projects).id
-        return SequencingGroupMutations(project_id=project_id)
+        return SequencingGroupMutations()
 
     # Cohort
     @strawberry.field()

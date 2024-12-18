@@ -16,10 +16,11 @@ from models.models.sample import SampleUpsert
 from models.utils.sample_id_format import (  # Sample,
     sample_id_transform_to_raw,
 )
+from models.models.project import FullWriteAccessRoles
+
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLComment, GraphQLSample
-    from api.graphql.mutations.project import ProjectMutations
 
 
 @strawberry.input  # type: ignore [misc]
@@ -40,8 +41,6 @@ class SampleUpsertInput:
 @strawberry.type
 class SampleMutations:
     """Sample mutations"""
-
-    project_id: strawberry.Private[int]
 
     @strawberry.mutation
     async def add_comment(
@@ -67,19 +66,22 @@ class SampleMutations:
     @strawberry.mutation
     async def create_sample(
         self,
+        project: str,
         sample: SampleUpsertInput,
         info: Info[GraphQLContext, 'SampleMutations'],
-        root: 'ProjectMutations',
     ) -> Annotated['GraphQLSample', strawberry.lazy('api.graphql.schema')]:
         """Creates a new sample, and returns the internal sample ID"""
         from api.graphql.schema import GraphQLSample
 
         connection: Connection = info.context['connection']
+        (target_project,) = connection.get_and_check_access_to_projects_for_names(
+            [project], FullWriteAccessRoles
+        )
         slayer = SampleLayer(connection)
 
         sample_upsert = SampleUpsert.from_dict(strawberry.asdict(sample))
         internal_sid = await slayer.upsert_sample(
-            sample_upsert.to_internal(), project=root.project_id
+            sample_upsert.to_internal(), project=target_project.id
         )
         created_sample = await slayer.get_sample_by_id(internal_sid.id)  # type: ignore [arg-type]
 
@@ -88,9 +90,9 @@ class SampleMutations:
     @strawberry.mutation
     async def upsert_samples(
         self,
+        project: str,
         samples: list[SampleUpsertInput],
         info: Info[GraphQLContext, 'SampleMutations'],
-        root: 'ProjectMutations',
     ) -> list[Annotated['GraphQLSample', strawberry.lazy('api.graphql.schema')]] | None:
         """
         Upserts a list of samples with sequencing-groups,
@@ -99,6 +101,9 @@ class SampleMutations:
         from api.graphql.schema import GraphQLSample
 
         connection: Connection = info.context['connection']
+        (target_project,) = connection.get_and_check_access_to_projects_for_names(
+            [project], FullWriteAccessRoles
+        )
         slayer = SampleLayer(connection)
 
         internal_samples = [
@@ -106,7 +111,7 @@ class SampleMutations:
             for sample in samples
         ]
         upserted = await slayer.upsert_samples(
-            internal_samples, project=root.project_id
+            internal_samples, project=target_project.id
         )
         upserted_samples = await slayer.get_samples_by(
             sample_ids=[s.id for s in upserted]  # type: ignore [arg-type]

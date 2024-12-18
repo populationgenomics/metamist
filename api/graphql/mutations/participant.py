@@ -92,6 +92,7 @@ class ParticipantMutations:
     @strawberry.mutation
     async def upsert_participants(
         self,
+        project: str,
         participants: list[ParticipantUpsertInput],
         info: Info,
     ) -> list[Annotated['GraphQLParticipant', strawberry.lazy('api.graphql.schema')]]:
@@ -102,7 +103,7 @@ class ParticipantMutations:
         from api.graphql.schema import GraphQLParticipant
 
         connection: Connection = info.context['connection']
-        connection.check_access(FullWriteAccessRoles)
+        connection.check_access_to_projects_for_names([project], FullWriteAccessRoles)
 
         pt = ParticipantLayer(connection)
         results = await pt.upsert_participants(

@@ -8,6 +8,7 @@ from strawberry.types import Info
 from strawberry.scalars import JSON
 
 from api.graphql.loaders import GraphQLContext
+from db.python.connect import Connection
 from db.python.layers.comment import CommentLayer
 from db.python.tables.project import ProjectPermissionsTable
 from models.models.project import (
@@ -18,7 +19,7 @@ from models.models.project import (
 from models.models.comment import CommentEntityType
 
 if TYPE_CHECKING:
-    from api.graphql.schema import GraphQLComment
+    from api.graphql.schema import GraphQLComment, GraphQLProject
 
 
 @strawberry.input
@@ -32,8 +33,6 @@ class ProjectMemberUpdateInput:
 @strawberry.type
 class ProjectMutations:
     """Project mutations"""
-
-    project_id: strawberry.Private[int]
 
     @strawberry.mutation
     async def add_comment(
@@ -60,11 +59,13 @@ class ProjectMutations:
         dataset: str,
         create_test_project: bool,
         info: Info,
-    ) -> int:
+    ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.schema')]:
         """
         Create a new project
         """
-        connection = info.context['connection']
+        from api.graphql.schema import GraphQLProject
+
+        connection: Connection = info.context['connection']
         ptable = ProjectPermissionsTable(connection)
 
         await ptable.check_project_creator_permissions(author=connection.author)
@@ -75,6 +76,10 @@ class ProjectMutations:
             author=connection.author,
         )
 
+        (project,) = connection.get_and_check_access_to_projects_for_ids(
+            [pid], {ProjectMemberRole.project_admin}
+        )
+
         if create_test_project:
             await ptable.create_project(
                 project_name=name + '-test',
@@ -82,7 +87,7 @@ class ProjectMutations:
                 author=connection.author,
             )
 
-        return pid
+        return GraphQLProject.from_internal(project)
 
     @strawberry.mutation
     async def update_project(
@@ -92,14 +97,16 @@ class ProjectMutations:
         info: Info,
     ) -> JSON:
         """Update a project by project name"""
-        connection = info.context['connection']
-        connection.check_access({ProjectMemberRole.project_admin})
+        connection: Connection = info.context['connection']
+        connection.check_access_to_projects_for_names(
+            [project], {ProjectMemberRole.project_admin}
+        )
 
         ptable = ProjectPermissionsTable(connection)
         await ptable.update_project(
             project_name=project,
             update=project_update_model,  # type: ignore [arg-type]
-            author=connection.author,  # type: ignore [arg-type]
+            author=connection.author,
         )
 
         return JSON({'success': True})
@@ -107,20 +114,22 @@ class ProjectMutations:
     @strawberry.mutation
     async def delete_project_data(
         self,
+        project: str,
         delete_project: bool,
         info: Info,
     ) -> JSON:
         """
         Delete all data in a project by project name.
         """
-        connection = info.context['connection']
-        connection.check_access({ProjectMemberRole.project_admin})
+        connection: Connection = info.context['connection']
+        (target_project,) = connection.get_and_check_access_to_projects_for_names(
+            [project], {ProjectMemberRole.project_admin}
+        )
 
         ptable = ProjectPermissionsTable(connection)
-        assert connection.project
 
         success = await ptable.delete_project_data(
-            project_id=connection.project.id,
+            project_id=target_project.id,
             delete_project=delete_project,
         )
 
@@ -129,6 +138,7 @@ class ProjectMutations:
     @strawberry.mutation
     async def update_project_members(
         self,
+        project: str,
         members: list[ProjectMemberUpdateInput],
         info: Info,
     ) -> JSON:
@@ -136,8 +146,10 @@ class ProjectMutations:
         Update project members for specific read / write group.
         Not that this is protected by access to a specific access group
         """
-        connection = info.context['connection']
-        connection.check_access({ProjectMemberRole.project_member_admin})
+        connection: Connection = info.context['connection']
+        (target_project,) = connection.get_and_check_access_to_projects_for_names(
+            [project], {ProjectMemberRole.project_member_admin}
+        )
 
         ptable = ProjectPermissionsTable(connection)
 
@@ -151,9 +163,6 @@ class ProjectMutations:
             ProjectMemberUpdate.from_dict(strawberry.asdict(member))
             for member in members
         ]
-        assert connection.project
-        await ptable.set_project_members(
-            project=connection.project, members=member_objs
-        )
+        await ptable.set_project_members(project=target_project, members=member_objs)
 
         return JSON({'success': True})
