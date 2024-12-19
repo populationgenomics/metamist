@@ -3,6 +3,7 @@ import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import MuckError from '../../shared/components/MuckError'
 import { ProjectSummary, WebApi } from '../../sm-api'
 
+import { Link } from 'react-router-dom'
 import BatchStatistics from './BatchStatistics'
 import MultiQCReports from './MultiQCReports'
 import SeqrLinks from './SeqrLinks'
@@ -54,6 +55,7 @@ export const ProjectSummaryView: React.FunctionComponent<ProjectSummaryProps> = 
 
     return (
         <>
+            <Link to={`/project/${projectName}/query`}>SQL Query</Link>
             <TotalsStats summary={summary ?? {}} />
             <SummaryStatistics
                 projectName={projectName}
