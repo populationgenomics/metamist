@@ -186,6 +186,26 @@ UPDATE_PARTICIPANT_MUTATION = """
         }
     }
 """
+
+UPSERT_PARTICIPANTS_MUTATION = """
+    mutation upsertParticipants($project: String!, $participants: [ParticipantUpsertInput!]!) {
+        participant {
+            upsertParticipants(project: $project, participants: $participants) {
+                id
+                externalIds
+                reportedSex
+                reportedGender
+                karyotype
+                samples {
+                    id
+                    type
+                    meta
+                    externalIds
+                }
+            }
+        }
+    }
+"""
 # endregion PARTICIPANT MUTATIONS
 
 
@@ -661,5 +681,98 @@ class TestMutations(DbIsolatedTest):
         self.assertEqual(api_result.reported_gender, mutation_result['reportedGender'])
         self.assertEqual(api_result.karyotype, mutation_result['karyotype'])
         self.assertEqual(api_result.samples[0].id, mutation_result['samples'][0]['id'])  # type: ignore [arg-type]
+
+    @run_as_sync
+    async def test_upsert_participants(self):
+        """Test upserting a list of participants using the mutation and the API. This inserts a new participant and updates an existing one."""
+        mutation_result = (
+            await self.run_graphql_query_async(
+                UPSERT_PARTICIPANTS_MUTATION,
+                variables={
+                    'project': self.project_name,
+                    'participants': [
+                        {
+                            'id': self.participant.id,
+                            'externalIds': {PRIMARY_EXTERNAL_ORG: 'EX01'},
+                            'reportedSex': 2,
+                            'reportedGender': 'female',
+                            'karyotype': 'test_karyotype',
+                            'samples': [
+                                {
+                                    'id': self.external_sample_id,
+                                    'type': 'blood',
+                                    'meta': {'test': 'test'},
+                                    'externalIds': {'test': 'test'},
+                                }
+                            ],
+                        },
+                        {
+                            'externalIds': {PRIMARY_EXTERNAL_ORG: 'EX01_pat'},
+                            'reportedSex': 1,
+                            'reportedGender': 'female',
+                            'karyotype': 'test_karyotype',
+                            'samples': [
+                                {
+                                    'id': self.external_sample_id,
+                                    'type': 'blood',
+                                    'meta': {'test': 'test'},
+                                    'externalIds': {'test': 'test'},
+                                }
+                            ],
+                        },
+                    ],
+                },
+            )
+        )['participant']['upsertParticipants']
+
+        api_result = await self.pl.upsert_participants(
+            [
+                ParticipantUpsertInternal(
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'EX01'},
+                    reported_sex=2,
+                    samples=[
+                        SampleUpsertInternal(
+                            id=self.sample_id,
+                            type='blood',
+                            meta={'test': 'test'},
+                            external_ids={'test': 'test'},
+                        )
+                    ],
+                    id=self.participant.id,
+                    reported_gender='female',
+                    karyotype='test_karyotype',
+                ),
+                ParticipantUpsertInternal(
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'EX02_pat'},
+                    reported_sex=1,
+                    samples=[
+                        SampleUpsertInternal(
+                            id=self.sample_id,
+                            type='blood',
+                            meta={'test': 'test'},
+                            external_ids={'test': 'test'},
+                        )
+                    ],
+                    reported_gender='female',
+                    karyotype='test_karyotype',
+                    id=None,
+                ),
+            ]
+        )
+
+        api_result = [p.to_external() for p in api_result]
+        self.assertEqual(api_result[0].id, mutation_result[0]['id'])
+        self.assertEqual(api_result[0].external_ids, mutation_result[0]['externalIds'])
+        self.assertEqual(api_result[0].reported_sex, mutation_result[0]['reportedSex'])
+        self.assertEqual(
+            api_result[0].reported_gender, mutation_result[0]['reportedGender']
+        )
+        self.assertEqual(api_result[0].karyotype, mutation_result[0]['karyotype'])
+
+        self.assertEqual(api_result[1].reported_sex, mutation_result[1]['reportedSex'])
+        self.assertEqual(
+            api_result[1].reported_gender, mutation_result[1]['reportedGender']
+        )
+        self.assertEqual(api_result[1].karyotype, mutation_result[1]['karyotype'])
 
     # endregion PARTICIPANT TESTS
