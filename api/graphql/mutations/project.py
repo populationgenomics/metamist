@@ -68,8 +68,6 @@ class ProjectMutations:
         connection: Connection = info.context['connection']
         ptable = ProjectPermissionsTable(connection)
 
-        await ptable.check_project_creator_permissions(author=connection.author)
-
         pid = await ptable.create_project(
             project_name=name,
             dataset_name=dataset,
@@ -95,10 +93,12 @@ class ProjectMutations:
         project: str,
         project_update_model: JSON,
         info: Info,
-    ) -> JSON:
+    ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.schema')]:
         """Update a project by project name"""
+        from api.graphql.schema import GraphQLProject
+
         connection: Connection = info.context['connection']
-        connection.check_access_to_projects_for_names(
+        (p,) = connection.get_and_check_access_to_projects_for_names(
             [project], {ProjectMemberRole.project_admin}
         )
 
@@ -109,31 +109,12 @@ class ProjectMutations:
             author=connection.author,
         )
 
-        return JSON({'success': True})
-
-    @strawberry.mutation
-    async def delete_project_data(
-        self,
-        project: str,
-        delete_project: bool,
-        info: Info,
-    ) -> JSON:
-        """
-        Delete all data in a project by project name.
-        """
-        connection: Connection = info.context['connection']
-        (target_project,) = connection.get_and_check_access_to_projects_for_names(
+        await connection.refresh_projects()
+        (p,) = connection.get_and_check_access_to_projects_for_names(
             [project], {ProjectMemberRole.project_admin}
         )
 
-        ptable = ProjectPermissionsTable(connection)
-
-        success = await ptable.delete_project_data(
-            project_id=target_project.id,
-            delete_project=delete_project,
-        )
-
-        return JSON({'success': success})
+        return GraphQLProject.from_internal(p)
 
     @strawberry.mutation
     async def update_project_members(
@@ -141,11 +122,13 @@ class ProjectMutations:
         project: str,
         members: list[ProjectMemberUpdateInput],
         info: Info,
-    ) -> JSON:
+    ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.schema')]:
         """
         Update project members for specific read / write group.
         Not that this is protected by access to a specific access group
         """
+        from api.graphql.schema import GraphQLProject
+
         connection: Connection = info.context['connection']
         (target_project,) = connection.get_and_check_access_to_projects_for_names(
             [project], {ProjectMemberRole.project_member_admin}
@@ -164,5 +147,9 @@ class ProjectMutations:
             for member in members
         ]
         await ptable.set_project_members(project=target_project, members=member_objs)
+        await connection.refresh_projects()
 
-        return JSON({'success': True})
+        (target_project,) = connection.get_and_check_access_to_projects_for_names(
+            [project], {ProjectMemberRole.project_member_admin}
+        )
+        return GraphQLProject.from_internal(target_project)

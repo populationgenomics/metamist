@@ -1,9 +1,11 @@
-# pylint: disable=ungrouped-imports
+# pylint: disable=ungrouped-imports, too-many-lines
 
 from db.python.filters.generic import GenericFilter
 from db.python.layers.cohort import CohortLayer
 from db.python.layers.family import FamilyLayer
 from db.python.tables.cohort import CohortFilter, CohortTemplateFilter
+from db.python.tables.project import ProjectPermissionsTable
+from models.models.project import ProjectMemberRole
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
     AnalysisInternal,
@@ -219,6 +221,48 @@ UPDATE_PARTICIPANT_FAMILY_MUTATION = """
 """
 # endregion PARTICIPANT MUTATIONS
 
+# region PROJECT MUTATIONS
+CREATE_PROJECT_MUTATION = """
+    mutation createProject($name: String!, $dataset: String!, $createTestProject: Boolean!) {
+        project {
+            createProject(name: $name, dataset: $dataset, createTestProject: $createTestProject) {
+                id
+                name
+                dataset
+                meta
+            }
+        }
+    }
+"""
+
+UPDATE_PROJECT_MUTATION = """
+    mutation updateProject($project: String!, $projectUpdateModel: JSON!) {
+        project {
+            updateProject(project: $project, projectUpdateModel: $projectUpdateModel) {
+                id
+                name
+                dataset
+                meta
+            }
+        }
+    }
+"""
+
+UPDATE_PROJECT_MEMBERS_MUTATION = """
+    mutation updateProjectMembers($project: String!, $members: [ProjectMemberUpdateInput!]!) {
+        project {
+            updateProjectMembers(project: $project, members: $members) {
+                id
+                name
+                dataset
+                meta
+                roles
+            }
+        }
+    }
+"""
+# endregion PROJECT MUTATIONS
+
 
 class TestMutations(DbIsolatedTest):
     """Test sample class"""
@@ -236,6 +280,7 @@ class TestMutations(DbIsolatedTest):
         self.al = AnalysisLayer(self.connection)
         self.pl = ParticipantLayer(self.connection)
         self.fl = FamilyLayer(self.connection)
+        self.ppt = ProjectPermissionsTable(self.connection)
 
         self.family_id = await self.fl.create_family(external_ids={'forg': 'FAM01'})
         self.family_id_2 = await self.fl.create_family(external_ids={'forg': 'FAM02'})
@@ -836,3 +881,125 @@ class TestMutations(DbIsolatedTest):
         self.assertEqual(api_result.family_id, mutation_result['familyId'])
 
     # endregion PARTICIPANT TESTS
+
+    # region PROJECT TESTS
+    @run_as_sync
+    async def test_create_project(self):
+        """Test creating a project using the mutation and the API"""
+        mutation_result = (
+            await self.run_graphql_query_async(
+                CREATE_PROJECT_MUTATION,
+                variables={
+                    'name': 'test_project',
+                    'dataset': 'test_dataset',
+                    'createTestProject': True,
+                },
+            )
+        )['project']['createProject']
+
+        api_result = list(
+            self.connection.get_and_check_access_to_projects_for_names(
+                [mutation_result['name'], mutation_result['name'] + '-test'],
+                allowed_roles={
+                    ProjectMemberRole.project_admin,
+                    ProjectMemberRole.writer,
+                },
+            )
+        )
+
+        self.assertEqual(api_result[0].name, mutation_result['name'])
+        self.assertEqual(api_result[0].dataset, mutation_result['dataset'])
+        self.assertEqual(api_result[0].meta, mutation_result['meta'])
+
+        self.assertEqual(api_result[1].name, mutation_result['name'] + '-test')
+        self.assertEqual(api_result[1].dataset, mutation_result['dataset'])
+        self.assertEqual(api_result[1].meta, mutation_result['meta'])
+
+    @run_as_sync
+    async def test_update_project(self):
+        """Test updating a project using the mutation and the API"""
+        create_project_result = (
+            await self.run_graphql_query_async(
+                CREATE_PROJECT_MUTATION,
+                variables={
+                    'name': 'new_test_project',
+                    'dataset': 'test_dataset',
+                    'createTestProject': False,
+                },
+            )
+        )['project']['createProject']
+
+        mutation_result = (
+            await self.run_graphql_query_async(
+                UPDATE_PROJECT_MUTATION,
+                variables={
+                    'project': create_project_result['name'],
+                    'projectUpdateModel': {
+                        'meta': {'test': 'test'},
+                    },
+                },
+            )
+        )['project']['updateProject']
+
+        await self.connection.refresh_projects()
+
+        api_result = list(
+            self.connection.get_and_check_access_to_projects_for_names(
+                [mutation_result['name']],
+                allowed_roles={
+                    ProjectMemberRole.project_admin,
+                    ProjectMemberRole.writer,
+                },
+            )
+        )[0]
+
+        self.assertEqual(api_result.name, mutation_result['name'])
+        self.assertEqual(api_result.dataset, mutation_result['dataset'])
+        self.assertEqual(api_result.meta, {'test': 'test'})
+
+    @run_as_sync
+    async def test_update_project_members(self):
+        """Test updating project members using the mutation and the API"""
+        create_project_result = (
+            await self.run_graphql_query_async(
+                CREATE_PROJECT_MUTATION,
+                variables={
+                    'name': 'new_test_project',
+                    'dataset': 'test_dataset',
+                    'createTestProject': False,
+                },
+            )
+        )['project']['createProject']
+
+        mutation_result = (
+            await self.run_graphql_query_async(
+                UPDATE_PROJECT_MEMBERS_MUTATION,
+                variables={
+                    'project': create_project_result['name'],
+                    'members': [
+                        {
+                            'member': 'testuser',
+                            'roles': ['reader', 'writer'],
+                        }
+                    ],
+                },
+            )
+        )['project']['updateProjectMembers']
+
+        api_result = list(
+            self.connection.get_and_check_access_to_projects_for_names(
+                [mutation_result['name']],
+                allowed_roles={
+                    ProjectMemberRole.project_member_admin,
+                },
+            )
+        )[0]
+
+        self.assertEqual(api_result.name, mutation_result['name'])
+        self.assertEqual(api_result.dataset, mutation_result['dataset'])
+        self.assertEqual(api_result.meta, mutation_result['meta'])
+        self.assertEqual(
+            [role.value for role in api_result.roles], mutation_result['roles']
+        )
+
+    # endregion PROJECT TESTS
