@@ -375,20 +375,12 @@ class TestMutations(DbIsolatedTest):
             affected=2,
         )
 
-        members_admin_group = await self.connection.connection.fetch_val(
-            'SELECT id FROM `group` WHERE name = :name',
-            {'name': GROUP_NAME_PROJECT_CREATORS},
-        )
         await self.connection.connection.execute(
+            f"""
+            INSERT INTO group_member(group_id, member)
+            SELECT id, '{self.author}'
+            FROM `group` WHERE name IN('project-creators', 'members-admin')
             """
-            INSERT INTO group_member (group_id, member, audit_log_id)
-            VALUES (:group_id, :member, :audit_log_id);
-            """,
-            {
-                'group_id': members_admin_group,
-                'member': self.author,
-                'audit_log_id': await self.audit_log_id(),
-            },
         )
 
     # region ANALYSIS TESTS
