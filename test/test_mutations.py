@@ -2,7 +2,8 @@
 
 from db.python.filters.generic import GenericFilter
 from db.python.layers.cohort import CohortLayer
-from db.python.tables.cohort import CohortFilter
+from db.python.layers.family import FamilyLayer
+from db.python.tables.cohort import CohortFilter, CohortTemplateFilter
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
     AnalysisInternal,
@@ -10,7 +11,8 @@ from models.models import (
     SampleUpsertInternal,
     SequencingGroupUpsertInternal,
 )
-from models.models.cohort import CohortCriteriaInternal
+from models.models.cohort import CohortCriteriaInternal, CohortTemplateInternal
+from models.models.participant import ParticipantUpsertInternal
 from test.testbase import DbIsolatedTest, run_as_sync
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.assay import AssayLayer
@@ -131,7 +133,60 @@ CREATE_COHORT_FROM_CRITERIA_MUTATION = """
     }
 """
 
+CREATE_COHORT_TEMPLATE_MUTATION = """
+    mutation createCohortTemplate($project: String!, $template: CohortTemplateInput!) {
+        cohort {
+            createCohortTemplate(
+                project: $project
+                template: $template
+            ) {
+                id
+                name
+                description
+                criteria
+            }
+        }
+    }
+"""
+
 # endregion COHORT MUTATIONS
+
+# region FAMILY MUTATIONS
+UPDATE_FAMILY_MUTATION = """
+    mutation updateFamily($family: FamilyUpdateInput!) {
+        family {
+            updateFamily(family: $family) {
+                id
+                externalIds
+                description
+                codedPhenotype
+            }
+        }
+    }
+"""
+# endregion FAMILY MUTATIONS
+
+# region PARTICIPANT MUTATIONS
+UPDATE_PARTICIPANT_MUTATION = """
+    mutation updateParticipant($participantId: Int!, $participant: ParticipantUpsertInput!) {
+        participant {
+            updateParticipant(participantId: $participantId, participant: $participant) {
+                id
+                externalIds
+                reportedSex
+                reportedGender
+                karyotype
+                samples {
+                    id
+                    type
+                    meta
+                    externalIds
+                }
+            }
+        }
+    }
+"""
+# endregion PARTICIPANT MUTATIONS
 
 
 class TestMutations(DbIsolatedTest):
@@ -149,6 +204,9 @@ class TestMutations(DbIsolatedTest):
         self.asl = AssayLayer(self.connection)
         self.al = AnalysisLayer(self.connection)
         self.pl = ParticipantLayer(self.connection)
+        self.fl = FamilyLayer(self.connection)
+
+        self.family_id = await self.fl.create_family(external_ids={'forg': 'FAM01'})
 
         sample = await self.sl.upsert_sample(
             SampleUpsertInternal(
@@ -203,6 +261,13 @@ class TestMutations(DbIsolatedTest):
         self.exome_sequencing_group_id = sample.sequencing_groups[self.project_id].id  # type: ignore [arg-type]
         self.exome_sequencing_group_id_external = (
             sample.sequencing_groups[self.project_id].to_external().id  # type: ignore [arg-type]
+        )
+        self.participant = await self.pl.upsert_participant(
+            ParticipantUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'EX01'},
+                reported_sex=2,
+                samples=[sample],
+            )
         )
 
     # region ANALYSIS TESTS
@@ -438,4 +503,163 @@ class TestMutations(DbIsolatedTest):
         self.assertEqual(api_result.description, mutation_result['description'])
         self.assertEqual(api_result.author, mutation_result['author'])
 
+    @run_as_sync
+    async def test_create_cohort_template(self):
+        """Test creating a cohort template"""
+
+        mutation_result = (
+            await self.run_graphql_query_async(
+                CREATE_COHORT_TEMPLATE_MUTATION,
+                variables={
+                    'project': self.project_name,
+                    'template': {
+                        'name': 'TestTemplate',
+                        'description': 'TestCohortTemplateDescription',
+                        'criteria': {
+                            'projects': [self.project_name],
+                            'sgIdsInternal': [self.genome_sequencing_group_id_external],
+                            'excludedSgsInternal': [
+                                self.exome_sequencing_group_id_external
+                            ],
+                            'sgTechnology': ['short-read'],
+                            'sgPlatform': ['illumina'],
+                            'sgType': ['genome'],
+                            'sampleType': ['blood'],
+                        },
+                    },
+                },
+            )
+        )['cohort']['createCohortTemplate']
+        template_id = await self.cl.create_cohort_template(
+            project=self.project_id,
+            cohort_template=CohortTemplateInternal(
+                id=None,
+                name='TestTemplate',
+                description='TestCohortTemplateDescription',
+                project=self.project_id,
+                criteria=CohortCriteriaInternal(
+                    projects=[self.project_id],
+                    sg_ids_internal_raw=[self.genome_sequencing_group_id],  # type: ignore [arg-type]
+                    excluded_sgs_internal_raw=[self.exome_sequencing_group_id],  # type: ignore [arg-type]
+                    sg_technology=['short-read'],
+                    sg_platform=['illumina'],
+                    sg_type=['genome'],
+                    sample_type=['blood'],
+                ),
+            ),
+        )
+        api_result = (
+            await self.cl.query_cohort_templates(
+                CohortTemplateFilter(id=GenericFilter(eq=template_id))
+            )
+        )[0]
+        self.assertEqual(api_result.description, mutation_result['description'])
+        self.assertEqual(
+            api_result.criteria.sample_type, mutation_result['criteria']['sample_type']
+        )
+        self.assertEqual(
+            api_result.criteria.sg_platform, mutation_result['criteria']['sg_platform']
+        )
+        self.assertEqual(
+            api_result.criteria.sg_technology,
+            mutation_result['criteria']['sg_technology'],
+        )
+        self.assertEqual(
+            api_result.criteria.sg_type, mutation_result['criteria']['sg_type']
+        )
+        self.assertEqual(api_result.name, mutation_result['name'])
+
     # endregion COHORT TESTS
+
+    # region FAMILY TESTS
+    @run_as_sync
+    async def test_update_family(self):
+        """Test updating a family using the mutation and the API"""
+        mutation_result = (
+            await self.run_graphql_query_async(
+                UPDATE_FAMILY_MUTATION,
+                variables={
+                    'project': self.project_name,
+                    'family': {
+                        'id': self.family_id,
+                        'externalIds': {PRIMARY_EXTERNAL_ORG: 'test'},
+                        'description': 'test_family',
+                        'codedPhenotype': 'test_family_phenotype',
+                    },
+                },
+            )
+        )['family']['updateFamily']
+
+        await self.fl.update_family(
+            id_=self.family_id,
+            external_ids={'test': 'test'},
+            description='test_family',
+            coded_phenotype='test_family_phenotype',
+        )
+
+        api_result = (
+            await self.fl.get_family_by_internal_id(self.family_id)
+        ).to_external()  # type: ignore [arg-type]
+
+        self.assertEqual(api_result.external_ids, mutation_result['externalIds'])
+        self.assertEqual(api_result.description, mutation_result['description'])
+        self.assertEqual(api_result.coded_phenotype, mutation_result['codedPhenotype'])
+
+    # endregion FAMILY TESTS
+
+    # region PARTICIPANT TESTS
+    @run_as_sync
+    async def test_update_participant(self):
+        """Test updating a participant using the mutation and the API"""
+        mutation_result = (
+            await self.run_graphql_query_async(
+                UPDATE_PARTICIPANT_MUTATION,
+                variables={
+                    'project': self.project_name,
+                    'participantId': self.participant.id,
+                    'participant': {
+                        'id': self.participant.id,
+                        'externalIds': {PRIMARY_EXTERNAL_ORG: 'test'},
+                        'reportedSex': 2,
+                        'reportedGender': 'female',
+                        'karyotype': 'test_karyotype',
+                        'samples': [
+                            {
+                                'id': self.external_sample_id,
+                                'type': 'blood',
+                                'meta': {'test': 'test'},
+                                'externalIds': {'test': 'test'},
+                            }
+                        ],
+                    },
+                },
+            )
+        )['participant']['updateParticipant']
+
+        api_result = (
+            await self.pl.upsert_participant(
+                ParticipantUpsertInternal(
+                    id=self.participant.id,
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'test'},
+                    reported_sex=2,
+                    reported_gender='female',
+                    karyotype='test_karyotype',
+                    samples=[
+                        SampleUpsertInternal(
+                            id=self.sample_id,
+                            type='blood',
+                            meta={'test': 'test'},
+                            external_ids={'test': 'test'},
+                        )
+                    ],
+                )
+            )
+        ).to_external()
+
+        self.assertEqual(api_result.external_ids, mutation_result['externalIds'])
+        self.assertEqual(api_result.reported_sex, mutation_result['reportedSex'])
+        self.assertEqual(api_result.reported_gender, mutation_result['reportedGender'])
+        self.assertEqual(api_result.karyotype, mutation_result['karyotype'])
+        self.assertEqual(api_result.samples[0].id, mutation_result['samples'][0]['id'])  # type: ignore [arg-type]
+
+    # endregion PARTICIPANT TESTS
