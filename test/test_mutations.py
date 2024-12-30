@@ -24,6 +24,8 @@ from db.python.layers.sequencing_group import SequencingGroupLayer
 from models.enums import AnalysisStatus
 from api.graphql.mutations.analysis import AnalysisStatusType
 
+GROUP_NAME_PROJECT_CREATORS = 'project-creators'
+
 # region ANALYSIS MUTATIONS
 
 CREATE_ANALYSIS_MUTATION = """
@@ -371,6 +373,22 @@ class TestMutations(DbIsolatedTest):
             paternal_id=self.pat_id,
             maternal_id=self.mat_id,
             affected=2,
+        )
+
+        members_admin_group = await self.connection.connection.fetch_val(
+            'SELECT id FROM `group` WHERE name = :name',
+            {'name': GROUP_NAME_PROJECT_CREATORS},
+        )
+        await self.connection.connection.execute(
+            """
+            INSERT INTO group_member (group_id, member, audit_log_id)
+            VALUES (:group_id, :member, :audit_log_id);
+            """,
+            {
+                'group_id': members_admin_group,
+                'member': self.author,
+                'audit_log_id': await self.audit_log_id(),
+            },
         )
 
     # region ANALYSIS TESTS

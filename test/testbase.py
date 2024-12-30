@@ -374,7 +374,6 @@ class DbIsolatedTest(DbTest):
             'project',
             'group',
             'project_member',
-            'group_member',
         }
         for table in TABLES_ORDERED_BY_FK_DEPS:
             if table in ignore:
