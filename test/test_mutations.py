@@ -206,6 +206,17 @@ UPSERT_PARTICIPANTS_MUTATION = """
         }
     }
 """
+
+UPDATE_PARTICIPANT_FAMILY_MUTATION = """
+    mutation updateParticipantFamily($participantId: Int!, $oldFamilyId: Int!, $newFamilyId: Int!) {
+        participant {
+            updateParticipantFamily(participantId: $participantId, oldFamilyId: $oldFamilyId, newFamilyId: $newFamilyId) {
+                familyId
+                participantId
+            }
+        }
+    }
+"""
 # endregion PARTICIPANT MUTATIONS
 
 
@@ -227,6 +238,7 @@ class TestMutations(DbIsolatedTest):
         self.fl = FamilyLayer(self.connection)
 
         self.family_id = await self.fl.create_family(external_ids={'forg': 'FAM01'})
+        self.family_id_2 = await self.fl.create_family(external_ids={'forg': 'FAM02'})
 
         sample = await self.sl.upsert_sample(
             SampleUpsertInternal(
@@ -288,6 +300,32 @@ class TestMutations(DbIsolatedTest):
                 reported_sex=2,
                 samples=[sample],
             )
+        )
+        self.pat_id = (
+            await self.pl.upsert_participant(
+                ParticipantUpsertInternal(
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'EX01_pat'}, reported_sex=1
+                )
+            )
+        ).id
+        self.mat_id = (
+            await self.pl.upsert_participant(
+                ParticipantUpsertInternal(
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'EX01_mat'}, reported_sex=2
+                )
+            )
+        ).id
+
+        assert self.participant.id
+        assert self.pat_id
+        assert self.mat_id
+
+        await self.pl.add_participant_to_family(
+            family_id=self.family_id,
+            participant_id=self.participant.id,
+            paternal_id=self.pat_id,
+            maternal_id=self.mat_id,
+            affected=2,
         )
 
     # region ANALYSIS TESTS
@@ -707,7 +745,7 @@ class TestMutations(DbIsolatedTest):
                             ],
                         },
                         {
-                            'externalIds': {PRIMARY_EXTERNAL_ORG: 'EX01_pat'},
+                            'externalIds': {PRIMARY_EXTERNAL_ORG: 'EX02_pat'},
                             'reportedSex': 1,
                             'reportedGender': 'female',
                             'karyotype': 'test_karyotype',
@@ -743,7 +781,7 @@ class TestMutations(DbIsolatedTest):
                     karyotype='test_karyotype',
                 ),
                 ParticipantUpsertInternal(
-                    external_ids={PRIMARY_EXTERNAL_ORG: 'EX02_pat'},
+                    external_ids={PRIMARY_EXTERNAL_ORG: 'EX03_pat'},
                     reported_sex=1,
                     samples=[
                         SampleUpsertInternal(
@@ -774,5 +812,27 @@ class TestMutations(DbIsolatedTest):
             api_result[1].reported_gender, mutation_result[1]['reportedGender']
         )
         self.assertEqual(api_result[1].karyotype, mutation_result[1]['karyotype'])
+
+    @run_as_sync
+    async def test_update_participant_family(self):
+        """Test updating a participants family data"""
+        mutation_result = (
+            await self.run_graphql_query_async(
+                UPDATE_PARTICIPANT_FAMILY_MUTATION,
+                variables={
+                    'project': self.project_name,
+                    'participantId': self.participant.id,
+                    'oldFamilyId': self.family_id,
+                    'newFamilyId': self.family_id_2,
+                },
+            )
+        )['participant']['updateParticipantFamily']
+
+        api_result = (
+            await self.fl.get_family_participants_by_family_ids([self.family_id_2])
+        )[self.family_id_2][0]
+
+        self.assertEqual(api_result.individual_id, mutation_result['participantId'])
+        self.assertEqual(api_result.family_id, mutation_result['familyId'])
 
     # endregion PARTICIPANT TESTS
