@@ -964,7 +964,7 @@ class TestMutations(DbIsolatedTest):
             await self.run_graphql_query_async(
                 CREATE_PROJECT_MUTATION,
                 variables={
-                    'name': 'new_test_project',
+                    'name': 'new_test_project2',
                     'dataset': 'test_dataset',
                     'createTestProject': False,
                 },
