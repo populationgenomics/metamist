@@ -15,6 +15,7 @@ from models.models import (
 )
 from models.models.cohort import CohortCriteriaInternal, CohortTemplateInternal
 from models.models.participant import ParticipantUpsertInternal
+from models.utils.sample_id_format import sample_id_transform_to_raw
 from test.testbase import DbIsolatedTest, run_as_sync
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.assay import AssayLayer
@@ -264,6 +265,50 @@ UPDATE_PROJECT_MEMBERS_MUTATION = """
     }
 """
 # endregion PROJECT MUTATIONS
+
+# region SAMPLE MUTATIONS
+CREATE_SAMPLE_MUTATION = """
+    mutation createSample($project: String!, $sample: SampleUpsertInput!) {
+        sample {
+            createSample(project: $project, sample: $sample) {
+                id
+                externalIds
+                type
+                active
+                meta
+            }
+        }
+    }
+"""
+
+UPSERT_SAMPLES_MUTATION = """
+    mutation upsertSamples($project: String!, $samples: [SampleUpsertInput!]!) {
+        sample {
+            upsertSamples(project: $project, samples: $samples) {
+                id
+                externalIds
+                type
+                active
+                meta
+            }
+        }
+    }
+"""
+
+UPDATE_SAMPLE_MUTATION = """
+    mutation updateSample($sample: SampleUpsertInput!) {
+        sample {
+            updateSample(sample: $sample) {
+                id
+                externalIds
+                type
+                active
+                meta
+            }
+        }
+    }
+"""
+# endregion SAMPLE MUTATIONS
 
 
 class TestMutations(DbIsolatedTest):
@@ -1013,3 +1058,160 @@ class TestMutations(DbIsolatedTest):
         )
 
     # endregion PROJECT TESTS
+
+    # region SAMPLE TESTS
+    @run_as_sync
+    async def test_create_sample(self):
+        """Test creating a sample using the mutation and the API"""
+        mutation_result = (
+            await self.run_graphql_query_async(
+                CREATE_SAMPLE_MUTATION,
+                variables={
+                    'project': self.project_name,
+                    'sample': {
+                        'type': 'blood',
+                        'meta': {'test': 'test'},
+                        'externalIds': {PRIMARY_EXTERNAL_ORG: 'Test10'},
+                        'active': True,
+                    },
+                },
+            )
+        )['sample']['createSample']
+
+        api_result = await self.sl.get_sample_by_id(
+            sample_id_transform_to_raw(mutation_result['id'])
+        )
+
+        self.assertEqual(
+            api_result.type,
+            'blood',
+        )
+        self.assertEqual(
+            api_result.meta,
+            {'test': 'test'},
+        )
+        self.assertEqual(
+            api_result.external_ids,
+            {PRIMARY_EXTERNAL_ORG: 'Test10'},
+        )
+        self.assertEqual(
+            api_result.active,
+            True,
+        )
+
+    @run_as_sync
+    async def test_upsert_samples(self):
+        """Test upserting a list of samples using the mutation and the API. This inserts a new sample and updates an existing one."""
+        mutation_result = (
+            await self.run_graphql_query_async(
+                UPSERT_SAMPLES_MUTATION,
+                variables={
+                    'project': self.project_name,
+                    'samples': [
+                        {
+                            'id': self.external_sample_id,
+                            'type': 'blood',
+                            'meta': {'test': 'test'},
+                            'externalIds': {PRIMARY_EXTERNAL_ORG: 'Test10'},
+                            'active': True,
+                        },
+                        {
+                            'externalIds': {PRIMARY_EXTERNAL_ORG: 'Test11'},
+                            'type': 'saliva',
+                            'meta': {'test': 'test'},
+                            'active': True,
+                        },
+                    ],
+                },
+            )
+        )['sample']['upsertSamples']
+
+        api_result = await self.sl.get_samples_by(
+            sample_ids=[sample_id_transform_to_raw(s['id']) for s in mutation_result]
+        )
+
+        self.assertEqual(len(api_result), 2)
+        self.assertEqual(
+            api_result[0].type,
+            'blood',
+        )
+        self.assertEqual(
+            api_result[0].external_ids,
+            {PRIMARY_EXTERNAL_ORG: 'Test10'},
+        )
+        self.assertEqual(
+            api_result[0].active,
+            True,
+        )
+        self.assertEqual(
+            api_result[1].type,
+            'saliva',
+        )
+        self.assertEqual(
+            api_result[1].meta,
+            {'test': 'test'},
+        )
+        self.assertEqual(
+            api_result[1].external_ids,
+            {PRIMARY_EXTERNAL_ORG: 'Test11'},
+        )
+        self.assertEqual(
+            api_result[1].active,
+            True,
+        )
+
+    @run_as_sync
+    async def test_update_sample(self):
+        """Test updating a sample using the mutation and the API"""
+        create_sample_result = (
+            await self.run_graphql_query_async(
+                CREATE_SAMPLE_MUTATION,
+                variables={
+                    'project': self.project_name,
+                    'sample': {
+                        'type': 'blood',
+                        'meta': {'test': 'test'},
+                        'externalIds': {PRIMARY_EXTERNAL_ORG: 'Test10'},
+                        'active': True,
+                    },
+                },
+            )
+        )['sample']['createSample']
+
+        mutation_result = (
+            await self.run_graphql_query_async(
+                UPDATE_SAMPLE_MUTATION,
+                variables={
+                    'sample': {
+                        'id': create_sample_result['id'],
+                        'type': 'saliva',
+                        'meta': {'test': 'test'},
+                        'externalIds': {PRIMARY_EXTERNAL_ORG: 'Test11'},
+                        'active': True,
+                    },
+                },
+            )
+        )['sample']['updateSample']
+
+        api_result = await self.sl.get_sample_by_id(
+            sample_id_transform_to_raw(mutation_result['id'])
+        )
+
+        self.assertEqual(
+            api_result.type,
+            'saliva',
+        )
+        self.assertEqual(
+            api_result.meta,
+            {'test': 'test'},
+        )
+        self.assertEqual(
+            api_result.external_ids,
+            {PRIMARY_EXTERNAL_ORG: 'Test11'},
+        )
+        self.assertEqual(
+            api_result.active,
+            True,
+        )
+
+    # endregion SAMPLE TESTS
