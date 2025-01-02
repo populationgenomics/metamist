@@ -7,7 +7,7 @@ flake8
 flake8-bugbear
 nest-asyncio
 pre-commit
-pylint
+pylint==3.2.7
 testcontainers[mysql]>=4.8.1
 types-PyMySQL
 pymysql==1.1.1
