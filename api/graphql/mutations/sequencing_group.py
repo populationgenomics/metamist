@@ -76,12 +76,15 @@ class SequencingGroupMutations:
         from api.graphql.schema import GraphQLSequencingGroup
 
         connection: Connection = info.context['connection']
+
+        # Having to do the permission check here is a bit of a hack, we ideally want to
+        # do it in the layer but this will involve potentially refactoring various other
+        # parts of the codebase. Should be looked at during a future refactor overhaul.
         connection.check_access_to_projects_for_names([project], FullWriteAccessRoles)
 
         if not sequencing_group.id:
             raise ValueError('Sequencing group ID must be provided for update')
 
-        # TODO: Review this against the route endpoint
         slayer = SequencingGroupLayer(connection)
         updated_sg: SequencingGroupUpsertInternal = (
             await slayer.upsert_sequencing_groups(
@@ -93,4 +96,5 @@ class SequencingGroupMutations:
                 ]
             )
         )[0]
-        return GraphQLSequencingGroup.from_internal(updated_sg)
+        full_updated_sg = await slayer.get_sequencing_group_by_id(updated_sg.id)  # type: ignore [arg-type]
+        return GraphQLSequencingGroup.from_internal(full_updated_sg)

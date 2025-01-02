@@ -16,6 +16,7 @@ from models.models import (
 from models.models.cohort import CohortCriteriaInternal, CohortTemplateInternal
 from models.models.participant import ParticipantUpsertInternal
 from models.utils.sample_id_format import sample_id_transform_to_raw
+from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
 from test.testbase import DbIsolatedTest, run_as_sync
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.assay import AssayLayer
@@ -309,6 +310,24 @@ UPDATE_SAMPLE_MUTATION = """
     }
 """
 # endregion SAMPLE MUTATIONS
+
+# region SEQUENCING GROUP MUTATIONS
+UPDATE_SEQUENCING_GROUP_MUTATION = """
+    mutation updateSequencingGroup($project: String!, $sequencingGroup: SequencingGroupMetaUpdateInput!) {
+        sequencingGroup {
+            updateSequencingGroup(project: $project, sequencingGroup: $sequencingGroup) {
+                id
+                type
+                meta
+                externalIds
+                sample {
+                    id
+                }
+            }
+        }
+    }
+"""
+# endregion SEQUENCING GROUP MUTATIONS
 
 
 class TestMutations(DbIsolatedTest):
@@ -1215,3 +1234,30 @@ class TestMutations(DbIsolatedTest):
         )
 
     # endregion SAMPLE TESTS
+
+    # region SEQUENCING GROUP TESTS
+    @run_as_sync
+    async def test_update_sequencing_group(self):
+        """Test updating a sequencing group using the mutation and the API"""
+        mutation_result = (
+            await self.run_graphql_query_async(
+                UPDATE_SEQUENCING_GROUP_MUTATION,
+                variables={
+                    'project': self.project_name,
+                    'sequencingGroup': {
+                        'id': self.genome_sequencing_group_id_external,
+                        'meta': {'test': 'test'},
+                    },
+                },
+            )
+        )['sequencingGroup']['updateSequencingGroup']
+
+        api_result = await self.sgl.get_sequencing_group_by_id(
+            sequencing_group_id_transform_to_raw(mutation_result['id'])
+        )
+        self.assertEqual(
+            api_result.meta,
+            {'test': 'test'},
+        )
+
+    # endregion SEQUENCING GROUP TESTS

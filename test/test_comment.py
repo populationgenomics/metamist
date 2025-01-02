@@ -11,7 +11,7 @@ from models.models.assay import AssayUpsertInternal
 from models.models.participant import ParticipantUpsertInternal
 from models.models.sequencing_group import SequencingGroupUpsertInternal
 from test.test_participant import get_participant_to_insert
-from test.testbase import TEST_PROJECT_NAME, DbIsolatedTest, run_as_sync
+from test.testbase import DbIsolatedTest, run_as_sync
 
 # @TODO would be good to add permissions testing to this, but first need a better
 # way of mocking the test user and their permissions to make that possible
@@ -347,7 +347,6 @@ class TestComment(DbIsolatedTest):
         create_comment_variables = {
             'id': entity_id,
             'content': content,
-            'project': TEST_PROJECT_NAME,
         }
 
         created_comment = await self.run_graphql_query_async(
