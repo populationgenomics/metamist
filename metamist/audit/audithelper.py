@@ -19,12 +19,14 @@ CRAM_EXTENSIONS = ('.cram',)
 READ_EXTENSIONS = FASTQ_EXTENSIONS + BAM_EXTENSIONS + CRAM_EXTENSIONS
 GVCF_EXTENSIONS = ('.g.vcf.gz',)
 VCF_EXTENSIONS = ('.vcf', '.vcf.gz')
+ARCHIVE_EXTENSIONS = ('.tar', '.tar.gz', '.zip')
 ALL_EXTENSIONS = (
     FASTQ_EXTENSIONS
     + BAM_EXTENSIONS
     + CRAM_EXTENSIONS
     + GVCF_EXTENSIONS
     + VCF_EXTENSIONS
+    + ARCHIVE_EXTENSIONS
 )
 
 FILE_TYPES_MAP = {
@@ -34,44 +36,36 @@ FILE_TYPES_MAP = {
     'all_reads': READ_EXTENSIONS,
     'gvcf': GVCF_EXTENSIONS,
     'vcf': VCF_EXTENSIONS,
+    'archive': ARCHIVE_EXTENSIONS,
     'all': ALL_EXTENSIONS,
 }
 
 HAIL_EXTENSIONS = ['.ht', '.mt', '.vds']
 
-ANALYSIS_TYPES_QUERY = gql(
+ENUMS_QUERY = gql(
     """
     query analysisTypes {
         enum {
             analysisType
-        }
-    }
-    """
-)
-
-SEQUENCING_TYPES_QUERY = gql(
-    """
-    query seqTypes {
-        enum {
             sequencingType
         }
     }
     """
 )
 
-def get_analysis_types():
-    """Return the list of analysis types from the enum table."""
-    analysis_types_query_result = query(ANALYSIS_TYPES_QUERY)
-    return analysis_types_query_result['enum']['analysisType']
 
-def get_sequencing_types():
-    """Return the list of sequencing types from the enum table."""
-    sequencing_types_query_result: dict[str, dict[str, list[str]]] = query(SEQUENCING_TYPES_QUERY)
-    return sequencing_types_query_result['enum']['sequencingType']
+def get_enums(enum_name) -> list[str]:
+    """
+    Return the list of allowed values of a particular enum type from the enum table.
+    Used to get the list of allowed analysis types and sequencing types.
+    """
+    enums_query_result = query(ENUMS_QUERY)
+    return enums_query_result['enum'][enum_name]
 
 
 class AuditHelper(CloudHelper):
     """General helper class for bucket auditing"""
+
     def __init__(
         self,
         gcp_project: str,
@@ -79,22 +73,28 @@ class AuditHelper(CloudHelper):
         all_sequencing_types: list[str] = None,
         excluded_sequencing_groups: list[str] = None,
     ):
-        # Initialize GCP project
-        self.gcp_project = gcp_project or get_gcp_project() or config_retrieve(['workflow', 'gcp_project']) 
+        super().__init__(search_paths=None)
+
+        # GCP project is used for GCP calls, which the auditor does a lot of
+        self.gcp_project = (
+            gcp_project
+            or get_gcp_project()
+            or config_retrieve(['workflow', 'gcp_project'])
+        )
         if not self.gcp_project:
             raise ValueError('GCP project is required')
-        
-        self.all_analysis_types = all_analysis_types or get_analysis_types()
-        self.all_sequencing_types = all_sequencing_types or get_sequencing_types()
-        
-        self.excluded_sequencing_groups = excluded_sequencing_groups or config_retrieve(['workflow', 'audit', 'excluded_sequencing_groups'])
 
-        super().__init__(
-            gcp_project=self.gcp_project,
+        self.all_analysis_types = all_analysis_types or get_enums('analysisType')
+        self.all_sequencing_types = all_sequencing_types or get_enums('sequencingType')
+
+        self.excluded_sequencing_groups = excluded_sequencing_groups or config_retrieve(
+            ['workflow', 'audit', 'excluded_sequencing_groups']
         )
 
     @staticmethod
-    def get_gcs_buckets_and_prefixes_from_paths(paths: list[str]) -> defaultdict[str, list]:
+    def get_gcs_buckets_and_prefixes_from_paths(
+        paths: list[str],
+    ) -> defaultdict[str, list]:
         """
         Takes a list of paths and extracts the bucket names and prefix, returning all unique pairs
         of buckets and prefixes. Does not make any calls to GCS.
@@ -107,7 +107,9 @@ class AuditHelper(CloudHelper):
                 logging.warning(f'{path} invalid')
                 continue
             bucket = pc['bucket']
-            prefix = pc['suffix'] # This is the prefix (i.e. the "subdirectory" in the bucket)
+            prefix = pc[
+                'suffix'
+            ]  # This is the prefix (i.e. the "subdirectory" in the bucket)
             if prefix and prefix not in buckets_prefixes[bucket]:
                 buckets_prefixes[bucket].append(prefix)
 
@@ -118,11 +120,9 @@ class AuditHelper(CloudHelper):
     ):
         """Iterate through a gcp bucket/prefix and get all the blobs with the specified file extension(s)"""
         bucket = self.gcs_client.bucket(bucket_name, user_project=self.user_project)
-        
+
         files_in_bucket_prefix = []
-        for blob in self.gcs_client.list_blobs(
-            bucket, prefix=prefix, delimiter='/'
-        ):
+        for blob in self.gcs_client.list_blobs(bucket, prefix=prefix, delimiter='/'):
             # Check if file ends with specified analysis type
             if not blob.name.endswith(file_extension):
                 continue
@@ -145,7 +145,9 @@ class AuditHelper(CloudHelper):
                 if any(hl_extension in prefix for hl_extension in HAIL_EXTENSIONS):
                     continue
                 files_in_bucket.extend(
-                    self.get_all_files_in_gcs_bucket_with_prefix_and_extensions(bucket_name, prefix, file_types)
+                    self.get_all_files_in_gcs_bucket_with_prefix_and_extensions(
+                        bucket_name, prefix, file_types
+                    )
                 )
 
         return files_in_bucket
@@ -165,7 +167,7 @@ class AuditHelper(CloudHelper):
                 'Call to list_blobs without prefix only valid for upload buckets'
             )
         bucket = self.gcs_client.bucket(bucket_name, user_project=self.user_project)
-        
+
         assay_paths_sizes = {}
         for blob in self.gcs_client.list_blobs(bucket, prefix=''):
             if not blob.name.endswith(file_extensions):
@@ -174,7 +176,7 @@ class AuditHelper(CloudHelper):
             assay_paths_sizes[blob.name] = blob.size
 
         return assay_paths_sizes
-    
+
     def get_audit_report_prefix(
         self,
         seq_types: str,
@@ -185,16 +187,15 @@ class AuditHelper(CloudHelper):
             sequencing_types_str = 'all_seq_types'
         else:
             sequencing_types_str = ('_').join(self.sequencing_types) + '_seq_types'
-            
+
         if set(file_types) == set(ALL_EXTENSIONS):
             file_types_str = 'all_file_types'
         elif set(file_types) == set(READ_EXTENSIONS):
             file_types_str = 'all_reads_file_types'
         else:
             file_types_str = ('_').join(self.file_types) + '_file_types'
-            
-        return f'{file_types_str}_{sequencing_types_str}'
 
+        return f'{file_types_str}_{sequencing_types_str}'
 
     def write_report_to_cloud(
         self,
@@ -218,7 +219,7 @@ class AuditHelper(CloudHelper):
         if not data_to_write:
             logging.info('No data to write to report')
             return
-        
+
         logging.info(f'Writing report to gs://{bucket_name}/{blob_path}')
 
         # Create a string buffer to hold the data
@@ -230,13 +231,15 @@ class AuditHelper(CloudHelper):
             content_type = 'text/tab-separated-values'
         else:
             raise ValueError('Blob path must end with either .csv or .tsv')
-        
+
         buffer = StringIO()
-        writer = csv.DictWriter(buffer, fieldnames=data_to_write[0].keys(), delimiter=delimiter)
+        writer = csv.DictWriter(
+            buffer, fieldnames=data_to_write[0].keys(), delimiter=delimiter
+        )
 
         writer.writeheader()
         writer.writerows(data_to_write)
-        
+
         storage_client = storage.Client()
         bucket = storage_client.bucket(bucket_name, user_project=self.user_project)
         blob = bucket.blob(blob_path)
@@ -248,5 +251,7 @@ class AuditHelper(CloudHelper):
         )
 
         buffer.close()
-        logging.info(f'Wrote {len(data_to_write)} lines to gs://{bucket_name}/{blob_path}')
+        logging.info(
+            f'Wrote {len(data_to_write)} lines to gs://{bucket_name}/{blob_path}'
+        )
         return
