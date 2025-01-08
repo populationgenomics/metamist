@@ -77,6 +77,8 @@ const TABLES: Record<string, (project: string) => Promise<Uint8Array | void>> = 
         ),
 }
 
+// The below code handles the duckdb-wasm setup,
+// @see here for details: https://duckdb.org/docs/api/wasm/instantiation
 const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
     mvp: {
         mainModule: duckdb_wasm,
@@ -114,6 +116,8 @@ async function initializeDatabase() {
     return db
 }
 
+// Add the table into duckdb from the parquet data blob.
+// Pulls out the table info and returns it along with the name
 async function buildTable(
     project: string,
     db: duckdb.AsyncDuckDB,
@@ -147,6 +151,7 @@ async function buildTable(
     }
 }
 
+// Loop through the tables and add them to the database in parallel
 async function buildTables(
     dbFuture: Promise<duckdb.AsyncDuckDB>,
     project: string
@@ -184,6 +189,8 @@ async function buildTables(
     return tableResults
 }
 
+// Set up the database for the project, including building the tables.
+// All this work is cached, and will only be redone when changing projects
 async function setup(project: string) {
     // Save what the last value of databaseProject was before updating it
     const previousProject = databaseProject
@@ -202,6 +209,7 @@ async function setup(project: string) {
     return { db, tableList }
 }
 
+// Handle execution of a query, will set up the database if needed
 async function executeQuery(project: string, query: string) {
     const { db } = await setup(project)
     const c = await db.connect()
@@ -210,6 +218,7 @@ async function executeQuery(project: string, query: string) {
     return result
 }
 
+// Hook to get the setup status of the project database
 export function useProjectDbSetup(project: string | undefined) {
     const [setupStatus, setSetupStatus] = useState<DbSetupStatus>()
     useEffect(() => {
@@ -234,6 +243,7 @@ export function useProjectDbSetup(project: string | undefined) {
     return setupStatus
 }
 
+// Hook to run a query on the project database
 export function useProjectDbQuery(project: string, query: string) {
     const [result, setResult] = useState<DbQueryResult>()
 
