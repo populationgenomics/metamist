@@ -244,7 +244,7 @@ class ProjectParticipantGridResponse(SMBase):
 
         family_fields: list[ProjectParticipantGridField] = [
             Field(
-                key='external_id',
+                key='external_ids',
                 label='Family ID',
                 is_visible=True,
                 filter_key='external_id',
