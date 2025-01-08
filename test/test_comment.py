@@ -344,7 +344,10 @@ class TestComment(DbIsolatedTest):
             {comment_query}
         """
 
-        create_comment_variables = {'id': entity_id, 'content': content}
+        create_comment_variables = {
+            'id': entity_id,
+            'content': content,
+        }
 
         created_comment = await self.run_graphql_query_async(
             create_comment_query, variables=create_comment_variables
