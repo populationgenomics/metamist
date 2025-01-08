@@ -1,6 +1,6 @@
 {
     "name": "metamist",
-    "version": "7.5.2",
+    "version": "7.6.0",
     "private": true,
     "dependencies": {
         "@apollo/client": "^3.11.5",
