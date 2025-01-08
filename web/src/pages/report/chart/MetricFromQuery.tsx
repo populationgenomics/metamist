@@ -1,4 +1,15 @@
-import { Box, Card, CardContent, Divider, Typography } from '@mui/material'
+import CodeIcon from '@mui/icons-material/Code'
+
+import {
+    Box,
+    Card,
+    CardActions,
+    CardContent,
+    Divider,
+    IconButton,
+    Tooltip,
+    Typography,
+} from '@mui/material'
 import CircularProgress from '@mui/material/CircularProgress'
 import { fromArrow } from 'arquero'
 import { ArrowTable } from 'arquero/dist/types/format/types'
@@ -27,6 +38,22 @@ export function MetricFromQueryCard(props: Props) {
 
     return (
         <Card sx={{ position: 'relative' }}>
+            <CardActions
+                disableSpacing
+                sx={{
+                    position: 'absolute',
+                    right: 0,
+                }}
+            >
+                <Tooltip title="View/Edit SQL" arrow>
+                    <IconButton
+                        target={'_blank'}
+                        href={`/project/${props.project}/query?query=${encodeURIComponent(props.query)}`}
+                    >
+                        <CodeIcon fontSize="small" />
+                    </IconButton>
+                </Tooltip>
+            </CardActions>
             <CardContent>
                 {(props.title || props.subtitle) && (
                     <Box mb={2}>
