@@ -1,3 +1,4 @@
+import CodeIcon from '@mui/icons-material/Code'
 import OpenInFullIcon from '@mui/icons-material/OpenInFull'
 import {
     Alert,
@@ -62,6 +63,14 @@ export function TableFromQueryCard(props: TableCardProps) {
                     right: 0,
                 }}
             >
+                <Tooltip title="View/Edit SQL" arrow>
+                    <IconButton
+                        target={'_blank'}
+                        href={`/project/${props.project}/query?query=${encodeURIComponent(props.query)}`}
+                    >
+                        <CodeIcon fontSize="small" />
+                    </IconButton>
+                </Tooltip>
                 <Tooltip title="Expand table" arrow>
                     <IconButton onClick={() => setExpanded(true)}>
                         <OpenInFullIcon fontSize="small" />

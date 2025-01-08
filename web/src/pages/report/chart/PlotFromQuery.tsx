@@ -1,3 +1,4 @@
+import CodeIcon from '@mui/icons-material/Code'
 import OpenInFullIcon from '@mui/icons-material/OpenInFull'
 import TableChartIcon from '@mui/icons-material/TableChart'
 import {
@@ -63,6 +64,14 @@ export function PlotFromQueryCard(props: Props) {
                     right: 0,
                 }}
             >
+                <Tooltip title="View/Edit SQL" arrow>
+                    <IconButton
+                        target={'_blank'}
+                        href={`/project/${props.project}/query?query=${encodeURIComponent(props.query)}`}
+                    >
+                        <CodeIcon fontSize="small" />
+                    </IconButton>
+                </Tooltip>
                 <Tooltip title="View data as table" arrow>
                     <IconButton onClick={() => setShowingTable(true)}>
                         <TableChartIcon fontSize="small" />
