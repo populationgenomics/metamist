@@ -231,10 +231,10 @@ class SampleTable(DbBase):
                 s.sample_root_id,
                 s.sample_parent_id,
                 s.meta,
-                {mt.external_id_query('sid')}
+                {mt.external_id_query('seid')}
             FROM sample s
-            LEFT JOIN sample_external_id sid
-            ON sid.sample_id = s.id
+            LEFT JOIN sample_external_id seid
+            ON seid.sample_id = s.id
             WHERE s.project = :project
             GROUP BY s.id
         """

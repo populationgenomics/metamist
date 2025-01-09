@@ -295,10 +295,10 @@ class ParticipantTable(DbBase):
                 p.reported_gender,
                 p.karyotype,
                 p.meta,
-                {mt.external_id_query('pid')}
+                {mt.external_id_query('peid')}
             FROM participant p
-            LEFT JOIN participant_external_id pid
-            ON pid.participant_id = p.id
+            LEFT JOIN participant_external_id peid
+            ON peid.participant_id = p.id
             WHERE p.project = :project
             GROUP BY p.id
         """
