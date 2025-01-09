@@ -73,7 +73,7 @@ class TestMetaTable(DbIsolatedTest):
             ]
         )
 
-        pts = await self.pl.participant_table_export(self.project_id)
+        pts = await self.pl.export_participant_table(self.project_id)
         assert pts
         result = query_parquet(
             {'participants': pts},
@@ -93,7 +93,7 @@ class TestMetaTable(DbIsolatedTest):
         Test that exporting an empty table returns none
         """
 
-        pts = await self.pl.participant_table_export(self.project_id)
+        pts = await self.pl.export_participant_table(self.project_id)
         self.assertIsNone(pts)
 
     @run_as_sync
@@ -120,7 +120,7 @@ class TestMetaTable(DbIsolatedTest):
             )
         )
 
-        samples = await self.sl.sample_table_export(self.project_id)
+        samples = await self.sl.export_sample_table(self.project_id)
         assert samples
         result = query_parquet(
             {'samples': samples},

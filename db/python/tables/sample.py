@@ -219,7 +219,7 @@ class SampleTable(DbBase):
         rows = await self.connection.fetch_all(_query, {'project_ids': project_ids})
         return {row['id']: row['project'] for row in rows}
 
-    async def sample_table_export(self, project: int):
+    async def export_sample_table(self, project: int):
         """Export the sample table, joined with external_ids"""
         mt = MetaTable(self._connection)
         query = f"""

@@ -285,7 +285,7 @@ class ParticipantTable(DbBase):
         )
         return particicpants
 
-    async def participant_table_export(self, project: int):
+    async def export_participant_table(self, project: int):
         """Export a parquet table of participants, including external_ids and meta"""
         mt = MetaTable(self._connection)
         query = f"""
