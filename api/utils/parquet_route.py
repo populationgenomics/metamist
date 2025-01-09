@@ -1,3 +1,4 @@
+import os
 from functools import wraps
 from io import BytesIO
 from typing import Awaitable, Callable, ParamSpec
@@ -44,9 +45,9 @@ def parquet_table_route(router: APIRouter, path: str, operation_id: str):
                     content=TableError(error='Table empty or not found'),
                 )
 
-            headers = {
-                'Content-Disposition': 'attachment; filename="participant_table.parquet"'
-            }
+            filename = os.path.basename(path)
+
+            headers = {'Content-Disposition': f'attachment; filename="{filename}"'}
 
             table_bytes.seek(0)
             result = table_bytes.getvalue()
