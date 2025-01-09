@@ -6,7 +6,6 @@ import json
 import logging
 import os
 import re
-import sys
 from abc import abstractmethod
 from collections import defaultdict
 from functools import wraps
@@ -17,6 +16,7 @@ from typing import (
     Hashable,
     Iterable,
     Iterator,
+    Literal,
     Match,
     Sequence,
     TypeVar,
@@ -36,12 +36,6 @@ from metamist.models import (
     SequencingGroupUpsert,
 )
 from metamist.parser.cloudhelper import CloudHelper, group_by
-
-# https://mypy.readthedocs.io/en/stable/runtime_troubles.html#using-new-additions-to-the-typing-module
-if sys.version_info >= (3, 8):
-    from typing import Literal
-else:
-    from typing_extensions import Literal
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__file__)
