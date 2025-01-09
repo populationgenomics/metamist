@@ -267,5 +267,5 @@ async def export_participants(
     """Return a parquet table of participants"""
     player = ParticipantLayer(connection)
     assert connection.project_id
-    table_bytes = await player.participant_table_export(project=connection.project_id)
+    table_bytes = await player.export_participant_table(project=connection.project_id)
     return table_bytes

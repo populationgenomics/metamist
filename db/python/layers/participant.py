@@ -620,9 +620,9 @@ class ParticipantLayer(BaseLayer):
             project=project, sequencing_type=sequencing_type
         )
 
-    async def participant_table_export(self, project: int):
+    async def export_participant_table(self, project: int):
         """Export a parquet table of participants"""
-        return await self.pttable.participant_table_export(project)
+        return await self.pttable.export_participant_table(project)
 
     # region UPSERTS / UPDATES
 

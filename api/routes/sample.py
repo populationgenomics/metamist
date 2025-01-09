@@ -247,5 +247,5 @@ async def export_samples(
     """Export the sample table as a parquet file"""
     slayer = SampleLayer(connection)
     assert connection.project_id
-    table_bytes = await slayer.sample_table_export(project=connection.project_id)
+    table_bytes = await slayer.export_sample_table(project=connection.project_id)
     return table_bytes
