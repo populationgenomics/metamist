@@ -21,7 +21,7 @@ import {
 } from '@mui/x-data-grid'
 import { fromArrow } from 'arquero'
 import { ArrowTable } from 'arquero/dist/types/format/types'
-import { ReactChild, useState } from 'react'
+import { memo, ReactChild, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useProjectDbQuery } from '../data/projectDatabase'
 
@@ -137,7 +137,19 @@ function CustomTableToolbar() {
     )
 }
 
-export function TableFromQuery(props: TableProps) {
+// Memoized version of the result table to avoid rerenders, they can be very expensive
+// if the result set is large
+export const TableFromQuery = memo(function TableFromQuery(props: TableProps) {
+    return (
+        <TableFromQueryUnmemoized
+            project={props.project}
+            query={props.query}
+            showToolbar={props.showToolbar}
+        />
+    )
+})
+
+function TableFromQueryUnmemoized(props: TableProps) {
     const { project, query, showToolbar } = props
     const result = useProjectDbQuery(project, query)
 
@@ -149,7 +161,7 @@ export function TableFromQuery(props: TableProps) {
 
     if (!data || !result || result.status === 'loading') return <CircularProgress />
 
-    const table = fromArrow(data as ArrowTable)
+    const table = fromArrow(data as ArrowTable, { useDate: true })
 
     const columns = table.columnNames().map(
         (colName): GridColDef => ({
