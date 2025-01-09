@@ -77,7 +77,7 @@ const FamilyCells: React.FC<{
                     }}
                     rowSpan={participantRowSpan}
                 >
-                    {field.key == 'external_id'
+                    {field.key == 'external_ids'
                         ? participant.families.map((f) => (
                               <FamilyLink
                                   key={`family-${participant.id}-${f.id}`}
