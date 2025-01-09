@@ -24,19 +24,13 @@ import {
 } from '@mui/material'
 import { debounce } from 'lodash'
 import { editor, KeyCode, KeyMod } from 'monaco-editor'
-import { Fragment, memo, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
 import { TableFromQuery } from './chart/TableFromQuery'
 import { useProjectDbSetup } from './data/projectDatabase'
 
 const SIDEBAR_WIDTH = 250
-
-// Memoized version of the result table to avoid rerenders, this is very important for performance
-// without this each keystroke takes forever to render
-const QueryResultTable = memo(function QueryResultTable(props: { project: string; query: string }) {
-    return <TableFromQuery project={props.project} query={props.query} showToolbar />
-})
 
 // This fn is debounced to try and limit the amount of history entries.
 const persistQueryToUrl = debounce(function persistQueryToUrl(query: string) {
@@ -429,7 +423,7 @@ export default function SqlQueryUi() {
 
                     <Box display={'flex'} flex={1} flexDirection={'column'} p={2} height={'80%'}>
                         {projectName && (selectedTableQuery || tableQueryValue) && (
-                            <QueryResultTable
+                            <TableFromQuery
                                 project={projectName}
                                 query={selectedTableQuery || tableQueryValue}
                             />

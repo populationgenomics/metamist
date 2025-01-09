@@ -245,8 +245,8 @@ export default function OurDnaDashboard() {
                             select
                                 s.participant_id,
                                 s.sample_id as sample_id,
-                                try_strptime(nullif("meta_collection-time", ' '), '%Y-%m-%d %H:%M:%S') as collection,
-                                try_strptime(nullif("meta_process-end-time", ' '), '%Y-%m-%d %H:%M:%S') as process_end,
+                                "meta_collection-time" as collection,
+                                "meta_process-end-time" as process_end,
                                 date_diff('hour', try_strptime(nullif("meta_collection-time", ' '), '%Y-%m-%d %H:%M:%S'), try_strptime(nullif("meta_process-end-time", ' '), '%Y-%m-%d %H:%M:%S')) as "duration (hrs)"
                             from sample s
                             join participant p
