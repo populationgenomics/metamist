@@ -14,7 +14,7 @@ aiosignal==1.3.2
     # via aiohttp
 annotated-types==0.7.0
     # via pydantic
-anyio==4.7.0
+anyio==4.8.0
     # via
     #   httpx
     #   starlette
@@ -35,12 +35,12 @@ azure-storage-file-datalake==12.18.0
     # via cloudpathlib
 backoff==2.2.1
     # via -r requirements.in
-boto3==1.35.90
+boto3==1.35.95
     # via
     #   -r requirements.in
     #   cloudpathlib
     #   cpg-utils
-botocore==1.35.90
+botocore==1.35.95
     # via
     #   -r requirements.in
     #   boto3
@@ -78,6 +78,8 @@ deprecated==1.2.15
     # via cpg-utils
 dnspython==2.7.0
     # via email-validator
+duckdb==1.1.3
+    # via -r requirements.in
 email-validator==2.2.0
     # via fastapi
 fastapi[all]==0.115.6
@@ -92,6 +94,8 @@ frozenlist==1.5.0
     # via
     #   aiohttp
     #   aiosignal
+fsspec==2024.10.0
+    # via -r requirements.in
 google-api-core[grpc]==2.24.0
     # via
     #   google-cloud-appengine-logging
@@ -152,7 +156,7 @@ grpc-google-iam-v1==0.12.7
     #   google-cloud-logging
     #   google-cloud-pubsub
     #   google-cloud-secret-manager
-grpcio==1.68.1
+grpcio==1.69.0
     # via
     #   google-api-core
     #   google-cloud-bigquery
@@ -203,7 +207,7 @@ multidict==6.1.0
     # via
     #   aiohttp
     #   yarl
-orjson==3.10.12
+orjson==3.10.14
     # via fastapi
 packaging==24.2
     # via google-cloud-bigquery
@@ -232,6 +236,8 @@ protobuf==4.25.5
     #   grpc-google-iam-v1
     #   grpcio-status
     #   proto-plus
+pyarrow==18.1.0
+    # via -r requirements.in
 pyasn1==0.6.1
     # via
     #   pyasn1-modules
@@ -249,9 +255,9 @@ pydantic-core==2.27.2
     # via pydantic
 pydantic-extra-types==2.10.1
     # via fastapi
-pydantic-settings==2.7.0
+pydantic-settings==2.7.1
     # via fastapi
-pygments==2.18.0
+pygments==2.19.1
     # via rich
 pymysql==1.1.1
     # via aiomysql

@@ -208,6 +208,10 @@ class SampleLayer(BaseLayer):
         )
         return await self.st.get_samples_create_date(sample_ids)
 
+    async def export_sample_table(self, project: int):
+        """Export a parquet table of samples"""
+        return await self.st.export_sample_table(project)
+
     # CREATE / UPDATES
     async def upsert_sample(
         self,

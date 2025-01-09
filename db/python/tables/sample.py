@@ -5,7 +5,9 @@ from typing import Any, Iterable
 from db.python.filters import GenericFilter
 from db.python.filters.sample import SampleFilter
 from db.python.tables.base import DbBase
+from db.python.tables.meta_table import MetaTable
 from db.python.utils import NotFoundError, escape_like_term, to_db_json
+from models.base import parse_sql_bool
 from models.models import PRIMARY_EXTERNAL_ORG, ProjectId
 from models.models.sample import SampleInternal, sample_id_format
 
@@ -216,6 +218,45 @@ class SampleTable(DbBase):
 
         rows = await self.connection.fetch_all(_query, {'project_ids': project_ids})
         return {row['id']: row['project'] for row in rows}
+
+    async def export_sample_table(self, project: int):
+        """Export the sample table, joined with external_ids"""
+        mt = MetaTable(self._connection)
+        query = f"""
+            SELECT
+                s.id,
+                s.participant_id,
+                s.active,
+                s.type,
+                s.sample_root_id,
+                s.sample_parent_id,
+                s.meta,
+                {mt.external_id_query('seid')}
+            FROM sample s
+            LEFT JOIN sample_external_id seid
+            ON seid.sample_id = s.id
+            WHERE s.project = :project
+            GROUP BY s.id
+        """
+
+        return await mt.entity_meta_table(
+            project=project,
+            query=query,
+            row_getter=lambda row: {
+                'sample_id': sample_id_format(row['id']),
+                'participant_id': row['participant_id'],
+                'type': row['type'],
+                'active': parse_sql_bool(row['active']),
+                'sample_root_id': sample_id_format(row['sample_root_id'])
+                if row['sample_root_id']
+                else None,
+                'sample_parent_id': sample_id_format(row['sample_parent_id'])
+                if row['sample_parent_id']
+                else None,
+            },
+            has_external_ids=True,
+            has_meta=True,
+        )
 
     # endregion GETS
 
