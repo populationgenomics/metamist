@@ -1,8 +1,4 @@
 import * as duckdb from '@duckdb/duckdb-wasm'
-import eh_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url'
-import mvp_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url'
-import duckdb_wasm_eh from '@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url'
-import duckdb_wasm from '@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url'
 import { Table, TypeMap } from 'apache-arrow'
 import { AxiosResponse } from 'axios'
 import { useEffect, useState } from 'react'
@@ -79,16 +75,9 @@ const TABLES: Record<string, (project: string) => Promise<Uint8Array | void>> = 
 
 // The below code handles the duckdb-wasm setup,
 // @see here for details: https://duckdb.org/docs/api/wasm/instantiation
-const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
-    mvp: {
-        mainModule: duckdb_wasm,
-        mainWorker: mvp_worker,
-    },
-    eh: {
-        mainModule: duckdb_wasm_eh,
-        mainWorker: eh_worker,
-    },
-}
+// This used the jsdeliver method as the wasm files are >32MB which is above
+// the limit of response size for a cloud run function.
+const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles()
 
 let databaseProject: string | null = null
 let dbFuture: Promise<duckdb.AsyncDuckDB> | null = null
@@ -96,12 +85,19 @@ let buildTablesFuture: Promise<TableSetupStatus[]> | null = null
 
 async function initializeDatabase() {
     // Select a bundle based on browser checks
-    const bundle = await duckdb.selectBundle(MANUAL_BUNDLES)
+    const bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES)
+
+    const worker_url = URL.createObjectURL(
+        new Blob([`importScripts("${bundle.mainWorker!}");`], { type: 'text/javascript' })
+    )
+
     // Instantiate the asynchronus version of DuckDB-wasm
-    const worker = new Worker(bundle.mainWorker!)
+    const worker = new Worker(worker_url)
     const logger = new duckdb.VoidLogger()
     const db = new duckdb.AsyncDuckDB(logger, worker)
     await db.instantiate(bundle.mainModule, bundle.pthreadWorker)
+
+    URL.revokeObjectURL(worker_url)
 
     await db.open({
         path: ':memory:',
