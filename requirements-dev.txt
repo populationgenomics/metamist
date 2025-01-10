@@ -112,7 +112,9 @@ databases[mysql]==0.9.0
     #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
     #   -r requirements.in
 deprecated==1.2.15
-    # via cpg-utils
+    # via
+    #   cpg-utils
+    #   opentelemetry-api
 deprecation==2.1.0
     # via cloudevents
 dill==0.3.9
@@ -175,6 +177,7 @@ google-auth==2.37.0
     #   google-api-core
     #   google-cloud-appengine-logging
     #   google-cloud-core
+    #   google-cloud-logging
     #   google-cloud-secret-manager
     #   google-cloud-storage
 google-cloud-appengine-logging==1.5.0
@@ -191,7 +194,7 @@ google-cloud-core==2.4.1
     #   google-cloud-bigquery
     #   google-cloud-logging
     #   google-cloud-storage
-google-cloud-logging==2.7.0
+google-cloud-logging==3.11.3
     # via
     #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
     #   -r requirements.in
@@ -202,13 +205,15 @@ google-cloud-pubsub==2.18.3
     #   -r requirements.in
 google-cloud-secret-manager==2.22.0
     # via cpg-utils
-google-cloud-storage==1.43.0
+google-cloud-storage==2.19.0
     # via
     #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
     #   -r requirements.in
     #   cloudpathlib
 google-crc32c==1.6.0
-    # via google-resumable-media
+    # via
+    #   google-cloud-storage
+    #   google-resumable-media
 google-resumable-media==2.7.2
     # via
     #   google-cloud-bigquery
@@ -261,6 +266,8 @@ idna==3.10
     #   httpx
     #   requests
     #   yarl
+importlib-metadata==8.5.0
+    # via opentelemetry-api
 iniconfig==2.0.0
     # via pytest
 isodate==0.7.2
@@ -305,6 +312,8 @@ nest-asyncio==1.6.0
     # via -r requirements-dev.in
 nodeenv==1.9.1
     # via pre-commit
+opentelemetry-api==1.29.0
+    # via google-cloud-logging
 orjson==3.10.12
     # via fastapi
 packaging==24.2
@@ -343,9 +352,9 @@ protobuf==4.25.5
     #   google-cloud-appengine-logging
     #   google-cloud-audit-log
     #   google-cloud-bigquery
+    #   google-cloud-logging
     #   google-cloud-pubsub
     #   google-cloud-secret-manager
-    #   google-cloud-storage
     #   googleapis-common-protos
     #   grpc-google-iam-v1
     #   grpcio-status
@@ -444,7 +453,6 @@ shellingham==1.5.4
 six==1.17.0
     # via
     #   azure-core
-    #   google-cloud-storage
     #   python-dateutil
 slack-sdk==3.20.2
     # via
@@ -529,3 +537,5 @@ wrapt==1.17.0
     #   testcontainers
 yarl==1.18.3
     # via aiohttp
+zipp==3.21.0
+    # via importlib-metadata
