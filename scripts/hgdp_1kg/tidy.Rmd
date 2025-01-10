@@ -1,0 +1,233 @@
+```{r}
+library(tidyverse)
+```
+
+```{r}
+sgdp_pops =
+  'sources/igsr-sgdp-pops.tsv' %>%
+  read_tsv %>%
+  select(
+    `Population code`, `Population name`, `Population description`,
+    `Superpopulation code`, `Superpopulation name`
+  ) %>%
+  mutate(
+    `Population description` = str_remove(`Population description`, ' \\(SGDP\\)'),
+    `Superpopulation name` = str_remove(`Superpopulation name`, ' \\(SGDP\\)')
+  )
+```
+
+```{r}
+hgdp_pops =
+  'sources/igsr-hgdp-pops.tsv' %>%
+  read_tsv %>%
+  select(
+    `Population code`, `Population name`, `Population description`,
+    `Superpopulation code`, `Superpopulation name`
+  ) %>%
+  mutate(
+    `Population description` = str_remove(`Population description`, ' \\(HGDP\\)'),
+    `Superpopulation name` = str_remove(`Superpopulation name`, ' \\(HGDP\\)')
+  )
+```
+
+```{r}
+sgdp_hgdp_pops = sgdp_pops %>% bind_rows(hgdp_pops) %>% arrange(`Population name`) %>%
+  mutate(
+    `Superpopulation name` = `Superpopulation name` %>%
+      str_replace("West Eurasia", "Europe") %>%
+      str_replace("Central South Asia", "South Asia"),
+    `Population name` = `Population name` %>%
+      str_replace("Bedouin B", "Bedouin") %>%
+      str_replace("Bergamo Italian", "Bergamo") %>%
+      str_replace("^Maya$", "Mayan") %>%
+      str_replace("^Mongola$", "Mongolian") %>%
+      str_replace("^Abkhasian$", "Abkhazian"),
+    `Population description` = `Population description` %>%
+      str_replace("Adygei in Russia\\(Caucasus\\)", "Adygei in Caucasus\\, Russia") %>%
+      str_replace("Bantu Kenya in Kenya", "Bantu in Kenya") %>%
+      str_replace("Bedouin B in Israel\\(Negev\\)", "Bedouin in Negev, Israel") %>%
+      str_replace("Bergamo in Italy\\(Bergamo\\)", "Bergamo in Bergamo, Italy") %>%
+      str_replace("Bergamo Italian in Bergamo, Italy", "Bergamo in Bergamo, Italy") %>%
+      str_replace("Bougainville in Bougainville", "Bougainville in Papua New Guinea") %>%
+      str_replace("Druze in Israel\\(Carmel\\)", "Druze in Carmel, Israel") %>%
+      str_replace("Mbuti in Democratic Republic of Congo", "Mbuti in Congo") %>%
+      str_replace("Maya in Mexico", "Mayan in Mexico") %>%
+      str_replace("Mongola in China", "Mongolian in China") %>%
+      str_replace("Mozabite in Algeria", "Mozabite in Mzab, Algeria") %>%
+      str_replace("Palestinian in Israel\\(Central\\)", "Palestinian in Central District, Israel") %>%
+      str_replace("Palestinian in Central, Israel", "Palestinian in Central District, Israel") %>%
+      str_replace("Saharawi in Western Sahara \\(Morocco\\)", "Saharawi in Western Sahara") %>%
+      str_replace("Tuscan in Italy\\(Tuscany\\)", "Tuscan in Tuscany, Italy") %>%
+      str_replace("^Tuscan in Italy$", "Tuscan in Tuscany, Italy") %>%
+      str_replace("Yakut in Siberia", "Yakut in Russia") %>%
+      str_replace("^Orcadian in Orkney$", "Orcadian in Orkney Islands") %>%
+      str_replace("Yoruba in Nigeria", "Yoruba in Ibadan, Nigeria") %>%
+      str_replace("Punjabi in Pakistan", "Punjabi in Lahore, Pakistan") %>%
+      str_replace("Luhya in Kenya", "Luhya in Webuye, Kenya")
+  ) %>%
+  mutate(
+    `Superpopulation name` = ifelse(`Population name` %in% c(
+      "Bedouin", "Druze", "Iranian", "Iraqi Jew", "Jordanian", "Palestinian", "Samaritan", "Turkish", "Yemenite Jew"
+      ), "Middle East", `Superpopulation name`)
+  ) %>%
+  mutate(
+    `Superpopulation name` = ifelse(`Population name` %in% c("Mongolian"), "Central Asia and Siberia", `Superpopulation name`)
+  ) %>%
+  mutate(
+    `Superpopulation name` = ifelse(`Population name` %in% c("Mozabite"), "Africa", `Superpopulation name`)
+  ) %>%
+  mutate(
+    `Superpopulation name` = ifelse(`Population name` %in% c("Tajik", "Uygur", "Yakut"), "Central Asia and Siberia", `Superpopulation name`)
+  ) %>%
+  mutate(
+    `Superpopulation name` = ifelse(`Population name` %in% c("Abkhazian", "Adygei", "Armenian", "Chechen", "Georgian", "Lezgin", "North Ossetian"), "Caucasus", `Superpopulation name`)
+  ) %>%
+  mutate(
+    `Superpopulation name` = ifelse(`Population name` %in% c("Cambodian", "Burmese", "Kinh", "Thai"), "Southeast Asia", `Superpopulation name`)
+  ) %>%
+  distinct()
+```
+
+```{r}
+tkg_pops = 'sources/igsr-thousand-genomes-pops.tsv' %>%
+  read_tsv %>%
+  select(
+    `Population code`, `Population name`, `Population description`,
+    `Superpopulation name`, `Superpopulation code`
+  ) %>%
+  mutate(
+    `Population name` = `Population name` %>%
+      str_replace(" Ancestry", "") %>%
+      str_replace(" Vietnamese", "") %>%
+      str_replace("SW", "SW US") %>%
+      str_replace(" Chinese", "") %>%
+      str_replace("Toscani", "Tuscan")
+  ) %>%
+  mutate(
+    `Population description` = `Population description` %>%
+      str_replace("Han Chinese South", "Southern Han in China") %>%
+      str_replace("Kinh in Ho Chi Minh City, Vietnam", "Kinh in Vietnam") %>%
+      str_replace("Han Chinese in Beijing, China", "Han in China") %>%
+      str_replace("Chinese Dai in Xishuangbanna, China", "Dai in China") %>%
+      str_replace("Toscani in Italy", "Tuscan in Tuscany, Italy") %>%
+      str_replace("Colombian in Medellin, Colombia", "Colombian in Colombia") %>%
+      str_replace("Japanese in Tokyo, Japan", "Japanese in Japan")
+  ) %>%
+  mutate(
+    `Superpopulation name` = `Superpopulation name` %>%
+      str_replace(" Ancestry", "") %>%
+      str_replace("European", "Europe") %>%
+      str_replace("Asian", "Asia") %>%
+      str_replace("African", "Africa") %>%
+      str_replace("American", "America")
+  ) %>%
+  mutate(
+    `Superpopulation name` = ifelse(`Population name` %in% c("Cambodian", "Burmese", "Kinh", "Thai"), "Southeast Asia", `Superpopulation name`)
+  )
+```
+
+```{r}
+pops = sgdp_hgdp_pops %>%
+  bind_rows(tkg_pops) %>%
+  arrange(`Population name`) %>%
+  select(
+    `Superpopulation name`, `Population name`, `Population description`
+  ) %>%
+  arrange(`Population name`) %>%
+  distinct() %>%
+  arrange(`Population name`)
+pops
+```
+
+Manually adding 2 rows corresponding to 2 special case samples with multiple ancestries.
+
+```{r}
+pops = pops %>%
+  add_row(`Superpopulation name` = "Europe", `Population name` = "Iberian,Mende", `Population description` = "Iberian and Mende in Sierra Leone") %>%
+  add_row(`Superpopulation name` = "Africa", `Population name` = "Ju|'hoan North,San", `Population description` = "San and Ju|'hoan North in Namibia")
+```
+
+```{r}
+pops %>% write_tsv('sources/pops.tsv')
+```
+
+Now tidying samples
+
+```{r}
+samples %>% arrange(`Biosample ID`)
+```
+```{r}
+tkg_samples %>% filter(`Population name` == "African Caribbean")
+```
+
+
+```{r}
+hgdp_samples = "sources/igsr-hgdp-samples.tsv" %>% read_tsv
+sgdp_samples = "sources/igsr-sgdp-samples.tsv" %>% read_tsv
+tkg_samples = "sources/igsr-thousand-genomes-samples.tsv" %>% read_tsv
+samples = hgdp_samples %>% bind_rows(sgdp_samples) %>% bind_rows(tkg_samples) %>%
+  select('Sample name', 'Sex', 'Population name', 'Biosample ID')
+samples = samples %>%
+  mutate(
+    `Population name` = `Population name` %>%
+      str_replace("Bedouin B", "Bedouin") %>%
+      str_replace("Bergamo Italian", "Bergamo") %>%
+      str_replace("^Maya$", "Mayan") %>%
+      str_replace("^Mongola$", "Mongolian") %>%
+      str_replace("^Abkhasian$", "Abkhazian") %>%
+      str_replace(" Ancestry", "") %>%
+      str_replace(" Vietnamese", "") %>%
+      str_replace("SW", "SW US") %>%
+      str_replace(" Chinese", "") %>%
+      str_replace("Toscani", "Tuscan") %>%
+      str_replace("Bengali,Bengali", "Bengali") %>%
+      str_replace("British,English", "British") %>%
+      str_replace("Cambodian,Cambodian", "Cambodian") %>%
+      str_replace("Papuan,Papuan Highlands", "Papuan Highlands") %>%
+      str_replace("Papuan,Papuan Sepik", "Papuan Sepik") %>%
+      str_replace("Finnish,Finnish", "Finnish") %>%
+      str_replace("Gambian Mandinka,Gambian", "Gambian Mandinka") %>%
+      str_replace("Japanese,Japanese", "Japanese") %>%
+      str_replace("Iberian,Spanish", "Iberian") %>%
+      str_replace("Esan,Esan", "Esan") %>%
+      str_replace("Kinh,Kinh", "Kinh") %>%
+      str_replace("Luhya,Luhya", "Luhya") %>%
+      str_replace("Mayan,Maya", "Mayan") %>%
+      str_replace("Mbuti,Mbuti", "Mbuti") %>%
+      str_replace("Mende,Mende", "Mende") %>%
+      str_replace("Mozabite,Mozabite", "Mozabite") %>%
+      str_replace("Pathan,Pathan", "Pathan") %>%
+      str_replace("Punjabi,Punjabi", "Punjabi")
+  ) %>%
+  arrange(`Population name`) %>%
+  left_join(pops, by='Population name')
+samples
+```
+
+
+```{r}
+samples %>% filter(str_detect(`Population name`, ","))
+samples %>% select("Population name") %>% distinct
+```
+
+
+```{r}
+# https://github.com/kaspermunch/PopulationGenomicsCourse/blob/5a6a2a3850af755cff63661e95644e9381f8031e/Cluster/metadata/Simons_meta_ENArun.txt
+sgdp_map = read_tsv('sources/Simons_meta_ENArun.txt') %>%
+  select(`Sample ID (Collaborator)`, 'Sample ID (Illumina)', 'Sample ID (SGDP)')
+
+samples = samples %>% select(-`Biosample ID`, `Sample ID (Collaborator)`=`Sample name`)
+
+samples = samples %>% left_join(sgdp_map, by='Sample ID (Collaborator)')
+
+samples %>% select(`Sample ID (Collaborator)`, `Sample ID (SGDP)`, everything()) %>% arrange(`Population name`) %>% filter(`Population name` %>% str_detect("Iber"))
+```
+
+
+```{r}
+samples %>% write_tsv('sources/samples-pops.tsv')
+```
+
+```{r}
+samples %>% select(`Sample ID (Collaborator)`, `Sample ID (Illumina)`, `Sample ID (SGDP)`)
+```
