@@ -283,59 +283,83 @@ export default function OurDnaDashboard() {
                     <PlotFromQueryCard
                         project="ourdna"
                         title={'Participant count by ancestry over time'}
-                        query={`
-                        with all_ancestries as (
-                            select
-                                p.participant_id,
-                                "meta_collection-time" as collection_time,
-                                unnest(p."meta_ancestry-participant-ancestry") as ancestry
-                            from participant p
-                            join sample s
-                            on s.participant_id = p.participant_id
-                            where collection_time is not null
-                            and collection_time != ' '
-                        ), counts_by_week as (
-                            select
-                                coalesce(count(distinct participant_id), 0) as participants,
-                                date_trunc(
-                                    'week',
-                                    try_strptime(
-                                        nullif(
-                                            collection_time,
-                                            ' '
-                                        ),
-                                        '%Y-%m-%d %H:%M:%S'
-                                    )
-                                ) as week,
-                                ancestry
-                            from all_ancestries p
-                            group by week, ancestry
-                        ), weeks as (
-                            select
-                                unnest(generate_series(min(week), max(week), interval '1 week')) as week
-                            from
-                            counts_by_week
-                        ), ancestries as (
-                            select distinct ancestry from counts_by_week
-                        ), filled as (
-                            select
-                                coalesce(r.participants, 0) as participants,
-                                strftime(w.week, '%Y-%m-%d') as week,
-                                a.ancestry,
-                                
-                            from weeks w
-                            join ancestries a on true
-                            left join counts_by_week r
-                            on r.week = w.week
-                            and r.ancestry = a.ancestry
-                            order by 2, 3
-                        ) select
-                            (SUM(participants) over (PARTITION BY ancestry  ORDER BY week ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)) as count,
-                            ancestry,
-                            week
-                        from filled
-
-                    `}
+                        queries={[
+                            {
+                                name: 'all_ancestries',
+                                query: `
+                                    select
+                                        p.participant_id,
+                                        "meta_collection-time" as collection_time,
+                                        unnest(p."meta_ancestry-participant-ancestry") as ancestry
+                                    from participant p
+                                    join sample s
+                                    on s.participant_id = p.participant_id
+                                    where collection_time is not null
+                                    and collection_time != ' '
+                                `,
+                            },
+                            {
+                                name: 'counts_by_week',
+                                query: `
+                                    select
+                                        coalesce(count(distinct participant_id), 0) as participants,
+                                        date_trunc(
+                                            'week',
+                                            try_strptime(
+                                                nullif(
+                                                    collection_time,
+                                                    ' '
+                                                ),
+                                                '%Y-%m-%d %H:%M:%S'
+                                            )
+                                        ) as week,
+                                        ancestry
+                                    from all_ancestries p
+                                    group by week, ancestry
+                                `,
+                            },
+                            {
+                                name: 'weeks',
+                                query: `
+                                    select
+                                        unnest(generate_series(min(week), max(week), interval '1 week')) as week
+                                    from
+                                    counts_by_week
+                                `,
+                            },
+                            {
+                                name: 'ancestries',
+                                query: `
+                                    select distinct ancestry from counts_by_week
+                                `,
+                            },
+                            {
+                                name: 'filled',
+                                query: `
+                                    select
+                                        coalesce(r.participants, 0) as participants,
+                                        strftime(w.week, '%Y-%m-%d') as week,
+                                        a.ancestry,
+                                        
+                                    from weeks w
+                                    join ancestries a on true
+                                    left join counts_by_week r
+                                    on r.week = w.week
+                                    and r.ancestry = a.ancestry
+                                    order by 2, 3
+                                `,
+                            },
+                            {
+                                name: 'result',
+                                query: `
+                                    select
+                                        (SUM(participants) over (PARTITION BY ancestry  ORDER BY week ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)) as count,
+                                        ancestry,
+                                        week
+                                    from filled
+                                `,
+                            },
+                        ]}
                         plot={(data, { width }) =>
                             Plot.plot({
                                 marginLeft: 40,

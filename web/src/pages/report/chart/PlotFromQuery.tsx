@@ -15,8 +15,10 @@ import {
 } from '@mui/material'
 import * as Plot from '@observablehq/plot'
 import { Table, TypeMap } from 'apache-arrow'
+import { stripIndent } from 'common-tags'
 import { ReactChild, useEffect, useRef, useState } from 'react'
 import { useMeasure } from 'react-use'
+import combineQueries from '../data/combineQueries'
 import { useProjectDbQuery } from '../data/projectDatabase'
 import { TableFromQuery } from './TableFromQuery'
 
@@ -29,14 +31,21 @@ type PlotInputFunc = (
     options: PlotOptions
 ) => (HTMLElement | SVGSVGElement) & Plot.Plot
 
+type QueryProps =
+    | {
+          query: string
+      }
+    | {
+          queries: { name: string; query: string }[]
+      }
+
 type Props = {
     project: string
-    query: string
     title?: ReactChild
     subtitle?: ReactChild
     description?: ReactChild
     plot: PlotInputFunc
-}
+} & QueryProps
 
 const modalStyle = {
     position: 'absolute',
@@ -55,6 +64,8 @@ export function PlotFromQueryCard(props: Props) {
     const [showingTable, setShowingTable] = useState(false)
     const [expanded, setExpanded] = useState(false)
 
+    let query = 'query' in props ? stripIndent(props.query) : combineQueries(props.queries)
+
     return (
         <Card sx={{ position: 'relative' }}>
             <CardActions
@@ -67,7 +78,7 @@ export function PlotFromQueryCard(props: Props) {
                 <Tooltip title="View/Edit SQL" arrow>
                     <IconButton
                         target={'_blank'}
-                        href={`/project/${props.project}/query?query=${encodeURIComponent(props.query)}`}
+                        href={`/project/${props.project}/query?query=${encodeURIComponent(query)}`}
                     >
                         <CodeIcon fontSize="small" />
                     </IconButton>
@@ -102,7 +113,7 @@ export function PlotFromQueryCard(props: Props) {
                             flexDirection: 'column',
                         }}
                     >
-                        <TableFromQuery query={props.query} project={props.project} />
+                        <TableFromQuery query={query} project={props.project} />
                     </div>
                 </Box>
             </Modal>
@@ -113,7 +124,9 @@ export function PlotFromQueryCard(props: Props) {
 export function PlotFromQuery(props: Props) {
     const containerRef = useRef<HTMLDivElement>(null)
 
-    const { project, query, plot } = props
+    const { project, plot } = props
+
+    const query = 'query' in props ? stripIndent(props.query) : combineQueries(props.queries)
     const result = useProjectDbQuery(project, query)
 
     const [measureRef, { width }] = useMeasure<HTMLDivElement>()
