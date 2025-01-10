@@ -30,6 +30,8 @@ import { ThemeContext } from '../../shared/components/ThemeProvider'
 import { TableFromQuery } from './chart/TableFromQuery'
 import { useProjectDbSetup } from './data/projectDatabase'
 
+const SIDEBAR_WIDTH = 250
+
 // Memoized version of the result table to avoid rerenders, this is very important for performance
 // without this each keystroke takes forever to render
 const QueryResultTable = memo(function QueryResultTable(props: { project: string; query: string }) {
@@ -354,15 +356,15 @@ export default function SqlQueryUi() {
         </List>
     )
 
-    const sidebarWidth = 250
-
     return (
         <Box display={'flex'}>
-            <Box component="nav" sx={{ width: sidebarWidth, flexShrink: { sm: 0 } }}>
+            <Box component="nav" sx={{ width: SIDEBAR_WIDTH, flexShrink: { sm: 0 } }}>
                 <Drawer
                     variant="permanent"
                     open
-                    PaperProps={{ sx: { width: sidebarWidth, top: 56, bottom: 0, height: 'auto' } }}
+                    PaperProps={{
+                        sx: { width: SIDEBAR_WIDTH, top: 56, bottom: 0, height: 'auto' },
+                    }}
                 >
                     {dbSetupStatus && dbSetupStatus.status === 'loading' && (
                         <Box p={2}>
@@ -380,7 +382,7 @@ export default function SqlQueryUi() {
 
             <Box
                 component="main"
-                sx={{ flexGrow: 1, width: { sm: `calc(100% - ${sidebarWidth}px)` } }}
+                sx={{ flexGrow: 1, width: { sm: `calc(100% - ${SIDEBAR_WIDTH}px)` } }}
             >
                 <Box display={'flex'} flexDirection={'column'} height={'calc(100vh - 80px)'}>
                     <Box
