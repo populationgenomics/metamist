@@ -22,6 +22,7 @@ import OurDnaDashboard from './pages/ourdna/OurDnaDashboard'
 import { ParticipantPage } from './pages/participant/ParticipantViewContainer'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
 import ProjectOverview from './pages/project/ProjectOverview'
+import SqlQueryUI from './pages/report/SqlQueryUI'
 import SampleView from './pages/sample/SampleView'
 import ErrorBoundary from './shared/utilities/errorBoundary'
 
@@ -36,6 +37,15 @@ const Routes: React.FunctionComponent = () => (
             element={
                 <ErrorBoundary>
                     <ProjectOverview />
+                </ErrorBoundary>
+            }
+        />
+
+        <Route
+            path="/project/:projectName/query/:tableName?"
+            element={
+                <ErrorBoundary>
+                    <SqlQueryUI />
                 </ErrorBoundary>
             }
         />

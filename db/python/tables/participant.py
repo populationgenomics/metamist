@@ -6,6 +6,7 @@ from typing import Any
 from db.python.filters import GenericFilter
 from db.python.filters.participant import ParticipantFilter
 from db.python.tables.base import DbBase
+from db.python.tables.meta_table import MetaTable
 from db.python.utils import NotFoundError, escape_like_term, to_db_json
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantInternal, ProjectId
 
@@ -69,7 +70,6 @@ class ParticipantTable(DbBase):
             },
             exclude=['family', 'sample', 'sequencing_group', 'assay'],
         )
-
         wheres = [_wheres]
 
         if filter_.family:
@@ -284,6 +284,37 @@ class ParticipantTable(DbBase):
             )
         )
         return particicpants
+
+    async def export_participant_table(self, project: int):
+        """Export a parquet table of participants, including external_ids and meta"""
+        mt = MetaTable(self._connection)
+        query = f"""
+            SELECT
+                p.id,
+                p.reported_sex,
+                p.reported_gender,
+                p.karyotype,
+                p.meta,
+                {mt.external_id_query('peid')}
+            FROM participant p
+            LEFT JOIN participant_external_id peid
+            ON peid.participant_id = p.id
+            WHERE p.project = :project
+            GROUP BY p.id
+        """
+
+        return await mt.entity_meta_table(
+            project=project,
+            query=query,
+            row_getter=lambda row: {
+                'participant_id': row['id'],
+                'reported_sex': row['reported_sex'],
+                'reported_gender': row['reported_gender'],
+                'karyotype': row['karyotype'],
+            },
+            has_external_ids=True,
+            has_meta=True,
+        )
 
     async def create_participant(
         self,
