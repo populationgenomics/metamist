@@ -76,7 +76,6 @@ from models.models.project import (
     ReadAccessRoles,
 )
 from models.models.sample import sample_id_transform_to_raw
-from models.models.sequencing_group import SequencingGroupUpsertInternal
 from models.utils.cohort_id_format import cohort_id_format, cohort_id_transform_to_raw
 from models.utils.cohort_template_id_format import (
     cohort_template_id_format,
@@ -180,7 +179,10 @@ class GraphQLCohort:
 
     @strawberry.field()
     async def sequencing_groups(
-        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLCohort'
+        self,
+        info: Info[GraphQLContext, 'Query'],
+        root: 'GraphQLCohort',
+        active_only: GraphQLFilter[bool] | None = None,
     ) -> list['GraphQLSequencingGroup']:
         connection = info.context['connection']
         cohort_layer = CohortLayer(connection)
@@ -189,7 +191,12 @@ class GraphQLCohort:
         )
 
         sg_layer = SequencingGroupLayer(connection)
-        sequencing_groups = await sg_layer.get_sequencing_groups_by_ids(sg_ids)
+        filter = SequencingGroupFilter(
+            id=GenericFilter(in_=sg_ids),
+            active_only=active_only.to_internal_filter() if active_only else None,
+        )
+        sequencing_groups = await sg_layer.query(filter_=filter)
+
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sequencing_groups]
 
     @strawberry.field()
@@ -1103,13 +1110,14 @@ class GraphQLSequencingGroup:
     platform: str
     meta: strawberry.scalars.JSON
     external_ids: strawberry.scalars.JSON
+    archived: bool | None
 
     internal_id: strawberry.Private[int]
     sample_id: strawberry.Private[int]
 
     @staticmethod
     def from_internal(
-        internal: SequencingGroupInternal | SequencingGroupUpsertInternal,
+        internal: SequencingGroupInternal,
     ) -> 'GraphQLSequencingGroup':
         if not internal.id:
             raise ValueError('SequencingGroup must have an id')
@@ -1121,6 +1129,7 @@ class GraphQLSequencingGroup:
             platform=internal.platform,
             meta=internal.meta,
             external_ids=internal.external_ids or {},
+            archived=internal.archived,
             # internal
             internal_id=internal.id,
             sample_id=internal.sample_id,
