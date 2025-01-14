@@ -180,7 +180,10 @@ class GraphQLCohort:
 
     @strawberry.field()
     async def sequencing_groups(
-        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLCohort'
+        self,
+        info: Info[GraphQLContext, 'Query'],
+        root: 'GraphQLCohort',
+        active_only: GraphQLFilter[bool] | None = None,
     ) -> list['GraphQLSequencingGroup']:
         connection = info.context['connection']
         cohort_layer = CohortLayer(connection)
@@ -189,7 +192,12 @@ class GraphQLCohort:
         )
 
         sg_layer = SequencingGroupLayer(connection)
-        sequencing_groups = await sg_layer.get_sequencing_groups_by_ids(sg_ids)
+        filter = SequencingGroupFilter(
+            id=GenericFilter(in_=sg_ids),
+            active_only=active_only.to_internal_filter() if active_only else None,
+        )
+        sequencing_groups = await sg_layer.query(filter_=filter)
+
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sequencing_groups]
 
     @strawberry.field()
