@@ -1103,6 +1103,7 @@ class GraphQLSequencingGroup:
     platform: str
     meta: strawberry.scalars.JSON
     external_ids: strawberry.scalars.JSON
+    archived: bool
 
     internal_id: strawberry.Private[int]
     sample_id: strawberry.Private[int]
@@ -1121,6 +1122,7 @@ class GraphQLSequencingGroup:
             platform=internal.platform,
             meta=internal.meta,
             external_ids=internal.external_ids or {},
+            archived=internal.archived,
             # internal
             internal_id=internal.id,
             sample_id=internal.sample_id,
