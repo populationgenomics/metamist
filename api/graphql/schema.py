@@ -76,7 +76,6 @@ from models.models.project import (
     ReadAccessRoles,
 )
 from models.models.sample import sample_id_transform_to_raw
-from models.models.sequencing_group import SequencingGroupUpsertInternal
 from models.utils.cohort_id_format import cohort_id_format, cohort_id_transform_to_raw
 from models.utils.cohort_template_id_format import (
     cohort_template_id_format,
@@ -1111,14 +1110,14 @@ class GraphQLSequencingGroup:
     platform: str
     meta: strawberry.scalars.JSON
     external_ids: strawberry.scalars.JSON
-    archived: bool
+    archived: bool | None
 
     internal_id: strawberry.Private[int]
     sample_id: strawberry.Private[int]
 
     @staticmethod
     def from_internal(
-        internal: SequencingGroupInternal | SequencingGroupUpsertInternal,
+        internal: SequencingGroupInternal,
     ) -> 'GraphQLSequencingGroup':
         if not internal.id:
             raise ValueError('SequencingGroup must have an id')
