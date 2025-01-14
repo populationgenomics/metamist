@@ -19,17 +19,27 @@ import {
     GridToolbarExport,
     GridToolbarQuickFilter,
 } from '@mui/x-data-grid'
+import combineQueries from '../data/combineQueries'
+
 import { fromArrow } from 'arquero'
 import { ArrowTable } from 'arquero/dist/types/format/types'
+import { stripIndent } from 'common-tags'
 import { memo, ReactChild, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useProjectDbQuery } from '../data/projectDatabase'
 
+type QueryProps =
+    | {
+          query: string
+      }
+    | {
+          queries: { name: string; query: string }[]
+      }
+
 type TableProps = {
     project: string
-    query: string
     showToolbar?: boolean
-}
+} & QueryProps
 
 type TableCardProps = TableProps & {
     height: number | string
@@ -54,6 +64,8 @@ const modalStyle = {
 export function TableFromQueryCard(props: TableCardProps) {
     const [expanded, setExpanded] = useState(false)
 
+    const query = 'query' in props ? stripIndent(props.query) : combineQueries(props.queries)
+
     return (
         <Card sx={{ position: 'relative' }}>
             <CardActions
@@ -66,7 +78,7 @@ export function TableFromQueryCard(props: TableCardProps) {
                 <Tooltip title="View/Edit SQL" arrow>
                     <IconButton
                         target={'_blank'}
-                        href={`/project/${props.project}/query?query=${encodeURIComponent(props.query)}`}
+                        href={`/project/${props.project}/query?query=${encodeURIComponent(query)}`}
                     >
                         <CodeIcon fontSize="small" />
                     </IconButton>
@@ -140,17 +152,13 @@ function CustomTableToolbar() {
 // Memoized version of the result table to avoid rerenders, they can be very expensive
 // if the result set is large
 export const TableFromQuery = memo(function TableFromQuery(props: TableProps) {
-    return (
-        <TableFromQueryUnmemoized
-            project={props.project}
-            query={props.query}
-            showToolbar={props.showToolbar}
-        />
-    )
+    return <TableFromQueryUnmemoized {...props} />
 })
 
 function TableFromQueryUnmemoized(props: TableProps) {
-    const { project, query, showToolbar } = props
+    const { project, showToolbar } = props
+    const query = 'query' in props ? stripIndent(props.query) : combineQueries(props.queries)
+
     const result = useProjectDbQuery(project, query)
 
     const data = result && result.status === 'success' ? result.data : undefined

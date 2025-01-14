@@ -3,7 +3,6 @@ import * as Plot from '@observablehq/plot'
 import { MetricFromQueryCard } from './chart/MetricFromQuery'
 import { PlotFromQueryCard } from './chart/PlotFromQuery'
 import { TableFromQueryCard } from './chart/TableFromQuery'
-import { useProjectDbQuery } from './data/projectDatabase'
 
 /*
 
@@ -22,20 +21,32 @@ other charts:
     - data quality
 
 */
-export default function OurDnaDashboard() {
-    const result = useProjectDbQuery(
-        'ourdna',
 
-        `
-        select * from participant limit 10
+// Common queries:
+// queries that are used in multiple charts
+
+// Query for processing times, this can be used for most visualistions
+// of processing time
+const PROCESS_DURATION_QUERY = `
+    select
+        s.sample_id,
+        cast(s.participant_id as string) as participant_id,
+        coalesce(s."meta_processing-site", 'Unknown') as processing_site,
         
+        try_strptime(nullif("meta_collection-time", ' '), '%Y-%m-%d %H:%M:%S') as collection_time,
+        try_strptime(nullif("meta_process-end-time", ' '), '%Y-%m-%d %H:%M:%S') as process_end_time,
+        date_diff(
+            'hour',
+            try_strptime(nullif("meta_collection-time", ' '), '%Y-%m-%d %H:%M:%S'),
+            try_strptime(nullif("meta_process-end-time", ' '), '%Y-%m-%d %H:%M:%S')
+        ) as duration
+    from sample s
+    join participant p
+    on p.participant_id = s.participant_id
+    where s.type = 'blood'
+`
 
-    `
-    )
-    if (result?.status === 'success') {
-        console.log(result.data.toArray().map((r) => r.toJSON()))
-    }
-
+export default function OurDnaDashboard() {
     return (
         <Box>
             <Box m={2}>
@@ -144,18 +155,18 @@ export default function OurDnaDashboard() {
                         title="Processing times for all samples"
                         description="This excludes any samples with > 100 hour processing times, and any that have missing or malformed collection or processing times"
                         project="ourdna"
-                        query={`
-                            with durations as (
-                                select
-                                    try_strptime(nullif("meta_collection-time", ' '), '%Y-%m-%d %H:%M:%S') as collection,
-                                    try_strptime(nullif("meta_process-end-time", ' '), '%Y-%m-%d %H:%M:%S') as process_end,
-                                    date_diff('hour', try_strptime(nullif("meta_collection-time", ' '), '%Y-%m-%d %H:%M:%S'), try_strptime(nullif("meta_process-end-time", ' '), '%Y-%m-%d %H:%M:%S')) as duration,
-                                from sample s
-                                join participant p
-                                on p.participant_id = s.participant_id
-                                where s.type = 'blood'
-                            ) select * from durations where duration < 100 and duration > 0
-                        `}
+                        queries={[
+                            {
+                                name: 'durations',
+                                query: PROCESS_DURATION_QUERY,
+                            },
+                            {
+                                name: 'result',
+                                query: `
+                                    select * from durations where duration < 100 and duration > 0
+                                `,
+                            },
+                        ]}
                         plot={(data, { width }) =>
                             Plot.plot({
                                 y: { grid: true, padding: 5, label: 'duration(hrs)' },
@@ -170,12 +181,16 @@ export default function OurDnaDashboard() {
                                 marks: [
                                     Plot.ruleY([24, 48, 72], { stroke: '#ff725c' }),
                                     Plot.dot(data, {
-                                        x: 'collection',
+                                        x: 'collection_time',
                                         y: 'duration',
                                         stroke: null,
                                         fill: '#4269d0',
                                         fillOpacity: 0.5,
-                                        channels: { process_end: 'process_end' },
+                                        channels: {
+                                            process_end: 'process_end_time',
+                                            sample_id: 'sample_id',
+                                            participant_id: 'participant_id',
+                                        },
                                         tip: true,
                                     }),
                                 ],
@@ -188,35 +203,29 @@ export default function OurDnaDashboard() {
                         title="Processing time buckets"
                         description="Count of participants with their samples processed in each bucket"
                         project="ourdna"
-                        query={`
-                            with durations as (
+                        queries={[
+                            { name: 'durations', query: PROCESS_DURATION_QUERY },
+                            {
+                                name: 'result',
+                                query: `
                                 select
-                                    s.participant_id,
-                                    try_strptime(nullif("meta_collection-time", ' '), '%Y-%m-%d %H:%M:%S') as collection,
-                                    try_strptime(nullif("meta_process-end-time", ' '), '%Y-%m-%d %H:%M:%S') as process_end,
-                                    date_diff('hour', try_strptime(nullif("meta_collection-time", ' '), '%Y-%m-%d %H:%M:%S'), try_strptime(nullif("meta_process-end-time", ' '), '%Y-%m-%d %H:%M:%S')) as duration,
-                                from sample s
-                                join participant p
-                                on p.participant_id = s.participant_id
-                                where s.type = 'blood'
-                            ) select
-                                count(distinct participant_id) as count,
-                                CASE
-                                    WHEN duration < 24 THEN '0-24 hours'
-                                    WHEN duration >= 24 AND duration < 30 THEN '24-30 hours'
-                                    WHEN duration >= 30 AND duration < 33 THEN '30-33 hours'
-                                    WHEN duration >= 33 AND duration < 48 THEN '33-48 hours'
-                                    WHEN duration >= 48 AND duration < 72 THEN '48-72 hours'
-                                    ELSE '72+ hours'
-                                END AS duration
-                                
-                            from durations group by 2 order by 2
-                        `}
+                                    count(distinct participant_id) as count,
+                                    CASE
+                                        WHEN duration < 24 THEN '0-24 hours'
+                                        WHEN duration >= 24 AND duration < 36 THEN '24-36 hours'
+                                        WHEN duration >= 36 AND duration < 48 THEN '36-48 hours'
+                                        WHEN duration >= 48 AND duration < 72 THEN '48-72 hours'
+                                        ELSE '72+ hours'
+                                    END AS duration
+                                from durations group by 2 order by 2    
+                            `,
+                            },
+                        ]}
                         plot={(data, { width }) =>
                             Plot.plot({
                                 marginLeft: 100,
                                 inset: 10,
-                                height: 410,
+                                height: 400,
                                 color: {
                                     scheme: 'RdYlGn',
                                     reverse: true,
@@ -235,25 +244,79 @@ export default function OurDnaDashboard() {
                     />
                 </Box>
             </Box>
-
             <Box display={'flex'} gap={2} m={2}>
-                <Box width={'100%'}>
+                <Box width={'50%'}>
+                    <PlotFromQueryCard
+                        title="Processing time by site"
+                        description="Count of participants processed in each time bucket by processing site"
+                        project="ourdna"
+                        queries={[
+                            { name: 'durations', query: PROCESS_DURATION_QUERY },
+                            {
+                                name: 'result',
+                                query: `
+                                select
+                                    count(distinct participant_id) as count,
+                                    processing_site,
+                                    CASE
+                                        WHEN duration < 24 THEN '0-24 hours'
+                                        WHEN duration >= 24 AND duration < 36 THEN '24-36 hours'
+                                        WHEN duration >= 36 AND duration < 48 THEN '36-48 hours'
+                                        WHEN duration >= 48 AND duration < 72 THEN '48-72 hours'
+                                        ELSE '72+ hours'
+                                    END AS duration
+                                from durations group by 2,3 order by 2,3    
+                            `,
+                            },
+                        ]}
+                        plot={(data, { width }) =>
+                            Plot.plot({
+                                marginLeft: 100,
+                                marginRight: 100,
+                                inset: 10,
+                                height: 450,
+                                color: {
+                                    scheme: 'RdYlGn',
+                                    reverse: true,
+                                },
+                                width,
+                                marks: [
+                                    Plot.barX(data, {
+                                        y: 'processing_site',
+                                        fy: 'duration',
+                                        x: 'count',
+                                        tip: true,
+                                        fill: 'duration',
+                                    }),
+                                ],
+                            })
+                        }
+                    />
+                </Box>
+
+                <Box width={'50%'}>
                     <TableFromQueryCard
+                        showToolbar={true}
                         project={'ourdna'}
                         title="All sample processing times"
-                        query={`
-                            select
-                                s.participant_id,
-                                s.sample_id as sample_id,
-                                "meta_collection-time" as collection,
-                                "meta_process-end-time" as process_end,
-                                date_diff('hour', try_strptime(nullif("meta_collection-time", ' '), '%Y-%m-%d %H:%M:%S'), try_strptime(nullif("meta_process-end-time", ' '), '%Y-%m-%d %H:%M:%S')) as "duration (hrs)"
-                            from sample s
-                            join participant p
-                            on p.participant_id = s.participant_id
-                            and type = 'blood'
-                        `}
-                        height={400}
+                        queries={[
+                            { name: 'durations', query: PROCESS_DURATION_QUERY },
+                            {
+                                name: 'result',
+                                query: `
+                                    select
+                                        sample_id,
+                                        participant_id,
+                                        processing_site,
+                                        strftime(collection_time, '%Y-%m-%d %H:%M:%S') as collection_time,
+                                        strftime(process_end_time, '%Y-%m-%d %H:%M:%S') as process_end_time,
+                                        duration
+                                    from durations
+                                    order by duration desc nulls last
+                                `,
+                            },
+                        ]}
+                        height={450}
                     />
                 </Box>
             </Box>
@@ -387,6 +450,90 @@ export default function OurDnaDashboard() {
                         }
                     />
                 </Box>
+            </Box>
+            <Box display={'flex'} gap={2} m={2}>
+                <Box width={'50%'}>
+                    <PlotFromQueryCard
+                        title="Participant age and reported sex"
+                        description="Age buckets for participants. (note, the ages are based off the birth year so may be +- 1 year depending on DOB"
+                        project="ourdna"
+                        query={`
+                            select
+                                participant_id,
+                                CASE reported_sex WHEN 1 THEN 'male' WHEN 2 THEN 'female' ELSE 'other/unknown' END as reported_sex,
+                                date_part('year', current_date()) - try_cast("meta_birth-year" as int) as age
+                            from participant
+                            where date_part('year', current_date()) - try_cast("meta_birth-year" as int) is not null
+                        `}
+                        plot={(data, { width }) =>
+                            Plot.plot({
+                                width,
+                                height: 450,
+                                color: { legend: true },
+                                marks: [
+                                    Plot.rectY(
+                                        data,
+                                        Plot.binX<Plot.RectYOptions>(
+                                            { y: 'count' },
+                                            { x: 'age', fill: 'reported_sex', tip: true }
+                                        )
+                                    ),
+                                ],
+                            })
+                        }
+                    />
+                </Box>
+                <Box width={'50%'}>
+                    <PlotFromQueryCard
+                        title="Ancestry totals"
+                        description="Count of participant by ancestry, each participant may have multiple ancestries"
+                        project="ourdna"
+                        query={`
+                            with all_ancestries as (
+                                select
+                                    p.participant_id,
+                                    unnest(p."meta_ancestry-participant-ancestry") as ancestry
+                                from participant p
+                            )
+                            select
+                                count(distinct participant_id) as count,
+                                ancestry
+                            from all_ancestries
+                            group by 2
+                            order by 1 desc
+                        `}
+                        plot={(data, { width }) =>
+                            Plot.plot({
+                                marginLeft: 160,
+                                inset: 10,
+                                height: 450,
+                                color: {
+                                    scheme: 'Observable10',
+                                    reverse: true,
+                                },
+                                width,
+                                marks: [
+                                    Plot.barX(data, {
+                                        y: 'ancestry',
+                                        fill: 'ancestry',
+                                        x: 'count',
+                                        tip: true,
+                                        sort: {
+                                            y: 'x',
+                                            reverse: true,
+                                        },
+                                    }),
+                                ],
+                            })
+                        }
+                    />
+                </Box>
+            </Box>
+
+            <Box m={2}>
+                <Typography fontWeight={'bold'} fontSize={26}>
+                    Choices
+                </Typography>
             </Box>
         </Box>
     )
