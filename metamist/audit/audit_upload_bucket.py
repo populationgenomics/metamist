@@ -11,11 +11,8 @@ from datetime import datetime
 
 import click
 
-from metamist.audit.generic_auditor import (
-    GenericAuditor,
-    SequencingGroupData,
-    AuditReportEntry,
-)
+from metamist.audit.audithelper import SequencingGroupData, AuditReportEntry
+from metamist.audit.generic_auditor import GenericAuditor
 
 
 def audit_upload_bucket(

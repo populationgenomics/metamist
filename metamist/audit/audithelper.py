@@ -3,9 +3,8 @@ import csv
 import logging
 from collections import defaultdict
 from io import StringIO
-from typing import Any
 
-from cpg_utils.config import config_retrieve, get_gcp_project
+from cpg_utils.config import config_retrieve, dataset_path, get_gcp_project
 
 from metamist.graphql import gql, query
 from metamist.parser.cloudhelper import CloudHelper
@@ -98,6 +97,9 @@ class AuditReportEntry:  # pylint: disable=too-many-instance-attributes
         self.sample_external_id = sample_external_id
         self.participant_id = participant_id
         self.participant_external_id = participant_external_id
+
+    def __repr__(self) -> str:
+        return f'AuditReportEntry({self.__dict__})'
 
 
 class ParticipantData:
@@ -201,8 +203,63 @@ class AuditHelper(CloudHelper):
         self.all_sequencing_types = all_sequencing_types or get_enums('sequencingType')
 
         self.excluded_sequencing_groups = excluded_sequencing_groups or config_retrieve(
-            ['metamist', 'audit', 'excluded_sequencing_groups']
+            ['metamist', 'audit', 'excluded_sequencing_groups'], default=[]
         )
+
+    def validate_dataset(self, dataset: str) -> str:
+        """Validate the input dataset"""
+        if not dataset:
+            dataset = config_retrieve(['workflow', 'dataset'])
+        if not dataset:
+            raise ValueError('Metamist dataset is required')
+        return dataset
+
+    def validate_sequencing_types(self, sequencing_types: list[str]) -> list[str]:
+        """Validate the input sequencing types"""
+        if sequencing_types == ('all',):
+            return self.all_sequencing_types
+        invalid_types = [
+            st for st in sequencing_types if st not in self.all_sequencing_types
+        ]
+        if invalid_types:
+            raise ValueError(
+                f'Input sequencing types "{invalid_types}" must be in the allowed types: {self.all_sequencing_types}'
+            )
+        return sequencing_types
+
+    def validate_file_types(self, file_types: tuple[str]) -> tuple[str]:
+        """Validate the input file types"""
+        if file_types in (('all',), ('all_reads',)):
+            return FILE_TYPES_MAP[file_types[0]]
+        invalid_file_types = [ft for ft in file_types if ft not in FILE_TYPES_MAP]
+        if invalid_file_types:
+            raise ValueError(
+                f'Input file types "{invalid_file_types}" must be in the allowed types: {", ".join(FILE_TYPES_MAP.keys())}'
+            )
+        return file_types
+
+    def get_bucket_name(self, dataset: str, category: str) -> str:
+        """Get the bucket name for the given dataset and category"""
+        test = config_retrieve(['workflow', 'access_level']) == 'test'
+        bucket: str = dataset_path(
+            suffix='', dataset=dataset, category=category, test=test
+        )
+        if not bucket:
+            raise ValueError(
+                f'No bucket found for dataset {dataset} and category {category}'
+            )
+        return bucket.removeprefix('gs://').removesuffix('/')
+
+    def get_sequencing_group_data_by_id(
+        self,
+        sg_id: str,
+        sequencing_groups: list[SequencingGroupData],
+    ):
+        """Get the sequencing group data for a given sg_id"""
+        for sg in sequencing_groups:
+            if sg.id == sg_id:
+                return sg
+        return None
 
     def get_gcs_buckets_and_prefixes_from_paths(
         self,
@@ -230,7 +287,7 @@ class AuditHelper(CloudHelper):
         self, bucket_name: str, prefix: str, file_extensions: tuple[str]
     ):
         """Iterate through a gcp bucket/prefix and get all the blobs with the specified file extension(s)"""
-        bucket = self.gcs_client.bucket(bucket_name, user_project=self.user_project)
+        bucket = self.gcs_client.bucket(bucket_name, user_project=self.gcp_project)
 
         files_in_bucket_prefix = []
         for blob in self.gcs_client.list_blobs(bucket, prefix=prefix, delimiter='/'):
@@ -288,7 +345,7 @@ class AuditHelper(CloudHelper):
             blob.reload()
             read_files.append(
                 ReadFileData(
-                    filepath=blob.name,
+                    filepath=f'gs://{bucket_name}/{blob.name}',
                     filesize=blob.size,
                     checksum=blob.crc32c,
                 )
@@ -343,7 +400,7 @@ class AuditHelper(CloudHelper):
 
     def write_report_to_cloud(
         self,
-        data_to_write: list[dict[str, Any]] | None,
+        data_to_write: list[AuditReportEntry] | None,
         bucket_name: str,
         blob_path: str,
     ) -> None:
@@ -378,11 +435,12 @@ class AuditHelper(CloudHelper):
 
         buffer = StringIO()
         writer = csv.DictWriter(
-            buffer, fieldnames=data_to_write[0].keys(), delimiter=delimiter
+            buffer, fieldnames=data_to_write[0].__dict__.keys(), delimiter=delimiter
         )
 
+        rows_to_write = [entry.__dict__ for entry in data_to_write]
         writer.writeheader()
-        writer.writerows(data_to_write)
+        writer.writerows(rows_to_write)
 
         storage_client = storage.Client()
         bucket = storage_client.bucket(bucket_name, user_project=self.gcp_project)
@@ -396,6 +454,6 @@ class AuditHelper(CloudHelper):
 
         buffer.close()
         logging.info(
-            f'Wrote {len(data_to_write)} lines to gs://{bucket_name}/{blob_path}'
+            f'Wrote {len(rows_to_write)} lines to gs://{bucket_name}/{blob_path}'
         )
         return
