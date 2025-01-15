@@ -1,6 +1,7 @@
 # pylint: disable=no-member
 import logging
 import os
+import re
 from collections import defaultdict
 from datetime import datetime
 from typing import Callable, Iterable, TypeVar
@@ -205,3 +206,25 @@ class CloudHelper:
             path.bucket, prefix=remaining_path, delimiter='/'
         )
         return [f'gs://{path.bucket}/{blob.name}' for blob in blobs]
+
+    def get_path_components_from_gcp_path(self, path: str) -> dict[str, str]:
+        """
+        Return the {bucket_name}, {dataset}, {bucket_type}, {prefix}, and {file} for GS only paths
+        Uses regex to match the full bucket name, dataset name, bucket type (e.g. 'test', 'main-upload', 'release'),
+        subdirectory, and the file name.
+        """
+
+        bucket_types = ['archive', 'hail', 'main', 'test', 'release']
+
+        # compile pattern matching all CPG bucket formats
+        gspath_pattern = re.compile(
+            r'gs://(?P<bucket>cpg-(?P<dataset>[\w-]+)-(?P<bucket_type>['
+            + '|'.join(s for s in bucket_types)
+            + r']+[-\w]*))/(?P<prefix>.+/)?(?P<file>.*)$',
+        )
+
+        # if a match succeeds, return the key: value dictionary
+        if path_match := gspath_pattern.match(path):
+            return path_match.groupdict()
+
+        raise ValueError('The input String did not match a valid GCP path')

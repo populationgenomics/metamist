@@ -1,13 +1,22 @@
 import logging
 import os
-from collections import defaultdict
 from datetime import datetime
 from typing import Any
 
 from cpg_utils.config import config_retrieve, dataset_path
 from gql.transport.requests import log as requests_logger
 
-from metamist.audit.audithelper import AuditHelper, FILE_TYPES_MAP
+from metamist.audit.audithelper import (
+    AuditHelper,
+    FILE_TYPES_MAP,
+    ReadFileData,
+    AssayData,
+    ParticipantData,
+    SampleData,
+    SequencingGroupData,
+    AuditReportEntry,
+    SequencingGroupId,
+)
 from metamist.graphql import gql, query_async
 
 handler = logging.StreamHandler()
@@ -20,7 +29,6 @@ logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 logger.propagate = False
-
 
 
 QUERY_PARTICIPANTS_SAMPLES_SGS = gql(
@@ -95,99 +103,6 @@ QUERY_SG_ANALYSES = gql(
     """
 )
 
-# Variable type definitions
-AnalysisId = int
-AssayId = int
-ParticipantId = int
-ParticipantExternalId = str
-SampleId = str
-SampleExternalId = str
-SequencingGroupId = str
-
-
-class AuditReportEntry:
-    """Class to hold the data for an audit report entry"""
-
-    def __init__(
-        self,
-        file_path: str,
-        filesize: int,
-        sg_id: str | None = None,
-        assay_id: int | None = None,
-        cram_analysis_id: int | None = None,
-        cram_file_path: str | None = None,
-        sample_id: str | None = None,
-        sample_external_id: str | None = None,
-        participant_id: int | None = None,
-        participant_external_id: str | None = None,
-    ):
-        self.file_path = file_path
-        self.filesize = filesize
-        self.sg_id = sg_id
-        self.assay_id = assay_id
-        self.cram_analysis_id = cram_analysis_id
-        self.cram_file_path = cram_file_path
-        self.sample_id = sample_id
-        self.sample_external_id = sample_external_id
-        self.participant_id = participant_id
-        self.participant_external_id = participant_external_id
-
-
-class ParticipantData:
-    """Class to hold the data for a participant"""
-    
-    def __init__(
-        self,
-        id: ParticipantId,
-        external_id: ParticipantExternalId,
-    ):
-        self.id = id
-        self.external_id = external_id
-
-class SampleData:
-    """Class to hold the data for a sample"""
-
-    def __init__(
-        self,
-        id: SampleId,
-        external_id: SampleExternalId,
-        participant: ParticipantData,
-    ):
-        self.id = id
-        self.external_id = external_id
-        self.participant = participant
-
-
-class AssayData:
-    """Class to hold the data for an assay"""
-
-    def __init__(
-        self,
-        id: AssayId,
-        read_files_paths_sizes: list[tuple[str, int]],
-        sample: SampleData,
-    ):
-        self.id = id
-        self.read_files_paths_sizes = read_files_paths_sizes
-        self.sample = sample
-
-class SequencingGroupData:
-    """Class to hold the data for a sequencing group"""
-
-    def __init__(
-        self, 
-        id: str,
-        sequencing_type: str,
-        sequencing_technology: str,
-        sample: SampleData,
-        assays: list[AssayData],
-    ):
-        self.id = id
-        self.sequencing_type = sequencing_type
-        self.sequencing_technology = sequencing_technology
-        self.sample = sample
-        self.assays = assays
-
 
 class GenericAuditor(AuditHelper):
     """Auditor for cloud storage buckets"""
@@ -202,32 +117,10 @@ class GenericAuditor(AuditHelper):
         default_analysis_type='cram',
         default_analysis_status='completed',
     ):
-        # Initialize dataset
-        self.dataset = dataset or config_retrieve(['workflow', 'dataset'])
-        if not self.dataset:
-            raise ValueError('Metamist dataset is required')
-
-        # Validate sequencing types
-        if sequencing_types == ('all',):
-            self.sequencing_types = self.all_sequencing_types
-        else:
-            invalid_types = [st for st in sequencing_types if st not in self.all_sequencing_types]
-            if invalid_types:
-                raise ValueError(
-                    f'Input sequencing types "{invalid_types}" must be in the allowed types: {self.all_sequencing_types}'
-                )
-            self.sequencing_types = sequencing_types
-
-        # Validate file types
-        if file_types in (('all',), ('all_reads',)):
-            self.file_types = FILE_TYPES_MAP[file_types[0]]
-        else:
-            invalid_files = [ft for ft in file_types if ft not in FILE_TYPES_MAP]
-            if invalid_files:
-                raise ValueError(
-                    f'Input file types "{invalid_files}" must be in the allowed types: {", ".join(FILE_TYPES_MAP.keys())}'
-                )
-            self.file_types = file_types
+        # Initialize the auditor
+        self.dataset = self.validate_dataset(dataset)
+        self.sequencing_types = self.validate_sequencing_types(sequencing_types)
+        self.file_types = self.validate_file_types(file_types)
 
         # Set remaining attributes
         self.sequencing_technologies = sequencing_technologies
@@ -235,84 +128,131 @@ class GenericAuditor(AuditHelper):
         self.default_analysis_status: str = default_analysis_status
 
         # Calculate bucket name
-        self.bucket_name = dataset_path(dataset=self.dataset, category='upload')
+        self.bucket_name = self.get_bucket_name(self.dataset, 'upload')
 
-        super().__init__(search_paths=None)
+        super().__init__()
         requests_logger.setLevel(logging.WARNING)
-    
+
+    def validate_dataset(self, dataset: str) -> str:
+        """Validate the input dataset"""
+        if not dataset:
+            dataset = config_retrieve(['workflow', 'dataset'])
+        if not dataset:
+            raise ValueError('Metamist dataset is required')
+        return dataset
+
+    def validate_sequencing_types(self, sequencing_types: list[str]) -> list[str]:
+        """Validate the input sequencing types"""
+        if sequencing_types == ('all',):
+            return self.all_sequencing_types
+        invalid_types = [
+            st for st in sequencing_types if st not in self.all_sequencing_types
+        ]
+        if invalid_types:
+            raise ValueError(
+                f'Input sequencing types "{invalid_types}" must be in the allowed types: {self.all_sequencing_types}'
+            )
+        return sequencing_types
+
+    def validate_file_types(self, file_types: tuple[str]) -> tuple[str]:
+        """Validate the input file types"""
+        if file_types in (('all',), ('all_reads',)):
+            return FILE_TYPES_MAP[file_types[0]]
+        invalid_file_types = [ft for ft in file_types if ft not in FILE_TYPES_MAP]
+        if invalid_file_types:
+            raise ValueError(
+                f'Input file types "{invalid_file_types}" must be in the allowed types: {", ".join(FILE_TYPES_MAP.keys())}'
+            )
+        return file_types
+
+    def get_bucket_name(self, dataset: str, category: str) -> str:
+        """Get the bucket name for the given dataset and category"""
+        test = config_retrieve(['workflow', 'access_level']) == 'test'
+        bucket: str = dataset_path(
+            suffix='', dataset=dataset, category=category, test=test
+        )
+        if not bucket:
+            raise ValueError(
+                f'No bucket found for dataset {dataset} and category {category}'
+            )
+        return bucket.removeprefix('gs://').removesuffix('/')
+
     async def get_sgs_for_dataset(self) -> list[SequencingGroupData]:
         """
         Fetches all sequencing groups for the given dataset, including the assays for each sequencing group.
-        
+
         Returns a list of SequencingGroupData objects.
         """
-        logger.info(f'{self.dataset} :: Fetching SG assays for {self.sequencing_types} sequencing types')
+        logger.info(
+            f'{self.dataset} :: Fetching SG assays for {self.sequencing_types} sequencing types'
+        )
         dataset_sgs_query_result = await query_async(
-            QUERY_DATASET_SGS, 
-            {'datasetName': self.dataset, 'seqTypes': self.sequencing_types, 'seqTechs': self.sequencing_technologies},
+            QUERY_DATASET_SGS,
+            {
+                'datasetName': self.dataset,
+                'seqTypes': self.sequencing_types,
+                'seqTechs': self.sequencing_technologies,
+            },
         )
         dataset_sgs = dataset_sgs_query_result['project']['sequencingGroups']
-        
+
         return [self.get_sg_data(sg) for sg in dataset_sgs]
-    
-    
+
     def get_sg_data(self, sg: dict[str, Any]) -> SequencingGroupData:
         """Parse a sequencing group dictionary into a SequencingGroupData object"""
         return SequencingGroupData(
-            id=sg['id'],
+            id_=sg['id'],
             sequencing_type=sg['type'],
             sequencing_technology=sg['technology'],
             sample=SampleData(
-                id=sg['sample']['id'],
+                id_=sg['sample']['id'],
                 external_id=sg['sample']['externalId'],
                 participant=ParticipantData(
-                    id=sg['sample']['participant']['id'],
+                    id_=sg['sample']['participant']['id'],
                     external_id=sg['sample']['participant']['externalId'],
                 ),
             ),
-            assays=[
-                self.parse_assay_data(assay) for assay in sg['assays']
-            ],
+            assays=[self.parse_assay_data(assay) for assay in sg['assays']],
         )
-        
-        
+
     def parse_assay_data(self, assay: dict[str, Any]) -> AssayData:
         """Parse an assay dictionary into an AssayData object"""
-        reads = assay['meta']['reads']
+        reads: list[dict] = assay['meta']['reads']
         if isinstance(assay['meta']['reads'], dict):
             reads = [reads]
-        
-        reads_files_paths_sizes = []
+
+        read_files = []
         for read in reads:
-            reads_files_paths_sizes.append(
-                (
-                    read['location'],
-                    read['size'],
+            read_files.append(
+                ReadFileData(
+                    filepath=read['path'],
+                    filesize=read['size'],
+                    checksum=read['checksum'],
                 )
             )
-            if 'secondaryFiles' in read:
+            if read.get('secondaryFiles'):
                 for secondary_file in read['secondaryFiles']:
-                    reads_files_paths_sizes.append(
-                        (
-                            secondary_file['location'],
-                            secondary_file['size'],
+                    read_files.append(
+                        ReadFileData(
+                            filepath=secondary_file['path'],
+                            filesize=secondary_file['size'],
+                            checksum=secondary_file['checksum'],
                         )
                     )
-            
+
         return AssayData(
-            id=assay['id'],
-            read_files_paths_sizes=reads_files_paths_sizes,
+            id_=assay['id'],
+            read_files=read_files,
             sample=SampleData(
-                id=assay['sample']['id'],
+                id_=assay['sample']['id'],
                 external_id=assay['sample']['externalId'],
                 participant=ParticipantData(
-                    id=assay['sample']['participant']['id'],
+                    id_=assay['sample']['participant']['id'],
                     external_id=assay['sample']['participant']['externalId'],
                 ),
             ),
         )
-        
-        
+
     def get_latest_analyses_by_sg(
         self,
         all_sg_analyses: list[dict[str, Any]],
@@ -342,9 +282,8 @@ class GenericAuditor(AuditHelper):
 
         # Check the analysis meta data for the sequencing type
         self.check_analyses_seq_type(list(latest_analysis_by_sg.values()))
-        
-        return latest_analysis_by_sg
 
+        return latest_analysis_by_sg
 
     def check_analyses_seq_type(
         self,
@@ -361,40 +300,33 @@ class GenericAuditor(AuditHelper):
                 f'{self.dataset} :: Analyses are missing sequencing_type field: {analyses_with_missing_seq_type}'
             )
 
-
-    async def get_analysis_cram_paths_for_dataset_sgs(
+    async def update_sequencing_groups_with_crams(
         self,
         sequencing_groups: list[SequencingGroupData],
-    ) -> dict[SequencingGroupId, dict[AnalysisId, str]]:
+    ):
         """
-        Fetches all CRAMs for the list of sgs in the given dataset.
-        Returns a dict mapping {sg_id : (cram_analysis_id, cram_path) }
+        Updates the sequencing group data in-place with the CRAM analysis id and path for each SG.
         """
         sg_ids = [sg.id for sg in sequencing_groups]
-        logging.info(f'{self.dataset} :: Fetching CRAM analyses for {len(set(sg_ids))} SGs')
+        logging.info(
+            f'{self.dataset} :: Fetching CRAM analyses for {len(set(sg_ids))} SGs'
+        )
 
         sg_analyses_query_result = await query_async(
             QUERY_SG_ANALYSES,
             {'dataset': self.dataset, 'sgId': sg_ids, 'analysisTypes': ['CRAM']},
         )
+        crams_by_sg = self.get_latest_analyses_by_sg(
+            all_sg_analyses=sg_analyses_query_result['sequencingGroups']
+        )
 
-        sg_analyses = sg_analyses_query_result['sequencingGroups']
-        latest_analysis_by_sg = self.get_latest_analyses_by_sg(all_sg_analyses=sg_analyses)
-
-        # For each sg id, collect the analysis id and cram paths
-        sg_cram_paths: dict[str, dict[int, str]] = defaultdict(dict)
-        for sg_id, analysis in latest_analysis_by_sg.items():
-            cram_path = analysis['outputs']['path']
-            if not cram_path.startswith('gs://') or not cram_path.endswith('.cram'):
-                logging.warning(
-                    f'Analysis {analysis["id"]} invalid output path: {analysis["output"]}'
-                )
+        # Update the sequencing group data with the CRAM analysis id and path
+        for seq_group in sequencing_groups:
+            sg_id = seq_group.id
+            if sg_id not in crams_by_sg:
                 continue
-
-            sg_cram_paths[sg_id] = {analysis['id']: cram_path}
-
-        return sg_cram_paths
-
+            seq_group.cram_analysis_id = crams_by_sg[sg_id]['id']
+            seq_group.cram_file_path = crams_by_sg[sg_id]['outputs']['path']
 
     async def check_for_non_cram_analyses(self, sgs_without_crams: list[str]) -> None:
         """Checks if other completed analyses exist for sequencing groups without a completed cram analysis"""
@@ -420,12 +352,10 @@ class GenericAuditor(AuditHelper):
                     f'{analysis["id"]} - {analysis["type"]} - {analysis["outputs"].get("path")}'
                 )
 
-
-    async def get_complete_and_incomplete_sgs(
+    async def check_sg_crams(
         self,
         sequencing_groups: list[SequencingGroupData],
-        sg_cram_paths: dict[SequencingGroupId, dict[AnalysisId, str]],
-    ) -> dict[str, Any]:
+    ) -> dict[str, SequencingGroupData]:
         """
         Returns a dictionary containing two categories of sequencing groups:
          - the completed sgs which have finished aligning and have a cram, as a dict mapping
@@ -433,196 +363,250 @@ class GenericAuditor(AuditHelper):
          - the incomplete sgs where the alignment hasn't completed and no cram exists, as a list
         """
         # Get all the unique cram paths to check
-        cram_paths = set()
-        for analyses in sg_cram_paths.values():
-            cram_paths.update(list(analyses.values()))
+        cram_paths = set(
+            sg.cram_file_path for sg in sequencing_groups if sg.cram_file_path
+        )
 
         # Check the analysis CRAM paths actually exist in the bucket
-        buckets_prefixes = self.get_gcs_buckets_and_prefixes_from_paths(list(cram_paths))
+        buckets_and_prefixes_to_search = self.get_gcs_buckets_and_prefixes_from_paths(
+            cram_paths
+        )
         crams_in_bucket = self.find_files_in_gcs_buckets_prefixes(
-            buckets_prefixes,
-            ('cram',),
+            buckets_prefixes=buckets_and_prefixes_to_search,
+            file_types=('.cram',),
         )
 
         # Incomplete SGs initialised as the SGs without a completed CRAM
-        incomplete_sgs = set([sg.id for sg in sequencing_groups]).difference(
-            set(sg_cram_paths.keys())
-        )
+        incomplete_sgs = [sg for sg in sequencing_groups if not sg.cram_file_path]
 
         # Completed SGs have a CRAM file in the bucket that matches the path in Metamist analysis record
         # Incomplete SGs have a CRAM analysis record in Metamist but are not found at that path in the bucket
-        completed_sgs = {}
-        for sg_id, analysis in sg_cram_paths.items():
-            for cram_analysis_id, cram_path in analysis.items():
-                if cram_path in crams_in_bucket:
-                    completed_sgs[sg_id] = cram_analysis_id
-                else:
-                    logging.warning(
-                        f'{self.dataset} :: SG {sg_id} has CRAM analysis: {cram_analysis_id} - but file not found at path: {cram_path}'
-                    )
-                    incomplete_sgs.update(sg_id)
+        completed_sgs = []
+        for sg in sequencing_groups:
+            if sg.cram_file_path in crams_in_bucket:
+                completed_sgs.append(sg)
+            else:
+                logging.warning(
+                    f'{self.dataset} :: {sg.id} has CRAM analysis: {sg.cram_analysis_id} - but file not found at path: {sg.cram_file_path}'
+                )
+                incomplete_sgs.append(sg)
 
         if incomplete_sgs:
             logging.warning(
-                f'{self.dataset} :: {len(incomplete_sgs)} SGs without CRAMs found: {list(incomplete_sgs)}'
+                f'{self.dataset} :: {len(incomplete_sgs)} SGs without CRAMs found: {sorted([sg.id for sg in incomplete_sgs])}'
             )
-            logging.warning('Checking if any other analyses exist for these SGs, which would be unexpected...')
-            await self.check_for_non_cram_analyses(list(incomplete_sgs))
+            logging.warning(
+                'Checking if any other analyses exist for these SGs, which would be unexpected...'
+            )
+            await self.check_for_non_cram_analyses([sg.id for sg in incomplete_sgs])
 
-        return {'complete': completed_sgs, 'incomplete': list(incomplete_sgs)}
+        return {'complete': completed_sgs, 'incomplete': incomplete_sgs}
 
-
-    async def check_for_uningested_or_moved_assays(  # pylint: disable=R0914
+    async def get_audit_report_records_for_reads_to_delete_and_reads_to_ingest(  # pylint: disable=R0914
         self,
-        bucket_name: str,
         sequencing_groups: list[SequencingGroupData],
-        completed_sgs: dict[SequencingGroupId, list[AnalysisId]],
-        assay_id_to_paths_and_sizes: dict[AssayId, list[tuple[str, int]]],
-    ) -> tuple[list[AuditReportEntry], list[AuditReportEntry], set[str]]:
+    ) -> tuple[list[AuditReportEntry], list[AuditReportEntry]]:
         """
-        Compares the assays read files in a Metamist dataset to the read files found in the
-        upload bucket.
+        Compares the read files in a Metamist dataset to the read files found in the
+        upload bucket, and decides which files should be deleted and which should be ingested.
 
-        Input:  
-            - bucket_name: The name of the GCS bucket to check
+        Input:
             - sequencing_groups: A list of SequencingGroupData objects
-            - completed_sgs: A dict mapping sg_ids to analysis_ids for completed CRAM analyses
-            - assay_id_to_paths_and_sizes: A dict mapping assay IDs to lists of tuples of read file paths and sizes
 
-        Returns: 1. A list of audit report records for reads that have not been ingested,
-                    but where a known sample ID exists in the read file path.
-                 2. A list of audit report records for reads that have been ingested,
-                    but have been moved to a different location in the bucket.
-                 3. A set of string paths to the assay read files that have been 
-                    deleted/moved from their original location in Metamist.
+        Returns: 1. A list of audit report records for read files that can be deleted
+                 2. A list of audit report records for read files that should be ingested
         """
-        # Get a list of all the paths and sizes of assay files recorded in Metamist
-        metamist_assay_paths_sizes: list[tuple[str, int]] = [
-            path_size for assay in assay_id_to_paths_and_sizes.values() for path_size in assay
+        # Get a list of all the paths and sizes of read files recorded in Metamist assay records
+        read_files_in_metamist = [
+            read_file
+            for sg in sequencing_groups
+            for assay in sg.assays
+            for read_file in assay.read_files
         ]
-        metamist_assay_paths = set(
-            [path for path, _ in metamist_assay_paths_sizes]
+        # Find all the read files in the bucket
+        read_files_in_bucket = self.get_read_file_blobs_in_gcs_bucket(
+            self.bucket_name, self.file_types
         )
 
-        # Get a list of all the paths and sizes of assay files anywhere in the upload bucket
-        bucket_assay_paths_sizes = self.find_assay_files_in_gcs_bucket(
-            bucket_name, self.file_types
+        # The files in Metamist which are not in the bucket are assumed to have been deleted
+        already_deleted_read_files = {
+            read.filepath for read in read_files_in_metamist
+        }.difference({read.filepath for read in read_files_in_bucket})
+
+        ingested_reads_that_were_moved = self.find_moved_reads(
+            read_files_in_bucket, read_files_in_metamist
         )
-        bucket_assay_paths = set(bucket_assay_paths_sizes.keys())
-        
-        # Find the paths that exist in the bucket and not in Metamist
-        uningested_assay_paths = set(bucket_assay_paths).difference(
-            set(metamist_assay_paths)
-        )
-        # Find the paths that exist in Metamist and not in the bucket
-        metamist_paths_to_nowhere = set(metamist_assay_paths).difference(
-            set(bucket_assay_paths)
+        uningested_reads = self.get_uningested_reads(
+            read_files_in_metamist, read_files_in_bucket, ingested_reads_that_were_moved
         )
 
-        # Strip the metamist paths into just filenames
-        # Map each file name to its file size and path
-        # This is used to identify if any files have been moved
-        metamist_assay_file_size_map = {
-            os.path.basename(path): {'size': size, 'path': path}
-            for path, size in metamist_assay_paths_sizes
+        # Report the reads that can be deleted
+        uningested_reads_to_delete_report_entries, reads_to_ingest_report_entries = (
+            self.report_uningested_reads(
+                sequencing_groups,
+                uningested_reads,
+            )
+        )
+        moved_reads_to_delete_report_entries = (
+            self.report_ingested_files_that_have_been_moved(
+                sequencing_groups,
+                ingested_reads_that_were_moved,
+            )
+        )
+        ingested_reads_to_delete_report_entries = self.report_ingested_reads_to_delete(
+            sequencing_groups,
+            already_deleted_read_files,
+        )
+
+        # Concatenate the lists of report entries for the reads to delete
+        reads_to_delete_report_entries = (
+            moved_reads_to_delete_report_entries
+            + uningested_reads_to_delete_report_entries
+            + ingested_reads_to_delete_report_entries
+        )
+
+        return reads_to_delete_report_entries, reads_to_ingest_report_entries
+
+    def report_ingested_reads_to_delete(
+        self,
+        sequencing_groups: list[SequencingGroupData],
+        already_deleted_read_paths: set[str],
+    ) -> list[AuditReportEntry]:
+        """
+        Generates a list of audit report entries for the read files that have been ingested
+        and can safely be deleted.
+        """
+        ingested_reads_to_delete_report_entries = []
+        for sg in sequencing_groups:
+            if sg.id in self.excluded_sequencing_groups or not (
+                sg.cram_analysis_id and sg.cram_file_path
+            ):
+                continue
+            for assay in sg.assays:
+                for read in assay.read_files:
+                    if read.filepath in already_deleted_read_paths:
+                        continue
+
+                    ingested_reads_to_delete_report_entries.append(
+                        AuditReportEntry(
+                            filepath=read.filepath,
+                            filesize=read.filesize,
+                            sg_id=sg.id,
+                            assay_id=assay.id,
+                            cram_analysis_id=sg.cram_analysis_id,
+                            sample_id=sg.sample.id,
+                            sample_external_id=sg.sample.external_id,
+                            participant_id=sg.sample.participant.id,
+                            participant_external_id=sg.sample.participant.external_id,
+                        )
+                    )
+
+        return ingested_reads_to_delete_report_entries
+
+    def find_moved_reads(
+        self,
+        read_files_in_bucket: list[ReadFileData],
+        read_files_in_metamist: list[ReadFileData],
+    ) -> dict[str, ReadFileData]:
+        """
+        Check the files in the bucket and the files in Metamist to validate if any have been moved.
+        Uses the checksums or the file size and file name to identify if a file has been moved.
+        Moved files are those that have the same checksum or size and name, but different paths.
+
+        Returns a dictionary of the moved files, with the Metamist path as the key and the ReadFileData object as the value.
+        """
+        metamist_read_files_by_filename = {
+            os.path.basename(read.filepath): read for read in read_files_in_metamist
+        }
+        metamist_filenames_by_checksum: dict[str, str] = {
+            read.checksum: os.path.basename(read.filepath)
+            for read in read_files_in_metamist
         }
 
-        # Check if any of the uningested paths are actually files that have been moved
-        ingested_reads_that_were_moved = self.check_if_assay_files_were_moved(
-            uningested_assay_paths,
-            metamist_assay_file_size_map,
-            bucket_assay_paths_sizes,
-        )
-        
-        # Check if any of the uningested paths contain sample IDs for completed SGs 
-        uningested_reads = self.check_uningested_assays_for_sample_ids(
-            sequencing_groups,
-            uningested_assay_paths,
-            bucket_assay_paths_sizes,
-            completed_sgs,
-        )
+        moved_files = {}
+        for read_file in read_files_in_bucket:
+            if read_file.checksum in metamist_filenames_by_checksum:
+                metamist_filename = metamist_filenames_by_checksum[read_file.checksum]
+                metamist_filepath = metamist_read_files_by_filename[
+                    metamist_filename
+                ].filepath
 
-        return uningested_reads, ingested_reads_that_were_moved, metamist_paths_to_nowhere
-    
+                if read_file.filepath != metamist_filepath:
+                    logging.warning(
+                        f'File {read_file.filepath} has the same checksum as {metamist_filepath} but different path'
+                    )
+                    moved_files[metamist_filepath] = read_file
+                    continue
 
-    def check_if_assay_files_were_moved(
+            if os.path.basename(read_file.filepath) in metamist_read_files_by_filename:
+                metamist_filepath = metamist_read_files_by_filename[
+                    os.path.basename(read_file.filepath)
+                ].filepath
+                metamist_filesize = metamist_read_files_by_filename[
+                    os.path.basename(read_file.filepath)
+                ].filesize
+                if (
+                    read_file.filepath != metamist_filepath
+                    and read_file.filesize == metamist_filesize
+                ):
+                    logging.warning(
+                        f'File {read_file.filepath} has the same name as {metamist_filepath} but different path'
+                    )
+                    moved_files[metamist_filepath] = read_file
+                elif (
+                    read_file.filepath != metamist_filepath
+                    and read_file.filesize != metamist_filesize
+                ):
+                    logging.warning(
+                        f'File {read_file.filepath} has the same name as {metamist_filepath} but different path and size'
+                    )
+                continue
+
+            logging.warning(f'File {read_file.filepath} not found in Metamist')
+
+        logging.info(f'Found {len(moved_files)} ingested files that have been moved')
+
+        return moved_files
+
+    def report_ingested_files_that_have_been_moved(
         self,
         sequencing_groups: list[SequencingGroupData],
-        completed_sgs: dict[str, list[int]],
-        uningested_assay_paths: set[str],
-        assay_id_to_paths_and_sizes: dict[int, list[tuple[str, int]]],
-        metamist_assay_paths_sizes: dict[str, dict[str, Any]],
-        bucket_assay_paths_sizes: dict[str, int],
-    ) -> list[AuditReportEntry]: 
+        ingested_reads_that_were_moved: dict[str, ReadFileData],
+    ) -> list[AuditReportEntry]:
         """
         Identify if any paths are to files that have actually just been moved
-        by checking if they are in the bucket but not Metamist. If they are,
-        check if the file size is the same as the file in Metamist. If so,
-        assume the file has been moved and add it to the list of ingested and moved
-        files.
-        
-        Returns a tuple of two lists, the first containing the paths of ingested and moved files,
-        the second containing the assay report data for these files
+        by checking if they are in the bucket but not Metamist.
+
+        If they are, validate it's the same file by comparing the checksums or sizes.
+        If they match, assume the file has been moved and add it to the list of
+        ingested and moved files.
+
+        Returns a list of AuditReportEntry objects for the moved files.
         """
-        ingested_and_moved_filepaths = []
-        new_assay_path_sizes = {}
-        for bucket_path in uningested_assay_paths:
-            filename = os.path.basename(bucket_path)
-            # If the file in the bucket has the exact same name and size as one in metamist, assume its the same
-            if filename in metamist_assay_paths_sizes:
-                metamist_file_path = metamist_assay_paths_sizes[filename]['path']
-                metamist_file_size = metamist_assay_paths_sizes[filename]['size']
-                bucket_file_size = bucket_assay_paths_sizes[bucket_path]
-                if bucket_file_size == metamist_file_size:
-                    ingested_and_moved_filepaths.append(
-                        {
-                            'bucket_path': bucket_path,
-                            'metamist_path': metamist_file_path,
-                            'size': bucket_file_size,
-                        }
-                    )
-                    new_assay_path_sizes[bucket_path] = bucket_file_size
-                else:
-                    logging.warning(
-                        f'Uningested file at {bucket_path} ({bucket_file_size}) is similar to file in Metamist: {metamist_file_path} ({metamist_file_size}) but has different size'
-                    )
-        logging.info(
-            f'Found {len(ingested_and_moved_filepaths)} ingested files that have been moved'
-        )
-        
-        # If the file has just been moved, we consider it ingested
-        uningested_assay_paths.remove(
-            {bucket_path for bucket_path, _ in ingested_and_moved_filepaths}
-        )
-        
-        # flip the assay id : reads mapping to identify assays by their reads
-        read_file_path_to_assay_id = {}
-        for assay_id, reads_sizes in assay_id_to_paths_and_sizes.items():
-            for read, _ in reads_sizes:
-                read_file_path_to_assay_id[read] = assay_id
+        sgs_by_assay_id = {
+            assay.id: sg for sg in sequencing_groups for assay in sg.assays
+        }
 
-        assay_sg_id_map = {assay.id: sg.id for sg in sequencing_groups for assay in sg.assays}
-        
-        assays_moved_paths = []
-        for ingested_and_moved_path in ingested_and_moved_filepaths:
+        assays = [assay for sg in sequencing_groups for assay in sg.assays]
+        read_file_path_to_assay_id = {
+            read.filepath: assay.id for assay in assays for read in assay.read_files
+        }
 
-            assay_id = read_file_path_to_assay_id.get(ingested_and_moved_path['metamist_path'])
-            
-            sg_id = assay_sg_id_map.get(assay_id)
-            cram_analysis_id = completed_sgs.get(sg_id)[0] if sg_id in completed_sgs else None
-            
-            if sg_id in self.excluded_sequencing_groups or not cram_analysis_id:
-                continue
-            
-            sg = self.get_sequencing_group_data_by_id(sg_id, sequencing_groups)
-            if not sg:
+        moved_reads = []
+        for metamist_path, read_file in ingested_reads_that_were_moved.items():
+            assay_id = read_file_path_to_assay_id.get(metamist_path)
+
+            sg = sgs_by_assay_id.get(assay_id)
+            cram_analysis_id = sg.cram_analysis_id if sg else None
+
+            if sg in self.excluded_sequencing_groups or not cram_analysis_id:
                 continue
 
-            assays_moved_paths.append(
+            moved_reads.append(
                 AuditReportEntry(
-                    file_path=ingested_and_moved_path['bucket_path'],
-                    filesize=ingested_and_moved_path['filesize'],
-                    sg_id=sg_id,
+                    filepath=read_file.filepath,
+                    filesize=read_file.filesize,
+                    sg_id=sg.id,
                     assay_id=assay_id,
                     cram_analysis_id=cram_analysis_id,
                     sample_id=sg.sample.id,
@@ -632,8 +616,8 @@ class GenericAuditor(AuditHelper):
                 )
             )
 
-        return assays_moved_paths
-    
+        return moved_reads
+
     def get_sequencing_group_data_by_id(
         self,
         sg_id: str,
@@ -645,150 +629,171 @@ class GenericAuditor(AuditHelper):
                 return sg
         return None
 
-
-    def check_uningested_assays_for_sample_ids(
+    def get_uningested_reads(
         self,
-        sequencing_groups: list[SequencingGroupData],
-        uningested_assay_paths: set[str],
-        bucket_assay_paths_sizes: dict[str, int],
-        completed_sgs: dict[SequencingGroupId, list[AnalysisId]],
-    ) -> list[AuditReportEntry]:
+        read_files_in_metamist: list[ReadFileData],
+        read_files_in_bucket: list[ReadFileData],
+        read_files_to_exclude: list[ReadFileData] = None,
+    ) -> list[ReadFileData]:
         """
-        Combs through the list of uningested assay paths to see if any of them contain sample ids for completed SGs.
-        Can happen when we ingest a fastq read pair for a sample, and additional read files were provided (e.g. bams, vcfs).
-        If there are extra files for a completed SG, we should either ingest them or delete them.
+        Get a list of read files in the bucket that are not in Metamist
+        Optionally exclude a list of read files from the comparison.
         """
-        sg_sample_map = {sg.id: sg.sample for sg in sequencing_groups}
-        uningested_reads = []
-        for sg_id, analysis_ids in completed_sgs.items():
-            try:
-                sample = sg_sample_map[sg_id]
-                for uningested_read_file in uningested_assay_paths:
-                    if sample.external_id not in uningested_read_file or sample.participant.external_id not in uningested_read_file:
-                        continue
-                    uningested_reads.append(
-                        AuditReportEntry(
-                            file_path=uningested_read_file,
-                            filesize=bucket_assay_paths_sizes[uningested_read_file],
-                            sg_id=sg_id,
-                            cram_analysis_id=analysis_ids[0],
-                            sample_id=sample.id, 
-                            sample_external_id=sample.external_id,
-                            participant_id=sample.participant.id,
-                            participant_external_id=sample.participant.external_id,
-                        )
-                    )
-            except KeyError:
-                logging.warning(
-                    f'{sg_id} from analyses: {analysis_ids} not found in SG-sample map.'
-                )
-        
-        return uningested_reads
-        
-    
-    async def get_reads_to_delete_or_ingest(
-        self,
-        bucket_name: str,
-        sequencing_groups: list[SequencingGroupData],
-        completed_sgs: dict[SequencingGroupId, list[AnalysisId]],
-        assay_id_to_paths_and_sizes: dict[AssayId, list[tuple[str, int]]],
-    ) -> tuple[list[AuditReportEntry], list[AuditReportEntry]]:
-        """
-        Inputs: 
-            - bucket_name: The name of the GCS bucket to check
-            - sequencing_groups: A list of SequencingGroupData objects
-            - completed_sgs: A dict mapping sg_ids to analysis_ids for completed CRAM analyses
-            - assay_id_to_paths_and_sizes: A dict mapping assay IDs to lists of tuples of read file paths and sizes
-        
-        Returns two lists, each containing AuditReportEntry objects.
-        The first containins reads which can be deleted, the second containing reads to ingest.
-        The sample id, assay id, and analysis id (of completed cram) are included in the delete list.
-        """
-        # Check for uningested assay data that may be hiding or assay data that has been moved
-        (
-            reads_to_ingest,
-            moved_assay_report_entries,
-            metamist_paths_to_nowhere,
-        ) = await self.check_for_uningested_or_moved_assays(
-            bucket_name,
-            sequencing_groups,
-            completed_sgs,
-            assay_id_to_paths_and_sizes,
-        )
-
-        # Create a mapping of sg id: assay ids
-        sg_assays_id_map = {sg.id: [assay.id for assay in sg.assays] for sg in sequencing_groups}
-        
-        # Create a list of assay report entries for the moved assays
-        assay_reads_to_delete: list[AuditReportEntry] = []
-        for sg_id, cram_analysis_id in completed_sgs.items():
-            if sg_id in self.excluded_sequencing_groups:
-                continue
-            sg = self.get_sequencing_group_data_by_id(sg_id, sequencing_groups)
-            assay_ids = sg_assays_id_map[sg_id]
-            for assay_id in assay_ids:
-                assay_read_paths = assay_id_to_paths_and_sizes[assay_id]
-                for path, size in assay_read_paths:
-                    if path in metamist_paths_to_nowhere: # Already deleted
-                        continue
-
-                    assay_reads_to_delete.append(
-                        AuditReportEntry(
-                            file_path=path,
-                            filesize=size,
-                            sg_id=sg_id,
-                            assay_id=assay_id,
-                            cram_analysis_id=cram_analysis_id,
-                            sample_id=sg.sample.id,
-                            sample_external_id=sg.sample.external_id,
-                            participant_id=sg.sample.participant.id,
-                            participant_external_id=sg.sample.participant.external_id,
-                        )
-                    )
-
-        reads_to_delete = assay_reads_to_delete + moved_assay_report_entries
-
-        return reads_to_delete, reads_to_ingest
-
-
-    @staticmethod
-    def find_crams_for_reads_to_ingest(
-        reads_to_ingest: list[AuditReportEntry],
-        sg_cram_paths: dict[str, dict[int, str]],
-    ) -> list[AuditReportEntry]:
-        """
-        Compares the external sample IDs for SGs with completed CRAMs against the
-        uningested read files. This may turn up results for cases where multiple read types
-        have been provided for a sample, but only one type was ingested and used for alignment.
-        """
-        possible_assay_ingests: list[AuditReportEntry] = []
-        for read_to_ingest in reads_to_ingest:
-            if not read_to_ingest.sample_id:
-                # If no sample id was detected in the filename, add the path with no further checks
-                possible_assay_ingests.append(
-                    AuditReportEntry(
-                        file_path=read_to_ingest.file_path,
-                        filesize=read_to_ingest.filesize,
-                    )
-                )
-                continue
-
-            # Else get the completed CRAM analysis id
-            sg_cram = sg_cram_paths[read_to_ingest.sg_id]
-            cram_path = sg_cram[read_to_ingest.cram_analysis_id]
-            possible_assay_ingests.append(
-                AuditReportEntry(
-                    file_path=read_to_ingest.file_path,
-                    filesize=read_to_ingest.filesize,
-                    sg_id=read_to_ingest.sg_id,
-                    assay_id=read_to_ingest.assay_id,
-                    cram_analysis_id=read_to_ingest.cram_analysis_id,
-                    cram_file_path=cram_path,
-                    sample_id=read_to_ingest.sample_id,
-                    sample_external_id=read_to_ingest.sample_external_id,
-                    participant_id=read_to_ingest.participant_id,
-                    participant_external_id=read_to_ingest.participant_external_id,
-                )
+        read_paths_in_metamist = {read.filepath for read in read_files_in_metamist}
+        if read_files_to_exclude:
+            read_paths_to_exclude = {read.filepath for read in read_files_to_exclude}
+            read_paths_in_metamist = read_paths_in_metamist.difference(
+                read_paths_to_exclude
             )
 
-        return possible_assay_ingests
+        return [
+            read
+            for read in read_files_in_bucket
+            if read.filepath not in read_paths_in_metamist
+        ]
+
+    def report_uningested_reads(
+        self,
+        sequencing_groups: list[SequencingGroupData],
+        uningested_reads: list[ReadFileData],
+    ) -> tuple[list[AuditReportEntry], list[AuditReportEntry]]:
+        """
+        Generates two lists of audit report entries for the uningested reads
+            1. Reads which can be deleted.
+            2. Reads which should be ingested.
+
+        If the read file path contains a sample or participant external ID associated with a completed SG,
+        it should be deleted.
+
+        Otherwise, it should be ingested.
+        """
+        if not uningested_reads:
+            return ([], [])
+
+        completed_sgs = [
+            sg for sg in sequencing_groups if sg.cram_analysis_id and sg.cram_file_path
+        ]
+        completed_sgs_by_sample_external_id = {
+            sg.sample.external_id: sg for sg in completed_sgs
+        }
+        completed_sgs_by_participant_external_id = {
+            sg.sample.participant.external_id: sg for sg in completed_sgs
+        }
+
+        reads_to_delete_report_entries = []
+        reads_to_ingest_report_entries = []
+        for read in uningested_reads:
+            known_sample_id = None
+            known_participant_id = None
+            for sample_ext_id in completed_sgs_by_sample_external_id.keys():
+                if sample_ext_id in read.filepath:
+                    known_sample_id = sample_ext_id
+                    break
+            if not known_sample_id:
+                for (
+                    participant_ext_id
+                ) in completed_sgs_by_participant_external_id.keys():
+                    if participant_ext_id in read.filepath:
+                        known_sample_id = completed_sgs_by_participant_external_id[
+                            participant_ext_id
+                        ].sample.external_id
+                        known_participant_id = participant_ext_id
+                        break
+            else:
+                known_participant_id = completed_sgs_by_sample_external_id[
+                    known_sample_id
+                ].sample.participant.external_id
+
+            if known_sample_id and known_participant_id:
+                sg = completed_sgs_by_sample_external_id[known_sample_id]
+                reads_to_delete_report_entries.append(
+                    AuditReportEntry(
+                        filepath=read.filepath,
+                        filesize=read.filesize,
+                        sg_id=sg.id,
+                        assay_id=None,  # Not relevant for uningested reads being deleted
+                        cram_analysis_id=sg.cram_analysis_id,
+                        cram_file_path=sg.cram_file_path,
+                        sample_id=sg.sample.id,
+                        sample_external_id=sg.sample.external_id,
+                        participant_id=sg.sample.participant.id,
+                        participant_external_id=sg.sample.participant.external_id,
+                    )
+                )
+
+            else:
+                # If no known ID was detected in the filename, add the path with no further checks
+                reads_to_ingest_report_entries.append(
+                    AuditReportEntry(
+                        filepath=read.filepath,
+                        filesize=read.filesize,
+                    )
+                )
+
+        return reads_to_delete_report_entries, reads_to_ingest_report_entries
+
+    async def get_reads_to_delete_or_ingest(
+        self,
+        sequencing_groups: list[SequencingGroupData],
+    ) -> tuple[list[AuditReportEntry], list[AuditReportEntry]]:
+        """
+        Inputs:
+            - sequencing_groups: A list of SequencingGroupData objects
+
+        Returns two lists, each containing AuditReportEntry objects:
+          1. Reads which can be deleted.
+          2. Reads which should be ingested.
+
+        The reads to delete are those that are associated with SGs that have completed CRAMs.
+        The reads to ingest are those that are not associated with SGs that have completed CRAMs.
+        """
+        (
+            reads_to_delete_report_entries,
+            reads_to_ingest_report_entries,
+        ) = await self.get_audit_report_records_for_reads_to_delete_and_reads_to_ingest(
+            sequencing_groups,
+        )
+
+        return reads_to_delete_report_entries, reads_to_ingest_report_entries
+
+    # @staticmethod
+    # def find_crams_for_reads_to_ingest(
+    #     reads_to_ingest: list[AuditReportEntry],
+    #     sg_cram_paths: dict[str, dict[int, str]],
+    # ) -> list[AuditReportEntry]:
+    #     """
+    #     Compares the external sample IDs for SGs with completed CRAMs against the
+    #     uningested read files. This may turn up results for cases where multiple read types
+    #     have been provided for a sample, but only one type was ingested and used for alignment.
+    #     """
+    #     possible_assay_ingests: list[AuditReportEntry] = []
+    #     for read_to_ingest in reads_to_ingest:
+    #         if not read_to_ingest.sample_id:
+    #             # If no sample id was detected in the filename, add the path with no further checks
+    #             possible_assay_ingests.append(
+    #                 AuditReportEntry(
+    #                     filepath=read_to_ingest.filepath,
+    #                     filesize=read_to_ingest.filesize,
+    #                 )
+    #             )
+    #             continue
+
+    #         # Else get the completed CRAM analysis id
+    #         sg_cram = sg_cram_paths[read_to_ingest.sg_id]
+    #         cram_path = sg_cram[read_to_ingest.cram_analysis_id]
+    #         possible_assay_ingests.append(
+    #             AuditReportEntry(
+    #                 filepath=read_to_ingest.filepath,
+    #                 filesize=read_to_ingest.filesize,
+    #                 sg_id=read_to_ingest.sg_id,
+    #                 assay_id=read_to_ingest.assay_id,
+    #                 cram_analysis_id=read_to_ingest.cram_analysis_id,
+    #                 cram_file_path=cram_path,
+    #                 sample_id=read_to_ingest.sample_id,
+    #                 sample_external_id=read_to_ingest.sample_external_id,
+    #                 participant_id=read_to_ingest.participant_id,
+    #                 participant_external_id=read_to_ingest.participant_external_id,
+    #             )
+    #         )
+
+    #     return possible_assay_ingests

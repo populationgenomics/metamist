@@ -5,7 +5,6 @@ from collections import defaultdict
 from io import StringIO
 from typing import Any
 
-from cpg_utils.cloud import get_path_components_from_gcp_path
 from cpg_utils.config import config_retrieve, get_gcp_project
 
 from metamist.graphql import gql, query
@@ -44,7 +43,7 @@ HAIL_EXTENSIONS = ['.ht', '.mt', '.vds']
 
 ENUMS_QUERY = gql(
     """
-    query analysisTypes {
+    query enumsQuery {
         enum {
             analysisType
             sequencingType
@@ -63,12 +62,126 @@ def get_enums(enum_name) -> list[str]:
     return enums_query_result['enum'][enum_name]
 
 
+# Variable type definitions
+AnalysisId = int
+AssayId = int
+ParticipantId = int
+ParticipantExternalId = str
+SampleId = str
+SampleExternalId = str
+SequencingGroupId = str
+
+
+class AuditReportEntry:  # pylint: disable=too-many-instance-attributes
+    """Class to hold the data for an audit report entry"""
+
+    def __init__(  # pylint: disable=too-many-arguments
+        self,
+        filepath: str | None = None,
+        filesize: int | None = None,
+        sg_id: str | None = None,
+        assay_id: int | None = None,
+        cram_analysis_id: int | None = None,
+        cram_file_path: str | None = None,
+        sample_id: str | None = None,
+        sample_external_id: str | None = None,
+        participant_id: int | None = None,
+        participant_external_id: str | None = None,
+    ):
+        self.filepath = filepath
+        self.filesize = filesize
+        self.sg_id = sg_id
+        self.assay_id = assay_id
+        self.cram_analysis_id = cram_analysis_id
+        self.cram_file_path = cram_file_path
+        self.sample_id = sample_id
+        self.sample_external_id = sample_external_id
+        self.participant_id = participant_id
+        self.participant_external_id = participant_external_id
+
+
+class ParticipantData:
+    """Class to hold the data for a participant"""
+
+    def __init__(
+        self,
+        id_: ParticipantId,
+        external_id: ParticipantExternalId,
+    ):
+        self.id = id_
+        self.external_id = external_id
+
+
+class SampleData:
+    """Class to hold the data for a sample"""
+
+    def __init__(
+        self,
+        id_: SampleId,
+        external_id: SampleExternalId,
+        participant: ParticipantData,
+    ):
+        self.id = id_
+        self.external_id = external_id
+        self.participant = participant
+
+
+class ReadFileData:
+    """Class to hold the data for a read file"""
+
+    def __init__(
+        self,
+        filepath: str,
+        filesize: int,
+        checksum: str | None = None,
+    ):
+        self.filepath = filepath
+        self.filesize = filesize
+        self.checksum = checksum
+
+
+class AssayData:
+    """Class to hold the data for an assay"""
+
+    def __init__(
+        self,
+        id_: AssayId,
+        read_files: list[ReadFileData],
+        sample: SampleData,
+    ):
+        self.id = id_
+        self.read_files = read_files
+        self.sample = sample
+
+
+class SequencingGroupData:
+    """Class to hold the data for a sequencing group"""
+
+    def __init__(
+        self,
+        id_: str,
+        sequencing_type: str,
+        sequencing_technology: str,
+        sample: SampleData,
+        assays: list[AssayData],
+        cram_analysis_id: int | None = None,
+        cram_file_path: str | None = None,
+    ):
+        self.id = id_
+        self.sequencing_type = sequencing_type
+        self.sequencing_technology = sequencing_technology
+        self.sample = sample
+        self.assays = assays
+        self.cram_analysis_id = cram_analysis_id
+        self.cram_file_path = cram_file_path
+
+
 class AuditHelper(CloudHelper):
     """General helper class for bucket auditing"""
 
     def __init__(
         self,
-        gcp_project: str,
+        gcp_project: str = None,
         all_analysis_types: list[str] = None,
         all_sequencing_types: list[str] = None,
         excluded_sequencing_groups: list[str] = None,
@@ -88,12 +201,12 @@ class AuditHelper(CloudHelper):
         self.all_sequencing_types = all_sequencing_types or get_enums('sequencingType')
 
         self.excluded_sequencing_groups = excluded_sequencing_groups or config_retrieve(
-            ['workflow', 'audit', 'excluded_sequencing_groups']
+            ['metamist', 'audit', 'excluded_sequencing_groups']
         )
 
-    @staticmethod
     def get_gcs_buckets_and_prefixes_from_paths(
-        paths: list[str],
+        self,
+        paths: list[str] | set[str],
     ) -> defaultdict[str, list]:
         """
         Takes a list of paths and extracts the bucket names and prefix, returning all unique pairs
@@ -102,7 +215,7 @@ class AuditHelper(CloudHelper):
         buckets_prefixes: defaultdict[str, list] = defaultdict(list)
         for path in paths:
             try:
-                pc = get_path_components_from_gcp_path(path)
+                pc = self.get_path_components_from_gcp_path(path)
             except ValueError:
                 logging.warning(f'{path} invalid')
                 continue
@@ -116,22 +229,24 @@ class AuditHelper(CloudHelper):
         return buckets_prefixes
 
     def get_all_files_in_gcs_bucket_with_prefix_and_extensions(
-        self, bucket_name: str, prefix: str, file_extension: tuple[str]
+        self, bucket_name: str, prefix: str, file_extensions: tuple[str]
     ):
         """Iterate through a gcp bucket/prefix and get all the blobs with the specified file extension(s)"""
         bucket = self.gcs_client.bucket(bucket_name, user_project=self.user_project)
 
         files_in_bucket_prefix = []
         for blob in self.gcs_client.list_blobs(bucket, prefix=prefix, delimiter='/'):
-            # Check if file ends with specified analysis type
-            if not blob.name.endswith(file_extension):
+            # If specified, check if the file ends with a valid extension
+            if file_extensions and not blob.name.endswith(file_extensions):
                 continue
             files_in_bucket_prefix.append(f'gs://{bucket_name}/{blob.name}')
 
         return files_in_bucket_prefix
 
     def find_files_in_gcs_buckets_prefixes(
-        self, buckets_prefixes: defaultdict[str, list[str]], file_types: tuple[str]
+        self,
+        buckets_prefixes: defaultdict[str, list[str]],
+        file_types: tuple[str] | None,
     ):
         """
         Takes a dict of {bucket: [prefix1, prefix2, ...]} tuples and finds all the files contained in that bucket/prefix
@@ -152,9 +267,9 @@ class AuditHelper(CloudHelper):
 
         return files_in_bucket
 
-    def find_assay_files_in_gcs_bucket(
+    def get_read_file_blobs_in_gcs_bucket(
         self, bucket_name: str, file_extensions: tuple[str]
-    ) -> dict[str, int]:
+    ) -> list[ReadFileData]:
         """
         Gets all the paths and sizes to assay files in the dataset's upload bucket.
         Calls list_blobs on the bucket with the specified file extensions, returning a dict of paths and sizes.
@@ -166,16 +281,22 @@ class AuditHelper(CloudHelper):
             raise NameError(
                 'Call to list_blobs without prefix only valid for upload buckets'
             )
-        bucket = self.gcs_client.bucket(bucket_name, user_project=self.user_project)
+        bucket = self.gcs_client.bucket(bucket_name, user_project=self.gcp_project)
 
-        assay_paths_sizes = {}
+        read_files = []
         for blob in self.gcs_client.list_blobs(bucket, prefix=''):
             if not blob.name.endswith(file_extensions):
                 continue
             blob.reload()
-            assay_paths_sizes[blob.name] = blob.size
+            read_files.append(
+                ReadFileData(
+                    filepath=blob.name,
+                    filesize=blob.size,
+                    checksum=blob.crc32c,
+                )
+            )
 
-        return assay_paths_sizes
+        return read_files
 
     def get_audit_report_prefix(
         self,
@@ -186,16 +307,41 @@ class AuditHelper(CloudHelper):
         if set(seq_types) == set(self.all_sequencing_types):
             sequencing_types_str = 'all_seq_types'
         else:
-            sequencing_types_str = ('_').join(self.sequencing_types) + '_seq_types'
+            sequencing_types_str = ('_').join(seq_types) + '_seq_types'
 
         if set(file_types) == set(ALL_EXTENSIONS):
             file_types_str = 'all_file_types'
         elif set(file_types) == set(READ_EXTENSIONS):
             file_types_str = 'all_reads_file_types'
         else:
-            file_types_str = ('_').join(self.file_types) + '_file_types'
+            file_types_str = ('_').join(file_types) + '_file_types'
 
         return f'{file_types_str}_{sequencing_types_str}'
+
+    def get_audit_report_records_from_sgs(
+        self,
+        sequencing_groups: list[SequencingGroupData],
+    ) -> list[AuditReportEntry]:
+        """
+        Get the audit report records from the sequencing group data.
+        """
+        audit_report_records = []
+        for sg in sequencing_groups:
+            for assay in sg.assays:
+                audit_report_records.append(
+                    AuditReportEntry(
+                        sg_id=sg.id,
+                        assay_id=assay.id,
+                        cram_analysis_id=sg.cram_analysis_id,
+                        cram_file_path=sg.cram_file_path,
+                        sample_id=sg.sample.id,
+                        sample_external_id=sg.sample.external_id,
+                        participant_id=sg.sample.participant.id,
+                        participant_external_id=sg.sample.participant.external_id,
+                    )
+                )
+
+        return audit_report_records
 
     def write_report_to_cloud(
         self,
@@ -241,7 +387,7 @@ class AuditHelper(CloudHelper):
         writer.writerows(data_to_write)
 
         storage_client = storage.Client()
-        bucket = storage_client.bucket(bucket_name, user_project=self.user_project)
+        bucket = storage_client.bucket(bucket_name, user_project=self.gcp_project)
         blob = bucket.blob(blob_path)
 
         # Upload the TSV content
