@@ -220,9 +220,7 @@ class AuditHelper(CloudHelper):
                 logging.warning(f'{path} invalid')
                 continue
             bucket = pc['bucket']
-            prefix = pc[
-                'suffix'
-            ]  # This is the prefix (i.e. the "subdirectory" in the bucket)
+            prefix = pc['prefix']
             if prefix and prefix not in buckets_prefixes[bucket]:
                 buckets_prefixes[bucket].append(prefix)
 
