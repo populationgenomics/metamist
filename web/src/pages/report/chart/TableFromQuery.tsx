@@ -73,6 +73,9 @@ export function TableFromQuery(props: TableProps) {
             columns={columns}
             getRowId={(row) => row.__index}
             density="compact"
+            sx={{
+                fontFamily: 'monospace',
+            }}
         />
     )
 }
