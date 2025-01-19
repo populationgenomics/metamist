@@ -5,13 +5,11 @@ and sequencing groups that have no aligned CRAM.
 """
 
 import asyncio
-import logging
-import sys
 from datetime import datetime
 
 import click
 
-from metamist.audit.audithelper import SequencingGroupData, AuditReportEntry
+from metamist.audit.audithelper import SequencingGroupData, AuditReportEntry, logger
 from metamist.audit.generic_auditor import GenericAuditor
 
 
@@ -55,11 +53,13 @@ class UploadBucketAuditor(GenericAuditor):
             default_analysis_type=default_analysis_type,
             default_analysis_status=default_analysis_status,
         )
+        logger.info(f'Initialising UploadBucketAuditor for {dataset}\n')
 
     async def write_unaligned_sgs_report(
         self,
         unaligned_sgs: list[SequencingGroupData],
         report_extension: str = 'tsv',
+        report_name: str = 'UNALIGNED SEQUENCING GROUPS',
     ):
         """Writes a report of the unaligned sequencing groups to the bucket"""
         today = datetime.today().strftime('%Y-%m-%d')
@@ -70,13 +70,14 @@ class UploadBucketAuditor(GenericAuditor):
             data_to_write=self.get_audit_report_records_from_sgs(unaligned_sgs),
             bucket_name=self.bucket_name,
             blob_path=f'audit_results/{today}/{report_prefix}_unaligned_sgs.{report_extension}',
+            report_name=report_name,
         )
 
     async def write_upload_bucket_audit_reports(
         self,
         bucket_name: str,
         audit_reports: dict[str, list[AuditReportEntry]],
-        report_extension: str = 'tsv',
+        report_extension: str = 'csv',
     ):
         """
         Writes the 'assay files to delete/ingest' reports and upload them to the bucket.
@@ -92,6 +93,7 @@ class UploadBucketAuditor(GenericAuditor):
                 data_to_write=audit_report,
                 bucket_name=bucket_name,
                 blob_path=f'audit_results/{today}/{report_prefix}_{audit_report_type}.{report_extension}',
+                report_name='FILES TO DELETE' if audit_report_type == 'reads_to_delete' else 'FILES TO INGEST',
             )
 
 
@@ -149,6 +151,8 @@ async def audit_upload_bucket_async(
             'reads_to_ingest': reads_to_ingest,
         },
     )
+    
+    logger.info(f'{dataset} upload bucket audit complete')
 
 
 @click.command()
@@ -194,10 +198,4 @@ def main(
 
 
 if __name__ == '__main__':
-    logging.basicConfig(
-        level=logging.WARNING,
-        format='%(asctime)s %(levelname)s %(module)s:%(lineno)d - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
-        stream=sys.stderr,
-    )
     main()  # pylint: disable=no-value-for-parameter

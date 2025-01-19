@@ -70,6 +70,16 @@ SampleId = str
 SampleExternalId = str
 SequencingGroupId = str
 
+handler = logging.StreamHandler()
+formatter = logging.Formatter(
+    fmt='%(asctime)s %(levelname)s %(module)s:%(lineno)d - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+)
+handler.setFormatter(formatter)
+logger = logging.getLogger(__name__)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+logger.propagate = False
 
 class AuditReportEntry:  # pylint: disable=too-many-instance-attributes
     """Class to hold the data for an audit report entry"""
@@ -100,6 +110,21 @@ class AuditReportEntry:  # pylint: disable=too-many-instance-attributes
 
     def __repr__(self) -> str:
         return f'AuditReportEntry({self.__dict__})'
+    
+    def to_report_dict(self) -> dict:
+        """Returns a dictionary with custom field names for the report"""
+        return {
+            "File Path": self.filepath,
+            "File Size": self.filesize,
+            "SG ID": self.sg_id,
+            "Assay ID": self.assay_id,
+            "Sample ID": self.sample_id,
+            "Sample External ID": self.sample_external_id,
+            "Participant ID": self.participant_id,
+            "Participant External ID": self.participant_external_id,
+            "CRAM Analysis ID": self.cram_analysis_id,
+            "CRAM Path": self.cram_file_path,
+        }
 
 
 class ParticipantData:
@@ -274,7 +299,7 @@ class AuditHelper(CloudHelper):
             try:
                 pc = self.get_path_components_from_gcp_path(path)
             except ValueError:
-                logging.warning(f'{path} invalid')
+                logger.warning(f'{path} invalid')
                 continue
             bucket = pc['bucket']
             prefix = pc['prefix']
@@ -403,6 +428,7 @@ class AuditHelper(CloudHelper):
         data_to_write: list[AuditReportEntry] | None,
         bucket_name: str,
         blob_path: str,
+        report_name: str = None,
     ) -> None:
         """
         Writes a CSV/TSV report directly to Google Cloud Storage.
@@ -417,11 +443,14 @@ class AuditHelper(CloudHelper):
             google.cloud.exceptions.NotFound: If the bucket doesn't exist
             google.cloud.exceptions.Forbidden: If permissions are insufficient
         """
+        if not report_name:
+            report_name = blob_path
+            
         if not data_to_write:
-            logging.info('No data to write to report')
+            logger.info(f'{report_name} - SKIPPED - No data to write\n')
             return
 
-        logging.info(f'Writing report to gs://{bucket_name}/{blob_path}')
+        logger.info(f'{report_name} - Writing report to gs://{bucket_name}/{blob_path}...')
 
         # Create a string buffer to hold the data
         if blob_path.endswith('.csv'):
@@ -435,10 +464,10 @@ class AuditHelper(CloudHelper):
 
         buffer = StringIO()
         writer = csv.DictWriter(
-            buffer, fieldnames=data_to_write[0].__dict__.keys(), delimiter=delimiter
+            buffer, fieldnames=data_to_write[0].to_report_dict(), delimiter=delimiter
         )
 
-        rows_to_write = [entry.__dict__ for entry in data_to_write]
+        rows_to_write = [entry.to_report_dict() for entry in data_to_write]
         writer.writeheader()
         writer.writerows(rows_to_write)
 
@@ -453,7 +482,7 @@ class AuditHelper(CloudHelper):
         )
 
         buffer.close()
-        logging.info(
-            f'Wrote {len(rows_to_write)} lines to gs://{bucket_name}/{blob_path}'
+        logger.info(
+            f'Wrote {len(rows_to_write)} lines.\n'
         )
         return

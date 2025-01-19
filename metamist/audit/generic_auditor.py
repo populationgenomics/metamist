@@ -6,6 +6,7 @@ from typing import Any
 from gql.transport.requests import log as requests_logger
 
 from metamist.audit.audithelper import (
+    logger,
     AuditHelper,
     ReadFileData,
     AssayData,
@@ -16,17 +17,6 @@ from metamist.audit.audithelper import (
     SequencingGroupId,
 )
 from metamist.graphql import gql, query_async
-
-handler = logging.StreamHandler()
-formatter = logging.Formatter(
-    fmt='%(asctime)s %(levelname)s %(module)s:%(lineno)d - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-)
-handler.setFormatter(formatter)
-logger = logging.getLogger(__name__)
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
-logger.propagate = False
 
 
 QUERY_PARTICIPANTS_SAMPLES_SGS = gql(
@@ -148,6 +138,7 @@ class GenericAuditor(AuditHelper):
             },
         )
         dataset_sgs = dataset_sgs_query_result['project']['sequencingGroups']
+        logger.info(f'{self.dataset} :: Got {len(dataset_sgs)} sequencing groups\n')
 
         return [self.get_sg_data(sg) for sg in dataset_sgs]
 
@@ -265,9 +256,7 @@ class GenericAuditor(AuditHelper):
         Updates the sequencing group data in-place with the CRAM analysis id and path for each SG.
         """
         sg_ids = [sg.id for sg in sequencing_groups]
-        logging.info(
-            f'{self.dataset} :: Fetching CRAM analyses for {len(set(sg_ids))} SGs'
-        )
+        logger.info(f'{self.dataset} :: Fetching CRAM analyses for {len(sg_ids)} SGs...')
 
         sg_analyses_query_result = await query_async(
             QUERY_SG_ANALYSES,
@@ -276,6 +265,7 @@ class GenericAuditor(AuditHelper):
         crams_by_sg = self.get_latest_analyses_by_sg(
             all_sg_analyses=sg_analyses_query_result['sequencingGroups']
         )
+        logger.info(f'{self.dataset} :: Got {len(crams_by_sg)} CRAM analyses for {len(sg_ids)} SGs\n')
 
         # Update the sequencing group data with the CRAM analysis id and path
         for seq_group in sequencing_groups:
@@ -304,12 +294,12 @@ class GenericAuditor(AuditHelper):
             sg_id = sg_analysis['id']
             if not sg_analysis['analyses']:
                 continue
-            logging.warning(
+            logger.warning(
                 f'{self.dataset} :: SG {sg_id} missing CRAM but has analyses:'
             )
             for analysis in sg_analysis['analyses']:
-                logging.warning(
-                    f'{analysis["id"]} - {analysis["type"]} - {analysis["outputs"].get("path")}'
+                logger.warning(
+                    f'{self.dataset} :: {analysis["id"]} - {analysis["type"]} - {analysis["outputs"].get("path")}'
                 )
 
     async def check_sg_crams(
@@ -345,17 +335,17 @@ class GenericAuditor(AuditHelper):
                 completed_sgs.append(sg)
                 continue
             if sg.cram_file_path and sg.cram_file_path not in crams_in_bucket:
-                logging.warning(
+                logger.warning(
                     f'{self.dataset} :: {sg.id} has CRAM analysis: {sg.cram_analysis_id} - but file not found at path: {sg.cram_file_path}'
                 )
             incomplete_sgs.append(sg)
 
         if incomplete_sgs:
-            logging.warning(
+            logger.warning(
                 f'{self.dataset} :: {len(incomplete_sgs)} SGs without CRAMs found: {sorted([sg.id for sg in incomplete_sgs])}'
             )
-            logging.warning(
-                'Checking if any other analyses exist for these SGs, which would be unexpected...'
+            logger.warning(
+                f'{self.dataset} :: Checking if any other analyses exist for these SGs, which would be unexpected...'
             )
             await self.check_for_non_cram_analyses([sg.id for sg in incomplete_sgs])
 
@@ -494,8 +484,8 @@ class GenericAuditor(AuditHelper):
                 ].filepath
 
                 if read_file.filepath != metamist_filepath:
-                    logging.warning(
-                        f'File {read_file.filepath} has the same checksum as {metamist_filepath} but different path'
+                    logger.warning(
+                        f'{self.dataset} :: FILE MOVE DETECTED\n  - Bucket file: {read_file.filepath}\n  {metamist_filepath} but different path'
                     )
                     moved_files[metamist_filepath] = read_file
                     continue
@@ -511,20 +501,21 @@ class GenericAuditor(AuditHelper):
                     read_file.filepath != metamist_filepath
                     and read_file.filesize == metamist_filesize
                 ):
-                    logging.warning(
-                        f'File {read_file.filepath} has the same name as {metamist_filepath} but different path'
+                    logger.warning(
+                        f'{self.dataset} :: FILE MOVE DETECTED\n  - Bucket file:  {read_file.filepath} ({read_file.filesize} bytes)\n  - Metamist file:  {metamist_filepath} ({metamist_filesize} bytes)\n'
                     )
                     moved_files[metamist_filepath] = read_file
                 elif (
                     read_file.filepath != metamist_filepath
                     and read_file.filesize != metamist_filesize
                 ):
-                    logging.warning(
-                        f'File {read_file.filepath} has the same name as {metamist_filepath} but different path and size'
+                    logger.warning(
+                        f'{self.dataset} :: FILE SIZE INCONSISTENCY\n  - Bucket file:  {read_file.filepath} ({read_file.filesize} bytes)\n  - Metamist file:  {metamist_filepath} ({metamist_filesize} bytes)\n'
                     )
                 continue
-
-        logging.info(f'Found {len(moved_files)} ingested files that have been moved')
+        
+        if moved_files:
+            logger.info(f'Found {len(moved_files)} ingested files that have been moved.\n')
 
         return moved_files
 
@@ -636,7 +627,7 @@ class GenericAuditor(AuditHelper):
             # Check if the read file path contains a sample or participant external ID associated with a completed SG
             # This is a naive check which assumes the external ID is in the file path
             # TODO: Improve this check to use a more robust method that uses known file naming conventions, e.g.
-            # - extract the VCGS or Garvan format sample ID from the file path and match this specifically
+            # - extract the VCGS or Garvan format sample ID from the file path, and match this specifically
             known_sample_id = None
             known_participant_id = None
             for sample_ext_id in completed_sgs_by_sample_external_id.keys():
@@ -661,7 +652,7 @@ class GenericAuditor(AuditHelper):
             if known_sample_id and known_participant_id:
                 sg = completed_sgs_by_sample_external_id[known_sample_id]
                 logger.info(
-                    f'{self.dataset} :: uningested file: {read.filepath} may match to completed SG: {sg.id} with sample: {sg.sample.external_id} and participant: {sg.sample.participant.external_id}'
+                    f'{self.dataset} :: UNINGESTED FILE MATCHES A METAMIST RECORD\n - Bucket file:  {read.filepath}\nMatches completed SG {sg.id} - Sample: {sg.sample.external_id} - Participant: {sg.sample.participant.external_id}\n'
                 )
                 reads_to_delete_report_entries.append(
                     AuditReportEntry(
