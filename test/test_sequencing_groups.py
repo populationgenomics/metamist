@@ -1,5 +1,4 @@
 from datetime import datetime
-from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.filters import GenericFilter
 from db.python.layers import AnalysisLayer, SampleLayer, SequencingGroupLayer
@@ -12,6 +11,7 @@ from models.models import (
     SampleUpsertInternal,
     SequencingGroupUpsertInternal,
 )
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 def get_sample_model():
@@ -331,3 +331,54 @@ class TestSequencingGroup(DbIsolatedTest):
         )
         self.assertEqual(len(sgs), 1)
         self.assertEqual(sgs[0].id, sample.sequencing_groups[0].id)
+
+    @run_as_sync
+    async def test_archiving_sequencing_groups(self):
+        """Check that sequencing groups can be archived from graphql"""
+        sample_model = SampleUpsertInternal(
+            meta={},
+            external_ids={PRIMARY_EXTERNAL_ORG: 'EXID1'},
+            type='blood',
+            sequencing_groups=[
+                SequencingGroupUpsertInternal(
+                    type='genome',
+                    technology='short-read',
+                    platform='illumina',
+                    meta={},
+                    assays=[],
+                ),
+                SequencingGroupUpsertInternal(
+                    type='exome',
+                    technology='short-read',
+                    platform='illumina',
+                    meta={},
+                    assays=[],
+                ),
+            ],
+        )
+
+        sample = await self.slayer.upsert_sample(sample_model)
+        assert sample.sequencing_groups
+        sg1 = sample.sequencing_groups[0].to_external().id
+
+        assert sg1
+
+        archive_result = await self.run_graphql_query_async(
+            """
+            mutation ArchiveSeqGroups($ids: [String!]!) {
+                sequencingGroup {
+                    archiveSequencingGroups(sequencingGroupIds:$ids) {
+                        id
+                        archived
+                    }
+                }
+            }
+            """,
+            {'ids': [sg1]},
+        )
+
+        archived_sgs = archive_result['sequencingGroup']['archiveSequencingGroups']
+
+        self.assertEqual(len(archived_sgs), 1)
+        self.assertEqual(archived_sgs[0]['id'], sg1)
+        self.assertEqual(archived_sgs[0]['archived'], True)

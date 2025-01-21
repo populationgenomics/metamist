@@ -75,4 +75,17 @@ async def update_sequencing_group(
     return True
 
 
+@router.patch('/archive', operation_id='archiveSequencingGroups')
+async def archive_sequencing_groups(
+    sequencing_group_ids: list[str],
+    connection: Connection = get_projectless_db_connection,
+) -> bool:
+    """Update the meta fields of a sequencing group"""
+    sl = SequencingGroupLayer(connection)
+    await sl.archive_sequencing_groups(
+        [sequencing_group_id_transform_to_raw(sgid) for sgid in sequencing_group_ids]
+    )
+    return True
+
+
 # endregion
