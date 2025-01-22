@@ -98,3 +98,25 @@ class SequencingGroupMutations:
         )[0]
         full_updated_sg = await slayer.get_sequencing_group_by_id(updated_sg.id)  # type: ignore [arg-type]
         return GraphQLSequencingGroup.from_internal(full_updated_sg)
+
+    @strawberry.mutation
+    async def archive_sequencing_groups(
+        self,
+        sequencing_group_ids: list[str],
+        info: Info,
+    ) -> list[
+        Annotated['GraphQLSequencingGroup', strawberry.lazy('api.graphql.schema')]
+    ]:
+        """Archive a list of sequencing groups"""
+        from api.graphql.schema import GraphQLSequencingGroup
+
+        connection: Connection = info.context['connection']
+
+        slayer = SequencingGroupLayer(connection)
+        raw_ids = [
+            sequencing_group_id_transform_to_raw(sgid) for sgid in sequencing_group_ids
+        ]
+        await slayer.archive_sequencing_groups(raw_ids)
+
+        updated_sgs = await slayer.get_sequencing_groups_by_ids(raw_ids)
+        return [GraphQLSequencingGroup.from_internal(sg) for sg in updated_sgs]
