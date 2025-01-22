@@ -11,7 +11,7 @@ from db.python.tables.sequencing_group import (
     SequencingGroupTable,
 )
 from db.python.utils import NotFoundError
-from models.models.project import ProjectId, ReadAccessRoles
+from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
 from models.models.sequencing_group import (
     SequencingGroupInternal,
     SequencingGroupInternalId,
@@ -266,12 +266,32 @@ class SequencingGroupLayer(BaseLayer):
 
     async def archive_sequencing_group(self, sequencing_group_id: int):
         """
-        Archive sequence group, should you be able to do this?
-        What are the consequences:
-        - should all relevant single-sample analysis entries be archived
-        - why are they being archived?
+        Archive a single sequencing group,
+        see `archive_sequencing_groups` for more details
+
         """
-        return await self.seqgt.archive_sequencing_groups([sequencing_group_id])
+        return await self.archive_sequencing_groups([sequencing_group_id])
+
+    async def archive_sequencing_groups(self, sequencing_group_ids: list[int]):
+        """
+        Archive multiple sequencing groups. Generally sequencing groups are archived
+        via the upsert_sample method when assays are updated. There are some
+        circumstances however where it is necessary to directly archive sequencing
+        groups. For example we may be provided with a new set of assays with new sample
+        ids, in this case the old sequencing groups will not be automatically archived.
+
+        This method should be used with care as it may be necessary to also deactivate
+        analyses and/or samples manually at the same time.
+        """
+
+        projects, _groups = await self.seqgt.get_sequencing_groups_by_ids(
+            sequencing_group_ids
+        )
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=FullWriteAccessRoles
+        )
+
+        return await self.seqgt.archive_sequencing_groups(sequencing_group_ids)
 
     async def upsert_sequencing_groups(
         self, sequencing_groups: list[SequencingGroupUpsertInternal]
