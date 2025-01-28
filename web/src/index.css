@@ -346,8 +346,6 @@ html[data-theme='dark-mode'] .ui.table {
     color: var(--color-text-primary);
 }
 
-
-
 /* Project Insights dashboard */
 .html-tooltip .MuiTooltip-tooltip {
     background-color: #f5f5f9;
@@ -469,7 +467,6 @@ html[data-theme='dark-mode'] .ui.table {
     display: flex !important;
 }
 
-
 /*
     hax to fix bad cascading styles.
     There are a few conflicting css frameworks on metamist for strange historical reasons.
@@ -477,6 +474,7 @@ html[data-theme='dark-mode'] .ui.table {
     is sometimes necessary to remove styles that cascade from bad global definitions.
 */
 
-.MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows {
+.MuiTablePagination-selectLabel,
+.MuiTablePagination-displayedRows {
     margin-bottom: 0 !important;
 }
