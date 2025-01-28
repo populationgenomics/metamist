@@ -189,6 +189,39 @@ export default function ProcessingTimes() {
                     ]}
                 />
             </ReportRow>
+            <ReportRow>
+                <ReportItemPlot
+                    height={ROW_HEIGHT}
+                    flexGrow={1}
+                    flexBasis={400}
+                    title="Sample types"
+                    description="Count of participants for each sample type"
+                    project={PROJECT}
+                    query={[
+                        {
+                            name: 'result',
+                            query: `
+                                select
+                                    count(distinct participant_id) as count,
+                                    type
+                                from sample s
+                                group by 2  
+                            `,
+                        },
+                    ]}
+                    plot={(data) => ({
+                        marginLeft: 100,
+                        marks: [
+                            Plot.barX(data, {
+                                y: 'type',
+                                x: 'count',
+                                fill: 'type',
+                                tip: true,
+                            }),
+                        ],
+                    })}
+                />
+            </ReportRow>
         </Report>
     )
 }

@@ -91,6 +91,56 @@ export default function Recruitment() {
                     })}
                 />
             </ReportRow>
+            <ReportRow>
+                <ReportItemPlot
+                    height={ROW_HEIGHT}
+                    flexGrow={1}
+                    title="Recruitment type by processing site"
+                    description="How the participant was recruited, broken down by processing site"
+                    project={PROJECT}
+                    query={`
+                        select
+                            count(distinct participant_id) as count,
+                            CASE coalesce("meta_collection-event-type", '__NULL__')
+                                WHEN 'POE'
+                                    THEN 'POE?'
+
+                                WHEN 'Walk-in'
+                                    THEN 'Walk in'
+                                WHEN 'Walk In'
+                                    THEN 'Walk in'
+
+                                WHEN 'OSS'
+                                    THEN 'Once Stop Shop'
+                                
+                                WHEN '__NULL__'
+                                    THEN 'Unknown'
+
+                                ELSE "meta_collection-event-type"
+
+                            END as collection_type,
+                            coalesce(s."meta_processing-site", 'Unknown') as processing_site,
+                        from sample s
+                        group by 2, 3
+                    `}
+                    plot={(data) => ({
+                        color: { legend: true },
+                        marginLeft: 100,
+                        marks: [
+                            Plot.barX(
+                                data,
+                                Plot.stackX({
+                                    x: 'count',
+                                    y: 'processing_site',
+                                    fill: 'collection_type',
+                                    inset: 0.5,
+                                    tip: true,
+                                })
+                            ),
+                        ],
+                    })}
+                />
+            </ReportRow>
         </Report>
     )
 }

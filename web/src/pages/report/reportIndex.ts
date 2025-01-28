@@ -1,6 +1,7 @@
+import OurDnaDataQuality from './reports/ourdna/DataQuality'
 import OurDnaDemographics from './reports/ourdna/Demographics'
-import OurDnaProcessingTimes from './reports/ourdna/ProcessingTimes'
 import OurDnaRecruitment from './reports/ourdna/Recruitment'
+import OurDnaProcessingTimes from './reports/ourdna/SampleProcessing'
 
 type ReportTab = {
     title: string
@@ -24,14 +25,19 @@ export const reports: Record<string, Record<string, ReportDefinition>> = {
                     content: OurDnaRecruitment,
                 },
                 {
-                    title: 'Processing Times',
-                    id: 'processing_times',
+                    title: 'Sample Processing',
+                    id: 'sample_processing',
                     content: OurDnaProcessingTimes,
                 },
                 {
                     title: 'Demographics',
                     id: 'demographics',
                     content: OurDnaDemographics,
+                },
+                {
+                    title: 'Data Quality',
+                    id: 'data_quality',
+                    content: OurDnaDataQuality,
                 },
             ],
         },

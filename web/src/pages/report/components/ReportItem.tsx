@@ -61,7 +61,7 @@ export function ReportItem(props: BaseReportItemProps & ReportItemContentProps) 
                 }}
             >
                 {(props.title || props.subtitle) && (
-                    <Box>
+                    <Box pr={8}>
                         {props.title && (
                             <Typography fontWeight={'bold'} fontSize={16}>
                                 {props.title}

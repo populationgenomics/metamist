@@ -6,25 +6,6 @@ import ReportRow from '../../components/ReportRow'
 const ROW_HEIGHT = 450
 const PROJECT = 'ourdna'
 
-const PROCESS_DURATION_QUERY = `
-    select
-        s.sample_id,
-        cast(s.participant_id as string) as participant_id,
-        coalesce(s."meta_processing-site", 'Unknown') as processing_site,
-        
-        try_strptime(nullif("meta_collection-time", ' '), '%Y-%m-%d %H:%M:%S') as collection_time,
-        try_strptime(nullif("meta_process-end-time", ' '), '%Y-%m-%d %H:%M:%S') as process_end_time,
-        date_diff(
-            'hour',
-            try_strptime(nullif("meta_collection-time", ' '), '%Y-%m-%d %H:%M:%S'),
-            try_strptime(nullif("meta_process-end-time", ' '), '%Y-%m-%d %H:%M:%S')
-        ) as duration
-    from sample s
-    join participant p
-    on p.participant_id = s.participant_id
-    where s.type = 'blood'
-`
-
 export default function Demographics() {
     return (
         <Report>
@@ -168,6 +149,7 @@ export default function Demographics() {
                     `}
                     plot={(data) => ({
                         color: { legend: true },
+                        y: { label: 'count' },
                         marks: [
                             Plot.rectY(
                                 data,
@@ -192,6 +174,8 @@ export default function Demographics() {
                                 p.participant_id,
                                 unnest(p."meta_ancestry-participant-ancestry") as ancestry
                             from participant p
+                            join sample s on s.participant_id = p.participant_id
+                            where s.type = 'blood'
                         )
                         select
                             count(distinct participant_id) as count,
@@ -215,6 +199,59 @@ export default function Demographics() {
                                 tip: true,
                                 sort: {
                                     y: 'x',
+                                    reverse: true,
+                                },
+                            }),
+                        ],
+                    })}
+                />
+            </ReportRow>
+            <ReportRow>
+                <ReportItemPlot
+                    height={800}
+                    project={PROJECT}
+                    flexGrow={1}
+                    flexBasis={400}
+                    title="Ancestry by processing site"
+                    description="Count of participant by ancestry, broken down by processing site. Each participant may have multiple ancestries"
+                    query={`
+                        with all_ancestries as (
+                            select
+                                p.participant_id,
+                                unnest(p."meta_ancestry-participant-ancestry") as ancestry,
+                                coalesce(s."meta_processing-site", 'Unknown') as processing_site
+                            from participant p
+                            join sample s on s.participant_id = p.participant_id
+                            where s.type = 'blood'
+                        )
+                        select
+                            count(distinct participant_id) as count,
+                            ancestry,
+                            processing_site
+                        from all_ancestries
+                        group by 2, 3
+                        order by 1 desc
+                    `}
+                    plot={(data) => ({
+                        marginLeft: 100,
+                        marginRight: 100,
+                        inset: 10,
+                        y: {
+                            inset: 1,
+                        },
+                        color: {
+                            scheme: 'Observable10',
+                            reverse: true,
+                        },
+                        marks: [
+                            Plot.barX(data, {
+                                y: 'processing_site',
+                                fy: 'ancestry',
+                                fill: 'ancestry',
+                                x: 'count',
+                                tip: true,
+                                sort: {
+                                    fy: 'x',
                                     reverse: true,
                                 },
                             }),

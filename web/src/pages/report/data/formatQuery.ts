@@ -19,6 +19,8 @@ export function formatQuery(query: UnformattedQuery) {
         }
     })
 
+    if (cleanQueries.length === 1) return cleanQueries[0].query
+
     const ctes = cleanQueries.slice(0, cleanQueries.length - 1).map((qq) => {
         // To format the query nicely, need to indent each line by the same amount, but no way
         // of knowing what that amount is, as it depends on the code formatting :/ so use a sentinel
