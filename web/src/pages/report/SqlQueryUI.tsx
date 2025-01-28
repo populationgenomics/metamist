@@ -27,7 +27,7 @@ import { editor, KeyCode, KeyMod } from 'monaco-editor'
 import { Fragment, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
-import { TableFromQuery } from './chart/TableFromQuery'
+import { TableFromQuery } from './components/TableFromQuery'
 import { useProjectDbSetup } from './data/projectDatabase'
 
 const SIDEBAR_WIDTH = 250

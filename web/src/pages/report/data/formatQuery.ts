@@ -1,14 +1,17 @@
 import { stripIndent } from 'common-tags'
 
-type Query = {
+export type NamedQueryPart = {
     name: string
     query: string
 }
 
+export type UnformattedQuery = string | NamedQueryPart[]
+
 // Take a list of queries and combine them into a single query using CTEs
 // This allows viewing of steps that are used to arrive at a final aggregated query
-export default function combineQueries(queries: Query[]) {
-    const cleanQueries = queries.map((qq) => {
+export function formatQuery(query: UnformattedQuery) {
+    if (typeof query === 'string') return stripIndent(query)
+    const cleanQueries = query.map((qq) => {
         return {
             ...qq,
             // remove any trailing semicolons from the query, in case they were added accidentally

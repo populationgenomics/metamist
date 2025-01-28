@@ -489,3 +489,15 @@ html[data-theme='dark-mode'] .ui.table {
 .dimmed.dimmable > .ui.modals.dimmer.visible {
     display: flex !important;
 }
+
+
+/* 
+    hax to fix bad cascading styles.
+    There are a few conflicting css frameworks on metamist for strange historical reasons.
+    While we're working to move to mui and remove other conflicting styles at the moment it
+    is sometimes necessary to remove styles that cascade from bad global definitions.
+*/
+
+.MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows {
+    margin-bottom: 0 !important;
+}
