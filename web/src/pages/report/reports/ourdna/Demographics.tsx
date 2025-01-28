@@ -88,7 +88,7 @@ export default function Demographics() {
                                     coalesce(r.participants, 0) as participants,
                                     strftime(w.week, '%Y-%m-%d') as week,
                                     a.ancestry,
-                                    
+
                                 from weeks w
                                 join ancestries a on true
                                 left join counts_by_week r

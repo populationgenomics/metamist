@@ -11,7 +11,7 @@ const PROCESS_DURATION_QUERY = `
         s.sample_id,
         cast(s.participant_id as string) as participant_id,
         coalesce(s."meta_processing-site", 'Unknown') as processing_site,
-        
+
         try_strptime(nullif("meta_collection-time", ' '), '%Y-%m-%d %H:%M:%S') as collection_time,
         try_strptime(nullif("meta_process-end-time", ' '), '%Y-%m-%d %H:%M:%S') as process_end_time,
         date_diff(
@@ -94,7 +94,7 @@ export default function ProcessingTimes() {
                                     WHEN duration >= 48 AND duration < 72 THEN '48-72 hours'
                                     ELSE '72+ hours'
                                 END AS duration
-                            from durations group by 2 order by 2    
+                            from durations group by 2 order by 2
                         `,
                         },
                     ]}
@@ -139,7 +139,7 @@ export default function ProcessingTimes() {
                                     WHEN duration >= 48 AND duration < 72 THEN '48-72 hours'
                                     ELSE '72+ hours'
                                 END AS duration
-                            from durations group by 2,3 order by 2,3    
+                            from durations group by 2,3 order by 2,3
                         `,
                         },
                     ]}
@@ -205,7 +205,7 @@ export default function ProcessingTimes() {
                                     count(distinct participant_id) as count,
                                     type
                                 from sample s
-                                group by 2  
+                                group by 2
                             `,
                         },
                     ]}

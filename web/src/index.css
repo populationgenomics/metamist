@@ -491,7 +491,7 @@ html[data-theme='dark-mode'] .ui.table {
 }
 
 
-/* 
+/*
     hax to fix bad cascading styles.
     There are a few conflicting css frameworks on metamist for strange historical reasons.
     While we're working to move to mui and remove other conflicting styles at the moment it

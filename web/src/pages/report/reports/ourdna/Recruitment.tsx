@@ -65,7 +65,7 @@ export default function Recruitment() {
 
                                 WHEN 'OSS'
                                     THEN 'Once Stop Shop'
-                                
+
                                 WHEN '__NULL__'
                                     THEN 'Unknown'
 
@@ -112,7 +112,7 @@ export default function Recruitment() {
 
                                 WHEN 'OSS'
                                     THEN 'Once Stop Shop'
-                                
+
                                 WHEN '__NULL__'
                                     THEN 'Unknown'
 
