@@ -425,6 +425,7 @@ export default function SqlQueryUi() {
                         {projectName && (selectedTableQuery || tableQueryValue) && (
                             <TableFromQuery
                                 project={projectName}
+                                showToolbar
                                 query={selectedTableQuery || tableQueryValue}
                             />
                         )}
