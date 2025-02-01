@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Annotated
 import strawberry
 from strawberry.types import Info
 
-from api.graphql.loaders import GraphQLContext
+from api.graphql.context import GraphQLContext
 from api.graphql.mutations.sample import SampleUpsertInput
 from db.python.connect import Connection
 from db.python.layers.comment import CommentLayer
@@ -15,7 +15,8 @@ from models.models.participant import ParticipantUpsert
 from models.models.project import FullWriteAccessRoles
 
 if TYPE_CHECKING:
-    from api.graphql.schema import GraphQLComment, GraphQLParticipant
+    from api.graphql.query.comment import GraphQLComment
+    from api.graphql.query.participant import GraphQLParticipant
 
 
 @strawberry.type
@@ -54,13 +55,13 @@ class ParticipantMutations:
         self,
         content: str,
         id: int,
-        info: Info[GraphQLContext, 'ParticipantMutations'],
-    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+        info: Info[GraphQLContext, None],
+    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.query.comment')]:
         """Add a comment to a participant"""
         # Import needed here to avoid circular import
-        from api.graphql.schema import GraphQLComment
+        from api.graphql.query.comment import GraphQLComment
 
-        connection = info.context['connection']
+        connection = info.context.connection
         cl = CommentLayer(connection)
         result = await cl.add_comment_to_entity(
             entity=CommentEntityType.participant, entity_id=id, content=content
@@ -73,11 +74,13 @@ class ParticipantMutations:
         participant_id: int,
         participant: ParticipantUpsertInput,
         info: Info,
-    ) -> Annotated['GraphQLParticipant', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated[
+        'GraphQLParticipant', strawberry.lazy('api.graphql.query.participant')
+    ]:
         """Update Participant Data"""
-        from api.graphql.schema import GraphQLParticipant
+        from api.graphql.query.participant import GraphQLParticipant
 
-        connection = info.context['connection']
+        connection = info.context.connection
         player = ParticipantLayer(connection)
 
         participant.id = participant_id
@@ -95,14 +98,18 @@ class ParticipantMutations:
         project: str,
         participants: list[ParticipantUpsertInput],
         info: Info,
-    ) -> list[Annotated['GraphQLParticipant', strawberry.lazy('api.graphql.schema')]]:
+    ) -> list[
+        Annotated[
+            'GraphQLParticipant', strawberry.lazy('api.graphql.query.participant')
+        ]
+    ]:
         """
         Upserts a list of participants with samples and sequences
         Returns the list of internal sample IDs
         """
-        from api.graphql.schema import GraphQLParticipant
+        from api.graphql.query.participant import GraphQLParticipant
 
-        connection: Connection = info.context['connection']
+        connection: Connection = info.context.connection
         connection.check_access_to_projects_for_names([project], FullWriteAccessRoles)
 
         pt = ParticipantLayer(connection)
@@ -130,7 +137,7 @@ class ParticipantMutations:
         to new_family_id, maintaining all other fields.
         The new_family_id must already exist.
         """
-        connection = info.context['connection']
+        connection = info.context.connection
         player = ParticipantLayer(connection)
 
         return UpdateParticipantFamilyType.from_tuple(

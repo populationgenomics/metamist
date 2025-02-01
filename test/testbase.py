@@ -17,7 +17,7 @@ from google.cloud.storage import Client
 from pymysql import IntegrityError
 from testcontainers.mysql import MySqlContainer
 
-from api.graphql.loaders import get_context  # type: ignore
+from api.graphql.context import get_context
 from api.graphql.schema import schema  # type: ignore
 from db.python.connect import (
     TABLES_ORDERED_BY_FK_DEPS,

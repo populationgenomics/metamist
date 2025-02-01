@@ -1,10 +1,11 @@
 # pylint: disable=redefined-builtin, import-outside-toplevel
 
 from typing import TYPE_CHECKING, Annotated
+
 import strawberry
 from strawberry.types import Info
 
-from api.graphql.loaders import GraphQLContext
+from api.graphql.context import GraphQLContext
 from db.python.connect import Connection
 from db.python.layers.analysis import AnalysisLayer
 from models.enums.analysis import AnalysisStatus
@@ -12,7 +13,7 @@ from models.models.analysis import Analysis
 from models.models.project import FullWriteAccessRoles
 
 if TYPE_CHECKING:
-    from api.graphql.schema import GraphQLAnalysis
+    from api.graphql.query.analysis import GraphQLAnalysis
 
 AnalysisStatusType = strawberry.enum(AnalysisStatus)  # type: ignore [misc]
 
@@ -54,11 +55,11 @@ class AnalysisMutations:
         project: str,
         analysis: AnalysisInput,
         info: Info[GraphQLContext, 'AnalysisMutations'],
-    ) -> Annotated['GraphQLAnalysis', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated['GraphQLAnalysis', strawberry.lazy('api.graphql.query.analysis')]:
         """Create a new analysis"""
-        from api.graphql.schema import GraphQLAnalysis
+        from api.graphql.query.analysis import GraphQLAnalysis
 
-        connection: Connection = info.context['connection']
+        connection: Connection = info.context.connection
 
         # Should be moved to the analysis layer
         (target_project,) = connection.get_and_check_access_to_projects_for_names(
@@ -86,11 +87,11 @@ class AnalysisMutations:
         analysis_id: int,
         analysis: AnalysisUpdateInput,
         info: Info[GraphQLContext, 'AnalysisMutations'],
-    ) -> Annotated['GraphQLAnalysis', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated['GraphQLAnalysis', strawberry.lazy('api.graphql.query.analysis')]:
         """Update status of analysis"""
-        from api.graphql.schema import GraphQLAnalysis
+        from api.graphql.query.analysis import GraphQLAnalysis
 
-        connection = info.context['connection']
+        connection = info.context.connection
         alayer = AnalysisLayer(connection)
         await alayer.update_analysis(
             analysis_id,
