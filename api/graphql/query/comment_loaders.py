@@ -1,5 +1,3 @@
-
-
 from api.graphql.utils.loaders import connected_data_loader
 from db.python.connect import Connection
 from db.python.layers.comment import CommentLayer

@@ -14,15 +14,14 @@ from api.graphql.query.family_loaders import FamilyLoaderKeys
 from api.graphql.query.participant_loaders import ParticipantLoaderKeys
 from api.graphql.query.project_loaders import ProjectLoaderKeys
 from api.graphql.query.sample_loaders import SampleLoaderKeys
+from db.python.filters.generic import GenericFilter
+from db.python.filters.sample import SampleFilter
 from models.base import PRIMARY_EXTERNAL_ORG
 from models.models.participant import ParticipantInternal
 
 from .audit_log import GraphQLAuditLog
 
 if TYPE_CHECKING:
-    from db.python.filters.generic import GenericFilter
-    from db.python.filters.sample import SampleFilter
-
     from .comment import GraphQLDiscussion
     from .family import GraphQLFamily, GraphQLFamilyParticipant
     from .project import GraphQLProject

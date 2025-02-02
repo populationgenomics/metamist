@@ -20,7 +20,7 @@ from db.python.filters.sequencing_group import SequencingGroupFilter
 from db.python.tables.assay import AssayFilter
 from models.base import PRIMARY_EXTERNAL_ORG
 from models.models.sample import SampleInternal
-from models.utils import sample_id_format
+from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
 
 if TYPE_CHECKING:

@@ -98,6 +98,13 @@ class GraphQLComment:
         ],
         strawberry.union('GraphQLCommentEntity'),
     ]:
+        from .assay import GraphQLAssay
+        from .family import GraphQLFamily
+        from .participant import GraphQLParticipant
+        from .project import GraphQLProject
+        from .sample import GraphQLSample
+        from .sequencing_group import GraphQLSequencingGroup
+
         entity_type = root.comment_entity_type
         entity_id = root.comment_entity_id
 

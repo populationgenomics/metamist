@@ -18,6 +18,7 @@ class GraphQLAuditLog:
 
     @staticmethod
     def from_internal(audit_log: AuditLogInternal) -> 'GraphQLAuditLog':
+        """From internal model"""
         return GraphQLAuditLog(
             id=audit_log.id,
             author=audit_log.author,

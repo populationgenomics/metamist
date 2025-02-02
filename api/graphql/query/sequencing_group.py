@@ -20,7 +20,7 @@ from models.models.project import (
     ReadAccessRoles,
 )
 from models.models.sequencing_group import SequencingGroupInternal
-from models.utils import sequencing_group_id_format
+from models.utils.sequencing_group_id_format import sequencing_group_id_format
 
 if TYPE_CHECKING:
     from .assay import GraphQLAssay
@@ -67,6 +67,8 @@ class GraphQLSequencingGroup:
     async def sample(
         self, info: strawberry.Info[GraphQLContext, None], root: Self
     ) -> Annotated['GraphQLSample', strawberry.lazy('.sample')]:
+        from .sample import GraphQLSample
+
         loader = info.context.loaders[SampleLoaderKeys.SAMPLES_FOR_IDS]
         sample = await loader.load(root.sample_id)
         return GraphQLSample.from_internal(sample)

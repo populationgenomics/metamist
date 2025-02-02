@@ -55,6 +55,8 @@ class GraphQLAnalysis:
     ) -> list[
         Annotated['GraphQLSequencingGroup', strawberry.lazy('.sequencing_group')]
     ]:
+        from .sequencing_group import GraphQLSequencingGroup
+
         loader = info.context.loaders[
             SequencingGroupLoaderKeys.SEQUENCING_GROUPS_FOR_ANALYSIS
         ]
@@ -75,6 +77,8 @@ class GraphQLAnalysis:
     async def audit_logs(
         self, info: strawberry.Info[GraphQLContext, None], root: Self
     ) -> list[Annotated['GraphQLAuditLog', strawberry.lazy('.audit_log')]]:
+        from .audit_log import GraphQLAuditLog
+
         loader = info.context.loaders[AuditLogLoaderKeys.AUDIT_LOGS_BY_ANALYSIS_IDS]
         audit_logs = await loader.load(root.id)
         return [GraphQLAuditLog.from_internal(audit_log) for audit_log in audit_logs]

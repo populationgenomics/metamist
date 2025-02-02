@@ -41,6 +41,8 @@ class GraphQLAssay:
     async def sample(
         self, info: strawberry.Info[GraphQLContext, None], root: Self
     ) -> Annotated['GraphQLSample', strawberry.lazy('.sample')]:
+        from .sample import GraphQLSample
+
         loader = info.context.loaders[SampleLoaderKeys.SAMPLES_FOR_IDS]
         sample = await loader.load(root.sample_id)
         return GraphQLSample.from_internal(sample)
@@ -49,6 +51,8 @@ class GraphQLAssay:
     async def discussion(
         self, info: strawberry.Info[GraphQLContext, None], root: Self
     ) -> Annotated['GraphQLDiscussion', strawberry.lazy('.comment')]:
+        from .comment import GraphQLDiscussion
+
         loader = info.context.loaders[CommentLoaderKeys.COMMENTS_FOR_ASSAY_IDS]
         discussion = await loader.load(root.id)
         return GraphQLDiscussion.from_internal(discussion)

@@ -15,7 +15,8 @@ from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter
 from models.models.cohort import CohortInternal, CohortTemplateInternal
 from models.models.project import ReadAccessRoles
-from models.utils import cohort_id_format, cohort_template_id_format
+from models.utils.cohort_id_format import cohort_id_format, cohort_id_transform_to_raw
+from models.utils.cohort_template_id_format import cohort_template_id_format
 
 if TYPE_CHECKING:
     from .analysis import GraphQLAnalysis
@@ -36,6 +37,7 @@ class GraphQLCohort:
 
     @staticmethod
     def from_internal(internal: CohortInternal) -> 'GraphQLCohort':
+        """From internal model"""
         return GraphQLCohort(
             id=cohort_id_format(internal.id),
             name=internal.name,
@@ -48,9 +50,10 @@ class GraphQLCohort:
     async def template(
         self, info: Info[GraphQLContext, None], root: Self
     ) -> 'GraphQLCohortTemplate':
+        """Get cohort template"""
         connection = info.context.connection
         template = await CohortLayer(connection).get_template_by_cohort_id(
-            cohort_id_format.cohort_id_transform_to_raw(root.id)
+            cohort_id_transform_to_raw(root.id)
         )
 
         projects = connection.get_and_check_access_to_projects_for_ids(
@@ -74,12 +77,13 @@ class GraphQLCohort:
     ) -> list[
         Annotated['GraphQLSequencingGroup', strawberry.lazy('.sequencing_group')]
     ]:
+        """Get sequencing groups for cohort"""
         from api.graphql.query.sequencing_group import GraphQLSequencingGroup
 
         connection = info.context.connection
         cohort_layer = CohortLayer(connection)
         sg_ids = await cohort_layer.get_cohort_sequencing_group_ids(
-            cohort_id_format.cohort_id_transform_to_raw(root.id)
+            cohort_id_transform_to_raw(root.id)
         )
 
         sg_layer = SequencingGroupLayer(connection)
@@ -100,9 +104,7 @@ class GraphQLCohort:
         connection = info.context.connection
         internal_analysis = await AnalysisLayer(connection).query(
             AnalysisFilter(
-                cohort_id=GenericFilter(
-                    in_=[cohort_id_format.cohort_id_transform_to_raw(root.id)]
-                ),
+                cohort_id=GenericFilter(in_=[cohort_id_transform_to_raw(root.id)]),
             )
         )
         return [GraphQLAnalysis.from_internal(a) for a in internal_analysis]
@@ -111,6 +113,7 @@ class GraphQLCohort:
     async def project(
         self, info: Info[GraphQLContext, None], root: Self
     ) -> Annotated['GraphQLProject', strawberry.lazy('.project')]:
+        """Get project for cohort"""
         from .project import GraphQLProject
 
         loader = info.context.loaders[ProjectLoaderKeys.PROJECTS_FOR_IDS]
