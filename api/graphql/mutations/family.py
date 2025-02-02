@@ -3,16 +3,17 @@
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
-from strawberry.types import Info
 from strawberry.scalars import JSON
+from strawberry.types import Info
 
-from api.graphql.loaders import GraphQLContext
+from api.graphql.context import GraphQLContext
 from db.python.layers.comment import CommentLayer
 from db.python.layers.family import FamilyLayer
 from models.models.comment import CommentEntityType
 
 if TYPE_CHECKING:
-    from api.graphql.schema import GraphQLComment, GraphQLFamily
+    from api.graphql.query.comment import GraphQLComment
+    from api.graphql.query.family import GraphQLFamily
 
 
 @strawberry.input
@@ -35,12 +36,12 @@ class FamilyMutations:
         content: str,
         id: int,
         info: Info[GraphQLContext, 'FamilyMutations'],
-    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.query.comment')]:
         """Add a comment to a family"""
         # Import needed here to avoid circular import
-        from api.graphql.schema import GraphQLComment
+        from api.graphql.query.comment import GraphQLComment
 
-        connection = info.context['connection']
+        connection = info.context.connection
         cl = CommentLayer(connection)
         result = await cl.add_comment_to_entity(
             entity=CommentEntityType.family, entity_id=id, content=content
@@ -52,11 +53,11 @@ class FamilyMutations:
         self,
         family: FamilyUpdateInput,
         info: Info,
-    ) -> Annotated['GraphQLFamily', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated['GraphQLFamily', strawberry.lazy('api.graphql.query.family')]:
         """Update information for a single family"""
-        from api.graphql.schema import GraphQLFamily
+        from api.graphql.query.family import GraphQLFamily
 
-        connection = info.context['connection']
+        connection = info.context.connection
         flayer = FamilyLayer(connection)
         await flayer.update_family(
             id_=family.id,

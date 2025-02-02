@@ -1,8 +1,8 @@
 import datetime
 
 import strawberry
-from strawberry.types import Info
 from strawberry.scalars import JSON
+from strawberry.types import Info
 
 from db.python.connect import Connection
 from db.python.layers.analysis_runner import AnalysisRunnerLayer
@@ -43,7 +43,7 @@ class AnalysisRunnerMutations:
         info: Info,
     ) -> str:
         """Create a new analysis runner log"""
-        connection: Connection = info.context['connection']
+        connection: Connection = info.context.connection
 
         # Should be moved to the analysis runner layer
         (target_project,) = connection.get_and_check_access_to_projects_for_names(

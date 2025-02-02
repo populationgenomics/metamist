@@ -5,22 +5,22 @@ from typing import TYPE_CHECKING, Annotated
 import strawberry
 from strawberry.types import Info
 
-from api.graphql.loaders import GraphQLContext
+from api.graphql.context import GraphQLContext
 from api.graphql.mutations.assay import AssayUpsertInput
 from api.graphql.mutations.sequencing_group import SequencingGroupUpsertInput
 from db.python.connect import Connection
 from db.python.layers.comment import CommentLayer
 from db.python.layers.sample import SampleLayer
 from models.models.comment import CommentEntityType
+from models.models.project import FullWriteAccessRoles
 from models.models.sample import SampleUpsert
 from models.utils.sample_id_format import (  # Sample,
     sample_id_transform_to_raw,
 )
-from models.models.project import FullWriteAccessRoles
-
 
 if TYPE_CHECKING:
-    from api.graphql.schema import GraphQLComment, GraphQLSample
+    from api.graphql.query.comment import GraphQLComment
+    from api.graphql.query.sample import GraphQLSample
 
 
 @strawberry.input  # type: ignore [misc]
@@ -48,11 +48,11 @@ class SampleMutations:
         content: str,
         id: str,
         info: Info[GraphQLContext, 'SampleMutations'],
-    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.query.comment')]:
         """Add a comment to a sample"""
-        from api.graphql.schema import GraphQLComment
+        from api.graphql.query.comment import GraphQLComment
 
-        connection = info.context['connection']
+        connection = info.context.connection
         cl = CommentLayer(connection)
         result = await cl.add_comment_to_entity(
             entity=CommentEntityType.sample,
@@ -69,11 +69,11 @@ class SampleMutations:
         project: str,
         sample: SampleUpsertInput,
         info: Info[GraphQLContext, 'SampleMutations'],
-    ) -> Annotated['GraphQLSample', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated['GraphQLSample', strawberry.lazy('api.graphql.query.sample')]:
         """Creates a new sample, and returns the internal sample ID"""
-        from api.graphql.schema import GraphQLSample
+        from api.graphql.query.sample import GraphQLSample
 
-        connection: Connection = info.context['connection']
+        connection: Connection = info.context.connection
         (target_project,) = connection.get_and_check_access_to_projects_for_names(
             [project], FullWriteAccessRoles
         )
@@ -93,14 +93,17 @@ class SampleMutations:
         project: str,
         samples: list[SampleUpsertInput],
         info: Info[GraphQLContext, 'SampleMutations'],
-    ) -> list[Annotated['GraphQLSample', strawberry.lazy('api.graphql.schema')]] | None:
+    ) -> (
+        list[Annotated['GraphQLSample', strawberry.lazy('api.graphql.query.sample')]]
+        | None
+    ):
         """
         Upserts a list of samples with sequencing-groups,
         and returns the list of internal sample IDs
         """
-        from api.graphql.schema import GraphQLSample
+        from api.graphql.query.sample import GraphQLSample
 
-        connection: Connection = info.context['connection']
+        connection: Connection = info.context.connection
         (target_project,) = connection.get_and_check_access_to_projects_for_names(
             [project], FullWriteAccessRoles
         )
@@ -128,11 +131,11 @@ class SampleMutations:
         self,
         sample: SampleUpsertInput,
         info: Info[GraphQLContext, 'SampleMutations'],
-    ) -> Annotated['GraphQLSample', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated['GraphQLSample', strawberry.lazy('api.graphql.query.sample')]:
         """Update sample with id"""
-        from api.graphql.schema import GraphQLSample
+        from api.graphql.query.sample import GraphQLSample
 
-        connection = info.context['connection']
+        connection = info.context.connection
         slayer = SampleLayer(connection)
         upserted = await slayer.upsert_sample(
             SampleUpsert.from_dict(strawberry.asdict(sample)).to_internal()

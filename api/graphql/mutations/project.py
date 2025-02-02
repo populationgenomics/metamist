@@ -2,24 +2,25 @@
 
 from typing import TYPE_CHECKING, Annotated
 
-from graphql import GraphQLError
 import strawberry
-from strawberry.types import Info
+from graphql import GraphQLError
 from strawberry.scalars import JSON
+from strawberry.types import Info
 
-from api.graphql.loaders import GraphQLContext
+from api.graphql.context import GraphQLContext
 from db.python.connect import Connection
 from db.python.layers.comment import CommentLayer
 from db.python.tables.project import ProjectPermissionsTable
+from models.models.comment import CommentEntityType
 from models.models.project import (
     ProjectMemberRole,
     ProjectMemberUpdate,
     project_member_role_names,
 )
-from models.models.comment import CommentEntityType
 
 if TYPE_CHECKING:
-    from api.graphql.schema import GraphQLComment, GraphQLProject
+    from api.graphql.query.comment import GraphQLComment
+    from api.graphql.query.project import GraphQLProject
 
 
 @strawberry.input
@@ -40,12 +41,12 @@ class ProjectMutations:
         content: str,
         id: int,
         info: Info[GraphQLContext, 'ProjectMutations'],
-    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.query.comment')]:
         """Add a comment to a project"""
         # Import needed here to avoid circular import
-        from api.graphql.schema import GraphQLComment
+        from api.graphql.query.comment import GraphQLComment
 
-        connection = info.context['connection']
+        connection = info.context.connection
         cl = CommentLayer(connection)
         result = await cl.add_comment_to_entity(
             entity=CommentEntityType.project, entity_id=id, content=content
@@ -59,13 +60,13 @@ class ProjectMutations:
         dataset: str,
         create_test_project: bool,
         info: Info,
-    ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.query.project')]:
         """
         Create a new project
         """
-        from api.graphql.schema import GraphQLProject
+        from api.graphql.query.project import GraphQLProject
 
-        connection: Connection = info.context['connection']
+        connection: Connection = info.context.connection
         ptable = ProjectPermissionsTable(connection)
 
         pid = await ptable.create_project(
@@ -93,11 +94,11 @@ class ProjectMutations:
         project: str,
         project_update_model: JSON,
         info: Info,
-    ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.query.project')]:
         """Update a project by project name"""
-        from api.graphql.schema import GraphQLProject
+        from api.graphql.query.project import GraphQLProject
 
-        connection: Connection = info.context['connection']
+        connection: Connection = info.context.connection
         (p,) = connection.get_and_check_access_to_projects_for_names(
             [project], {ProjectMemberRole.project_admin}
         )
@@ -122,14 +123,14 @@ class ProjectMutations:
         project: str,
         members: list[ProjectMemberUpdateInput],
         info: Info,
-    ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.query.project')]:
         """
         Update project members for specific read / write group.
         Not that this is protected by access to a specific access group
         """
-        from api.graphql.schema import GraphQLProject
+        from api.graphql.query.project import GraphQLProject
 
-        connection: Connection = info.context['connection']
+        connection: Connection = info.context.connection
         (target_project,) = connection.get_and_check_access_to_projects_for_names(
             [project], {ProjectMemberRole.project_member_admin}
         )
