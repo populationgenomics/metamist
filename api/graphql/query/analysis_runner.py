@@ -35,6 +35,7 @@ class GraphQLAnalysisRunner:
 
     @staticmethod
     def from_internal(internal: AnalysisRunnerInternal) -> 'GraphQLAnalysisRunner':
+        """From internal model"""
         return GraphQLAnalysisRunner(
             ar_guid=internal.ar_guid,
             timestamp=internal.timestamp,
