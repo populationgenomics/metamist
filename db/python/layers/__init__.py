@@ -7,7 +7,6 @@ from db.python.layers.billing import BillingLayer
 from db.python.layers.cohort import CohortLayer
 from db.python.layers.comment import CommentLayer
 from db.python.layers.family import FamilyLayer
-from db.python.layers.ourdna.dashboard import OurDnaDashboardLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.project_insights import ProjectInsightsLayer
 from db.python.layers.sample import SampleLayer

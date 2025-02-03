@@ -18,10 +18,10 @@ import DocumentationArticle from './pages/docs/Documentation'
 import { FamilyPage } from './pages/family/FamilyView'
 import Details from './pages/insights/Details'
 import Summary from './pages/insights/Summary'
-import OurDnaDashboard from './pages/ourdna/OurDnaDashboard'
 import { ParticipantPage } from './pages/participant/ParticipantViewContainer'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
 import ProjectOverview from './pages/project/ProjectOverview'
+import ProjectReport from './pages/report/ProjectReport'
 import SqlQueryUI from './pages/report/SqlQueryUI'
 import SampleView from './pages/sample/SampleView'
 import ErrorBoundary from './shared/utilities/errorBoundary'
@@ -46,6 +46,14 @@ const Routes: React.FunctionComponent = () => (
             element={
                 <ErrorBoundary>
                     <SqlQueryUI />
+                </ErrorBoundary>
+            }
+        />
+        <Route
+            path="/project/:projectName/report/:reportName/:tabName?"
+            element={
+                <ErrorBoundary>
+                    <ProjectReport />
                 </ErrorBoundary>
             }
         />
@@ -108,8 +116,6 @@ const Routes: React.FunctionComponent = () => (
                 </ErrorBoundary>
             }
         />
-
-        <Route path="/ourdna" element={<OurDnaDashboard />} />
 
         <Route path="/swagger" element={<SwaggerUI url="/openapi.json" tryItOutEnabled={true} />} />
 
