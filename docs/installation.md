@@ -97,7 +97,6 @@ export PATH="$HB_PREFIX/opt/mariadb@10.8/bin:$PATH"
 export SM_ENVIRONMENT=LOCAL # good default to have
 export SM_DEV_DB_USER=sm_api # makes it easier to copy liquibase update command
 
-export VITE_OURDNA_PROJECT_NAME=greek-myth # points the dashboard to the project to fetch data from
 ```
 
 You can also add these to your shell config file e.g `.zshrc` or `.bashrc` for persistence to new sessions.

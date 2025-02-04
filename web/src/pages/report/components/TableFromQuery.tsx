@@ -1,5 +1,4 @@
 import { Alert, Box } from '@mui/material'
-import CircularProgress from '@mui/material/CircularProgress'
 import {
     DataGrid,
     GridColDef,
@@ -7,14 +6,18 @@ import {
     GridToolbarExport,
     GridToolbarQuickFilter,
 } from '@mui/x-data-grid'
+
 import { fromArrow } from 'arquero'
 import { ArrowTable } from 'arquero/dist/types/format/types'
+import { memo } from 'react'
 import { Link } from 'react-router-dom'
+import { formatQuery, UnformattedQuery } from '../data/formatQuery'
 import { useProjectDbQuery } from '../data/projectDatabase'
+import ReportItemLoader from './ReportItemLoader'
 
-type TableProps = {
+export type TableProps = {
     project: string
-    query: string
+    query: UnformattedQuery
     showToolbar?: boolean
 }
 
@@ -38,8 +41,16 @@ function CustomTableToolbar() {
     )
 }
 
-export function TableFromQuery(props: TableProps) {
-    const { project, query, showToolbar } = props
+// Memoized version of the result table to avoid rerenders, they can be very expensive
+// if the result set is large
+export const TableFromQuery = memo(function TableFromQuery(props: TableProps) {
+    return <TableFromQueryUnmemoized {...props} />
+})
+
+function TableFromQueryUnmemoized(props: TableProps) {
+    const { project, showToolbar } = props
+    const query = formatQuery(props.query)
+
     const result = useProjectDbQuery(project, query)
 
     const data = result && result.status === 'success' ? result.data : undefined
@@ -48,9 +59,9 @@ export function TableFromQuery(props: TableProps) {
         return <Alert severity="error">{result.errorMessage}</Alert>
     }
 
-    if (!data || !result || result.status === 'loading') return <CircularProgress />
+    if (!data || !result || result.status === 'loading') return <ReportItemLoader />
 
-    const table = fromArrow(data as ArrowTable)
+    const table = fromArrow(data as ArrowTable, { useDate: true })
 
     const columns = table.columnNames().map(
         (colName): GridColDef => ({
