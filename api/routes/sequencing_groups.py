@@ -10,7 +10,10 @@ from api.utils.db import (
 )
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from models.models.project import FullWriteAccessRoles, ReadAccessRoles
-from models.models.sequencing_group import SequencingGroupUpsertInternal
+from models.models.sequencing_group import (
+    SequencingGroup,
+    SequencingGroupUpsertInternal,
+)
 from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import (  # Sample,
     sequencing_group_id_format_list,
@@ -28,10 +31,10 @@ class SequencingGroupMetaUpdateModel(BaseModel):
     meta: dict[str, Any] | None = None
 
 
-@router.get('{sequencing_group_id}', operation_id='getSequencingGroup')
+@router.get('/{sequencing_group_id}', operation_id='getSequencingGroup')
 async def get_sequencing_group(
     sequencing_group_id: str, connection: Connection = get_projectless_db_connection
-) -> str:
+) -> SequencingGroup:
     """Creates a new sample, and returns the internal sample ID"""
     st = SequencingGroupLayer(connection)
     sg = await st.get_sequencing_group_by_id(
