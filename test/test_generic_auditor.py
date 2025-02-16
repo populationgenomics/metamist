@@ -16,7 +16,10 @@ class TestGenericAuditor(unittest.TestCase):
     async def test_get_participant_data_for_dataset(self, mock_query):
         """Only participants with a non-empty samples field should be returned"""
         auditor = GenericAuditor(
-            dataset='dev', sequencing_types=['genome'], sequencing_technologies=['short-read'], file_types=('fastq',)
+            dataset='dev',
+            sequencing_types=['genome'],
+            sequencing_technologies=['short-read'],
+            file_types=('fastq',),
         )
         mock_query.return_value = {
             'project': {
@@ -83,7 +86,10 @@ class TestGenericAuditor(unittest.TestCase):
     def test_get_assay_map_from_participants_genome(self):
         """Only genome sequences should be mapped to the sample ID"""
         auditor = GenericAuditor(
-            dataset='dev', sequencing_types=['genome'], sequencing_technologies=['short-read'], file_types=('fastq',)
+            dataset='dev',
+            sequencing_types=['genome'],
+            sequencing_technologies=['short-read'],
+            file_types=('fastq',),
         )
         participants = [
             {
@@ -285,7 +291,10 @@ class TestGenericAuditor(unittest.TestCase):
     def test_get_sequence_mapping_error_logging(self):
         """If the sequence reads meta field maps to a raw string, logging.error triggers"""
         auditor = GenericAuditor(
-            dataset='dev', sequencing_types=['genome'], sequencing_technologies=['short-read'], file_types=('fastq',)
+            dataset='dev',
+            sequencing_types=['genome'],
+            sequencing_technologies=['short-read'],
+            file_types=('fastq',),
         )
         participants = [
             {
@@ -327,7 +336,10 @@ class TestGenericAuditor(unittest.TestCase):
     def test_get_sequence_mapping_warning_logging(self):
         """If the sequence reads meta field is missing, logging.warning triggers"""
         auditor = GenericAuditor(
-            dataset='dev', sequencing_types=['genome'], sequencing_technologies=['short-read'], file_types=('fastq',)
+            dataset='dev',
+            sequencing_types=['genome'],
+            sequencing_technologies=['short-read'],
+            file_types=('fastq',),
         )
         participants = [
             {
@@ -367,7 +379,10 @@ class TestGenericAuditor(unittest.TestCase):
     async def test_query_genome_analyses_crams(self, mock_query):
         """Test that only the genome analysis crams for a sample map dictionary are returned"""
         auditor = GenericAuditor(
-            dataset='dev', sequencing_types=['genome'], sequencing_technologies=['short-read'], file_types=('fastq',)
+            dataset='dev',
+            sequencing_types=['genome'],
+            sequencing_technologies=['short-read'],
+            file_types=('fastq',),
         )
         mock_query.side_effect = [
             {
@@ -404,7 +419,10 @@ class TestGenericAuditor(unittest.TestCase):
     async def test_query_genome_and_exome_analyses_crams(self, mock_query):
         """Test that both the genome and exome analysis crams for a sample map dictionary are returned"""
         auditor = GenericAuditor(
-            dataset='dev', sequencing_types=['genome', 'exome'], sequencing_technologies=['short-read'], file_types=('fastq',)
+            dataset='dev',
+            sequencing_types=['genome', 'exome'],
+            sequencing_technologies=['short-read'],
+            file_types=('fastq',),
         )
         mock_query.side_effect = [
             {
@@ -464,7 +482,10 @@ class TestGenericAuditor(unittest.TestCase):
         ValueError raised if not
         """
         auditor = GenericAuditor(
-            dataset='dev', sequencing_types=['genome'], sequencing_technologies=['short-read'], file_types=('fastq',)
+            dataset='dev',
+            sequencing_types=['genome'],
+            sequencing_technologies=['short-read'],
+            file_types=('fastq',),
         )
         mock_query.return_value = {
             'sequencingGroups': [
@@ -496,7 +517,10 @@ class TestGenericAuditor(unittest.TestCase):
     async def test_query_analyses_crams_warning(self, mock_query):
         """Warn if the analysis CRAM output URI is not a CRAM file"""
         auditor = GenericAuditor(
-            dataset='dev', sequencing_types=['genome'], sequencing_technologies=['short-read'], file_types=('fastq',)
+            dataset='dev',
+            sequencing_types=['genome'],
+            sequencing_technologies=['short-read'],
+            file_types=('fastq',),
         )
         mock_query.return_value = {
             'sequencingGroups': [
@@ -531,7 +555,10 @@ class TestGenericAuditor(unittest.TestCase):
     async def test_analyses_for_sgs_without_crams(self, mock_query):
         """Log any analyses found for samples without completed CRAMs"""
         auditor = GenericAuditor(
-            dataset='dev', sequencing_types=['genome'], sequencing_technologies=['short-read'], file_types=('fastq',)
+            dataset='dev',
+            sequencing_types=['genome'],
+            sequencing_technologies=['short-read'],
+            file_types=('fastq',),
         )
         sgs_without_crams = [  # noqa: B006
             'CPGaaa',
@@ -615,7 +642,10 @@ class TestGenericAuditor(unittest.TestCase):
             'CPGbbb': {2: 'gs://cpg-dataset-main/exome/cram/CPGbbb.cram'},
         }
         auditor = GenericAuditor(
-            dataset='dev', sequencing_types=['genome', 'exome'], sequencing_technologies=['short-read'], file_types=('fastq',)
+            dataset='dev',
+            sequencing_types=['genome', 'exome'],
+            sequencing_technologies=['short-read'],
+            file_types=('fastq',),
         )
 
         mock_get_gcs_bucket_subdirs.return_value = {
@@ -651,7 +681,10 @@ class TestGenericAuditor(unittest.TestCase):
         Test 2 ingested reads, one ingested and moved read, and one uningested read
         """
         auditor = GenericAuditor(
-            dataset='dev', sequencing_types=['genome'], sequencing_technologies=['short-read'], file_types=('fastq',)
+            dataset='dev',
+            sequencing_types=['genome'],
+            sequencing_technologies=['short-read'],
+            file_types=('fastq',),
         )
         assay_reads_sizes = {  # noqa: B006
             1: [('read1.fq', 10), ('read2.fq', 11), ('dir1/read3.fq', 12)]
@@ -713,7 +746,10 @@ class TestGenericAuditor(unittest.TestCase):
             'gs://cpg-dataset-main-upload/data5.cram',
         ]
         auditor = GenericAuditor(
-            dataset='dev', sequencing_types=['genome'], sequencing_technologies=['short-read'], file_types=('fastq',)
+            dataset='dev',
+            sequencing_types=['genome'],
+            sequencing_technologies=['short-read'],
+            file_types=('fastq',),
         )
         buckets_subdirs = auditor.get_gcs_bucket_subdirs_to_search(paths)
 

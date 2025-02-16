@@ -93,7 +93,9 @@ class UploadBucketAuditor(GenericAuditor):
                 data_to_write=audit_report,
                 bucket_name=bucket_name,
                 blob_path=f'audit_results/{today}/{report_prefix}_{audit_report_type}.{report_extension}',
-                report_name='FILES TO DELETE' if audit_report_type == 'reads_to_delete' else 'FILES TO INGEST',
+                report_name='FILES TO DELETE'
+                if audit_report_type == 'reads_to_delete'
+                else 'FILES TO INGEST',
             )
 
 
@@ -122,7 +124,7 @@ async def audit_upload_bucket_async(
     )
     sequencing_groups: list[SequencingGroupData] = await auditor.get_sgs_for_dataset()
 
-    # Update the sequencing groups with their completed analysis crams
+    # Update the sequencing groups with their completed cram analyses
     await auditor.update_sequencing_groups_with_crams(sequencing_groups)
 
     # Identify sgs with and without completed crams
@@ -151,7 +153,7 @@ async def audit_upload_bucket_async(
             'reads_to_ingest': reads_to_ingest,
         },
     )
-    
+
     logger.info(f'{dataset} upload bucket audit complete')
 
 

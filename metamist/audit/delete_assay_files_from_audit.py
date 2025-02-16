@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-This script takes a path to a csv/tsv report, and a column name. 
+This script takes a path to a csv/tsv report, and a column name.
 It will delete all the files in the column from the cloud storage bucket.
 A log file of the deletes will be written to the same directory as the input report.
 """

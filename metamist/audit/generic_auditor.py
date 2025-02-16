@@ -202,7 +202,7 @@ class GenericAuditor(AuditHelper):
         return ReadFileData(
             filepath=read['location'],
             filesize=read['size'],
-            checksum=read['checksum'],
+            checksum=read['checksum'] if 'checksum' in read else None,
         )
 
     def get_latest_analyses_by_sg(
@@ -256,7 +256,9 @@ class GenericAuditor(AuditHelper):
         Updates the sequencing group data in-place with the CRAM analysis id and path for each SG.
         """
         sg_ids = [sg.id for sg in sequencing_groups]
-        logger.info(f'{self.dataset} :: Fetching CRAM analyses for {len(sg_ids)} SGs...')
+        logger.info(
+            f'{self.dataset} :: Fetching CRAM analyses for {len(sg_ids)} SGs...'
+        )
 
         sg_analyses_query_result = await query_async(
             QUERY_SG_ANALYSES,
@@ -265,7 +267,9 @@ class GenericAuditor(AuditHelper):
         crams_by_sg = self.get_latest_analyses_by_sg(
             all_sg_analyses=sg_analyses_query_result['sequencingGroups']
         )
-        logger.info(f'{self.dataset} :: Got {len(crams_by_sg)} CRAM analyses for {len(sg_ids)} SGs\n')
+        logger.info(
+            f'{self.dataset} :: Got {len(crams_by_sg)} CRAM analyses for {len(sg_ids)} SGs\n'
+        )
 
         # Update the sequencing group data with the CRAM analysis id and path
         for seq_group in sequencing_groups:
@@ -513,9 +517,11 @@ class GenericAuditor(AuditHelper):
                         f'{self.dataset} :: FILE SIZE INCONSISTENCY\n  - Bucket file:  {read_file.filepath} ({read_file.filesize} bytes)\n  - Metamist file:  {metamist_filepath} ({metamist_filesize} bytes)\n'
                     )
                 continue
-        
+
         if moved_files:
-            logger.info(f'Found {len(moved_files)} ingested files that have been moved.\n')
+            logger.info(
+                f'Found {len(moved_files)} ingested files that have been moved.\n'
+            )
 
         return moved_files
 
