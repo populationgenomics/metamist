@@ -12,7 +12,6 @@ import DescriptionIcon from '@mui/icons-material/Description'
 import DisplaySettingsIcon from '@mui/icons-material/DisplaySettings'
 import ExploreIcon from '@mui/icons-material/Explore'
 import InsightsIcon from '@mui/icons-material/Insights'
-import PeopleIcon from '@mui/icons-material/People'
 import SummarizeIcon from '@mui/icons-material/Summarize'
 import TroubleshootIcon from '@mui/icons-material/Troubleshoot'
 import MuckTheDuck from '../MuckTheDuck'
@@ -133,11 +132,7 @@ const NavBar = () => {
             url: '/analysis-runner',
             icon: <InsightsIcon />,
         },
-        {
-            title: 'OurDNA',
-            url: '/ourdna',
-            icon: <PeopleIcon />,
-        },
+
         {
             title: 'Swagger',
             url: '/swagger',

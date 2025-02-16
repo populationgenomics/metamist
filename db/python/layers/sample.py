@@ -208,6 +208,10 @@ class SampleLayer(BaseLayer):
         )
         return await self.st.get_samples_create_date(sample_ids)
 
+    async def export_sample_table(self, project: int):
+        """Export a parquet table of samples"""
+        return await self.st.export_sample_table(project)
+
     # CREATE / UPDATES
     async def upsert_sample(
         self,
@@ -223,6 +227,18 @@ class SampleLayer(BaseLayer):
         with_function = (
             self.connection.connection.transaction if open_transaction else NoOpAenter
         )
+        if sample.id:
+            pjcts = await self.st.get_project_ids_for_sample_ids([sample.id])
+            self.connection.check_access_to_projects_for_ids(
+                pjcts, allowed_roles=FullWriteAccessRoles
+            )
+
+        # Needed for the create_sample mutation
+        if project:
+            self.connection.check_access_to_projects_for_ids(
+                [project], allowed_roles=FullWriteAccessRoles
+            )
+
         # safely ignore nested samples here
         async with with_function():
             for r in self.unwrap_nested_samples([sample]):

@@ -1,3 +1,4 @@
+import functools
 from typing import Iterable
 
 from api.settings import SAMPLE_CHECKSUM_OFFSET, SAMPLE_PREFIX
@@ -59,6 +60,9 @@ def sample_id_format_list(sample_ids: Iterable[int | str]) -> list[str]:
     return [sample_id_format(s) for s in sample_ids]
 
 
+# This potentially gets called a lot in loops when iterating over lots of samples,
+# so maintain a cache.
+@functools.lru_cache(maxsize=1024)
 def sample_id_format(sample_id: int | str) -> str:
     """
     Transform raw (int) sample identifier to format (CPGXXXH) where:

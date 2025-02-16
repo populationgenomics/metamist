@@ -1,10 +1,10 @@
 import datetime
-from test.testbase import DbIsolatedTest, run_as_sync
 
 from pymysql.err import IntegrityError
 
 from db.python.filters import GenericFilter
 from db.python.layers import CohortLayer, SampleLayer
+from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.cohort import CohortFilter
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
@@ -21,6 +21,7 @@ from models.models.cohort import (
 )
 from models.utils.cohort_id_format import cohort_id_format
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 class TestCohortBasic(DbIsolatedTest):
@@ -487,3 +488,103 @@ class TestCohortData(DbIsolatedTest):
         self.assertEqual(2, len(result))
         self.assertIn(self.sA.sequencing_groups[0].id, result)
         self.assertIn(self.sB.sequencing_groups[0].id, result)
+
+
+class TestCohortGraphql(DbIsolatedTest):
+    """Test custom cohort endpoints that need some sequencing groups already set up"""
+
+    # pylint: disable=too-many-instance-attributes
+
+    @run_as_sync
+    async def setUp(self):
+        super().setUp()
+        self.cohortl = CohortLayer(self.connection)
+        self.samplel = SampleLayer(self.connection)
+        self.sgl = SequencingGroupLayer(self.connection)
+
+    @run_as_sync
+    async def test_cohort_with_archived_sgs(self):
+        """Check that archived sequencing groups are shown by default in cohorts"""
+        sample_model = SampleUpsertInternal(
+            meta={},
+            external_ids={PRIMARY_EXTERNAL_ORG: 'EXID1'},
+            type='blood',
+            sequencing_groups=[
+                SequencingGroupUpsertInternal(
+                    type='genome',
+                    technology='short-read',
+                    platform='illumina',
+                    meta={},
+                    assays=[],
+                ),
+                SequencingGroupUpsertInternal(
+                    type='exome',
+                    technology='short-read',
+                    platform='illumina',
+                    meta={},
+                    assays=[],
+                ),
+            ],
+        )
+
+        sample = await self.samplel.upsert_sample(sample_model)
+        assert sample.sequencing_groups
+        sg1 = sample.sequencing_groups[0].id
+        sg2 = sample.sequencing_groups[1].id
+
+        assert sg1, sg2
+
+        cohort_name = 'Archive test cohort 1'
+        await self.cohortl.create_cohort_from_criteria(
+            project_to_write=self.project_id,
+            description='Genome & Exome cohort',
+            cohort_name=cohort_name,
+            dry_run=False,
+            cohort_criteria=CohortCriteriaInternal(
+                projects=[self.project_id],
+                sg_type=['genome', 'exome'],
+            ),
+        )
+
+        # Archive the first sequencing group
+        await self.sgl.archive_sequencing_group(sg1)
+
+        query_result_incl_archived = await self.run_graphql_query_async(
+            """
+            query Cohort($name: StrGraphQLFilter) {
+                cohorts(name:$name) {
+                    name
+                    sequencingGroups {
+                        id
+                        archived
+                    }
+                }
+            }
+        """,
+            {'name': {'eq': cohort_name}},
+        )
+
+        incl_archived_cohort = query_result_incl_archived['cohorts'][0]
+        self.assertEqual(incl_archived_cohort['name'], cohort_name)
+        self.assertEqual(len(incl_archived_cohort['sequencingGroups']), 2)
+        self.assertEqual(incl_archived_cohort['sequencingGroups'][0]['archived'], True)
+        self.assertEqual(incl_archived_cohort['sequencingGroups'][1]['archived'], False)
+
+        query_result_excl_archived = await self.run_graphql_query_async(
+            """
+            query Cohort($name: StrGraphQLFilter, $active_only: BoolGraphQLFilter) {
+                cohorts(name:$name) {
+                    name
+                    sequencingGroups(activeOnly: $active_only) {
+                        id
+                        archived
+                    }
+                }
+            }
+        """,
+            {'name': {'eq': cohort_name}, 'active_only': {'eq': True}},
+        )
+
+        excl_archived_cohort = query_result_excl_archived['cohorts'][0]
+        self.assertEqual(len(excl_archived_cohort['sequencingGroups']), 1)
+        self.assertEqual(excl_archived_cohort['sequencingGroups'][0]['archived'], False)

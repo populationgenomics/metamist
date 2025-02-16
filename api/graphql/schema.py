@@ -33,7 +33,6 @@ from db.python.layers import (
     AssayLayer,
     CohortLayer,
     FamilyLayer,
-    OurDnaDashboardLayer,
     SampleLayer,
     SequencingGroupLayer,
 )
@@ -68,7 +67,6 @@ from models.models.comment import (
     DiscussionInternal,
 )
 from models.models.family import PedRowInternal
-from models.models.ourdna import OurDNADashboard, OurDNALostSample
 from models.models.project import (
     FullWriteAccessRoles,
     ProjectId,
@@ -108,30 +106,6 @@ for enum in enum_tables.__dict__.values():
 GraphQLEnum = strawberry.type(type('GraphQLEnum', (object,), enum_methods))
 
 GraphQLAnalysisStatus = strawberry.enum(AnalysisStatus)  # type: ignore
-
-
-@strawberry.experimental.pydantic.type(model=OurDNALostSample, all_fields=True)  # type: ignore
-class GraphQLOurDNALostSample:
-    """OurDNA Lost Sample GraphQL model to be used in OurDNA Dashboard"""
-
-    pass  # pylint: disable=unnecessary-pass
-
-
-@strawberry.experimental.pydantic.type(model=OurDNADashboard)  # type: ignore
-class GraphQLOurDNADashboard:
-    """OurDNA Dashboard model"""
-
-    collection_to_process_end_time: strawberry.scalars.JSON
-    collection_to_process_end_time_statistics: strawberry.scalars.JSON
-    collection_to_process_end_time_bucket_statistics: strawberry.scalars.JSON
-    collection_to_process_end_time_24h: strawberry.scalars.JSON
-    processing_times_by_site: strawberry.scalars.JSON
-    processing_times_by_collection_site: strawberry.scalars.JSON
-    total_samples_by_collection_event_name: strawberry.scalars.JSON
-    samples_lost_after_collection: list[GraphQLOurDNALostSample]
-    samples_concentration_gt_1ug: strawberry.scalars.JSON
-    participants_consented_not_collected: list[int]
-    participants_signed_not_consented: list[int]
 
 
 # Create cohort GraphQL model
@@ -179,7 +153,10 @@ class GraphQLCohort:
 
     @strawberry.field()
     async def sequencing_groups(
-        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLCohort'
+        self,
+        info: Info[GraphQLContext, 'Query'],
+        root: 'GraphQLCohort',
+        active_only: GraphQLFilter[bool] | None = None,
     ) -> list['GraphQLSequencingGroup']:
         connection = info.context['connection']
         cohort_layer = CohortLayer(connection)
@@ -188,7 +165,12 @@ class GraphQLCohort:
         )
 
         sg_layer = SequencingGroupLayer(connection)
-        sequencing_groups = await sg_layer.get_sequencing_groups_by_ids(sg_ids)
+        filter = SequencingGroupFilter(
+            id=GenericFilter(in_=sg_ids),
+            active_only=active_only.to_internal_filter() if active_only else None,
+        )
+        sequencing_groups = await sg_layer.query(filter_=filter)
+
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sequencing_groups]
 
     @strawberry.field()
@@ -407,18 +389,6 @@ class GraphQLProject:
         )
         analysis_runners = await alayer.query(filter_)
         return [GraphQLAnalysisRunner.from_internal(ar) for ar in analysis_runners]
-
-    @strawberry.field
-    async def ourdna_dashboard(
-        self, info: Info, root: 'Project'
-    ) -> 'GraphQLOurDNADashboard':
-        connection = info.context['connection']
-        ourdna_layer = OurDnaDashboardLayer(connection)
-        if not root.id:
-            raise ValueError('Project must have an id')
-        ourdna_dashboard = await ourdna_layer.query(project_id=root.id)
-        # pylint: disable=no-member
-        return GraphQLOurDNADashboard.from_pydantic(ourdna_dashboard)
 
     @strawberry.field()
     async def pedigree(
@@ -1102,12 +1072,15 @@ class GraphQLSequencingGroup:
     platform: str
     meta: strawberry.scalars.JSON
     external_ids: strawberry.scalars.JSON
+    archived: bool | None
 
     internal_id: strawberry.Private[int]
     sample_id: strawberry.Private[int]
 
     @staticmethod
-    def from_internal(internal: SequencingGroupInternal) -> 'GraphQLSequencingGroup':
+    def from_internal(
+        internal: SequencingGroupInternal,
+    ) -> 'GraphQLSequencingGroup':
         if not internal.id:
             raise ValueError('SequencingGroup must have an id')
 
@@ -1118,6 +1091,7 @@ class GraphQLSequencingGroup:
             platform=internal.platform,
             meta=internal.meta,
             external_ids=internal.external_ids or {},
+            archived=internal.archived,
             # internal
             internal_id=internal.id,
             sample_id=internal.sample_id,

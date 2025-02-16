@@ -52,7 +52,7 @@ default_assay_meta = {
 
 DEFAULT_FAMILY_FIELDS = [
     ProjectParticipantGridField(
-        key='external_id',
+        key='external_ids',
         label='Family ID',
         is_visible=True,
         filter_key='external_id',
