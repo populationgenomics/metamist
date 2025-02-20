@@ -101,7 +101,7 @@ cpg-utils==5.2.0
     # via
     #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
     #   -r requirements.in
-cryptography==44.0.0
+cryptography==44.0.1
     # via
     #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
     #   -r requirements.in
