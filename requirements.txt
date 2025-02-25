@@ -68,7 +68,7 @@ cloudpathlib[all,azure,gs,s3]==0.20.0
     #   cpg-utils
 cpg-utils==5.2.0
     # via -r requirements.in
-cryptography==44.0.0
+cryptography==44.0.1
     # via
     #   -r requirements.in
     #   azure-storage-blob
