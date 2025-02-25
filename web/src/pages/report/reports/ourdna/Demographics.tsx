@@ -140,12 +140,15 @@ export default function Demographics() {
                     title="Participant age and reported sex"
                     description="Age buckets for participants. (note, the ages are based off the birth year so may be +- 1 year depending on DOB"
                     query={`
-                        select
-                            participant_id,
-                            CASE reported_sex WHEN 1 THEN 'male' WHEN 2 THEN 'female' ELSE 'other/unknown' END as reported_sex,
-                            date_part('year', current_date()) - try_cast("meta_birth-year" as int) as age
-                        from participant
-                        where date_part('year', current_date()) - try_cast("meta_birth-year" as int) is not null
+                        with ages as (
+                            select
+                                participant_id,
+                                CASE reported_sex WHEN 1 THEN 'male' WHEN 2 THEN 'female' ELSE 'other/unknown' END as reported_sex,
+                                date_part('year', current_date()) - try_cast("meta_birth-year" as int) as age
+                            from participant
+                            where date_part('year', current_date()) - try_cast("meta_birth-year" as int) is not null
+                        ) select * from ages
+                        where age >= 16 and age <= 120
                     `}
                     plot={(data) => ({
                         color: { legend: true },
