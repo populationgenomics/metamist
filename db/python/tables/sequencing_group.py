@@ -511,32 +511,32 @@ class SequencingGroupTable(DbBase):
 
         await self.connection.execute(_query, values)
 
-    async def archive_sequencing_groups(self, sequencing_group_id: list[int]):
+    async def archive_sequencing_groups(self, sequencing_group_ids: list[int]):
         """
         Archive sequence group by setting archive flag to TRUE
         """
         _query = """
         UPDATE sequencing_group
         SET archived = 1, audit_log_id = :audit_log_id
-        WHERE id = :sequencing_group_id;
+        WHERE id IN :sequencing_group_ids;
         """
         # do this so we can reuse the sequencing_group_ids
         _external_id_query = """
         UPDATE sequencing_group_external_id
         SET nullIfInactive = NULL, audit_log_id = :audit_log_id
-        WHERE sequencing_group_id = :sequencing_group_id;
+        WHERE sequencing_group_id IN :sequencing_group_ids;
         """
         await self.connection.execute(
             _query,
             {
-                'sequencing_group_id': sequencing_group_id,
+                'sequencing_group_ids': sequencing_group_ids,
                 'audit_log_id': await self.audit_log_id(),
             },
         )
         await self.connection.execute(
             _external_id_query,
             {
-                'sequencing_group_id': sequencing_group_id,
+                'sequencing_group_ids': sequencing_group_ids,
                 'audit_log_id': await self.audit_log_id(),
             },
         )
