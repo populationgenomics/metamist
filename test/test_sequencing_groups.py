@@ -348,6 +348,13 @@ class TestSequencingGroup(DbIsolatedTest):
                     assays=[],
                 ),
                 SequencingGroupUpsertInternal(
+                    type='genome',
+                    technology='short-read',
+                    platform='illumina',
+                    meta={},
+                    assays=[],
+                ),
+                SequencingGroupUpsertInternal(
                     type='exome',
                     technology='short-read',
                     platform='illumina',
@@ -360,8 +367,9 @@ class TestSequencingGroup(DbIsolatedTest):
         sample = await self.slayer.upsert_sample(sample_model)
         assert sample.sequencing_groups
         sg1 = sample.sequencing_groups[0].to_external().id
+        sg2 = sample.sequencing_groups[1].to_external().id
 
-        assert sg1
+        assert sg1, sg2
 
         archive_result = await self.run_graphql_query_async(
             """
@@ -374,11 +382,13 @@ class TestSequencingGroup(DbIsolatedTest):
                 }
             }
             """,
-            {'ids': [sg1]},
+            {'ids': [sg1, sg2]},
         )
 
         archived_sgs = archive_result['sequencingGroup']['archiveSequencingGroups']
 
-        self.assertEqual(len(archived_sgs), 1)
+        self.assertEqual(len(archived_sgs), 2)
         self.assertEqual(archived_sgs[0]['id'], sg1)
         self.assertEqual(archived_sgs[0]['archived'], True)
+        self.assertEqual(archived_sgs[1]['id'], sg2)
+        self.assertEqual(archived_sgs[1]['archived'], True)
