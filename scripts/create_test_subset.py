@@ -844,7 +844,12 @@ def get_random_families(
     return returned_families
 
 
-def rewrite_file(old_path: str, new_path: str, new_base_path: str, sid: tuple[str, str]):
+def rewrite_file(
+    old_path: str,
+    new_path: str,
+    new_base_path: str,
+    sid: tuple[str, str],
+):
     """
     Returns the shell commands necessary to rewrite embedded IDs as appropriate
     for each type of file likely to be encountered.
@@ -864,7 +869,7 @@ def rewrite_file(old_path: str, new_path: str, new_base_path: str, sid: tuple[st
         gcloud storage cat {new_base_path!r} | samtools index -o - - | gcloud storage cp - {new_path!r}
         """
     elif new_path.endswith('.md5'):
-        logger.info(f'Regenerating {new_path} by checksumming {new_base_path} [check the file format]')
+        logger.info(f'Regenerating {new_path} by checksumming {new_base_path}')
         cmd = f"""
         gcloud storage cat {new_base_path!r} | md5sum | gcloud storage cp - {new_path!r}
         """
@@ -908,8 +913,9 @@ def copy_files_in_dict(
                 logger.info(f'Copying file in metadata: {" ".join(cmd)}')
             subprocess.run(cmd, check=True, shell=isinstance(cmd, str))
         else:
-            if embedded_ids and sid_replacement is not None and new_path.endswith('.cram'):
-                logger.error(f'IDs embedded in {new_path} not updated: already exists')
+            if embedded_ids and sid_replacement is not None:
+                if new_path.endswith('.cram'):
+                    logger.error(f'{new_path} already exists: embedded IDs not updated')
 
         extra_exts = ['.md5']
         if new_path.endswith('.vcf.gz'):
@@ -919,7 +925,9 @@ def copy_files_in_dict(
         for ext in extra_exts:
             if file_exists(old_path + ext) and not file_exists(new_path + ext):
                 if embedded_ids and sid_replacement is not None:
-                    cmd = rewrite_file(old_path + ext, new_path + ext, new_path, sid_replacement)
+                    cmd = rewrite_file(
+                        old_path + ext, new_path + ext, new_path, sid_replacement
+                    )
                 else:
                     cmd = ['gcloud', 'storage', 'cp', old_path + ext, new_path + ext]
                     logger.info(f'Copying extra file in metadata: {" ".join(cmd)}')
