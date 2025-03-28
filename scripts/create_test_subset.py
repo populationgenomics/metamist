@@ -868,6 +868,26 @@ def rewrite_file(
         cmd = f"""
         gcloud storage cat {new_base_path!r} | samtools index -o - - | gcloud storage cp - {new_path!r}
         """
+    elif new_path.endswith('.vcf.gz'):
+        logger.info(f'Copying to {new_path} while rewriting #CHROM line')
+        cmd = rf"""
+        gcloud storage cat {old_path!r} |
+        bgzip -dc - | sed '/^#CHROM/s/\<{sid[0]}\>/{sid[1]}/g' | bgzip -c - |
+        gcloud storage cp - {new_path!r}
+        """
+    elif new_path.endswith('.tbi'):
+        logger.info(f'Regenerating {new_path} by indexing {new_base_path}')
+        # Tabix cannot read from stdin. Work around this by creating a FIFO with the
+        # expected .vcf.gz extension that tabix will read from and gcloud cat (in the
+        # background) will write to (via `cat` and shell redirection rather than `cp`
+        # to ensure it writes it as a single stream).
+        local_fname = new_base_path.rsplit('/', maxsplit=1)[1]
+        cmd = f"""
+        mkfifo {local_fname} &&
+        (gcloud storage cat {new_base_path!r} > {local_fname} & tabix {local_fname}) &&
+        gcloud storage cp {local_fname}.tbi {new_path!r} &&
+        rm {local_fname} {local_fname}.tbi
+        """
     elif new_path.endswith('.md5'):
         logger.info(f'Regenerating {new_path} by checksumming {new_base_path}')
         cmd = f"""
@@ -914,7 +934,7 @@ def copy_files_in_dict(
             subprocess.run(cmd, check=True, shell=isinstance(cmd, str))
         else:
             if embedded_ids and sid_replacement is not None:
-                if new_path.endswith('.cram'):
+                if new_path.endswith('.cram') or new_path.endswith('.vcf.gz'):
                     logger.error(f'{new_path} already exists: embedded IDs not updated')
 
         extra_exts = ['.md5']
@@ -1003,7 +1023,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--embedded-ids',
         action=BooleanOptionalAction,
-        help='Update IDs embedded within files (currently for CRAM only)',
+        help='Update IDs embedded within CRAM and VCF files (on by default)',
         default=True,
     )
     args, fail = parser.parse_known_args()
