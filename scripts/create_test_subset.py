@@ -195,7 +195,7 @@ def main(
     additional_samples: set[str],
     cohorts: set[str],
     skip_ped: bool = True,
-    embedded_ids: bool = False,
+    update_embedded_ids: bool = False,
 ):
     """
     Script creates a test subset for a given project.
@@ -291,7 +291,7 @@ def main(
         project,
         old_sid_to_new_sid,
         sample_to_sg_attribute_map,
-        embedded_ids,
+        update_embedded_ids,
     )
     logger.info('Subset generation complete!')
 
@@ -477,7 +477,7 @@ def transfer_analyses(
     project: str,
     old_sid_to_new_sid: dict[str, str],
     sample_to_sg_attribute_map: dict[tuple, dict[tuple, str]],
-    embedded_ids: bool,
+    update_embedded_ids: bool,
 ):
     """
     This function will transfer the analyses from the original project to the test project.
@@ -524,7 +524,7 @@ def transfer_analyses(
                             analysis['output'],
                             project,
                             (str(sg['id']), new_sg_map[s['externalId']][0]),
-                            embedded_ids,
+                            update_embedded_ids,
                         ),
                         status=AnalysisStatus(
                             analysis['status'].lower().replace('_', '-')
@@ -543,7 +543,7 @@ def transfer_analyses(
                             analysis['output'],
                             project,
                             (str(sg['id']), new_sg_map[s['externalId']][0]),
-                            embedded_ids,
+                            update_embedded_ids,
                         ),
                         status=AnalysisStatus(
                             analysis['status'].lower().replace('_', '-')
@@ -901,7 +901,10 @@ def rewrite_file(
 
 
 def copy_files_in_dict(
-    d, dataset: str, sid_replacement: tuple[str, str] = None, embedded_ids: bool = False
+    d,
+    dataset: str,
+    sid_replacement: tuple[str, str] = None,
+    update_embedded_ids: bool = False,
 ):
     """
     Replaces all `gs://cpg-{project}-main*/` paths
@@ -926,14 +929,14 @@ def copy_files_in_dict(
             new_path = new_path.replace(sid_replacement[0], sid_replacement[1])
 
         if not file_exists(new_path):
-            if embedded_ids and sid_replacement is not None:
+            if update_embedded_ids and sid_replacement is not None:
                 cmd = rewrite_file(old_path, new_path, new_path, sid_replacement)
             else:
                 cmd = ['gcloud', 'storage', 'cp', old_path, new_path]
                 logger.info(f'Copying file in metadata: {" ".join(cmd)}')
             subprocess.run(cmd, check=True, shell=isinstance(cmd, str))
         else:
-            if embedded_ids and sid_replacement is not None:
+            if update_embedded_ids and sid_replacement is not None:
                 if new_path.endswith('.cram') or new_path.endswith('.vcf.gz'):
                     logger.error(f'{new_path} already exists: embedded IDs not updated')
 
@@ -944,7 +947,7 @@ def copy_files_in_dict(
             extra_exts.append('.crai')
         for ext in extra_exts:
             if file_exists(old_path + ext) and not file_exists(new_path + ext):
-                if embedded_ids and sid_replacement is not None:
+                if update_embedded_ids and sid_replacement is not None:
                     cmd = rewrite_file(
                         old_path + ext, new_path + ext, new_path, sid_replacement
                     )
@@ -1021,7 +1024,7 @@ if __name__ == '__main__':
         '--noninteractive', action='store_true', help='Skip interactive confirmation'
     )
     parser.add_argument(
-        '--embedded-ids',
+        '--update-embedded-ids',
         action=BooleanOptionalAction,
         help='Update IDs embedded within CRAM and VCF files (on by default)',
         default=True,
@@ -1040,5 +1043,5 @@ if __name__ == '__main__':
         additional_families=set(args.families),
         skip_ped=args.skip_ped,
         cohorts=set(args.cohorts),
-        embedded_ids=args.embedded_ids,
+        update_embedded_ids=args.update_embedded_ids,
     )
