@@ -891,7 +891,7 @@ def rewrite_file(
     elif new_path.endswith('.md5'):
         logger.info(f'Regenerating {new_path} by checksumming {new_base_path}')
         cmd = f"""
-        gcloud storage cat {new_base_path!r} | md5sum | gcloud storage cp - {new_path!r}
+        gcloud storage cat {new_base_path!r} | md5sum | cut -d' ' -f1 | gcloud storage cp - {new_path!r}
         """
     else:
         logger.info(f'Copying to {new_path} without any rewriting')
