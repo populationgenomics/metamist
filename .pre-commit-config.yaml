@@ -70,5 +70,5 @@ repos:
             operator,
           ]
         additional_dependencies:
-          - strawberry-graphql[fastapi]==0.206.0
+          - strawberry-graphql[fastapi]==0.263.0
           - types-PyMySQL==1.1.0.1
