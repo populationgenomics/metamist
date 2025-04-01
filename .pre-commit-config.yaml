@@ -76,9 +76,3 @@ repos:
     rev: v1.5.2
     hooks:
       - id: zizmor
-
-  - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.29.0
-    hooks:
-      - id: yamllint
-        args: [--strict, .github/workflows]
