@@ -39,18 +39,16 @@ jobs:
         with:
           persist-credentials: false
 
-      - id: 'google-cloud-auth'
-        name: 'Authenticate to Google Cloud'
+      - name: 'Authenticate to Google Cloud'
         uses: 'google-github-actions/auth@v2'
         with:
           workload_identity_provider: 'projects/774248915715/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
           service_account: 'sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com'
 
-      - id: 'google-cloud-sdk-setup'
-        name: 'Set up Cloud SDK'
+      - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: 'gcloud docker auth'
+      - name: gcloud docker auth
         run: |
           gcloud auth configure-docker australia-southeast1-docker.pkg.dev
 
@@ -83,14 +81,14 @@ jobs:
               --new-version $(cat deploy/python/version.txt)dev$(echo $(git rev-parse HEAD) | cut -c1-7)
           fi
 
-      - name: 'build deployable API'
+      - name: build deployable API
         run: |
           export OPENAPI_COMMAND="java -jar openapi-generator-cli.jar"
           python regenerate_api.py
           ls -lGh metamist
 
         # also copies build artifacts to api/public
-      - name: 'build web front-end'
+      - name: build web front-end
         run: |
           set -eo pipefail
           pushd web
@@ -99,7 +97,7 @@ jobs:
           npm run build
           popd
 
-      - name: 'build image'
+      - name: build image
         run: |
           docker build \
             --build-arg SM_ENVIRONMENT=$SM_ENVIRONMENT \
@@ -110,11 +108,11 @@ jobs:
       - name: Build python package
         run: python setup.py sdist
 
-      - name: 'push server image'
+      - name: push server image
         run: |
           docker push $SM_DOCKER
 
-      - name: 'deploy to Cloud Run'
+      - name: deploy to Cloud Run
         run: |
           if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
             gcloud_deploy_name=sample-metadata-api

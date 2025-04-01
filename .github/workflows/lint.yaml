@@ -38,19 +38,19 @@ jobs:
           # openapi-generator
           wget https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/5.3.0/openapi-generator-cli-5.3.0.jar -O openapi-generator-cli.jar
 
-      - name: 'install frontend deps'
+      - name: install frontend deps
         working-directory: ./web
         run: npm ci
 
-      - name: 'check frontend formatting'
+      - name: check frontend formatting
         working-directory: ./web
         run: npm run format:check
 
-      - name: 'check frontend linting'
+      - name: check frontend linting
         working-directory: ./web
         run: npm run lint
 
-      - name: 'build image'
+      - name: build image
         run: |
           docker build \
             --build-arg SM_ENVIRONMENT=local \

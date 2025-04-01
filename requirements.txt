@@ -191,7 +191,7 @@ isodate==0.7.2
     #   azure-storage-file-datalake
 itsdangerous==2.2.0
     # via fastapi
-jinja2==3.1.5
+jinja2==3.1.6
     # via fastapi
 jmespath==1.0.1
     # via
