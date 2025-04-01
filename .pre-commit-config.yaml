@@ -81,4 +81,4 @@ repos:
     rev: v1.29.0
     hooks:
       - id: yamllint
-        args: [--strict, -c=./.yamllint, .github/workflows]
+        args: [--strict, -c=.yamllint, .github/workflows]
