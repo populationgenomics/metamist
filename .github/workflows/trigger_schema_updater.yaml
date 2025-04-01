@@ -12,16 +12,17 @@ on:
           - prod
           - dev
 
-permissions:
-  contents: 'read'
-  id-token: 'write'
-
 jobs:
   invoke-cloud-run:
     runs-on: ubuntu-latest
     environment: production
+    permissions:
+      contents: 'read'
+      id-token: 'write'
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - id: 'branch-check'
         name: Fail if branch is not main or dev
@@ -43,7 +44,9 @@ jobs:
 
       - id: 'invoke-cloud-run'
         name: 'Invoke Cloud Run'
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
         run: |
-          CLOUD_RUN_URL=$(gcloud run services describe schema-updater --region australia-southeast1 --format 'value(status.url)')/execute-liquibase?environment=${{ github.event.inputs.environment }}
+          CLOUD_RUN_URL=$(gcloud run services describe schema-updater --region australia-southeast1 --format 'value(status.url)')/execute-liquibase?environment=$ENVIRONMENT
           TOKEN=$(gcloud auth print-identity-token --impersonate-service-account="sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com" --audiences="$CLOUD_RUN_URL" --include-email)
-            curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/xml" --data-binary "@db/project.xml" $CLOUD_RUN_URL
+            curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/xml" --data-binary "@db/project.xml" "$CLOUD_RUN_URL"

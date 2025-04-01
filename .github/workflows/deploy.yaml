@@ -7,9 +7,7 @@ on:
       - main
       - dev
 
-permissions:
-  id-token: write
-  contents: read
+permissions: {}
 
 jobs:
   unittests:
@@ -24,6 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: unittests
     environment: production
+    permissions:
+      id-token: write
+      contents: read
     env:
       DOCKER_BUILDKIT: 1
       BUILDKIT_PROGRESS: plain
@@ -35,30 +36,32 @@ jobs:
         shell: bash -eo pipefail -l {0}
     steps:
       - uses: actions/checkout@v4
-
-      - id: "google-cloud-auth"
-        name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@v2"
         with:
-          workload_identity_provider: "projects/774248915715/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
-          service_account: "sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com"
+          persist-credentials: false
 
-      - id: "google-cloud-sdk-setup"
-        name: "Set up Cloud SDK"
+      - id: 'google-cloud-auth'
+        name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: 'projects/774248915715/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com'
+
+      - id: 'google-cloud-sdk-setup'
+        name: 'Set up Cloud SDK'
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: "gcloud docker auth"
+      - name: 'gcloud docker auth'
         run: |
           gcloud auth configure-docker australia-southeast1-docker.pkg.dev
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - uses: actions/setup-java@v4
         with:
-          distribution: "temurin" # See 'Supported distributions' for available options
-          java-version: "17"
+          distribution: 'temurin' # See 'Supported distributions' for available options
+          java-version: '17'
 
       - name: Setup build env
         run: |
@@ -80,14 +83,14 @@ jobs:
               --new-version $(cat deploy/python/version.txt)dev$(echo $(git rev-parse HEAD) | cut -c1-7)
           fi
 
-      - name: "build deployable API"
+      - name: 'build deployable API'
         run: |
           export OPENAPI_COMMAND="java -jar openapi-generator-cli.jar"
           python regenerate_api.py
           ls -lGh metamist
 
         # also copies build artifacts to api/public
-      - name: "build web front-end"
+      - name: 'build web front-end'
         run: |
           set -eo pipefail
           pushd web
@@ -96,7 +99,7 @@ jobs:
           npm run build
           popd
 
-      - name: "build image"
+      - name: 'build image'
         run: |
           docker build \
             --build-arg SM_ENVIRONMENT=$SM_ENVIRONMENT \
@@ -107,11 +110,11 @@ jobs:
       - name: Build python package
         run: python setup.py sdist
 
-      - name: "push server image"
+      - name: 'push server image'
         run: |
           docker push $SM_DOCKER
 
-      - name: "deploy to Cloud Run"
+      - name: 'deploy to Cloud Run'
         run: |
           if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
             gcloud_deploy_name=sample-metadata-api
@@ -127,7 +130,5 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
           packages-dir: dist/
           skip-existing: true
