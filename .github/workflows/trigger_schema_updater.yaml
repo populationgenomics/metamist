@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Target environment (prod or dev)'
+        description: Target environment (prod or dev)
         required: true
-        default: 'dev'
+        default: dev
         type: choice
         options:
           - prod
