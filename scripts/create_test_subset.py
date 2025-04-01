@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=too-many-instance-attributes,too-many-locals
+# pylint: disable=too-many-instance-attributes,too-many-lines,too-many-locals
 
 """ Example Invocation
 
@@ -21,6 +21,9 @@ from collections import Counter
 from typing import Any, Tuple
 
 from google.cloud import storage
+
+from cpg_utils.config import image_path
+from cpg_utils.hail_batch import copy_common_env, get_batch
 
 from metamist.apis import AnalysisApi, AssayApi, FamilyApi, ParticipantApi, SampleApi
 from metamist.graphql import gql, query
@@ -278,6 +281,14 @@ def main(
 
     existing_data = query(EXISTING_DATA_QUERY, {'project': target_project})
 
+    # Create batch if needed for running header updating jobs
+    if update_embedded_ids:
+        this_batch = os.environ.get('HAIL_BATCH_ID')
+        this_batch_text = f' invoked by batch {this_batch}' if this_batch else ''
+        batch = get_batch(f'Reheadering for create_test_subset.py{this_batch_text}')
+    else:
+        batch = None
+
     logger.info('Transferring samples, sequencing groups, and assays')
     samples = original_project_subset_data.get('project').get('samples')
     old_sid_to_new_sid, sample_to_sg_attribute_map = transfer_samples_sgs_assays(
@@ -294,6 +305,10 @@ def main(
         update_embedded_ids,
     )
     logger.info('Subset generation complete!')
+
+    if batch:
+        logger.info('Submitting batch to update IDs embedded in file headers')
+        batch.run(wait=False)
 
 
 def transfer_samples_sgs_assays(
@@ -844,6 +859,56 @@ def get_random_families(
     return returned_families
 
 
+def file_reheaderable(path: str) -> bool:
+    """Returns whether this is a file that can be reheadered"""
+    return any(path.endswith(e) for e in ['.cram', '.vcf.gz', '.crai', '.tbi', '.md5'])
+
+
+def main_file_commands(batch, job, old_path: str, new_path: str, sid: tuple[str, str]):
+    """Adds the commands required to reheader the main CRAM/VCF file"""
+    if new_path.endswith('.cram'):
+        job.image(image_path('samtools'))
+        old_file = batch.read_input(old_path)
+        job.declare_resource_group(
+            new_file={'main': '{root}.cram', 'crai': '{root}.cram.crai'}
+        )
+        job.command(rf"""
+            samtools reheader --no-PG --in-place --command 'sed /^@RG/s/\<SM:{sid[0]}\>/SM:{sid[1]}/g' {old_file}
+            mv {old_file} {job.new_file.main}
+        """)
+        batch.write_output(job.new_file.main, new_path)
+
+    elif new_path.endswith('.vcf.gz'):
+        job.image(image_path('bcftools'))
+        old_file = batch.read_input(old_path)
+        job.declare_resource_group(
+            new_file={'main': '{root}.vcf.gz', 'tbi': '{root}.vcf.gz.tbi'}
+        )
+        job.command(rf"""
+            echo {sid[0]} {sid[1]} > $BATCH_TMPDIR/samples.txt
+            bcftools reheader --samples $BATCH_TMPDIR/samples.txt -o {job.new_file.main} {old_file}
+        """)
+        batch.write_output(job.new_file.main, new_path)
+
+
+def extra_file_commands(batch, job, new_path: str):
+    """Adds the commands required to regenerate the various associated files"""
+    if new_path.endswith('.crai'):
+        job.command(rf'samtools index -o {job.new_file.crai} {job.new_file.main}')
+        batch.write_output(job.new_file.crai, new_path)
+
+    elif new_path.endswith('.tbi'):
+        job.command(rf"""
+            tabix {job.new_file.main}
+            # Mention {job.new_file.tbi} for hail as tabix has no -o option
+        """)
+        batch.write_output(job.new_file.tbi, new_path)
+
+    elif new_path.endswith('.md5'):
+        job.command(rf"md5sum {job.new_file.main} | cut -d' ' -f1 > {job.new_md5}")
+        batch.write_output(job.new_md5, new_path)
+
+
 def copy_files_in_dict(
     d,
     dataset: str,
@@ -872,10 +937,22 @@ def copy_files_in_dict(
         if sid_replacement is not None:
             new_path = new_path.replace(sid_replacement[0], sid_replacement[1])
 
+        job = None
+
         if not file_exists(new_path):
-            cmd = ['gcloud', 'storage', 'cp', old_path, new_path]
-            logger.info(f'Copying file in metadata: {" ".join(cmd)}')
-            subprocess.run(cmd, check=True)
+            if update_embedded_ids and sid_replacement and file_reheaderable(new_path):
+                logger.info(f'Adding job to rewrite {old_path} to {new_path}')
+                batch = get_batch()
+                job = batch.new_job(f'Reheader {new_path} from {old_path}')
+                copy_common_env(job)
+                main_file_commands(batch, job, old_path, new_path, sid_replacement)
+                job.storage(file_size(old_path) + 2 * 1024**3)  # Allow 2 GiB extra
+            else:
+                cmd = ['gcloud', 'storage', 'cp', old_path, new_path]
+                logger.info(f'Copying file in metadata: {" ".join(cmd)}')
+                subprocess.run(cmd, check=True)
+        else:
+            logger.error(f'{new_path} already exists')
 
         extra_exts = ['.md5']
         if new_path.endswith('.vcf.gz'):
@@ -884,9 +961,15 @@ def copy_files_in_dict(
             extra_exts.append('.crai')
         for ext in extra_exts:
             if file_exists(old_path + ext) and not file_exists(new_path + ext):
-                cmd = ['gcloud', 'storage', 'cp', old_path + ext, new_path + ext]
-                logger.info(f'Copying extra file in metadata: {" ".join(cmd)}')
-                subprocess.run(cmd, check=True)
+                if job and file_reheaderable(new_path + ext):
+                    logger.info(f'Extending job to regenerate {new_path + ext}')
+                    extra_file_commands(batch, job, new_path + ext)
+                else:
+                    cmd = ['gcloud', 'storage', 'cp', old_path + ext, new_path + ext]
+                    logger.info(f'Copying extra file in metadata: {" ".join(cmd)}')
+                    subprocess.run(cmd, check=True)
+            elif file_exists(old_path + ext):
+                logger.error(f'{new_path} already exists')
         return new_path
     if isinstance(d, list):
         return [copy_files_in_dict(x, dataset) for x in d]
@@ -910,6 +993,15 @@ def file_exists(path: str) -> bool:
         gs = storage.Client()
         return gs.get_bucket(bucket).get_blob(path)
     return os.path.exists(path)
+
+
+def file_size(path: str) -> int:
+    """Return the size (in bytes) of the object, which is assumed to exist"""
+    if path.startswith('gs://'):
+        (bucket, path) = path.removeprefix('gs://').split('/', maxsplit=1)
+        return storage.Client().get_bucket(bucket).get_blob(path).size
+
+    return os.path.getsize(path)
 
 
 if __name__ == '__main__':
