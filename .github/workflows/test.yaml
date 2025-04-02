@@ -10,6 +10,8 @@ on:
       SONAR_HOST_URL:
         required: true
 
+permissions: {}
+
 jobs:
   unittests:
     name: Run unit tests
@@ -25,6 +27,8 @@ jobs:
         shell: bash -eo pipefail -l {0}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-python@v5
         with:
@@ -111,16 +115,20 @@ jobs:
       - name: Fail if unit tests are not passing
         if: ${{ steps.runtests.outputs.rc != 0}}
         uses: actions/github-script@v6
+        env:
+          rc: ${{ steps.runtests.outputs.rc }}
         with:
           script: |
-            core.setFailed('Unittests failed with rc = ${{ steps.runtests.outputs.rc }}')
+            core.setFailed('Unittests failed with rc = ${rc}')
 
       - name: Fail if web build fails
         if: ${{ steps.runtests.outputs.rc != 0}}
         uses: actions/github-script@v6
+        env:
+          web_rc: ${{ steps.runtests.outputs.web_rc }}
         with:
           script: |
-            core.setFailed('Web failed to build with rc = ${{ steps.runtests.outputs.web_rc }}')
+            core.setFailed('Web failed to build with rc = ${web_rc}')
 
   sonarqube:
     name: SonarQube scan
@@ -132,6 +140,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
+          persist-credentials: false
 
       # Download the coverage report artifact
       - name: 'Download coverage and execution report'
