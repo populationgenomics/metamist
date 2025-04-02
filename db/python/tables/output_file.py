@@ -178,7 +178,7 @@ class OutputFileTable(DbBase):
                                     analysis_id,
                                     secondary_file_id,
                                     json_structure=secondary_file['json_path'],
-                                    # If the file couldnt be created, we just pass the path as the output
+                                    # If the file couldn't be created, we just pass the path as the output
                                     output=(
                                         None
                                         if secondary_file_id
