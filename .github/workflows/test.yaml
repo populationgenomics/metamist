@@ -75,8 +75,9 @@ jobs:
       - name: 'Run unit tests'
         id: runtests
         run: |
-          coverage run -m pytest --doctest-modules --doctest-continue-on-failure test/ --junitxml=test-execution.xml
-          rc=$?
+          rc=0
+          coverage run -m pytest --doctest-modules --doctest-continue-on-failure \
+            test/ --junitxml=test-execution.xml || rc=$?
           coverage xml
 
           echo "rc=$rc" >> $GITHUB_OUTPUT
@@ -119,16 +120,16 @@ jobs:
           rc: ${{ steps.runtests.outputs.rc }}
         with:
           script: |
-            core.setFailed('Unittests failed with rc = ${rc}')
+            core.setFailed(`Unittests failed with rc = ${process.env.rc}`)
 
       - name: Fail if web build fails
-        if: ${{ steps.runtests.outputs.rc != 0}}
+        if: ${{ steps.runtests.outputs.web_rc != 0}}
         uses: actions/github-script@v6
         env:
           web_rc: ${{ steps.runtests.outputs.web_rc }}
         with:
           script: |
-            core.setFailed('Web failed to build with rc = ${web_rc}')
+            core.setFailed(`Web failed to build with rc = ${process.env.web_rc}`)
 
   sonarqube:
     name: SonarQube scan
