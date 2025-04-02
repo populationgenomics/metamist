@@ -7,9 +7,7 @@ on:
       - dev
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
+permissions: {}
 
 jobs:
   renovate:
@@ -23,6 +21,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Self-hosted Renovate
         uses: renovatebot/github-action@v40.2.10
