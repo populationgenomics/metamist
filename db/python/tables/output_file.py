@@ -160,7 +160,7 @@ class OutputFileTable(DbBase):
                         analysis_id,
                         parent_file_id,
                         json_structure=primary_file['json_path'],
-                        # If the file couldnt be created, we just pass the path as the output
+                        # If the file couldn't be created, we just pass the path as the output
                         output=(None if parent_file_id else primary_file['path']),
                     )
                     secondary_files = files.get('secondary_files_grouped')
