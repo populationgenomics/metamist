@@ -1,8 +1,12 @@
 name: Security Checks
 
 on:
-  workflow_dispatch:
   push:
+    branches: [main]
+  pull_request:
+    branches: ['**']
+
+permissions: {}
 
 jobs:
   pip-audit:
@@ -10,6 +14,9 @@ jobs:
     name: Pip Audit
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
       - uses: pypa/gh-action-pip-audit@v1.1.0
         name: Pip Audit Dependencies
         with:

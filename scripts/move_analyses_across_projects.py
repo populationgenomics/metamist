@@ -278,7 +278,6 @@ def move_files(
             blob_copy = source_bucket.copy_blob(
                 source_blob,
                 destination_bucket,
-                destination_blob_name,
             )
             source_bucket.delete_blob(source_blob)
             logger.info(
@@ -312,7 +311,7 @@ def update_analyses(
             logger.info(f'DRY RUN :: Skipping updating analysis {analysis["id"]}')
             continue
         update_model = AnalysisUpdateModel(
-            status=AnalysisStatus('COMPLETED'),
+            status=AnalysisStatus('completed'),
             outputs=analysis['outputs'],
             meta=analysis['meta'],
         )
