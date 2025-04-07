@@ -75,8 +75,8 @@ jobs:
       - name: 'Run unit tests'
         id: runtests
         run: |
-          coverage run -m pytest --doctest-modules --doctest-continue-on-failure test/ --junitxml=test-execution.xml
-          rc=$?
+          rc=0
+          coverage run -m pytest --doctest-modules --doctest-continue-on-failure test/ --junitxml=test-execution.xml || rc=$?
           coverage xml
 
           echo "rc=$rc" >> $GITHUB_OUTPUT
@@ -99,14 +99,15 @@ jobs:
           name: execution-report
           path: ./test-execution.xml
 
-      - name: 'build web front-end'
+      - id: buildweb
+        name: 'build web front-end'
         run: |
           set -eo pipefail
           pushd web
           # installs package-lock, not what it thinks it should be
+          rc=0
           npm ci
-          npm run build
-          rc=$?
+          npm run build || rc=$?
 
           echo "web_rc=$rc" >> $GITHUB_OUTPUT
           # eventually run web front-end tests
@@ -119,16 +120,16 @@ jobs:
           rc: ${{ steps.runtests.outputs.rc }}
         with:
           script: |
-            core.setFailed('Unittests failed with rc = ${rc}')
+            core.setFailed(`Unittests failed with rc = ${process.env.rc}`)
 
       - name: Fail if web build fails
-        if: ${{ steps.runtests.outputs.rc != 0}}
+        if: ${{ steps.buildweb.outputs.web_rc != 0}}
         uses: actions/github-script@v6
         env:
-          web_rc: ${{ steps.runtests.outputs.web_rc }}
+          web_rc: ${{ steps.buildweb.outputs.web_rc }}
         with:
           script: |
-            core.setFailed('Web failed to build with rc = ${web_rc}')
+            core.setFailed(`Web failed to build with rc = ${process.env.web_rc}`)
 
   sonarqube:
     name: SonarQube scan
