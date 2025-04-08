@@ -312,7 +312,8 @@ def update_analyses(
             continue
         update_model = AnalysisUpdateModel(
             status=AnalysisStatus('completed'),
-            outputs=analysis['outputs'],
+            # Update model only needs the 'output' - not compatible with 'outputs'
+            output=analysis['outputs']['path'],
             meta=analysis['meta'],
         )
         promises.append(
