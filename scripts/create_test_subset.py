@@ -16,7 +16,7 @@ import logging
 import os
 import random
 import subprocess
-from argparse import ArgumentParser
+from argparse import ArgumentParser, BooleanOptionalAction
 from collections import Counter
 from typing import Any, Tuple
 
@@ -194,7 +194,8 @@ def main(
     additional_families: set[str],
     additional_samples: set[str],
     cohorts: set[str],
-    skip_ped: bool = True,
+    skip_ped: bool,
+    update_embedded_ids: bool,
 ):
     """
     Script creates a test subset for a given project.
@@ -290,6 +291,7 @@ def main(
         project,
         old_sid_to_new_sid,
         sample_to_sg_attribute_map,
+        update_embedded_ids,
     )
     logger.info('Subset generation complete!')
 
@@ -475,6 +477,7 @@ def transfer_analyses(
     project: str,
     old_sid_to_new_sid: dict[str, str],
     sample_to_sg_attribute_map: dict[tuple, dict[tuple, str]],
+    update_embedded_ids: bool,
 ):
     """
     This function will transfer the analyses from the original project to the test project.
@@ -521,6 +524,7 @@ def transfer_analyses(
                             analysis['output'],
                             project,
                             (str(sg['id']), new_sg_map[s['externalId']][0]),
+                            update_embedded_ids,
                         ),
                         status=AnalysisStatus(
                             analysis['status'].lower().replace('_', '-')
@@ -539,6 +543,7 @@ def transfer_analyses(
                             analysis['output'],
                             project,
                             (str(sg['id']), new_sg_map[s['externalId']][0]),
+                            update_embedded_ids,
                         ),
                         status=AnalysisStatus(
                             analysis['status'].lower().replace('_', '-')
@@ -839,7 +844,12 @@ def get_random_families(
     return returned_families
 
 
-def copy_files_in_dict(d, dataset: str, sid_replacement: tuple[str, str] = None):
+def copy_files_in_dict(
+    d,
+    dataset: str,
+    sid_replacement: tuple[str, str] = None,
+    update_embedded_ids: bool = False,
+):
     """
     Replaces all `gs://cpg-{project}-main*/` paths
     into `gs://cpg-{project}-test*/` and creates copies if needed
@@ -945,6 +955,12 @@ if __name__ == '__main__':
     parser.add_argument(
         '--noninteractive', action='store_true', help='Skip interactive confirmation'
     )
+    parser.add_argument(
+        '--update-embedded-ids',
+        action=BooleanOptionalAction,
+        help='Update IDs embedded within CRAM and VCF files (on by default)',
+        default=True,
+    )
     args, fail = parser.parse_known_args()
     if fail:
         parser.print_help()
@@ -959,4 +975,5 @@ if __name__ == '__main__':
         additional_families=set(args.families),
         skip_ped=args.skip_ped,
         cohorts=set(args.cohorts),
+        update_embedded_ids=args.update_embedded_ids,
     )
