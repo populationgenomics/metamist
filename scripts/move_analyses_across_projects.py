@@ -312,7 +312,8 @@ def update_analyses(
             continue
         update_model = AnalysisUpdateModel(
             status=AnalysisStatus('completed'),
-            outputs=analysis['outputs'],
+            # Update model only needs the 'output' - not compatible with 'outputs'
+            output=analysis['outputs']['path'],
             meta=analysis['meta'],
         )
         promises.append(
@@ -379,19 +380,19 @@ async def main(
         list(sequencing_group_ids), old_dataset, new_dataset
     )
 
-    # Add the unrecorded analysis files to the files to move
-    for sg_id in sequencing_group_ids:
-        files_to_move += get_unrecorded_analysis_files(
-            sg_id,
-            old_dataset,
-            new_dataset,
-            old_bucket_name,
-            gcp_project,
-            storage_client,
-        )
+    # # Add the unrecorded analysis files to the files to move
+    # for sg_id in sequencing_group_ids:
+    #     files_to_move += get_unrecorded_analysis_files(
+    #         sg_id,
+    #         old_dataset,
+    #         new_dataset,
+    #         old_bucket_name,
+    #         gcp_project,
+    #         storage_client,
+    #     )
 
-    # Move the files
-    move_files(files_to_move, storage_client, gcp_project, unarchive, dry_run)
+    # # Move the files
+    # move_files(files_to_move, storage_client, gcp_project, unarchive, dry_run)
 
     # Update the analyses
     await update_analyses(analyses_to_update, dry_run)
