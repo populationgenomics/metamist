@@ -23,7 +23,7 @@ from typing import Any, Tuple
 from google.cloud import storage
 
 from cpg_utils.config import image_path
-from cpg_utils.hail_batch import copy_common_env, get_batch
+from cpg_utils.hail_batch import get_batch
 
 from metamist.apis import AnalysisApi, AssayApi, FamilyApi, ParticipantApi, SampleApi
 from metamist.graphql import gql, query
@@ -944,7 +944,6 @@ def copy_files_in_dict(
                 logger.info(f'Adding job to rewrite {old_path} to {new_path}')
                 batch = get_batch()
                 job = batch.new_job(f'Reheader {new_path} from {old_path}')
-                copy_common_env(job)
                 main_file_commands(batch, job, old_path, new_path, sid_replacement)
                 job.storage(file_size(old_path) + 2 * 1024**3)  # Allow 2 GiB extra
             else:
