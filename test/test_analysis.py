@@ -1,6 +1,5 @@
 # pylint: disable=invalid-overridden-method
 import time
-from test.testbase import DbIsolatedTest, run_as_sync
 
 from api.routes.analysis import AnalysisUpdateModel, update_analysis
 from db.python.filters import GenericFilter
@@ -20,6 +19,7 @@ from models.models import (
     SequencingGroupUpsertInternal,
     parse_sql_bool,
 )
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 class TestAnalysis(DbIsolatedTest):
@@ -169,6 +169,89 @@ class TestAnalysis(DbIsolatedTest):
                 timestamp_completed=None,
                 project=1,
                 meta={},
+                active=True,
+                author=None,
+            )
+        ]
+
+        self.assertEqual(analyses, expected)
+
+    @run_as_sync
+    async def test_get_analysis_by_meta_isnull(self):
+        """
+        Test getting an analysis by a meta query that uses isnull
+        this tests that the comparison works even if there isn't a primitive
+        value at the specified path. If we were to use JSON_VALUE in the query this
+        wouldn't work.
+        """
+
+        a_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='analysis-runner',
+                status=AnalysisStatus.UNKNOWN,
+                sequencing_group_ids=[],
+                meta={'nested_meta': {'foo': 'bar'}},
+            )
+        )
+
+        analyses = await self.al.query(
+            AnalysisFilter(
+                project=GenericFilter(eq=self.project_id),
+                meta={'nested_meta': GenericFilter(isnull=False)},
+            )
+        )
+        expected = [
+            AnalysisInternal(
+                id=a_id,
+                type='analysis-runner',
+                status=AnalysisStatus.UNKNOWN,
+                sequencing_group_ids=[],
+                cohort_ids=[],
+                output=None,
+                timestamp_completed=None,
+                project=1,
+                meta={'nested_meta': {'foo': 'bar'}},
+                active=True,
+                author=None,
+            )
+        ]
+
+        self.assertEqual(analyses, expected)
+
+    @run_as_sync
+    async def test_get_analysis_by_meta_in_(self):
+        """
+        Test getting an analysis by a meta query that uses in_ filter. These filters
+        were previously not working due to JSON_EXTRACT returning a json value that
+        failed comparison to the input list of strings.
+        """
+
+        a_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='analysis-runner',
+                status=AnalysisStatus.UNKNOWN,
+                sequencing_group_ids=[],
+                meta={'foo': 'bar'},
+            )
+        )
+
+        analyses = await self.al.query(
+            AnalysisFilter(
+                project=GenericFilter(eq=self.project_id),
+                meta={'foo': GenericFilter(in_=['bar', 'baz'])},
+            )
+        )
+        expected = [
+            AnalysisInternal(
+                id=a_id,
+                type='analysis-runner',
+                status=AnalysisStatus.UNKNOWN,
+                sequencing_group_ids=[],
+                cohort_ids=[],
+                output=None,
+                timestamp_completed=None,
+                project=1,
+                meta={'foo': 'bar'},
                 active=True,
                 author=None,
             )
