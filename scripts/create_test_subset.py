@@ -48,6 +48,8 @@ papi = ParticipantApi()
 
 DEFAULT_SAMPLES_N = 10
 
+PRIMARY_EXTERNAL_ORG = ''
+
 QUERY_ALL_DATA = gql(
     """
     query getAllData($project: String!, $sids: [String!]) {
@@ -720,7 +722,8 @@ def transfer_families(
         for family in families:
             tsv_writer.writerow(
                 [
-                    family['external_id'],
+                    # import_families() only imports the primary eid anyway
+                    family['external_ids'][PRIMARY_EXTERNAL_ORG],
                     family['description'] or '',
                     family['coded_phenotype'] or '',
                 ]
