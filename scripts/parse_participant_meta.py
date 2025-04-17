@@ -14,7 +14,7 @@ import traceback
 import click
 from google.cloud import storage
 
-from metamist import ApiException
+from metamist.exceptions import ApiException
 from metamist.apis import ParticipantApi
 from metamist.model.participant_upsert import ParticipantUpsert
 

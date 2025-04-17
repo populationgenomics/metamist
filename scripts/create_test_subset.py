@@ -211,6 +211,7 @@ QUERY_FAMILY_BY_INTERNAL_IDS = gql(
 """
 )
 
+
 def main(
     project: str,
     samples_n: int,
@@ -727,7 +728,13 @@ def transfer_families(
     initial_project: str, target_project: str, internal_participant_ids: list[int]
 ) -> list[int]:
     """Pull relevant families from the input project, and copy to target_project"""
-    family_data = query(QUERY_FAMILY_BY_INTERNAL_IDS, variables={'project': initial_project, 'internal_ids': internal_participant_ids})
+    family_data = query(
+        QUERY_FAMILY_BY_INTERNAL_IDS,
+        variables={
+            'project': initial_project,
+            'internal_ids': internal_participant_ids,
+        },
+    )
     families = family_data.get('project').get('families', [])
     family_ids = [family['id'] for family in families]
 
