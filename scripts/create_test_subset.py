@@ -25,7 +25,7 @@ from google.cloud import storage
 from cpg_utils.config import image_path
 from cpg_utils.hail_batch import get_batch
 
-from metamist.apis import AnalysisApi, AssayApi, FamilyApi, ParticipantApi, SampleApi
+from metamist.apis import AnalysisApi, FamilyApi, ParticipantApi, SampleApi
 from metamist.graphql import gql, query
 from metamist.models import (
     Analysis,
@@ -42,7 +42,6 @@ logger.setLevel(logging.INFO)
 
 sapi = SampleApi()
 aapi = AnalysisApi()
-assayapi = AssayApi()
 fapi = FamilyApi()
 papi = ParticipantApi()
 
@@ -165,8 +164,12 @@ PARTICIPANT_QUERY = gql(
     query ($project: String!) {
         project (name: $project) {
             participants {
+                externalIds
                 id
-                externalId
+                meta
+                phenotypes
+                reportedGender
+                reportedSex
             }
         }
     }
@@ -188,6 +191,24 @@ COHORT_QUERY = gql(
         }
     }
     """
+)
+
+# take a parameter which is an array of ints
+QUERY_FAMILY_BY_INTERNAL_IDS = gql(
+    """
+    query FamilyQuery($project: String!, $internal_ids: [Int!]!) {
+  project(name: $project) {
+    families(
+      id: {in_: $internal_ids}
+    ) {
+      id
+      codedPhenotype
+      externalIds
+      description
+    }
+  }
+}
+"""
 )
 
 
@@ -240,9 +261,10 @@ def main(
     logger.info(f'Found {len(all_sids)} sample ids in {project}')
 
     # 3. Randomly select from the remaining sgs
-    additional_samples.update(
-        random.sample(list(all_sids - additional_samples), samples_n)
-    )
+    if samples_n:
+        additional_samples.update(
+            random.sample(list(all_sids - additional_samples), samples_n)
+        )
 
     # 4. Query all the samples from the selected sgs
     logger.info(f'Transferring {len(additional_samples)} samples. Querying metadata.')
@@ -706,26 +728,31 @@ def transfer_families(
     initial_project: str, target_project: str, internal_participant_ids: list[int]
 ) -> list[int]:
     """Pull relevant families from the input project, and copy to target_project"""
-    families = fapi.get_families(
-        project=initial_project,
-        participant_ids=internal_participant_ids,
+    family_data = query(
+        QUERY_FAMILY_BY_INTERNAL_IDS,
+        variables={
+            'project': initial_project,
+            'internal_ids': internal_participant_ids,
+        },
     )
-
+    families = family_data.get('project').get('families', [])
     family_ids = [family['id'] for family in families]
 
     tmp_family_tsv = 'tmp_families.tsv'
+    # TODO: this doesn't match the default ordering in fapi.import_families, and is not passed as a list of headers
     family_tsv_headers = ['Family ID', 'Description', 'Coded Phenotype', 'Display Name']
     # Work-around as import_families takes a file.
     with open(tmp_family_tsv, 'wt') as tmp_families:
         tsv_writer = csv.writer(tmp_families, delimiter='\t')
         tsv_writer.writerow(family_tsv_headers)
         for family in families:
+            # TODO only 3 elements are written to this 4-col TSV
             tsv_writer.writerow(
                 [
                     # import_families() only imports the primary eid anyway
-                    family['external_ids'][PRIMARY_EXTERNAL_ORG],
+                    family['externalIds'][PRIMARY_EXTERNAL_ORG],
                     family['description'] or '',
-                    family['coded_phenotype'] or '',
+                    family['codedPhenotype'] or '',
                 ]
             )
 
@@ -759,12 +786,11 @@ def transfer_ped(
 
     # Get map of external participant id to internal
     participant_output = query(PARTICIPANT_QUERY, {'project': target_project})
-    participant_map = {
-        participant['externalId']: participant['id']
+    return {
+        external_id: participant['id']
         for participant in participant_output.get('project').get('participants')
+        for external_id in participant['externalIds'].values()
     }
-
-    return participant_map
 
 
 def transfer_participants(
@@ -772,34 +798,34 @@ def transfer_participants(
     participant_data,
 ) -> dict[str, int]:
     """Transfers relevant participants between projects"""
-    existing_participants = papi.get_participants(
-        project=target_project, query_participant_criteria={}
-    )
+
+    existing_participants = query(PARTICIPANT_QUERY, {'project': target_project})
 
     target_project_pid_map = {
         external_id: participant['id']
-        for participant in existing_participants
-        for external_id in participant['external_ids'].values()
+        for participant in existing_participants.get('project').get('participants')
+        for external_id in participant['externalIds'].values()
     }
 
     participants_to_transfer = []
     for participant in participant_data:
-        if participant['externalId'] in target_project_pid_map:
-            # Participants with id field will be updated & those without will be inserted
-            participant['id'] = target_project_pid_map[participant['externalId']]
-        else:
-            del participant['id']
-        transfer_participant = {
-            'external_ids': participant['externalIds'],
-            'meta': participant.get('meta') or {},
-            'karyotype': participant.get('karyotype'),
-            'reported_gender': participant.get('reportedGender'),
-            'reported_sex': participant.get('reportedSex'),
-            'id': participant.get('id'),
-            'samples': [],
-        }
-        # Participants are being created before the samples are, so this will be empty for now.
-        participants_to_transfer.append(transfer_participant)
+        for alt_id in participant['externalIds'].values():
+            if alt_id in target_project_pid_map:
+                # Participants with id field will be updated & those without will be inserted
+                participant['id'] = target_project_pid_map[alt_id]
+            else:
+                del participant['id']
+            transfer_participant = {
+                'external_ids': participant['externalIds'],
+                'meta': participant.get('meta') or {},
+                'karyotype': participant.get('karyotype'),
+                'reported_gender': participant.get('reportedGender'),
+                'reported_sex': participant.get('reportedSex'),
+                'id': participant.get('id'),
+                'samples': [],
+            }
+            # Participants are being created before the samples are, so this will be empty for now.
+            participants_to_transfer.append(transfer_participant)
 
     upserted_participants = papi.upsert_participants(
         target_project, participant_upsert=participants_to_transfer
@@ -808,7 +834,7 @@ def transfer_participants(
     external_to_internal_participant_id_map: dict[str, int] = {}
 
     for participant in upserted_participants:
-        for external_id in participant['external_ids'].values():
+        for external_id in participant['externalIds'].values():
             external_to_internal_participant_id_map[external_id] = participant['id']
 
     return external_to_internal_participant_id_map
