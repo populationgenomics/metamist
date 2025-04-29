@@ -818,7 +818,7 @@ def transfer_families(
     with open(tmp_family_tsv, 'wt') as tmp_families:
         tsv_writer = csv.writer(tmp_families, delimiter='\t')
         tsv_writer.writerow(family_tsv_headers)
-        for family_id, family in families.items():
+        for family in families.values():
             # TODO only 3 elements are written to this 4-col TSV
             tsv_writer.writerow(
                 [
