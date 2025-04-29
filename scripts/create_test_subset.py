@@ -212,7 +212,9 @@ QUERY_FAMILY_BY_INTERNAL_IDS = gql(
 )
 
 
-def get_sids_by_random_sampling(project: str, sample_count: int, samples_so_far: set[str] | None = None) -> list[str]:
+def get_sids_by_random_sampling(
+    project: str, sample_count: int, samples_so_far: set[str] | None = None
+) -> list[str]:
     """
     Take a project to select samples from, a number of samples to select, and a set of samples already selected.
     Select sample_count new samples from the project, excluding any already selected.
@@ -233,9 +235,13 @@ def get_sids_by_random_sampling(project: str, sample_count: int, samples_so_far:
     sid_output = query(SG_ID_QUERY, variables={'project': project})
 
     # all_sids here is a set of all internal IDs in the project, minus any we already selected
-    all_sids = {sid['id'] for sid in sid_output.get('project').get('samples')} - samples_so_far
+    all_sids = {
+        sid['id'] for sid in sid_output.get('project').get('samples')
+    } - samples_so_far
 
-    logger.info(f'Found {len(all_sids)} sample ids in {project}, excluding any previously seen')
+    logger.info(
+        f'Found {len(all_sids)} sample ids in {project}, excluding any previously seen'
+    )
 
     # Randomly select from the remaining sgs
     return random.sample(sorted(all_sids), sample_count)
@@ -288,12 +294,14 @@ def main(
 
     # 1c. If we are gathering random additional samples, get all sample IDs in project and sample from the collection
     if samples_n:
-        logger.info(f'Updating sample selection with {samples_n} additional random samples')
+        logger.info(
+            f'Updating sample selection with {samples_n} additional random samples'
+        )
         additional_samples.update(
             get_sids_by_random_sampling(
                 project=project,
                 sample_count=samples_n,
-                samples_so_far=additional_samples
+                samples_so_far=additional_samples,
             )
         )
 
@@ -351,7 +359,7 @@ def main(
         existing_data=existing_data,
         upserted_participant_map=upserted_participant_map,
         target_project=target_project,
-        project=project
+        project=project,
     )
 
     logger.info('Transferring analyses')
@@ -713,7 +721,9 @@ def get_sids_for_families(
 
     # subselect down to families with samples
     families_with_samples = [
-        fam for fam in all_family_sgids if any(participant.get('samples') for participant in fam['participants'])
+        fam
+        for fam in all_family_sgids
+        if any(participant.get('samples') for participant in fam['participants'])
     ]
 
     # 1. Remove the specifically requested families
@@ -737,8 +747,12 @@ def get_sids_for_families(
     # log the gathered families, and any requested families we couldn't find
     selected_family_ids = [fam['externalId'] for fam in user_input_families]
     logger.info(f'Families selected: {", ".join(selected_family_ids)}')
-    if failed_to_find := [user_fam_id for user_fam_id in additional_families if user_fam_id not in selected_family_ids]:
-        logger.warning(f'Families not found: {", ".join(len(failed_to_find))}')
+    if failed_to_find := [
+        user_fam_id
+        for user_fam_id in additional_families
+        if user_fam_id not in selected_family_ids
+    ]:
+        logger.warning(f'Families not found: {", ".join(failed_to_find)}')
 
     # 3. Pull SGs from random + specific families
     included_sids: set[str] = set()
@@ -747,7 +761,9 @@ def get_sids_for_families(
             for sample in participant['samples']:
                 included_sids.add(sample['id'])
 
-    logger.info(f'Identified {len(included_sids)} samples from {len(user_input_families)} families')
+    logger.info(
+        f'Identified {len(included_sids)} samples from {len(user_input_families)} families'
+    )
 
     return included_sids
 
