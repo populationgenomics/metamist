@@ -198,18 +198,47 @@ QUERY_FAMILY_BY_INTERNAL_IDS = gql(
     """
     query FamilyQuery($project: String!, $internal_ids: [Int!]!) {
   project(name: $project) {
-    families(
-      id: {in_: $internal_ids}
-    ) {
-      id
-      codedPhenotype
-      externalIds
-      description
+    participants(id: {in_: $internal_ids}) {
+      families {
+        id
+        codedPhenotype
+        description
+        externalIds
+      }
     }
   }
 }
 """
 )
+
+
+def get_sids_by_random_sampling(project: str, sample_count: int, samples_so_far: set[str] | None = None) -> list[str]:
+    """
+    Take a project to select samples from, a number of samples to select, and a set of samples already selected.
+    Select sample_count new samples from the project, excluding any already selected.
+
+    Args:
+        project (str): the metamist project to query
+        sample_count (int): number of additional samples to add
+        samples_so_far (set[str] | None): optional, samples we already selected by other means, remove before sampling
+
+    Returns:
+        list[str]: a list of sample IDs
+    """
+
+    if samples_so_far is None:
+        samples_so_far = set()
+
+    logger.info(f'Querying all samples in {project}')
+    sid_output = query(SG_ID_QUERY, variables={'project': project})
+
+    # all_sids here is a set of all internal IDs in the project, minus any we already selected
+    all_sids = {sid['id'] for sid in sid_output.get('project').get('samples')} - samples_so_far
+
+    logger.info(f'Found {len(all_sids)} sample ids in {project}, excluding any previously seen')
+
+    # Randomly select from the remaining sgs
+    return random.sample(sorted(all_sids), sample_count)
 
 
 def main(
@@ -233,6 +262,8 @@ def main(
     ):
         raise ValueError('Come on, what exactly are you asking for?')
 
+    # TODO(vbakiris) IMO it makes sense to pull the whole cohort if we're requesting a cohort?
+    # TODO(vbakiris) for any smaller subset we have other params to select for that
     if cohorts and not cohort_samples_n:
         raise ValueError(
             'You must specify the number of samples to transfer from the cohort.'
@@ -242,31 +273,31 @@ def main(
     logger.info('Setting random seed to 42')
     random.seed(42)
 
-    # 1. Find SG IDs to be moved by Family ID to -test.
+    # 1a. Find SG IDs to be moved by Family ID to -test.
     if families_n or additional_families:
         additional_samples.update(
             get_sids_for_families(project, families_n, additional_families)
         )
 
-    # 1.5 Find SG IDs to be moved by Cohort ID to -test.
+    # 1b. Find SG IDs to be moved by Cohort ID to -test.
     if cohorts:
+        logger.info(f'Updating sample selection to use cohorts: {cohorts}')
         additional_samples.update(
             get_sids_for_cohorts(project, cohorts, cohort_samples_n)
         )
 
-    # 2. Get all sample IDs and their SG IDs in project.
-    logger.info(f'Querying all samples in {project}')
-    sid_output = query(SG_ID_QUERY, variables={'project': project})
-    all_sids = {sid['id'] for sid in sid_output.get('project').get('samples')}
-    logger.info(f'Found {len(all_sids)} sample ids in {project}')
-
-    # 3. Randomly select from the remaining sgs
+    # 1c. If we are gathering random additional samples, get all sample IDs in project and sample from the collection
     if samples_n:
+        logger.info(f'Updating sample selection with {samples_n} additional random samples')
         additional_samples.update(
-            random.sample(list(all_sids - additional_samples), samples_n)
+            get_sids_by_random_sampling(
+                project=project,
+                sample_count=samples_n,
+                samples_so_far=additional_samples
+            )
         )
 
-    # 4. Query all the samples from the selected sgs
+    # 2. Query all the samples from the selected sgs
     logger.info(f'Transferring {len(additional_samples)} samples. Querying metadata.')
     original_project_subset_data = query(
         QUERY_ALL_DATA, {'project': project, 'sids': list(additional_samples)}
@@ -316,8 +347,13 @@ def main(
     logger.info('Transferring samples, sequencing groups, and assays')
     samples = original_project_subset_data.get('project').get('samples')
     old_sid_to_new_sid, sample_to_sg_attribute_map = transfer_samples_sgs_assays(
-        samples, existing_data, upserted_participant_map, target_project, project
+        samples=samples,
+        existing_data=existing_data,
+        upserted_participant_map=upserted_participant_map,
+        target_project=target_project,
+        project=project
     )
+
     logger.info('Transferring analyses')
     transfer_analyses(
         samples,
@@ -362,8 +398,7 @@ def transfer_samples_sgs_assays(
 
         sample_type = None if s['type'] == 'None' else s['type']
         existing_sid: str | None = None
-        existing_sample = get_existing_sample(existing_data, s['externalId'])
-        if existing_sample:
+        if existing_sample := get_existing_sample(existing_data, s['externalId']):
             existing_sid = existing_sample['id']
 
         existing_pid: int | None = None
@@ -455,7 +490,7 @@ def get_new_sg_id(
     """
     Returns the new sequencing group id for a given sample id and sequencing group attributes.
     Args:
-        sid (str): The sample id to search for.
+        old_sid (str): The sample id to search for.
         new_sg_attributes (tuple[str, str, str]): The attributes of the sequencing group to search for.
         old_sid_to_new_sid (dict[str, str]): A map from old sample ids to new sample ids.
         sample_to_sg_attribute_map (dict[tuple, dict[tuple, str]]): A map from (seid, sid) keys to a map of sequencing group attribute keys to old sequencing group ids.
@@ -665,16 +700,25 @@ def get_existing_analysis(
 def get_sids_for_families(
     project: str, families_n: int, additional_families: set[str]
 ) -> set[str]:
-    """Returns specific samples to be included in the test project."""
+    """
+    Returns specific samples to be included in the test project.
+    This process returns internal sample IDs for members of the families selected
+    Remove any families with no samples from consideration prior to random selection
+    """
 
     family_sgid_output = query(QUERY_FAMILY_SAMPLES, {'project': project})
 
     all_family_sgids = family_sgid_output.get('project', {}).get('families', [])
     assert all_family_sgids, 'No families returned in GQL result'
 
+    # subselect down to families with samples
+    families_with_samples = [
+        fam for fam in all_family_sgids if any(participant.get('samples') for participant in fam['participants'])
+    ]
+
     # 1. Remove the specifically requested families
     user_input_families = [
-        fam for fam in all_family_sgids if fam['externalId'] in additional_families
+        fam for fam in families_with_samples if fam['externalId'] in additional_families
     ]
 
     # TODO: Replace this with the nice script that randomly selects better :)
@@ -683,12 +727,18 @@ def get_sids_for_families(
         random.sample(
             [
                 fam
-                for fam in all_family_sgids
+                for fam in families_with_samples
                 if fam['externalId'] not in additional_families
             ],
             families_n,
         )
     )
+
+    # log the gathered families, and any requested families we couldn't find
+    selected_family_ids = [fam['externalId'] for fam in user_input_families]
+    logger.info(f'Families selected: {", ".join(selected_family_ids)}')
+    if failed_to_find := [user_fam_id for user_fam_id in additional_families if user_fam_id not in selected_family_ids]:
+        logger.warning(f'Families not found: {", ".join(len(failed_to_find))}')
 
     # 3. Pull SGs from random + specific families
     included_sids: set[str] = set()
@@ -696,6 +746,8 @@ def get_sids_for_families(
         for participant in fam['participants']:
             for sample in participant['samples']:
                 included_sids.add(sample['id'])
+
+    logger.info(f'Identified {len(included_sids)} samples from {len(user_input_families)} families')
 
     return included_sids
 
@@ -735,8 +787,13 @@ def transfer_families(
             'internal_ids': internal_participant_ids,
         },
     )
-    families = family_data.get('project').get('families', [])
-    family_ids = [family['id'] for family in families]
+
+    families: dict[int, dict] = {}
+    for participant in family_data['project']['participants']:
+        for family in participant['families']:
+            families[family['id']] = family
+
+    family_ids: list[int] = list(families.keys())
 
     tmp_family_tsv = 'tmp_families.tsv'
     # TODO: this doesn't match the default ordering in fapi.import_families, and is not passed as a list of headers
@@ -745,7 +802,7 @@ def transfer_families(
     with open(tmp_family_tsv, 'wt') as tmp_families:
         tsv_writer = csv.writer(tmp_families, delimiter='\t')
         tsv_writer.writerow(family_tsv_headers)
-        for family in families:
+        for family_id, family in families.items():
             # TODO only 3 elements are written to this 4-col TSV
             tsv_writer.writerow(
                 [
