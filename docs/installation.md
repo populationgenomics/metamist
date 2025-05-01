@@ -32,7 +32,7 @@ brew install pyenv
 brew install wget
 
 # skip if you wish to install via docker
-brew install mariadb@10.8
+brew install mariadb@11.7.2
 
 ```
 
@@ -52,7 +52,7 @@ choco install pyenv-win
 choco install wget
 
 # skip if you wish to install via docker
-choco install mariadb --version=10.8.3
+choco install mariadb --version=11.7.2
 ```
 
 ## Installation Steps
@@ -298,6 +298,15 @@ export SM_ENVIRONMENT=LOCAL
 # uses your username as the "author" in requests
 export SM_LOCALONLY_DEFAULTUSER=$(whoami)
 ```
+
+First start up your mysql server if it's not already running. 
+```mysql.server start```
+
+Enter the mysql command prompt
+```mysql```
+
+Switch your database to sm_dev
+```USE sm_dev;```
 
 To allow the system to be bootstrapped and create the initial project, you'll need to add yourself to the two admin groups that allow creating projects and updating project members:
 
