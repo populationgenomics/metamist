@@ -32,7 +32,7 @@ brew install pyenv
 brew install wget
 
 # skip if you wish to install via docker
-brew install mariadb@10.8
+brew install mariadb@11.7.2
 
 ```
 
@@ -52,7 +52,7 @@ choco install pyenv-win
 choco install wget
 
 # skip if you wish to install via docker
-choco install mariadb --version=10.8.3
+choco install mariadb --version=11.7.2
 ```
 
 ## Installation Steps
@@ -91,7 +91,7 @@ export PATH="$HB_PREFIX/bin:$PATH:$HB_PREFIX/opt/openjdk/bin"
 export LIQUIBASE_HOME=$(brew --prefix)/opt/liquibase/libexec
 
 # mariadb
-export PATH="$HB_PREFIX/opt/mariadb@10.8/bin:$PATH"
+export PATH="$HB_PREFIX/opt/mariadb@11.7.2/bin:$PATH"
 
 # metamist config
 export SM_ENVIRONMENT=LOCAL # good default to have
@@ -225,19 +225,19 @@ Ensure you have Docker installed or follow [this guide](https://docs.docker.com/
 Pull the image:
 
 ```bash
-docker pull mariadb:10.8.3
+docker pull mariadb:11.7.2
 ```
 
 Run the container on port 3306:
 
 ```bash
-docker run --name mariadb-p3306 -e MYSQL_ALLOW_EMPTY_PASSWORD=1 -p 3306:3306 -d docker.io/library/mariadb:10.8.3
+docker run --name mariadb-p3306 -e MYSQL_ALLOW_EMPTY_PASSWORD=1 -p 3306:3306 -d docker.io/library/mariadb:11.7.2
 ```
 
 If you have a local MySQL instance already running on port 3306, you can map the docker container to run on 3307:
 
 ```bash
-docker run --name mariadb-p3307 -e MYSQL_ALLOW_EMPTY_PASSWORD=1 -p 3307:3306 -d docker.io/library/mariadb:10.8.3
+docker run --name mariadb-p3307 -e MYSQL_ALLOW_EMPTY_PASSWORD=1 -p 3307:3306 -d docker.io/library/mariadb:11.7.2
 ```
 
 You can now execute bash commands inside a shell:
@@ -297,6 +297,24 @@ This will allow you to test the front-end components that access data. This happ
 export SM_ENVIRONMENT=LOCAL
 # uses your username as the "author" in requests
 export SM_LOCALONLY_DEFAULTUSER=$(whoami)
+```
+
+First start up your mysql server if it's not already running.
+
+```bash
+mysql.server start
+```
+
+Enter the mysql command prompt
+
+```bash
+mysql
+```
+
+Switch your database to sm_dev
+
+```sql
+USE sm_dev;
 ```
 
 To allow the system to be bootstrapped and create the initial project, you'll need to add yourself to the two admin groups that allow creating projects and updating project members:
