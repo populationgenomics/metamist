@@ -894,6 +894,7 @@ def transfer_participants(
                 'karyotype': participant.get('karyotype'),
                 'reported_gender': participant.get('reportedGender'),
                 'reported_sex': participant.get('reportedSex'),
+                'phenotypes': participant.get('phenotypes'),
                 'id': participant.get('id'),
                 'samples': [],
             }
