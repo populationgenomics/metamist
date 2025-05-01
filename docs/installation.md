@@ -299,14 +299,23 @@ export SM_ENVIRONMENT=LOCAL
 export SM_LOCALONLY_DEFAULTUSER=$(whoami)
 ```
 
-First start up your mysql server if it's not already running. 
-```mysql.server start```
+First start up your mysql server if it's not already running.
+
+```bash
+mysql.server start
+```
 
 Enter the mysql command prompt
-```mysql```
+
+```bash
+mysql
+```
 
 Switch your database to sm_dev
-```USE sm_dev;```
+
+```sql
+USE sm_dev;
+```
 
 To allow the system to be bootstrapped and create the initial project, you'll need to add yourself to the two admin groups that allow creating projects and updating project members:
 
