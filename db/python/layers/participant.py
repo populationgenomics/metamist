@@ -390,7 +390,7 @@ class ParticipantLayer(BaseLayer):
         return f'Updated {len(sample_ids_to_update)} records'
 
     async def insert_participant_phenotypes(
-        self, participant_phenotypes: dict[int, dict]
+        self, participant_phenotypes: dict[int, dict[str, Any]]
     ):
         """
         Insert participant phenotypes, with format: {pid: {key: value}}
@@ -676,6 +676,11 @@ class ParticipantLayer(BaseLayer):
                     participant.samples,
                     project=project,
                     open_transaction=False,
+                )
+
+            if participant.phenotypes:
+                await self.insert_participant_phenotypes(
+                    {participant.id: participant.phenotypes}
                 )
 
             return participant
