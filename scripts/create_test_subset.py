@@ -976,7 +976,8 @@ def main_file_commands(batch, job, old_path: str, new_path: str, sid: tuple[str,
             new_file={'main': '{root}.cram', 'crai': '{root}.cram.crai'}
         )
         job.command(rf"""
-            samtools reheader --no-PG --in-place --command 'sed /^@RG/s/\<SM:{sid[0]}\>/SM:{sid[1]}/g' {old_file}
+            samtools head {old_file} | sed '/^@RG/s/\<SM:{sid[0]}\>/SM:{sid[1]}/g' > $BATCH_TMPDIR/header.txt
+            samtools reheader --no-PG --in-place $BATCH_TMPDIR/header.txt {old_file}
             mv {old_file} {job.new_file.main}
         """)
         batch.write_output(job.new_file.main, new_path)
