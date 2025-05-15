@@ -1,3 +1,5 @@
+from typing import Any
+
 from models.base import OpenApiGenNoneType, SMBase, parse_sql_dict
 from models.models.family import FamilySimple, FamilySimpleInternal
 from models.models.project import ProjectId
@@ -79,6 +81,7 @@ class ParticipantUpsertInternal(SMBase):
     meta: dict | None = None
 
     samples: list[SampleUpsertInternal] | None = None
+    phenotypes: dict[str, Any] | None = None
 
     def to_external(self):
         """Convert to transport model"""
@@ -89,6 +92,7 @@ class ParticipantUpsertInternal(SMBase):
             reported_gender=self.reported_gender,
             karyotype=self.karyotype,
             meta=self.meta,
+            phenotypes=self.phenotypes,
             samples=[s.to_external() for s in self.samples or []],
         )
 
@@ -130,6 +134,7 @@ class ParticipantUpsert(SMBase):
     meta: dict | OpenApiGenNoneType = None
 
     samples: list[SampleUpsert] | None = None
+    phenotypes: dict[str, Any] | None = None
 
     def to_internal(self):
         """Convert to internal model, doesn't really do much"""
@@ -139,6 +144,7 @@ class ParticipantUpsert(SMBase):
             reported_sex=self.reported_sex,  # type: ignore
             reported_gender=self.reported_gender,  # type: ignore
             karyotype=self.karyotype,  # type: ignore
+            phenotypes=self.phenotypes,
             meta=self.meta,  # type: ignore
         )
 
