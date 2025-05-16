@@ -289,6 +289,7 @@ packaging==24.2
     #   google-cloud-bigquery
     #   gunicorn
     #   pytest
+    #   strawberry-graphql
 pathspec==0.12.1
     # via black
 platformdirs==4.3.6
@@ -429,7 +430,7 @@ starlette==0.41.3
     # via
     #   fastapi
     #   strawberry-graphql
-strawberry-graphql[debug-server,fastapi]==0.257.0
+strawberry-graphql[debug-server,fastapi]==0.268.1
     # via
     #   -r requirements-dev.in
     #   -r requirements.in
