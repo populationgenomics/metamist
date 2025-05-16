@@ -96,7 +96,7 @@ frozenlist==1.6.0
     #   aiosignal
 fsspec==2024.10.0
     # via -r requirements.in
-google-api-core[grpc]==2.24.2
+google-api-core[grpc]==2.25.0rc1
     # via
     #   google-cloud-appengine-logging
     #   google-cloud-artifact-registry
@@ -161,7 +161,7 @@ grpc-google-iam-v1==0.12.7
     #   google-cloud-logging
     #   google-cloud-pubsub
     #   google-cloud-secret-manager
-grpcio==1.71.0
+grpcio==1.72.0rc1
     # via
     #   google-api-core
     #   google-cloud-bigquery
