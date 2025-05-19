@@ -14,6 +14,7 @@ from api.graphql.mutations.participant import ParticipantMutations
 from api.graphql.mutations.sequencing_group import SequencingGroupMutations
 from api.graphql.mutations.sample import SampleMutations
 
+from api.graphql.mutations.user import UserMutations
 from models.models.project import FullWriteAccessRoles, ReadAccessRoles
 
 
@@ -80,3 +81,9 @@ class Mutation:
     def cohort(self) -> CohortMutations:
         """Cohort mutations"""
         return CohortMutations()
+
+    # Users
+    @strawberry.field()
+    def user(self) -> UserMutations:
+        """User mutations"""
+        return UserMutations()

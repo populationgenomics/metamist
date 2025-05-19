@@ -36,6 +36,7 @@ from db.python.layers import (
     SampleLayer,
     SequencingGroupLayer,
 )
+from db.python.layers.user import UserLayer
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.analysis_runner import AnalysisRunnerFilter
 from db.python.tables.assay import AssayFilter
@@ -1267,6 +1268,29 @@ class GraphQLAnalysisRunner:
 
 
 @strawberry.type
+class GraphQLUser:
+    """User GraphQL model"""
+
+    id: int
+    email: str
+    full_name: str | None
+    settings: strawberry.scalars.JSON | None
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+
+    @staticmethod
+    def from_internal(user: dict) -> 'GraphQLUser':
+        return GraphQLUser(
+            id=user['id'],
+            email=user['email'],
+            full_name=user.get('full_name'),
+            settings=user.get('settings'),
+            created_at=user['created_at'],
+            updated_at=user['updated_at'],
+        )
+
+
+@strawberry.type
 class GraphQLViewer:
     """
     The "Viewer" construct is the current user and contains information about the
@@ -1589,6 +1613,19 @@ class Query:  # entry point to graphql.
             AnalysisFilter(id=id.to_internal_filter())
         )
         return [GraphQLAnalysis.from_internal(a) for a in analyses]
+
+    @strawberry.field
+    async def user(self, info: Info, id: int) -> GraphQLUser | None:
+        connection = info.context['connection']
+        user = await UserLayer(connection).get_user_by_id(id)
+        return GraphQLUser.from_internal(user) if user else None
+
+    @strawberry.field
+    async def users(self, info: Info) -> list[GraphQLUser]:
+        connection = info.context['connection']
+        # You may want to implement a method to fetch all users
+        users = await UserLayer(connection).get_all_users()
+        return [GraphQLUser.from_internal(u if u else {}) for u in users]
 
 
 schema = strawberry.Schema(

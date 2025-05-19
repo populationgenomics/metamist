@@ -23,6 +23,7 @@ from db.python.layers import (
     SequencingGroupLayer,
 )
 from db.python.layers.comment import CommentLayer
+from db.python.layers.user import UserLayer
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.assay import AssayFilter
 from db.python.tables.family import FamilyFilter
@@ -89,6 +90,8 @@ class LoaderKeys(enum.Enum):
     COMMENTS_FOR_PROJECT_IDS = 'comments_for_project_ids'
     COMMENTS_FOR_SEQUENCING_GROUP_IDS = 'comments_for_sequencing_group_ids'
     COMMENTS_FOR_FAMILY_IDS = 'comments_for_family_ids'
+
+    USERS = 'users'
 
 
 loaders: dict[LoaderKeys, Any] = {}
@@ -607,6 +610,18 @@ async def load_comments_for_sequencing_group_ids(
         entity=CommentEntityType.sequencing_group, entity_ids=sequencing_group_ids
     )
     return comments
+
+
+@connected_data_loader(LoaderKeys.USERS)
+async def load_users_by_ids(
+    user_ids: list[int], connection: Connection
+) -> list[dict | None]:
+    """
+    DataLoader: get users by ids
+    """
+    ulayer = UserLayer(connection)
+    # Fetch each user by id, preserving order
+    return [await ulayer.get_user_by_id(uid) for uid in user_ids]
 
 
 class GraphQLContext(TypedDict):
