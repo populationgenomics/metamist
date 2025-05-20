@@ -1,5 +1,6 @@
 from typing import Any, Optional
 from db.python.tables.base import DbBase
+from models.models.user import UserInternal
 
 
 class UsersTable(DbBase):
@@ -9,17 +10,17 @@ class UsersTable(DbBase):
 
     table_name = 'users'
 
-    async def get_by_id(self, user_id: int) -> Optional[dict]:
+    async def get_by_id(self, user_id: int) -> Optional[UserInternal]:
         """Retrieve a user by their unique user ID."""
         query = f'SELECT * FROM {self.table_name} WHERE id = :user_id'
         row = await self.connection.fetch_one(query, {'user_id': user_id})
-        return dict(row) if row else None
+        return UserInternal.from_db(dict(row)) if row else None
 
-    async def get_by_email(self, email: str) -> Optional[dict]:
+    async def get_by_email(self, email: str) -> Optional[UserInternal]:
         """Retrieve a user by their email address."""
         query = f'SELECT * FROM {self.table_name} WHERE email = :email'
         row = await self.connection.fetch_one(query, {'email': email})
-        return dict(row) if row else None
+        return UserInternal.from_db(dict(row)) if row else None
 
     async def create(
         self,

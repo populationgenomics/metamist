@@ -44,6 +44,7 @@ from models.models import (
 from models.models.audit_log import AuditLogInternal
 from models.models.comment import CommentEntityType, DiscussionInternal
 from models.models.family import PedRowInternal
+from models.models.user import UserInternal
 
 
 class LoaderKeys(enum.Enum):
@@ -615,13 +616,16 @@ async def load_comments_for_sequencing_group_ids(
 @connected_data_loader(LoaderKeys.USERS)
 async def load_users_by_ids(
     user_ids: list[int], connection: Connection
-) -> list[dict | None]:
+) -> list[UserInternal]:
     """
     DataLoader: get users by ids
     """
     ulayer = UserLayer(connection)
     # Fetch each user by id, preserving order
-    return [await ulayer.get_user_by_id(uid) for uid in user_ids]
+    users = [await ulayer.get_user_by_id(uid) for uid in user_ids]
+    users = [user for user in users if user is not None]
+
+    return users
 
 
 class GraphQLContext(TypedDict):

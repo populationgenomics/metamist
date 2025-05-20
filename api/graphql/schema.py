@@ -75,6 +75,7 @@ from models.models.project import (
     ReadAccessRoles,
 )
 from models.models.sample import sample_id_transform_to_raw
+from models.models.user import UserInternal
 from models.utils.cohort_id_format import cohort_id_format, cohort_id_transform_to_raw
 from models.utils.cohort_template_id_format import (
     cohort_template_id_format,
@@ -1273,20 +1274,20 @@ class GraphQLUser:
 
     id: int
     email: str
-    full_name: str | None
-    settings: strawberry.scalars.JSON | None
+    full_name: str
+    settings: strawberry.scalars.JSON
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
     @staticmethod
-    def from_internal(user: dict) -> 'GraphQLUser':
+    def from_internal(user: UserInternal) -> 'GraphQLUser':
         return GraphQLUser(
-            id=user['id'],
-            email=user['email'],
-            full_name=user.get('full_name'),
-            settings=user.get('settings'),
-            created_at=user['created_at'],
-            updated_at=user['updated_at'],
+            id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            settings=strawberry.scalars.JSON(user.settings),
+            created_at=user.created_at,
+            updated_at=user.updated_at,
         )
 
 
@@ -1625,7 +1626,7 @@ class Query:  # entry point to graphql.
         connection = info.context['connection']
         # You may want to implement a method to fetch all users
         users = await UserLayer(connection).get_all_users()
-        return [GraphQLUser.from_internal(u if u else {}) for u in users]
+        return [GraphQLUser.from_internal(u) for u in users]
 
 
 schema = strawberry.Schema(

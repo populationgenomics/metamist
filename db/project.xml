@@ -1899,7 +1899,9 @@
             <column name="email" type="VARCHAR(255)">
                 <constraints nullable="false" unique="true"/>
             </column>
-            <column name="full_name" type="VARCHAR(255)"/>
+            <column name="full_name" type="VARCHAR(255)">
+				<constraints nullable="false"/>
+			</column>
             <column name="settings" type="JSON"/>
             <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
             <column name="updated_at" type="TIMESTAMP"
