@@ -4,7 +4,7 @@ from typing import Annotated, Optional
 
 from db.python.layers.user import UserLayer
 from api.graphql.loaders import GraphQLContext
-from api.graphql.types.user import GraphQLUser, UserSettingsInput
+from api.graphql.types.user import GraphQLUser, UserSettings
 
 JSON = strawberry.scalars.JSON
 
@@ -19,7 +19,7 @@ class UserMutations:
         info: Info[GraphQLContext, None],
         email: str,
         full_name: Optional[str] = None,
-        settings: Optional[UserSettingsInput] = None,
+        settings: Optional[UserSettings] = None,
     ) -> Annotated['GraphQLUser', strawberry.lazy('api.graphql.schema')]:
         """Create a new user with the given email, full name, and settings."""
         connection = info.context['connection']
@@ -37,9 +37,9 @@ class UserMutations:
         self,
         info: Info[GraphQLContext, None],
         user_id: int,
-        email: str,
+        email: Optional[str] = None,
         full_name: Optional[str] = None,
-        settings: Optional[UserSettingsInput] = None,
+        settings: Optional[UserSettings] = None,
     ) -> Optional[Annotated['GraphQLUser', strawberry.lazy('api.graphql.schema')]]:
         """Update the current user's full name and/or settings."""
         connection = info.context['connection']

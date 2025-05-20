@@ -2,7 +2,7 @@ from db.python.layers.base import BaseLayer
 from db.python.tables.user import UsersTable
 from typing import Optional
 from api.utils.db import get_projectless_db_connection
-from api.graphql.types.user import UserSettingsInput
+from api.graphql.types.user import UserSettings
 
 from models.models.user import UserInternal
 
@@ -70,7 +70,7 @@ class UserLayer(BaseLayer):
         self,
         email: str,
         full_name: Optional[str] = None,
-        settings: Optional[UserSettingsInput] = None,
+        settings: Optional[UserSettings] = None,
     ) -> int:
         """Create a new user if the email matches the authenticated user's email."""
         self.check_authentication(email)
@@ -79,9 +79,9 @@ class UserLayer(BaseLayer):
     async def update_user(
         self,
         user_id: int,
-        email: str,
+        email: Optional[str],
         full_name: Optional[str] = None,
-        settings: Optional[UserSettingsInput] = None,
+        settings: Optional[UserSettings] = None,
     ):
         """Update the current user's record if the user ID matches the authenticated user."""
         user = await self.users_table.get_by_id(user_id)

@@ -1,5 +1,5 @@
 from typing import Any, Optional
-from api.graphql.types.user import UserSettingsInput
+from api.graphql.types.user import UserSettings
 from db.python.tables.base import DbBase
 
 from models.models.user import UserInternal
@@ -34,7 +34,7 @@ class UsersTable(DbBase):
         self,
         email: str,
         full_name: Optional[str] = None,
-        settings: Optional[UserSettingsInput] = None,
+        settings: Optional[UserSettings] = None,
     ) -> int:
         """Create a new user with the given email, full name, and settings."""
         query = f"""
@@ -59,9 +59,9 @@ class UsersTable(DbBase):
     async def update(
         self,
         user_id: int,
-        email: str,
+        email: Optional[str],
         full_name: Optional[str] = None,
-        settings: Optional[UserSettingsInput] = None,
+        settings: Optional[UserSettings] = None,
     ):
         """Update the user's full name and/or settings by user ID."""
         updates = []

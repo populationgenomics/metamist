@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 import json
 import strawberry
 import datetime
@@ -14,27 +13,21 @@ class DisplayMode(Enum):
     AUTO = 'auto'
 
 
-@dataclass
+@strawberry.input
 class UserSettings:
-    """User settings model. This is used for output from db -> GraphQLUser"""
+    """User settings input model. This is used for GraphQL input -> db methods"""
 
     display_mode: DisplayMode | None = None
 
-    @classmethod
-    def validate_fields(cls, instance):
+    def validate_fields(self):
         """Validate that the instance only contains allowed fields."""
-        allowed_keys = cls.__annotations__.keys()
-        extra_keys = set(instance.__dict__.keys()) - allowed_keys
+        allowed_keys = type(self).__annotations__.keys()
+        extra_keys = set(self.__dict__.keys()) - set(allowed_keys)
         if extra_keys:
             raise ValueError(f'Unexpected fields: {extra_keys}')
 
-
-@strawberry.input
-class UserSettingsInput(UserSettings):
-    """User settings input model. This is used for GraphQL input -> db methods"""
-
     def to_dict(self) -> dict:
-        """Convert UserSettingsInput to a dictionary with camelCase keys and enum values."""
+        """Convert UserSettings to a dictionary with camelCase keys and enum values."""
 
         def to_camel_case(s):
             parts = s.split('_')
@@ -52,7 +45,7 @@ class UserSettingsInput(UserSettings):
         }
 
     def to_db(self) -> str:
-        """Convert UserSettingsInput to a JSON string with camelCase keys and enum values."""
+        """Convert UserSettings to a JSON string with camelCase keys and enum values."""
         return json.dumps(self.to_dict())
 
 
@@ -63,20 +56,18 @@ class GraphQLUser:
     id: int
     email: str
     full_name: str | None
-    settings: UserSettings | None
+    settings: dict
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
     @staticmethod
     def from_internal(user: dict) -> 'GraphQLUser':
         """Convert from internal User model (db results) to GraphQLUser"""
-        settings = user.get('settings', {})
-
         return GraphQLUser(
             id=user['id'],
             email=user['email'],
             full_name=user['full_name'],
-            settings=UserSettings(**settings),
+            settings=user.get('settings', {}),
             created_at=user['created_at'],
             updated_at=user['updated_at'],
         )
