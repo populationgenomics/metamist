@@ -1,9 +1,9 @@
-import Papa from 'papaparse'
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Dropdown, Grid, Message } from 'semantic-ui-react'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
+import { exportTable } from '../../shared/utilities/exportTable'
 import {
     generateInvoiceMonths,
     getAdjustedDay,
@@ -243,64 +243,45 @@ const BillingCostByTime: React.FunctionComponent = () => {
     }, [start, end])
     /* eslint-enable react-hooks/exhaustive-deps */
 
-    const exportOptions = [
-        { key: 'csv', text: 'Export to CSV', value: 'csv' },
-        { key: 'tsv', text: 'Export to TSV', value: 'tsv' },
-    ]
-
     const exportToFile = (format: 'csv' | 'tsv') => {
-        // Prepare headers: first column "Topic", second "Cost Type", then each month
-        const allMonths = months.slice().sort()
-        const headers = ['Topic', 'Cost Type', ...allMonths]
+        const allMonths = [...months].sort()
+        const headerFields = ['Topic', 'Cost Type', ...allMonths]
 
-        // Prepare rows: for each topic, one row for compute and one row for storage, columns are months
-        const rows: any[] = []
+        const matrix: string[][] = []
+
         Object.keys(data)
             .sort((a, b) => a.localeCompare(b))
             .forEach((topic) => {
-                // Storage Cost row
-                const storageRow: any = {
-                    Topic: topic,
-                    'Cost Type': CloudSpendCategory.STORAGE_COST,
-                }
-                allMonths.forEach((month) => {
-                    storageRow[month] = (
-                        data[topic]?.[month]?.[CloudSpendCategory.STORAGE_COST] ?? 0
-                    ).toFixed(2)
-                })
-                rows.push(storageRow)
+                // Storage cost row
+                const storageRow: [string, CloudSpendCategory, ...string[]] = [
+                    topic,
+                    CloudSpendCategory.STORAGE_COST,
+                    ...allMonths.map((m) => {
+                        const val = data[topic]?.[m]?.[CloudSpendCategory.STORAGE_COST]
+                        return val === undefined ? '' : val.toFixed(2)
+                    }),
+                ]
+                matrix.push(storageRow)
 
-                // Compute Cost row
-                const computeRow: any = {
-                    Topic: topic,
-                    'Cost Type': CloudSpendCategory.COMPUTE_COST,
-                }
-                allMonths.forEach((month) => {
-                    computeRow[month] = (
-                        data[topic]?.[month]?.[CloudSpendCategory.COMPUTE_COST] ?? 0
-                    ).toFixed(2)
-                })
-                rows.push(computeRow)
+                const computeRow: [string, CloudSpendCategory, ...string[]] = [
+                    topic,
+                    CloudSpendCategory.COMPUTE_COST,
+                    ...allMonths.map((m) => {
+                        const val = data[topic]?.[m]?.[CloudSpendCategory.COMPUTE_COST]
+                        return val === undefined ? '' : val.toFixed(2)
+                    }),
+                ]
+                matrix.push(computeRow)
             })
 
-        // Convert to CSV/TSV using papaparse
-        const delimiter = format === 'csv' ? ',' : '\t'
-        const csvString = Papa.unparse(
+        exportTable(
             {
-                fields: headers,
-                data: rows.map((row) => headers.map((header) => row[header])),
+                headerFields,
+                matrix,
             },
-            { delimiter }
+            format,
+            'billing_data'
         )
-
-        // Download the file
-        const blob = new Blob([csvString], { type: 'text/' + format })
-        const a = document.createElement('a')
-        a.href = URL.createObjectURL(blob)
-        a.download = `billing_data.${format}`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
     }
 
     return (
@@ -321,10 +302,23 @@ const BillingCostByTime: React.FunctionComponent = () => {
                             floating
                             labeled
                             icon="download"
-                            options={exportOptions}
                             text="Export"
-                            onChange={(_, data) => exportToFile(data.value as 'csv' | 'tsv')}
-                        />
+                        >
+                            <Dropdown.Menu>
+                                <Dropdown.Item
+                                    key="csv"
+                                    text="Export to CSV"
+                                    icon="file excel"
+                                    onClick={() => exportToFile('csv')}
+                                />
+                                <Dropdown.Item
+                                    key="tsv"
+                                    text="Export to TSV"
+                                    icon="file text outline"
+                                    onClick={() => exportToFile('tsv')}
+                                />
+                            </Dropdown.Menu>
+                        </Dropdown>
                     </div>
                 </div>
 

@@ -6,6 +6,7 @@ import { DonutChart } from '../../shared/components/Graphs/DonutChart'
 import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
+import { exportTable } from '../../shared/utilities/exportTable'
 import { convertFieldName } from '../../shared/utilities/fieldName'
 import generateUrl from '../../shared/utilities/generateUrl'
 import { getMonthEndDate, getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
@@ -335,43 +336,28 @@ const BillingCostByTime: React.FunctionComponent = () => {
         }
     }, [start, end, groupBy, selectedData])
 
-    const exportOptions = [
-        { key: 'csv', text: 'Export to CSV', value: 'csv' },
-        { key: 'tsv', text: 'Export to TSV', value: 'tsv' },
-    ]
-
     const exportToFile = (format: 'csv' | 'tsv') => {
-        // Create header: Date plus group/column names
-        const headerData = ['Date', ...groups]
-
-        // Build rows: for each object in `data` (each date)
-        const rowData = data.map((row) => {
-            // Each `row` is { date, values }
-            const dateStr =
-                row.date instanceof Date ? row.date.toISOString().slice(0, 10) : String(row.date)
-
-            // Get values for each group, blank if not found
-            const vals = groups.map((group) =>
-                row.values[group] !== undefined && row.values[group] !== null
-                    ? Number(row.values[group]).toFixed(2)
-                    : ''
-            )
-
+        const headerFields = ['Date', ...groups]
+        const matrix = data.map((row) => {
+            const dateStr = row.date.toISOString().slice(0, 10)
+            const vals = groups.map((group) => {
+                const val = row.values[group]
+                if (typeof val === 'number') {
+                    // leave blank if value is exactly 0
+                    return val === 0 ? '' : Number(val).toFixed(2)
+                }
+                return ''
+            })
             return [dateStr, ...vals]
         })
-
-        // Compose file content
-        const separator = format === 'csv' ? ',' : '\t'
-        const fileData = [headerData, ...rowData].map((row) => row.join(separator)).join('\n')
-        const blob = new Blob([fileData], { type: `text/${format}` })
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        const fileName = `billing_cost_by_time.${format}`
-        link.setAttribute('download', fileName)
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
+        exportTable(
+            {
+                headerFields,
+                matrix,
+            },
+            format,
+            'billing_cost_by_time'
+        )
     }
 
     return (
@@ -392,10 +378,23 @@ const BillingCostByTime: React.FunctionComponent = () => {
                             floating
                             labeled
                             icon="download"
-                            options={exportOptions}
                             text="Export"
-                            onChange={(_, data) => exportToFile(data.value as 'csv' | 'tsv')}
-                        />
+                        >
+                            <Dropdown.Menu>
+                                <Dropdown.Item
+                                    key="csv"
+                                    text="Export to CSV"
+                                    icon="file excel"
+                                    onClick={() => exportToFile('csv')}
+                                />
+                                <Dropdown.Item
+                                    key="tsv"
+                                    text="Export to TSV"
+                                    icon="file text outline"
+                                    onClick={() => exportToFile('tsv')}
+                                />
+                            </Dropdown.Menu>
+                        </Dropdown>
                     </div>
                 </div>
 
