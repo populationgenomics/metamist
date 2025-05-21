@@ -336,44 +336,42 @@ const BillingCostByTime: React.FunctionComponent = () => {
     }, [start, end, groupBy, selectedData])
 
     const exportOptions = [
-            { key: 'csv', text: 'Export to CSV', value: 'csv' },
-            { key: 'tsv', text: 'Export to TSV', value: 'tsv' },
-        ]
+        { key: 'csv', text: 'Export to CSV', value: 'csv' },
+        { key: 'tsv', text: 'Export to TSV', value: 'tsv' },
+    ]
 
     const exportToFile = (format: 'csv' | 'tsv') => {
         // Create header: Date plus group/column names
-        const headerData = ["Date", ...groups];
+        const headerData = ['Date', ...groups]
 
         // Build rows: for each object in `data` (each date)
         const rowData = data.map((row) => {
             // Each `row` is { date, values }
             const dateStr =
-                row.date instanceof Date ? row.date.toISOString().slice(0, 10) : String(row.date);
+                row.date instanceof Date ? row.date.toISOString().slice(0, 10) : String(row.date)
 
             // Get values for each group, blank if not found
             const vals = groups.map((group) =>
                 row.values[group] !== undefined && row.values[group] !== null
                     ? Number(row.values[group]).toFixed(2)
-                    : ""
-            );
+                    : ''
+            )
 
-            return [dateStr, ...vals];
-        });
+            return [dateStr, ...vals]
+        })
 
         // Compose file content
-        const separator = format === "csv" ? "," : "\t";
-        const fileData = [headerData, ...rowData]
-            .map((row) => row.join(separator))
-            .join("\n");
-        const blob = new Blob([fileData], { type: `text/${format}` });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        const fileName = `billing_cost_by_time.${format}`;
-        link.setAttribute("download", fileName);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const separator = format === 'csv' ? ',' : '\t'
+        const fileData = [headerData, ...rowData].map((row) => row.join(separator)).join('\n')
+        const blob = new Blob([fileData], { type: `text/${format}` })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        const fileName = `billing_cost_by_time.${format}`
+        link.setAttribute('download', fileName)
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
     }
 
     return (

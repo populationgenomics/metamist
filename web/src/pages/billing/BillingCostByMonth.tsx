@@ -1,3 +1,4 @@
+import Papa from 'papaparse'
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Dropdown, Grid, Message } from 'semantic-ui-react'
@@ -20,7 +21,6 @@ import {
 } from '../../sm-api'
 import BillingCostByMonthTable from './components/BillingCostByMonthTable'
 import FieldSelector from './components/FieldSelector'
-import Papa from 'papaparse'
 
 enum CloudSpendCategory {
     STORAGE_COST = 'Storage Cost',
@@ -250,44 +250,57 @@ const BillingCostByTime: React.FunctionComponent = () => {
 
     const exportToFile = (format: 'csv' | 'tsv') => {
         // Prepare headers: first column "Topic", second "Cost Type", then each month
-        const allMonths = months.slice().sort();
-        const headers = ["Topic", "Cost Type", ...allMonths];
+        const allMonths = months.slice().sort()
+        const headers = ['Topic', 'Cost Type', ...allMonths]
 
         // Prepare rows: for each topic, one row for compute and one row for storage, columns are months
-        const rows: any[] = [];
+        const rows: any[] = []
         Object.keys(data)
             .sort((a, b) => a.localeCompare(b))
-            .forEach(topic => {
+            .forEach((topic) => {
                 // Storage Cost row
-                const storageRow: any = { "Topic": topic, "Cost Type": CloudSpendCategory.STORAGE_COST };
-                allMonths.forEach(month => {
-                    storageRow[month] = (data[topic]?.[month]?.[CloudSpendCategory.STORAGE_COST] ?? 0).toFixed(2);
-                });
-                rows.push(storageRow);
+                const storageRow: any = {
+                    Topic: topic,
+                    'Cost Type': CloudSpendCategory.STORAGE_COST,
+                }
+                allMonths.forEach((month) => {
+                    storageRow[month] = (
+                        data[topic]?.[month]?.[CloudSpendCategory.STORAGE_COST] ?? 0
+                    ).toFixed(2)
+                })
+                rows.push(storageRow)
 
                 // Compute Cost row
-                const computeRow: any = { "Topic": topic, "Cost Type": CloudSpendCategory.COMPUTE_COST };
-                allMonths.forEach(month => {
-                    computeRow[month] = (data[topic]?.[month]?.[CloudSpendCategory.COMPUTE_COST] ?? 0).toFixed(2);
-                });
-                rows.push(computeRow);
-            });
+                const computeRow: any = {
+                    Topic: topic,
+                    'Cost Type': CloudSpendCategory.COMPUTE_COST,
+                }
+                allMonths.forEach((month) => {
+                    computeRow[month] = (
+                        data[topic]?.[month]?.[CloudSpendCategory.COMPUTE_COST] ?? 0
+                    ).toFixed(2)
+                })
+                rows.push(computeRow)
+            })
 
         // Convert to CSV/TSV using papaparse
-        const delimiter = format === 'csv' ? "," : "\t";
-        const csvString = Papa.unparse({
-            fields: headers,
-            data: rows.map(row => headers.map(header => row[header]))
-        }, { delimiter });
+        const delimiter = format === 'csv' ? ',' : '\t'
+        const csvString = Papa.unparse(
+            {
+                fields: headers,
+                data: rows.map((row) => headers.map((header) => row[header])),
+            },
+            { delimiter }
+        )
 
         // Download the file
-        const blob = new Blob([csvString], { type: "text/" + format });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `billing_data.${format}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        const blob = new Blob([csvString], { type: 'text/' + format })
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(blob)
+        a.download = `billing_data.${format}`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
     }
 
     return (
