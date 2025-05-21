@@ -253,9 +253,9 @@ const BillingCostByTime: React.FunctionComponent = () => {
             .sort((a, b) => a.localeCompare(b))
             .forEach((topic) => {
                 // Storage cost row
-                const storageRow: [string, CloudSpendCategory, ...string[]] = [
+                const storageRow: [string, string, ...string[]] = [
                     topic,
-                    CloudSpendCategory.STORAGE_COST,
+                    CloudSpendCategory.STORAGE_COST.toString(),
                     ...allMonths.map((m) => {
                         const val = data[topic]?.[m]?.[CloudSpendCategory.STORAGE_COST]
                         return val === undefined ? '' : val.toFixed(2)
@@ -263,9 +263,9 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 ]
                 matrix.push(storageRow)
 
-                const computeRow: [string, CloudSpendCategory, ...string[]] = [
+                const computeRow: [string, string, ...string[]] = [
                     topic,
-                    CloudSpendCategory.COMPUTE_COST,
+                    CloudSpendCategory.COMPUTE_COST.toString(),
                     ...allMonths.map((m) => {
                         const val = data[topic]?.[m]?.[CloudSpendCategory.COMPUTE_COST]
                         return val === undefined ? '' : val.toFixed(2)
@@ -280,7 +280,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 matrix,
             },
             format,
-            'billing_data'
+            'billing_cost_by_month'
         )
     }
 
