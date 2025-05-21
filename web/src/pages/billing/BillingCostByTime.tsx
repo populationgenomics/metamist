@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, DropdownProps, Grid, Input, Message } from 'semantic-ui-react'
+import { Button, Card, Dropdown, DropdownProps, Grid, Input, Message } from 'semantic-ui-react'
 import { BarChart, IData } from '../../shared/components/Graphs/BarChart'
 import { DonutChart } from '../../shared/components/Graphs/DonutChart'
 import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
@@ -335,16 +335,71 @@ const BillingCostByTime: React.FunctionComponent = () => {
         }
     }, [start, end, groupBy, selectedData])
 
+    const exportOptions = [
+            { key: 'csv', text: 'Export to CSV', value: 'csv' },
+            { key: 'tsv', text: 'Export to TSV', value: 'tsv' },
+        ]
+
+    const exportToFile = (format: 'csv' | 'tsv') => {
+        // Create header: Date plus group/column names
+        const headerData = ["Date", ...groups];
+
+        // Build rows: for each object in `data` (each date)
+        const rowData = data.map((row) => {
+            // Each `row` is { date, values }
+            const dateStr =
+                row.date instanceof Date ? row.date.toISOString().slice(0, 10) : String(row.date);
+
+            // Get values for each group, blank if not found
+            const vals = groups.map((group) =>
+                row.values[group] !== undefined && row.values[group] !== null
+                    ? Number(row.values[group]).toFixed(2)
+                    : ""
+            );
+
+            return [dateStr, ...vals];
+        });
+
+        // Compose file content
+        const separator = format === "csv" ? "," : "\t";
+        const fileData = [headerData, ...rowData]
+            .map((row) => row.join(separator))
+            .join("\n");
+        const blob = new Blob([fileData], { type: `text/${format}` });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        const fileName = `billing_cost_by_time.${format}`;
+        link.setAttribute("download", fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
     return (
         <PaddedPage>
             <Card fluid style={{ padding: '20px' }} id="billing-container">
-                <h1
-                    style={{
-                        fontSize: 40,
-                    }}
-                >
-                    Billing Cost By Time
-                </h1>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <h1
+                        style={{
+                            fontSize: 40,
+                        }}
+                    >
+                        Billing Cost By Time
+                    </h1>
+                    <div style={{ textAlign: 'right' }}>
+                        <Dropdown
+                            button
+                            className="icon"
+                            floating
+                            labeled
+                            icon="download"
+                            options={exportOptions}
+                            text="Export"
+                            onChange={(_, data) => exportToFile(data.value as 'csv' | 'tsv')}
+                        />
+                    </div>
+                </div>
 
                 <Grid columns="equal" stackable doubling>
                     <Grid.Column>

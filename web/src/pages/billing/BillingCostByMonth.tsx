@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Grid, Message } from 'semantic-ui-react'
+import { Button, Card, Dropdown, Grid, Message } from 'semantic-ui-react'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import {
@@ -20,6 +20,7 @@ import {
 } from '../../sm-api'
 import BillingCostByMonthTable from './components/BillingCostByMonthTable'
 import FieldSelector from './components/FieldSelector'
+import Papa from 'papaparse'
 
 enum CloudSpendCategory {
     STORAGE_COST = 'Storage Cost',
@@ -242,16 +243,77 @@ const BillingCostByTime: React.FunctionComponent = () => {
     }, [start, end])
     /* eslint-enable react-hooks/exhaustive-deps */
 
+    const exportOptions = [
+        { key: 'csv', text: 'Export to CSV', value: 'csv' },
+        { key: 'tsv', text: 'Export to TSV', value: 'tsv' },
+    ]
+
+    const exportToFile = (format: 'csv' | 'tsv') => {
+        // Prepare headers: first column "Topic", second "Cost Type", then each month
+        const allMonths = months.slice().sort();
+        const headers = ["Topic", "Cost Type", ...allMonths];
+
+        // Prepare rows: for each topic, one row for compute and one row for storage, columns are months
+        const rows: any[] = [];
+        Object.keys(data)
+            .sort((a, b) => a.localeCompare(b))
+            .forEach(topic => {
+                // Storage Cost row
+                const storageRow: any = { "Topic": topic, "Cost Type": CloudSpendCategory.STORAGE_COST };
+                allMonths.forEach(month => {
+                    storageRow[month] = (data[topic]?.[month]?.[CloudSpendCategory.STORAGE_COST] ?? 0).toFixed(2);
+                });
+                rows.push(storageRow);
+
+                // Compute Cost row
+                const computeRow: any = { "Topic": topic, "Cost Type": CloudSpendCategory.COMPUTE_COST };
+                allMonths.forEach(month => {
+                    computeRow[month] = (data[topic]?.[month]?.[CloudSpendCategory.COMPUTE_COST] ?? 0).toFixed(2);
+                });
+                rows.push(computeRow);
+            });
+
+        // Convert to CSV/TSV using papaparse
+        const delimiter = format === 'csv' ? "," : "\t";
+        const csvString = Papa.unparse({
+            fields: headers,
+            data: rows.map(row => headers.map(header => row[header]))
+        }, { delimiter });
+
+        // Download the file
+        const blob = new Blob([csvString], { type: "text/" + format });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `billing_data.${format}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
     return (
         <PaddedPage>
             <Card fluid style={{ padding: '20px' }} id="billing-container">
-                <h1
-                    style={{
-                        fontSize: 40,
-                    }}
-                >
-                    Cost Across Invoice Months (Topic only)
-                </h1>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <h1
+                        style={{
+                            fontSize: 40,
+                        }}
+                    >
+                        Cost Across Invoice Months (Topic only)
+                    </h1>
+                    <div style={{ textAlign: 'right' }}>
+                        <Dropdown
+                            button
+                            className="icon"
+                            floating
+                            labeled
+                            icon="download"
+                            options={exportOptions}
+                            text="Export"
+                            onChange={(_, data) => exportToFile(data.value as 'csv' | 'tsv')}
+                        />
+                    </div>
+                </div>
 
                 <Grid columns="equal" stackable doubling>
                     <Grid.Column className="field-selector-label">

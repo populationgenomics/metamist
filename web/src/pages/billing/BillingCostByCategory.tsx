@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Checkbox, Grid, Input, Message } from 'semantic-ui-react'
+import { Button, Card, Checkbox, Dropdown, Grid, Input, Message } from 'semantic-ui-react'
 import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import { convertFieldName } from '../../shared/utilities/fieldName'
@@ -198,16 +198,83 @@ const BillingCostByCategory: React.FunctionComponent = () => {
         )
     }
 
+    const exportOptions = [
+        { key: 'csv', text: 'Export to CSV', value: 'csv' },
+        { key: 'tsv', text: 'Export to TSV', value: 'tsv' },
+    ]
+
+    const exportToFile = (format: 'csv' | 'tsv') => {
+        // 1. Collect all dates (columns) and all SKUs (rows)
+        const dateSet: Set<string> = new Set();
+        const skuSet: Set<string> = new Set();
+        data.forEach((row) => {
+            const dateStr = row.date instanceof Date ? row.date.toISOString().slice(0, 10) : String(row.date);
+            dateSet.add(dateStr);
+            Object.keys(row.values).forEach((sku) => {
+                skuSet.add(sku);
+            });
+        });
+        const dates = Array.from(dateSet).sort();
+        const skus = Array.from(skuSet).sort();
+
+        // 2. Build header and rows (SKUs as rows, dates as columns)
+        const headerData = ["SKU", ...dates];
+        const rowData = skus.map((sku) => {
+            const costsForSku = dates.map(date => {
+                // Find the data row for the date
+                const rowForDate = data.find(row => {
+                  const d = row.date instanceof Date ? row.date.toISOString().slice(0, 10) : String(row.date);
+                  return d === date;
+                });
+                if (rowForDate && rowForDate.values[sku] !== undefined && rowForDate.values[sku] !== null) {
+                    return Number(rowForDate.values[sku]).toFixed(2);
+                } else {
+                    return "";
+                }
+            });
+            return [sku, ...costsForSku];
+        });
+
+        // 3. Compose file content
+        const separator = format === "csv" ? "," : "\t";
+        const fileData = [headerData, ...rowData]
+            .map((row) => row.join(separator))
+            .join("\n");
+        const blob = new Blob([fileData], { type: `text/${format}` });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        const fileName = `billing_cost_by_category.${format}`;
+        link.setAttribute("download", fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
     return (
         <>
             <Card fluid style={{ padding: '20px' }} id="billing-container">
-                <h1
-                    style={{
-                        fontSize: 40,
-                    }}
-                >
-                    Billing Cost By Category
-                </h1>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <h1
+                        style={{
+                            fontSize: 40,
+                        }}
+                    >
+                        Billing Cost By Category
+                    </h1>
+                    <div style={{ textAlign: 'right' }}>
+                        <Dropdown
+                            button
+                            className="icon"
+                            floating
+                            labeled
+                            icon="download"
+                            options={exportOptions}
+                            text="Export"
+                            onChange={(_, data) => exportToFile(data.value as 'csv' | 'tsv')}
+                        />
+                    </div>
+                </div>
 
                 <Grid stackable doubling>
                     <Grid.Column width={4}>
