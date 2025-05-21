@@ -12,6 +12,7 @@
         "@mui/material": "^6.1.6",
         "@mui/x-data-grid": "^7.22.2",
         "@observablehq/plot": "^0.6.16",
+        "@types/papaparse": "^5.3.16",
         "arquero": "^7.2.0",
         "axios": "^0.24.0",
         "common-tags": "^1.8.2",
