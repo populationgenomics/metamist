@@ -1,8 +1,9 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Grid, Message } from 'semantic-ui-react'
+import { Button, Card, Dropdown, Grid, Message } from 'semantic-ui-react'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
+import { exportTable } from '../../shared/utilities/exportTable'
 import {
     generateInvoiceMonths,
     getAdjustedDay,
@@ -242,16 +243,84 @@ const BillingCostByTime: React.FunctionComponent = () => {
     }, [start, end])
     /* eslint-enable react-hooks/exhaustive-deps */
 
+    const exportToFile = (format: 'csv' | 'tsv') => {
+        const allMonths = [...months].sort()
+        const headerFields = ['Topic', 'Cost Type', ...allMonths]
+
+        const matrix: string[][] = []
+
+        Object.keys(data)
+            .sort((a, b) => a.localeCompare(b))
+            .forEach((topic) => {
+                // Storage cost row
+                const storageRow: [string, string, ...string[]] = [
+                    topic,
+                    CloudSpendCategory.STORAGE_COST.toString(),
+                    ...allMonths.map((m) => {
+                        const val = data[topic]?.[m]?.[CloudSpendCategory.STORAGE_COST]
+                        return val === undefined ? '' : val.toFixed(2)
+                    }),
+                ]
+                matrix.push(storageRow)
+
+                const computeRow: [string, string, ...string[]] = [
+                    topic,
+                    CloudSpendCategory.COMPUTE_COST.toString(),
+                    ...allMonths.map((m) => {
+                        const val = data[topic]?.[m]?.[CloudSpendCategory.COMPUTE_COST]
+                        return val === undefined ? '' : val.toFixed(2)
+                    }),
+                ]
+                matrix.push(computeRow)
+            })
+
+        exportTable(
+            {
+                headerFields,
+                matrix,
+            },
+            format,
+            'billing_cost_by_month'
+        )
+    }
+
     return (
         <PaddedPage>
             <Card fluid style={{ padding: '20px' }} id="billing-container">
-                <h1
-                    style={{
-                        fontSize: 40,
-                    }}
-                >
-                    Cost Across Invoice Months (Topic only)
-                </h1>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <h1
+                        style={{
+                            fontSize: 40,
+                        }}
+                    >
+                        Cost Across Invoice Months (Topic only)
+                    </h1>
+                    <div style={{ textAlign: 'right' }}>
+                        <Dropdown
+                            button
+                            className="icon"
+                            floating
+                            labeled
+                            icon="download"
+                            text="Export"
+                        >
+                            <Dropdown.Menu>
+                                <Dropdown.Item
+                                    key="csv"
+                                    text="Export to CSV"
+                                    icon="file excel"
+                                    onClick={() => exportToFile('csv')}
+                                />
+                                <Dropdown.Item
+                                    key="tsv"
+                                    text="Export to TSV"
+                                    icon="file text outline"
+                                    onClick={() => exportToFile('tsv')}
+                                />
+                            </Dropdown.Menu>
+                        </Dropdown>
+                    </div>
+                </div>
 
                 <Grid columns="equal" stackable doubling>
                     <Grid.Column className="field-selector-label">

@@ -1,11 +1,12 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, DropdownProps, Grid, Input, Message } from 'semantic-ui-react'
+import { Button, Card, Dropdown, DropdownProps, Grid, Input, Message } from 'semantic-ui-react'
 import { BarChart, IData } from '../../shared/components/Graphs/BarChart'
 import { DonutChart } from '../../shared/components/Graphs/DonutChart'
 import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
+import { exportTable } from '../../shared/utilities/exportTable'
 import { convertFieldName } from '../../shared/utilities/fieldName'
 import generateUrl from '../../shared/utilities/generateUrl'
 import { getMonthEndDate, getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
@@ -335,16 +336,67 @@ const BillingCostByTime: React.FunctionComponent = () => {
         }
     }, [start, end, groupBy, selectedData])
 
+    const exportToFile = (format: 'csv' | 'tsv') => {
+        const headerFields = ['Date', ...groups]
+        const matrix = data.map((row) => {
+            const dateStr = row.date.toISOString().slice(0, 10)
+            const vals = groups.map((group) => {
+                const val = row.values[group]
+                if (typeof val === 'number') {
+                    // leave blank if value is exactly 0
+                    return val === 0 ? '' : Number(val).toFixed(2)
+                }
+                return ''
+            })
+            return [dateStr, ...vals]
+        })
+        exportTable(
+            {
+                headerFields,
+                matrix,
+            },
+            format,
+            'billing_cost_by_time'
+        )
+    }
+
     return (
         <PaddedPage>
             <Card fluid style={{ padding: '20px' }} id="billing-container">
-                <h1
-                    style={{
-                        fontSize: 40,
-                    }}
-                >
-                    Billing Cost By Time
-                </h1>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <h1
+                        style={{
+                            fontSize: 40,
+                        }}
+                    >
+                        Billing Cost By Time
+                    </h1>
+                    <div style={{ textAlign: 'right' }}>
+                        <Dropdown
+                            button
+                            className="icon"
+                            floating
+                            labeled
+                            icon="download"
+                            text="Export"
+                        >
+                            <Dropdown.Menu>
+                                <Dropdown.Item
+                                    key="csv"
+                                    text="Export to CSV"
+                                    icon="file excel"
+                                    onClick={() => exportToFile('csv')}
+                                />
+                                <Dropdown.Item
+                                    key="tsv"
+                                    text="Export to TSV"
+                                    icon="file text outline"
+                                    onClick={() => exportToFile('tsv')}
+                                />
+                            </Dropdown.Menu>
+                        </Dropdown>
+                    </div>
+                </div>
 
                 <Grid columns="equal" stackable doubling>
                     <Grid.Column>
