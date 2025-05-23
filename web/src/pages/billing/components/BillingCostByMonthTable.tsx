@@ -63,7 +63,7 @@ const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
     return (
         <>
             <Header as="h3">
-                SUM of Cost (AUD) By Topic from {start} to {end}
+                SUM of Cost in AUD (excluding GST) By Topic from {start} to {end}
             </Header>
             <Table celled compact sortable selectable>
                 <SUITable.Header>

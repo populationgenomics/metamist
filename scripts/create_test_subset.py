@@ -95,7 +95,6 @@ QUERY_ALL_DATA = gql(
     """
 )
 
-# TODO: We can change this to filter external sample ids
 EXISTING_DATA_QUERY = gql(
     """
     query getExistingData($project: String!) {
@@ -111,7 +110,7 @@ EXISTING_DATA_QUERY = gql(
                         meta
                         type
                     }
-                    analyses {
+                    analyses(project: {eq: $project}) {
                         id
                         type
                     }

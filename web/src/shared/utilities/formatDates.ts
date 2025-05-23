@@ -24,8 +24,8 @@ const generateInvoiceMonths = (start: string, end: string): string[] => {
     const yearStart = parseInt(start.substring(0, 4))
     const yearEnd = parseInt(end.substring(0, 4))
 
-    const mthStart = parseInt(start.substring(4, 6))
-    const mthEnd = parseInt(end.substring(4, 6))
+    const mthStart = start.substring(4, 6).padStart(2, '0')
+    const mthEnd = end.substring(4, 6).padStart(2, '0')
 
     const dateStart = new Date(yearStart + '-' + mthStart + '-01')
     const dateEnd = new Date(yearEnd + '-' + mthEnd + '-01')
