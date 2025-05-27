@@ -226,9 +226,7 @@ const BillingCurrentCost = () => {
             return row
         })
 
-        const fileName = `billing-costs-${groupBy}-${invoiceMonth}`
-
-        exportTable({ headerFields, matrix }, format, fileName)
+        exportTable({ headerFields, matrix }, format, 'billing-cost-by-invoice-month')
     }
 
     return (
