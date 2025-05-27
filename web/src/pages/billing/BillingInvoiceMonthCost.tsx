@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import {
     Button,
     Checkbox,
+    Dropdown,
     DropdownProps,
     Grid,
     Message,
@@ -12,6 +13,7 @@ import {
 import { HorizontalStackedBarChart } from '../../shared/components/Graphs/HorizontalStackedBarChart'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import Table from '../../shared/components/Table'
+import { exportTable } from '../../shared/utilities/exportTable'
 import { convertFieldName } from '../../shared/utilities/fieldName'
 import formatMoney from '../../shared/utilities/formatMoney'
 import generateUrl from '../../shared/utilities/generateUrl'
@@ -198,6 +200,35 @@ const BillingCurrentCost = () => {
         return `/billing/costByTime?groupBy=${groupBy}&selectedData=${data}&start=${startDate}&end=${endDate}`
     }
 
+    const exportToFile = (format: 'csv' | 'tsv') => {
+        // Filter out just the columns actually shown
+        const visibleFields = HEADER_FIELDS.filter(
+            (k) => k.show_always || invoiceMonth === thisMonth
+        )
+        const headerFields: string[] = visibleFields.map((k) => convertFieldName(k.category))
+        // Add Budget % spend if it should be shown
+        const budgetSpendVisible =
+            groupBy === BillingColumn.GcpProject && invoiceMonth === thisMonth
+        if (budgetSpendVisible) headerFields.push('Budget Spend %')
+
+        // Prepare 2D matrix of data strings
+        const matrix = costRecords.map((rec) => {
+            const row = visibleFields.map((k) =>
+                k.category === 'field'
+                    ? String(rec[k.category] ?? '')
+                    : formatMoney(
+                          (rec as unknown as Record<string, number | undefined>)[k.category] ?? 0
+                      )
+            )
+            if (budgetSpendVisible) {
+                row.push(percFormat(rec.budget_spent))
+            }
+            return row
+        })
+
+        exportTable({ headerFields, matrix }, format, 'billing-cost-by-invoice-month')
+    }
+
     return (
         <>
             <h1>Cost By Invoice Month</h1>
@@ -228,6 +259,31 @@ const BillingCurrentCost = () => {
                         checked={showAsChart}
                         onChange={() => setShowAsChart(!showAsChart)}
                     />
+                </Grid.Column>
+                <Grid.Column textAlign="right">
+                    <Dropdown
+                        button
+                        className="icon"
+                        floating
+                        labeled
+                        icon="download"
+                        text="Export"
+                    >
+                        <Dropdown.Menu>
+                            <Dropdown.Item
+                                key="csv"
+                                text="Export to CSV"
+                                icon="file excel"
+                                onClick={() => exportToFile('csv')}
+                            />
+                            <Dropdown.Item
+                                key="tsv"
+                                text="Export to TSV"
+                                icon="file text outline"
+                                onClick={() => exportToFile('tsv')}
+                            />
+                        </Dropdown.Menu>
+                    </Dropdown>
                 </Grid.Column>
             </Grid>
 
