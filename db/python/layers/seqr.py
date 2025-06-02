@@ -61,6 +61,7 @@ _url_update_es_index = '/api/project/sa/{projectGuid}/add_dataset/variants'
 _url_update_saved_variants = '/api/project/sa/{projectGuid}/saved_variant/update'
 _url_igv_diff = '/api/project/sa/{projectGuid}/igv/diff'
 _url_igv_individual_update = '/api/individual/sa/{individualGuid}/igv/update'
+_url_families_guid_map = '/api/project/sa/{projectGuid}/families/mapping'
 
 T = TypeVar('T')
 
@@ -759,6 +760,37 @@ class SeqrLayer(BaseLayer):
             }
 
         return list(map(process_row, json_rows))
+
+    async def get_family_guid_map(
+        self,
+        sequencing_type: str,
+    ) -> dict[str, str]:
+        """Get family GUID map from seqr"""
+        token = self.generate_seqr_auth_token()
+        project = self.connection.project
+        assert project
+
+        project_guid = (
+            project.meta.get(self.get_meta_key_from_sequencing_type(sequencing_type))
+            if project.meta
+            else None
+        )
+
+        if not project_guid:
+            raise ValueError(
+                f'The project {project.name} does NOT have an appropriate seqr '
+                f'project attached for {sequencing_type}'
+            )
+        headers = ({'Authorization': f'Bearer {token}'},)
+
+        req_url = SEQR_URL + _url_families_guid_map.format(projectGuid=project_guid)
+
+        async with aiohttp.ClientSession() as session:
+            # Get family GUID map from seqr
+            resp = await session.get(req_url, headers=headers)
+            resp.raise_for_status()
+            response = await resp.json()
+            return response.get('familyGuidById', {})
 
     def send_slack_notification(
         self,
