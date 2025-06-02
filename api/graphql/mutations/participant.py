@@ -41,6 +41,7 @@ class ParticipantUpsertInput:
     reported_gender: str | None = None
     karyotype: str | None = None
     meta: strawberry.scalars.JSON | None = None
+    phenotypes: strawberry.scalars.JSON | None = None
 
     samples: list[SampleUpsertInput] | None = None
 

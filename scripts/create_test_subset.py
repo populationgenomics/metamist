@@ -95,7 +95,6 @@ QUERY_ALL_DATA = gql(
     """
 )
 
-# TODO: We can change this to filter external sample ids
 EXISTING_DATA_QUERY = gql(
     """
     query getExistingData($project: String!) {
@@ -111,7 +110,7 @@ EXISTING_DATA_QUERY = gql(
                         meta
                         type
                     }
-                    analyses {
+                    analyses(project: {eq: $project}) {
                         id
                         type
                     }
@@ -976,7 +975,8 @@ def main_file_commands(batch, job, old_path: str, new_path: str, sid: tuple[str,
             new_file={'main': '{root}.cram', 'crai': '{root}.cram.crai'}
         )
         job.command(rf"""
-            samtools reheader --no-PG --in-place --command 'sed /^@RG/s/\<SM:{sid[0]}\>/SM:{sid[1]}/g' {old_file}
+            samtools head {old_file} | sed '/^@RG/s/\<SM:{sid[0]}\>/SM:{sid[1]}/g' > $BATCH_TMPDIR/header.txt
+            samtools reheader --no-PG --in-place $BATCH_TMPDIR/header.txt {old_file}
             mv {old_file} {job.new_file.main}
         """)
         batch.write_output(job.new_file.main, new_path)
