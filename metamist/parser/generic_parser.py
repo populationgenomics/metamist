@@ -56,6 +56,7 @@ logger.setLevel(logging.INFO)
 PRIMARY_EXTERNAL_ORG = ''
 
 FASTQ_EXTENSIONS = ('.fq.gz', '.fastq.gz', '.fq', '.fastq')
+FASTQ_ORA_EXTENSIONS = ('.fq.ora', '.fastq.ora')
 BAM_EXTENSIONS = ('.bam',)
 CRAM_EXTENSIONS = ('.cram',)
 GVCF_EXTENSIONS = ('.g.vcf.gz',)
@@ -64,6 +65,7 @@ READS_EXTENSIONS = FASTQ_EXTENSIONS + CRAM_EXTENSIONS + BAM_EXTENSIONS
 
 ALL_EXTENSIONS = (
     FASTQ_EXTENSIONS
+    + FASTQ_ORA_EXTENSIONS
     + CRAM_EXTENSIONS
     + BAM_EXTENSIONS
     + GVCF_EXTENSIONS
@@ -75,7 +77,7 @@ RNA_SEQ_TYPES = ['polyarna', 'totalrna', 'singlecellrna']
 rmatch_str = (
     r'(?:[<>]|\/|_|\.|-|[0-9]|[a-z]|[A-Z])+'
     + r'(?=[_|-]([12]|R[12])?(_[0-9]*?)?('
-    + '|'.join(s.replace('.', '\\.') for s in FASTQ_EXTENSIONS)
+    + '|'.join(s.replace('.', '\\.') for s in (FASTQ_EXTENSIONS+FASTQ_ORA_EXTENSIONS))
     + '$))'
 )
 rmatch = re.compile(rmatch_str)
@@ -1315,7 +1317,27 @@ class GenericParser(
 
             grouped_fastqs = list(await asyncio.gather(*fastq_files))  # type: ignore
             file_by_type['reads']['fastq'].extend(grouped_fastqs)
+        fastq_oras = [
+            r
+            for r in _reads
+            if any(r.lower().endswith(ext) for ext in FASTQ_ORA_EXTENSIONS)
+        ]
+        if fastq_oras:
+            
+            # TODO if not ora ref, fail
+            
+            structured_fastq_oras = self.parse_fastqs_structure(fastq_oras)
+            fastq_ora_files: List[Sequence[Union[Coroutine, BaseException]]] = []  # type: ignore
+            for fastq_ora_group in structured_fastq_oras:
+                create_file_futures: List[Coroutine] = [
+                    self.create_file_object(f, checksum=read_to_checksum.get(f))
+                    for f in fastq_ora_group
+                ]
+                fastq_ora_files.append(asyncio.gather(*create_file_futures))  # type: ignore
 
+            grouped_fastq_oras = list(await asyncio.gather(*fastq_ora_files))  # type: ignore
+            file_by_type['reads']['fastq_ora'].extend(grouped_fastq_oras)
+        
         crams = [
             r for r in _reads if any(r.lower().endswith(ext) for ext in CRAM_EXTENSIONS)
         ]

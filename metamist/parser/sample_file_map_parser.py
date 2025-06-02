@@ -103,6 +103,7 @@ class SampleFileMapParser(GenericMetadataParser):
         default_read_length: str | int = None,
         allow_extra_files_in_search_path=False,
         default_reference_assembly_location: str | None = None,
+        ora_reference_assembly_location: str | None = None,
         verbose=True,
         **kwargs,
     ):
@@ -123,6 +124,7 @@ class SampleFileMapParser(GenericMetadataParser):
             default_read_end_type=default_read_end_type,
             default_read_length=default_read_length,
             default_reference_assembly_location=default_reference_assembly_location,
+            ora_reference_assembly_location=ora_reference_assembly_location,
             allow_extra_files_in_search_path=allow_extra_files_in_search_path,
             key_map=KeyMap,
             verbose=verbose,
@@ -166,6 +168,14 @@ class SampleFileMapParser(GenericMetadataParser):
     ),
 )
 @click.option(
+    '--default-ora-reference-assembly',
+    required=False,
+    help=(
+        'ORA compressed fastqs require a reference assembly to realign. '
+        'This must be provided if any of the reads are ORA compressed fastqs'
+    ),
+)
+@click.option(
     '--search-path',
     multiple=True,
     required=True,
@@ -199,6 +209,7 @@ async def main(  # pylint: disable=too-many-arguments
     default_read_end_type: str = None,
     default_read_length: str = None,
     default_reference_assembly: str = None,
+    default_ora_reference_assembly: str = None,
     allow_extra_files_in_search_path=False,
     confirm=False,
     dry_run=False,
@@ -225,6 +236,7 @@ async def main(  # pylint: disable=too-many-arguments
         default_read_end_type=default_read_end_type,
         default_read_length=default_read_length,
         default_reference_assembly_location=default_reference_assembly,
+        ora_reference_assembly_location=default_ora_reference_assembly,
         search_locations=search_path,
         allow_extra_files_in_search_path=allow_extra_files_in_search_path,
         verbose=verbose,
