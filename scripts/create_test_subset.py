@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=too-many-instance-attributes,too-many-locals
+# pylint: disable=too-many-instance-attributes,too-many-lines,too-many-locals
 
 """ Example Invocation
 
@@ -16,13 +16,16 @@ import logging
 import os
 import random
 import subprocess
-from argparse import ArgumentParser
+from argparse import ArgumentParser, BooleanOptionalAction
 from collections import Counter
 from typing import Any, Tuple
 
 from google.cloud import storage
 
-from metamist.apis import AnalysisApi, AssayApi, FamilyApi, ParticipantApi, SampleApi
+from cpg_utils.config import image_path
+from cpg_utils.hail_batch import get_batch
+
+from metamist.apis import AnalysisApi, FamilyApi, ParticipantApi, SampleApi
 from metamist.graphql import gql, query
 from metamist.models import (
     Analysis,
@@ -39,11 +42,12 @@ logger.setLevel(logging.INFO)
 
 sapi = SampleApi()
 aapi = AnalysisApi()
-assayapi = AssayApi()
 fapi = FamilyApi()
 papi = ParticipantApi()
 
 DEFAULT_SAMPLES_N = 10
+
+PRIMARY_EXTERNAL_ORG = ''
 
 QUERY_ALL_DATA = gql(
     """
@@ -91,7 +95,6 @@ QUERY_ALL_DATA = gql(
     """
 )
 
-# TODO: We can change this to filter external sample ids
 EXISTING_DATA_QUERY = gql(
     """
     query getExistingData($project: String!) {
@@ -107,7 +110,7 @@ EXISTING_DATA_QUERY = gql(
                         meta
                         type
                     }
-                    analyses {
+                    analyses(project: {eq: $project}) {
                         id
                         type
                     }
@@ -160,8 +163,12 @@ PARTICIPANT_QUERY = gql(
     query ($project: String!) {
         project (name: $project) {
             participants {
+                externalIds
                 id
-                externalId
+                meta
+                phenotypes
+                reportedGender
+                reportedSex
             }
         }
     }
@@ -185,6 +192,59 @@ COHORT_QUERY = gql(
     """
 )
 
+# take a parameter which is an array of ints
+QUERY_FAMILY_BY_INTERNAL_IDS = gql(
+    """
+    query FamilyQuery($project: String!, $internal_ids: [Int!]!) {
+  project(name: $project) {
+    participants(id: {in_: $internal_ids}) {
+      families {
+        id
+        codedPhenotype
+        description
+        externalIds
+      }
+    }
+  }
+}
+"""
+)
+
+
+def get_sids_by_random_sampling(
+    project: str, sample_count: int, samples_so_far: set[str] | None = None
+) -> list[str]:
+    """
+    Take a project to select samples from, a number of samples to select, and a set of samples already selected.
+    Select sample_count new samples from the project, excluding any already selected.
+
+    Args:
+        project (str): the metamist project to query
+        sample_count (int): number of additional samples to add
+        samples_so_far (set[str] | None): optional, samples we already selected by other means, remove before sampling
+
+    Returns:
+        list[str]: a list of sample IDs
+    """
+
+    if samples_so_far is None:
+        samples_so_far = set()
+
+    logger.info(f'Querying all samples in {project}')
+    sid_output = query(SG_ID_QUERY, variables={'project': project})
+
+    # all_sids here is a set of all internal IDs in the project, minus any we already selected
+    all_sids = {
+        sid['id'] for sid in sid_output.get('project').get('samples')
+    } - samples_so_far
+
+    logger.info(
+        f'Found {len(all_sids)} sample ids in {project}, excluding any previously seen'
+    )
+
+    # Randomly select from the remaining sgs
+    return random.sample(sorted(all_sids), sample_count)
+
 
 def main(
     project: str,
@@ -194,7 +254,8 @@ def main(
     additional_families: set[str],
     additional_samples: set[str],
     cohorts: set[str],
-    skip_ped: bool = True,
+    skip_ped: bool,
+    update_embedded_ids: bool,
 ):
     """
     Script creates a test subset for a given project.
@@ -206,6 +267,8 @@ def main(
     ):
         raise ValueError('Come on, what exactly are you asking for?')
 
+    # TODO(vbakiris) IMO it makes sense to pull the whole cohort if we're requesting a cohort?
+    # TODO(vbakiris) for any smaller subset we have other params to select for that
     if cohorts and not cohort_samples_n:
         raise ValueError(
             'You must specify the number of samples to transfer from the cohort.'
@@ -215,30 +278,33 @@ def main(
     logger.info('Setting random seed to 42')
     random.seed(42)
 
-    # 1. Find SG IDs to be moved by Family ID to -test.
+    # 1a. Find SG IDs to be moved by Family ID to -test.
     if families_n or additional_families:
         additional_samples.update(
             get_sids_for_families(project, families_n, additional_families)
         )
 
-    # 1.5 Find SG IDs to be moved by Cohort ID to -test.
+    # 1b. Find SG IDs to be moved by Cohort ID to -test.
     if cohorts:
+        logger.info(f'Updating sample selection to use cohorts: {cohorts}')
         additional_samples.update(
             get_sids_for_cohorts(project, cohorts, cohort_samples_n)
         )
 
-    # 2. Get all sample IDs and their SG IDs in project.
-    logger.info(f'Querying all samples in {project}')
-    sid_output = query(SG_ID_QUERY, variables={'project': project})
-    all_sids = {sid['id'] for sid in sid_output.get('project').get('samples')}
-    logger.info(f'Found {len(all_sids)} sample ids in {project}')
+    # 1c. If we are gathering random additional samples, get all sample IDs in project and sample from the collection
+    if samples_n:
+        logger.info(
+            f'Updating sample selection with {samples_n} additional random samples'
+        )
+        additional_samples.update(
+            get_sids_by_random_sampling(
+                project=project,
+                sample_count=samples_n,
+                samples_so_far=additional_samples,
+            )
+        )
 
-    # 3. Randomly select from the remaining sgs
-    additional_samples.update(
-        random.sample(list(all_sids - additional_samples), samples_n)
-    )
-
-    # 4. Query all the samples from the selected sgs
+    # 2. Query all the samples from the selected sgs
     logger.info(f'Transferring {len(additional_samples)} samples. Querying metadata.')
     original_project_subset_data = query(
         QUERY_ALL_DATA, {'project': project, 'sids': list(additional_samples)}
@@ -277,11 +343,24 @@ def main(
 
     existing_data = query(EXISTING_DATA_QUERY, {'project': target_project})
 
+    # Create batch if needed for running header updating jobs
+    if update_embedded_ids:
+        this_batch = os.environ.get('HAIL_BATCH_ID')
+        this_batch_text = f' invoked by batch {this_batch}' if this_batch else ''
+        batch = get_batch(f'Reheadering for create_test_subset.py{this_batch_text}')
+    else:
+        batch = None
+
     logger.info('Transferring samples, sequencing groups, and assays')
     samples = original_project_subset_data.get('project').get('samples')
     old_sid_to_new_sid, sample_to_sg_attribute_map = transfer_samples_sgs_assays(
-        samples, existing_data, upserted_participant_map, target_project, project
+        samples=samples,
+        existing_data=existing_data,
+        upserted_participant_map=upserted_participant_map,
+        target_project=target_project,
+        project=project,
     )
+
     logger.info('Transferring analyses')
     transfer_analyses(
         samples,
@@ -290,8 +369,13 @@ def main(
         project,
         old_sid_to_new_sid,
         sample_to_sg_attribute_map,
+        update_embedded_ids,
     )
     logger.info('Subset generation complete!')
+
+    if batch:
+        logger.info('Submitting batch to update IDs embedded in file headers')
+        batch.run(wait=False)
 
 
 def transfer_samples_sgs_assays(
@@ -321,8 +405,7 @@ def transfer_samples_sgs_assays(
 
         sample_type = None if s['type'] == 'None' else s['type']
         existing_sid: str | None = None
-        existing_sample = get_existing_sample(existing_data, s['externalId'])
-        if existing_sample:
+        if existing_sample := get_existing_sample(existing_data, s['externalId']):
             existing_sid = existing_sample['id']
 
         existing_pid: int | None = None
@@ -414,7 +497,7 @@ def get_new_sg_id(
     """
     Returns the new sequencing group id for a given sample id and sequencing group attributes.
     Args:
-        sid (str): The sample id to search for.
+        old_sid (str): The sample id to search for.
         new_sg_attributes (tuple[str, str, str]): The attributes of the sequencing group to search for.
         old_sid_to_new_sid (dict[str, str]): A map from old sample ids to new sample ids.
         sample_to_sg_attribute_map (dict[tuple, dict[tuple, str]]): A map from (seid, sid) keys to a map of sequencing group attribute keys to old sequencing group ids.
@@ -475,6 +558,7 @@ def transfer_analyses(
     project: str,
     old_sid_to_new_sid: dict[str, str],
     sample_to_sg_attribute_map: dict[tuple, dict[tuple, str]],
+    update_embedded_ids: bool,
 ):
     """
     This function will transfer the analyses from the original project to the test project.
@@ -521,6 +605,7 @@ def transfer_analyses(
                             analysis['output'],
                             project,
                             (str(sg['id']), new_sg_map[s['externalId']][0]),
+                            update_embedded_ids,
                         ),
                         status=AnalysisStatus(
                             analysis['status'].lower().replace('_', '-')
@@ -539,6 +624,7 @@ def transfer_analyses(
                             analysis['output'],
                             project,
                             (str(sg['id']), new_sg_map[s['externalId']][0]),
+                            update_embedded_ids,
                         ),
                         status=AnalysisStatus(
                             analysis['status'].lower().replace('_', '-')
@@ -621,16 +707,27 @@ def get_existing_analysis(
 def get_sids_for_families(
     project: str, families_n: int, additional_families: set[str]
 ) -> set[str]:
-    """Returns specific samples to be included in the test project."""
+    """
+    Returns specific samples to be included in the test project.
+    This process returns internal sample IDs for members of the families selected
+    Remove any families with no samples from consideration prior to random selection
+    """
 
     family_sgid_output = query(QUERY_FAMILY_SAMPLES, {'project': project})
 
     all_family_sgids = family_sgid_output.get('project', {}).get('families', [])
     assert all_family_sgids, 'No families returned in GQL result'
 
+    # subselect down to families with samples
+    families_with_samples = [
+        fam
+        for fam in all_family_sgids
+        if any(participant.get('samples') for participant in fam['participants'])
+    ]
+
     # 1. Remove the specifically requested families
     user_input_families = [
-        fam for fam in all_family_sgids if fam['externalId'] in additional_families
+        fam for fam in families_with_samples if fam['externalId'] in additional_families
     ]
 
     # TODO: Replace this with the nice script that randomly selects better :)
@@ -639,12 +736,22 @@ def get_sids_for_families(
         random.sample(
             [
                 fam
-                for fam in all_family_sgids
+                for fam in families_with_samples
                 if fam['externalId'] not in additional_families
             ],
             families_n,
         )
     )
+
+    # log the gathered families, and any requested families we couldn't find
+    selected_family_ids = [fam['externalId'] for fam in user_input_families]
+    logger.info(f'Families selected: {", ".join(selected_family_ids)}')
+    if failed_to_find := [
+        user_fam_id
+        for user_fam_id in additional_families
+        if user_fam_id not in selected_family_ids
+    ]:
+        logger.warning(f'Families not found: {", ".join(failed_to_find)}')
 
     # 3. Pull SGs from random + specific families
     included_sids: set[str] = set()
@@ -652,6 +759,10 @@ def get_sids_for_families(
         for participant in fam['participants']:
             for sample in participant['samples']:
                 included_sids.add(sample['id'])
+
+    logger.info(
+        f'Identified {len(included_sids)} samples from {len(user_input_families)} families'
+    )
 
     return included_sids
 
@@ -684,25 +795,36 @@ def transfer_families(
     initial_project: str, target_project: str, internal_participant_ids: list[int]
 ) -> list[int]:
     """Pull relevant families from the input project, and copy to target_project"""
-    families = fapi.get_families(
-        project=initial_project,
-        participant_ids=internal_participant_ids,
+    family_data = query(
+        QUERY_FAMILY_BY_INTERNAL_IDS,
+        variables={
+            'project': initial_project,
+            'internal_ids': internal_participant_ids,
+        },
     )
 
-    family_ids = [family['id'] for family in families]
+    families: dict[int, dict] = {}
+    for participant in family_data['project']['participants']:
+        for family in participant['families']:
+            families[family['id']] = family
+
+    family_ids: list[int] = list(families.keys())
 
     tmp_family_tsv = 'tmp_families.tsv'
+    # TODO: this doesn't match the default ordering in fapi.import_families, and is not passed as a list of headers
     family_tsv_headers = ['Family ID', 'Description', 'Coded Phenotype', 'Display Name']
     # Work-around as import_families takes a file.
     with open(tmp_family_tsv, 'wt') as tmp_families:
         tsv_writer = csv.writer(tmp_families, delimiter='\t')
         tsv_writer.writerow(family_tsv_headers)
-        for family in families:
+        for family in families.values():
+            # TODO only 3 elements are written to this 4-col TSV
             tsv_writer.writerow(
                 [
-                    family['external_id'],
+                    # import_families() only imports the primary eid anyway
+                    family['externalIds'][PRIMARY_EXTERNAL_ORG],
                     family['description'] or '',
-                    family['coded_phenotype'] or '',
+                    family['codedPhenotype'] or '',
                 ]
             )
 
@@ -736,12 +858,11 @@ def transfer_ped(
 
     # Get map of external participant id to internal
     participant_output = query(PARTICIPANT_QUERY, {'project': target_project})
-    participant_map = {
-        participant['externalId']: participant['id']
+    return {
+        external_id: participant['id']
         for participant in participant_output.get('project').get('participants')
+        for external_id in participant['externalIds'].values()
     }
-
-    return participant_map
 
 
 def transfer_participants(
@@ -749,34 +870,35 @@ def transfer_participants(
     participant_data,
 ) -> dict[str, int]:
     """Transfers relevant participants between projects"""
-    existing_participants = papi.get_participants(
-        project=target_project, query_participant_criteria={}
-    )
+
+    existing_participants = query(PARTICIPANT_QUERY, {'project': target_project})
 
     target_project_pid_map = {
         external_id: participant['id']
-        for participant in existing_participants
-        for external_id in participant['external_ids'].values()
+        for participant in existing_participants.get('project').get('participants')
+        for external_id in participant['externalIds'].values()
     }
 
     participants_to_transfer = []
     for participant in participant_data:
-        if participant['externalId'] in target_project_pid_map:
-            # Participants with id field will be updated & those without will be inserted
-            participant['id'] = target_project_pid_map[participant['externalId']]
-        else:
-            del participant['id']
-        transfer_participant = {
-            'external_ids': participant['externalIds'],
-            'meta': participant.get('meta') or {},
-            'karyotype': participant.get('karyotype'),
-            'reported_gender': participant.get('reportedGender'),
-            'reported_sex': participant.get('reportedSex'),
-            'id': participant.get('id'),
-            'samples': [],
-        }
-        # Participants are being created before the samples are, so this will be empty for now.
-        participants_to_transfer.append(transfer_participant)
+        for alt_id in participant['externalIds'].values():
+            if alt_id in target_project_pid_map:
+                # Participants with id field will be updated & those without will be inserted
+                participant['id'] = target_project_pid_map[alt_id]
+            else:
+                del participant['id']
+            transfer_participant = {
+                'external_ids': participant['externalIds'],
+                'meta': participant.get('meta') or {},
+                'karyotype': participant.get('karyotype'),
+                'reported_gender': participant.get('reportedGender'),
+                'reported_sex': participant.get('reportedSex'),
+                'phenotypes': participant.get('phenotypes'),
+                'id': participant.get('id'),
+                'samples': [],
+            }
+            # Participants are being created before the samples are, so this will be empty for now.
+            participants_to_transfer.append(transfer_participant)
 
     upserted_participants = papi.upsert_participants(
         target_project, participant_upsert=participants_to_transfer
@@ -785,7 +907,7 @@ def transfer_participants(
     external_to_internal_participant_id_map: dict[str, int] = {}
 
     for participant in upserted_participants:
-        for external_id in participant['external_ids'].values():
+        for external_id in participant['externalIds'].values():
             external_to_internal_participant_id_map[external_id] = participant['id']
 
     return external_to_internal_participant_id_map
@@ -839,7 +961,63 @@ def get_random_families(
     return returned_families
 
 
-def copy_files_in_dict(d, dataset: str, sid_replacement: tuple[str, str] = None):
+def file_reheaderable(path: str) -> bool:
+    """Returns whether this is a file that can be reheadered"""
+    return any(path.endswith(e) for e in ['.cram', '.vcf.gz', '.crai', '.tbi', '.md5'])
+
+
+def main_file_commands(batch, job, old_path: str, new_path: str, sid: tuple[str, str]):
+    """Adds the commands required to reheader the main CRAM/VCF file"""
+    if new_path.endswith('.cram'):
+        job.image(image_path('samtools'))
+        old_file = batch.read_input(old_path)
+        job.declare_resource_group(
+            new_file={'main': '{root}.cram', 'crai': '{root}.cram.crai'}
+        )
+        job.command(rf"""
+            samtools head {old_file} | sed '/^@RG/s/\<SM:{sid[0]}\>/SM:{sid[1]}/g' > $BATCH_TMPDIR/header.txt
+            samtools reheader --no-PG --in-place $BATCH_TMPDIR/header.txt {old_file}
+            mv {old_file} {job.new_file.main}
+        """)
+        batch.write_output(job.new_file.main, new_path)
+
+    elif new_path.endswith('.vcf.gz'):
+        job.image(image_path('bcftools'))
+        old_file = batch.read_input(old_path)
+        job.declare_resource_group(
+            new_file={'main': '{root}.vcf.gz', 'tbi': '{root}.vcf.gz.tbi'}
+        )
+        job.command(rf"""
+            echo {sid[0]} {sid[1]} > $BATCH_TMPDIR/samples.txt
+            bcftools reheader --samples $BATCH_TMPDIR/samples.txt -o {job.new_file.main} {old_file}
+        """)
+        batch.write_output(job.new_file.main, new_path)
+
+
+def extra_file_commands(batch, job, new_path: str):
+    """Adds the commands required to regenerate the various associated files"""
+    if new_path.endswith('.crai'):
+        job.command(rf'samtools index -o {job.new_file.crai} {job.new_file.main}')
+        batch.write_output(job.new_file.crai, new_path)
+
+    elif new_path.endswith('.tbi'):
+        job.command(rf"""
+            tabix {job.new_file.main}
+            # Mention {job.new_file.tbi} for hail as tabix has no -o option
+        """)
+        batch.write_output(job.new_file.tbi, new_path)
+
+    elif new_path.endswith('.md5'):
+        job.command(rf"md5sum {job.new_file.main} | cut -d' ' -f1 > {job.new_md5}")
+        batch.write_output(job.new_md5, new_path)
+
+
+def copy_files_in_dict(
+    d,
+    dataset: str,
+    sid_replacement: tuple[str, str] = None,
+    update_embedded_ids: bool = False,
+):
     """
     Replaces all `gs://cpg-{project}-main*/` paths
     into `gs://cpg-{project}-test*/` and creates copies if needed
@@ -862,10 +1040,21 @@ def copy_files_in_dict(d, dataset: str, sid_replacement: tuple[str, str] = None)
         if sid_replacement is not None:
             new_path = new_path.replace(sid_replacement[0], sid_replacement[1])
 
+        job = None
+
         if not file_exists(new_path):
-            cmd = ['gcloud', 'storage', 'cp', old_path, new_path]
-            logger.info(f'Copying file in metadata: {" ".join(cmd)}')
-            subprocess.run(cmd, check=True)
+            if update_embedded_ids and sid_replacement and file_reheaderable(new_path):
+                logger.info(f'Adding job to rewrite {old_path} to {new_path}')
+                batch = get_batch()
+                job = batch.new_job(f'Reheader {new_path} from {old_path}')
+                main_file_commands(batch, job, old_path, new_path, sid_replacement)
+                job.storage(file_size(old_path) + 2 * 1024**3)  # Allow 2 GiB extra
+            else:
+                cmd = ['gcloud', 'storage', 'cp', old_path, new_path]
+                logger.info(f'Copying file in metadata: {" ".join(cmd)}')
+                subprocess.run(cmd, check=True)
+        else:
+            logger.error(f'{new_path} already exists')
 
         extra_exts = ['.md5']
         if new_path.endswith('.vcf.gz'):
@@ -874,9 +1063,15 @@ def copy_files_in_dict(d, dataset: str, sid_replacement: tuple[str, str] = None)
             extra_exts.append('.crai')
         for ext in extra_exts:
             if file_exists(old_path + ext) and not file_exists(new_path + ext):
-                cmd = ['gcloud', 'storage', 'cp', old_path + ext, new_path + ext]
-                logger.info(f'Copying extra file in metadata: {" ".join(cmd)}')
-                subprocess.run(cmd, check=True)
+                if job and file_reheaderable(new_path + ext):
+                    logger.info(f'Extending job to regenerate {new_path + ext}')
+                    extra_file_commands(batch, job, new_path + ext)
+                else:
+                    cmd = ['gcloud', 'storage', 'cp', old_path + ext, new_path + ext]
+                    logger.info(f'Copying extra file in metadata: {" ".join(cmd)}')
+                    subprocess.run(cmd, check=True)
+            elif file_exists(old_path + ext):
+                logger.error(f'{new_path} already exists')
         return new_path
     if isinstance(d, list):
         return [copy_files_in_dict(x, dataset) for x in d]
@@ -900,6 +1095,15 @@ def file_exists(path: str) -> bool:
         gs = storage.Client()
         return gs.get_bucket(bucket).get_blob(path)
     return os.path.exists(path)
+
+
+def file_size(path: str) -> int:
+    """Return the size (in bytes) of the object, which is assumed to exist"""
+    if path.startswith('gs://'):
+        (bucket, path) = path.removeprefix('gs://').split('/', maxsplit=1)
+        return storage.Client().get_bucket(bucket).get_blob(path).size
+
+    return os.path.getsize(path)
 
 
 if __name__ == '__main__':
@@ -945,6 +1149,12 @@ if __name__ == '__main__':
     parser.add_argument(
         '--noninteractive', action='store_true', help='Skip interactive confirmation'
     )
+    parser.add_argument(
+        '--update-embedded-ids',
+        action=BooleanOptionalAction,
+        help='Update IDs embedded within CRAM and VCF files (on by default)',
+        default=True,
+    )
     args, fail = parser.parse_known_args()
     if fail:
         parser.print_help()
@@ -959,4 +1169,5 @@ if __name__ == '__main__':
         additional_families=set(args.families),
         skip_ped=args.skip_ped,
         cohorts=set(args.cohorts),
+        update_embedded_ids=args.update_embedded_ids,
     )

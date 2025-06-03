@@ -104,8 +104,8 @@ class BillingDailyExtendedTable(BillingBaseTable):
                     batch_id, CAST(job_id AS INT) job_id,
                     sku, cost,
                     usage_start_time, usage_end_time, sequencing_group, stage, wdl_task_name, cromwell_sub_workflow_name, cromwell_workflow_id,
-                    JSON_VALUE(PARSE_JSON(labels), '$.batch_name') as batch_name,
-                    JSON_VALUE(PARSE_JSON(labels), '$.job_name') as job_name
+                    JSON_VALUE(PARSE_JSON(labels, wide_number_mode=>'round'), '$.batch_name') as batch_name,
+                    JSON_VALUE(PARSE_JSON(labels, wide_number_mode=>'round'), '$.job_name') as job_name
                     FROM `{self.table_name}`
                         WHERE day >= @start_time
                         AND day <= @end_time

@@ -278,7 +278,6 @@ def move_files(
             blob_copy = source_bucket.copy_blob(
                 source_blob,
                 destination_bucket,
-                destination_blob_name,
             )
             source_bucket.delete_blob(source_blob)
             logger.info(
@@ -312,8 +311,9 @@ def update_analyses(
             logger.info(f'DRY RUN :: Skipping updating analysis {analysis["id"]}')
             continue
         update_model = AnalysisUpdateModel(
-            status=AnalysisStatus('COMPLETED'),
-            outputs=analysis['outputs'],
+            status=AnalysisStatus('completed'),
+            # Update model only needs the 'output' - not compatible with 'outputs'
+            output=analysis['outputs']['path'],
             meta=analysis['meta'],
         )
         promises.append(
