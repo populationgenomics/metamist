@@ -1,8 +1,9 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Checkbox, Grid, Input, Message } from 'semantic-ui-react'
+import { Button, Card, Checkbox, Dropdown, Grid, Input, Message } from 'semantic-ui-react'
 import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
+import { exportTable } from '../../shared/utilities/exportTable'
 import { convertFieldName } from '../../shared/utilities/fieldName'
 import generateUrl from '../../shared/utilities/generateUrl'
 import { getMonthEndDate, getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
@@ -198,16 +199,72 @@ const BillingCostByCategory: React.FunctionComponent = () => {
         )
     }
 
+    const exportToFile = (format: 'csv' | 'tsv') => {
+        const dateSet = new Set<string>()
+        const skuSet = new Set<string>()
+
+        const dateToValues = new Map<string, Record<string, number>>()
+
+        data.forEach((row) => {
+            const dateStr = row.date.toISOString().slice(0, 10)
+            dateSet.add(dateStr)
+            dateToValues.set(dateStr, row.values)
+            Object.keys(row.values).forEach((sku) => skuSet.add(sku))
+        })
+
+        const dates = [...dateSet].sort()
+        const skus = [...skuSet].sort()
+
+        const headerFields = ['SKU', ...dates]
+
+        const matrix = skus.map((sku) => {
+            const rowCells = dates.map((date) => {
+                const cost = dateToValues.get(date)?.[sku]
+                return typeof cost === 'number' && cost !== 0 ? cost.toFixed(2) : ''
+            })
+            return [sku, ...rowCells]
+        })
+
+        exportTable({ headerFields, matrix }, format, 'billing_cost_by_category')
+    }
+
     return (
         <>
             <Card fluid style={{ padding: '20px' }} id="billing-container">
-                <h1
-                    style={{
-                        fontSize: 40,
-                    }}
-                >
-                    Billing Cost By Category
-                </h1>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <h1
+                        style={{
+                            fontSize: 40,
+                        }}
+                    >
+                        Billing Cost By Category
+                    </h1>
+                    <div style={{ textAlign: 'right' }}>
+                        <Dropdown
+                            button
+                            className="icon"
+                            floating
+                            labeled
+                            icon="download"
+                            text="Export"
+                        >
+                            <Dropdown.Menu>
+                                <Dropdown.Item
+                                    key="csv"
+                                    text="Export to CSV"
+                                    icon="file excel"
+                                    onClick={() => exportToFile('csv')}
+                                />
+                                <Dropdown.Item
+                                    key="tsv"
+                                    text="Export to TSV"
+                                    icon="file text outline"
+                                    onClick={() => exportToFile('tsv')}
+                                />
+                            </Dropdown.Menu>
+                        </Dropdown>
+                    </div>
+                </div>
 
                 <Grid stackable doubling>
                     <Grid.Column width={4}>

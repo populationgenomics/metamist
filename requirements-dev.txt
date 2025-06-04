@@ -127,7 +127,7 @@ flake8==7.1.1
     #   flake8-bugbear
 flake8-bugbear==24.12.12
     # via -r requirements-dev.in
-flask==3.1.0
+flask==3.1.1
     # via functions-framework
 frozendict==2.4.6
     # via cpg-utils
