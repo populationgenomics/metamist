@@ -1,15 +1,13 @@
 # pylint: disable=redefined-builtin, import-outside-toplevel
 
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 import strawberry
 from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
+from api.graphql.types.comments import GraphQLComment
 from db.python.layers.comment import CommentLayer
-
-if TYPE_CHECKING:
-    from api.graphql.schema import GraphQLComment
 
 
 @strawberry.type
@@ -22,11 +20,8 @@ class CommentMutations:
         parent_id: int,
         content: str,
         info: Info[GraphQLContext, 'CommentMutations'],
-    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated[GraphQLComment, strawberry.lazy('api.graphql.schema')]:
         """Adds a comment to a thread on an existing comment"""
-        # Import needed here to avoid circular import
-        from api.graphql.schema import GraphQLComment
-
         connection = info.context['connection']
         comment_layer = CommentLayer(connection)
         comment = await comment_layer.add_comment_to_thread(parent_id, content)
@@ -38,11 +33,8 @@ class CommentMutations:
         id: int,
         content: str,
         info: Info[GraphQLContext, 'CommentMutations'],
-    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated[GraphQLComment, strawberry.lazy('api.graphql.schema')]:
         """Updates the content of an existing comment"""
-        # Import needed here to avoid circular import
-        from api.graphql.schema import GraphQLComment
-
         connection = info.context['connection']
         comment_layer = CommentLayer(connection)
         comment = await comment_layer.update_comment(id, content)
@@ -52,11 +44,8 @@ class CommentMutations:
     @strawberry.mutation
     async def delete_comment(
         self, id: int, info: Info[GraphQLContext, 'CommentMutations']
-    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated[GraphQLComment, strawberry.lazy('api.graphql.schema')]:
         """Soft-deletes an existing comment"""
-        # Import needed here to avoid circular import
-        from api.graphql.schema import GraphQLComment
-
         connection = info.context['connection']
         comment_layer = CommentLayer(connection)
         comment = await comment_layer.delete_comment(id)
@@ -65,11 +54,8 @@ class CommentMutations:
     @strawberry.mutation
     async def restore_comment(
         self, id: int, info: Info[GraphQLContext, 'CommentMutations']
-    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated[GraphQLComment, strawberry.lazy('api.graphql.schema')]:
         """Restores a previously deleted comment"""
-        # Import needed here to avoid circular import
-        from api.graphql.schema import GraphQLComment
-
         connection = info.context['connection']
         comment_layer = CommentLayer(connection)
         comment = await comment_layer.restore_comment(id)

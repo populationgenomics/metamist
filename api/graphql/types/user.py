@@ -1,7 +1,10 @@
-import json
-import strawberry
 import datetime
+import json
 from enum import Enum
+
+import strawberry
+
+from models.models.user import UserInternal
 
 
 @strawberry.enum
@@ -55,19 +58,19 @@ class GraphQLUser:
 
     id: int
     email: str
-    full_name: str | None
-    settings: dict
+    full_name: str
+    settings: strawberry.scalars.JSON
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
     @staticmethod
-    def from_internal(user: dict) -> 'GraphQLUser':
-        """Convert from internal User model (db results) to GraphQLUser"""
+    def from_internal(user: UserInternal) -> 'GraphQLUser':
+        """Convert UserInternal to GraphQLUser."""
         return GraphQLUser(
-            id=user['id'],
-            email=user['email'],
-            full_name=user['full_name'],
-            settings=user.get('settings', {}),
-            created_at=user['created_at'],
-            updated_at=user['updated_at'],
+            id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            settings=strawberry.scalars.JSON(user.settings),
+            created_at=user.created_at,
+            updated_at=user.updated_at,
         )

@@ -1,10 +1,11 @@
-import strawberry
-from strawberry.types import Info
 from typing import Annotated, Optional
 
-from db.python.layers.user import UserLayer
+import strawberry
+from strawberry.types import Info
+
 from api.graphql.loaders import GraphQLContext
 from api.graphql.types.user import GraphQLUser, UserSettings
+from db.python.layers.user import UserLayer
 
 JSON = strawberry.scalars.JSON
 
@@ -30,7 +31,7 @@ class UserMutations:
         if user is None:
             raise ValueError('Failed to create user')
 
-        return GraphQLUser.from_internal(dict(user))
+        return GraphQLUser.from_internal(user)
 
     @strawberry.mutation
     async def update_user(
@@ -46,7 +47,7 @@ class UserMutations:
         user_layer = UserLayer(connection)
         await user_layer.update_user(user_id, email, full_name, settings)
         user = await user_layer.get_user_by_id(user_id)
-        return GraphQLUser.from_internal(dict(user)) if user else None
+        return GraphQLUser.from_internal(user) if user else None
 
     @strawberry.mutation
     async def delete_user(
@@ -63,4 +64,4 @@ class UserMutations:
             raise ValueError(f'Cannot delete: User with email {user_email} not found')
 
         await user_layer.delete_user(user.id)
-        return GraphQLUser.from_internal(dict(user)) if user else None
+        return GraphQLUser.from_internal(user) if user else None
