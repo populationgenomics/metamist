@@ -781,7 +781,7 @@ class SeqrLayer(BaseLayer):
                 f'The project {project.name} does NOT have an appropriate seqr '
                 f'project attached for {sequencing_type}'
             )
-        headers = ({'Authorization': f'Bearer {token}'},)
+        headers = {'Authorization': f'Bearer {token}'}
 
         req_url = SEQR_URL + _url_families_guid_map.format(projectGuid=project_guid)
 
