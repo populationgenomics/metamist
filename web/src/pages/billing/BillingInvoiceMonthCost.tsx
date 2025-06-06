@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import {
     Button,
     Checkbox,
+    CheckboxProps,
     Dropdown,
     DropdownProps,
     Grid,
@@ -32,6 +33,15 @@ const BillingCurrentCost = () => {
     })
 
     const [showAsChart, setShowAsChart] = React.useState<boolean>(true)
+
+    // State for column visibility
+    const [visibleColumns, setVisibleColumns] = React.useState<Set<string>>(new Set([
+        'field', 'compute_daily', 'storage_daily', 'total_daily',
+        'compute_monthly', 'storage_monthly', 'total_monthly', 'budget_spent'
+    ]))
+
+    // State to control dropdown menu open/close
+    const [isColumnsDropdownOpen, setColumnsDropdownOpen] = React.useState<boolean>(false)
 
     // Pull search params for use in the component
     const [searchParams] = useSearchParams()
@@ -112,6 +122,34 @@ const BillingCurrentCost = () => {
     React.useEffect(() => {
         getCosts(groupBy, invoiceMonth)
     }, [])
+
+    // Handle outside clicks and keyboard events for dropdown
+    React.useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as HTMLElement
+            const columnsDropdown = document.querySelector('.columns-dropdown')
+
+            // If clicking outside the dropdown and dropdown is open, close it
+            if (isColumnsDropdownOpen && columnsDropdown && !columnsDropdown.contains(target)) {
+                setColumnsDropdownOpen(false)
+            }
+        }
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            // Close dropdown on ESC key press
+            if (event.key === 'Escape' && isColumnsDropdownOpen) {
+                setColumnsDropdownOpen(false)
+            }
+        }
+
+        document.addEventListener('mousedown', handleClickOutside)
+        document.addEventListener('keydown', handleKeyDown)
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside)
+            document.removeEventListener('keydown', handleKeyDown)
+        }
+    }, [isColumnsDropdownOpen])
     /* eslint-enable react-hooks/exhaustive-deps */
 
     const HEADER_FIELDS = [
@@ -123,6 +161,92 @@ const BillingCurrentCost = () => {
         { category: 'storage_monthly', title: 'S', show_always: true },
         { category: 'total_monthly', title: 'Total', show_always: true },
     ]
+
+    // Define column groups for easier management
+    const DAILY_COLUMNS = ['compute_daily', 'storage_daily', 'total_daily']
+    const MONTHLY_COLUMNS = ['compute_monthly', 'storage_monthly', 'total_monthly']
+    const BUDGET_COLUMNS = ['budget_spent']
+    const ALL_COLUMNS = [...DAILY_COLUMNS, ...MONTHLY_COLUMNS, ...BUDGET_COLUMNS]
+
+    // Helper functions for column visibility
+    const toggleColumnVisibility = (category: string, event?: React.SyntheticEvent) => {
+        // Stop propagation to prevent dropdown from closing
+        if (event) {
+            event.stopPropagation()
+        }
+
+        setVisibleColumns(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(category)) {
+                // Don't allow hiding 'field' column
+                if (category !== 'field') {
+                    newSet.delete(category)
+                }
+            } else {
+                newSet.add(category)
+            }
+            return newSet
+        })
+    }
+
+    // Toggle all columns in a group
+    const toggleColumnGroup = (categoryGroup: string[], visible: boolean) => {
+        setVisibleColumns(prev => {
+            const newSet = new Set(prev)
+            categoryGroup.forEach(category => {
+                if (category !== 'field') { // Don't allow hiding 'field' column
+                    if (visible) {
+                        newSet.add(category)
+                    } else {
+                        newSet.delete(category)
+                    }
+                }
+            })
+            return newSet
+        })
+    }
+
+    // Reusable column checkbox component
+    const ColumnCheckbox = ({ category, label }: { category: string, label: string }) => {
+        const handleItemClick = (e: React.MouseEvent) => {
+            e.stopPropagation()
+            e.preventDefault()
+            toggleColumnVisibility(category, e)
+        }
+
+        // Use the correct type for Semantic UI's onChange handler
+        const handleChange = (e: React.FormEvent<HTMLInputElement>, _data: CheckboxProps) => {
+            e.stopPropagation()
+            toggleColumnVisibility(category, e)
+        }
+
+        const isVisible = isColumnVisible(category)
+
+        return (
+            <Dropdown.Item
+                onClick={handleItemClick}
+                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                role="menuitemcheckbox"
+                aria-checked={isVisible}
+            >
+                <Checkbox
+                    label={label}
+                    checked={isVisible}
+                    onChange={handleChange}
+                    onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                />
+            </Dropdown.Item>
+        )
+    }
+
+    // Check if a column is visible
+    const isColumnVisible = (category: string): boolean => {
+        // Field column is always visible
+        if (category === 'field') {
+            return true
+        }
+        return visibleColumns.has(category)
+    }
 
     const handleToggle = (field: string) => {
         if (!openRows.includes(field)) {
@@ -201,14 +325,18 @@ const BillingCurrentCost = () => {
     }
 
     const exportToFile = (format: 'csv' | 'tsv') => {
-        // Filter out just the columns actually shown
+        // Filter based on user-selected visible columns
         const visibleFields = HEADER_FIELDS.filter(
-            (k) => k.show_always || invoiceMonth === thisMonth
+            (k) => isColumnVisible(k.category)
         )
         const headerFields: string[] = visibleFields.map((k) => convertFieldName(k.category))
-        // Add Budget % spend if it should be shown
+
+        // Add Budget % spend if it should be shown and is selected
         const budgetSpendVisible =
-            groupBy === BillingColumn.GcpProject && invoiceMonth === thisMonth
+            groupBy === BillingColumn.GcpProject &&
+            invoiceMonth === thisMonth &&
+            isColumnVisible('budget_spent')
+
         if (budgetSpendVisible) headerFields.push('Budget Spend %')
 
         // Prepare 2D matrix of data strings
@@ -261,6 +389,158 @@ const BillingCurrentCost = () => {
                     />
                 </Grid.Column>
                 <Grid.Column textAlign="right">
+                    <Dropdown
+                        button
+                        className="icon columns-dropdown"
+                        floating
+                        labeled
+                        icon="columns"
+                        text="Columns"
+                        style={{ marginRight: '10px' }}
+                        open={isColumnsDropdownOpen}
+                        onClick={(e) => {
+                            // Only toggle if the dropdown button itself is clicked
+                            if (e.target && (e.target as HTMLElement).closest('.ui.dropdown > .text, .ui.dropdown > .icon')) {
+                                setColumnsDropdownOpen(!isColumnsDropdownOpen)
+                            }
+                        }}
+                        // Don't use onClose or onOpen, as we want to manually control it
+                        closeOnBlur={false}
+                        closeOnChange={false}
+                        closeOnEscape={true}
+                    >
+                        <Dropdown.Menu className="dropdown-menu-content">
+                            <Dropdown.Header icon='table' content='Column Visibility' />
+                            <Dropdown.Item
+                                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                                onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                            >
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <Button
+                                        compact
+                                        size="mini"
+                                        onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                                        onClick={(e: React.MouseEvent) => {
+                                            e.stopPropagation();
+                                            e.preventDefault();
+                                            toggleColumnGroup(ALL_COLUMNS, true);
+                                        }}
+                                    >
+                                        Select All
+                                    </Button>
+                                    <Button
+                                        compact
+                                        size="mini"
+                                        onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                                        onClick={(e: React.MouseEvent) => {
+                                            e.stopPropagation();
+                                            e.preventDefault();
+                                            toggleColumnGroup(ALL_COLUMNS, false);
+                                        }}
+                                    >
+                                        Hide All
+                                    </Button>
+                                </div>
+                            </Dropdown.Item>
+                            <Dropdown.Divider />
+
+                            {/* ID Column - Always visible */}
+                            <Dropdown.Item disabled>
+                                <Checkbox
+                                    label={convertFieldName(groupBy.toUpperCase())}
+                                    checked={true}
+                                    readOnly
+                                />
+                            </Dropdown.Item>
+
+                            {/* Daily Columns */}
+                            {invoiceMonth === thisMonth && (
+                                <>
+                                    <Dropdown.Header content='Daily Costs' />
+                                    <Dropdown.Item
+                                        onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                                    >
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <Button
+                                                compact
+                                                size="mini"
+                                                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                                                onClick={(e: React.MouseEvent) => {
+                                                    e.stopPropagation();
+                                                    e.preventDefault();
+                                                    toggleColumnGroup(DAILY_COLUMNS, true);
+                                                }}
+                                            >
+                                                All
+                                            </Button>
+                                            <Button
+                                                compact
+                                                size="mini"
+                                                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                                                onClick={(e: React.MouseEvent) => {
+                                                    e.stopPropagation();
+                                                    e.preventDefault();
+                                                    toggleColumnGroup(DAILY_COLUMNS, false);
+                                                }}
+                                            >
+                                                None
+                                            </Button>
+                                        </div>
+                                    </Dropdown.Item>
+                                    <ColumnCheckbox category="compute_daily" label="Compute (Daily)" />
+                                    <ColumnCheckbox category="storage_daily" label="Storage (Daily)" />
+                                    <ColumnCheckbox category="total_daily" label="Total (Daily)" />
+                                </>
+                            )}
+
+                            {/* Monthly Columns */}
+                            <Dropdown.Header content='Monthly Costs' />
+                            <Dropdown.Item
+                                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                                onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                            >
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <Button
+                                        compact
+                                        size="mini"
+                                        onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                                        onClick={(e: React.MouseEvent) => {
+                                            e.stopPropagation();
+                                            e.preventDefault();
+                                            toggleColumnGroup(MONTHLY_COLUMNS, true);
+                                        }}
+                                    >
+                                        All
+                                    </Button>
+                                    <Button
+                                        compact
+                                        size="mini"
+                                        onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                                        onClick={(e: React.MouseEvent) => {
+                                            e.stopPropagation();
+                                            e.preventDefault();
+                                            toggleColumnGroup(MONTHLY_COLUMNS, false);
+                                        }}
+                                    >
+                                        None
+                                    </Button>
+                                </div>
+                            </Dropdown.Item>
+                            <ColumnCheckbox category="compute_monthly" label="Compute (Monthly)" />
+                            <ColumnCheckbox category="storage_monthly" label="Storage (Monthly)" />
+                            <ColumnCheckbox category="total_monthly" label="Total (Monthly)" />
+
+                            {/* Budget Column */}
+                            {groupBy === BillingColumn.GcpProject && invoiceMonth === thisMonth && (
+                                <>
+                                    <Dropdown.Header content='Budget' />
+                                    <ColumnCheckbox category="budget_spent" label="Budget Spend %" />
+                                </>
+                            )}
+                        </Dropdown.Menu>
+                    </Dropdown>
+
                     <Dropdown
                         button
                         className="icon"
@@ -351,48 +631,67 @@ const BillingCurrentCost = () => {
 
                             <SUITable.HeaderCell></SUITable.HeaderCell>
 
-                            {invoiceMonth === thisMonth ? (
-                                <SUITable.HeaderCell colSpan="3">
-                                    24H (day UTC {lastLoadedDay})
-                                </SUITable.HeaderCell>
-                            ) : null}
+                            {(() => {
+                                // Calculate how many daily columns are visible
+                                if (invoiceMonth === thisMonth) {
+                                    const visibleCount = ['compute_daily', 'storage_daily', 'total_daily'].filter(
+                                        col => isColumnVisible(col)
+                                    ).length;
 
-                            {groupBy === BillingColumn.GcpProject ? (
-                                <SUITable.HeaderCell colSpan="4">
-                                    Invoice Month (Acc)
-                                </SUITable.HeaderCell>
-                            ) : (
-                                <SUITable.HeaderCell colSpan="3">
-                                    Invoice Month (Acc)
-                                </SUITable.HeaderCell>
-                            )}
+                                    return visibleCount > 0 ? (
+                                        <SUITable.HeaderCell colSpan={visibleCount}>
+                                            24H (day UTC {lastLoadedDay})
+                                        </SUITable.HeaderCell>
+                                    ) : null;
+                                }
+                                return null;
+                            })()}
+
+                            {(() => {
+                                // Calculate how many monthly columns are visible
+                                const baseColumns = ['compute_monthly', 'storage_monthly', 'total_monthly'];
+                                const budgetColumn = (groupBy === BillingColumn.GcpProject &&
+                                                     invoiceMonth === thisMonth &&
+                                                     isColumnVisible('budget_spent')) ? 1 : 0;
+
+                                const visibleCount = baseColumns.filter(
+                                    col => isColumnVisible(col)
+                                ).length + budgetColumn;
+
+                                return visibleCount > 0 ? (
+                                    <SUITable.HeaderCell colSpan={visibleCount}>
+                                        Invoice Month (Acc)
+                                    </SUITable.HeaderCell>
+                                ) : null;
+                            })()}
                         </SUITable.Row>
                         <SUITable.Row>
                             <SUITable.HeaderCell></SUITable.HeaderCell>
 
                             {HEADER_FIELDS.map((k) => {
-                                switch (k.show_always || invoiceMonth === thisMonth) {
-                                    case true:
-                                        return (
-                                            <SUITable.HeaderCell
-                                                key={k.category}
-                                                sorted={checkDirection(k.category)}
-                                                onClick={() => handleSort(k.category)}
-                                                style={{
-                                                    borderBottom: 'none',
-                                                    position: 'sticky',
-                                                    resize: 'horizontal',
-                                                }}
-                                            >
-                                                {convertFieldName(k.title)}
-                                            </SUITable.HeaderCell>
-                                        )
-                                    default:
-                                        return null
+                                // Only show columns that are visible
+                                if (isColumnVisible(k.category)) {
+                                    return (
+                                        <SUITable.HeaderCell
+                                            key={k.category}
+                                            sorted={checkDirection(k.category)}
+                                            onClick={() => handleSort(k.category)}
+                                            style={{
+                                                borderBottom: 'none',
+                                                position: 'sticky',
+                                                resize: 'horizontal',
+                                            }}
+                                        >
+                                            {convertFieldName(k.title)}
+                                        </SUITable.HeaderCell>
+                                    )
                                 }
+                                return null
                             })}
 
-                            {groupBy === BillingColumn.GcpProject && invoiceMonth === thisMonth ? (
+                            {groupBy === BillingColumn.GcpProject &&
+                              invoiceMonth === thisMonth &&
+                              isColumnVisible('budget_spent') ? (
                                 <SUITable.HeaderCell
                                     key={'budget_spent'}
                                     sorted={checkDirection('budget_spent')}
@@ -434,10 +733,15 @@ const BillingCurrentCost = () => {
                                         />
                                     </SUITable.Cell>
                                     {HEADER_FIELDS.map((k) => {
+                                        // Skip columns that are not visible
+                                        if (!isColumnVisible(k.category)) {
+                                            return null
+                                        }
+
                                         switch (k.category) {
                                             case 'field':
                                                 return (
-                                                    <SUITable.Cell className="billing-href">
+                                                    <SUITable.Cell key={k.category} className="billing-href">
                                                         <b>
                                                             <Link
                                                                 to={
@@ -454,27 +758,21 @@ const BillingCurrentCost = () => {
                                                     </SUITable.Cell>
                                                 )
                                             default:
-                                                switch (
-                                                    k.show_always ||
-                                                    invoiceMonth === thisMonth
-                                                ) {
-                                                    case true:
-                                                        return (
-                                                            <SUITable.Cell>
-                                                                {
-                                                                    // @ts-ignore
-                                                                    formatMoney(p[k.category])
-                                                                }
-                                                            </SUITable.Cell>
-                                                        )
-                                                    default:
-                                                        return null
-                                                }
+                                                // We already checked visibility above, so just render
+                                                return (
+                                                    <SUITable.Cell key={k.category}>
+                                                        {
+                                                            // @ts-ignore
+                                                            formatMoney(p[k.category])
+                                                        }
+                                                    </SUITable.Cell>
+                                                )
                                         }
                                     })}
 
                                     {groupBy === BillingColumn.GcpProject &&
-                                    invoiceMonth === thisMonth ? (
+                                    invoiceMonth === thisMonth &&
+                                    isColumnVisible('budget_spent') ? (
                                         <SUITable.Cell>
                                             {
                                                 // @ts-ignore
@@ -502,40 +800,81 @@ const BillingCurrentCost = () => {
 
                                             {dk.cost_group === 'C' ? (
                                                 <React.Fragment>
-                                                    {invoiceMonth === thisMonth ? (
-                                                        <React.Fragment>
-                                                            <SUITable.Cell>
-                                                                {formatMoney(dk.daily_cost)}
-                                                            </SUITable.Cell>
-
-                                                            <SUITable.Cell colSpan="2" />
-                                                        </React.Fragment>
+                                                    {invoiceMonth === thisMonth && isColumnVisible('compute_daily') ? (
+                                                        <SUITable.Cell>
+                                                            {formatMoney(dk.daily_cost)}
+                                                        </SUITable.Cell>
                                                     ) : null}
-                                                    <SUITable.Cell>
-                                                        {formatMoney(dk.monthly_cost)}
-                                                    </SUITable.Cell>
-                                                    <SUITable.Cell colSpan="2" />
+
+                                                    {/* Calculate colspan dynamically based on visible columns */}
+                                                    {(() => {
+                                                        // For the daily section, we need to check visibility of storage_daily and total_daily
+                                                        if (invoiceMonth === thisMonth) {
+                                                            const visibleCount =
+                                                                (isColumnVisible('storage_daily') ? 1 : 0) +
+                                                                (isColumnVisible('total_daily') ? 1 : 0);
+
+                                                            return visibleCount > 0 ? (
+                                                                <SUITable.Cell colSpan={visibleCount} />
+                                                            ) : null;
+                                                        }
+                                                        return null;
+                                                    })()}
+
+                                                    {isColumnVisible('compute_monthly') ? (
+                                                        <SUITable.Cell>
+                                                            {formatMoney(dk.monthly_cost)}
+                                                        </SUITable.Cell>
+                                                    ) : null}
+
+                                                    {/* Calculate colspan dynamically based on visible columns */}
+                                                    {(() => {
+                                                        // For monthly section, check visibility of storage_monthly and total_monthly
+                                                        const visibleCount =
+                                                            (isColumnVisible('storage_monthly') ? 1 : 0) +
+                                                            (isColumnVisible('total_monthly') ? 1 : 0);
+
+                                                        return visibleCount > 0 ? (
+                                                            <SUITable.Cell colSpan={visibleCount} />
+                                                        ) : null;
+                                                    })()}
                                                 </React.Fragment>
                                             ) : (
                                                 <React.Fragment>
-                                                    <SUITable.Cell />
-                                                    {invoiceMonth === thisMonth ? (
-                                                        <React.Fragment>
-                                                            <SUITable.Cell>
-                                                                {formatMoney(dk.daily_cost)}
-                                                            </SUITable.Cell>
-
-                                                            <SUITable.Cell colSpan="2" />
-                                                        </React.Fragment>
+                                                    {isColumnVisible('compute_daily') ? (
+                                                        <SUITable.Cell />
                                                     ) : null}
-                                                    <SUITable.Cell>
-                                                        {formatMoney(dk.monthly_cost)}
-                                                    </SUITable.Cell>
-                                                    <SUITable.Cell />
+
+                                                    {invoiceMonth === thisMonth && isColumnVisible('storage_daily') ? (
+                                                        <SUITable.Cell>
+                                                            {formatMoney(dk.daily_cost)}
+                                                        </SUITable.Cell>
+                                                    ) : null}
+
+                                                    {/* Calculate colspan for total_daily */}
+                                                    {invoiceMonth === thisMonth && isColumnVisible('total_daily') ? (
+                                                        <SUITable.Cell />
+                                                    ) : null}
+
+                                                    {isColumnVisible('compute_monthly') ? (
+                                                        <SUITable.Cell />
+                                                    ) : null}
+
+                                                    {isColumnVisible('storage_monthly') ? (
+                                                        <SUITable.Cell>
+                                                            {formatMoney(dk.monthly_cost)}
+                                                        </SUITable.Cell>
+                                                    ) : null}
+
+                                                    {isColumnVisible('total_monthly') ? (
+                                                        <SUITable.Cell />
+                                                    ) : null}
                                                 </React.Fragment>
                                             )}
 
-                                            {groupBy === BillingColumn.GcpProject ? (
+                                            {groupBy === BillingColumn.GcpProject &&
+                                             invoiceMonth === thisMonth &&
+                                             isColumnVisible('budget_spent') ? (
                                                 <SUITable.Cell />
                                             ) : null}
                                         </SUITable.Row>
