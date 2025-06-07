@@ -18,6 +18,7 @@ def audit_upload_bucket(
     sequencing_types: list[str],
     sequencing_technologies: list[str],
     file_types: list[str],
+    excluded_prefixes: tuple[str] | None = None,
 ):
     """Entrypoint for running upload bucket auditor asynchronously."""
     asyncio.get_event_loop().run_until_complete(
@@ -27,6 +28,7 @@ def audit_upload_bucket(
                 sequencing_types,
                 sequencing_technologies,
                 file_types,
+                excluded_prefixes=excluded_prefixes,
             ),
             timeout=60,
         )
@@ -42,6 +44,7 @@ class UploadBucketAuditor(GenericAuditor):
         sequencing_types: list[str],
         sequencing_technologies: list[str],
         file_types: tuple[str],
+        excluded_prefixes: tuple[str] | None = None,
         default_analysis_type='cram',
         default_analysis_status='completed',
     ):
@@ -50,6 +53,7 @@ class UploadBucketAuditor(GenericAuditor):
             sequencing_types=sequencing_types,
             sequencing_technologies=sequencing_technologies,
             file_types=file_types,
+            excluded_prefixes=excluded_prefixes,
             default_analysis_type=default_analysis_type,
             default_analysis_status=default_analysis_status,
         )
@@ -104,6 +108,7 @@ async def audit_upload_bucket_async(
     sequencing_types: list[str],
     sequencing_technologies: list[str],
     file_types: list[str],
+    excluded_prefixes: tuple[str] | None = None,
 ):
     """
     Finds sequence files for samples with completed CRAMs and adds these to a csv for deletion.
@@ -113,7 +118,9 @@ async def audit_upload_bucket_async(
     Arguments:
         dataset: The name of the dataset to audit
         sequencing_types: The list of sequencing types to audit
+        sequencing_technologies: The list of sequencing technologies to audit
         file_types: The list of file types to audit
+        exclude_prefixes: Optional prefixes to exclude from the audit
     """
     # Initialise the auditor
     auditor = UploadBucketAuditor(
@@ -121,6 +128,7 @@ async def audit_upload_bucket_async(
         sequencing_types=sequencing_types,
         sequencing_technologies=sequencing_technologies,
         file_types=file_types,
+        excluded_prefixes=excluded_prefixes,
     )
     sequencing_groups: list[SequencingGroupData] = await auditor.get_sgs_for_dataset()
 
@@ -184,11 +192,18 @@ async def audit_upload_bucket_async(
     required='True',
     help='Find fastq, bam, cram, gvcf, vcf, all_reads (fastq + bam + cram), or all sequence file types',
 )
+@click.option(
+    '--excluded-prefixes',
+    '-e',
+    multiple=True,
+    help='Exclude files with these prefixes from the audit',
+)
 def main(
     dataset: str,
     sequencing_types: tuple[str],
     sequencing_technologies: tuple[str],
     file_types: tuple[str],
+    excluded_prefixes: tuple[str] | None = None,
 ):
     """Runs the auditor on the dataset"""
     audit_upload_bucket(
@@ -196,6 +211,7 @@ def main(
         sequencing_types,
         sequencing_technologies,
         file_types,
+        excluded_prefixes=excluded_prefixes,
     )
 
 

@@ -175,11 +175,11 @@ class AssayData:
         self,
         id_: AssayId,
         read_files: list[ReadFileData],
-        sample: SampleData,
+        # sample: SampleData, # Uncomment if you want to include sample data in the assay
     ):
         self.id = id_
         self.read_files = read_files
-        self.sample = sample
+        # self.sample = sample
 
 
 class SequencingGroupData:
@@ -209,18 +209,20 @@ class AuditHelper(CloudHelper):
 
     def __init__(
         self,
+        dataset: str = None,
         gcp_project: str = None,
         all_analysis_types: list[str] = None,
         all_sequencing_types: list[str] = None,
         excluded_sequencing_groups: list[str] = None,
     ):
         super().__init__(search_paths=None)
+        
+        self.dataset = self.validate_dataset(dataset)
 
         # GCP project is used for GCP calls, which the auditor does a lot of
         self.gcp_project = (
             gcp_project
-            or get_gcp_project()
-            or config_retrieve(['workflow', 'gcp_project'])
+            or config_retrieve(['workflow', self.dataset, 'gcp_project'])
         )
         if not self.gcp_project:
             raise ValueError('GCP project is required')
@@ -232,7 +234,7 @@ class AuditHelper(CloudHelper):
             ['metamist', 'audit', 'excluded_sequencing_groups'], default=[]
         )
 
-    def validate_dataset(self, dataset: str) -> str:
+    def validate_dataset(self, dataset: str | None) -> str:
         """Validate the input dataset"""
         if not dataset:
             dataset = config_retrieve(['workflow', 'dataset'])
@@ -262,7 +264,14 @@ class AuditHelper(CloudHelper):
             raise ValueError(
                 f'Input file types "{invalid_file_types}" must be in the allowed types: {", ".join(FILE_TYPES_MAP.keys())}'
             )
-        return file_types
+        
+        if len(file_types) == 1:
+            return FILE_TYPES_MAP[file_types[0]]
+        # If multiple file types are specified, return the combined extensions
+        combined_extensions = []
+        for ft in file_types:
+            combined_extensions.extend(FILE_TYPES_MAP[ft])
+        return tuple(combined_extensions)
 
     def get_bucket_name(self, dataset: str, category: str) -> str:
         """Get the bucket name for the given dataset and category"""
@@ -349,7 +358,7 @@ class AuditHelper(CloudHelper):
         return files_in_bucket
 
     def get_read_file_blobs_in_gcs_bucket(
-        self, bucket_name: str, file_extensions: tuple[str]
+        self, bucket_name: str, file_extensions: tuple[str], excluded_prefixes: tuple[str] | None = None
     ) -> list[ReadFileData]:
         """
         Gets all the paths and sizes to assay files in the dataset's upload bucket.
@@ -359,6 +368,7 @@ class AuditHelper(CloudHelper):
         if 'upload' not in bucket_name:
             # No prefix means it will get all blobs in the bucket (regardless of path)
             # This can be a dangerous call outside of the upload buckets
+            # Due to hail tables, matrixtables, and vds files
             raise NameError(
                 'Call to list_blobs without prefix only valid for upload buckets'
             )
@@ -367,6 +377,10 @@ class AuditHelper(CloudHelper):
         read_files = []
         for blob in self.gcs_client.list_blobs(bucket, prefix=''):
             if not blob.name.endswith(file_extensions):
+                continue
+            if excluded_prefixes and any(
+                blob.name.startswith(prefix) for prefix in excluded_prefixes
+            ):
                 continue
             blob.reload()
             read_files.append(
@@ -471,6 +485,9 @@ class AuditHelper(CloudHelper):
         )
 
         rows_to_write = [entry.to_report_dict() for entry in data_to_write]
+        if report_name == 'FILES TO DELETE':
+            # Sort the rows by SG ID for the 'FILES TO DELETE' report
+            rows_to_write = sorted(rows_to_write, key=lambda x: x['SG ID'])
         writer.writeheader()
         writer.writerows(rows_to_write)
 

@@ -40,6 +40,11 @@ QUERY_PARTICIPANTS_SAMPLES_SGS = gql(
     """
 )
 
+# TODO
+# For datasets with many sequencing groups, this query can be slow, time out, or return a 500 error.
+# Implement a method to fetch sequencing group data in smaller batches by first fetching all sequencing group IDs,
+# and then fetching the sequencing group data in smaller chunks.
+# This will allow us to avoid the 500 error and improve performance for large datasets.
 QUERY_DATASET_SGS = gql(
     """
         query DatasetData($datasetName: String!, $seqTypes: [String!], $seqTechs: [String!]) {
@@ -59,14 +64,15 @@ QUERY_DATASET_SGS = gql(
                     assays {
                         id
                         meta
-                        sample {
-                            id
-                            externalId
-                            participant {
-                                id
-                                externalId
-                            }
-                        }
+                        # Getting the sample and participant data for the assay is not needed
+                        # sample {
+                        #     id
+                        #     externalId
+                        #     participant {
+                        #         id
+                        #         externalId
+                        #     }
+                        # }
                     }
                 }
             }
@@ -102,14 +108,15 @@ class GenericAuditor(AuditHelper):
         sequencing_types: list[str],
         sequencing_technologies: list[str],
         file_types: tuple[str],
+        excluded_prefixes: tuple[str] | None = None,
         default_analysis_type='cram',
         default_analysis_status='completed',
     ):
-        super().__init__()
+        super().__init__(dataset=dataset)
         # Initialize the auditor
-        self.dataset = self.validate_dataset(dataset)
         self.sequencing_types = self.validate_sequencing_types(sequencing_types)
         self.file_types = self.validate_file_types(file_types)
+        self.excluded_prefixes = excluded_prefixes
 
         # Set remaining attributes
         self.sequencing_technologies = sequencing_technologies
@@ -187,14 +194,16 @@ class GenericAuditor(AuditHelper):
         return AssayData(
             id_=assay['id'],
             read_files=read_files,
-            sample=SampleData(
-                id_=assay['sample']['id'],
-                external_id=assay['sample']['externalId'],
-                participant=ParticipantData(
-                    id_=assay['sample']['participant']['id'],
-                    external_id=assay['sample']['participant']['externalId'],
-                ),
-            ),
+            # Filling the sample and participant data for the assay is just not needed
+            
+            # sample=SampleData(
+            #     id_=assay['sample']['id'],
+            #     external_id=assay['sample']['externalId'],
+            #     participant=ParticipantData(
+            #         id_=assay['sample']['participant']['id'],
+            #         external_id=assay['sample']['participant']['externalId'],
+            #     ),
+            # ),
         )
 
     def parse_read_file(self, read: dict) -> ReadFileData:
@@ -376,9 +385,11 @@ class GenericAuditor(AuditHelper):
             for assay in sg.assays
             for read_file in assay.read_files
         ]
+        
         # Find all the read files in the bucket
+        logger.info(f'{self.dataset} :: Fetching read files in bucket {self.bucket_name}')
         read_files_in_bucket = self.get_read_file_blobs_in_gcs_bucket(
-            self.bucket_name, self.file_types
+            self.bucket_name, self.file_types, self.excluded_prefixes
         )
 
         # The files in Metamist which are not in the bucket are assumed to have been deleted
@@ -386,15 +397,19 @@ class GenericAuditor(AuditHelper):
             read.filepath for read in read_files_in_metamist
         }.difference({read.filepath for read in read_files_in_bucket})
 
+        logger.info(f'{self.dataset} :: Finding reads that have been moved or deleted')
         ingested_reads_that_were_moved = self.find_moved_reads(
             read_files_in_bucket, read_files_in_metamist
         )
+        
+        logger.info(f'{self.dataset} :: Finding uningested reads in bucket')
         uningested_reads = self.get_uningested_reads(
             read_files_in_metamist,
             read_files_in_bucket,
             ingested_reads_that_were_moved.values(),
         )
 
+        logger.info(f'{self.dataset} :: Reporting on uningested reads to delete and ingest')
         # Report the reads that can be deleted
         uningested_reads_to_delete_report_entries, reads_to_ingest_report_entries = (
             self.report_uningested_reads(
@@ -402,12 +417,14 @@ class GenericAuditor(AuditHelper):
                 uningested_reads,
             )
         )
+        logger.info(f'{self.dataset} :: Reporting on ingested reads that have been moved')
         moved_reads_to_delete_report_entries = (
             self.report_ingested_files_that_have_been_moved(
                 sequencing_groups,
                 ingested_reads_that_were_moved,
             )
         )
+        logger.info(f'{self.dataset} :: Reporting on ingested reads to delete')
         ingested_reads_to_delete_report_entries = self.report_ingested_reads_to_delete(
             sequencing_groups,
             already_deleted_read_files,
@@ -656,7 +673,22 @@ class GenericAuditor(AuditHelper):
                 ].sample.participant.external_id
 
             if known_sample_id and known_participant_id:
+                # TODO
+                # Be careful with this check, as it assumes that
+                #  - If the participant external ID is from a completed SG, and the participant external ID is in the file path
+                #  - Then the read file is associated with that completed SG. 
+                # This is a naive check and may not always be correct!
+                #  - Some datasets have multiple samples for the same participant, and the read file may not be associated with the sample in the file path.
+                #  - E.g. a participant 'IND001' has a completed genome SG, and a bucket file path contains 'IND001' but is actually an exome read file for a different sample from the same participant.
+                #    - In this case, the read file should not be deleted, but should be ingested.
+                #  - Or, the read file may be from a different participant with the same external ID, e.g. 'IND001' in a different dataset.
+                #  - Or, the read file may be from a different sample and just happens to have the same participant external ID in the file path (unlikely, but possible). 
+                #  - This is a known issue with the current implementation, and should be improved in the future.
                 sg = completed_sgs_by_sample_external_id[known_sample_id]
+                if not sg.id:
+                    raise ValueError(
+                        f'{self.dataset} :: {known_sample_id} has no SG ID, cannot delete read file: {read.filepath}'
+                    )
                 logger.info(
                     f'{self.dataset} :: UNINGESTED FILE MATCHES A METAMIST RECORD\n - Bucket file:  {read.filepath}\nMatches completed SG {sg.id} - Sample: {sg.sample.external_id} - Participant: {sg.sample.participant.external_id}\n'
                 )
