@@ -4,7 +4,7 @@ import logging
 from collections import defaultdict
 from io import StringIO
 
-from cpg_utils.config import config_retrieve, dataset_path, get_gcp_project
+from cpg_utils.config import config_retrieve, dataset_path
 
 from metamist.graphql import gql, query
 from metamist.parser.cloudhelper import CloudHelper
@@ -319,7 +319,7 @@ class AuditHelper(CloudHelper):
         return buckets_prefixes
 
     def get_all_files_in_gcs_bucket_with_prefix_and_extensions(
-        self, bucket_name: str, prefix: str, file_extensions: tuple[str]
+        self, bucket_name: str, prefix: str, file_extensions: tuple[str] | None = None
     ):
         """Iterate through a gcp bucket/prefix and get all the blobs with the specified file extension(s)"""
         bucket = self.gcs_client.bucket(bucket_name, user_project=self.gcp_project)
@@ -336,7 +336,7 @@ class AuditHelper(CloudHelper):
     def find_files_in_gcs_buckets_prefixes(
         self,
         buckets_prefixes: defaultdict[str, list[str]],
-        file_types: tuple[str] | None,
+        file_types: tuple[str] | None = None,
     ):
         """
         Takes a dict of {bucket: [prefix1, prefix2, ...]} tuples and finds all the files contained in that bucket/prefix
