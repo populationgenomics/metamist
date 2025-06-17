@@ -28,7 +28,11 @@ from models.models.family import FamilyInternal
 from models.models.participant import NestedParticipantInternal, ParticipantInternal
 from models.models.sample import SampleInternal
 from models.models.sequencing_group import SequencingGroupInternal
-from models.models.web import ProjectSummaryInternal, WebProject
+from models.models.web import (
+    ProjectSummaryInternal,
+    WebProject,
+    ProjectWebReportInternal,
+)
 
 
 class WebLayer(BaseLayer):
@@ -43,6 +47,20 @@ class WebLayer(BaseLayer):
         """
         webdb = WebDb(self.connection)
         return await webdb.get_project_summary()
+
+    async def get_project_web_reports(
+        self,
+        sequencing_types: list[str] | None = None,
+        stages: list[str] | None = None,
+    ):
+        """
+        Get web reports for a project, optionally filtered by sequencing type.
+        """
+        webdb = WebDb(self.connection)
+        return await webdb.get_project_web_reports(
+            sequencing_types=sequencing_types or [],
+            stages=stages or [],
+        )
 
     async def query_participants(
         self,
@@ -92,6 +110,50 @@ class WebDb(DbBase):
         INNER JOIN sample s ON s.id = sq.sample_id
         WHERE s.project = :project"""
         return await self.connection.fetch_val(_query, {'project': self.project_id})
+
+    async def get_project_web_reports(
+        self, sequencing_types: list[str], stages: list[str]
+    ):
+        """Get web analyses for a project filtered by sequencing type and stage."""
+        _query = """
+        SELECT
+            a.id,
+            a.timestamp_completed,
+            ao.output,
+            JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) as sequencing_type,
+            JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.stage')) as stage,
+            GROUP_CONCAT(DISTINCT asg.sequencing_group_id) as sequencing_groups
+        FROM analysis a
+        LEFT JOIN analysis_output ao ON ao.analysis_id = a.id
+        LEFT JOIN analysis_sequencing_group asg ON asg.analysis_id = a.id
+        WHERE a.project = :project
+        AND a.type = 'qc'
+        AND a.status = 'COMPLETED'
+        AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) IN :sequencing_types
+        AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.stage')) in :stages
+        GROUP BY a.id, ao.output, a.timestamp_completed, sequencing_type, stage
+        """
+        web_reports = await self.connection.fetch_all(
+            _query,
+            {
+                'project': self.project_id,
+                'sequencing_types': tuple(sequencing_types),
+                'stages': tuple(stages),
+            },
+        )
+        return [
+            ProjectWebReportInternal(
+                id=report['id'],
+                timestamp_completed=report['timestamp_completed'],
+                output=report['output'],
+                sequencing_type=report['sequencing_type'],
+                stage=report['stage'],
+                sequencing_groups=report['sequencing_groups'].split(',')
+                if report['sequencing_groups']
+                else [],
+            )
+            for report in web_reports
+        ]
 
     def get_seqr_links_from_project(self, project: WebProject) -> dict[str, str]:
         """

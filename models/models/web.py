@@ -84,6 +84,55 @@ class ProjectSummary(SMBase):
     seqr_sync_types: list[str]
 
 
+class ProjectWebReport(SMBase):
+    """Return class for the project web report endpoint"""
+
+    id: int
+    timestamp_completed: str
+    sequencing_type: str
+    stage: str
+    output: str
+    html_path: str | None = None
+    sequencing_groups: list[str] | None = None
+
+
+class ProjectWebReportInternal(SMBase):
+    """Return class for the project web report endpoint"""
+
+    id: int
+    timestamp_completed: str
+    sequencing_type: str
+    stage: str
+    output: str
+    sequencing_groups: list[str] | None = None
+
+    def _html_path(self) -> str | None:
+        """
+        Format the HTML path for the report from the output path
+
+        Convert "gs://cpg-dataset-(main|test)/qc/cram/<sg_hash>/multiqc_data.json"
+        to      "https://(main|test)-web.populationgenomics.org.au/dataset/qc/cram/<sg_hash>/multiqc.html"
+        """
+        if not self.output or not self.output.startswith('gs://'):
+            return None
+        bucket_name, blob_name = self.output.removeprefix('gs://').split('/', 1)
+        blob_name = blob_name.replace('multiqc_data.json', 'multiqc.html')
+        dataset_name, access_level = bucket_name.removeprefix('cpg-').split('-', 1)
+        return f'https://{access_level}-web.populationgenomics.org.au/{dataset_name}/{blob_name}'
+
+    def to_external(self):
+        """Convert to transport model"""
+        return ProjectWebReport(
+            id=self.id,
+            timestamp_completed=self.timestamp_completed,
+            sequencing_type=self.sequencing_type,
+            stage=self.stage,
+            output=self.output,
+            html_path=self._html_path(),
+            sequencing_groups=self.sequencing_groups,
+        )
+
+
 class ProjectParticipantGridFilterType(Enum):
     """Filter types for grid response"""
 
