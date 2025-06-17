@@ -84,7 +84,7 @@ class ProjectSummary(SMBase):
     seqr_sync_types: list[str]
 
 
-class ProjectWebReport(SMBase):
+class ProjectQcWebReport(SMBase):
     """Return class for the project web report endpoint"""
 
     id: int
@@ -96,7 +96,7 @@ class ProjectWebReport(SMBase):
     sequencing_groups: list[str] | None = None
 
 
-class ProjectWebReportInternal(SMBase):
+class ProjectQcWebReportInternal(SMBase):
     """Return class for the project web report endpoint"""
 
     id: int
@@ -122,7 +122,7 @@ class ProjectWebReportInternal(SMBase):
 
     def to_external(self):
         """Convert to transport model"""
-        return ProjectWebReport(
+        return ProjectQcWebReport(
             id=self.id,
             timestamp_completed=self.timestamp_completed,
             sequencing_type=self.sequencing_type,

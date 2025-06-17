@@ -31,7 +31,7 @@ from models.models.sequencing_group import SequencingGroupInternal
 from models.models.web import (
     ProjectSummaryInternal,
     WebProject,
-    ProjectWebReportInternal,
+    ProjectQcWebReportInternal,
 )
 
 
@@ -48,7 +48,7 @@ class WebLayer(BaseLayer):
         webdb = WebDb(self.connection)
         return await webdb.get_project_summary()
 
-    async def get_project_web_reports(
+    async def get_project_qc_web_reports(
         self,
         sequencing_types: list[str] | None = None,
         stages: list[str] | None = None,
@@ -57,7 +57,7 @@ class WebLayer(BaseLayer):
         Get web reports for a project, optionally filtered by sequencing type.
         """
         webdb = WebDb(self.connection)
-        return await webdb.get_project_web_reports(
+        return await webdb.get_project_qc_web_reports(
             sequencing_types=sequencing_types or [],
             stages=stages or [],
         )
@@ -111,10 +111,10 @@ class WebDb(DbBase):
         WHERE s.project = :project"""
         return await self.connection.fetch_val(_query, {'project': self.project_id})
 
-    async def get_project_web_reports(
+    async def get_project_qc_web_reports(
         self, sequencing_types: list[str], stages: list[str]
     ):
-        """Get web analyses for a project filtered by sequencing type and stage."""
+        """Get qc web report analyses for a project filtered by sequencing type and stage."""
         _query = """
         SELECT
             a.id,
@@ -142,7 +142,7 @@ class WebDb(DbBase):
             },
         )
         return [
-            ProjectWebReportInternal(
+            ProjectQcWebReportInternal(
                 id=report['id'],
                 timestamp_completed=report['timestamp_completed'],
                 output=report['output'],
