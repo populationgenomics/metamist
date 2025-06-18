@@ -113,7 +113,11 @@ class ProjectQcWebReportInternal(SMBase):
         Convert "gs://cpg-dataset-(main|test)/qc/cram/<sg_hash>/multiqc_data.json"
         to      "https://(main|test)-web.populationgenomics.org.au/dataset/qc/cram/<sg_hash>/multiqc.html"
         """
-        if not self.output or not self.output.startswith('gs://'):
+        if (
+            (not self.output)
+            or (not self.output.startswith('gs://'))
+            or ('multiqc_data.json' not in self.output)
+        ):
             return None
         bucket_name, blob_name = self.output.removeprefix('gs://').split('/', 1)
         blob_name = blob_name.replace('multiqc_data.json', 'multiqc.html')

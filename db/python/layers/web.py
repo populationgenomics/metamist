@@ -119,19 +119,20 @@ class WebDb(DbBase):
         SELECT
             a.id,
             a.timestamp_completed,
-            ao.output,
-            JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) as sequencing_type,
-            JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.stage')) as stage,
+            of.path as output,
+            JSON_VALUE(a.meta, '$.sequencing_type') as sequencing_type,
+            JSON_VALUE(a.meta, '$.stage') as stage,
             GROUP_CONCAT(DISTINCT asg.sequencing_group_id) as sequencing_groups
         FROM analysis a
-        LEFT JOIN analysis_output ao ON ao.analysis_id = a.id
+        LEFT JOIN analysis_outputs ao ON ao.analysis_id = a.id
+        LEFT JOIN output_file of ON of.id = ao.file_id
         LEFT JOIN analysis_sequencing_group asg ON asg.analysis_id = a.id
         WHERE a.project = :project
         AND a.type = 'qc'
         AND a.status = 'COMPLETED'
-        AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) IN :sequencing_types
-        AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.stage')) in :stages
-        GROUP BY a.id, ao.output, a.timestamp_completed, sequencing_type, stage
+        AND JSON_VALUE(a.meta, '$.sequencing_type') IN :sequencing_types
+        AND JSON_VALUE(a.meta, '$.stage') in :stages
+        GROUP BY a.id, of.path
         """
         web_reports = await self.connection.fetch_all(
             _query,
