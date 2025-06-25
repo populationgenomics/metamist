@@ -39,7 +39,7 @@ export function ActionViewExpandedTable({ query, project }: { project: string; q
                             flexDirection: 'column',
                         }}
                     >
-                        <TableFromQuery query={query} project={project} />
+                        <TableFromQuery query={query} project={project} showToolbar />
                     </div>
                 </Box>
             </Modal>
