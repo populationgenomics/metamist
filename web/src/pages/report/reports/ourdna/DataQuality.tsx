@@ -183,6 +183,7 @@ export default function DataQuality() {
                         select
                             coalesce(p.participant_id, s.participant_id) as participant_id,
                             s.sample_id,
+                            s.meta_processing_site,
                             p.meta_event_recorded_sonic_id as event_portal_sonic_id,
                             s.external_id_sonic as processing_site_sonic_id
                         from participant p
