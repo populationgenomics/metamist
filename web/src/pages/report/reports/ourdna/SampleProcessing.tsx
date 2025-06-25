@@ -27,7 +27,7 @@ const PROCESS_DURATION_QUERY = `
         join participant p
         on p.participant_id = s.participant_id
         where s.type = 'blood'
-    ) select 
+    ) select
         *,
         date_diff(
             'hour',
