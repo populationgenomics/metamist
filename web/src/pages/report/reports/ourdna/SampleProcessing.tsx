@@ -42,7 +42,7 @@ export default function ProcessingTimes() {
         <Report>
             <ReportRow>
                 <ReportItemPlot
-                    height={ROW_HEIGHT}
+                    height={ROW_HEIGHT + 100}
                     flexGrow={1}
                     title="Processing times for all samples by processing site"
                     description="Time from collection to completion of PBMC processing. This excludes any samples with > 100 hour processing times, and any that have missing or malformed collection or processing times"
@@ -64,7 +64,7 @@ export default function ProcessingTimes() {
                         x: { grid: true, padding: 5 },
                         marginTop: 20,
                         marginRight: 20,
-                        marginBottom: 30,
+                        marginBottom: 40,
                         color: { legend: true },
 
                         marginLeft: 40,
@@ -89,7 +89,7 @@ export default function ProcessingTimes() {
             </ReportRow>
             <ReportRow>
                 <ReportItemPlot
-                    height={ROW_HEIGHT}
+                    height={ROW_HEIGHT + 100}
                     flexGrow={1}
                     title="Processing times for all samples by event type"
                     description="Time from collection to completion of PBMC processing. This excludes any samples with > 100 hour processing times, and any that have missing or malformed collection or processing times"
@@ -111,7 +111,7 @@ export default function ProcessingTimes() {
                         x: { grid: true, padding: 5 },
                         marginTop: 20,
                         marginRight: 20,
-                        marginBottom: 30,
+                        marginBottom: 40,
                         color: { legend: true },
 
                         marginLeft: 40,
