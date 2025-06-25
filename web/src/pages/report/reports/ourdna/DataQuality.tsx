@@ -176,7 +176,7 @@ export default function DataQuality() {
                     flexGrow={1}
                     flexBasis={300}
                     title="Mismatched or invalid Sonic Ids"
-                    description={`Sonic ids that are either not numeric, or don't match the sonic id on the participant`}
+                    description={`Sonic ids that are either not numeric, or don't match the sonic id recorded in the event portal`}
                     project={PROJECT}
                     showToolbar={true}
                     query={`
