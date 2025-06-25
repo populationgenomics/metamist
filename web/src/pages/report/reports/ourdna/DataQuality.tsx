@@ -194,11 +194,11 @@ export default function DataQuality() {
                         )
                         or (
                             s.external_id_sonic is not null
-                            and not regexp_full_match(s.external_id_sonic, '\d+')
+                            and not regexp_full_match(s.external_id_sonic, '\\d+')
                         )
                         or (
                             p.meta_event_recorded_sonic_id is not null
-                            and not regexp_full_match(p.meta_event_recorded_sonic_id, '\d+')
+                            and not regexp_full_match(p.meta_event_recorded_sonic_id, '\\d+')
                         )
                     `}
                 />
