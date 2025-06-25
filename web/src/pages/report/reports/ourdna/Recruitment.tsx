@@ -21,7 +21,7 @@ export default function Recruitment() {
                             select
                                 count(distinct p.participant_id) as "All Participants",
                                 count(distinct p.participant_id) filter (
-                                    p."meta_blood-consent" = 'yes' and p."meta_informed-consent" = 'yes'
+                                    p."meta_consent_blood_consent" = 'yes' and p."meta_consent_informed_consent" = 'yes'
                                 ) as "Participants consented",
                                 count(distinct p.participant_id) filter (s.sample_id is not null) as "Participants with samples"
                             from participant p
@@ -54,25 +54,9 @@ export default function Recruitment() {
                     query={`
                         select
                             count(distinct participant_id) as count,
-                            CASE coalesce("meta_collection-event-type", '__NULL__')
-                                WHEN 'POE'
-                                    THEN 'POE?'
-
-                                WHEN 'Walk-in'
-                                    THEN 'Walk in'
-                                WHEN 'Walk In'
-                                    THEN 'Walk in'
-
-                                WHEN 'OSS'
-                                    THEN 'Once Stop Shop'
-
-                                WHEN '__NULL__'
-                                    THEN 'Unknown'
-
-                                ELSE "meta_collection-event-type"
-
-                            END as collection_type
+                            coalesce("meta_collection_event_type", 'unknown') as collection_type
                         from sample s
+                        where type = 'blood'
                         group by 2
                     `}
                     plot={(data) => ({
@@ -101,26 +85,10 @@ export default function Recruitment() {
                     query={`
                         select
                             count(distinct participant_id) as count,
-                            CASE coalesce("meta_collection-event-type", '__NULL__')
-                                WHEN 'POE'
-                                    THEN 'POE?'
-
-                                WHEN 'Walk-in'
-                                    THEN 'Walk in'
-                                WHEN 'Walk In'
-                                    THEN 'Walk in'
-
-                                WHEN 'OSS'
-                                    THEN 'Once Stop Shop'
-
-                                WHEN '__NULL__'
-                                    THEN 'Unknown'
-
-                                ELSE "meta_collection-event-type"
-
-                            END as collection_type,
-                            coalesce(s."meta_processing-site", 'Unknown') as processing_site,
+                            coalesce(meta_collection_event_type, 'unknown') as collection_type,
+                            coalesce(meta_processing_site, 'unknown') as processing_site,
                         from sample s
+                        where type = 'blood'
                         group by 2, 3
                     `}
                     plot={(data) => ({
