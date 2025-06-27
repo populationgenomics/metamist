@@ -399,10 +399,12 @@ const BillingCurrentCost = () => {
                         style={{ marginRight: '10px' }}
                         open={isColumnsDropdownOpen}
                         onClick={(e) => {
-                            // Only toggle if the dropdown button itself is clicked
-                            if (e.target && (e.target as HTMLElement).closest('.ui.dropdown > .text, .ui.dropdown > .icon')) {
-                                setColumnsDropdownOpen(!isColumnsDropdownOpen)
+                            // Prevent toggling if clicking on dropdown menu content
+                            const target = e.target as HTMLElement
+                            if (target && target.closest('.dropdown-menu-content')) {
+                                return
                             }
+                            setColumnsDropdownOpen(!isColumnsDropdownOpen)
                         }}
                         // Don't use onClose or onOpen, as we want to manually control it
                         closeOnBlur={false}
