@@ -199,7 +199,98 @@ Output files are managed indirectly through analysis endpoints:
 
 ### GraphQL
 
-Currently, OutputFile models are not directly exposed in the GraphQL schema but are accessible through analysis queries as part of the analysis outputs.
+OutputFile objects can be created and updated through GraphQL analysis mutations, and are accessible through analysis queries as part of the analysis outputs.
+
+#### GraphQL Mutations for OutputFile Creation/Updates
+
+**Create Analysis with Outputs:**
+
+```graphql
+mutation createAnalysis($project: String!, $sequencingGroupIds: [String!], $type: String!, $status: AnalysisStatus!, $outputs: JSON) {
+    analysis {
+        createAnalysis(project: $project, analysis: {
+            type: $type,
+            status: $status,
+            sequencingGroupIds: $sequencingGroupIds,
+            outputs: $outputs,
+            meta: {}
+        }) {
+            id
+            status
+            outputs {
+                # OutputFile fields accessible here
+                id
+                path
+                basename
+                dirname
+                nameroot
+                nameext
+                fileChecksum
+                size
+                valid
+                secondaryFiles
+                meta
+            }
+        }
+    }
+}
+```
+
+**Update Analysis Outputs:**
+
+```graphql
+mutation updateAnalysis($analysisId: Int!, $status: AnalysisStatus!, $outputs: JSON) {
+    analysis {
+        updateAnalysis(analysisId: $analysisId, analysis: {
+            status: $status,
+            outputs: $outputs
+        }) {
+            id
+            status
+            outputs {
+                # Updated OutputFile fields accessible here
+                id
+                path
+                basename
+                dirname
+                nameroot
+                nameext
+                fileChecksum
+                size
+                valid
+                secondaryFiles
+                meta
+            }
+        }
+    }
+}
+```
+
+The `outputs` parameter accepts the same JSON structure as the REST API, allowing creation and updates of OutputFile objects through GraphQL mutations.
+
+**Example GraphQL Variables for Creating Analysis with Outputs:**
+
+```json
+{
+    "project": "my-project",
+    "sequencingGroupIds": ["ABC123", "ABC124"],
+    "type": "joint-calling",
+    "status": "COMPLETED",
+    "outputs": {
+        "vcf": {
+            "basename": "gs://bucket/results/joint.vcf.gz",
+            "secondary_files": {
+                "index": {
+                    "basename": "gs://bucket/results/joint.vcf.gz.tbi"
+                }
+            }
+        },
+        "stats": {
+            "basename": "gs://bucket/results/stats.json"
+        }
+    }
+}
+```
 
 ## API Response Formats
 
