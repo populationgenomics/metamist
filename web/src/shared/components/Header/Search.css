@@ -41,12 +41,12 @@
     }
 
     .ui.search.nav-searchbar.focus {
-        width: 363px;
+        width: min(363px, calc(100vw - 100px));
         padding: 0 0 0 10px;
     }
 
     .ui.search.nav-searchbar.focus #navsearch {
-        width: 363px !important;
+        width: min(363px, calc(100vw - 100px)) !important;
         padding: 10px;
         margin-top: 8px;
         opacity: 1;
@@ -75,6 +75,6 @@
     }
 
     .nav-searchbar {
-        width: 400px;
+        width: min(400px, calc(100vw - 200px));
     }
 }
