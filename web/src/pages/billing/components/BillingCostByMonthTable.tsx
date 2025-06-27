@@ -16,7 +16,7 @@ const date2Month = (dt: string): string => {
         const date = new Date(parseInt(year), parseInt(month) - 1, 1)
         return date.toLocaleDateString('en-US', {
             year: 'numeric',
-            month: 'long'
+            month: 'long',
         })
     }
 
@@ -24,7 +24,7 @@ const date2Month = (dt: string): string => {
     const date = new Date(dt)
     return date.toLocaleDateString('en-US', {
         year: 'numeric',
-        month: 'long'
+        month: 'long',
     })
 }
 type DataDict = { [key: string]: { [key: string]: { [key: string]: number } } }
@@ -65,7 +65,7 @@ const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
 
     // Get only visible months
     const getVisibleMonths = () => {
-        return months.filter(month => isColumnVisible(month))
+        return months.filter((month) => isColumnVisible(month))
     }
 
     const dataToBody = (data: DataDict) => {
@@ -96,7 +96,8 @@ const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
     return (
         <>
             <Header as="h3">
-                SUM of Cost in AUD (excluding GST) By Topic from {date2Month(start)} to {date2Month(end)}
+                SUM of Cost in AUD (excluding GST) By Topic from {date2Month(start)} to{' '}
+                {date2Month(end)}
             </Header>
             <Table celled compact sortable selectable>
                 <SUITable.Header>

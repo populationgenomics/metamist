@@ -199,7 +199,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     cursor: 'pointer',
                     minHeight: '36px',
                     display: 'flex',
-                    alignItems: 'center'
+                    alignItems: 'center',
                 }}
                 className={`column-checkbox-item ${isVisible ? 'selected' : ''}`}
             >
@@ -215,7 +215,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         style={{
                             marginLeft: '8px',
                             color: '#495057',
-                            fontWeight: isVisible ? '500' : '400'
+                            fontWeight: isVisible ? '500' : '400',
                         }}
                     >
                         {label}
@@ -422,7 +422,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
 
     const exportToFile = (format: 'csv' | 'tsv') => {
         // Filter months based on visibility
-        const visibleMonths = months.filter(month => isColumnVisible(month))
+        const visibleMonths = months.filter((month) => isColumnVisible(month))
         const headerFields = ['Topic', 'Cost Type', ...visibleMonths]
 
         const matrix: string[][] = []
@@ -504,12 +504,12 @@ const BillingCostByTime: React.FunctionComponent = () => {
                                     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                                     minWidth: '250px',
                                     maxHeight: '500px',
-                                    overflowY: 'auto'
+                                    overflowY: 'auto',
                                 }}
                             >
                                 <Dropdown.Header
-                                    icon='table'
-                                    content='Column Visibility'
+                                    icon="table"
+                                    content="Column Visibility"
                                     style={{
                                         backgroundColor: '#e9ecef',
                                         color: '#495057',
@@ -518,7 +518,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                                         borderBottom: '1px solid #dee2e6',
                                         position: 'sticky',
                                         top: 0,
-                                        zIndex: 10
+                                        zIndex: 10,
                                     }}
                                 />
 
@@ -528,19 +528,27 @@ const BillingCostByTime: React.FunctionComponent = () => {
                                     style={{
                                         padding: '12px 16px',
                                         backgroundColor: '#f8f9fa',
-                                        borderBottom: '1px solid #dee2e6'
+                                        borderBottom: '1px solid #dee2e6',
                                     }}
                                 >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                                    <div
+                                        style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            gap: '8px',
+                                        }}
+                                    >
                                         <Button
                                             compact
                                             size="mini"
                                             color="blue"
-                                            onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                                            onMouseDown={(e: React.MouseEvent) =>
+                                                e.stopPropagation()
+                                            }
                                             onClick={(e: React.MouseEvent) => {
-                                                e.stopPropagation();
-                                                e.preventDefault();
-                                                toggleColumnGroup(months, true);
+                                                e.stopPropagation()
+                                                e.preventDefault()
+                                                toggleColumnGroup(months, true)
                                             }}
                                         >
                                             Select All
@@ -549,11 +557,13 @@ const BillingCostByTime: React.FunctionComponent = () => {
                                             compact
                                             size="mini"
                                             color="grey"
-                                            onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                                            onMouseDown={(e: React.MouseEvent) =>
+                                                e.stopPropagation()
+                                            }
                                             onClick={(e: React.MouseEvent) => {
-                                                e.stopPropagation();
-                                                e.preventDefault();
-                                                toggleColumnGroup(months, false);
+                                                e.stopPropagation()
+                                                e.preventDefault()
+                                                toggleColumnGroup(months, false)
                                             }}
                                         >
                                             Hide All
@@ -564,7 +574,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                                 {/* Required Columns - Always visible */}
                                 <div style={{ borderBottom: '1px solid #dee2e6' }}>
                                     <Dropdown.Header
-                                        content='Required Columns'
+                                        content="Required Columns"
                                         style={{
                                             color: '#6c757d',
                                             fontSize: '0.85em',
@@ -573,7 +583,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                                             position: 'sticky',
                                             top: '61px',
                                             backgroundColor: '#f8f9fa',
-                                            zIndex: 9
+                                            zIndex: 9,
                                         }}
                                     />
                                     <Dropdown.Item
@@ -581,11 +591,17 @@ const BillingCostByTime: React.FunctionComponent = () => {
                                         style={{
                                             padding: '8px 16px',
                                             opacity: 0.7,
-                                            backgroundColor: '#f8f9fa'
+                                            backgroundColor: '#f8f9fa',
                                         }}
                                     >
                                         <Checkbox
-                                            label={<span style={{ color: '#495057', marginLeft: '8px' }}>Topic</span>}
+                                            label={
+                                                <span
+                                                    style={{ color: '#495057', marginLeft: '8px' }}
+                                                >
+                                                    Topic
+                                                </span>
+                                            }
                                             checked={true}
                                             readOnly
                                             disabled
@@ -596,11 +612,17 @@ const BillingCostByTime: React.FunctionComponent = () => {
                                         style={{
                                             padding: '8px 16px',
                                             opacity: 0.7,
-                                            backgroundColor: '#f8f9fa'
+                                            backgroundColor: '#f8f9fa',
                                         }}
                                     >
                                         <Checkbox
-                                            label={<span style={{ color: '#495057', marginLeft: '8px' }}>Compute Type</span>}
+                                            label={
+                                                <span
+                                                    style={{ color: '#495057', marginLeft: '8px' }}
+                                                >
+                                                    Compute Type
+                                                </span>
+                                            }
                                             checked={true}
                                             readOnly
                                             disabled
@@ -611,7 +633,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                                 {/* Month Columns */}
                                 <div>
                                     <Dropdown.Header
-                                        content='Invoice Months'
+                                        content="Invoice Months"
                                         style={{
                                             color: '#6c757d',
                                             fontSize: '0.85em',
@@ -620,14 +642,17 @@ const BillingCostByTime: React.FunctionComponent = () => {
                                             position: 'sticky',
                                             top: '61px',
                                             backgroundColor: '#f8f9fa',
-                                            zIndex: 9
+                                            zIndex: 9,
                                         }}
                                     />
                                     {months.map((month) => {
-                                        const monthLabel = new Date(month).toLocaleDateString('en-US', {
-                                            year: 'numeric',
-                                            month: 'short'
-                                        })
+                                        const monthLabel = new Date(month).toLocaleDateString(
+                                            'en-US',
+                                            {
+                                                year: 'numeric',
+                                                month: 'short',
+                                            }
+                                        )
                                         return (
                                             <ColumnCheckbox
                                                 key={month}

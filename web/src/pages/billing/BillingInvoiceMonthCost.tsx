@@ -35,10 +35,18 @@ const BillingCurrentCost = () => {
     const [showAsChart, setShowAsChart] = React.useState<boolean>(true)
 
     // State for column visibility
-    const [visibleColumns, setVisibleColumns] = React.useState<Set<string>>(new Set([
-        'field', 'compute_daily', 'storage_daily', 'total_daily',
-        'compute_monthly', 'storage_monthly', 'total_monthly', 'budget_spent'
-    ]))
+    const [visibleColumns, setVisibleColumns] = React.useState<Set<string>>(
+        new Set([
+            'field',
+            'compute_daily',
+            'storage_daily',
+            'total_daily',
+            'compute_monthly',
+            'storage_monthly',
+            'total_monthly',
+            'budget_spent',
+        ])
+    )
 
     // State to control dropdown menu open/close
     const [isColumnsDropdownOpen, setColumnsDropdownOpen] = React.useState<boolean>(false)
@@ -175,7 +183,7 @@ const BillingCurrentCost = () => {
             event.stopPropagation()
         }
 
-        setVisibleColumns(prev => {
+        setVisibleColumns((prev) => {
             const newSet = new Set(prev)
             if (newSet.has(category)) {
                 // Don't allow hiding 'field' column
@@ -191,10 +199,11 @@ const BillingCurrentCost = () => {
 
     // Toggle all columns in a group
     const toggleColumnGroup = (categoryGroup: string[], visible: boolean) => {
-        setVisibleColumns(prev => {
+        setVisibleColumns((prev) => {
             const newSet = new Set(prev)
-            categoryGroup.forEach(category => {
-                if (category !== 'field') { // Don't allow hiding 'field' column
+            categoryGroup.forEach((category) => {
+                if (category !== 'field') {
+                    // Don't allow hiding 'field' column
                     if (visible) {
                         newSet.add(category)
                     } else {
@@ -207,7 +216,7 @@ const BillingCurrentCost = () => {
     }
 
     // Reusable column checkbox component
-    const ColumnCheckbox = ({ category, label }: { category: string, label: string }) => {
+    const ColumnCheckbox = ({ category, label }: { category: string; label: string }) => {
         const handleItemClick = (e: React.MouseEvent) => {
             e.stopPropagation()
             e.preventDefault()
@@ -326,9 +335,7 @@ const BillingCurrentCost = () => {
 
     const exportToFile = (format: 'csv' | 'tsv') => {
         // Filter based on user-selected visible columns
-        const visibleFields = HEADER_FIELDS.filter(
-            (k) => isColumnVisible(k.category)
-        )
+        const visibleFields = HEADER_FIELDS.filter((k) => isColumnVisible(k.category))
         const headerFields: string[] = visibleFields.map((k) => convertFieldName(k.category))
 
         // Add Budget % spend if it should be shown and is selected
@@ -412,7 +419,7 @@ const BillingCurrentCost = () => {
                         closeOnEscape={true}
                     >
                         <Dropdown.Menu className="dropdown-menu-content">
-                            <Dropdown.Header icon='table' content='Column Visibility' />
+                            <Dropdown.Header icon="table" content="Column Visibility" />
                             <Dropdown.Item
                                 onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
                                 onClick={(e: React.MouseEvent) => e.stopPropagation()}
@@ -423,9 +430,9 @@ const BillingCurrentCost = () => {
                                         size="mini"
                                         onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
                                         onClick={(e: React.MouseEvent) => {
-                                            e.stopPropagation();
-                                            e.preventDefault();
-                                            toggleColumnGroup(ALL_COLUMNS, true);
+                                            e.stopPropagation()
+                                            e.preventDefault()
+                                            toggleColumnGroup(ALL_COLUMNS, true)
                                         }}
                                     >
                                         Select All
@@ -435,9 +442,9 @@ const BillingCurrentCost = () => {
                                         size="mini"
                                         onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
                                         onClick={(e: React.MouseEvent) => {
-                                            e.stopPropagation();
-                                            e.preventDefault();
-                                            toggleColumnGroup(ALL_COLUMNS, false);
+                                            e.stopPropagation()
+                                            e.preventDefault()
+                                            toggleColumnGroup(ALL_COLUMNS, false)
                                         }}
                                     >
                                         Hide All
@@ -458,20 +465,27 @@ const BillingCurrentCost = () => {
                             {/* Daily Columns */}
                             {invoiceMonth === thisMonth && (
                                 <>
-                                    <Dropdown.Header content='Daily Costs' />
+                                    <Dropdown.Header content="Daily Costs" />
                                     <Dropdown.Item
                                         onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
                                         onClick={(e: React.MouseEvent) => e.stopPropagation()}
                                     >
-                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <div
+                                            style={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                            }}
+                                        >
                                             <Button
                                                 compact
                                                 size="mini"
-                                                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                                                onMouseDown={(e: React.MouseEvent) =>
+                                                    e.stopPropagation()
+                                                }
                                                 onClick={(e: React.MouseEvent) => {
-                                                    e.stopPropagation();
-                                                    e.preventDefault();
-                                                    toggleColumnGroup(DAILY_COLUMNS, true);
+                                                    e.stopPropagation()
+                                                    e.preventDefault()
+                                                    toggleColumnGroup(DAILY_COLUMNS, true)
                                                 }}
                                             >
                                                 All
@@ -479,25 +493,33 @@ const BillingCurrentCost = () => {
                                             <Button
                                                 compact
                                                 size="mini"
-                                                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                                                onMouseDown={(e: React.MouseEvent) =>
+                                                    e.stopPropagation()
+                                                }
                                                 onClick={(e: React.MouseEvent) => {
-                                                    e.stopPropagation();
-                                                    e.preventDefault();
-                                                    toggleColumnGroup(DAILY_COLUMNS, false);
+                                                    e.stopPropagation()
+                                                    e.preventDefault()
+                                                    toggleColumnGroup(DAILY_COLUMNS, false)
                                                 }}
                                             >
                                                 None
                                             </Button>
                                         </div>
                                     </Dropdown.Item>
-                                    <ColumnCheckbox category="compute_daily" label="Compute (Daily)" />
-                                    <ColumnCheckbox category="storage_daily" label="Storage (Daily)" />
+                                    <ColumnCheckbox
+                                        category="compute_daily"
+                                        label="Compute (Daily)"
+                                    />
+                                    <ColumnCheckbox
+                                        category="storage_daily"
+                                        label="Storage (Daily)"
+                                    />
                                     <ColumnCheckbox category="total_daily" label="Total (Daily)" />
                                 </>
                             )}
 
                             {/* Monthly Columns */}
-                            <Dropdown.Header content='Monthly Costs' />
+                            <Dropdown.Header content="Monthly Costs" />
                             <Dropdown.Item
                                 onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
                                 onClick={(e: React.MouseEvent) => e.stopPropagation()}
@@ -508,9 +530,9 @@ const BillingCurrentCost = () => {
                                         size="mini"
                                         onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
                                         onClick={(e: React.MouseEvent) => {
-                                            e.stopPropagation();
-                                            e.preventDefault();
-                                            toggleColumnGroup(MONTHLY_COLUMNS, true);
+                                            e.stopPropagation()
+                                            e.preventDefault()
+                                            toggleColumnGroup(MONTHLY_COLUMNS, true)
                                         }}
                                     >
                                         All
@@ -520,9 +542,9 @@ const BillingCurrentCost = () => {
                                         size="mini"
                                         onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
                                         onClick={(e: React.MouseEvent) => {
-                                            e.stopPropagation();
-                                            e.preventDefault();
-                                            toggleColumnGroup(MONTHLY_COLUMNS, false);
+                                            e.stopPropagation()
+                                            e.preventDefault()
+                                            toggleColumnGroup(MONTHLY_COLUMNS, false)
                                         }}
                                     >
                                         None
@@ -536,8 +558,11 @@ const BillingCurrentCost = () => {
                             {/* Budget Column */}
                             {groupBy === BillingColumn.GcpProject && invoiceMonth === thisMonth && (
                                 <>
-                                    <Dropdown.Header content='Budget' />
-                                    <ColumnCheckbox category="budget_spent" label="Budget Spend %" />
+                                    <Dropdown.Header content="Budget" />
+                                    <ColumnCheckbox
+                                        category="budget_spent"
+                                        label="Budget Spend %"
+                                    />
                                 </>
                             )}
                         </Dropdown.Menu>
@@ -636,35 +661,44 @@ const BillingCurrentCost = () => {
                             {(() => {
                                 // Calculate how many daily columns are visible
                                 if (invoiceMonth === thisMonth) {
-                                    const visibleCount = ['compute_daily', 'storage_daily', 'total_daily'].filter(
-                                        col => isColumnVisible(col)
-                                    ).length;
+                                    const visibleCount = [
+                                        'compute_daily',
+                                        'storage_daily',
+                                        'total_daily',
+                                    ].filter((col) => isColumnVisible(col)).length
 
                                     return visibleCount > 0 ? (
                                         <SUITable.HeaderCell colSpan={visibleCount}>
                                             24H (day UTC {lastLoadedDay})
                                         </SUITable.HeaderCell>
-                                    ) : null;
+                                    ) : null
                                 }
-                                return null;
+                                return null
                             })()}
 
                             {(() => {
                                 // Calculate how many monthly columns are visible
-                                const baseColumns = ['compute_monthly', 'storage_monthly', 'total_monthly'];
-                                const budgetColumn = (groupBy === BillingColumn.GcpProject &&
-                                                     invoiceMonth === thisMonth &&
-                                                     isColumnVisible('budget_spent')) ? 1 : 0;
+                                const baseColumns = [
+                                    'compute_monthly',
+                                    'storage_monthly',
+                                    'total_monthly',
+                                ]
+                                const budgetColumn =
+                                    groupBy === BillingColumn.GcpProject &&
+                                    invoiceMonth === thisMonth &&
+                                    isColumnVisible('budget_spent')
+                                        ? 1
+                                        : 0
 
-                                const visibleCount = baseColumns.filter(
-                                    col => isColumnVisible(col)
-                                ).length + budgetColumn;
+                                const visibleCount =
+                                    baseColumns.filter((col) => isColumnVisible(col)).length +
+                                    budgetColumn
 
                                 return visibleCount > 0 ? (
                                     <SUITable.HeaderCell colSpan={visibleCount}>
                                         Invoice Month (Acc)
                                     </SUITable.HeaderCell>
-                                ) : null;
+                                ) : null
                             })()}
                         </SUITable.Row>
                         <SUITable.Row>
@@ -692,8 +726,8 @@ const BillingCurrentCost = () => {
                             })}
 
                             {groupBy === BillingColumn.GcpProject &&
-                              invoiceMonth === thisMonth &&
-                              isColumnVisible('budget_spent') ? (
+                            invoiceMonth === thisMonth &&
+                            isColumnVisible('budget_spent') ? (
                                 <SUITable.HeaderCell
                                     key={'budget_spent'}
                                     sorted={checkDirection('budget_spent')}
@@ -743,7 +777,10 @@ const BillingCurrentCost = () => {
                                         switch (k.category) {
                                             case 'field':
                                                 return (
-                                                    <SUITable.Cell key={k.category} className="billing-href">
+                                                    <SUITable.Cell
+                                                        key={k.category}
+                                                        className="billing-href"
+                                                    >
                                                         <b>
                                                             <Link
                                                                 to={
@@ -802,7 +839,8 @@ const BillingCurrentCost = () => {
 
                                             {dk.cost_group === 'C' ? (
                                                 <React.Fragment>
-                                                    {invoiceMonth === thisMonth && isColumnVisible('compute_daily') ? (
+                                                    {invoiceMonth === thisMonth &&
+                                                    isColumnVisible('compute_daily') ? (
                                                         <SUITable.Cell>
                                                             {formatMoney(dk.daily_cost)}
                                                         </SUITable.Cell>
@@ -813,14 +851,20 @@ const BillingCurrentCost = () => {
                                                         // For the daily section, we need to check visibility of storage_daily and total_daily
                                                         if (invoiceMonth === thisMonth) {
                                                             const visibleCount =
-                                                                (isColumnVisible('storage_daily') ? 1 : 0) +
-                                                                (isColumnVisible('total_daily') ? 1 : 0);
+                                                                (isColumnVisible('storage_daily')
+                                                                    ? 1
+                                                                    : 0) +
+                                                                (isColumnVisible('total_daily')
+                                                                    ? 1
+                                                                    : 0)
 
                                                             return visibleCount > 0 ? (
-                                                                <SUITable.Cell colSpan={visibleCount} />
-                                                            ) : null;
+                                                                <SUITable.Cell
+                                                                    colSpan={visibleCount}
+                                                                />
+                                                            ) : null
                                                         }
-                                                        return null;
+                                                        return null
                                                     })()}
 
                                                     {isColumnVisible('compute_monthly') ? (
@@ -833,12 +877,16 @@ const BillingCurrentCost = () => {
                                                     {(() => {
                                                         // For monthly section, check visibility of storage_monthly and total_monthly
                                                         const visibleCount =
-                                                            (isColumnVisible('storage_monthly') ? 1 : 0) +
-                                                            (isColumnVisible('total_monthly') ? 1 : 0);
+                                                            (isColumnVisible('storage_monthly')
+                                                                ? 1
+                                                                : 0) +
+                                                            (isColumnVisible('total_monthly')
+                                                                ? 1
+                                                                : 0)
 
                                                         return visibleCount > 0 ? (
                                                             <SUITable.Cell colSpan={visibleCount} />
-                                                        ) : null;
+                                                        ) : null
                                                     })()}
                                                 </React.Fragment>
                                             ) : (
@@ -847,14 +895,16 @@ const BillingCurrentCost = () => {
                                                         <SUITable.Cell />
                                                     ) : null}
 
-                                                    {invoiceMonth === thisMonth && isColumnVisible('storage_daily') ? (
+                                                    {invoiceMonth === thisMonth &&
+                                                    isColumnVisible('storage_daily') ? (
                                                         <SUITable.Cell>
                                                             {formatMoney(dk.daily_cost)}
                                                         </SUITable.Cell>
                                                     ) : null}
 
                                                     {/* Calculate colspan for total_daily */}
-                                                    {invoiceMonth === thisMonth && isColumnVisible('total_daily') ? (
+                                                    {invoiceMonth === thisMonth &&
+                                                    isColumnVisible('total_daily') ? (
                                                         <SUITable.Cell />
                                                     ) : null}
 
@@ -875,8 +925,8 @@ const BillingCurrentCost = () => {
                                             )}
 
                                             {groupBy === BillingColumn.GcpProject &&
-                                             invoiceMonth === thisMonth &&
-                                             isColumnVisible('budget_spent') ? (
+                                            invoiceMonth === thisMonth &&
+                                            isColumnVisible('budget_spent') ? (
                                                 <SUITable.Cell />
                                             ) : null}
                                         </SUITable.Row>

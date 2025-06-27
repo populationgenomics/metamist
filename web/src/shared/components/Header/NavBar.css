@@ -109,7 +109,8 @@
 }
 
 /* Popup z-index fixes */
-.ui.popup, .navPopup {
+.ui.popup,
+.navPopup {
     z-index: 1004 !important;
 }
 

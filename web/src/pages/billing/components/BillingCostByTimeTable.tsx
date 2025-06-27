@@ -1,5 +1,12 @@
 import React from 'react'
-import { Button, Checkbox, CheckboxProps, Dropdown, Header, Table as SUITable } from 'semantic-ui-react'
+import {
+    Button,
+    Checkbox,
+    CheckboxProps,
+    Dropdown,
+    Header,
+    Table as SUITable,
+} from 'semantic-ui-react'
 import { IStackedAreaByDateChartData } from '../../../shared/components/Graphs/StackedAreaByDateChart'
 import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
 import Table from '../../../shared/components/Table'
@@ -88,7 +95,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     // Define available columns based on expand state
     const getAvailableColumns = React.useCallback(() => {
         // Filter out 'Cloud Storage' from groups since it's always a storage cost, not compute cost
-        const computeGroups = groups.filter(group => group !== 'Cloud Storage')
+        const computeGroups = groups.filter((group) => group !== 'Cloud Storage')
 
         if (expandCompute) {
             // When expanded, show all individual compute categories, plus storage and daily total
@@ -112,7 +119,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
             let hasChanges = false
 
             // Filter out 'Cloud Storage' from groups since it's always a storage cost, not compute cost
-            const computeGroups = groups.filter(group => group !== 'Cloud Storage')
+            const computeGroups = groups.filter((group) => group !== 'Cloud Storage')
 
             if (expandCompute) {
                 // Switching to expanded mode - remove 'Compute Cost' summary and add individual compute groups
@@ -121,7 +128,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                     hasChanges = true
                 }
                 // Add all compute cost columns (excluding Cloud Storage)
-                computeGroups.forEach(group => {
+                computeGroups.forEach((group) => {
                     if (!newVisibleColumns.has(group)) {
                         newVisibleColumns.add(group)
                         hasChanges = true
@@ -129,7 +136,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                 })
             } else {
                 // Switching to collapsed mode - remove individual compute groups and add 'Compute Cost' summary
-                computeGroups.forEach(group => {
+                computeGroups.forEach((group) => {
                     if (newVisibleColumns.has(group)) {
                         newVisibleColumns.delete(group)
                         hasChanges = true
@@ -174,29 +181,29 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     const headerFields = () => {
         const baseFields = expandCompute
             ? internalGroups
-                .sort(headerSort)
-                .filter((group) => group != 'Compute Cost')
-                .map((group: string) => ({
-                    category: group,
-                    title: group,
-                }))
+                  .sort(headerSort)
+                  .filter((group) => group != 'Compute Cost')
+                  .map((group: string) => ({
+                      category: group,
+                      title: group,
+                  }))
             : [
-                {
-                    category: 'Daily Total',
-                    title: 'Daily Total',
-                },
-                {
-                    category: 'Cloud Storage',
-                    title: 'Cloud Storage',
-                },
-                {
-                    category: 'Compute Cost',
-                    title: 'Compute Cost',
-                },
-            ]
+                  {
+                      category: 'Daily Total',
+                      title: 'Daily Total',
+                  },
+                  {
+                      category: 'Cloud Storage',
+                      title: 'Cloud Storage',
+                  },
+                  {
+                      category: 'Compute Cost',
+                      title: 'Compute Cost',
+                  },
+              ]
 
         // Filter by visible columns
-        return baseFields.filter(field => visibleColumns.has(field.category))
+        return baseFields.filter((field) => visibleColumns.has(field.category))
     }
 
     const handleSort = (clickedColumn: string) => {
@@ -283,7 +290,10 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     }
 
     // Toggle parent column groups (Storage Cost / Compute Cost)
-    const toggleParentColumnGroup = (parentGroup: 'Storage Cost' | 'Compute Cost', event?: React.SyntheticEvent) => {
+    const toggleParentColumnGroup = (
+        parentGroup: 'Storage Cost' | 'Compute Cost',
+        event?: React.SyntheticEvent
+    ) => {
         if (event) {
             event.stopPropagation()
         }
@@ -300,15 +310,15 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         } else if (parentGroup === 'Compute Cost') {
             if (expandCompute) {
                 // When expanded, toggle all individual compute categories
-                const computeGroups = groups.filter(group => group !== 'Cloud Storage')
-                const allComputeVisible = computeGroups.every(group => newSet.has(group))
+                const computeGroups = groups.filter((group) => group !== 'Cloud Storage')
+                const allComputeVisible = computeGroups.every((group) => newSet.has(group))
 
                 if (allComputeVisible) {
                     // Hide all compute categories
-                    computeGroups.forEach(group => newSet.delete(group))
+                    computeGroups.forEach((group) => newSet.delete(group))
                 } else {
                     // Show all compute categories
-                    computeGroups.forEach(group => newSet.add(group))
+                    computeGroups.forEach((group) => newSet.add(group))
                 }
             } else {
                 // When collapsed, toggle the Compute Cost summary
@@ -330,8 +340,8 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         } else if (parentGroup === 'Compute Cost') {
             if (expandCompute) {
                 // When expanded, check if any individual compute categories are visible
-                const computeGroups = groups.filter(group => group !== 'Cloud Storage')
-                return computeGroups.some(group => visibleColumns.has(group))
+                const computeGroups = groups.filter((group) => group !== 'Cloud Storage')
+                return computeGroups.some((group) => visibleColumns.has(group))
             } else {
                 // When collapsed, check if Compute Cost summary is visible
                 return visibleColumns.has('Compute Cost')
@@ -343,7 +353,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     // Toggle all columns in a group
     const toggleColumnGroup = (categoryGroup: string[], visible: boolean) => {
         const newSet = new Set(visibleColumns)
-        categoryGroup.forEach(category => {
+        categoryGroup.forEach((category) => {
             if (visible) {
                 newSet.add(category)
             } else {
@@ -354,7 +364,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     }
 
     // Reusable column checkbox component
-    const ColumnCheckbox = ({ category, label }: { category: string, label: string }) => {
+    const ColumnCheckbox = ({ category, label }: { category: string; label: string }) => {
         const handleItemClick = (e: React.MouseEvent) => {
             e.stopPropagation()
             e.preventDefault()
@@ -387,7 +397,13 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     }
 
     // Reusable parent column checkbox component
-    const ParentColumnCheckbox = ({ parentGroup, label }: { parentGroup: 'Storage Cost' | 'Compute Cost', label: string }) => {
+    const ParentColumnCheckbox = ({
+        parentGroup,
+        label,
+    }: {
+        parentGroup: 'Storage Cost' | 'Compute Cost'
+        label: string
+    }) => {
         const handleItemClick = (e: React.MouseEvent) => {
             e.stopPropagation()
             e.preventDefault()
@@ -421,7 +437,14 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
 
     return (
         <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <div
+                style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '15px',
+                }}
+            >
                 <Header as="h3" style={{ margin: 0 }}>
                     {convertFieldName(heading)} costs from {start} to {end}
                 </Header>
@@ -451,11 +474,8 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                         closeOnChange={false}
                         closeOnEscape={true}
                     >
-                        <Dropdown.Menu
-                            className="dropdown-menu-content"
-                            style={{ zIndex: 1001 }}
-                        >
-                            <Dropdown.Header icon='table' content='Column Visibility' />
+                        <Dropdown.Menu className="dropdown-menu-content" style={{ zIndex: 1001 }}>
+                            <Dropdown.Header icon="table" content="Column Visibility" />
                             <Dropdown.Item
                                 onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
                                 onClick={(e: React.MouseEvent) => e.stopPropagation()}
@@ -466,9 +486,9 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                                         size="mini"
                                         onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
                                         onClick={(e: React.MouseEvent) => {
-                                            e.stopPropagation();
-                                            e.preventDefault();
-                                            toggleColumnGroup(availableColumns, true);
+                                            e.stopPropagation()
+                                            e.preventDefault()
+                                            toggleColumnGroup(availableColumns, true)
                                         }}
                                     >
                                         Select All
@@ -478,9 +498,9 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                                         size="mini"
                                         onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
                                         onClick={(e: React.MouseEvent) => {
-                                            e.stopPropagation();
-                                            e.preventDefault();
-                                            toggleColumnGroup(availableColumns, false);
+                                            e.stopPropagation()
+                                            e.preventDefault()
+                                            toggleColumnGroup(availableColumns, false)
                                         }}
                                     >
                                         Hide All
@@ -490,7 +510,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                             <Dropdown.Divider />
 
                             {/* Main Column Groups */}
-                            <Dropdown.Header content='Column Groups' />
+                            <Dropdown.Header content="Column Groups" />
                             <ColumnCheckbox category="Daily Total" label="Daily Total" />
                             <ParentColumnCheckbox parentGroup="Storage Cost" label="Storage Cost" />
                             <ParentColumnCheckbox parentGroup="Compute Cost" label="Compute Cost" />
@@ -499,9 +519,9 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                             {expandCompute && groups.length > 0 && (
                                 <>
                                     <Dropdown.Divider />
-                                    <Dropdown.Header content='Individual Compute Categories' />
+                                    <Dropdown.Header content="Individual Compute Categories" />
                                     {groups
-                                        .filter(group => group !== 'Cloud Storage') // Exclude Cloud Storage from compute categories
+                                        .filter((group) => group !== 'Cloud Storage') // Exclude Cloud Storage from compute categories
                                         .sort()
                                         .map((group) => (
                                             <ColumnCheckbox
@@ -560,15 +580,23 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                         <SUITable.HeaderCell
                             colSpan={visibleColumns.has('Cloud Storage') ? 1 : 0}
                             style={{
-                                display: visibleColumns.has('Cloud Storage') ? 'table-cell' : 'none'
+                                display: visibleColumns.has('Cloud Storage')
+                                    ? 'table-cell'
+                                    : 'none',
                             }}
                         >
                             Storage Cost
                         </SUITable.HeaderCell>
                         <SUITable.HeaderCell
-                            colSpan={headerFields().length - (visibleColumns.has('Cloud Storage') ? 1 : 0) - (visibleColumns.has('Daily Total') ? 1 : 0)}
+                            colSpan={
+                                headerFields().length -
+                                (visibleColumns.has('Cloud Storage') ? 1 : 0) -
+                                (visibleColumns.has('Daily Total') ? 1 : 0)
+                            }
                             style={{
-                                display: isParentGroupVisible('Compute Cost') ? 'table-cell' : 'none'
+                                display: isParentGroupVisible('Compute Cost')
+                                    ? 'table-cell'
+                                    : 'none',
                             }}
                         >
                             Compute Cost

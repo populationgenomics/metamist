@@ -364,9 +364,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
             .sort(headerSort)
 
         // Filter to only visible columns
-        const visibleGroups = allPossibleColumns.filter(group =>
-            visibleColumns.has(group)
-        )
+        const visibleGroups = allPossibleColumns.filter((group) => visibleColumns.has(group))
 
         const headerFields = ['Date', ...visibleGroups]
         const matrix = data.map((row) => {
