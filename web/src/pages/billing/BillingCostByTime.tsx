@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Dropdown, DropdownProps, Grid, Input, Message } from 'semantic-ui-react'
+import { Button, Card, DropdownProps, Grid, Input, Message } from 'semantic-ui-react'
 import { BarChart, IData } from '../../shared/components/Graphs/BarChart'
 import { DonutChart } from '../../shared/components/Graphs/DonutChart'
 import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
@@ -49,6 +49,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
     const [groups, setGroups] = React.useState<string[]>([])
     const [data, setData] = React.useState<IStackedAreaByDateChartData[]>([])
     const [aggregatedData, setAggregatedData] = React.useState<IData[]>([])
+    const [visibleColumns, setVisibleColumns] = React.useState<Set<string>>(new Set())
 
     // use navigate and update url params
     const location = useLocation()
@@ -143,6 +144,10 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     (item): item is string => item !== undefined
                 )
                 setGroups(no_undefined)
+
+                // Include additional columns that will be added by the table component
+                const allColumns = [...no_undefined, 'Daily Total', 'Cloud Storage', 'Compute Cost']
+                setVisibleColumns(new Set(allColumns))
                 setData(
                     Object.keys(records).map((key) => ({
                         date: new Date(key),
@@ -271,6 +276,9 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         groups={groups}
                         isLoading={isLoading}
                         data={data}
+                        visibleColumns={visibleColumns}
+                        setVisibleColumns={setVisibleColumns}
+                        exportToFile={exportToFile}
                     />
                 </Card>
             </>
@@ -337,11 +345,45 @@ const BillingCostByTime: React.FunctionComponent = () => {
     }, [start, end, groupBy, selectedData])
 
     const exportToFile = (format: 'csv' | 'tsv') => {
-        const headerFields = ['Date', ...groups]
+        // Use the same priority columns and sorting logic as the table
+        const priorityColumns = ['Daily Total', 'Cloud Storage', 'Compute Cost']
+        const headerSort = (a: string, b: string) => {
+            if (priorityColumns.includes(a) && priorityColumns.includes(b)) {
+                return priorityColumns.indexOf(a) < priorityColumns.indexOf(b) ? -1 : 1
+            } else if (priorityColumns.includes(a)) {
+                return -1
+            } else if (priorityColumns.includes(b)) {
+                return 1
+            }
+            return a < b ? -1 : 1
+        }
+
+        // Create the full list of possible columns in the correct order
+        const allPossibleColumns = [...groups, 'Daily Total', 'Cloud Storage', 'Compute Cost']
+            .filter((column, index, arr) => arr.indexOf(column) === index) // Remove duplicates
+            .sort(headerSort)
+
+        // Filter to only visible columns
+        const visibleGroups = allPossibleColumns.filter(group =>
+            visibleColumns.has(group)
+        )
+
+        const headerFields = ['Date', ...visibleGroups]
         const matrix = data.map((row) => {
             const dateStr = row.date.toISOString().slice(0, 10)
-            const vals = groups.map((group) => {
-                const val = row.values[group]
+            const total = Object.values(row.values).reduce((acc, cur) => acc + cur, 0)
+            const computeCost = total - row.values['Cloud Storage']
+
+            const vals = visibleGroups.map((group) => {
+                let val: number
+                if (group === 'Daily Total') {
+                    val = total
+                } else if (group === 'Compute Cost') {
+                    val = computeCost
+                } else {
+                    val = row.values[group]
+                }
+
                 if (typeof val === 'number') {
                     // leave blank if value is exactly 0
                     return val === 0 ? '' : Number(val).toFixed(2)
@@ -371,31 +413,6 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     >
                         Billing Cost By Time
                     </h1>
-                    <div style={{ textAlign: 'right' }}>
-                        <Dropdown
-                            button
-                            className="icon"
-                            floating
-                            labeled
-                            icon="download"
-                            text="Export"
-                        >
-                            <Dropdown.Menu>
-                                <Dropdown.Item
-                                    key="csv"
-                                    text="Export to CSV"
-                                    icon="file excel"
-                                    onClick={() => exportToFile('csv')}
-                                />
-                                <Dropdown.Item
-                                    key="tsv"
-                                    text="Export to TSV"
-                                    icon="file text outline"
-                                    onClick={() => exportToFile('tsv')}
-                                />
-                            </Dropdown.Menu>
-                        </Dropdown>
-                    </div>
                 </div>
 
                 <Grid columns="equal" stackable doubling>
