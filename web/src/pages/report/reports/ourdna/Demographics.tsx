@@ -17,12 +17,13 @@ export default function Demographics() {
                     flexGrow={1}
                     title="Ratio of reported sex"
                     subtitle="For participants who have reported"
-                    description="This chart shows the ratio of participants that have responded by reporting their sex"
+                    description="This chart shows the ratio of participants that have responded by reporting their sex, limited to participant for whom we have blood samples"
                     query={`
                         select
-                            count(*) filter (reported_sex = 1) as male,
-                            count(*) filter (reported_sex = 2) as female
-                        from participant
+                            count(distinct p.participant_id) filter (p.reported_sex = 1) as male,
+                            count(distinct p.participant_id) filter (p.reported_sex = 2) as female
+                        from participant p
+                        join sample s on s.participant_id = p.participant_id
                     `}
                 />
                 <ReportItemPlot
@@ -37,13 +38,13 @@ export default function Demographics() {
                             query: `
                                 select
                                     p.participant_id,
-                                    "meta_collection-time" as collection_time,
-                                    unnest(p."meta_ancestry-participant-ancestry") as ancestry
+                                    meta_collection_datetime as collection_time,
+                                    unnest(p.meta_ancestry_participant_ancestry) as ancestry
                                 from participant p
                                 join sample s
                                 on s.participant_id = p.participant_id
                                 where collection_time is not null
-                                and collection_time != ' '
+                                and s.type = 'blood'
                             `,
                         },
                         {
@@ -54,11 +55,8 @@ export default function Demographics() {
                                     date_trunc(
                                         'week',
                                         try_strptime(
-                                            nullif(
-                                                collection_time,
-                                                ' '
-                                            ),
-                                            '%Y-%m-%d %H:%M:%S'
+                                            collection_time,
+                                            '%Y-%m-%dT%H:%M:%S'
                                         )
                                     ) as week,
                                     ancestry
@@ -101,7 +99,7 @@ export default function Demographics() {
                             name: 'result',
                             query: `
                                 select
-                                    (SUM(participants) over (PARTITION BY ancestry  ORDER BY week ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)) as count,
+                                    (SUM(participants) over (PARTITION BY ancestry ORDER BY week ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)) as count,
                                     ancestry,
                                     week
                                 from filled
@@ -138,17 +136,24 @@ export default function Demographics() {
                     flexGrow={1}
                     flexBasis={400}
                     title="Participant age and reported sex"
-                    description="Age buckets for participants. (note, the ages are based off the birth year so may be +- 1 year depending on DOB"
+                    description="Age (at time of collection) buckets for participants. (note, the ages are based off the birth year so may be +- 1 year depending on DOB"
                     query={`
                         with ages as (
-                            select
-                                participant_id,
+                            select distinct
+                                p.participant_id,
                                 CASE reported_sex WHEN 1 THEN 'male' WHEN 2 THEN 'female' ELSE 'other/unknown' END as reported_sex,
-                                date_part('year', current_date()) - try_cast("meta_birth-year" as int) as age
-                            from participant
-                            where date_part('year', current_date()) - try_cast("meta_birth-year" as int) is not null
+                                date_part(
+                                    'year',
+                                    try_strptime(
+                                        s.meta_collection_datetime,
+                                        '%Y-%m-%dT%H:%M:%S'
+                                    )
+                                ) - try_cast(meta_birth_year as int) as age
+                            from participant p
+                            join sample s on s.participant_id = p.participant_id
+                            and s.type = 'blood'
                         ) select * from ages
-                        where age >= 16 and age <= 120
+                        where age >= 16 and age <= 120 and age is not null
                     `}
                     plot={(data) => ({
                         color: { legend: true },
@@ -175,7 +180,7 @@ export default function Demographics() {
                         with all_ancestries as (
                             select
                                 p.participant_id,
-                                unnest(p."meta_ancestry-participant-ancestry") as ancestry
+                                unnest(p.meta_ancestry_participant_ancestry) as ancestry
                             from participant p
                             join sample s on s.participant_id = p.participant_id
                             where s.type = 'blood'
@@ -221,8 +226,8 @@ export default function Demographics() {
                         with all_ancestries as (
                             select
                                 p.participant_id,
-                                unnest(p."meta_ancestry-participant-ancestry") as ancestry,
-                                coalesce(s."meta_processing-site", 'Unknown') as processing_site
+                                unnest(p.meta_ancestry_participant_ancestry) as ancestry,
+                                coalesce(s.meta_processing_site, 'Unknown') as processing_site
                             from participant p
                             join sample s on s.participant_id = p.participant_id
                             where s.type = 'blood'
