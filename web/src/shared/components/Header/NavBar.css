@@ -23,10 +23,8 @@
     position: sticky;
     top: 0;
     width: 100%;
-    max-width: 100vw;
     z-index: 999;
     padding: 0 8px;
-    box-sizing: border-box;
     /* height: 50px; */
 }
 
@@ -43,7 +41,6 @@
 .ui.header.menu {
     background-color: #24344f;
     box-shadow: none;
-    max-width: 100%;
 }
 
 /* Menu items top level */
@@ -69,14 +66,9 @@
 }
 
 /* Menu items sub level */
-#navDrop {
-    z-index: 1001 !important;
-}
-
 #navDrop #navDropMenu {
     border-radius: 4px !important;
     top: 150% !important;
-    z-index: 1002 !important;
 
     html[data-theme='dark-mode'] & {
         background-color: #555 !important;
@@ -106,63 +98,6 @@
     padding: 10px !important;
     margin: 1px !important;
     border-radius: 4px !important;
-}
-
-/* Popup z-index fixes */
-.ui.popup,
-.navPopup {
-    z-index: 1004 !important;
-}
-
-/* Search component z-index */
-.ui.search .results {
-    z-index: 1003 !important;
-}
-
-/* Ensure dropdown menus appear above page content */
-.ui.dropdown .menu {
-    z-index: 1002 !important;
-}
-
-.ui.dropdown.visible {
-    z-index: 1001 !important;
-}
-
-/* Specific fix for navigation dropdowns */
-.App-header .ui.dropdown .menu {
-    z-index: 1003 !important;
-    position: absolute !important;
-}
-
-.App-header .ui.dropdown.visible {
-    z-index: 1002 !important;
-}
-
-/* Responsive navigation */
-@media (max-width: 768px) {
-    .App-header {
-        padding: 0 4px;
-    }
-
-    .App-header .ui.menu .item {
-        padding: 4px !important;
-        font-size: 0.9rem;
-    }
-
-    #metamist-img {
-        padding: 8px;
-        font-size: 24px;
-    }
-}
-
-@media (max-width: 480px) {
-    .App-header .navbarLink {
-        display: none;
-    }
-
-    .App-header .navbarIcon {
-        padding: 4px;
-    }
 }
 
 /* To check */
