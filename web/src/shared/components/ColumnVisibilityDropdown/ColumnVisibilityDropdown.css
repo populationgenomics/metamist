@@ -1,0 +1,144 @@
+/* Column Visibility Dropdown Styles */
+
+.dropdown-menu-content {
+    background-color: #f8f9fa !important;
+    border: 1px solid #e9ecef !important;
+    border-radius: 4px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    min-width: 250px !important;
+    max-height: 500px !important;
+    overflow-y: auto !important;
+}
+
+.dropdown-menu-content .ui.checkbox label {
+    color: #495057 !important;
+}
+
+.dropdown-header {
+    background-color: #e9ecef !important;
+    color: #495057 !important;
+    font-weight: bold !important;
+    padding: 12px 16px !important;
+    border-bottom: 1px solid #dee2e6 !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+}
+
+.section-header {
+    color: #6c757d !important;
+    font-size: 0.85em !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    padding: 8px 16px !important;
+    margin: 0 !important;
+    position: sticky !important;
+    top: 61px !important;
+    background-color: #f8f9fa !important;
+    z-index: 9 !important;
+}
+
+/* Column checkbox items */
+.column-checkbox-item {
+    padding: 8px 16px !important;
+    background-color: #ffffff !important;
+    border-left: 3px solid transparent !important;
+    transition: all 0.2s ease !important;
+    cursor: pointer !important;
+    min-height: 36px !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+.column-checkbox-item:hover {
+    background-color: #f1f3f4 !important;
+}
+
+.column-checkbox-item.selected {
+    background-color: #e3f2fd !important;
+    border-left: 3px solid #2196f3 !important;
+}
+
+.column-checkbox-item.selected:hover {
+    background-color: #bbdefb !important;
+}
+
+.column-checkbox-content {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.column-checkbox-content .ui.checkbox {
+    margin: 0 !important;
+}
+
+.column-label {
+    margin-left: 8px;
+    color: #495057;
+    font-weight: 400;
+}
+
+.column-label.visible {
+    font-weight: 500;
+}
+
+/* Toggle button sections */
+.global-toggle-item,
+.group-toggle-item {
+    padding: 12px 16px !important;
+    background-color: #f8f9fa !important;
+    border-bottom: 1px solid #dee2e6 !important;
+}
+
+.global-toggle-buttons,
+.group-toggle-buttons {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+/* Required column items */
+.required-column-item {
+    padding: 8px 16px !important;
+    opacity: 0.7 !important;
+    background-color: #f8f9fa !important;
+}
+
+.required-columns-section {
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* Section spacing */
+.column-group-section,
+.ungrouped-columns-section {
+    border-bottom: 1px solid #dee2e6;
+}
+
+.column-group-section:last-child,
+.ungrouped-columns-section:last-child {
+    border-bottom: none;
+}
+
+/* Accessibility improvements */
+.column-checkbox-item[role='menuitemcheckbox'][aria-checked='true'] {
+    background-color: #e3f2fd !important;
+}
+
+.column-checkbox-item[role='menuitemcheckbox']:focus {
+    outline: 2px solid #2196f3;
+    outline-offset: -2px;
+}
+
+/* Disabled state */
+.column-checkbox-item[disabled] {
+    cursor: not-allowed !important;
+    opacity: 0.6 !important;
+}
+
+/* Button overrides for compact mini buttons */
+.global-toggle-buttons .ui.button.mini,
+.group-toggle-buttons .ui.button.mini {
+    font-size: 0.7rem !important;
+    padding: 0.4em 0.8em !important;
+}

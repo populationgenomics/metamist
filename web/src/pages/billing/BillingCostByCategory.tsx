@@ -1,6 +1,12 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Checkbox, Dropdown, Grid, Input, Message } from 'semantic-ui-react'
+import {
+    ColumnConfig,
+    ColumnGroup,
+    ColumnVisibilityDropdown,
+    useColumnVisibility,
+} from '../../shared/components/ColumnVisibilityDropdown'
 import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import { exportTable } from '../../shared/utilities/exportTable'
@@ -52,6 +58,7 @@ const BillingCostByCategory: React.FunctionComponent = () => {
     )
 
     const [accumulate, setAccumulate] = React.useState<boolean>(true)
+    const [visibleColumns, setVisibleColumns] = React.useState<Set<string>>(new Set())
 
     // use navigate and update url params
     const location = useLocation()
@@ -187,6 +194,52 @@ const BillingCostByCategory: React.FunctionComponent = () => {
         }
     }, [groupBy, selectedGroup, selectedCostCategory, selectedPeriod, start, end])
 
+    // Generate column configurations for the dropdown
+    const getColumnConfigs = React.useCallback((): ColumnConfig[] => {
+        const configs: ColumnConfig[] = []
+
+        // Add SKU columns based on available data
+        const skuSet = new Set<string>()
+        data.forEach((row) => {
+            Object.keys(row.values).forEach((sku) => skuSet.add(sku))
+        })
+
+        const skus = [...skuSet].sort()
+        skus.forEach((sku) => {
+            configs.push({ id: sku, label: sku, group: 'skus' })
+        })
+
+        return configs
+    }, [data])
+
+    // Generate column groups for the dropdown
+    const getColumnGroups = React.useCallback((): ColumnGroup[] => {
+        const skuColumns = getColumnConfigs()
+            .filter((config) => config.group === 'skus')
+            .map((config) => config.id)
+
+        return [{ id: 'skus', label: 'SKUs', columns: skuColumns }]
+    }, [getColumnConfigs])
+
+    // Use the column visibility hook
+    const { isColumnVisible } = useColumnVisibility(getColumnConfigs(), visibleColumns)
+
+    // Initialize visible columns when data changes
+    React.useEffect(() => {
+        if (data.length > 0) {
+            const skuSet = new Set<string>()
+            data.forEach((row) => {
+                Object.keys(row.values).forEach((sku) => skuSet.add(sku))
+            })
+            const skus = [...skuSet].sort()
+
+            // Start with all SKUs visible by default
+            const initialColumns = new Set<string>(skus)
+
+            setVisibleColumns(initialColumns)
+        }
+    }, [data])
+
     if (error) {
         return (
             <Message negative onDismiss={() => setError(undefined)}>
@@ -215,14 +268,17 @@ const BillingCostByCategory: React.FunctionComponent = () => {
         const dates = [...dateSet].sort()
         const skus = [...skuSet].sort()
 
-        const headerFields = ['SKU', ...dates]
+        // Filter SKUs by visible columns
+        const visibleSkus = skus.filter((sku) => isColumnVisible(sku))
+        const headerFields = ['Date', ...visibleSkus]
 
-        const matrix = skus.map((sku) => {
-            const rowCells = dates.map((date) => {
-                const cost = dateToValues.get(date)?.[sku]
+        const matrix = dates.map((date) => {
+            const values = dateToValues.get(date) || {}
+            const rowCells = visibleSkus.map((sku) => {
+                const cost = values[sku]
                 return typeof cost === 'number' && cost !== 0 ? cost.toFixed(2) : ''
             })
-            return [sku, ...rowCells]
+            return [date, ...rowCells]
         })
 
         exportTable({ headerFields, matrix }, format, 'billing_cost_by_category')
@@ -239,7 +295,14 @@ const BillingCostByCategory: React.FunctionComponent = () => {
                     >
                         Billing Cost By Category
                     </h1>
-                    <div style={{ textAlign: 'right' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <ColumnVisibilityDropdown
+                            columns={getColumnConfigs()}
+                            groups={getColumnGroups()}
+                            visibleColumns={visibleColumns}
+                            onVisibilityChange={setVisibleColumns}
+                            buttonStyle={{ marginRight: '0px' }}
+                        />
                         <Dropdown
                             button
                             className="icon"
@@ -341,7 +404,14 @@ const BillingCostByCategory: React.FunctionComponent = () => {
                         <CostByTimeBarChart
                             isLoading={isLoading}
                             accumulate={accumulate}
-                            data={data}
+                            data={data.map((row) => ({
+                                ...row,
+                                values: Object.fromEntries(
+                                    Object.entries(row.values).filter(([sku]) =>
+                                        isColumnVisible(sku)
+                                    )
+                                ),
+                            }))}
                         />
                     </Grid.Column>
                 </Grid>

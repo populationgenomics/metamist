@@ -1,12 +1,11 @@
 import React from 'react'
+import { Checkbox, Dropdown, Header, Table as SUITable } from 'semantic-ui-react'
 import {
-    Button,
-    Checkbox,
-    CheckboxProps,
-    Dropdown,
-    Header,
-    Table as SUITable,
-} from 'semantic-ui-react'
+    ColumnConfig,
+    ColumnGroup,
+    ColumnVisibilityDropdown,
+    useColumnVisibility,
+} from '../../../shared/components/ColumnVisibilityDropdown'
 import { IStackedAreaByDateChartData } from '../../../shared/components/Graphs/StackedAreaByDateChart'
 import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
 import Table from '../../../shared/components/Table'
@@ -39,43 +38,12 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     const [internalData, setInternalData] = React.useState<IStackedAreaByDateChartData[]>([])
     const [internalGroups, setInternalGroups] = React.useState<string[]>([])
 
-    // State to control dropdown menu open/close
-    const [isColumnsDropdownOpen, setColumnsDropdownOpen] = React.useState<boolean>(false)
-
     // Properties
     const [expandCompute, setExpandCompute] = React.useState<boolean>(false)
     const [sort, setSort] = React.useState<{ column: string | null; direction: string | null }>({
         column: null,
         direction: null,
     })
-
-    // Handle outside clicks and keyboard events for dropdown
-    React.useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            const target = event.target as HTMLElement
-            const columnsDropdown = document.querySelector('.columns-dropdown')
-
-            // If clicking outside the dropdown and dropdown is open, close it
-            if (isColumnsDropdownOpen && columnsDropdown && !columnsDropdown.contains(target)) {
-                setColumnsDropdownOpen(false)
-            }
-        }
-
-        const handleKeyDown = (event: KeyboardEvent) => {
-            // Close dropdown on ESC key press
-            if (event.key === 'Escape' && isColumnsDropdownOpen) {
-                setColumnsDropdownOpen(false)
-            }
-        }
-
-        document.addEventListener('mousedown', handleClickOutside)
-        document.addEventListener('keydown', handleKeyDown)
-
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside)
-            document.removeEventListener('keydown', handleKeyDown)
-        }
-    }, [isColumnsDropdownOpen])
 
     // Format data
     React.useEffect(() => {
@@ -92,22 +60,50 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         setInternalGroups(groups.concat(['Daily Total', 'Compute Cost']))
     }, [data, groups])
 
-    // Define available columns based on expand state
-    const getAvailableColumns = React.useCallback(() => {
-        // Filter out 'Cloud Storage' from groups since it's always a storage cost, not compute cost
-        const computeGroups = groups.filter((group) => group !== 'Cloud Storage')
+    // Generate column configurations for the dropdown
+    const getColumnConfigs = React.useCallback((): ColumnConfig[] => {
+        const configs: ColumnConfig[] = [
+            { id: 'Daily Total', label: 'Daily Total', group: 'summary' },
+            { id: 'Cloud Storage', label: 'Cloud Storage', group: 'storage' },
+        ]
 
         if (expandCompute) {
-            // When expanded, show all individual compute categories, plus storage and daily total
-            return [...computeGroups, 'Daily Total', 'Cloud Storage']
+            // When expanded, add individual compute categories
+            const computeGroups = groups.filter((group) => group !== 'Cloud Storage')
+            computeGroups.forEach((group) => {
+                configs.push({ id: group, label: group, group: 'compute' })
+            })
         } else {
-            // When collapsed, show only summary columns
-            return ['Daily Total', 'Cloud Storage', 'Compute Cost']
+            // When collapsed, add summary compute cost
+            configs.push({ id: 'Compute Cost', label: 'Compute Cost', group: 'summary' })
         }
+
+        return configs
     }, [expandCompute, groups])
 
-    // Get available columns dynamically based on current expand state
-    const availableColumns = getAvailableColumns()
+    // Generate column groups for the dropdown
+    const getColumnGroups = React.useCallback((): ColumnGroup[] => {
+        const groups: ColumnGroup[] = [
+            { id: 'summary', label: 'Summary', columns: ['Daily Total'] },
+            { id: 'storage', label: 'Storage Cost', columns: ['Cloud Storage'] },
+        ]
+
+        if (expandCompute) {
+            const computeColumns = getColumnConfigs()
+                .filter((config) => config.group === 'compute')
+                .map((config) => config.id)
+            if (computeColumns.length > 0) {
+                groups.push({ id: 'compute', label: 'Compute Categories', columns: computeColumns })
+            }
+        } else {
+            groups[0].columns.push('Compute Cost') // Add to summary group
+        }
+
+        return groups
+    }, [expandCompute, getColumnConfigs])
+
+    // Use the column visibility hook
+    const { isColumnVisible } = useColumnVisibility(getColumnConfigs(), visibleColumns)
 
     // Handle expand toggle changes - only modify columns when user explicitly toggles expand
     const [previousExpandState, setPreviousExpandState] = React.useState<boolean | null>(null)
@@ -202,8 +198,8 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                   },
               ]
 
-        // Filter by visible columns
-        return baseFields.filter((field) => visibleColumns.has(field.category))
+        // Filter by visible columns using our new hook
+        return baseFields.filter((field) => isColumnVisible(field.category))
     }
 
     const handleSort = (clickedColumn: string) => {
@@ -273,168 +269,6 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         </>
     )
 
-    // Helper functions for column visibility
-    const toggleColumnVisibility = (category: string, event?: React.SyntheticEvent) => {
-        // Stop propagation to prevent dropdown from closing
-        if (event) {
-            event.stopPropagation()
-        }
-
-        const newSet = new Set(visibleColumns)
-        if (newSet.has(category)) {
-            newSet.delete(category)
-        } else {
-            newSet.add(category)
-        }
-        setVisibleColumns(newSet)
-    }
-
-    // Toggle parent column groups (Storage Cost / Compute Cost)
-    const toggleParentColumnGroup = (
-        parentGroup: 'Storage Cost' | 'Compute Cost',
-        event?: React.SyntheticEvent
-    ) => {
-        if (event) {
-            event.stopPropagation()
-        }
-
-        const newSet = new Set(visibleColumns)
-
-        if (parentGroup === 'Storage Cost') {
-            // Toggle Cloud Storage
-            if (newSet.has('Cloud Storage')) {
-                newSet.delete('Cloud Storage')
-            } else {
-                newSet.add('Cloud Storage')
-            }
-        } else if (parentGroup === 'Compute Cost') {
-            if (expandCompute) {
-                // When expanded, toggle all individual compute categories
-                const computeGroups = groups.filter((group) => group !== 'Cloud Storage')
-                const allComputeVisible = computeGroups.every((group) => newSet.has(group))
-
-                if (allComputeVisible) {
-                    // Hide all compute categories
-                    computeGroups.forEach((group) => newSet.delete(group))
-                } else {
-                    // Show all compute categories
-                    computeGroups.forEach((group) => newSet.add(group))
-                }
-            } else {
-                // When collapsed, toggle the Compute Cost summary
-                if (newSet.has('Compute Cost')) {
-                    newSet.delete('Compute Cost')
-                } else {
-                    newSet.add('Compute Cost')
-                }
-            }
-        }
-
-        setVisibleColumns(newSet)
-    }
-
-    // Check if parent group is visible
-    const isParentGroupVisible = (parentGroup: 'Storage Cost' | 'Compute Cost'): boolean => {
-        if (parentGroup === 'Storage Cost') {
-            return visibleColumns.has('Cloud Storage')
-        } else if (parentGroup === 'Compute Cost') {
-            if (expandCompute) {
-                // When expanded, check if any individual compute categories are visible
-                const computeGroups = groups.filter((group) => group !== 'Cloud Storage')
-                return computeGroups.some((group) => visibleColumns.has(group))
-            } else {
-                // When collapsed, check if Compute Cost summary is visible
-                return visibleColumns.has('Compute Cost')
-            }
-        }
-        return false
-    }
-
-    // Toggle all columns in a group
-    const toggleColumnGroup = (categoryGroup: string[], visible: boolean) => {
-        const newSet = new Set(visibleColumns)
-        categoryGroup.forEach((category) => {
-            if (visible) {
-                newSet.add(category)
-            } else {
-                newSet.delete(category)
-            }
-        })
-        setVisibleColumns(newSet)
-    }
-
-    // Reusable column checkbox component
-    const ColumnCheckbox = ({ category, label }: { category: string; label: string }) => {
-        const handleItemClick = (e: React.MouseEvent) => {
-            e.stopPropagation()
-            e.preventDefault()
-            toggleColumnVisibility(category, e)
-        }
-
-        // Use the correct type for Semantic UI's onChange handler
-        const handleChange = (e: React.FormEvent<HTMLInputElement>, _data: CheckboxProps) => {
-            e.stopPropagation()
-            toggleColumnVisibility(category, e)
-        }
-
-        const isVisible = visibleColumns.has(category)
-
-        return (
-            <Dropdown.Item
-                onClick={handleItemClick}
-                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                role="menuitemcheckbox"
-                aria-checked={isVisible}
-            >
-                <Checkbox
-                    label={label}
-                    checked={isVisible}
-                    onChange={handleChange}
-                    onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                />
-            </Dropdown.Item>
-        )
-    }
-
-    // Reusable parent column checkbox component
-    const ParentColumnCheckbox = ({
-        parentGroup,
-        label,
-    }: {
-        parentGroup: 'Storage Cost' | 'Compute Cost'
-        label: string
-    }) => {
-        const handleItemClick = (e: React.MouseEvent) => {
-            e.stopPropagation()
-            e.preventDefault()
-            toggleParentColumnGroup(parentGroup, e)
-        }
-
-        // Use the correct type for Semantic UI's onChange handler
-        const handleChange = (e: React.FormEvent<HTMLInputElement>, _data: CheckboxProps) => {
-            e.stopPropagation()
-            toggleParentColumnGroup(parentGroup, e)
-        }
-
-        const isVisible = isParentGroupVisible(parentGroup)
-
-        return (
-            <Dropdown.Item
-                onClick={handleItemClick}
-                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                role="menuitemcheckbox"
-                aria-checked={isVisible}
-            >
-                <Checkbox
-                    label={label}
-                    checked={isVisible}
-                    onChange={handleChange}
-                    onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                />
-            </Dropdown.Item>
-        )
-    }
-
     return (
         <>
             <div
@@ -449,91 +283,12 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                     {convertFieldName(heading)} costs from {start} to {end}
                 </Header>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                    <Dropdown
-                        button
-                        className="icon columns-dropdown"
-                        floating
-                        labeled
-                        icon="columns"
-                        text="Columns"
-                        style={{
-                            minWidth: '120px',
-                            zIndex: 1000,
-                        }}
-                        open={isColumnsDropdownOpen}
-                        onClick={(e) => {
-                            // Prevent toggling if clicking on dropdown menu content
-                            const target = e.target as HTMLElement
-                            if (target && target.closest('.dropdown-menu-content')) {
-                                return
-                            }
-                            setColumnsDropdownOpen(!isColumnsDropdownOpen)
-                        }}
-                        // Don't use onClose or onOpen, as we want to manually control it
-                        closeOnBlur={false}
-                        closeOnChange={false}
-                        closeOnEscape={true}
-                    >
-                        <Dropdown.Menu className="dropdown-menu-content" style={{ zIndex: 1001 }}>
-                            <Dropdown.Header icon="table" content="Column Visibility" />
-                            <Dropdown.Item
-                                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                                onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                            >
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <Button
-                                        compact
-                                        size="mini"
-                                        onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                                        onClick={(e: React.MouseEvent) => {
-                                            e.stopPropagation()
-                                            e.preventDefault()
-                                            toggleColumnGroup(availableColumns, true)
-                                        }}
-                                    >
-                                        Select All
-                                    </Button>
-                                    <Button
-                                        compact
-                                        size="mini"
-                                        onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                                        onClick={(e: React.MouseEvent) => {
-                                            e.stopPropagation()
-                                            e.preventDefault()
-                                            toggleColumnGroup(availableColumns, false)
-                                        }}
-                                    >
-                                        Hide All
-                                    </Button>
-                                </div>
-                            </Dropdown.Item>
-                            <Dropdown.Divider />
-
-                            {/* Main Column Groups */}
-                            <Dropdown.Header content="Column Groups" />
-                            <ColumnCheckbox category="Daily Total" label="Daily Total" />
-                            <ParentColumnCheckbox parentGroup="Storage Cost" label="Storage Cost" />
-                            <ParentColumnCheckbox parentGroup="Compute Cost" label="Compute Cost" />
-
-                            {/* Individual Compute Categories - only show when expanded */}
-                            {expandCompute && groups.length > 0 && (
-                                <>
-                                    <Dropdown.Divider />
-                                    <Dropdown.Header content="Individual Compute Categories" />
-                                    {groups
-                                        .filter((group) => group !== 'Cloud Storage') // Exclude Cloud Storage from compute categories
-                                        .sort()
-                                        .map((group) => (
-                                            <ColumnCheckbox
-                                                key={group}
-                                                category={group}
-                                                label={group}
-                                            />
-                                        ))}
-                                </>
-                            )}
-                        </Dropdown.Menu>
-                    </Dropdown>
+                    <ColumnVisibilityDropdown
+                        columns={getColumnConfigs()}
+                        groups={getColumnGroups()}
+                        visibleColumns={visibleColumns}
+                        onVisibilityChange={setVisibleColumns}
+                    />
                     <Dropdown
                         button
                         className="icon"
@@ -566,7 +321,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                 <SUITable.Header>
                     <SUITable.Row>
                         <SUITable.HeaderCell
-                            colSpan={visibleColumns.has('Daily Total') ? 2 : 1}
+                            colSpan={isColumnVisible('Daily Total') ? 2 : 1}
                             textAlign="center"
                         >
                             <Checkbox
@@ -578,11 +333,9 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                             />
                         </SUITable.HeaderCell>
                         <SUITable.HeaderCell
-                            colSpan={visibleColumns.has('Cloud Storage') ? 1 : 0}
+                            colSpan={isColumnVisible('Cloud Storage') ? 1 : 0}
                             style={{
-                                display: visibleColumns.has('Cloud Storage')
-                                    ? 'table-cell'
-                                    : 'none',
+                                display: isColumnVisible('Cloud Storage') ? 'table-cell' : 'none',
                             }}
                         >
                             Storage Cost
@@ -590,11 +343,15 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                         <SUITable.HeaderCell
                             colSpan={
                                 headerFields().length -
-                                (visibleColumns.has('Cloud Storage') ? 1 : 0) -
-                                (visibleColumns.has('Daily Total') ? 1 : 0)
+                                (isColumnVisible('Cloud Storage') ? 1 : 0) -
+                                (isColumnVisible('Daily Total') ? 1 : 0)
                             }
                             style={{
-                                display: isParentGroupVisible('Compute Cost')
+                                display: headerFields().some(
+                                    (f) =>
+                                        f.category !== 'Daily Total' &&
+                                        f.category !== 'Cloud Storage'
+                                )
                                     ? 'table-cell'
                                     : 'none',
                             }}

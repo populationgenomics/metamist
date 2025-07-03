@@ -4,13 +4,18 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import {
     Button,
     Checkbox,
-    CheckboxProps,
     Dropdown,
     DropdownProps,
     Grid,
     Message,
     Table as SUITable,
 } from 'semantic-ui-react'
+import {
+    ColumnConfig,
+    ColumnGroup,
+    ColumnVisibilityDropdown,
+    useColumnVisibility,
+} from '../../shared/components/ColumnVisibilityDropdown'
 import { HorizontalStackedBarChart } from '../../shared/components/Graphs/HorizontalStackedBarChart'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import Table from '../../shared/components/Table'
@@ -47,9 +52,6 @@ const BillingCurrentCost = () => {
             'budget_spent',
         ])
     )
-
-    // State to control dropdown menu open/close
-    const [isColumnsDropdownOpen, setColumnsDropdownOpen] = React.useState<boolean>(false)
 
     // Pull search params for use in the component
     const [searchParams] = useSearchParams()
@@ -126,136 +128,91 @@ const BillingCurrentCost = () => {
         }
     }
 
-    /* eslint-disable react-hooks/exhaustive-deps */
     React.useEffect(() => {
         getCosts(groupBy, invoiceMonth)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
-
-    // Handle outside clicks and keyboard events for dropdown
-    React.useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            const target = event.target as HTMLElement
-            const columnsDropdown = document.querySelector('.columns-dropdown')
-
-            // If clicking outside the dropdown and dropdown is open, close it
-            if (isColumnsDropdownOpen && columnsDropdown && !columnsDropdown.contains(target)) {
-                setColumnsDropdownOpen(false)
-            }
-        }
-
-        const handleKeyDown = (event: KeyboardEvent) => {
-            // Close dropdown on ESC key press
-            if (event.key === 'Escape' && isColumnsDropdownOpen) {
-                setColumnsDropdownOpen(false)
-            }
-        }
-
-        document.addEventListener('mousedown', handleClickOutside)
-        document.addEventListener('keydown', handleKeyDown)
-
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside)
-            document.removeEventListener('keydown', handleKeyDown)
-        }
-    }, [isColumnsDropdownOpen])
-    /* eslint-enable react-hooks/exhaustive-deps */
-
-    const HEADER_FIELDS = [
-        { category: 'field', title: groupBy.toUpperCase(), show_always: true },
-        { category: 'compute_daily', title: 'C', show_always: false },
-        { category: 'storage_daily', title: 'S', show_always: false },
-        { category: 'total_daily', title: 'Total', show_always: false },
-        { category: 'compute_monthly', title: 'C', show_always: true },
-        { category: 'storage_monthly', title: 'S', show_always: true },
-        { category: 'total_monthly', title: 'Total', show_always: true },
-    ]
 
     // Define column groups for easier management
     const DAILY_COLUMNS = ['compute_daily', 'storage_daily', 'total_daily']
     const MONTHLY_COLUMNS = ['compute_monthly', 'storage_monthly', 'total_monthly']
     const BUDGET_COLUMNS = ['budget_spent']
-    const ALL_COLUMNS = [...DAILY_COLUMNS, ...MONTHLY_COLUMNS, ...BUDGET_COLUMNS]
 
-    // Helper functions for column visibility
-    const toggleColumnVisibility = (category: string, event?: React.SyntheticEvent) => {
-        // Stop propagation to prevent dropdown from closing
-        if (event) {
-            event.stopPropagation()
+    // Define header fields for table rendering
+    const HEADER_FIELDS = [
+        { category: 'field', title: groupBy.toUpperCase() },
+        // Daily columns (only if current month)
+        ...(invoiceMonth === thisMonth
+            ? [
+                  { category: 'compute_daily', title: 'COMPUTE_DAILY' },
+                  { category: 'storage_daily', title: 'STORAGE_DAILY' },
+                  { category: 'total_daily', title: 'TOTAL_DAILY' },
+              ]
+            : []),
+        // Monthly columns
+        { category: 'compute_monthly', title: 'COMPUTE_MONTHLY' },
+        { category: 'storage_monthly', title: 'STORAGE_MONTHLY' },
+        { category: 'total_monthly', title: 'TOTAL_MONTHLY' },
+    ]
+
+    // Generate column configurations for the dropdown
+    const getColumnConfigs = (): ColumnConfig[] => {
+        const configs: ColumnConfig[] = [
+            { id: 'field', label: convertFieldName(groupBy.toUpperCase()), isRequired: true },
+        ]
+
+        // Add daily columns if current month
+        if (invoiceMonth === thisMonth) {
+            configs.push(
+                { id: 'compute_daily', label: 'Compute (Daily)', group: 'daily' },
+                { id: 'storage_daily', label: 'Storage (Daily)', group: 'daily' },
+                { id: 'total_daily', label: 'Total (Daily)', group: 'daily' }
+            )
         }
 
-        setVisibleColumns((prev) => {
-            const newSet = new Set(prev)
-            if (newSet.has(category)) {
-                // Don't allow hiding 'field' column
-                if (category !== 'field') {
-                    newSet.delete(category)
-                }
-            } else {
-                newSet.add(category)
-            }
-            return newSet
-        })
-    }
-
-    // Toggle all columns in a group
-    const toggleColumnGroup = (categoryGroup: string[], visible: boolean) => {
-        setVisibleColumns((prev) => {
-            const newSet = new Set(prev)
-            categoryGroup.forEach((category) => {
-                if (category !== 'field') {
-                    // Don't allow hiding 'field' column
-                    if (visible) {
-                        newSet.add(category)
-                    } else {
-                        newSet.delete(category)
-                    }
-                }
-            })
-            return newSet
-        })
-    }
-
-    // Reusable column checkbox component
-    const ColumnCheckbox = ({ category, label }: { category: string; label: string }) => {
-        const handleItemClick = (e: React.MouseEvent) => {
-            e.stopPropagation()
-            e.preventDefault()
-            toggleColumnVisibility(category, e)
-        }
-
-        // Use the correct type for Semantic UI's onChange handler
-        const handleChange = (e: React.FormEvent<HTMLInputElement>, _data: CheckboxProps) => {
-            e.stopPropagation()
-            toggleColumnVisibility(category, e)
-        }
-
-        const isVisible = isColumnVisible(category)
-
-        return (
-            <Dropdown.Item
-                onClick={handleItemClick}
-                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                role="menuitemcheckbox"
-                aria-checked={isVisible}
-            >
-                <Checkbox
-                    label={label}
-                    checked={isVisible}
-                    onChange={handleChange}
-                    onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                />
-            </Dropdown.Item>
+        // Add monthly columns
+        configs.push(
+            { id: 'compute_monthly', label: 'Compute (Monthly)', group: 'monthly' },
+            { id: 'storage_monthly', label: 'Storage (Monthly)', group: 'monthly' },
+            { id: 'total_monthly', label: 'Total (Monthly)', group: 'monthly' }
         )
+
+        // Add budget column if applicable
+        if (
+            groupBy === BillingColumn.GcpProject &&
+            costRecords.length > 0 &&
+            costRecords[0].budget_spent !== null
+        ) {
+            configs.push({ id: 'budget_spent', label: 'Budget Spent %', group: 'budget' })
+        }
+
+        return configs
     }
 
-    // Check if a column is visible
-    const isColumnVisible = (category: string): boolean => {
-        // Field column is always visible
-        if (category === 'field') {
-            return true
+    // Generate column groups for the dropdown
+    const getColumnGroups = (): ColumnGroup[] => {
+        const groups: ColumnGroup[] = [
+            { id: 'monthly', label: 'Monthly Costs', columns: MONTHLY_COLUMNS },
+        ]
+
+        if (invoiceMonth === thisMonth) {
+            groups.unshift({ id: 'daily', label: 'Daily Costs', columns: DAILY_COLUMNS })
         }
-        return visibleColumns.has(category)
+
+        // Add budget group if budget data is available
+        if (
+            groupBy === BillingColumn.GcpProject &&
+            costRecords.length > 0 &&
+            costRecords[0].budget_spent !== null
+        ) {
+            groups.push({ id: 'budget', label: 'Budget', columns: BUDGET_COLUMNS })
+        }
+
+        return groups
     }
+
+    // Use the column visibility hook for easier export handling
+    const { isColumnVisible } = useColumnVisibility(getColumnConfigs(), visibleColumns)
 
     const handleToggle = (field: string) => {
         if (!openRows.includes(field)) {
@@ -396,177 +353,12 @@ const BillingCurrentCost = () => {
                     />
                 </Grid.Column>
                 <Grid.Column textAlign="right">
-                    <Dropdown
-                        button
-                        className="icon columns-dropdown"
-                        floating
-                        labeled
-                        icon="columns"
-                        text="Columns"
-                        style={{ marginRight: '10px' }}
-                        open={isColumnsDropdownOpen}
-                        onClick={(e) => {
-                            // Prevent toggling if clicking on dropdown menu content
-                            const target = e.target as HTMLElement
-                            if (target && target.closest('.dropdown-menu-content')) {
-                                return
-                            }
-                            setColumnsDropdownOpen(!isColumnsDropdownOpen)
-                        }}
-                        // Don't use onClose or onOpen, as we want to manually control it
-                        closeOnBlur={false}
-                        closeOnChange={false}
-                        closeOnEscape={true}
-                    >
-                        <Dropdown.Menu className="dropdown-menu-content">
-                            <Dropdown.Header icon="table" content="Column Visibility" />
-                            <Dropdown.Item
-                                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                                onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                            >
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <Button
-                                        compact
-                                        size="mini"
-                                        onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                                        onClick={(e: React.MouseEvent) => {
-                                            e.stopPropagation()
-                                            e.preventDefault()
-                                            toggleColumnGroup(ALL_COLUMNS, true)
-                                        }}
-                                    >
-                                        Select All
-                                    </Button>
-                                    <Button
-                                        compact
-                                        size="mini"
-                                        onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                                        onClick={(e: React.MouseEvent) => {
-                                            e.stopPropagation()
-                                            e.preventDefault()
-                                            toggleColumnGroup(ALL_COLUMNS, false)
-                                        }}
-                                    >
-                                        Hide All
-                                    </Button>
-                                </div>
-                            </Dropdown.Item>
-                            <Dropdown.Divider />
-
-                            {/* ID Column - Always visible */}
-                            <Dropdown.Item disabled>
-                                <Checkbox
-                                    label={convertFieldName(groupBy.toUpperCase())}
-                                    checked={true}
-                                    readOnly
-                                />
-                            </Dropdown.Item>
-
-                            {/* Daily Columns */}
-                            {invoiceMonth === thisMonth && (
-                                <>
-                                    <Dropdown.Header content="Daily Costs" />
-                                    <Dropdown.Item
-                                        onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                                    >
-                                        <div
-                                            style={{
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                            }}
-                                        >
-                                            <Button
-                                                compact
-                                                size="mini"
-                                                onMouseDown={(e: React.MouseEvent) =>
-                                                    e.stopPropagation()
-                                                }
-                                                onClick={(e: React.MouseEvent) => {
-                                                    e.stopPropagation()
-                                                    e.preventDefault()
-                                                    toggleColumnGroup(DAILY_COLUMNS, true)
-                                                }}
-                                            >
-                                                All
-                                            </Button>
-                                            <Button
-                                                compact
-                                                size="mini"
-                                                onMouseDown={(e: React.MouseEvent) =>
-                                                    e.stopPropagation()
-                                                }
-                                                onClick={(e: React.MouseEvent) => {
-                                                    e.stopPropagation()
-                                                    e.preventDefault()
-                                                    toggleColumnGroup(DAILY_COLUMNS, false)
-                                                }}
-                                            >
-                                                None
-                                            </Button>
-                                        </div>
-                                    </Dropdown.Item>
-                                    <ColumnCheckbox
-                                        category="compute_daily"
-                                        label="Compute (Daily)"
-                                    />
-                                    <ColumnCheckbox
-                                        category="storage_daily"
-                                        label="Storage (Daily)"
-                                    />
-                                    <ColumnCheckbox category="total_daily" label="Total (Daily)" />
-                                </>
-                            )}
-
-                            {/* Monthly Columns */}
-                            <Dropdown.Header content="Monthly Costs" />
-                            <Dropdown.Item
-                                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                                onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                            >
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <Button
-                                        compact
-                                        size="mini"
-                                        onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                                        onClick={(e: React.MouseEvent) => {
-                                            e.stopPropagation()
-                                            e.preventDefault()
-                                            toggleColumnGroup(MONTHLY_COLUMNS, true)
-                                        }}
-                                    >
-                                        All
-                                    </Button>
-                                    <Button
-                                        compact
-                                        size="mini"
-                                        onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                                        onClick={(e: React.MouseEvent) => {
-                                            e.stopPropagation()
-                                            e.preventDefault()
-                                            toggleColumnGroup(MONTHLY_COLUMNS, false)
-                                        }}
-                                    >
-                                        None
-                                    </Button>
-                                </div>
-                            </Dropdown.Item>
-                            <ColumnCheckbox category="compute_monthly" label="Compute (Monthly)" />
-                            <ColumnCheckbox category="storage_monthly" label="Storage (Monthly)" />
-                            <ColumnCheckbox category="total_monthly" label="Total (Monthly)" />
-
-                            {/* Budget Column */}
-                            {groupBy === BillingColumn.GcpProject && invoiceMonth === thisMonth && (
-                                <>
-                                    <Dropdown.Header content="Budget" />
-                                    <ColumnCheckbox
-                                        category="budget_spent"
-                                        label="Budget Spend %"
-                                    />
-                                </>
-                            )}
-                        </Dropdown.Menu>
-                    </Dropdown>
+                    <ColumnVisibilityDropdown
+                        columns={getColumnConfigs()}
+                        groups={getColumnGroups()}
+                        visibleColumns={visibleColumns}
+                        onVisibilityChange={setVisibleColumns}
+                    />
 
                     <Dropdown
                         button
