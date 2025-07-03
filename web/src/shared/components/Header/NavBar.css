@@ -101,3 +101,5 @@
 }
 
 /* To check */
+html[data-theme='dark-mode'] .ui.dropdown .menu > .item {
+}
