@@ -128,6 +128,20 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
     }, [fieldName])
     /* eslint-enable react-hooks/exhaustive-deps */
 
+    const formatInvoiceMonth = (invoiceMonth: string): string => {
+        // Convert from format like "202505" to "May 2025"
+        if (invoiceMonth.length === 6) {
+            const year = invoiceMonth.substring(0, 4)
+            const month = invoiceMonth.substring(4, 6)
+            const date = new Date(parseInt(year), parseInt(month) - 1, 1)
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+            })
+        }
+        return invoiceMonth
+    }
+
     const capitalize = (str: string): string => {
         if (str === 'gcp_project') {
             return 'GCP-Project'
@@ -143,6 +157,16 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
                 value: p,
             }))
         }
+
+        // Special formatting for invoice months
+        if (fieldName === BillingColumn.InvoiceMonth) {
+            return records.map((p: string) => ({
+                key: p,
+                text: formatInvoiceMonth(p),
+                value: p,
+            }))
+        }
+
         return records.map((p: string) => ({
             key: p,
             text: p,
