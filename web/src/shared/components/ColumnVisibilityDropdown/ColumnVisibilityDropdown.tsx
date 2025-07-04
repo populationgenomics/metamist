@@ -31,6 +31,10 @@ export interface ColumnVisibilityDropdownProps {
     className?: string
     /** Optional label formatter for columns */
     labelFormatter?: (column: ColumnConfig) => string
+    /** Show search input when column count exceeds this threshold (default: 10) */
+    searchThreshold?: number
+    /** Custom search placeholder text */
+    searchPlaceholder?: string
 }
 
 const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
@@ -41,9 +45,16 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
     buttonStyle,
     className,
     labelFormatter,
+    searchThreshold = 10,
+    searchPlaceholder = 'Search columns...',
 }) => {
     const [isOpen, setIsOpen] = React.useState(false)
+    const [searchTerm, setSearchTerm] = React.useState('')
     const dropdownRef = React.useRef<HTMLDivElement>(null)
+    const searchInputRef = React.useRef<HTMLInputElement>(null)
+
+    // Show search when there are many columns
+    const showSearch = columns.length > searchThreshold
 
     // Handle outside clicks
     useClickAway(dropdownRef, () => {
@@ -63,6 +74,53 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
         document.addEventListener('keydown', handleKeyDown)
         return () => document.removeEventListener('keydown', handleKeyDown)
     }, [isOpen])
+
+    // Focus search input when dropdown opens
+    React.useEffect(() => {
+        if (isOpen && showSearch && searchInputRef.current) {
+            setTimeout(() => {
+                searchInputRef.current?.focus()
+            }, 100)
+        }
+    }, [isOpen, showSearch])
+
+    // Clear search when dropdown closes
+    React.useEffect(() => {
+        if (!isOpen) {
+            setSearchTerm('')
+        }
+    }, [isOpen])
+
+    // Filter columns based on search term
+    const filterColumns = (columnsToFilter: ColumnConfig[]): ColumnConfig[] => {
+        if (!searchTerm.trim()) {
+            return columnsToFilter
+        }
+
+        const term = searchTerm.toLowerCase()
+        return columnsToFilter.filter((column) => {
+            const label = labelFormatter ? labelFormatter(column) : column.label
+            return (
+                label.toLowerCase().includes(term) ||
+                column.id.toLowerCase().includes(term) ||
+                column.group?.toLowerCase().includes(term)
+            )
+        })
+    }
+
+    // Filter groups based on search term
+    const filterGroups = (groupsToFilter: ColumnGroup[]): ColumnGroup[] => {
+        if (!searchTerm.trim()) {
+            return groupsToFilter
+        }
+
+        const term = searchTerm.toLowerCase()
+        return groupsToFilter.filter((group) => {
+            const groupColumns = columns.filter((c) => c.group === group.id)
+            const filteredGroupColumns = filterColumns(groupColumns)
+            return filteredGroupColumns.length > 0 || group.label.toLowerCase().includes(term)
+        })
+    }
 
     // Toggle individual column visibility
     const toggleColumn = (columnId: string, event?: React.SyntheticEvent) => {
@@ -202,8 +260,37 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
     }
 
     // Get required columns
-    const requiredColumns = columns.filter((c) => c.isRequired)
-    const ungroupedColumns = columns.filter((c) => !c.group && !c.isRequired)
+    const requiredColumns = filterColumns(columns.filter((c) => c.isRequired))
+    const ungroupedColumns = filterColumns(columns.filter((c) => !c.group && !c.isRequired))
+    const filteredGroups = filterGroups(groups)
+
+    // Check if we have any results
+    const hasResults =
+        requiredColumns.length > 0 ||
+        ungroupedColumns.length > 0 ||
+        filteredGroups.some((group) => filterColumns(getColumnsByGroup(group.id)).length > 0)
+
+    // Handle dynamic positioning based on viewport
+    React.useEffect(() => {
+        if (isOpen && dropdownRef.current) {
+            const dropdownElement = dropdownRef.current
+            const menuElement = dropdownElement.querySelector('.menu') as HTMLElement
+
+            if (menuElement) {
+                const rect = dropdownElement.getBoundingClientRect()
+                const menuRect = menuElement.getBoundingClientRect()
+                const viewportWidth = window.innerWidth
+
+                // Remove existing position classes
+                menuElement.classList.remove('position-left')
+
+                // Check if dropdown would overflow to the right
+                if (rect.left + menuRect.width > viewportWidth - 20) {
+                    menuElement.classList.add('position-left')
+                }
+            }
+        }
+    }, [isOpen])
 
     return (
         <div ref={dropdownRef} className={className}>
@@ -227,48 +314,75 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
                 closeOnChange={false}
                 closeOnEscape={true}
             >
-                <Dropdown.Menu className="dropdown-menu-content">
+                <Dropdown.Menu
+                    className={`dropdown-menu-content${showSearch ? ' has-search' : ''}`}
+                >
                     <Dropdown.Header
                         icon="table"
                         content="Column Visibility"
                         className="dropdown-header"
                     />
 
-                    {/* Global toggle buttons */}
-                    <Dropdown.Item
-                        onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                        className="global-toggle-item"
-                    >
-                        <div className="global-toggle-buttons">
-                            <Button
-                                compact
-                                size="mini"
-                                color="blue"
-                                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                                onClick={(e: React.MouseEvent) => {
-                                    e.stopPropagation()
-                                    e.preventDefault()
-                                    toggleAllColumns(true)
-                                }}
-                            >
-                                Select All
-                            </Button>
-                            <Button
-                                compact
-                                size="mini"
-                                color="grey"
-                                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                                onClick={(e: React.MouseEvent) => {
-                                    e.stopPropagation()
-                                    e.preventDefault()
-                                    toggleAllColumns(false)
-                                }}
-                            >
-                                Hide All
-                            </Button>
+                    {/* Search input */}
+                    {showSearch && (
+                        <div className="search-section">
+                            <input
+                                ref={searchInputRef}
+                                type="text"
+                                className="search-input"
+                                placeholder={searchPlaceholder}
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                onKeyDown={(e) => e.stopPropagation()}
+                            />
                         </div>
-                    </Dropdown.Item>
+                    )}
+
+                    {/* Show no results message */}
+                    {showSearch && searchTerm.trim() && !hasResults && (
+                        <div className="no-results-message">
+                            No columns found matching &ldquo;{searchTerm}&rdquo;
+                        </div>
+                    )}
+
+                    {/* Global toggle buttons - only show if we have results */}
+                    {hasResults && (
+                        <Dropdown.Item
+                            onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                            className="global-toggle-item"
+                        >
+                            <div className="global-toggle-buttons">
+                                <Button
+                                    compact
+                                    size="mini"
+                                    color="blue"
+                                    onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                                    onClick={(e: React.MouseEvent) => {
+                                        e.stopPropagation()
+                                        e.preventDefault()
+                                        toggleAllColumns(true)
+                                    }}
+                                >
+                                    Select All
+                                </Button>
+                                <Button
+                                    compact
+                                    size="mini"
+                                    color="grey"
+                                    onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                                    onClick={(e: React.MouseEvent) => {
+                                        e.stopPropagation()
+                                        e.preventDefault()
+                                        toggleAllColumns(false)
+                                    }}
+                                >
+                                    Hide All
+                                </Button>
+                            </div>
+                        </Dropdown.Item>
+                    )}
 
                     {/* Required columns */}
                     {requiredColumns.length > 0 && (
@@ -297,20 +411,25 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
                     )}
 
                     {/* Grouped columns */}
-                    {groups.map((group) => (
-                        <div key={group.id} className="column-group-section">
-                            <Dropdown.Header content={group.label} className="section-header" />
-                            <GroupToggleButtons group={group} />
-                            {getColumnsByGroup(group.id).map((column) => (
-                                <ColumnCheckbox key={column.id} column={column} />
-                            ))}
-                        </div>
-                    ))}
+                    {filteredGroups.map((group) => {
+                        const groupColumns = filterColumns(getColumnsByGroup(group.id))
+                        if (groupColumns.length === 0) return null
+
+                        return (
+                            <div key={group.id} className="column-group-section">
+                                <Dropdown.Header content={group.label} className="section-header" />
+                                <GroupToggleButtons group={group} />
+                                {groupColumns.map((column) => (
+                                    <ColumnCheckbox key={column.id} column={column} />
+                                ))}
+                            </div>
+                        )
+                    })}
 
                     {/* Ungrouped columns */}
                     {ungroupedColumns.length > 0 && (
                         <div className="ungrouped-columns-section">
-                            {groups.length > 0 && (
+                            {filteredGroups.length > 0 && (
                                 <Dropdown.Header
                                     content="Other Columns"
                                     className="section-header"

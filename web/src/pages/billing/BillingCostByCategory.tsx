@@ -302,6 +302,8 @@ const BillingCostByCategory: React.FunctionComponent = () => {
                             visibleColumns={visibleColumns}
                             onVisibilityChange={setVisibleColumns}
                             buttonStyle={{ marginRight: '0px' }}
+                            searchThreshold={8}
+                            searchPlaceholder="Search SKUs..."
                         />
                         <Dropdown
                             button

@@ -358,6 +358,8 @@ const BillingCurrentCost = () => {
                         groups={getColumnGroups()}
                         visibleColumns={visibleColumns}
                         onVisibilityChange={setVisibleColumns}
+                        searchThreshold={8}
+                        searchPlaceholder="Search topics and months..."
                     />
 
                     <Dropdown

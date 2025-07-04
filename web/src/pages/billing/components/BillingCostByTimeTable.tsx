@@ -288,6 +288,8 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                         groups={getColumnGroups()}
                         visibleColumns={visibleColumns}
                         onVisibilityChange={setVisibleColumns}
+                        searchThreshold={8}
+                        searchPlaceholder="Search time periods..."
                     />
                     <Dropdown
                         button

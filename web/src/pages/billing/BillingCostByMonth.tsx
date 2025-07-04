@@ -348,6 +348,8 @@ const BillingCostByTime: React.FunctionComponent = () => {
                             ]}
                             visibleColumns={visibleColumns}
                             onVisibilityChange={setVisibleColumns}
+                            searchThreshold={8}
+                            searchPlaceholder="Search months and topics..."
                         />
 
                         <Dropdown
