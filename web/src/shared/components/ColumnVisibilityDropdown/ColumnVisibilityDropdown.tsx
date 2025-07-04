@@ -213,14 +213,18 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
         )
     }
 
-    // Group toggle buttons
-    const GroupToggleButtons: React.FC<{ group: ColumnGroup }> = ({ group }) => (
+    // Reusable toggle buttons component
+    const ToggleButtons: React.FC<{
+        onSelectAll: () => void
+        onHideAll: () => void
+        className?: string
+    }> = ({ onSelectAll, onHideAll, className = '' }) => (
         <Dropdown.Item
             onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
             onClick={(e: React.MouseEvent) => e.stopPropagation()}
-            className="group-toggle-item"
+            className={className}
         >
-            <div className="group-toggle-buttons">
+            <div className="toggle-buttons">
                 <Button
                     compact
                     size="mini"
@@ -229,7 +233,7 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
                     onClick={(e: React.MouseEvent) => {
                         e.stopPropagation()
                         e.preventDefault()
-                        toggleGroup(group.columns, true)
+                        onSelectAll()
                     }}
                 >
                     Select All
@@ -242,13 +246,22 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
                     onClick={(e: React.MouseEvent) => {
                         e.stopPropagation()
                         e.preventDefault()
-                        toggleGroup(group.columns, false)
+                        onHideAll()
                     }}
                 >
                     Hide All
                 </Button>
             </div>
         </Dropdown.Item>
+    )
+
+    // Group toggle buttons
+    const GroupToggleButtons: React.FC<{ group: ColumnGroup }> = ({ group }) => (
+        <ToggleButtons
+            onSelectAll={() => toggleGroup(group.columns, true)}
+            onHideAll={() => toggleGroup(group.columns, false)}
+            className="group-toggle-item"
+        />
     )
 
     // Get columns by group
@@ -348,40 +361,11 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
 
                     {/* Global toggle buttons - only show if we have results */}
                     {hasResults && (
-                        <Dropdown.Item
-                            onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                        <ToggleButtons
+                            onSelectAll={() => toggleAllColumns(true)}
+                            onHideAll={() => toggleAllColumns(false)}
                             className="global-toggle-item"
-                        >
-                            <div className="global-toggle-buttons">
-                                <Button
-                                    compact
-                                    size="mini"
-                                    color="blue"
-                                    onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                                    onClick={(e: React.MouseEvent) => {
-                                        e.stopPropagation()
-                                        e.preventDefault()
-                                        toggleAllColumns(true)
-                                    }}
-                                >
-                                    Select All
-                                </Button>
-                                <Button
-                                    compact
-                                    size="mini"
-                                    color="grey"
-                                    onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                                    onClick={(e: React.MouseEvent) => {
-                                        e.stopPropagation()
-                                        e.preventDefault()
-                                        toggleAllColumns(false)
-                                    }}
-                                >
-                                    Hide All
-                                </Button>
-                            </div>
-                        </Dropdown.Item>
+                        />
                     )}
 
                     {/* Required columns */}
