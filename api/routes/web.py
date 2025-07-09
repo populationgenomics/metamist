@@ -307,3 +307,21 @@ async def sync_seqr_project(
     except Exception as e:
         raise ConnectionError(f'Failed to synchronise seqr project: {str(e)}') from e
         # return {'success': False, 'message': str(e)}
+
+
+@router.get(
+    '/{project}/{sequencing_type}/seqr-family-guid-map',
+    operation_id='getSeqrFamilyGuidMap',
+)
+async def get_seqr_family_guid_map(
+    sequencing_type: str,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
+):
+    """
+    Get the mapping of seqr family GUIDs to internal family IDs
+    """
+    seqr = SeqrLayer(connection)
+    if not connection.project_id:
+        raise ValueError('Project not set')
+
+    return await seqr.get_family_guid_map(sequencing_type=sequencing_type)

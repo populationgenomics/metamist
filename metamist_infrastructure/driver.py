@@ -375,7 +375,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         subscription = gcp.pubsub.Subscription(
             'metamist-etl-subscription',
             topic=self.etl_pubsub_topic.name,
-            ack_deadline_seconds=30,
+            ack_deadline_seconds=300,
             expiration_policy=gcp.pubsub.SubscriptionExpirationPolicyArgs(
                 ttl='',  # never expire
             ),
