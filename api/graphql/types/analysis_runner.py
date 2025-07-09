@@ -1,15 +1,18 @@
+# pylint: disable=import-outside-toplevel
 import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
 import strawberry
+from strawberry.scalars import JSON
 from strawberry.types import Info
 
-from api.graphql.loaders import GraphQLContext, LoaderKeys
-from api.graphql.types.project import GraphQLProject
+from api.graphql.loader_keys import LoaderKeys
+from api.graphql.loaders import GraphQLContext
 from models.models.analysis_runner import AnalysisRunnerInternal
 
 if TYPE_CHECKING:
     from api.graphql.schema import Query
+    from api.graphql.types.project import GraphQLProject
 
 
 @strawberry.type
@@ -32,7 +35,7 @@ class GraphQLAnalysisRunner:
     hail_version: str | None
     batch_url: str
     submitting_user: str
-    meta: strawberry.scalars.JSON
+    meta: JSON
 
     internal_project: strawberry.Private[int]
 
@@ -63,8 +66,10 @@ class GraphQLAnalysisRunner:
     @strawberry.field
     async def project(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLAnalysisRunner'
-    ) -> GraphQLProject:
+    ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.types.project')]:
         """Get the project associated with this analysis runner."""
+        from api.graphql.types.project import GraphQLProject
+
         loader = info.context['loaders'][LoaderKeys.PROJECTS_FOR_IDS]
         project = await loader.load(root.internal_project)
         return GraphQLProject.from_internal(project)

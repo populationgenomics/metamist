@@ -18,6 +18,9 @@ if TYPE_CHECKING:
 class GraphQLEnum:
     """Dynamically populated enum fields will be added to this class."""
 
+    # Example field to demonstrate the structure
+    example: str = 'example'
+
 
 # Dynamically add strawberry fields to the GraphQLEnum class
 for enum in enum_tables.__dict__.values():

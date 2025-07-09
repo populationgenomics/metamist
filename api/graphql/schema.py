@@ -20,19 +20,21 @@ from api.graphql.filters import (
 )
 from api.graphql.loaders import GraphQLContext, LoaderKeys, get_context
 from api.graphql.mutations import Mutation
-from api.graphql.types.analysis import GraphQLAnalysis
-from api.graphql.types.analysis_runner import GraphQLAnalysisRunner
-from api.graphql.types.assay import GraphQLAssay
-from api.graphql.types.cohort import GraphQLCohort
-from api.graphql.types.cohort_template import GraphQLCohortTemplate
-from api.graphql.types.enums import GraphQLEnum
-from api.graphql.types.family import GraphQLFamily
-from api.graphql.types.participant import GraphQLParticipant
-from api.graphql.types.project import GraphQLProject
-from api.graphql.types.project_groups import GraphQLProjectGroup
-from api.graphql.types.sample import GraphQLSample
-from api.graphql.types.sequencing_group import GraphQLSequencingGroup
-from api.graphql.types.user import GraphQLUser
+from api.graphql.types import (
+    GraphQLAnalysis,
+    GraphQLAnalysisRunner,
+    GraphQLAssay,
+    GraphQLCohort,
+    GraphQLCohortTemplate,
+    GraphQLEnum,
+    GraphQLFamily,
+    GraphQLParticipant,
+    GraphQLProject,
+    GraphQLProjectGroup,
+    GraphQLSample,
+    GraphQLSequencingGroup,
+    GraphQLUser,
+)
 from db.python.filters import GenericFilter
 from db.python.layers import (
     AnalysisLayer,

@@ -1,20 +1,22 @@
+# pylint: disable=reimported,import-outside-toplevel,wrong-import-position
 import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
 import strawberry
 from strawberry.types import Info
 
-from api.graphql.loaders import GraphQLContext, LoaderKeys
-from api.graphql.types.audit_log import GraphQLAuditLog
-from api.graphql.types.project import GraphQLProject
-from api.graphql.types.sequencing_group import GraphQLSequencingGroup
+from api.graphql.loaders import LoaderKeys
 from models.enums import AnalysisStatus
 from models.models import (
     AnalysisInternal,
 )
 
 if TYPE_CHECKING:
+    from api.graphql.loaders import GraphQLContext
     from api.graphql.schema import Query
+    from api.graphql.types.audit_log import GraphQLAuditLog
+    from api.graphql.types.project import GraphQLProject
+    from api.graphql.types.sequencing_group import GraphQLSequencingGroup
 
 
 @strawberry.type
@@ -73,8 +75,11 @@ class GraphQLAnalysis:
 
     @strawberry.field
     async def sequencing_groups(
-        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLAnalysis'
-    ) -> list[GraphQLSequencingGroup]:
+        self, info: Info['GraphQLContext', 'Query'], root: 'GraphQLAnalysis'
+    ) -> Annotated[
+        list['GraphQLSequencingGroup'],
+        strawberry.lazy('api.graphql.types.sequencing_group'),
+    ]:
         """
         Retrieve sequencing groups associated with this analysis.
 
@@ -84,14 +89,16 @@ class GraphQLAnalysis:
         Returns:
             List of GraphQLSequencingGroup objects linked to this analysis.
         """
+        from api.graphql.types.sequencing_group import GraphQLSequencingGroup
+
         loader = info.context['loaders'][LoaderKeys.SEQUENCING_GROUPS_FOR_ANALYSIS]
         sgs = await loader.load(root.id)
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sgs]
 
     @strawberry.field
     async def project(
-        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLAnalysis'
-    ) -> GraphQLProject:
+        self, info: Info['GraphQLContext', 'Query'], root: 'GraphQLAnalysis'
+    ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.types.project')]:
         """
         Retrieve the project associated with this analysis.
 
@@ -101,14 +108,18 @@ class GraphQLAnalysis:
         Returns:
             The GraphQLProject instance for this analysis.
         """
+        from api.graphql.types.project import GraphQLProject
+
         loader = info.context['loaders'][LoaderKeys.PROJECTS_FOR_IDS]
         project = await loader.load(root.project_id)
         return GraphQLProject.from_internal(project)
 
     @strawberry.field
     async def audit_logs(
-        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLAnalysis'
-    ) -> list[GraphQLAuditLog]:
+        self, info: Info['GraphQLContext', 'Query'], root: 'GraphQLAnalysis'
+    ) -> Annotated[
+        list['GraphQLAuditLog'], strawberry.lazy('api.graphql.types.audit_log')
+    ]:
         """
         Retrieve audit logs related to this analysis.
 
@@ -118,6 +129,13 @@ class GraphQLAnalysis:
         Returns:
             List of GraphQLAuditLog objects for this analysis.
         """
+        from api.graphql.types.audit_log import GraphQLAuditLog
+
         loader = info.context['loaders'][LoaderKeys.AUDIT_LOGS_BY_ANALYSIS_IDS]
         audit_logs = await loader.load(root.id)
         return [GraphQLAuditLog.from_internal(audit_log) for audit_log in audit_logs]
+
+
+from api.graphql.types.audit_log import GraphQLAuditLog
+from api.graphql.types.project import GraphQLProject
+from api.graphql.types.sequencing_group import GraphQLSequencingGroup

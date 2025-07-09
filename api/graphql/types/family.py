@@ -1,12 +1,11 @@
-from typing import TYPE_CHECKING
+# pylint: disable=reimported,import-outside-toplevel,wrong-import-position
+from typing import TYPE_CHECKING, Annotated
 
 import strawberry
 from strawberry.types import Info
 
-from api.graphql.loaders import GraphQLContext, LoaderKeys
-from api.graphql.types.comments import GraphQLDiscussion
-from api.graphql.types.participant import GraphQLParticipant
-from api.graphql.types.project import GraphQLProject
+from api.graphql.loader_keys import LoaderKeys
+from api.graphql.loaders import GraphQLContext
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
     FamilyInternal,
@@ -15,6 +14,9 @@ from models.models.family import PedRowInternal
 
 if TYPE_CHECKING:
     from api.graphql.schema import Query
+    from api.graphql.types.comments import GraphQLDiscussion
+    from api.graphql.types.participant import GraphQLParticipant
+    from api.graphql.types.project import GraphQLProject
 
 
 @strawberry.type
@@ -46,8 +48,10 @@ class GraphQLFamily:
     @strawberry.field
     async def project(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLFamily'
-    ) -> GraphQLProject:
+    ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.types.project')]:
         """Load the project associated with this family."""
+        from api.graphql.types.project import GraphQLProject
+
         loader = info.context['loaders'][LoaderKeys.PROJECTS_FOR_IDS]
         project = await loader.load(root.project_id)
         return GraphQLProject.from_internal(project)
@@ -55,8 +59,12 @@ class GraphQLFamily:
     @strawberry.field
     async def participants(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLFamily'
-    ) -> list[GraphQLParticipant]:
+    ) -> Annotated[
+        list['GraphQLParticipant'], strawberry.lazy('api.graphql.types.participant')
+    ]:
         """Load the participants associated with this family."""
+        from api.graphql.types.participant import GraphQLParticipant
+
         participants = await info.context['loaders'][
             LoaderKeys.PARTICIPANTS_FOR_FAMILIES
         ].load(root.id)
@@ -77,8 +85,10 @@ class GraphQLFamily:
     @strawberry.field()
     async def discussion(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLFamily'
-    ) -> GraphQLDiscussion:
+    ) -> Annotated['GraphQLDiscussion', strawberry.lazy('api.graphql.types.comments')]:
         """Load the discussion associated with this family."""
+        from api.graphql.types.comments import GraphQLDiscussion
+
         loader = info.context['loaders'][LoaderKeys.COMMENTS_FOR_FAMILY_IDS]
         discussion = await loader.load(root.id)
         return GraphQLDiscussion.from_internal(discussion)
@@ -110,8 +120,10 @@ class GraphQLFamilyParticipant:
     @strawberry.field
     async def participant(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLFamilyParticipant'
-    ) -> GraphQLParticipant:
+    ) -> 'GraphQLParticipant':
         """Load the participant associated with this family participant."""
+        from api.graphql.types.participant import GraphQLParticipant
+
         loader = info.context['loaders'][LoaderKeys.PARTICIPANTS_FOR_IDS]
         participant = await loader.load(root.participant_id)
         return GraphQLParticipant.from_internal(participant)
@@ -124,3 +136,8 @@ class GraphQLFamilyParticipant:
         loader = info.context['loaders'][LoaderKeys.FAMILIES_FOR_IDS]
         family = await loader.load(root.family_id)
         return GraphQLFamily.from_internal(family)
+
+
+from api.graphql.types.comments import GraphQLDiscussion
+from api.graphql.types.participant import GraphQLParticipant
+from api.graphql.types.project import GraphQLProject

@@ -1,14 +1,15 @@
+# pylint: disable=reimported,import-outside-toplevel,wrong-import-position
 import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
 import strawberry
 from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext, LoaderKeys
-from api.graphql.types.project import GraphQLProject
 
 if TYPE_CHECKING:
     from api.graphql.schema import Query
+    from api.graphql.types.project import GraphQLProject
 
 
 @strawberry.type
@@ -42,8 +43,15 @@ class GraphQLProjectGroup:
     @strawberry.field
     async def projects(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLProjectGroup'
-    ) -> list[GraphQLProject]:
+    ) -> Annotated[
+        list['GraphQLProject'], strawberry.lazy('api.graphql.types.project')
+    ]:
         """Load projects associated with this project group."""
+        from api.graphql.types.project import GraphQLProject
+
         loader = info.context['loaders'][LoaderKeys.PROJECTS_FOR_IDS]
         projects = await loader.load(root.project_ids)
         return [GraphQLProject.from_internal(p) for p in projects]
+
+
+from api.graphql.types.project import GraphQLProject

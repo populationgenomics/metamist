@@ -1,6 +1,6 @@
-# pylint: disable=redefined-builtin
+# pylint: disable=reimported,import-outside-toplevel,wrong-import-position,redefined-builtin
 import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
 import strawberry
 from strawberry.types import Info
@@ -11,15 +11,7 @@ from api.graphql.filters import (
     graphql_meta_filter_to_internal_filter,
 )
 from api.graphql.loaders import GraphQLContext, LoaderKeys
-from api.graphql.types.analysis import GraphQLAnalysis
-from api.graphql.types.analysis_runner import GraphQLAnalysisRunner
-from api.graphql.types.cohort import GraphQLCohort
-from api.graphql.types.comments import GraphQLDiscussion
 from api.graphql.types.enums import GraphQLAnalysisStatus
-from api.graphql.types.family import GraphQLFamily
-from api.graphql.types.participant import GraphQLParticipant
-from api.graphql.types.sample import GraphQLSample
-from api.graphql.types.sequencing_group import GraphQLSequencingGroup
 from db.python.filters import GenericFilter
 from db.python.layers import (
     AnalysisLayer,
@@ -52,6 +44,14 @@ from models.utils.sequencing_group_id_format import (
 
 if TYPE_CHECKING:
     from api.graphql.schema import Query
+    from api.graphql.types.analysis import GraphQLAnalysis
+    from api.graphql.types.analysis_runner import GraphQLAnalysisRunner
+    from api.graphql.types.cohort import GraphQLCohort
+    from api.graphql.types.comments import GraphQLDiscussion
+    from api.graphql.types.family import GraphQLFamily
+    from api.graphql.types.participant import GraphQLParticipant
+    from api.graphql.types.sample import GraphQLSample
+    from api.graphql.types.sequencing_group import GraphQLSequencingGroup
 
 
 @strawberry.type
@@ -85,8 +85,13 @@ class GraphQLProject:
         repository: GraphQLFilter[str] | None = None,
         access_level: GraphQLFilter[str] | None = None,
         environment: GraphQLFilter[str] | None = None,
-    ) -> list[GraphQLAnalysisRunner]:
+    ) -> Annotated[
+        list['GraphQLAnalysisRunner'],
+        strawberry.lazy('api.graphql.types.analysis_runner'),
+    ]:
         """List analysis runners for a project with optional filters."""
+        from api.graphql.types.analysis_runner import GraphQLAnalysisRunner
+
         connection = info.context['connection']
         alayer = AnalysisRunnerLayer(connection)
         filter_ = AnalysisRunnerFilter(
@@ -136,8 +141,10 @@ class GraphQLProject:
         root: 'GraphQLProject',
         id: GraphQLFilter[int] | None = None,
         external_id: GraphQLFilter[str] | None = None,
-    ) -> list[GraphQLFamily]:
+    ) -> Annotated[list['GraphQLFamily'], strawberry.lazy('api.graphql.types.family')]:
         """List families for a project with optional filters."""
+        from api.graphql.types.family import GraphQLFamily
+
         # don't need a data loader here as we're presuming we're not often running
         # the "families" method for many projects at once. If so, we might need to fix that
         connection = info.context['connection']
@@ -161,8 +168,12 @@ class GraphQLProject:
         reported_sex: GraphQLFilter[int] | None = None,
         reported_gender: GraphQLFilter[str] | None = None,
         karyotype: GraphQLFilter[str] | None = None,
-    ) -> list[GraphQLParticipant]:
+    ) -> Annotated[
+        list['GraphQLParticipant'], strawberry.lazy('api.graphql.types.participant')
+    ]:
         """List participants for a project with optional filters."""
+        from api.graphql.types.participant import GraphQLParticipant
+
         loader = info.context['loaders'][LoaderKeys.PARTICIPANTS_FOR_PROJECTS]
         participants = await loader.load(
             {
@@ -199,8 +210,10 @@ class GraphQLProject:
         meta: GraphQLMetaFilter | None = None,
         parent_id: GraphQLFilter[str] | None = None,
         root_id: GraphQLFilter[str] | None = None,
-    ) -> list[GraphQLSample]:
+    ) -> Annotated[list['GraphQLSample'], strawberry.lazy('api.graphql.types.sample')]:
         """List samples for a project with optional filters."""
+        from api.graphql.types.sample import GraphQLSample
+
         loader = info.context['loaders'][LoaderKeys.SAMPLES_FOR_PROJECTS]
         filter_ = SampleFilter(
             type=type.to_internal_filter() if type else None,
@@ -232,8 +245,13 @@ class GraphQLProject:
         technology: GraphQLFilter[str] | None = None,
         platform: GraphQLFilter[str] | None = None,
         active_only: GraphQLFilter[bool] | None = None,
-    ) -> list[GraphQLSequencingGroup]:
+    ) -> Annotated[
+        list['GraphQLSequencingGroup'],
+        strawberry.lazy('api.graphql.types.sequencing_group'),
+    ]:
         """List sequencing groups for a project with optional filters."""
+        from api.graphql.types.sequencing_group import GraphQLSequencingGroup
+
         loader = info.context['loaders'][LoaderKeys.SEQUENCING_GROUPS_FOR_PROJECTS]
         filter_ = SequencingGroupFilter(
             id=(
@@ -260,13 +278,17 @@ class GraphQLProject:
         info: Info[GraphQLContext, 'Query'],
         root: Project,
         type: GraphQLFilter[str] | None = None,
-        status: GraphQLFilter[GraphQLAnalysisStatus] | None = None,
+        status: GraphQLFilter['GraphQLAnalysisStatus'] | None = None,
         active: GraphQLFilter[bool] | None = None,
         meta: GraphQLMetaFilter | None = None,
         timestamp_completed: GraphQLFilter[datetime.datetime] | None = None,
         ids: GraphQLFilter[int] | None = None,
-    ) -> list[GraphQLAnalysis]:
+    ) -> Annotated[
+        list['GraphQLAnalysis'], strawberry.lazy('api.graphql.types.analysis')
+    ]:
         """List analyses for a project with optional filters."""
+        from api.graphql.types.analysis import GraphQLAnalysis
+
         connection = info.context['connection']
         internal_analysis = await AnalysisLayer(connection).query(
             AnalysisFilter(
@@ -275,7 +297,7 @@ class GraphQLProject:
                 status=(
                     status.to_internal_filter()
                     if status
-                    else GenericFilter(eq=AnalysisStatus.COMPLETED)
+                    else GenericFilter[AnalysisStatus](eq=AnalysisStatus.COMPLETED)
                 ),
                 active=active.to_internal_filter() if active else None,
                 project=GenericFilter(eq=root.id),
@@ -299,8 +321,10 @@ class GraphQLProject:
         author: GraphQLFilter[str] | None = None,
         template_id: GraphQLFilter[str] | None = None,
         timestamp: GraphQLFilter[datetime.datetime] | None = None,
-    ) -> list[GraphQLCohort]:
+    ) -> Annotated[list['GraphQLCohort'], strawberry.lazy('api.graphql.types.cohort')]:
         """List cohorts for a project with optional filters."""
+        from api.graphql.types.cohort import GraphQLCohort
+
         connection = info.context['connection']
 
         c_filter = CohortFilter(
@@ -324,8 +348,20 @@ class GraphQLProject:
     @strawberry.field()
     async def discussion(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLProject'
-    ) -> GraphQLDiscussion:
+    ) -> Annotated['GraphQLDiscussion', strawberry.lazy('api.graphql.types.comments')]:
         """Load the discussion associated with this project."""
+        from api.graphql.types.comments import GraphQLDiscussion
+
         loader = info.context['loaders'][LoaderKeys.COMMENTS_FOR_PROJECT_IDS]
         discussion = await loader.load(root.id)
         return GraphQLDiscussion.from_internal(discussion)
+
+
+from api.graphql.types.analysis import GraphQLAnalysis
+from api.graphql.types.analysis_runner import GraphQLAnalysisRunner
+from api.graphql.types.cohort import GraphQLCohort
+from api.graphql.types.comments import GraphQLDiscussion
+from api.graphql.types.family import GraphQLFamily
+from api.graphql.types.participant import GraphQLParticipant
+from api.graphql.types.sample import GraphQLSample
+from api.graphql.types.sequencing_group import GraphQLSequencingGroup

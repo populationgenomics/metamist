@@ -1,5 +1,5 @@
-# pylint: disable=redefined-builtin
-from typing import TYPE_CHECKING
+# pylint: disable=reimported,import-outside-toplevel,wrong-import-position,redefined-builtin
+from typing import TYPE_CHECKING, Annotated, Optional
 
 import strawberry
 from strawberry.types import Info
@@ -10,11 +10,6 @@ from api.graphql.filters import (
     graphql_meta_filter_to_internal_filter,
 )
 from api.graphql.loaders import GraphQLContext, LoaderKeys
-from api.graphql.types.assay import GraphQLAssay
-from api.graphql.types.comments import GraphQLDiscussion
-from api.graphql.types.participant import GraphQLParticipant
-from api.graphql.types.project import GraphQLProject
-from api.graphql.types.sequencing_group import GraphQLSequencingGroup
 from db.python.filters import GenericFilter
 from db.python.tables.assay import AssayFilter
 from db.python.tables.sample import SampleFilter
@@ -30,6 +25,11 @@ from models.utils.sequencing_group_id_format import (
 
 if TYPE_CHECKING:
     from api.graphql.schema import Query
+    from api.graphql.types.assay import GraphQLAssay
+    from api.graphql.types.comments import GraphQLDiscussion
+    from api.graphql.types.participant import GraphQLParticipant
+    from api.graphql.types.project import GraphQLProject
+    from api.graphql.types.sequencing_group import GraphQLSequencingGroup
 
 
 @strawberry.type
@@ -71,8 +71,12 @@ class GraphQLSample:
     @strawberry.field
     async def participant(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLSample'
-    ) -> GraphQLParticipant | None:
+    ) -> Annotated[
+        Optional['GraphQLParticipant'], strawberry.lazy('api.graphql.types.participant')  # noqa: F821
+    ]:
         """Retrieve the participant associated with this sample."""
+        from api.graphql.types.participant import GraphQLParticipant
+
         if root.participant_id is None:
             return None
         loader_participants_for_ids = info.context['loaders'][
@@ -88,8 +92,10 @@ class GraphQLSample:
         root: 'GraphQLSample',
         type: GraphQLFilter[str] | None = None,
         meta: GraphQLMetaFilter | None = None,
-    ) -> list[GraphQLAssay]:
+    ) -> Annotated[list['GraphQLAssay'], strawberry.lazy('api.graphql.types.assay')]:
         """Retrieve assays associated with this sample."""
+        from api.graphql.types.assay import GraphQLAssay
+
         loader_assays_for_sample_ids = info.context['loaders'][
             LoaderKeys.ASSAYS_FOR_SAMPLES
         ]
@@ -108,8 +114,10 @@ class GraphQLSample:
     @strawberry.field
     async def project(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLSample'
-    ) -> GraphQLProject:
+    ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.types.project')]:
         """Retrieve the project associated with this sample."""
+        from api.graphql.types.project import GraphQLProject
+
         project = await info.context['loaders'][LoaderKeys.PROJECTS_FOR_IDS].load(
             root.project_id
         )
@@ -126,8 +134,13 @@ class GraphQLSample:
         platform: GraphQLFilter[str] | None = None,
         meta: GraphQLMetaFilter | None = None,
         active_only: GraphQLFilter[bool] | None = None,
-    ) -> list[GraphQLSequencingGroup]:
+    ) -> Annotated[
+        list['GraphQLSequencingGroup'],
+        strawberry.lazy('api.graphql.types.sequencing_group'),
+    ]:
         """Retrieve sequencing groups associated with this sample."""
+        from api.graphql.types.sequencing_group import GraphQLSequencingGroup
+
         loader = info.context['loaders'][LoaderKeys.SEQUENCING_GROUPS_FOR_SAMPLES]
 
         _filter = SequencingGroupFilter(
@@ -201,8 +214,17 @@ class GraphQLSample:
     @strawberry.field()
     async def discussion(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLSample'
-    ) -> GraphQLDiscussion:
+    ) -> Annotated['GraphQLDiscussion', strawberry.lazy('api.graphql.types.comments')]:
         """Load the discussion associated with this sample."""
+        from api.graphql.types.comments import GraphQLDiscussion
+
         loader = info.context['loaders'][LoaderKeys.COMMENTS_FOR_SAMPLE_IDS]
         discussion = await loader.load(root.internal_id)
         return GraphQLDiscussion.from_internal(discussion)
+
+
+from api.graphql.types.assay import GraphQLAssay
+from api.graphql.types.comments import GraphQLDiscussion
+from api.graphql.types.participant import GraphQLParticipant
+from api.graphql.types.project import GraphQLProject
+from api.graphql.types.sequencing_group import GraphQLSequencingGroup

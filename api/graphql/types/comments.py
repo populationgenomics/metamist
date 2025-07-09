@@ -1,3 +1,4 @@
+# pylint: disable=reimported,import-outside-toplevel,wrong-import-position
 import datetime
 from typing import TYPE_CHECKING, Annotated
 
@@ -5,12 +6,6 @@ import strawberry
 from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext, LoaderKeys
-from api.graphql.types.assay import GraphQLAssay
-from api.graphql.types.family import GraphQLFamily
-from api.graphql.types.participant import GraphQLParticipant
-from api.graphql.types.project import GraphQLProject
-from api.graphql.types.sample import GraphQLSample
-from api.graphql.types.sequencing_group import GraphQLSequencingGroup
 from models.models.comment import (
     CommentEntityType,
     CommentInternal,
@@ -21,6 +16,12 @@ from models.models.comment import (
 
 if TYPE_CHECKING:
     from api.graphql.schema import Query
+    from api.graphql.types.assay import GraphQLAssay
+    from api.graphql.types.family import GraphQLFamily
+    from api.graphql.types.participant import GraphQLParticipant
+    from api.graphql.types.project import GraphQLProject
+    from api.graphql.types.sample import GraphQLSample
+    from api.graphql.types.sequencing_group import GraphQLSequencingGroup
 
 
 @strawberry.type
@@ -85,15 +86,17 @@ class GraphQLComment:
     async def entity(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLComment'
     ) -> Annotated[
-        GraphQLSample
-        | GraphQLAssay
-        | GraphQLSequencingGroup
-        | GraphQLProject
-        | GraphQLParticipant
-        | GraphQLFamily,
+        'GraphQLSample | GraphQLAssay | GraphQLSequencingGroup | GraphQLProject | GraphQLParticipant | GraphQLFamily',
         strawberry.union('GraphQLCommentEntity'),
     ]:
         """Retrieve the entity this comment is associated with."""
+        from api.graphql.types.assay import GraphQLAssay
+        from api.graphql.types.family import GraphQLFamily
+        from api.graphql.types.participant import GraphQLParticipant
+        from api.graphql.types.project import GraphQLProject
+        from api.graphql.types.sample import GraphQLSample
+        from api.graphql.types.sequencing_group import GraphQLSequencingGroup
+
         entity_type = root.comment_entity_type
         entity_id = root.comment_entity_id
 
@@ -146,3 +149,11 @@ class GraphQLComment:
                 GraphQLCommentVersion.from_internal(v) for v in internal.versions
             ],
         )
+
+
+from api.graphql.types.assay import GraphQLAssay
+from api.graphql.types.family import GraphQLFamily
+from api.graphql.types.participant import GraphQLParticipant
+from api.graphql.types.project import GraphQLProject
+from api.graphql.types.sample import GraphQLSample
+from api.graphql.types.sequencing_group import GraphQLSequencingGroup

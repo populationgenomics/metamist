@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING
+# pylint: disable=reimported,import-outside-toplevel,wrong-import-position
+from typing import TYPE_CHECKING, Annotated
 
 import strawberry
 from strawberry.types import Info
@@ -7,10 +8,6 @@ from api.graphql.filters import (
     GraphQLFilter,
 )
 from api.graphql.loaders import GraphQLContext, LoaderKeys
-from api.graphql.types.analysis import GraphQLAnalysis
-from api.graphql.types.cohort_template import GraphQLCohortTemplate
-from api.graphql.types.project import GraphQLProject
-from api.graphql.types.sequencing_group import GraphQLSequencingGroup
 from db.python.filters import GenericFilter
 from db.python.layers import (
     AnalysisLayer,
@@ -29,6 +26,10 @@ from models.utils.cohort_id_format import cohort_id_format, cohort_id_transform_
 
 if TYPE_CHECKING:
     from api.graphql.schema import Query
+    from api.graphql.types.analysis import GraphQLAnalysis
+    from api.graphql.types.cohort_template import GraphQLCohortTemplate
+    from api.graphql.types.project import GraphQLProject
+    from api.graphql.types.sequencing_group import GraphQLSequencingGroup
 
 
 # Create cohort GraphQL model
@@ -57,8 +58,12 @@ class GraphQLCohort:
     @strawberry.field()
     async def template(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLCohort'
-    ) -> GraphQLCohortTemplate:
+    ) -> Annotated[
+        'GraphQLCohortTemplate', strawberry.lazy('api.graphql.types.cohort_template')
+    ]:
         """Get the cohort template associated with this cohort."""
+        from api.graphql.types.cohort_template import GraphQLCohortTemplate
+
         connection = info.context['connection']
         template = await CohortLayer(connection).get_template_by_cohort_id(
             cohort_id_transform_to_raw(root.id)
@@ -82,8 +87,13 @@ class GraphQLCohort:
         info: Info[GraphQLContext, 'Query'],
         root: 'GraphQLCohort',
         active_only: GraphQLFilter[bool] | None = None,
-    ) -> list[GraphQLSequencingGroup]:
+    ) -> Annotated[
+        list['GraphQLSequencingGroup'],
+        strawberry.lazy('api.graphql.types.sequencing_group'),
+    ]:
         """Get the sequencing groups associated with this cohort."""
+        from api.graphql.types.sequencing_group import GraphQLSequencingGroup
+
         connection = info.context['connection']
         cohort_layer = CohortLayer(connection)
         sg_ids = await cohort_layer.get_cohort_sequencing_group_ids(
@@ -102,8 +112,12 @@ class GraphQLCohort:
     @strawberry.field()
     async def analyses(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLCohort'
-    ) -> list[GraphQLAnalysis]:
+    ) -> Annotated[
+        list['GraphQLAnalysis'], strawberry.lazy('api.graphql.types.analysis')
+    ]:
         """Get the analyses associated with this cohort."""
+        from api.graphql.types.analysis import GraphQLAnalysis
+
         connection = info.context['connection']
         internal_analysis = await AnalysisLayer(connection).query(
             AnalysisFilter(
@@ -115,8 +129,16 @@ class GraphQLCohort:
     @strawberry.field()
     async def project(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLCohort'
-    ) -> GraphQLProject:
+    ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.types.project')]:
         """Get the project associated with this cohort."""
+        from api.graphql.types.project import GraphQLProject
+
         loader = info.context['loaders'][LoaderKeys.PROJECTS_FOR_IDS]
         project = await loader.load(root.project_id)
         return GraphQLProject.from_internal(project)
+
+
+from api.graphql.types.analysis import GraphQLAnalysis
+from api.graphql.types.cohort_template import GraphQLCohortTemplate
+from api.graphql.types.project import GraphQLProject
+from api.graphql.types.sequencing_group import GraphQLSequencingGroup

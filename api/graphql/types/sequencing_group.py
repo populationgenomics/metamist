@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING
+# pylint: disable=reimported,import-outside-toplevel,wrong-import-position
+from typing import TYPE_CHECKING, Annotated
 
 import strawberry
 from strawberry.types import Info
@@ -9,11 +10,7 @@ from api.graphql.filters import (
     graphql_meta_filter_to_internal_filter,
 )
 from api.graphql.loaders import GraphQLContext, LoaderKeys
-from api.graphql.types.analysis import GraphQLAnalysis
-from api.graphql.types.assay import GraphQLAssay
-from api.graphql.types.comments import GraphQLDiscussion
 from api.graphql.types.enums import GraphQLAnalysisStatus
-from api.graphql.types.sample import GraphQLSample
 from db.python.filters import GenericFilter
 from db.python.tables.analysis import AnalysisFilter
 from models.models import (
@@ -29,6 +26,10 @@ from models.utils.sequencing_group_id_format import (
 
 if TYPE_CHECKING:
     from api.graphql.schema import Query
+    from api.graphql.types.analysis import GraphQLAnalysis
+    from api.graphql.types.assay import GraphQLAssay
+    from api.graphql.types.comments import GraphQLDiscussion
+    from api.graphql.types.sample import GraphQLSample
 
 
 @strawberry.type
@@ -70,8 +71,10 @@ class GraphQLSequencingGroup:
     @strawberry.field
     async def sample(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLSequencingGroup'
-    ) -> GraphQLSample:
+    ) -> Annotated['GraphQLSample', strawberry.lazy('api.graphql.types.sample')]:
         """Get the sample associated with this sequencing group"""
+        from api.graphql.types.sample import GraphQLSample
+
         loader = info.context['loaders'][LoaderKeys.SAMPLES_FOR_IDS]
         sample = await loader.load(root.sample_id)
         return GraphQLSample.from_internal(sample)
@@ -86,8 +89,12 @@ class GraphQLSequencingGroup:
         meta: GraphQLMetaFilter | None = None,
         active: GraphQLFilter[bool] | None = None,
         project: GraphQLFilter[str] | None = None,
-    ) -> list[GraphQLAnalysis]:
+    ) -> Annotated[
+        list['GraphQLAnalysis'], strawberry.lazy('api.graphql.types.analysis')
+    ]:
         """Get analyses associated with this sequencing group"""
+        from api.graphql.types.analysis import GraphQLAnalysis
+
         connection = info.context['connection']
         loader = info.context['loaders'][LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS]
 
@@ -126,8 +133,10 @@ class GraphQLSequencingGroup:
     @strawberry.field
     async def assays(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLSequencingGroup'
-    ) -> list[GraphQLAssay]:
+    ) -> Annotated[list['GraphQLAssay'], strawberry.lazy('api.graphql.types.assay')]:
         """Get assays associated with this sequencing group"""
+        from api.graphql.types.assay import GraphQLAssay
+
         loader = info.context['loaders'][LoaderKeys.ASSAYS_FOR_SEQUENCING_GROUPS]
         assays = await loader.load(root.internal_id)
         return [GraphQLAssay.from_internal(assay) for assay in assays]
@@ -135,8 +144,16 @@ class GraphQLSequencingGroup:
     @strawberry.field()
     async def discussion(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLSequencingGroup'
-    ) -> GraphQLDiscussion:
+    ) -> Annotated['GraphQLDiscussion', strawberry.lazy('api.graphql.types.comments')]:
         """Get discussion associated with this sequencing group"""
+        from api.graphql.types.comments import GraphQLDiscussion
+
         loader = info.context['loaders'][LoaderKeys.COMMENTS_FOR_SEQUENCING_GROUP_IDS]
         discussion = await loader.load(root.internal_id)
         return GraphQLDiscussion.from_internal(discussion)
+
+
+from api.graphql.types.analysis import GraphQLAnalysis
+from api.graphql.types.assay import GraphQLAssay
+from api.graphql.types.comments import GraphQLDiscussion
+from api.graphql.types.sample import GraphQLSample
