@@ -1,3 +1,4 @@
+# pylint: disable=redefined-builtin
 from typing import Annotated
 
 import strawberry
@@ -42,7 +43,7 @@ class SampleMutations:
     async def add_comment(
         self,
         content: str,
-        sample_id: str,
+        id: str,
         info: Info[GraphQLContext, 'SampleMutations'],
     ) -> Annotated[GraphQLComment, strawberry.lazy('api.graphql.schema')]:
         """Add a comment to a sample"""
@@ -50,7 +51,7 @@ class SampleMutations:
         cl = CommentLayer(connection)
         result = await cl.add_comment_to_entity(
             entity=CommentEntityType.sample,
-            entity_id=sample_id_transform_to_raw(sample_id),
+            entity_id=sample_id_transform_to_raw(id),
             content=content,
         )
         return GraphQLComment.from_internal(result)

@@ -1,3 +1,4 @@
+# pylint: disable=redefined-builtin
 from typing import Annotated
 
 import strawberry
@@ -30,14 +31,14 @@ class FamilyMutations:
     async def add_comment(
         self,
         content: str,
-        family_id: int,
+        id: int,
         info: Info[GraphQLContext, 'FamilyMutations'],
     ) -> Annotated[GraphQLComment, strawberry.lazy('api.graphql.schema')]:
         """Add a comment to a family"""
         connection = info.context['connection']
         cl = CommentLayer(connection)
         result = await cl.add_comment_to_entity(
-            entity=CommentEntityType.family, entity_id=family_id, content=content
+            entity=CommentEntityType.family, entity_id=id, content=content
         )
         return GraphQLComment.from_internal(result)
 

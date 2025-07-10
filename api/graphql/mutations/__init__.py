@@ -1,19 +1,17 @@
 import strawberry
 from strawberry.types import Info
 
-
-from api.graphql.mutations.cohort import CohortMutations
-from api.graphql.mutations.comment import CommentMutations
-from api.graphql.mutations.project import ProjectMutations
 from api.graphql.mutations.analysis import AnalysisMutations
 from api.graphql.mutations.analysis_runner import AnalysisRunnerMutations
 from api.graphql.mutations.assay import AssayMutations
+from api.graphql.mutations.cohort import CohortMutations
+from api.graphql.mutations.comment import CommentMutations
 from api.graphql.mutations.family import FamilyMutations
 from api.graphql.mutations.participant import ParticipantMutations
-from api.graphql.mutations.sequencing_group import SequencingGroupMutations
-from api.graphql.mutations.sample import SampleMutations
+from api.graphql.mutations.project import ProjectMutations
 from api.graphql.mutations.project_groups import ProjectGroupsMutations
-
+from api.graphql.mutations.sample import SampleMutations
+from api.graphql.mutations.sequencing_group import SequencingGroupMutations
 from api.graphql.mutations.user import UserMutations
 
 

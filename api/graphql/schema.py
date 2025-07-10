@@ -266,9 +266,9 @@ class Query:  # entry point to graphql.
     async def sequencing_groups(
         self,
         info: Info[GraphQLContext, 'Query'],
-        sg_id: GraphQLFilter[str] | None = None,
-        project: GraphQLFilter[str] | None = None,
         id: GraphQLFilter[str] | None = None,
+        project: GraphQLFilter[str] | None = None,
+        sample_id: GraphQLFilter[str] | None = None,
         type: GraphQLFilter[str] | None = None,
         technology: GraphQLFilter[str] | None = None,
         platform: GraphQLFilter[str] | None = None,
@@ -282,7 +282,7 @@ class Query:  # entry point to graphql.
 
         connection = info.context['connection']
         sglayer = SequencingGroupLayer(connection)
-        if not (project or id or id):
+        if not (project or sample_id or id):
             raise ValueError('Must filter by project, sample or id')
 
         # we list project names, but internally we want project ids
@@ -303,14 +303,14 @@ class Query:  # entry point to graphql.
             project=_project_filter,
             sample=(
                 SequencingGroupFilter.SequencingGroupSampleFilter(
-                    id=id.to_internal_filter_mapped(sample_id_transform_to_raw)
+                    id=sample_id.to_internal_filter_mapped(sample_id_transform_to_raw)
                 )
-                if id
+                if sample_id
                 else None
             ),
             id=(
-                sg_id.to_internal_filter_mapped(sequencing_group_id_transform_to_raw)
-                if sg_id
+                id.to_internal_filter_mapped(sequencing_group_id_transform_to_raw)
+                if id
                 else None
             ),
             type=type.to_internal_filter() if type else None,
@@ -351,11 +351,11 @@ class Query:  # entry point to graphql.
 
     @strawberry.field()
     async def family(
-        self, info: Info[GraphQLContext, 'Query'], id: int
+        self, info: Info[GraphQLContext, 'Query'], family_id: int
     ) -> GraphQLFamily:
         """Family Query"""
         connection = info.context['connection']
-        family = await FamilyLayer(connection).get_family_by_internal_id(id)
+        family = await FamilyLayer(connection).get_family_by_internal_id(family_id)
         return GraphQLFamily.from_internal(family)
 
     @strawberry.field
