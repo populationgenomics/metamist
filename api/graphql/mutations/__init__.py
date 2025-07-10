@@ -1,20 +1,18 @@
 import strawberry
 from strawberry.types import Info
 
-
-from api.graphql.loaders import GraphQLContext
-from api.graphql.mutations.cohort import CohortMutations
-from api.graphql.mutations.comment import CommentMutations
-from api.graphql.mutations.project import ProjectMutations
 from api.graphql.mutations.analysis import AnalysisMutations
 from api.graphql.mutations.analysis_runner import AnalysisRunnerMutations
 from api.graphql.mutations.assay import AssayMutations
+from api.graphql.mutations.cohort import CohortMutations
+from api.graphql.mutations.comment import CommentMutations
 from api.graphql.mutations.family import FamilyMutations
 from api.graphql.mutations.participant import ParticipantMutations
-from api.graphql.mutations.sequencing_group import SequencingGroupMutations
+from api.graphql.mutations.project import ProjectMutations
+from api.graphql.mutations.project_groups import ProjectGroupsMutations
 from api.graphql.mutations.sample import SampleMutations
-
-from models.models.project import FullWriteAccessRoles, ReadAccessRoles
+from api.graphql.mutations.sequencing_group import SequencingGroupMutations
+from api.graphql.mutations.user import UserMutations
 
 
 @strawberry.type
@@ -80,3 +78,15 @@ class Mutation:
     def cohort(self) -> CohortMutations:
         """Cohort mutations"""
         return CohortMutations()
+
+    # Users
+    @strawberry.field()
+    def user(self) -> UserMutations:
+        """User mutations"""
+        return UserMutations()
+
+    # Project Groups
+    @strawberry.field
+    def project_group(self) -> ProjectGroupsMutations:
+        """Project group mutations"""
+        return ProjectGroupsMutations()

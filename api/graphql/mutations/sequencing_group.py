@@ -1,11 +1,13 @@
 # pylint: disable=redefined-builtin, import-outside-toplevel
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 import strawberry
 from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
 from api.graphql.mutations.assay import AssayUpsertInput
+from api.graphql.types.comments import GraphQLComment
+from api.graphql.types.sequencing_group import GraphQLSequencingGroup
 from db.python.connect import Connection
 from db.python.layers.comment import CommentLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
@@ -13,9 +15,6 @@ from models.models.comment import CommentEntityType
 from models.models.project import FullWriteAccessRoles
 from models.models.sequencing_group import SequencingGroupUpsertInternal
 from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
-
-if TYPE_CHECKING:
-    from api.graphql.schema import GraphQLComment, GraphQLSequencingGroup
 
 
 @strawberry.input  # type: ignore [misc]
@@ -51,11 +50,8 @@ class SequencingGroupMutations:
         content: str,
         id: str,
         info: Info[GraphQLContext, 'SequencingGroupMutations'],
-    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated[GraphQLComment, strawberry.lazy('api.graphql.schema')]:
         """Add a comment to a sequencing group"""
-        # Import needed here to avoid circular import
-        from api.graphql.schema import GraphQLComment
-
         connection = info.context['connection']
         cl = CommentLayer(connection)
         result = await cl.add_comment_to_entity(
@@ -71,10 +67,8 @@ class SequencingGroupMutations:
         project: str,
         sequencing_group: SequencingGroupMetaUpdateInput,
         info: Info,
-    ) -> Annotated['GraphQLSequencingGroup', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated[GraphQLSequencingGroup, strawberry.lazy('api.graphql.schema')]:
         """Update the meta fields of a sequencing group"""
-        from api.graphql.schema import GraphQLSequencingGroup
-
         connection: Connection = info.context['connection']
 
         # Having to do the permission check here is a bit of a hack, we ideally want to
@@ -104,12 +98,8 @@ class SequencingGroupMutations:
         self,
         sequencing_group_ids: list[str],
         info: Info,
-    ) -> list[
-        Annotated['GraphQLSequencingGroup', strawberry.lazy('api.graphql.schema')]
-    ]:
+    ) -> list[Annotated[GraphQLSequencingGroup, strawberry.lazy('api.graphql.schema')]]:
         """Archive a list of sequencing groups"""
-        from api.graphql.schema import GraphQLSequencingGroup
-
         connection: Connection = info.context['connection']
 
         slayer = SequencingGroupLayer(connection)

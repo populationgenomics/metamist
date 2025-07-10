@@ -1889,4 +1889,77 @@
 			columnName="write_group_name"
 		/>
 	</changeSet>
+
+ 	<!-- Create users table -->
+    <changeSet id="2025-05-21-create-users-table" author="sabrina.yan">
+        <createTable tableName="users">
+            <column name="id" type="INT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="email" type="VARCHAR(255)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="full_name" type="VARCHAR(255)">
+				<constraints nullable="false"/>
+			</column>
+            <column name="settings" type="JSON"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+            <column name="updated_at" type="TIMESTAMP"
+                    defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"/>
+        </createTable>
+    </changeSet>
+
+	<!-- Create project_groups table -->
+	<changeSet id="2025-05-21-create-project-groups-table" author="sabrina.yan">
+		<createTable tableName="project_groups">
+			<column name="id" type="INT" autoIncrement="true">
+				<constraints primaryKey="true" nullable="false"/>
+			</column>
+			<column name="user_id" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_project_groups_user" references="users(id)" />
+			</column>
+			<column name="group_id" type="INT">
+				<constraints nullable="false"/>
+			</column>
+			<column name="group_name" type="VARCHAR(255)">
+				<constraints nullable="false"/>
+			</column>
+			<column name="description" type="TEXT"/>
+			<column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+			<column name="updated_at" type="TIMESTAMP"
+					defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"/>
+		</createTable>
+	</changeSet>
+
+	<!-- Create project_group_items table -->
+	<changeSet id="2025-05-21-create-project-group-items-table" author="sabrina.yan">
+		<createTable tableName="project_group_items">
+			<column name="id" type="INT" autoIncrement="true">
+				<constraints primaryKey="true" nullable="false"/>
+			</column>
+			<column name="group_id" type="INT">
+				<constraints nullable="false"/>
+			</column>
+			<column name="project_id" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_project_group_items_project" references="project(id)" />
+			</column>
+		</createTable>
+
+		<!-- Index for fast lookup of all project_ids for a given group_id and project_id -->
+		<createIndex tableName="project_group_items" indexName="idx_project_group_items_group_id">
+			<column name="group_id"/>
+		</createIndex>
+	</changeSet>
+
+	<!-- Add fk constraints for project_groups -->
+	<changeSet id="2025-05-21-add-fk-project-group-items-group-id" author="sabrina.yan">
+		<addForeignKeyConstraint
+			baseTableName="project_group_items"
+			baseColumnNames="group_id"
+			constraintName="fk_project_group_items_group"
+			referencedTableName="project_groups"
+			referencedColumnNames="id"
+		/>
+	</changeSet>
+
 </databaseChangeLog>
