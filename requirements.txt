@@ -94,7 +94,7 @@ frozenlist==1.6.0
     # via
     #   aiohttp
     #   aiosignal
-fsspec==2024.10.0
+fsspec==2025.5.1
     # via -r requirements.in
 google-api-core[grpc]==2.24.2
     # via
@@ -114,6 +114,7 @@ google-auth==2.40.1
     #   google-cloud-appengine-logging
     #   google-cloud-artifact-registry
     #   google-cloud-core
+    #   google-cloud-logging
     #   google-cloud-secret-manager
     #   google-cloud-storage
 google-cloud-appengine-logging==1.6.1
@@ -129,18 +130,20 @@ google-cloud-core==2.4.3
     #   google-cloud-bigquery
     #   google-cloud-logging
     #   google-cloud-storage
-google-cloud-logging==2.7.0
+google-cloud-logging==3.12.1
     # via -r requirements.in
 google-cloud-pubsub==2.18.3
     # via -r requirements.in
 google-cloud-secret-manager==2.23.0
     # via cpg-utils
-google-cloud-storage==1.43.0
+google-cloud-storage==3.2.0
     # via
     #   -r requirements.in
     #   cloudpathlib
 google-crc32c==1.7.1
-    # via google-resumable-media
+    # via
+    #   google-cloud-storage
+    #   google-resumable-media
 google-resumable-media==2.7.2
     # via
     #   google-cloud-bigquery
@@ -190,6 +193,8 @@ idna==3.10
     #   httpx
     #   requests
     #   yarl
+importlib-metadata==8.7.0
+    # via opentelemetry-api
 isodate==0.7.2
     # via
     #   azure-storage-blob
@@ -212,6 +217,8 @@ multidict==6.4.3
     # via
     #   aiohttp
     #   yarl
+opentelemetry-api==1.35.0
+    # via google-cloud-logging
 orjson==3.10.18
     # via fastapi
 packaging==25.0
@@ -238,14 +245,14 @@ protobuf==4.25.7
     #   google-cloud-artifact-registry
     #   google-cloud-audit-log
     #   google-cloud-bigquery
+    #   google-cloud-logging
     #   google-cloud-pubsub
     #   google-cloud-secret-manager
-    #   google-cloud-storage
     #   googleapis-common-protos
     #   grpc-google-iam-v1
     #   grpcio-status
     #   proto-plus
-pyarrow==18.1.0
+pyarrow==20.0.0
     # via -r requirements.in
 pyasn1==0.6.1
     # via
@@ -311,7 +318,6 @@ shellingham==1.5.4
 six==1.17.0
     # via
     #   azure-core
-    #   google-cloud-storage
     #   python-dateutil
 slack-sdk==3.20.2
     # via -r requirements.in
@@ -336,6 +342,7 @@ typing-extensions==4.13.2
     #   azure-storage-blob
     #   azure-storage-file-datalake
     #   fastapi
+    #   opentelemetry-api
     #   pydantic
     #   pydantic-core
     #   pydantic-extra-types
@@ -369,3 +376,5 @@ wrapt==1.17.2
     # via deprecated
 yarl==1.20.0
     # via aiohttp
+zipp==3.23.0
+    # via importlib-metadata
