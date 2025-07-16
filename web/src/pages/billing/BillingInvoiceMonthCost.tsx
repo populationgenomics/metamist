@@ -24,6 +24,7 @@ import { convertFieldName } from '../../shared/utilities/fieldName'
 import formatMoney from '../../shared/utilities/formatMoney'
 import generateUrl from '../../shared/utilities/generateUrl'
 import { BillingApi, BillingColumn, BillingCostBudgetRecord } from '../../sm-api'
+import './components/BillingCostByTimeTable.css'
 import FieldSelector from './components/FieldSelector'
 
 const BillingCurrentCost = () => {
@@ -353,38 +354,58 @@ const BillingCurrentCost = () => {
                     />
                 </Grid.Column>
                 <Grid.Column textAlign="right">
-                    <ColumnVisibilityDropdown
-                        columns={getColumnConfigs()}
-                        groups={getColumnGroups()}
-                        visibleColumns={visibleColumns}
-                        onVisibilityChange={setVisibleColumns}
-                        searchThreshold={8}
-                        searchPlaceholder="Search topics and months..."
-                    />
-
-                    <Dropdown
-                        button
-                        className="icon"
-                        floating
-                        labeled
-                        icon="download"
-                        text="Export"
+                    <div
+                        className="button-container"
+                        style={{
+                            display: 'flex',
+                            gap: '10px',
+                            alignItems: 'stretch',
+                            justifyContent: 'flex-end',
+                            flex: '0 0 auto',
+                            minWidth: '240px',
+                        }}
                     >
-                        <Dropdown.Menu>
-                            <Dropdown.Item
-                                key="csv"
-                                text="Export to CSV"
-                                icon="file excel"
-                                onClick={() => exportToFile('csv')}
-                            />
-                            <Dropdown.Item
-                                key="tsv"
-                                text="Export to TSV"
-                                icon="file text outline"
-                                onClick={() => exportToFile('tsv')}
-                            />
-                        </Dropdown.Menu>
-                    </Dropdown>
+                        <ColumnVisibilityDropdown
+                            columns={getColumnConfigs()}
+                            groups={getColumnGroups()}
+                            visibleColumns={visibleColumns}
+                            onVisibilityChange={setVisibleColumns}
+                            searchThreshold={8}
+                            searchPlaceholder="Search topics and months..."
+                            buttonStyle={{
+                                minWidth: '115px',
+                                height: '36px',
+                            }}
+                        />
+
+                        <Dropdown
+                            button
+                            className="icon"
+                            floating
+                            labeled
+                            icon="download"
+                            text="Export"
+                            style={{
+                                minWidth: '115px',
+                                height: '36px',
+                            }}
+                        >
+                            <Dropdown.Menu>
+                                <Dropdown.Item
+                                    key="csv"
+                                    text="Export to CSV"
+                                    icon="file excel"
+                                    onClick={() => exportToFile('csv')}
+                                />
+                                <Dropdown.Item
+                                    key="tsv"
+                                    text="Export to TSV"
+                                    icon="file text outline"
+                                    onClick={() => exportToFile('tsv')}
+                                />
+                            </Dropdown.Menu>
+                        </Dropdown>
+                    </div>
                 </Grid.Column>
             </Grid>
 

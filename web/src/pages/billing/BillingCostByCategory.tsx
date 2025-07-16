@@ -20,6 +20,7 @@ import {
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 } from '../../sm-api'
+import './components/BillingCostByTimeTable.css'
 import CostByTimeBarChart from './components/CostByTimeBarChart'
 import FieldSelector from './components/FieldSelector'
 
@@ -287,21 +288,45 @@ const BillingCostByCategory: React.FunctionComponent = () => {
     return (
         <>
             <Card fluid style={{ padding: '20px' }} id="billing-container">
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div
+                    className="header-container"
+                    style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        flexWrap: 'wrap',
+                        gap: '10px',
+                    }}
+                >
                     <h1
                         style={{
                             fontSize: 40,
+                            margin: 0,
+                            flex: '1 1 200px',
                         }}
                     >
                         Billing Cost By Category
                     </h1>
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <div
+                        className="button-container"
+                        style={{
+                            display: 'flex',
+                            gap: '10px',
+                            alignItems: 'stretch',
+                            flex: '0 0 auto',
+                            minWidth: '240px',
+                        }}
+                    >
                         <ColumnVisibilityDropdown
                             columns={getColumnConfigs()}
                             groups={getColumnGroups()}
                             visibleColumns={visibleColumns}
                             onVisibilityChange={setVisibleColumns}
-                            buttonStyle={{ marginRight: '0px' }}
+                            buttonStyle={{
+                                marginRight: '0px',
+                                minWidth: '115px',
+                                height: '36px',
+                            }}
                             searchThreshold={8}
                             searchPlaceholder="Search SKUs..."
                         />
@@ -312,6 +337,10 @@ const BillingCostByCategory: React.FunctionComponent = () => {
                             labeled
                             icon="download"
                             text="Export"
+                            style={{
+                                minWidth: '115px',
+                                height: '36px',
+                            }}
                         >
                             <Dropdown.Menu>
                                 <Dropdown.Item

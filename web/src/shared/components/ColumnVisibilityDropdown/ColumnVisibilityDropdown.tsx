@@ -52,6 +52,7 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
     const [searchTerm, setSearchTerm] = React.useState('')
     const dropdownRef = React.useRef<HTMLDivElement>(null)
     const searchInputRef = React.useRef<HTMLInputElement>(null)
+    const stickyHeaderRef = React.useRef<HTMLDivElement>(null)
 
     // Show search when there are many columns
     const showSearch = columns.length > searchThreshold
@@ -283,6 +284,30 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
         ungroupedColumns.length > 0 ||
         filteredGroups.some((group) => filterColumns(getColumnsByGroup(group.id)).length > 0)
 
+    // Update sticky positioning dynamically
+    React.useEffect(() => {
+        if (isOpen && stickyHeaderRef.current && dropdownRef.current) {
+            const stickyHeader = stickyHeaderRef.current
+            const menu = dropdownRef.current.querySelector('.dropdown-menu-content')
+
+            if (menu) {
+                const stickyHeaderHeight = stickyHeader.offsetHeight
+                const sectionHeaders = menu.querySelectorAll('.section-header')
+                const groupToggleButtons = menu.querySelectorAll('.group-toggle-item')
+
+                // Update section header positions
+                sectionHeaders.forEach((header) => {
+                    ;(header as HTMLElement).style.top = `${stickyHeaderHeight}px`
+                })
+
+                // Update group toggle button positions
+                groupToggleButtons.forEach((button) => {
+                    ;(button as HTMLElement).style.top = `${stickyHeaderHeight + 32}px` // +32px for section header height
+                })
+            }
+        }
+    }, [isOpen, showSearch, hasResults])
+
     // Handle dynamic positioning based on viewport
     React.useEffect(() => {
         if (isOpen && dropdownRef.current) {
@@ -330,42 +355,45 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
                 <Dropdown.Menu
                     className={`dropdown-menu-content${showSearch ? ' has-search' : ''}`}
                 >
-                    <Dropdown.Header
-                        icon="table"
-                        content="Column Visibility"
-                        className="dropdown-header"
-                    />
+                    {/* Sticky header section - groups header, search, and toggle buttons */}
+                    <div ref={stickyHeaderRef} className="sticky-header-section">
+                        <Dropdown.Header
+                            icon="table"
+                            content="Column Visibility"
+                            className="dropdown-header"
+                        />
 
-                    {/* Search input */}
-                    {showSearch && (
-                        <div className="search-section">
-                            <input
-                                ref={searchInputRef}
-                                type="text"
-                                className="search-input"
-                                placeholder={searchPlaceholder}
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                onClick={(e) => e.stopPropagation()}
-                                onKeyDown={(e) => e.stopPropagation()}
+                        {/* Search input */}
+                        {showSearch && (
+                            <div className="search-section">
+                                <input
+                                    ref={searchInputRef}
+                                    type="text"
+                                    className="search-input"
+                                    placeholder={searchPlaceholder}
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onKeyDown={(e) => e.stopPropagation()}
+                                />
+                            </div>
+                        )}
+
+                        {/* Global toggle buttons - only show if we have results */}
+                        {hasResults && (
+                            <ToggleButtons
+                                onSelectAll={() => toggleAllColumns(true)}
+                                onHideAll={() => toggleAllColumns(false)}
+                                className="global-toggle-item"
                             />
-                        </div>
-                    )}
+                        )}
+                    </div>
 
                     {/* Show no results message */}
                     {showSearch && searchTerm.trim() && !hasResults && (
                         <div className="no-results-message">
                             No columns found matching &ldquo;{searchTerm}&rdquo;
                         </div>
-                    )}
-
-                    {/* Global toggle buttons - only show if we have results */}
-                    {hasResults && (
-                        <ToggleButtons
-                            onSelectAll={() => toggleAllColumns(true)}
-                            onHideAll={() => toggleAllColumns(false)}
-                            className="global-toggle-item"
-                        />
                     )}
 
                     {/* Required columns */}

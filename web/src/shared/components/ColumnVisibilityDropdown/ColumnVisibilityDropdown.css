@@ -16,15 +16,22 @@
     color: #495057 !important;
 }
 
+/* Sticky header section - groups header, search, and toggle buttons */
+.sticky-header-section {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+    background-color: #f8f9fa !important;
+    border-bottom: 1px solid #dee2e6 !important;
+}
+
 .dropdown-header {
     background-color: #e9ecef !important;
     color: #495057 !important;
     font-weight: bold !important;
     padding: 12px 16px !important;
     border-bottom: 1px solid #dee2e6 !important;
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 10 !important;
+    margin: 0 !important;
 }
 
 .section-header {
@@ -36,17 +43,12 @@
     margin: 0 !important;
     position: sticky !important;
     background-color: #f8f9fa !important;
-    z-index: 9 !important;
+    z-index: 8 !important;
+    border-bottom: 1px solid #dee2e6 !important;
 }
 
-/* Adjust section header positioning based on search presence */
-.dropdown-menu-content.has-search .section-header {
-    top: 122px !important; /* header (61px) + search (61px) */
-}
-
-.dropdown-menu-content:not(.has-search) .section-header {
-    top: 61px !important; /* header (61px) only */
-}
+/* Calculate sticky header section height dynamically - handled by JavaScript */
+/* Dynamic positioning for section headers and group toggle buttons will be set by JavaScript */
 
 /* Column checkbox items */
 .column-checkbox-item {
@@ -109,7 +111,7 @@
     font-weight: 500;
 }
 
-/* Toggle button sections */
+/* Toggle button sections - now part of sticky header */
 .global-toggle-item,
 .group-toggle-item {
     padding: 12px 16px !important;
@@ -117,8 +119,27 @@
     border-bottom: 1px solid #dee2e6 !important;
 }
 
+/* Global toggle buttons in sticky header */
+.sticky-header-section .global-toggle-item {
+    background-color: #f8f9fa !important;
+    border-bottom: none !important;
+    margin: 0 !important;
+    padding: 12px 16px !important;
+}
+
+/* Group toggle buttons should stick under their section headers */
+.group-toggle-item {
+    position: sticky !important;
+    z-index: 7 !important;
+    background-color: #f8f9fa !important;
+    border-bottom: 1px solid #dee2e6 !important;
+}
+
+/* Position will be set dynamically by JavaScript */
+
 .global-toggle-buttons,
-.group-toggle-buttons {
+.group-toggle-buttons,
+.toggle-buttons {
     display: flex;
     justify-content: space-between;
     gap: 8px;
@@ -164,19 +185,24 @@
 
 /* Button overrides for compact mini buttons */
 .global-toggle-buttons .ui.button.mini,
-.group-toggle-buttons .ui.button.mini {
+.group-toggle-buttons .ui.button.mini,
+.toggle-buttons .ui.button.mini {
     font-size: 0.7rem !important;
     padding: 0.4em 0.8em !important;
 }
 
-/* Search input section */
+/* Search input section - now part of sticky header */
 .search-section {
     padding: 12px 16px !important;
     background-color: #ffffff !important;
     border-bottom: 1px solid #dee2e6 !important;
-    position: sticky !important;
-    top: 61px !important;
-    z-index: 9 !important;
+    margin: 0 !important;
+}
+
+/* Search input within sticky header */
+.sticky-header-section .search-section {
+    background-color: #f8f9fa !important;
+    border-bottom: none !important;
 }
 
 .search-input {

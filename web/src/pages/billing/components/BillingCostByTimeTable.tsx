@@ -75,7 +75,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
             })
         } else {
             // When collapsed, add summary compute cost
-            configs.push({ id: 'Compute Cost', label: 'Compute Cost', group: 'summary' })
+            configs.push({ id: 'Compute Cost', label: 'Compute Cost', group: 'compute' })
         }
 
         return configs
@@ -96,7 +96,8 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                 groups.push({ id: 'compute', label: 'Compute Categories', columns: computeColumns })
             }
         } else {
-            groups[0].columns.push('Compute Cost') // Add to summary group
+            // Add compute cost to its own group instead of summary
+            groups.push({ id: 'compute', label: 'Compute Cost', columns: ['Compute Cost'] })
         }
 
         return groups
@@ -275,21 +276,34 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                 style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'center',
+                    alignItems: 'flex-start',
                     marginBottom: '15px',
+                    flexWrap: 'wrap',
+                    gap: '10px',
                 }}
             >
-                <Header as="h3" style={{ margin: 0 }}>
+                <Header as="h3" style={{ margin: 0, flex: '1 1 200px' }}>
                     {convertFieldName(heading)} costs from {start} to {end}
                 </Header>
-                <div style={{ display: 'flex', gap: '10px' }}>
+                <div
+                    style={{
+                        display: 'flex',
+                        gap: '10px',
+                        flex: '0 0 auto',
+                        minWidth: '240px',
+                    }}
+                >
                     <ColumnVisibilityDropdown
                         columns={getColumnConfigs()}
                         groups={getColumnGroups()}
                         visibleColumns={visibleColumns}
                         onVisibilityChange={setVisibleColumns}
                         searchThreshold={8}
-                        searchPlaceholder="Search time periods..."
+                        searchPlaceholder="Search columns..."
+                        buttonStyle={{
+                            minWidth: '115px',
+                            height: '36px',
+                        }}
                     />
                     <Dropdown
                         button
@@ -299,7 +313,8 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                         icon="download"
                         text="Export"
                         style={{
-                            minWidth: '100px',
+                            minWidth: '115px',
+                            height: '36px',
                         }}
                     >
                         <Dropdown.Menu>

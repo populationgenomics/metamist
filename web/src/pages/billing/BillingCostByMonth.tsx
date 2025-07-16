@@ -25,6 +25,7 @@ import {
     BillingTotalCostRecord,
 } from '../../sm-api'
 import BillingCostByMonthTable from './components/BillingCostByMonthTable'
+import './components/BillingCostByTimeTable.css'
 import FieldSelector from './components/FieldSelector'
 
 enum CloudSpendCategory {
@@ -328,15 +329,35 @@ const BillingCostByTime: React.FunctionComponent = () => {
     return (
         <PaddedPage>
             <Card fluid style={{ padding: '20px' }} id="billing-container">
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div
+                    className="header-container"
+                    style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        flexWrap: 'wrap',
+                        gap: '10px',
+                    }}
+                >
                     <h1
                         style={{
                             fontSize: 40,
+                            margin: 0,
+                            flex: '1 1 200px',
                         }}
                     >
                         Cost Across Invoice Months (Topic only)
                     </h1>
-                    <div style={{ textAlign: 'right' }}>
+                    <div
+                        className="button-container"
+                        style={{
+                            display: 'flex',
+                            gap: '10px',
+                            alignItems: 'stretch',
+                            flex: '0 0 auto',
+                            minWidth: '240px',
+                        }}
+                    >
                         <ColumnVisibilityDropdown
                             columns={getColumnConfigs()}
                             groups={[
@@ -350,6 +371,10 @@ const BillingCostByTime: React.FunctionComponent = () => {
                             onVisibilityChange={setVisibleColumns}
                             searchThreshold={8}
                             searchPlaceholder="Search months and topics..."
+                            buttonStyle={{
+                                minWidth: '115px',
+                                height: '36px',
+                            }}
                         />
 
                         <Dropdown
@@ -359,6 +384,10 @@ const BillingCostByTime: React.FunctionComponent = () => {
                             labeled
                             icon="download"
                             text="Export"
+                            style={{
+                                minWidth: '115px',
+                                height: '36px',
+                            }}
                         >
                             <Dropdown.Menu>
                                 <Dropdown.Item
