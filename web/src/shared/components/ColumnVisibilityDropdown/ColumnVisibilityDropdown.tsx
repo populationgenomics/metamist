@@ -297,12 +297,12 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
 
                 // Update section header positions
                 sectionHeaders.forEach((header) => {
-                    ;(header as HTMLElement).style.top = `${stickyHeaderHeight}px`
+                    (header as HTMLElement).style.top = `${stickyHeaderHeight}px`
                 })
 
                 // Update group toggle button positions
                 groupToggleButtons.forEach((button) => {
-                    ;(button as HTMLElement).style.top = `${stickyHeaderHeight + 32}px` // +32px for section header height
+                    (button as HTMLElement).style.top = `${stickyHeaderHeight + 32}px` // +32px for section header height
                 })
             }
         }
