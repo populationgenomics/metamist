@@ -8,6 +8,9 @@ const PROJECT = 'ourdna'
 const AGE_QUERY = `
     select distinct
         p.participant_id,
+        p.external_id as participant_portal_id,
+        s.sample_id,
+        s.external_id as sample_agd_id,
         try_cast(p.meta_birth_year as int) as birth_year,
         date_part('year', try_strptime(
             s.meta_collection_datetime,
@@ -182,7 +185,9 @@ export default function DataQuality() {
                     query={`
                         select
                             coalesce(p.participant_id, s.participant_id) as participant_id,
+                            p.external_id as participant_portal_id,
                             s.sample_id,
+                            s.external_id as sample_agd_id,
                             s.meta_processing_site,
                             p.meta_event_recorded_sonic_id as event_portal_sonic_id,
                             s.external_id_sonic as processing_site_sonic_id
