@@ -1,6 +1,11 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Dropdown, Grid, Message } from 'semantic-ui-react'
+import {
+    ColumnConfig,
+    ColumnVisibilityDropdown,
+    useColumnVisibility,
+} from '../../shared/components/ColumnVisibilityDropdown'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { exportTable } from '../../shared/utilities/exportTable'
@@ -20,6 +25,7 @@ import {
     BillingTotalCostRecord,
 } from '../../sm-api'
 import BillingCostByMonthTable from './components/BillingCostByMonthTable'
+import './components/BillingCostByTimeTable.css'
 import FieldSelector from './components/FieldSelector'
 
 enum CloudSpendCategory {
@@ -45,9 +51,43 @@ const BillingCostByTime: React.FunctionComponent = () => {
     const [months, setMonths] = React.useState<string[]>([])
     const [data, setData] = React.useState<any>([])
 
+    // State for column visibility
+    const [visibleColumns, setVisibleColumns] = React.useState<Set<string>>(new Set())
+
+    // Initialize visible columns when data changes
+    React.useEffect(() => {
+        if (months.length > 0 && data && Object.keys(data).length > 0) {
+            // Show all months and compute_type by default, plus all topics
+            const allTopics = Object.keys(data)
+            const allColumns = new Set(['compute_type', ...months, ...allTopics])
+            setVisibleColumns(allColumns)
+        }
+    }, [months, data])
+
     // use navigate and update url params
     const location = useLocation()
     const navigate = useNavigate()
+
+    // Generate column configurations for the dropdown
+    const getColumnConfigs = (): ColumnConfig[] => {
+        const configs: ColumnConfig[] = [
+            { id: 'compute_type', label: 'Compute Type', isRequired: true },
+        ]
+
+        // Add topic columns (these are the selectable ones)
+        if (data && Object.keys(data).length > 0) {
+            Object.keys(data)
+                .sort((a, b) => a.localeCompare(b))
+                .forEach((topic) => {
+                    configs.push({ id: topic, label: topic, group: 'topics' })
+                })
+        }
+
+        return configs
+    }
+
+    // Use the column visibility hook for easier export handling
+    const { isColumnVisible } = useColumnVisibility(getColumnConfigs(), visibleColumns)
 
     const updateNav = (st: string, ed: string) => {
         const url = generateUrl(location, {
@@ -200,6 +240,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         isLoading={isLoading}
                         data={data}
                         months={months}
+                        visibleColumns={visibleColumns}
                     />
                 </Card>
             </>
@@ -244,19 +285,20 @@ const BillingCostByTime: React.FunctionComponent = () => {
     /* eslint-enable react-hooks/exhaustive-deps */
 
     const exportToFile = (format: 'csv' | 'tsv') => {
-        const allMonths = [...months].sort()
-        const headerFields = ['Topic', 'Cost Type', ...allMonths]
+        // All months are always visible - filter topics based on visibility
+        const visibleTopics = Object.keys(data).filter((topic) => isColumnVisible(topic))
+        const headerFields = ['Topic', 'Cost Type', ...months]
 
         const matrix: string[][] = []
 
-        Object.keys(data)
+        visibleTopics
             .sort((a, b) => a.localeCompare(b))
             .forEach((topic) => {
                 // Storage cost row
                 const storageRow: [string, string, ...string[]] = [
                     topic,
                     CloudSpendCategory.STORAGE_COST.toString(),
-                    ...allMonths.map((m) => {
+                    ...months.map((m) => {
                         const val = data[topic]?.[m]?.[CloudSpendCategory.STORAGE_COST]
                         return val === undefined ? '' : val.toFixed(2)
                     }),
@@ -266,7 +308,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 const computeRow: [string, string, ...string[]] = [
                     topic,
                     CloudSpendCategory.COMPUTE_COST.toString(),
-                    ...allMonths.map((m) => {
+                    ...months.map((m) => {
                         const val = data[topic]?.[m]?.[CloudSpendCategory.COMPUTE_COST]
                         return val === undefined ? '' : val.toFixed(2)
                     }),
@@ -287,15 +329,54 @@ const BillingCostByTime: React.FunctionComponent = () => {
     return (
         <PaddedPage>
             <Card fluid style={{ padding: '20px' }} id="billing-container">
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div
+                    style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        flexWrap: 'wrap',
+                        gap: '10px',
+                        marginBottom: '20px',
+                    }}
+                >
                     <h1
                         style={{
                             fontSize: 40,
+                            margin: 0,
+                            flex: '1 1 200px',
                         }}
                     >
                         Cost Across Invoice Months (Topic only)
                     </h1>
-                    <div style={{ textAlign: 'right' }}>
+                    <div
+                        className="button-container"
+                        style={{
+                            display: 'flex',
+                            gap: '10px',
+                            alignItems: 'stretch',
+                            flex: '0 0 auto',
+                            minWidth: '240px',
+                        }}
+                    >
+                        <ColumnVisibilityDropdown
+                            columns={getColumnConfigs()}
+                            groups={[
+                                {
+                                    id: 'topics',
+                                    label: 'Topics',
+                                    columns: Object.keys(data).sort((a, b) => a.localeCompare(b)),
+                                },
+                            ]}
+                            visibleColumns={visibleColumns}
+                            onVisibilityChange={setVisibleColumns}
+                            searchThreshold={8}
+                            searchPlaceholder="Search topics..."
+                            buttonStyle={{
+                                minWidth: '115px',
+                                height: '36px',
+                            }}
+                        />
+
                         <Dropdown
                             button
                             className="icon"
@@ -303,6 +384,10 @@ const BillingCostByTime: React.FunctionComponent = () => {
                             labeled
                             icon="download"
                             text="Export"
+                            style={{
+                                minWidth: '115px',
+                                height: '36px',
+                            }}
                         >
                             <Dropdown.Menu>
                                 <Dropdown.Item
