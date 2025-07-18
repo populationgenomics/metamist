@@ -54,14 +54,15 @@ const BillingCostByTime: React.FunctionComponent = () => {
     // State for column visibility
     const [visibleColumns, setVisibleColumns] = React.useState<Set<string>>(new Set())
 
-    // Initialize visible columns when months data changes
+    // Initialize visible columns when data changes
     React.useEffect(() => {
-        if (months.length > 0) {
-            // Show all months initially, plus the fixed columns
-            const allColumns = new Set(['topic', 'compute_type', ...months])
+        if (months.length > 0 && data && Object.keys(data).length > 0) {
+            // Show all months and compute_type by default, plus all topics
+            const allTopics = Object.keys(data)
+            const allColumns = new Set(['compute_type', ...months, ...allTopics])
             setVisibleColumns(allColumns)
         }
-    }, [months])
+    }, [months, data])
 
     // use navigate and update url params
     const location = useLocation()
@@ -70,18 +71,17 @@ const BillingCostByTime: React.FunctionComponent = () => {
     // Generate column configurations for the dropdown
     const getColumnConfigs = (): ColumnConfig[] => {
         const configs: ColumnConfig[] = [
-            { id: 'topic', label: 'Topic', isRequired: true },
             { id: 'compute_type', label: 'Compute Type', isRequired: true },
         ]
 
-        // Add month columns
-        months.forEach((month) => {
-            const monthLabel = new Date(month).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-            })
-            configs.push({ id: month, label: monthLabel, group: 'months' })
-        })
+        // Add topic columns (these are the selectable ones)
+        if (data && Object.keys(data).length > 0) {
+            Object.keys(data)
+                .sort((a, b) => a.localeCompare(b))
+                .forEach((topic) => {
+                    configs.push({ id: topic, label: topic, group: 'topics' })
+                })
+        }
 
         return configs
     }
@@ -285,20 +285,20 @@ const BillingCostByTime: React.FunctionComponent = () => {
     /* eslint-enable react-hooks/exhaustive-deps */
 
     const exportToFile = (format: 'csv' | 'tsv') => {
-        // Filter months based on visibility
-        const visibleMonths = months.filter((month) => isColumnVisible(month))
-        const headerFields = ['Topic', 'Cost Type', ...visibleMonths]
+        // All months are always visible - filter topics based on visibility
+        const visibleTopics = Object.keys(data).filter((topic) => isColumnVisible(topic))
+        const headerFields = ['Topic', 'Cost Type', ...months]
 
         const matrix: string[][] = []
 
-        Object.keys(data)
+        visibleTopics
             .sort((a, b) => a.localeCompare(b))
             .forEach((topic) => {
                 // Storage cost row
                 const storageRow: [string, string, ...string[]] = [
                     topic,
                     CloudSpendCategory.STORAGE_COST.toString(),
-                    ...visibleMonths.map((m) => {
+                    ...months.map((m) => {
                         const val = data[topic]?.[m]?.[CloudSpendCategory.STORAGE_COST]
                         return val === undefined ? '' : val.toFixed(2)
                     }),
@@ -308,7 +308,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 const computeRow: [string, string, ...string[]] = [
                     topic,
                     CloudSpendCategory.COMPUTE_COST.toString(),
-                    ...visibleMonths.map((m) => {
+                    ...months.map((m) => {
                         const val = data[topic]?.[m]?.[CloudSpendCategory.COMPUTE_COST]
                         return val === undefined ? '' : val.toFixed(2)
                     }),
@@ -330,13 +330,13 @@ const BillingCostByTime: React.FunctionComponent = () => {
         <PaddedPage>
             <Card fluid style={{ padding: '20px' }} id="billing-container">
                 <div
-                    className="header-container"
                     style={{
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'flex-start',
                         flexWrap: 'wrap',
                         gap: '10px',
+                        marginBottom: '20px',
                     }}
                 >
                     <h1
@@ -362,15 +362,15 @@ const BillingCostByTime: React.FunctionComponent = () => {
                             columns={getColumnConfigs()}
                             groups={[
                                 {
-                                    id: 'months',
-                                    label: 'Invoice Months',
-                                    columns: months,
+                                    id: 'topics',
+                                    label: 'Topics',
+                                    columns: Object.keys(data).sort((a, b) => a.localeCompare(b)),
                                 },
                             ]}
                             visibleColumns={visibleColumns}
                             onVisibilityChange={setVisibleColumns}
                             searchThreshold={8}
-                            searchPlaceholder="Search months and topics..."
+                            searchPlaceholder="Search topics..."
                             buttonStyle={{
                                 minWidth: '115px',
                                 height: '36px',

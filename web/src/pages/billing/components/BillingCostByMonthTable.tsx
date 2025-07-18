@@ -57,22 +57,23 @@ const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
 
     // Helper function to check if a column is visible
     const isColumnVisible = (category: string): boolean => {
-        if (category === 'topic' || category === 'compute_type') {
+        if (category === 'compute_type') {
             return true // Always show required columns
         }
         return visibleColumns.has(category)
     }
 
-    // Get only visible months
-    const getVisibleMonths = () => {
-        return months.filter((month) => isColumnVisible(month))
+    // Get only visible topics
+    const getVisibleTopics = () => {
+        return Object.keys(data)
+            .filter((topic) => isColumnVisible(topic))
+            .sort((a, b) => a.localeCompare(b))
     }
 
     const dataToBody = (data: DataDict) => {
-        const sortedKeys = Object.keys(data).sort()
-        const visibleMonths = getVisibleMonths()
+        const visibleTopics = getVisibleTopics()
 
-        return sortedKeys.map((key) => (
+        return visibleTopics.map((key) => (
             <>
                 {compTypes.map((compType, index) => (
                     <SUITable.Row key={`${key}-${index}-row`}>
@@ -80,7 +81,7 @@ const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
                             {index === 0 && <b>{key}</b>}
                         </SUITable.Cell>
                         <SUITable.Cell key={`${key}-${index}-compType`}>{compType}</SUITable.Cell>
-                        {visibleMonths.map((month) => (
+                        {months.map((month) => (
                             <SUITable.Cell key={`${key}-${index}-${month}`}>
                                 {data[key] && data[key][month] && data[key][month][compType]
                                     ? formatMoney(data[key][month][compType])
@@ -104,14 +105,14 @@ const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
                     <SUITable.Row>
                         <SUITable.HeaderCell></SUITable.HeaderCell>
                         <SUITable.HeaderCell></SUITable.HeaderCell>
-                        <SUITable.HeaderCell colSpan={getVisibleMonths().length}>
+                        <SUITable.HeaderCell colSpan={months.length}>
                             Invoice Month
                         </SUITable.HeaderCell>
                     </SUITable.Row>
                     <SUITable.Row>
                         <SUITable.HeaderCell>Topic</SUITable.HeaderCell>
                         <SUITable.HeaderCell>Compute Type</SUITable.HeaderCell>
-                        {getVisibleMonths().map((month) => (
+                        {months.map((month) => (
                             <SUITable.HeaderCell key={month}>
                                 {date2Month(month)}
                             </SUITable.HeaderCell>

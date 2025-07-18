@@ -340,7 +340,7 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
                 floating
                 labeled
                 icon="columns"
-                text="Columns"
+                text="Fields"
                 style={{ marginRight: '10px', ...buttonStyle }}
                 open={isOpen}
                 onClick={(e) => {
@@ -361,7 +361,7 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
                     <div ref={stickyHeaderRef} className="sticky-header-section">
                         <Dropdown.Header
                             icon="table"
-                            content="Column Visibility"
+                            content="Field Visibility"
                             className="dropdown-header"
                         />
 
@@ -394,7 +394,7 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
                     {/* Show no results message */}
                     {showSearch && searchTerm.trim() && !hasResults && (
                         <div className="no-results-message">
-                            No columns found matching &ldquo;{searchTerm}&rdquo;
+                            No fields found matching &ldquo;{searchTerm}&rdquo;
                         </div>
                     )}
 
