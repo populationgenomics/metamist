@@ -4,13 +4,13 @@
 #
 #    pip-compile --output-file=requirements-dev.txt requirements-dev.in requirements.in
 #
-aiohappyeyeballs==2.4.4
+aiohappyeyeballs==2.6.1
     # via aiohttp
-aiohttp==3.11.11
+aiohttp==3.12.14
     # via -r requirements.in
 aiomysql==0.2.0
     # via databases
-aiosignal==1.3.2
+aiosignal==1.4.0
     # via aiohttp
 annotated-types==0.7.0
     # via pydantic
@@ -63,6 +63,7 @@ certifi==2024.12.14
     #   httpcore
     #   httpx
     #   requests
+    #   sentry-sdk
 cffi==1.17.1
     # via cryptography
 cfgv==3.4.0
@@ -112,13 +113,17 @@ docker==7.1.0
 duckdb==1.1.3
     # via -r requirements.in
 email-validator==2.2.0
-    # via fastapi
-fastapi[all]==0.115.6
+    # via
+    #   fastapi
+    #   pydantic
+fastapi[all]==0.116.1
     # via
     #   -r requirements.in
     #   strawberry-graphql
-fastapi-cli[standard]==0.0.7
+fastapi-cli[standard]==0.0.8
     # via fastapi
+fastapi-cloud-cli==0.1.4
+    # via fastapi-cli
 filelock==3.16.1
     # via virtualenv
 flake8==7.1.1
@@ -226,7 +231,9 @@ httpcore==1.0.9
 httptools==0.6.4
     # via uvicorn
 httpx==0.28.1
-    # via fastapi
+    # via
+    #   fastapi
+    #   fastapi-cloud-cli
 identify==2.6.4
     # via pre-commit
 idna==3.10
@@ -262,6 +269,7 @@ markdown-it-py==3.0.0
     # via rich
 markupsafe==3.0.2
     # via
+    #   flask
     #   jinja2
     #   werkzeug
 mccabe==0.7.0
@@ -338,9 +346,10 @@ pycodestyle==2.12.1
     # via flake8
 pycparser==2.22
     # via cffi
-pydantic==2.10.4
+pydantic[email]==2.10.4
     # via
     #   fastapi
+    #   fastapi-cloud-cli
     #   pydantic-extra-types
     #   pydantic-settings
 pydantic-core==2.27.2
@@ -391,7 +400,7 @@ pyyaml==6.0.2
     #   libcst
     #   pre-commit
     #   uvicorn
-requests==2.32.3
+requests==2.32.4
     # via
     #   -r requirements.in
     #   azure-core
@@ -405,12 +414,18 @@ rich==13.9.4
     #   rich-toolkit
     #   strawberry-graphql
     #   typer
-rich-toolkit==0.12.0
-    # via fastapi-cli
+rich-toolkit==0.14.8
+    # via
+    #   fastapi-cli
+    #   fastapi-cloud-cli
+rignore==0.6.4
+    # via fastapi-cloud-cli
 rsa==4.9
     # via google-auth
 s3transfer==0.10.4
     # via boto3
+sentry-sdk==2.33.1
+    # via fastapi-cloud-cli
 shellingham==1.5.4
     # via typer
 six==1.17.0
@@ -445,11 +460,13 @@ tomlkit==0.13.2
 typer==0.15.1
     # via
     #   fastapi-cli
+    #   fastapi-cloud-cli
     #   strawberry-graphql
 types-pymysql==1.1.0.20241103
     # via -r requirements-dev.in
 typing-extensions==4.12.2
     # via
+    #   aiosignal
     #   anyio
     #   azure-core
     #   azure-storage-blob
@@ -470,12 +487,14 @@ urllib3==2.3.0
     #   botocore
     #   docker
     #   requests
+    #   sentry-sdk
     #   testcontainers
 uvicorn[standard]==0.34.2
     # via
     #   -r requirements.in
     #   fastapi
     #   fastapi-cli
+    #   fastapi-cloud-cli
     #   strawberry-graphql
 uvloop==0.21.0
     # via uvicorn
