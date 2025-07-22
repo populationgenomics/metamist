@@ -321,7 +321,7 @@ proto-plus==1.25.0
     #   google-cloud-logging
     #   google-cloud-pubsub
     #   google-cloud-secret-manager
-protobuf==4.25.5
+protobuf==4.25.8
     # via
     #   google-api-core
     #   google-cloud-appengine-logging
@@ -441,7 +441,7 @@ sqlalchemy==2.0.36
     # via
     #   databases
     #   testcontainers
-starlette==0.41.3
+starlette==0.47.2
     # via
     #   fastapi
     #   strawberry-graphql
@@ -482,7 +482,7 @@ typing-extensions==4.12.2
     #   typer
 ujson==5.10.0
     # via fastapi
-urllib3==2.3.0
+urllib3==2.5.0
     # via
     #   botocore
     #   docker
