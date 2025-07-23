@@ -1,12 +1,13 @@
 import orderBy from 'lodash/orderBy'
 import startCase from 'lodash/startCase'
 import * as React from 'react'
-import { Card } from 'semantic-ui-react'
+import { Card, Dropdown } from 'semantic-ui-react'
 import '../../project/AnalysisRunnerView/AnalysisGrid.css'
 
 import { Table as SUITable } from 'semantic-ui-react'
 
 import Table, { CheckboxRow, DisplayRow } from '../../../shared/components/Table'
+import { exportTable } from '../../../shared/utilities/exportTable'
 
 import { useQuery } from '@apollo/client'
 import { gql } from '../../../__generated__'
@@ -32,6 +33,164 @@ const BatchUrlLink: React.FC<{ batch_id: string }> = ({ batch_id }) => (
     <a href={getHailBatchUrl(batch_id)} rel="noopener noreferrer" target="_blank">
         BATCH ID: {batch_id}
     </a>
+)
+
+// Export functions
+const exportAnalysisRunnerData = (data: AnalysisCostRecord, format: 'csv' | 'tsv') => {
+    const matrix: string[][] = []
+
+    // Summary section
+    matrix.push(['ANALYSIS RUNNER SUMMARY', '', '', ''])
+    matrix.push(['AR-GUID', data.total?.ar_guid || '', '', ''])
+    matrix.push(['Total Cost', (data.total?.cost ?? 0).toFixed(2), '', ''])
+    matrix.push(['Start Time', data.total?.usage_start_time || '', '', ''])
+    matrix.push(['End Time', data.total?.usage_end_time || '', '', ''])
+    matrix.push(['', '', '', '']) // Empty row
+
+    // Cost by Categories
+    if (data.categories && data.categories.length > 0) {
+        matrix.push(['COST BY CATEGORIES', '', '', ''])
+        matrix.push(['Category', 'Cost', 'Workflows', ''])
+        data.categories.forEach((cat) => {
+            matrix.push([cat.category, cat.cost.toFixed(2), cat.workflows?.toString() || '', ''])
+        })
+        matrix.push(['', '', '', '']) // Empty row
+    }
+
+    // Cost by Topics
+    if (data.topics && data.topics.length > 0) {
+        matrix.push(['COST BY TOPICS', '', '', ''])
+        matrix.push(['Topic', 'Cost', '', ''])
+        data.topics.forEach((topic) => {
+            matrix.push([topic.topic, topic.cost.toFixed(2), '', ''])
+        })
+        matrix.push(['', '', '', '']) // Empty row
+    }
+
+    // Cost by Sequencing Groups
+    if (data.seq_groups && data.seq_groups.length > 0) {
+        matrix.push(['COST BY SEQUENCING GROUPS', '', '', ''])
+        matrix.push(['Stage', 'Sequencing Group', 'Cost', ''])
+        data.seq_groups.forEach((sg) => {
+            matrix.push([sg.stage || '', sg.sequencing_group || '', sg.cost.toFixed(2), ''])
+        })
+        matrix.push(['', '', '', '']) // Empty row
+    }
+
+    // Cost by SKUs
+    if (data.skus && data.skus.length > 0) {
+        matrix.push(['COST BY SKUS', '', '', ''])
+        matrix.push(['SKU', 'Cost', '', ''])
+        data.skus.forEach((sku) => {
+            matrix.push([sku.sku, sku.cost.toFixed(2), '', ''])
+        })
+    }
+
+    const arGuid = data.total?.ar_guid || 'unknown'
+    exportTable({ headerFields: [], matrix }, format, `analysis_runner_${arGuid}`)
+}
+
+const exportBatchData = (batch: AnalysisCostRecordBatch, format: 'csv' | 'tsv') => {
+    const matrix: string[][] = []
+
+    // Batch Summary
+    matrix.push(['BATCH SUMMARY', '', '', ''])
+    matrix.push(['Batch ID', batch.batch_id, '', ''])
+    matrix.push(['Batch Name', batch.batch_name || '', '', ''])
+    matrix.push(['Total Cost', batch.cost.toFixed(2), '', ''])
+    matrix.push(['Jobs Count', batch.jobs_cnt?.toString() || '0', '', ''])
+    matrix.push(['Start Time', batch.usage_start_time || '', '', ''])
+    matrix.push(['End Time', batch.usage_end_time || '', '', ''])
+    matrix.push(['Driver Batch', batch.jobs[0]?.job_name === 'driver' ? 'True' : 'False', '', ''])
+    matrix.push(['', '', '', '']) // Empty row
+
+    // Cost by Sequencing Groups
+    if (batch.seq_groups && batch.seq_groups.length > 0) {
+        matrix.push(['COST BY SEQUENCING GROUPS', '', '', ''])
+        matrix.push(['Stage', 'Sequencing Group', 'Cost', ''])
+        batch.seq_groups.forEach((sg) => {
+            matrix.push([sg.stage || '', sg.sequencing_group || '', sg.cost.toFixed(2), ''])
+        })
+        matrix.push(['', '', '', '']) // Empty row
+    }
+
+    // Cost by SKUs
+    if (batch.skus && batch.skus.length > 0) {
+        matrix.push(['COST BY SKUS', '', '', ''])
+        matrix.push(['SKU', 'Cost', '', ''])
+        batch.skus.forEach((sku) => {
+            matrix.push([sku.sku, sku.cost.toFixed(2), '', ''])
+        })
+        matrix.push(['', '', '', '']) // Empty row
+    }
+
+    // Cost by Jobs
+    if (batch.jobs && batch.jobs.length > 0) {
+        matrix.push(['COST BY JOBS', '', '', ''])
+        matrix.push(['Job Name', 'Cost', '', ''])
+        batch.jobs.forEach((job) => {
+            matrix.push([job.job_name || '', job.cost.toFixed(2), '', ''])
+        })
+    }
+
+    exportTable({ headerFields: [], matrix }, format, `batch_${batch.batch_id}`)
+}
+
+const exportGenericData = (
+    data: IGenericCardData,
+    label: string,
+    identifier: string,
+    format: 'csv' | 'tsv'
+) => {
+    const matrix: string[][] = []
+
+    // Summary section
+    matrix.push([`${label.toUpperCase()} SUMMARY`, '', ''])
+    matrix.push(['Identifier', identifier, ''])
+    matrix.push(['Total Cost', data.cost.toFixed(2), ''])
+    matrix.push(['Jobs Count', data.jobs_cnt?.toString() || '0', ''])
+    matrix.push(['Start Time', data.usage_start_time || '', ''])
+    matrix.push(['End Time', data.usage_end_time || '', ''])
+    matrix.push(['', '', '']) // Empty row
+
+    // Cost by SKUs
+    if (data.skus && data.skus.length > 0) {
+        matrix.push(['COST BY SKUS', '', ''])
+        matrix.push(['SKU', 'Cost', ''])
+        data.skus.forEach((sku) => {
+            matrix.push([sku.sku, sku.cost.toFixed(2), ''])
+        })
+    }
+
+    const filename = `${label.toLowerCase().replace(/\s+/g, '_')}_${identifier.replace(/[^a-zA-Z0-9]/g, '_')}`
+    exportTable({ headerFields: [], matrix }, format, filename)
+}
+
+// Export Button Component
+const ExportButton: React.FC<{ onExport: (format: 'csv' | 'tsv') => void }> = ({ onExport }) => (
+    <Dropdown
+        button
+        compact
+        floating
+        icon="download"
+        className="icon"
+        style={{ marginLeft: '10px', height: '28px', minWidth: '28px' }}
+    >
+        <Dropdown.Menu>
+            <Dropdown.Item
+                key="csv"
+                text="Export to CSV"
+                icon="file excel"
+                onClick={() => onExport('csv')}
+            />
+            <Dropdown.Item
+                key="tsv"
+                text="Export to TSV"
+                icon="file text outline"
+                onClick={() => onExport('tsv')}
+            />
+        </Dropdown.Menu>
+    </Dropdown>
 )
 
 const GET_AR_RECORDS = gql(`
@@ -71,6 +230,10 @@ const AnalysisRunnerRecordCard: React.FC<{ data: AnalysisCostRecord }> = ({ data
 
     const arRecord = queryResponse?.data?.analysisRunner
 
+    const handleExport = (format: 'csv' | 'tsv') => {
+        exportAnalysisRunnerData(data, format)
+    }
+
     return (
         <Card fluid style={{ padding: '20px' }} {...props}>
             <Table celled compact>
@@ -82,7 +245,17 @@ const AnalysisRunnerRecordCard: React.FC<{ data: AnalysisCostRecord }> = ({ data
                             colSpan={2}
                             rowStyle={{ backgroundColor: 'var(--color-bg-card)' }}
                         >
-                            AR-GUID: {arGuid}
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    width: '100%',
+                                }}
+                            >
+                                <span>AR-GUID: {arGuid}</span>
+                                <ExportButton onExport={handleExport} />
+                            </div>
                         </CheckboxRow>
 
                         <DisplayRow label="Total cost">
@@ -245,6 +418,10 @@ const BatchCard: React.FC<{ item: AnalysisCostRecordBatch }> = ({ item }) => {
 
     const isDriverBatch = item.jobs[0]?.job_name === 'driver'
 
+    const handleExport = (format: 'csv' | 'tsv') => {
+        exportBatchData(item, format)
+    }
+
     return (
         <Card fluid style={{ padding: '20px' }}>
             <Table celled compact>
@@ -255,7 +432,17 @@ const BatchCard: React.FC<{ item: AnalysisCostRecordBatch }> = ({ item }) => {
                         colSpan={2}
                         rowStyle={{ backgroundColor: 'var(--color-bg-card)' }}
                     >
-                        <BatchUrlLink batch_id={item.batch_id} />
+                        <div
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                width: '100%',
+                            }}
+                        >
+                            <BatchUrlLink batch_id={item.batch_id} />
+                            <ExportButton onExport={handleExport} />
+                        </div>
                     </CheckboxRow>
                     {isDriverBatch && <DisplayRow label="Driver Batch">True</DisplayRow>}
                     <DisplayRow label="Batch Name">{item.batch_name}</DisplayRow>
@@ -351,6 +538,10 @@ const BatchGrid: React.FunctionComponent<{
         const [isOpen, setIsOpen] = React.useState(false)
         const [skuIsOpen, setSkuIsOpen] = React.useState(false)
 
+        const handleExport = (format: 'csv' | 'tsv') => {
+            exportGenericData(data, label, pkey, format)
+        }
+
         return (
             <Card fluid style={{ padding: '20px' }}>
                 <Table celled compact>
@@ -361,7 +552,17 @@ const BatchGrid: React.FunctionComponent<{
                             colSpan={2}
                             rowStyle={{ backgroundColor: 'var(--color-bg-card)' }}
                         >
-                            {label}
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    width: '100%',
+                                }}
+                            >
+                                <span>{label}</span>
+                                <ExportButton onExport={handleExport} />
+                            </div>
                         </CheckboxRow>
 
                         <DisplayRow label="Cost">
