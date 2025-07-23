@@ -1,4 +1,5 @@
 import React from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useClickAway } from 'react-use'
 import { Button, Checkbox, CheckboxProps, Dropdown } from 'semantic-ui-react'
 import './ColumnVisibilityDropdown.css'
@@ -35,6 +36,10 @@ export interface ColumnVisibilityDropdownProps {
     searchThreshold?: number
     /** Custom search placeholder text */
     searchPlaceholder?: string
+    /** Enable URL persistence for column selection (default: false) */
+    enableUrlPersistence?: boolean
+    /** URL parameter name for column selection (default: 'columns') */
+    urlParamName?: string
 }
 
 const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
@@ -47,6 +52,8 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
     labelFormatter,
     searchThreshold = 10,
     searchPlaceholder = 'Search columns...',
+    enableUrlPersistence = false,
+    urlParamName = 'columns',
 }) => {
     const [isOpen, setIsOpen] = React.useState(false)
     const [searchTerm, setSearchTerm] = React.useState('')
@@ -54,8 +61,72 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
     const searchInputRef = React.useRef<HTMLInputElement>(null)
     const stickyHeaderRef = React.useRef<HTMLDivElement>(null)
 
+    // URL persistence hooks
+    const location = useLocation()
+    const navigate = useNavigate()
+    const isInitialized = React.useRef(false)
+
     // Show search when there are many columns
     const showSearch = columns.length > searchThreshold
+
+    // URL persistence utility functions
+    const encodeColumnsForUrl = (columns: Set<string>): string => {
+        return Array.from(columns).sort().join(',')
+    }
+
+    const decodeColumnsFromUrl = (param: string | null): Set<string> => {
+        if (!param) return new Set()
+        return new Set(param.split(',').filter(Boolean))
+    }
+
+    const updateUrlWithColumns = React.useCallback(
+        (columns: Set<string>) => {
+            if (!enableUrlPersistence) return
+
+            const searchParams = new URLSearchParams(location.search)
+            const encodedColumns = encodeColumnsForUrl(columns)
+
+            if (encodedColumns) {
+                searchParams.set(urlParamName, encodedColumns)
+            } else {
+                searchParams.delete(urlParamName)
+            }
+
+            const newUrl = `${location.pathname}?${searchParams.toString()}`
+            navigate(newUrl, { replace: true })
+        },
+        [enableUrlPersistence, location.search, location.pathname, navigate, urlParamName]
+    )
+
+    // Initialize from URL on mount
+    React.useEffect(() => {
+        if (enableUrlPersistence && !isInitialized.current && columns.length > 0) {
+            const searchParams = new URLSearchParams(location.search)
+            const urlColumns = decodeColumnsFromUrl(searchParams.get(urlParamName))
+
+            if (urlColumns.size > 0) {
+                // Validate that URL columns exist in available columns
+                const availableColumnIds = new Set(columns.map((c) => c.id))
+                const validUrlColumns = new Set(
+                    Array.from(urlColumns).filter((id) => availableColumnIds.has(id))
+                )
+
+                if (validUrlColumns.size > 0) {
+                    onVisibilityChange(validUrlColumns)
+                }
+            }
+            isInitialized.current = true
+        }
+    }, [enableUrlPersistence, urlParamName, columns, location.search, onVisibilityChange])
+
+    // Enhanced onVisibilityChange that also updates URL
+    const handleVisibilityChange = React.useCallback(
+        (newVisibleColumns: Set<string>) => {
+            onVisibilityChange(newVisibleColumns)
+            updateUrlWithColumns(newVisibleColumns)
+        },
+        [onVisibilityChange, updateUrlWithColumns]
+    )
 
     // Handle outside clicks
     useClickAway(dropdownRef, () => {
@@ -140,7 +211,7 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
         } else {
             newVisibleColumns.add(columnId)
         }
-        onVisibilityChange(newVisibleColumns)
+        handleVisibilityChange(newVisibleColumns)
     }
 
     // Toggle all columns in a group
@@ -156,7 +227,7 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
                 }
             }
         })
-        onVisibilityChange(newVisibleColumns)
+        handleVisibilityChange(newVisibleColumns)
     }
 
     // Toggle all columns

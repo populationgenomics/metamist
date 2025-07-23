@@ -60,6 +60,7 @@ const BillingCostByCategory: React.FunctionComponent = () => {
 
     const [accumulate, setAccumulate] = React.useState<boolean>(true)
     const [visibleColumns, setVisibleColumns] = React.useState<Set<string>>(new Set())
+    const [urlInitialized, setUrlInitialized] = React.useState(false)
 
     // use navigate and update url params
     const location = useLocation()
@@ -73,6 +74,9 @@ const BillingCostByCategory: React.FunctionComponent = () => {
         st: string,
         ed: string
     ) => {
+        const searchParams = new URLSearchParams(location.search)
+        const columnsParam = searchParams.get('columns')
+
         const url = generateUrl(location, {
             groupBy: grpBy,
             group: grp,
@@ -80,6 +84,8 @@ const BillingCostByCategory: React.FunctionComponent = () => {
             period: period,
             start: st,
             end: ed,
+            // Preserve existing columns parameter if it exists
+            ...(columnsParam && { columns: columnsParam }),
         })
         navigate(url)
     }
@@ -227,19 +233,30 @@ const BillingCostByCategory: React.FunctionComponent = () => {
 
     // Initialize visible columns when data changes
     React.useEffect(() => {
-        if (data.length > 0) {
+        if (data.length > 0 && !urlInitialized) {
             const skuSet = new Set<string>()
             data.forEach((row) => {
                 Object.keys(row.values).forEach((sku) => skuSet.add(sku))
             })
             const skus = [...skuSet].sort()
 
-            // Start with all SKUs visible by default
-            const initialColumns = new Set<string>(skus)
+            // Check for URL parameters first
+            const urlColumns = searchParams.get('columns')
+            if (urlColumns) {
+                const columnsFromUrl = urlColumns.split(',').filter(Boolean)
+                const validColumns = columnsFromUrl.filter((sku) => skus.includes(sku))
+                if (validColumns.length > 0) {
+                    setVisibleColumns(new Set(validColumns))
+                    setUrlInitialized(true)
+                    return
+                }
+            }
 
-            setVisibleColumns(initialColumns)
+            // No valid URL parameters, set defaults (all SKUs visible)
+            setVisibleColumns(new Set(skus))
+            setUrlInitialized(true)
         }
-    }, [data])
+    }, [data, urlInitialized, searchParams])
 
     if (error) {
         return (
@@ -329,6 +346,8 @@ const BillingCostByCategory: React.FunctionComponent = () => {
                             }}
                             searchThreshold={8}
                             searchPlaceholder="Search SKUs..."
+                            enableUrlPersistence={true}
+                            urlParamName="columns"
                         />
                         <Dropdown
                             button

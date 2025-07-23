@@ -21,6 +21,8 @@ interface IBillingCostByTimeTableProps {
     data: IStackedAreaByDateChartData[]
     visibleColumns: Set<string>
     setVisibleColumns: (columns: Set<string>) => void
+    expandCompute?: boolean
+    setExpandCompute?: (expand: boolean) => void
     exportToFile: (format: 'csv' | 'tsv') => void
 }
 
@@ -33,13 +35,19 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     data,
     visibleColumns,
     setVisibleColumns,
+    expandCompute: externalExpandCompute,
+    setExpandCompute: externalSetExpandCompute,
     exportToFile,
 }) => {
     const [internalData, setInternalData] = React.useState<IStackedAreaByDateChartData[]>([])
     const [internalGroups, setInternalGroups] = React.useState<string[]>([])
 
+    // Use external expand state if provided, otherwise use internal state
+    const [internalExpandCompute, setInternalExpandCompute] = React.useState<boolean>(false)
+    const expandCompute = externalExpandCompute ?? internalExpandCompute
+    const setExpandCompute = externalSetExpandCompute ?? setInternalExpandCompute
+
     // Properties
-    const [expandCompute, setExpandCompute] = React.useState<boolean>(false)
     const [sort, setSort] = React.useState<{ column: string | null; direction: string | null }>({
         column: null,
         direction: null,
@@ -68,8 +76,10 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         ]
 
         if (expandCompute) {
-            // When expanded, add individual compute categories
-            const computeGroups = groups.filter((group) => group !== 'Cloud Storage')
+            // When expanded, add individual compute categories (sorted alphabetically)
+            const computeGroups = groups
+                .filter((group) => group !== 'Cloud Storage')
+                .sort((a, b) => a.localeCompare(b))
             computeGroups.forEach((group) => {
                 configs.push({ id: group, label: group, group: 'compute' })
             })
@@ -92,6 +102,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
             const computeColumns = getColumnConfigs()
                 .filter((config) => config.group === 'compute')
                 .map((config) => config.id)
+                .sort((a, b) => a.localeCompare(b))
             if (computeColumns.length > 0) {
                 groups.push({ id: 'compute', label: 'Compute Categories', columns: computeColumns })
             }
@@ -300,6 +311,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                         onVisibilityChange={setVisibleColumns}
                         searchThreshold={8}
                         searchPlaceholder="Search columns..."
+                        enableUrlPersistence={false}
                         buttonStyle={{
                             minWidth: '115px',
                             height: '36px',

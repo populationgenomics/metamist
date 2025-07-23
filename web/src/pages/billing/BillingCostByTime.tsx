@@ -51,6 +51,11 @@ const BillingCostByTime: React.FunctionComponent = () => {
     const [aggregatedData, setAggregatedData] = React.useState<IData[]>([])
     const [visibleColumns, setVisibleColumns] = React.useState<Set<string>>(new Set())
 
+    // Add expand state management
+    const [expandCompute, setExpandCompute] = React.useState<boolean>(
+        searchParams.get('expand') === 'true'
+    )
+
     // use navigate and update url params
     const location = useLocation()
     const navigate = useNavigate()
@@ -59,13 +64,34 @@ const BillingCostByTime: React.FunctionComponent = () => {
         grp: string | undefined,
         selData: string | undefined,
         st: string,
-        ed: string
+        ed: string,
+        expand?: boolean,
+        columns?: Set<string>
     ) => {
+        const searchParams = new URLSearchParams(location.search)
+
+        // Handle expand parameter
+        if (expand !== undefined) {
+            if (expand) {
+                searchParams.set('expand', 'true')
+            } else {
+                searchParams.delete('expand')
+            }
+        }
+
+        // Handle columns parameter
+        if (columns !== undefined && columns.size > 0) {
+            const columnsArray = Array.from(columns).sort()
+            searchParams.set('columns', columnsArray.join(','))
+        }
+
         const url = generateUrl(location, {
             groupBy: grp,
             selectedData: selData,
             start: st,
             end: ed,
+            expand: searchParams.get('expand') || undefined,
+            columns: searchParams.get('columns') || undefined,
         })
         navigate(url)
     }
@@ -75,7 +101,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
         if (typeof value == 'string') {
             setGroupBy(value as BillingColumn)
             setSelectedData(undefined)
-            updateNav(value, undefined, start, end)
+            updateNav(value, undefined, start, end, expandCompute, visibleColumns)
         }
     }
 
@@ -83,7 +109,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
         const value = data.value
         if (typeof value == 'string') {
             setSelectedData(value)
-            updateNav(groupBy, value, start, end)
+            updateNav(groupBy, value, start, end, expandCompute, visibleColumns)
         }
     }
 
@@ -94,7 +120,18 @@ const BillingCostByTime: React.FunctionComponent = () => {
         if (name === 'end') end_update = value
         setStart(start_update)
         setEnd(end_update)
-        updateNav(groupBy, selectedData, start_update, end_update)
+        updateNav(groupBy, selectedData, start_update, end_update, expandCompute, visibleColumns)
+    }
+
+    // Custom handlers that update URL
+    const handleExpandChange = (expand: boolean) => {
+        setExpandCompute(expand)
+        updateNav(groupBy, selectedData, start, end, expand, visibleColumns)
+    }
+
+    const handleColumnsChange = (columns: Set<string>) => {
+        setVisibleColumns(columns)
+        updateNav(groupBy, selectedData, start, end, expandCompute, columns)
     }
 
     const getData = (query: BillingTotalCostQueryModel) => {
@@ -147,7 +184,20 @@ const BillingCostByTime: React.FunctionComponent = () => {
 
                 // Include additional columns that will be added by the table component
                 const allColumns = [...no_undefined, 'Daily Total', 'Cloud Storage', 'Compute Cost']
-                setVisibleColumns(new Set(allColumns))
+
+                // Check for URL parameters first
+                const urlColumns = searchParams.get('columns')
+                if (urlColumns) {
+                    const columnsFromUrl = urlColumns.split(',').filter(Boolean)
+                    const validColumns = columnsFromUrl.filter((col) => allColumns.includes(col))
+                    if (validColumns.length > 0) {
+                        setVisibleColumns(new Set(validColumns))
+                    } else {
+                        setVisibleColumns(new Set(allColumns))
+                    }
+                } else {
+                    setVisibleColumns(new Set(allColumns))
+                }
                 setData(
                     Object.keys(records).map((key) => ({
                         date: new Date(key),
@@ -277,7 +327,9 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         isLoading={isLoading}
                         data={data}
                         visibleColumns={visibleColumns}
-                        setVisibleColumns={setVisibleColumns}
+                        setVisibleColumns={handleColumnsChange}
+                        expandCompute={expandCompute}
+                        setExpandCompute={handleExpandChange}
                         exportToFile={exportToFile}
                     />
                 </Card>

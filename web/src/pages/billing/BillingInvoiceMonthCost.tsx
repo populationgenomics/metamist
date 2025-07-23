@@ -372,6 +372,8 @@ const BillingCurrentCost = () => {
                             onVisibilityChange={setVisibleColumns}
                             searchThreshold={8}
                             searchPlaceholder="Search topics and months..."
+                            enableUrlPersistence={true}
+                            urlParamName="columns"
                             buttonStyle={{
                                 minWidth: '115px',
                                 height: '36px',
