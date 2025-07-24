@@ -19,7 +19,8 @@ from redcap_parsing_utils import Facility, find_fastq_pairs, FILEMAP_HEADERS
 @click.option('-p', '--search-path', required=True)
 @click.option('-s', '--sample_id_column', default='Sample ID')
 @click.option('-g', '--garvan', is_flag=True)
-def main(search_path: str, id_map_path: str, garvan: bool, sample_id_column):
+@click.option('-a', '--agrf', is_flag=True, default=False,)
+def main(search_path: str, id_map_path: str, garvan: bool, agrf: bool, sample_id_column):
     """
     Helper script to preapare a sample file map for ingest.
 
@@ -34,10 +35,14 @@ def main(search_path: str, id_map_path: str, garvan: bool, sample_id_column):
 
     - Garvan/KCCG
         - Assumes WGS type
+    - AGRF
+        - Assumes WGS type
 
     """
     if garvan:
         facility = Facility.GARVAN
+    elif agrf:
+        facility = Facility.AGRF
     else:
         facility = Facility.VCGS
 

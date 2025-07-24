@@ -38,6 +38,7 @@ class Facility(str, Enum):
     VCGS = 'VCGS'
     NSWPath = 'NSWPath'
     QPath = 'QPath'
+    AGRF = 'AGRF'
 
 
 class SeqType(Enum):
@@ -88,6 +89,8 @@ class FacilityFastq:  # pylint: disable=too-many-instance-attributes
             self.parse_nswpath_fastq_name()
         elif facility == Facility.QPath:
             self.parse_qpath_fastq_name()
+        elif facility == Facility.AGRF:
+            self.parse_agrf_fastq_name()
         else:
             raise AssertionError(f'Facility {facility} not supported')
 
@@ -246,6 +249,29 @@ class FacilityFastq:  # pylint: disable=too-many-instance-attributes
         self.read_pair_prefix = self.path.name.split('_', 1)[0]
         sample_id_full = self.read_pair_prefix.rsplit('-', 1)[1]
         self.sample_id = sample_id_full[:5] + '-' + sample_id_full[5:]
+
+        self.sample_type = 'DNA'
+        self.seq_type = SeqType.GENOME
+        
+    def parse_agrf_fastq_name(self):
+        """
+        Parse a standard AGRF fastq file name of format:
+            XX-0123-01_ABCD_EFGH_L001_R1.fastq.gz
+        Where:
+            - XX-0123-01 is a unique individual/biological sample ID
+            - L001 is the lane number
+            - R1 is the read pair prefix (R1 or R2)
+        Sets the following properties:
+            sample_id: set to individualID (eg EH-0013-02)
+            read_pair_prefix: set to sequence ID (eg 22TKG2LT4_AGGCAGCTCT-CGGCTAACGT).
+        """
+        
+        # Sanity checks
+        assert self.path.match('*.fastq.gz')
+        assert len(self.path.name.split('_')) == 5
+
+        self.read_pair_prefix = self.path.name.rsplit('_', 1)[0]
+        self.sample_id = self.read_pair_prefix.split('_')[0]
 
         self.sample_type = 'DNA'
         self.seq_type = SeqType.GENOME
