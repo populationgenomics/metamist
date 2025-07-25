@@ -25,6 +25,7 @@ from api.graphql.filters import (
 )
 from api.graphql.loaders import GraphQLContext, LoaderKeys, get_context
 from api.graphql.mutations import Mutation
+from api.settings import COHORT_PREFIX, SAMPLE_PREFIX, SEQUENCING_GROUP_PREFIX
 from db.python import enum_tables
 from db.python.filters import GenericFilter
 from db.python.layers import (
@@ -1267,6 +1268,18 @@ class GraphQLAnalysisRunner:
 
 
 @strawberry.type
+class GraphQLMetamistSettings:
+    """
+    Metamist settings that are useful to know on the client and in scripts
+    """
+
+    sample_prefix: str
+    cohort_prefix: str
+    sequencing_group_prefix: str
+    primary_external_id_name: str
+
+
+@strawberry.type
 class GraphQLViewer:
     """
     The "Viewer" construct is the current user and contains information about the
@@ -1284,6 +1297,15 @@ class Query:  # entry point to graphql.
     @strawberry.field()
     def enum(self, info: Info[GraphQLContext, 'Query']) -> GraphQLEnum:  # type: ignore
         return GraphQLEnum()
+
+    @strawberry.field()
+    def metamist_settings(self) -> GraphQLMetamistSettings:
+        return GraphQLMetamistSettings(
+            sample_prefix=SAMPLE_PREFIX,
+            cohort_prefix=COHORT_PREFIX,
+            sequencing_group_prefix=SEQUENCING_GROUP_PREFIX,
+            primary_external_id_name=PRIMARY_EXTERNAL_ORG,
+        )
 
     @strawberry.field()
     async def viewer(
