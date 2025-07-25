@@ -1,0 +1,54 @@
+/* Responsive button container styles */
+.button-container {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    align-items: stretch;
+    flex: 0 0 auto;
+    min-width: 240px;
+}
+
+.button-container > div {
+    flex: 1 1 50%;
+    min-width: 115px;
+}
+
+.button-container .ui.button {
+    width: 100% !important;
+    height: 36px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+}
+
+/* Stack buttons vertically on smaller screens */
+@media (max-width: 768px) {
+    .button-container {
+        flex-direction: column;
+        min-width: 120px;
+    }
+
+    .button-container > div {
+        flex: 1 1 auto;
+        min-width: 120px;
+    }
+}
+
+/* Very small screens */
+@media (max-width: 480px) {
+    .header-container {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 15px;
+    }
+
+    .button-container {
+        width: 100%;
+        min-width: unset;
+    }
+
+    .button-container > div {
+        min-width: unset;
+    }
+}
