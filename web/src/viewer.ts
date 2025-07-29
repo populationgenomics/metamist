@@ -13,10 +13,17 @@ const VIEWER_QUERY = gql(`
                 roles
             }
         }
+        metamistSettings {
+            samplePrefix
+            cohortPrefix
+            sequencingGroupPrefix
+            primaryExternalIdName
+        }
     }
 `)
 
 type ViewerData = ViewerQueryQuery['viewer']
+type MetamistSettings = ViewerQueryQuery['metamistSettings']
 type ProjectIdRoleMap = Map<number, Set<ProjectMemberRole>>
 type ProjectNameRoleMap = Map<string, Set<ProjectMemberRole>>
 
@@ -24,9 +31,11 @@ class Viewer {
     private data: ViewerData
     private projectIdRoleMap: ProjectIdRoleMap
     private projectNameRoleMap: ProjectNameRoleMap
+    metamistSettings: MetamistSettings
 
-    constructor(viewerData: ViewerData) {
+    constructor(viewerData: ViewerData, metamistSettings: MetamistSettings) {
         this.data = viewerData
+        this.metamistSettings = metamistSettings
 
         this.projectIdRoleMap = this.data.projects.reduce((mm: ProjectIdRoleMap, pp) => {
             return mm.set(pp.id, new Set(pp.roles))
@@ -74,6 +83,6 @@ export function useViewer(): {
     return {
         loading,
         error,
-        viewer: data ? new Viewer(data.viewer) : null,
+        viewer: data ? new Viewer(data.viewer, data.metamistSettings) : null,
     }
 }
