@@ -11,9 +11,11 @@ const PROCESS_DURATION_QUERY = `
         select
             s.sample_id,
             cast(s.participant_id as string) as participant_id,
+            p.external_id as participant_portal_id,
             coalesce(s.meta_processing_site, 'unknown') as processing_site,
             coalesce(s.meta_collection_event_type, 'unknown') as event_type,
             try_strptime(meta_collection_datetime, '%Y-%m-%dT%H:%M:%S') as collection_time,
+            s.external_id as sample_agd_id,
             -- The most important sample derivative to track the processing time of is PBMC
             try_strptime((
                 select
@@ -79,7 +81,9 @@ export default function ProcessingTimes() {
                                 channels: {
                                     process_end: 'process_end_time',
                                     sample_id: 'sample_id',
+                                    sample_agd_id: 'sample_agd_id',
                                     participant_id: 'participant_id',
+                                    participant_portal_id: 'participant_portal_id',
                                 },
                                 tip: true,
                             }),
@@ -126,7 +130,9 @@ export default function ProcessingTimes() {
                                 channels: {
                                     process_end: 'process_end_time',
                                     sample_id: 'sample_id',
+                                    sample_agd_id: 'sample_agd_id',
                                     participant_id: 'participant_id',
+                                    participant_portal_id: 'participant_portal_id',
                                 },
                                 tip: true,
                             }),
@@ -238,7 +244,9 @@ export default function ProcessingTimes() {
                             query: `
                                 select
                                     sample_id,
+                                    sample_agd_id,
                                     participant_id,
+                                    participant_portal_id,
                                     processing_site,
                                     event_type,
                                     strftime(collection_time, '%Y-%m-%d %H:%M:%S') as collection_time,
