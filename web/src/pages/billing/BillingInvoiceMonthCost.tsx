@@ -322,6 +322,41 @@ const BillingCurrentCost = () => {
         exportTable({ headerFields, matrix }, format, 'billing-cost-by-invoice-month')
     }
 
+    let dailyHeaderCell: React.ReactNode = null
+    if (invoiceMonth === thisMonth) {
+        const visibleCount = ['compute_daily', 'storage_daily', 'total_daily'].filter((col) =>
+            isColumnVisible(col)
+        ).length
+        if (visibleCount > 0) {
+            dailyHeaderCell = (
+                <SUITable.HeaderCell colSpan={visibleCount}>
+                    24H (day UTC {lastLoadedDay})
+                </SUITable.HeaderCell>
+            )
+        }
+    }
+
+    let monthlyHeaderCell: React.ReactNode = null
+    {
+        const baseColumns = ['compute_monthly', 'storage_monthly', 'total_monthly']
+        const budgetColumn =
+            groupBy === BillingColumn.GcpProject &&
+            invoiceMonth === thisMonth &&
+            isColumnVisible('budget_spent')
+                ? 1
+                : 0
+
+        const visibleCount = baseColumns.filter((col) => isColumnVisible(col)).length + budgetColumn
+
+        if (visibleCount > 0) {
+            monthlyHeaderCell = (
+                <SUITable.HeaderCell colSpan={visibleCount}>
+                    Invoice Month (Acc)
+                </SUITable.HeaderCell>
+            )
+        }
+    }
+
     return (
         <>
             <h1>Cost By Invoice Month</h1>
@@ -475,48 +510,8 @@ const BillingCurrentCost = () => {
 
                             <SUITable.HeaderCell></SUITable.HeaderCell>
 
-                            {(() => {
-                                // Calculate how many daily columns are visible
-                                if (invoiceMonth === thisMonth) {
-                                    const visibleCount = [
-                                        'compute_daily',
-                                        'storage_daily',
-                                        'total_daily',
-                                    ].filter((col) => isColumnVisible(col)).length
-
-                                    return visibleCount > 0 ? (
-                                        <SUITable.HeaderCell colSpan={visibleCount}>
-                                            24H (day UTC {lastLoadedDay})
-                                        </SUITable.HeaderCell>
-                                    ) : null
-                                }
-                                return null
-                            })()}
-
-                            {(() => {
-                                // Calculate how many monthly columns are visible
-                                const baseColumns = [
-                                    'compute_monthly',
-                                    'storage_monthly',
-                                    'total_monthly',
-                                ]
-                                const budgetColumn =
-                                    groupBy === BillingColumn.GcpProject &&
-                                    invoiceMonth === thisMonth &&
-                                    isColumnVisible('budget_spent')
-                                        ? 1
-                                        : 0
-
-                                const visibleCount =
-                                    baseColumns.filter((col) => isColumnVisible(col)).length +
-                                    budgetColumn
-
-                                return visibleCount > 0 ? (
-                                    <SUITable.HeaderCell colSpan={visibleCount}>
-                                        Invoice Month (Acc)
-                                    </SUITable.HeaderCell>
-                                ) : null
-                            })()}
+                            {dailyHeaderCell}
+                            {monthlyHeaderCell}
                         </SUITable.Row>
                         <SUITable.Row>
                             <SUITable.HeaderCell></SUITable.HeaderCell>

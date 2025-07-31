@@ -4,4 +4,4 @@ export type {
     ColumnGroup,
     ColumnVisibilityDropdownProps,
 } from './ColumnVisibilityDropdown'
-export { createColumnConfigs, useColumnVisibility } from './hooks'
+export { useColumnVisibility } from './columnVisibilityHooks'

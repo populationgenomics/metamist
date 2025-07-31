@@ -42,6 +42,94 @@ export interface ColumnVisibilityDropdownProps {
     urlParamName?: string
 }
 
+/**
+ * Reusable toggle buttons component for selecting/hiding all columns or groups.
+ */
+const ToggleButtons: React.FC<{
+    onSelectAll: () => void
+    onHideAll: () => void
+    className?: string
+}> = ({ onSelectAll, onHideAll, className = '' }) => (
+    <Dropdown.Item
+        onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        className={className}
+    >
+        <div className="toggle-buttons">
+            <Button
+                compact
+                size="mini"
+                color="blue"
+                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    onSelectAll()
+                }}
+            >
+                Select All
+            </Button>
+            <Button
+                compact
+                size="mini"
+                color="grey"
+                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    onHideAll()
+                }}
+            >
+                Hide All
+            </Button>
+        </div>
+    </Dropdown.Item>
+)
+
+const ColumnCheckbox: React.FC<{
+    column: ColumnConfig
+    isColumnVisible: (columnId: string) => boolean
+    toggleColumn: (columnId: string, event?: React.SyntheticEvent) => void
+    labelFormatter?: (column: ColumnConfig) => string
+}> = ({ column, isColumnVisible, toggleColumn, labelFormatter }) => {
+    const handleItemClick = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        e.preventDefault()
+        toggleColumn(column.id, e)
+    }
+
+    const handleChange = (e: React.FormEvent<HTMLInputElement>, _data: CheckboxProps) => {
+        e.stopPropagation()
+        toggleColumn(column.id, e)
+    }
+
+    const isVisible = isColumnVisible(column.id)
+    const isDisabled = column.isRequired
+
+    const label = labelFormatter ? labelFormatter(column) : column.label
+
+    return (
+        <Dropdown.Item
+            onClick={handleItemClick}
+            onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+            role="menuitemcheckbox"
+            aria-checked={isVisible}
+            disabled={isDisabled}
+            className={`column-checkbox-item ${isVisible ? 'selected' : ''}`}
+        >
+            <div className="column-checkbox-content">
+                <Checkbox
+                    checked={isVisible}
+                    onChange={handleChange}
+                    onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                    disabled={isDisabled}
+                />
+                <span className={`column-label ${isVisible ? 'visible' : ''}`}>{label}</span>
+            </div>
+        </Dropdown.Item>
+    )
+}
+
 const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
     columns,
     groups = [],
@@ -245,88 +333,6 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
         return visibleColumns.has(columnId)
     }
 
-    // Column checkbox component
-    const ColumnCheckbox: React.FC<{ column: ColumnConfig }> = ({ column }) => {
-        const handleItemClick = (e: React.MouseEvent) => {
-            e.stopPropagation()
-            e.preventDefault()
-            toggleColumn(column.id, e)
-        }
-
-        const handleChange = (e: React.FormEvent<HTMLInputElement>, _data: CheckboxProps) => {
-            e.stopPropagation()
-            toggleColumn(column.id, e)
-        }
-
-        const isVisible = isColumnVisible(column.id)
-        const isDisabled = column.isRequired
-
-        const label = labelFormatter ? labelFormatter(column) : column.label
-
-        return (
-            <Dropdown.Item
-                onClick={handleItemClick}
-                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                role="menuitemcheckbox"
-                aria-checked={isVisible}
-                disabled={isDisabled}
-                className={`column-checkbox-item ${isVisible ? 'selected' : ''}`}
-            >
-                <div className="column-checkbox-content">
-                    <Checkbox
-                        checked={isVisible}
-                        onChange={handleChange}
-                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                        disabled={isDisabled}
-                    />
-                    <span className={`column-label ${isVisible ? 'visible' : ''}`}>{label}</span>
-                </div>
-            </Dropdown.Item>
-        )
-    }
-
-    // Reusable toggle buttons component
-    const ToggleButtons: React.FC<{
-        onSelectAll: () => void
-        onHideAll: () => void
-        className?: string
-    }> = ({ onSelectAll, onHideAll, className = '' }) => (
-        <Dropdown.Item
-            onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-            onClick={(e: React.MouseEvent) => e.stopPropagation()}
-            className={className}
-        >
-            <div className="toggle-buttons">
-                <Button
-                    compact
-                    size="mini"
-                    color="blue"
-                    onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                    onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation()
-                        e.preventDefault()
-                        onSelectAll()
-                    }}
-                >
-                    Select All
-                </Button>
-                <Button
-                    compact
-                    size="mini"
-                    color="grey"
-                    onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
-                    onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation()
-                        e.preventDefault()
-                        onHideAll()
-                    }}
-                >
-                    Hide All
-                </Button>
-            </div>
-        </Dropdown.Item>
-    )
-
     // Group toggle buttons
     const GroupToggleButtons: React.FC<{ group: ColumnGroup }> = ({ group }) => (
         <ToggleButtons
@@ -505,7 +511,13 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
                                 <Dropdown.Header content={group.label} className="section-header" />
                                 <GroupToggleButtons group={group} />
                                 {groupColumns.map((column) => (
-                                    <ColumnCheckbox key={column.id} column={column} />
+                                    <ColumnCheckbox
+                                        key={column.id}
+                                        column={column}
+                                        isColumnVisible={isColumnVisible}
+                                        toggleColumn={toggleColumn}
+                                        labelFormatter={labelFormatter}
+                                    />
                                 ))}
                             </div>
                         )
@@ -521,7 +533,13 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
                                 />
                             )}
                             {ungroupedColumns.map((column) => (
-                                <ColumnCheckbox key={column.id} column={column} />
+                                <ColumnCheckbox
+                                    key={column.id}
+                                    column={column}
+                                    isColumnVisible={isColumnVisible}
+                                    toggleColumn={toggleColumn}
+                                    labelFormatter={labelFormatter}
+                                />
                             ))}
                         </div>
                     )}
