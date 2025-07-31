@@ -8,8 +8,24 @@ const date2Month = (dt: string): string => {
     if (dt === undefined || dt === null) {
         return ''
     }
+
+    // Convert from format like "202505" to a proper date and format it nicely
+    if (dt.length === 6) {
+        const year = dt.substring(0, 4)
+        const month = dt.substring(4, 6)
+        const date = new Date(parseInt(year), parseInt(month) - 1, 1)
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+        })
+    }
+
+    // Fallback for other date formats
     const date = new Date(dt)
-    return `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}`
+    return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+    })
 }
 type DataDict = { [key: string]: { [key: string]: { [key: string]: number } } }
 
@@ -19,6 +35,7 @@ interface IBillingCostByMonthTableProps {
     isLoading: boolean
     data: DataDict
     months: string[]
+    visibleColumns: Set<string>
 }
 
 const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
@@ -27,6 +44,7 @@ const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
     isLoading,
     data,
     months,
+    visibleColumns,
 }) => {
     if (isLoading) {
         return (
@@ -37,9 +55,25 @@ const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
     }
     const compTypes = ['Compute Cost', 'Storage Cost']
 
+    // Helper function to check if a column is visible
+    const isColumnVisible = (category: string): boolean => {
+        if (category === 'compute_type') {
+            return true // Always show required columns
+        }
+        return visibleColumns.has(category)
+    }
+
+    // Get only visible topics
+    const getVisibleTopics = () => {
+        return Object.keys(data)
+            .filter((topic) => isColumnVisible(topic))
+            .sort((a, b) => a.localeCompare(b))
+    }
+
     const dataToBody = (data: DataDict) => {
-        const sortedKeys = Object.keys(data).sort()
-        return sortedKeys.map((key) => (
+        const visibleTopics = getVisibleTopics()
+
+        return visibleTopics.map((key) => (
             <>
                 {compTypes.map((compType, index) => (
                     <SUITable.Row key={`${key}-${index}-row`}>
@@ -63,7 +97,8 @@ const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
     return (
         <>
             <Header as="h3">
-                SUM of Cost in AUD (excluding GST) By Topic from {start} to {end}
+                SUM of Cost in AUD (excluding GST) By Topic from {date2Month(start)} to{' '}
+                {date2Month(end)}
             </Header>
             <Table celled compact sortable selectable>
                 <SUITable.Header>
