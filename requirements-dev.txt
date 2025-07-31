@@ -7,7 +7,9 @@
 aiohappyeyeballs==2.6.1
     # via aiohttp
 aiohttp==3.12.14
-    # via -r requirements.in
+    # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
+    #   -r requirements.in
 aiomysql==0.2.0
     # via databases
 aiosignal==1.4.0
@@ -22,7 +24,9 @@ anyio==4.7.0
 astroid==3.2.4
     # via pylint
 async-lru==2.0.4
-    # via -r requirements.in
+    # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
+    #   -r requirements.in
 attrs==24.3.0
     # via
     #   aiohttp
@@ -38,18 +42,22 @@ azure-storage-blob==12.24.0
 azure-storage-file-datalake==12.18.0
     # via cloudpathlib
 backoff==2.2.1
-    # via -r requirements.in
+    # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
+    #   -r requirements.in
 black==24.10.0
     # via -r requirements-dev.in
 blinker==1.9.0
     # via flask
 boto3==1.35.90
     # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
     #   -r requirements.in
     #   cloudpathlib
     #   cpg-utils
 botocore==1.35.90
     # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
     #   -r requirements.in
     #   boto3
     #   cpg-utils
@@ -83,6 +91,7 @@ cloudevents==1.11.0
     # via functions-framework
 cloudpathlib[all,azure,gs,s3]==0.20.0
     # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
     #   -r requirements.in
     #   cpg-utils
 coverage[toml]==7.6.10
@@ -90,14 +99,19 @@ coverage[toml]==7.6.10
     #   -r requirements-dev.in
     #   pytest-cov
 cpg-utils==5.2.0
-    # via -r requirements.in
+    # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
+    #   -r requirements.in
 cryptography==44.0.1
     # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
     #   -r requirements.in
     #   azure-storage-blob
     #   pymysql
 databases[mysql]==0.9.0
-    # via -r requirements.in
+    # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
+    #   -r requirements.in
 deprecated==1.2.15
     # via cpg-utils
 deprecation==2.1.0
@@ -111,13 +125,16 @@ dnspython==2.7.0
 docker==7.1.0
     # via testcontainers
 duckdb==1.1.3
-    # via -r requirements.in
+    # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
+    #   -r requirements.in
 email-validator==2.2.0
     # via
     #   fastapi
     #   pydantic
 fastapi[all]==0.116.1
     # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
     #   -r requirements.in
     #   strawberry-graphql
 fastapi-cli[standard]==0.0.8
@@ -140,8 +157,10 @@ frozenlist==1.5.0
     # via
     #   aiohttp
     #   aiosignal
-fsspec==2024.10.0
-    # via -r requirements.in
+fsspec==2025.7.0
+    # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
+    #   -r requirements.in
 functions-framework==3.8.2
     # via -r requirements-dev.in
 google-api-core[grpc]==2.24.0
@@ -155,40 +174,49 @@ google-api-core[grpc]==2.24.0
     #   google-cloud-storage
 google-auth==2.37.0
     # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
     #   -r requirements.in
     #   cpg-utils
     #   google-api-core
     #   google-cloud-appengine-logging
     #   google-cloud-core
+    #   google-cloud-logging
     #   google-cloud-secret-manager
     #   google-cloud-storage
 google-cloud-appengine-logging==1.5.0
     # via google-cloud-logging
-google-cloud-audit-log==0.3.0
+google-cloud-audit-log==0.3.2
     # via google-cloud-logging
 google-cloud-bigquery==3.11.4
     # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
     #   -r requirements-dev.in
     #   -r requirements.in
-google-cloud-core==2.4.1
+google-cloud-core==2.4.3
     # via
     #   google-cloud-bigquery
     #   google-cloud-logging
     #   google-cloud-storage
-google-cloud-logging==2.7.0
-    # via -r requirements.in
+google-cloud-logging==3.12.1
+    # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
+    #   -r requirements.in
 google-cloud-pubsub==2.18.3
     # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
     #   -r requirements-dev.in
     #   -r requirements.in
 google-cloud-secret-manager==2.22.0
     # via cpg-utils
-google-cloud-storage==1.43.0
+google-cloud-storage==3.2.0
     # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
     #   -r requirements.in
     #   cloudpathlib
 google-crc32c==1.6.0
-    # via google-resumable-media
+    # via
+    #   google-cloud-storage
+    #   google-resumable-media
 google-resumable-media==2.7.2
     # via
     #   google-cloud-bigquery
@@ -243,6 +271,8 @@ idna==3.10
     #   httpx
     #   requests
     #   yarl
+importlib-metadata==8.7.0
+    # via opentelemetry-api
 iniconfig==2.0.0
     # via pytest
 isodate==0.7.2
@@ -288,6 +318,8 @@ nest-asyncio==1.6.0
     # via -r requirements-dev.in
 nodeenv==1.9.1
     # via pre-commit
+opentelemetry-api==1.36.0
+    # via google-cloud-logging
 orjson==3.10.12
     # via fastapi
 packaging==24.2
@@ -327,15 +359,17 @@ protobuf==4.25.8
     #   google-cloud-appengine-logging
     #   google-cloud-audit-log
     #   google-cloud-bigquery
+    #   google-cloud-logging
     #   google-cloud-pubsub
     #   google-cloud-secret-manager
-    #   google-cloud-storage
     #   googleapis-common-protos
     #   grpc-google-iam-v1
     #   grpcio-status
     #   proto-plus
-pyarrow==18.1.0
-    # via -r requirements.in
+pyarrow==21.0.0
+    # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
+    #   -r requirements.in
 pyasn1==0.6.1
     # via
     #   pyasn1-modules
@@ -379,6 +413,7 @@ pytest-cov==6.0.0
     # via -r requirements-dev.in
 python-dateutil==2.8.2
     # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
     #   -r requirements.in
     #   botocore
     #   google-cloud-bigquery
@@ -402,6 +437,7 @@ pyyaml==6.0.2
     #   uvicorn
 requests==2.32.4
     # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
     #   -r requirements.in
     #   azure-core
     #   cpg-utils
@@ -431,10 +467,11 @@ shellingham==1.5.4
 six==1.17.0
     # via
     #   azure-core
-    #   google-cloud-storage
     #   python-dateutil
 slack-sdk==3.20.2
-    # via -r requirements.in
+    # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
+    #   -r requirements.in
 sniffio==1.3.1
     # via anyio
 sqlalchemy==2.0.36
@@ -447,6 +484,7 @@ starlette==0.47.2
     #   strawberry-graphql
 strawberry-graphql[debug-server,fastapi]==0.268.1
     # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
     #   -r requirements-dev.in
     #   -r requirements.in
 tabulate==0.9.0
@@ -472,11 +510,13 @@ typing-extensions==4.12.2
     #   azure-storage-blob
     #   azure-storage-file-datalake
     #   fastapi
+    #   opentelemetry-api
     #   pydantic
     #   pydantic-core
     #   pydantic-extra-types
     #   rich-toolkit
     #   sqlalchemy
+    #   starlette
     #   strawberry-graphql
     #   testcontainers
     #   typer
@@ -491,6 +531,7 @@ urllib3==2.5.0
     #   testcontainers
 uvicorn[standard]==0.34.2
     # via
+    #   -r /tmp/renovate/repos/github/populationgenomics/metamist/requirements.in
     #   -r requirements.in
     #   fastapi
     #   fastapi-cli
@@ -516,3 +557,5 @@ wrapt==1.17.0
     #   testcontainers
 yarl==1.18.3
     # via aiohttp
+zipp==3.23.0
+    # via importlib-metadata
