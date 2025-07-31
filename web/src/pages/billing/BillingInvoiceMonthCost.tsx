@@ -322,40 +322,31 @@ const BillingCurrentCost = () => {
         exportTable({ headerFields, matrix }, format, 'billing-cost-by-invoice-month')
     }
 
-    let dailyHeaderCell: React.ReactNode = null
-    if (invoiceMonth === thisMonth) {
-        const visibleCount = ['compute_daily', 'storage_daily', 'total_daily'].filter((col) =>
-            isColumnVisible(col)
-        ).length
-        if (visibleCount > 0) {
-            dailyHeaderCell = (
-                <SUITable.HeaderCell colSpan={visibleCount}>
-                    24H (day UTC {lastLoadedDay})
-                </SUITable.HeaderCell>
-            )
-        }
-    }
+    // Prepare header cells for daily and monthly columns (simplified, no block scope)
+    const visibleDailyCount = ['compute_daily', 'storage_daily', 'total_daily'].filter((col) =>
+        isColumnVisible(col)
+    ).length
+    const dailyHeaderCell =
+        invoiceMonth === thisMonth && visibleDailyCount > 0 ? (
+            <SUITable.HeaderCell colSpan={visibleDailyCount}>
+                24H (day UTC {lastLoadedDay})
+            </SUITable.HeaderCell>
+        ) : null
 
-    let monthlyHeaderCell: React.ReactNode = null
-    {
-        const baseColumns = ['compute_monthly', 'storage_monthly', 'total_monthly']
-        const budgetColumn =
-            groupBy === BillingColumn.GcpProject &&
-            invoiceMonth === thisMonth &&
-            isColumnVisible('budget_spent')
-                ? 1
-                : 0
-
-        const visibleCount = baseColumns.filter((col) => isColumnVisible(col)).length + budgetColumn
-
-        if (visibleCount > 0) {
-            monthlyHeaderCell = (
-                <SUITable.HeaderCell colSpan={visibleCount}>
-                    Invoice Month (Acc)
-                </SUITable.HeaderCell>
-            )
-        }
-    }
+    const baseMonthlyColumns = ['compute_monthly', 'storage_monthly', 'total_monthly']
+    const budgetColumnVisible =
+        groupBy === BillingColumn.GcpProject &&
+        invoiceMonth === thisMonth &&
+        isColumnVisible('budget_spent')
+    const visibleMonthlyCount =
+        baseMonthlyColumns.filter((col) => isColumnVisible(col)).length +
+        (budgetColumnVisible ? 1 : 0)
+    const monthlyHeaderCell =
+        visibleMonthlyCount > 0 ? (
+            <SUITable.HeaderCell colSpan={visibleMonthlyCount}>
+                Invoice Month (Acc)
+            </SUITable.HeaderCell>
+        ) : null
 
     return (
         <>
