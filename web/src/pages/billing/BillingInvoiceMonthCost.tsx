@@ -10,6 +10,7 @@ import {
     Message,
     Table as SUITable,
 } from 'semantic-ui-react'
+import { SelectChangeEvent } from '@mui/material/Select'
 import {
     ColumnConfig,
     ColumnGroup,
