@@ -1,14 +1,15 @@
-import * as React from 'react'
-import { Message } from 'semantic-ui-react'
 import {
+    CircularProgress,
+    Divider,
     FormControl,
     InputLabel,
-    Select,
     MenuItem,
-    CircularProgress,
-    SelectChangeEvent,
     OutlinedInput,
+    Select,
+    SelectChangeEvent,
 } from '@mui/material'
+import * as React from 'react'
+import { Message } from 'semantic-ui-react'
 import { convertFieldName } from '../../../shared/utilities/fieldName'
 import { BillingApi, BillingColumn, BillingTimePeriods } from '../../../sm-api'
 
@@ -18,6 +19,7 @@ interface MultiFieldSelectorProps {
     selected?: string[]
     includeAll?: boolean
     autoSelect?: boolean
+    isApiLoading?: boolean
     onClickFunction: (
         event: SelectChangeEvent<string[]> | undefined,
         data: { value: string[] }
@@ -30,6 +32,7 @@ const MultiFieldSelector: React.FunctionComponent<MultiFieldSelectorProps> = ({
     selected = [],
     includeAll,
     autoSelect,
+    isApiLoading = false,
     onClickFunction,
 }) => {
     const [loading, setLoading] = React.useState<boolean>(true)
@@ -182,6 +185,15 @@ const MultiFieldSelector: React.FunctionComponent<MultiFieldSelectorProps> = ({
         }))
     }
 
+    const getSortedOptions = (options: { key: string; text: string; value: string }[]) => {
+        // Sort options to show selected items at the top, maintaining original order within each group
+        // This makes it easier for users to see and manage their selections
+        const selectedOptions = options.filter((option) => selected.includes(option.value))
+        const unselectedOptions = options.filter((option) => !selected.includes(option.value))
+
+        return [...selectedOptions, ...unselectedOptions]
+    }
+
     const handleSelectChange = (event: SelectChangeEvent<string[]>) => {
         const value = Array.isArray(event.target.value) ? event.target.value : [event.target.value]
         onClickFunction(event, { value })
@@ -193,7 +205,7 @@ const MultiFieldSelector: React.FunctionComponent<MultiFieldSelectorProps> = ({
         }
         if (selectedValues.length === 1) {
             const options = recordsMap(records as BillingColumn[])
-            const option = options.find(opt => opt.value === selectedValues[0])
+            const option = options.find((opt) => opt.value === selectedValues[0])
             return option?.text || selectedValues[0]
         }
         return `${selectedValues.length} ${convertFieldName(fieldName)}s selected`
@@ -209,7 +221,7 @@ const MultiFieldSelector: React.FunctionComponent<MultiFieldSelectorProps> = ({
     }
 
     return (
-        <FormControl fullWidth variant="outlined" disabled={loading}>
+        <FormControl fullWidth variant="outlined" disabled={loading || isApiLoading}>
             <InputLabel id={`${fieldName}-multiselect-label`}>{label}</InputLabel>
             <Select
                 labelId={`${fieldName}-multiselect-label`}
@@ -219,7 +231,7 @@ const MultiFieldSelector: React.FunctionComponent<MultiFieldSelectorProps> = ({
                 onChange={handleSelectChange}
                 input={<OutlinedInput label={label} />}
                 renderValue={renderValue}
-                startAdornment={loading ? <CircularProgress size={20} /> : null}
+                startAdornment={loading || isApiLoading ? <CircularProgress size={20} /> : null}
                 MenuProps={{
                     PaperProps: {
                         style: {
@@ -228,31 +240,58 @@ const MultiFieldSelector: React.FunctionComponent<MultiFieldSelectorProps> = ({
                     },
                 }}
             >
-                {records && recordsMap(records as BillingColumn[]).map((option) => (
-                    <MenuItem
-                        key={option.key}
-                        value={option.value}
-                        sx={{
-                            fontWeight: selected.includes(option.value) ? 600 : 400,
-                            backgroundColor: selected.includes(option.value) ? 'rgba(25, 118, 210, 0.08)' : 'transparent',
-                            '&:hover': {
-                                backgroundColor: selected.includes(option.value)
-                                    ? 'rgba(25, 118, 210, 0.12)'
-                                    : 'rgba(0, 0, 0, 0.04)',
-                            },
-                            position: 'relative',
-                            '&::after': selected.includes(option.value) ? {
-                                content: '"✓"',
-                                position: 'absolute',
-                                right: '16px',
-                                color: 'primary.main',
-                                fontWeight: 'bold',
-                            } : {},
-                        }}
-                    >
-                        {option.text}
-                    </MenuItem>
-                ))}
+                {records &&
+                    (() => {
+                        const options = recordsMap(records as BillingColumn[])
+                        const sortedOptions = getSortedOptions(options)
+                        const selectedCount = selected.length
+                        const elements: React.ReactNode[] = []
+
+                        sortedOptions.forEach((option, index) => {
+                            // Add divider after selected options if there are both selected and unselected options
+                            if (
+                                index === selectedCount &&
+                                selectedCount > 0 &&
+                                selectedCount < options.length
+                            ) {
+                                elements.push(
+                                    <Divider key={`divider-${selectedCount}`} sx={{ my: 0.5 }} />
+                                )
+                            }
+
+                            elements.push(
+                                <MenuItem
+                                    key={option.key}
+                                    value={option.value}
+                                    sx={{
+                                        fontWeight: selected.includes(option.value) ? 600 : 400,
+                                        backgroundColor: selected.includes(option.value)
+                                            ? 'rgba(25, 118, 210, 0.08)'
+                                            : 'transparent',
+                                        '&:hover': {
+                                            backgroundColor: selected.includes(option.value)
+                                                ? 'rgba(25, 118, 210, 0.12)'
+                                                : 'rgba(0, 0, 0, 0.04)',
+                                        },
+                                        position: 'relative',
+                                        '&::after': selected.includes(option.value)
+                                            ? {
+                                                  content: '"✓"',
+                                                  position: 'absolute',
+                                                  right: '16px',
+                                                  color: 'primary.main',
+                                                  fontWeight: 'bold',
+                                              }
+                                            : {},
+                                    }}
+                                >
+                                    {option.text}
+                                </MenuItem>
+                            )
+                        })
+
+                        return elements
+                    })()}
             </Select>
         </FormControl>
     )

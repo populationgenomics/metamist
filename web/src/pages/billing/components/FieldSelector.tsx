@@ -1,13 +1,13 @@
-import * as React from 'react'
-import { Message } from 'semantic-ui-react'
 import {
+    CircularProgress,
     FormControl,
     InputLabel,
-    Select,
     MenuItem,
-    CircularProgress,
+    Select,
     SelectChangeEvent,
 } from '@mui/material'
+import * as React from 'react'
+import { Message } from 'semantic-ui-react'
 import { convertFieldName } from '../../../shared/utilities/fieldName'
 import { BillingApi, BillingColumn, BillingTimePeriods } from '../../../sm-api'
 
@@ -17,10 +17,7 @@ interface FieldSelectorProps {
     selected?: string
     includeAll?: boolean
     autoSelect?: boolean
-    onClickFunction: (
-        event: SelectChangeEvent<string> | undefined,
-        data: { value: string }
-    ) => void
+    onClickFunction: (event: SelectChangeEvent<string> | undefined, data: { value: string }) => void
 }
 
 const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
@@ -205,11 +202,12 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
                 label={label}
                 startAdornment={loading ? <CircularProgress size={20} /> : null}
             >
-                {records && recordsMap(records as BillingColumn[]).map((option) => (
-                    <MenuItem key={option.key} value={option.value}>
-                        {option.text}
-                    </MenuItem>
-                ))}
+                {records &&
+                    recordsMap(records as BillingColumn[]).map((option) => (
+                        <MenuItem key={option.key} value={option.value}>
+                            {option.text}
+                        </MenuItem>
+                    ))}
             </Select>
         </FormControl>
     )

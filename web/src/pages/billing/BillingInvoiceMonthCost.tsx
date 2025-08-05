@@ -1,3 +1,5 @@
+import { SelectChangeEvent } from '@mui/material/Select'
+import { debounce } from 'lodash'
 import orderBy from 'lodash/orderBy'
 import * as React from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
@@ -10,7 +12,6 @@ import {
     Message,
     Table as SUITable,
 } from 'semantic-ui-react'
-import { SelectChangeEvent } from '@mui/material/Select'
 import {
     ColumnConfig,
     ColumnGroup,
@@ -24,7 +25,7 @@ import { exportTable } from '../../shared/utilities/exportTable'
 import { convertFieldName } from '../../shared/utilities/fieldName'
 import formatMoney from '../../shared/utilities/formatMoney'
 import generateUrl from '../../shared/utilities/generateUrl'
-import { BillingApi, BillingColumn, BillingCostBudgetRecord } from '../../sm-api'
+import { BillingApi, BillingColumn, BillingCostBudgetRecord, BillingSource } from '../../sm-api'
 import './components/BillingCostByTimeTable.css'
 import FieldSelector from './components/FieldSelector'
 import MultiFieldSelector from './components/MultiFieldSelector'
@@ -63,15 +64,25 @@ const BillingCurrentCost = () => {
         ? (inputGroupBy as BillingColumn)
         : BillingColumn.GcpProject
     const inputInvoiceMonth = searchParams.get('invoiceMonth')
+    // GCP projects are stored as comma-separated values in URL: gcpProjects=project1,project2,project3
+    const inputGcpProjects = searchParams.get('gcpProjects')
+    const initialGcpProjects = inputGcpProjects
+        ? inputGcpProjects.split(',').filter((p) => p.trim() !== '')
+        : []
 
     // use navigate and update url params
     const location = useLocation()
     const navigate = useNavigate()
 
-    const updateNav = (grp: BillingColumn, invoiceMonth: string | undefined) => {
+    const updateNav = (
+        grp: BillingColumn,
+        invoiceMonth: string | undefined,
+        gcpProjects?: string[]
+    ) => {
         const url = generateUrl(location, {
             groupBy: grp,
             invoiceMonth: invoiceMonth,
+            gcpProjects: gcpProjects && gcpProjects.length > 0 ? gcpProjects.join(',') : undefined,
         })
         navigate(url)
     }
@@ -91,29 +102,76 @@ const BillingCurrentCost = () => {
         fixedGroupBy ?? BillingColumn.GcpProject
     )
     const [invoiceMonth, setInvoiceMonth] = React.useState<string>(inputInvoiceMonth ?? thisMonth)
-    const [selectedGcpProjects, setSelectedGcpProjects] = React.useState<string[]>([])
+    const [selectedGcpProjects, setSelectedGcpProjects] =
+        React.useState<string[]>(initialGcpProjects)
 
     const [lastLoadedDay, setLastLoadedDay] = React.useState<string>()
 
-    const getCosts = (grp: BillingColumn, invoiceMth: string | undefined) => {
-        updateNav(grp, invoiceMth)
+    // Create a debounced version of getCosts for project selections
+    const debouncedGetCosts = React.useMemo(
+        () =>
+            debounce(
+                (
+                    grp: BillingColumn,
+                    invoiceMth: string | undefined,
+                    gcpProjectFilters?: string[]
+                ) => {
+                    getCosts(grp, invoiceMth, gcpProjectFilters)
+                },
+                500
+            ), // 500ms delay
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        []
+    )
+
+    // Cleanup debounced function on unmount
+    React.useEffect(() => {
+        return () => {
+            debouncedGetCosts.cancel()
+        }
+    }, [debouncedGetCosts])
+
+    const getCosts = (
+        grp: BillingColumn,
+        invoiceMth: string | undefined,
+        gcpProjectFilters?: string[]
+    ) => {
+        // Use provided filters or fall back to current state
+        const filtersToUse =
+            gcpProjectFilters !== undefined ? gcpProjectFilters : selectedGcpProjects
+
+        updateNav(grp, invoiceMth, filtersToUse)
         setIsLoading(true)
         setError(undefined)
-        let source = 'aggregate'
+        let source = BillingSource.Aggregate
         if (grp === BillingColumn.GcpProject) {
-            source = 'gcp_billing'
+            source = BillingSource.GcpBilling
         }
+
+        // Create the query model with filters
+        const queryModel = {
+            field: grp,
+            invoice_month: invoiceMth,
+            source: source,
+            filters: filtersToUse.length > 0 ? { gcp_project: filtersToUse } : undefined,
+        }
+
         new BillingApi()
-            // @ts-ignore
-            .getRunningCost(grp, invoiceMth, source)
+            .getRunningCost(queryModel)
             .then((response) => {
                 setIsLoading(false)
                 if (response.data.length > 0) {
                     setCosts(response.data)
                     setLastLoadedDay(response.data[0].last_loaded_day || '')
+                } else {
+                    setCosts([])
                 }
             })
-            .catch((er) => setError(er.message))
+            .catch((er) => {
+                console.error('API error:', er) // Debug log
+                setIsLoading(false)
+                setError(er.message)
+            })
     }
 
     const onGroupBySelect = (event: unknown, data: DropdownProps) => {
@@ -136,14 +194,16 @@ const BillingCurrentCost = () => {
         event: SelectChangeEvent<string[]> | undefined,
         data: { value: string[] }
     ) => {
+        // Update UI state immediately for responsive feedback
         setSelectedGcpProjects(data.value)
-        // TODO: Update API call to filter by selected GCP projects
+        // Use debounced version for API calls to prevent excessive requests during rapid selections
+        debouncedGetCosts(groupBy, invoiceMonth, data.value)
     }
 
     React.useEffect(() => {
-        getCosts(groupBy, invoiceMonth)
+        getCosts(groupBy, invoiceMonth, selectedGcpProjects)
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
+    }, [groupBy, invoiceMonth])
 
     // Define column groups for easier management
     const DAILY_COLUMNS = ['compute_daily', 'storage_daily', 'total_daily']
@@ -385,6 +445,7 @@ const BillingCurrentCost = () => {
                         label="Filter GCP Projects"
                         fieldName={BillingColumn.GcpProject}
                         selected={selectedGcpProjects}
+                        isApiLoading={isLoading}
                         onClickFunction={onGcpProjectsSelect}
                     />
                 </Grid.Column>

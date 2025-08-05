@@ -33,31 +33,26 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
     const colorFunc: (t: number) => string | undefined = colors ?? d3.interpolateRainbow
 
     // set the dimensions and margins of the graph
-    const margin = { top: 80, right: 20, bottom: 50, left: 250 }
+    const margin = React.useMemo(() => ({ top: 80, right: 20, bottom: 50, left: 250 }), [])
     const width = 650 - margin.left - margin.right
     const outsideHeight = 2850
     const height = outsideHeight - margin.top - margin.bottom
 
     const containerDivRef = React.useRef<HTMLDivElement | null>(null)
 
-    if (!isLoading && (!data || data.length === 0)) {
-        return <div>No data available</div>
-    }
+    React.useEffect(() => {
+        const contDiv = containerDivRef.current
+        if (!contDiv) return
 
-    const contDiv = containerDivRef.current
-    if (contDiv) {
         // reset svg
         contDiv.innerHTML = ''
 
         if (isLoading) {
-            return (
-                <div>
-                    <LoadingDucks />
-                    <p style={{ textAlign: 'center', marginTop: '5px' }}>
-                        <em>This query takes a while...</em>
-                    </p>
-                </div>
-            )
+            return
+        }
+
+        if (!data || data.length === 0) {
+            return
         }
 
         // prepare data
@@ -353,7 +348,39 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
                     .text('Budget')
             }
         }
+    }, [
+        data,
+        title,
+        series,
+        labels,
+        total_series,
+        threshold_values,
+        threshold_series,
+        sorted_by,
+        isLoading,
+        showLegend,
+        width,
+        height,
+        outsideHeight,
+        margin,
+        colorFunc,
+    ])
+
+    if (!isLoading && (!data || data.length === 0)) {
+        return <div>No data available</div>
     }
+
+    if (isLoading) {
+        return (
+            <div>
+                <LoadingDucks />
+                <p style={{ textAlign: 'center', marginTop: '5px' }}>
+                    <em>This query takes a while...</em>
+                </p>
+            </div>
+        )
+    }
+
     return <div ref={containerDivRef}></div>
 }
 

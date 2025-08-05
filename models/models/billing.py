@@ -538,3 +538,40 @@ class AnalysisCostRecord(SMBase):
             ],
             dataproc=d.get('dataproc'),
         )
+
+
+class BillingRunningCostQueryModel(SMBase):
+    """
+    Used to query for billing running cost with filtering support
+    """
+
+    # required
+    field: BillingColumn
+
+    # optional
+    invoice_month: str | None = None
+    source: BillingSource | None = None
+
+    # optional filters, similar to BillingTotalCostQueryModel
+    filters: dict[BillingColumn, str | list | dict] | None = None
+
+    def __hash__(self):
+        """Create hash for this object to use in caching"""
+        return hash(self.model_dump_json())
+
+    def to_filter(self) -> BillingFilter:
+        """
+        Convert to internal analysis filter
+        """
+        billing_filter = BillingFilter()
+        if self.filters:
+            # add filters as attributes
+            for fk, fv in self.filters.items():
+                # fk is BillColumn, fv is value
+                # if fv is a list, then use IN filter
+                if isinstance(fv, list):
+                    setattr(billing_filter, fk.value, GenericBQFilter(in_=fv))
+                else:
+                    setattr(billing_filter, fk.value, GenericBQFilter(eq=fv))
+
+        return billing_filter
