@@ -27,6 +27,7 @@ import generateUrl from '../../shared/utilities/generateUrl'
 import { BillingApi, BillingColumn, BillingCostBudgetRecord } from '../../sm-api'
 import './components/BillingCostByTimeTable.css'
 import FieldSelector from './components/FieldSelector'
+import MultiFieldSelector from './components/MultiFieldSelector'
 
 const BillingCurrentCost = () => {
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
@@ -90,6 +91,7 @@ const BillingCurrentCost = () => {
         fixedGroupBy ?? BillingColumn.GcpProject
     )
     const [invoiceMonth, setInvoiceMonth] = React.useState<string>(inputInvoiceMonth ?? thisMonth)
+    const [selectedGcpProjects, setSelectedGcpProjects] = React.useState<string[]>([])
 
     const [lastLoadedDay, setLastLoadedDay] = React.useState<string>()
 
@@ -128,6 +130,14 @@ const BillingCurrentCost = () => {
             setInvoiceMonth(value)
             getCosts(groupBy, value)
         }
+    }
+
+    const onGcpProjectsSelect = (
+        event: SelectChangeEvent<string[]> | undefined,
+        data: { value: string[] }
+    ) => {
+        setSelectedGcpProjects(data.value)
+        // TODO: Update API call to filter by selected GCP projects
     }
 
     React.useEffect(() => {
@@ -368,6 +378,14 @@ const BillingCurrentCost = () => {
                         fieldName={BillingColumn.InvoiceMonth}
                         onClickFunction={onInvoiceMonthSelect}
                         selected={invoiceMonth}
+                    />
+                </Grid.Column>
+                <Grid.Column>
+                    <MultiFieldSelector
+                        label="Filter GCP Projects"
+                        fieldName={BillingColumn.GcpProject}
+                        selected={selectedGcpProjects}
+                        onClickFunction={onGcpProjectsSelect}
                     />
                 </Grid.Column>
 
