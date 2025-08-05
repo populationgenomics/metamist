@@ -67,9 +67,10 @@ const BillingCurrentCost = () => {
     // GCP projects are stored as comma-separated values in URL: gcpProjects=project1,project2,project3
     const inputGcpProjects = searchParams.get('gcpProjects')
     // Only use GCP projects from URL if we're grouping by GCP Project
-    const initialGcpProjects = fixedGroupBy === BillingColumn.GcpProject && inputGcpProjects
-        ? inputGcpProjects.split(',').filter((p) => p.trim() !== '')
-        : []
+    const initialGcpProjects =
+        fixedGroupBy === BillingColumn.GcpProject && inputGcpProjects
+            ? inputGcpProjects.split(',').filter((p) => p.trim() !== '')
+            : []
 
     // use navigate and update url params
     const location = useLocation()
@@ -84,7 +85,10 @@ const BillingCurrentCost = () => {
             groupBy: grp,
             invoiceMonth: invoiceMonth,
             // Only include gcpProjects in URL if grouping by GCP Project and there are selected projects
-            gcpProjects: grp === BillingColumn.GcpProject && gcpProjects && gcpProjects.length > 0 ? gcpProjects.join(',') : undefined,
+            gcpProjects:
+                grp === BillingColumn.GcpProject && gcpProjects && gcpProjects.length > 0
+                    ? gcpProjects.join(',')
+                    : undefined,
         })
         navigate(url)
     }
@@ -141,7 +145,9 @@ const BillingCurrentCost = () => {
         // Use provided filters or fall back to current state, but only for GCP Project grouping
         const filtersToUse =
             grp === BillingColumn.GcpProject
-                ? gcpProjectFilters !== undefined ? gcpProjectFilters : selectedGcpProjects
+                ? gcpProjectFilters !== undefined
+                    ? gcpProjectFilters
+                    : selectedGcpProjects
                 : []
 
         updateNav(grp, invoiceMth, filtersToUse)
@@ -157,7 +163,10 @@ const BillingCurrentCost = () => {
             field: grp,
             invoice_month: invoiceMth,
             source: source,
-            filters: grp === BillingColumn.GcpProject && filtersToUse.length > 0 ? { gcp_project: filtersToUse } : undefined,
+            filters:
+                grp === BillingColumn.GcpProject && filtersToUse.length > 0
+                    ? { gcp_project: filtersToUse }
+                    : undefined,
         }
 
         new BillingApi()
