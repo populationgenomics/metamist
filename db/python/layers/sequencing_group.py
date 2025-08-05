@@ -347,7 +347,7 @@ class SequencingGroupLayer(BaseLayer):
         # but we're inside a transaction, so it's not actually committing anything
         # so should be quick to "write" in serial
         for sg in to_insert:
-            assay_ids = [a.id for a in sg.assays]
+            assay_ids = [a.id for a in sg.assays] if sg.assays else None
             sg.id = await self.seqgt.create_sequencing_group(
                 sample_id=sg.sample_id,
                 type_=sg.type,
