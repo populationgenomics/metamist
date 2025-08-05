@@ -66,7 +66,8 @@ const BillingCurrentCost = () => {
     const inputInvoiceMonth = searchParams.get('invoiceMonth')
     // GCP projects are stored as comma-separated values in URL: gcpProjects=project1,project2,project3
     const inputGcpProjects = searchParams.get('gcpProjects')
-    const initialGcpProjects = inputGcpProjects
+    // Only use GCP projects from URL if we're grouping by GCP Project
+    const initialGcpProjects = fixedGroupBy === BillingColumn.GcpProject && inputGcpProjects
         ? inputGcpProjects.split(',').filter((p) => p.trim() !== '')
         : []
 
@@ -82,7 +83,8 @@ const BillingCurrentCost = () => {
         const url = generateUrl(location, {
             groupBy: grp,
             invoiceMonth: invoiceMonth,
-            gcpProjects: gcpProjects && gcpProjects.length > 0 ? gcpProjects.join(',') : undefined,
+            // Only include gcpProjects in URL if grouping by GCP Project and there are selected projects
+            gcpProjects: grp === BillingColumn.GcpProject && gcpProjects && gcpProjects.length > 0 ? gcpProjects.join(',') : undefined,
         })
         navigate(url)
     }
@@ -136,9 +138,11 @@ const BillingCurrentCost = () => {
         invoiceMth: string | undefined,
         gcpProjectFilters?: string[]
     ) => {
-        // Use provided filters or fall back to current state
+        // Use provided filters or fall back to current state, but only for GCP Project grouping
         const filtersToUse =
-            gcpProjectFilters !== undefined ? gcpProjectFilters : selectedGcpProjects
+            grp === BillingColumn.GcpProject
+                ? gcpProjectFilters !== undefined ? gcpProjectFilters : selectedGcpProjects
+                : []
 
         updateNav(grp, invoiceMth, filtersToUse)
         setIsLoading(true)
@@ -148,12 +152,12 @@ const BillingCurrentCost = () => {
             source = BillingSource.GcpBilling
         }
 
-        // Create the query model with filters
+        // Create the query model with filters only for GCP Project grouping
         const queryModel = {
             field: grp,
             invoice_month: invoiceMth,
             source: source,
-            filters: filtersToUse.length > 0 ? { gcp_project: filtersToUse } : undefined,
+            filters: grp === BillingColumn.GcpProject && filtersToUse.length > 0 ? { gcp_project: filtersToUse } : undefined,
         }
 
         new BillingApi()
@@ -178,7 +182,13 @@ const BillingCurrentCost = () => {
         const value = data.value
         if (typeof value == 'string') {
             setGroupBy(value as BillingColumn)
-            getCosts(value as BillingColumn, invoiceMonth)
+            // Clear project filters when switching away from GCP Project grouping
+            if (value !== BillingColumn.GcpProject) {
+                setSelectedGcpProjects([])
+                getCosts(value as BillingColumn, invoiceMonth, [])
+            } else {
+                getCosts(value as BillingColumn, invoiceMonth)
+            }
         }
     }
 
@@ -186,7 +196,12 @@ const BillingCurrentCost = () => {
         const value = data.value
         if (typeof value == 'string') {
             setInvoiceMonth(value)
-            getCosts(groupBy, value)
+            // Only pass project filters if grouping by GCP Project
+            if (groupBy === BillingColumn.GcpProject) {
+                getCosts(groupBy, value)
+            } else {
+                getCosts(groupBy, value, [])
+            }
         }
     }
 
@@ -201,7 +216,12 @@ const BillingCurrentCost = () => {
     }
 
     React.useEffect(() => {
-        getCosts(groupBy, invoiceMonth, selectedGcpProjects)
+        // Only pass project filters if grouping by GCP Project
+        if (groupBy === BillingColumn.GcpProject) {
+            getCosts(groupBy, invoiceMonth, selectedGcpProjects)
+        } else {
+            getCosts(groupBy, invoiceMonth, [])
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [groupBy, invoiceMonth])
 
@@ -440,15 +460,17 @@ const BillingCurrentCost = () => {
                         selected={invoiceMonth}
                     />
                 </Grid.Column>
-                <Grid.Column>
-                    <MultiFieldSelector
-                        label="Filter GCP Projects"
-                        fieldName={BillingColumn.GcpProject}
-                        selected={selectedGcpProjects}
-                        isApiLoading={isLoading}
-                        onClickFunction={onGcpProjectsSelect}
-                    />
-                </Grid.Column>
+                {groupBy === BillingColumn.GcpProject && (
+                    <Grid.Column>
+                        <MultiFieldSelector
+                            label="Filter GCP Projects"
+                            fieldName={BillingColumn.GcpProject}
+                            selected={selectedGcpProjects}
+                            isApiLoading={isLoading}
+                            onClickFunction={onGcpProjectsSelect}
+                        />
+                    </Grid.Column>
+                )}
 
                 <Grid.Column>
                     <Checkbox
