@@ -1,13 +1,6 @@
-import {
-    CircularProgress,
-    FormControl,
-    InputLabel,
-    MenuItem,
-    Select,
-    SelectChangeEvent,
-} from '@mui/material'
 import * as React from 'react'
-import { Message } from 'semantic-ui-react'
+import { SyntheticEvent } from 'react'
+import { Dropdown, DropdownProps, Input, Message } from 'semantic-ui-react'
 import { convertFieldName } from '../../../shared/utilities/fieldName'
 import { BillingApi, BillingColumn, BillingTimePeriods } from '../../../sm-api'
 
@@ -17,7 +10,10 @@ interface FieldSelectorProps {
     selected?: string
     includeAll?: boolean
     autoSelect?: boolean
-    onClickFunction: (event: SelectChangeEvent<string> | undefined, data: { value: string }) => void
+    onClickFunction: (
+        event: SyntheticEvent<HTMLElement, Event> | undefined,
+        data: DropdownProps
+    ) => void
 }
 
 const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
@@ -178,10 +174,6 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
         }))
     }
 
-    const handleSelectChange = (event: SelectChangeEvent<string>) => {
-        onClickFunction(event, { value: event.target.value })
-    }
-
     if (error) {
         return (
             <Message negative>
@@ -192,24 +184,26 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
     }
 
     return (
-        <FormControl fullWidth variant="outlined" disabled={loading}>
-            <InputLabel id={`${fieldName}-select-label`}>{label}</InputLabel>
-            <Select
-                labelId={`${fieldName}-select-label`}
-                id={`${fieldName}-select`}
-                value={selected ?? ''}
-                onChange={handleSelectChange}
-                label={label}
-                startAdornment={loading ? <CircularProgress size={20} /> : null}
-            >
-                {records &&
-                    recordsMap(records as BillingColumn[]).map((option) => (
-                        <MenuItem key={option.key} value={option.value}>
-                            {option.text}
-                        </MenuItem>
-                    ))}
-            </Select>
-        </FormControl>
+        <Input
+            label={label}
+            fluid
+            input={
+                <Dropdown
+                    id="group-by-dropdown"
+                    loading={loading}
+                    search
+                    selection
+                    fluid
+                    onChange={onClickFunction}
+                    placeholder={`Select ${convertFieldName(fieldName)}`}
+                    value={selected ?? ''}
+                    options={records && recordsMap(records as BillingColumn[])}
+                    style={{
+                        borderRadius: '0 4px 4px 0',
+                    }}
+                />
+            }
+        />
     )
 }
 
