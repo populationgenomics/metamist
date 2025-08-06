@@ -1,20 +1,17 @@
-import { Description, Download, InsertDriveFile } from '@mui/icons-material'
-import {
-    Alert,
-    Button,
-    FormControlLabel,
-    ListItemIcon,
-    ListItemText,
-    Menu,
-    MenuItem,
-    Switch,
-} from '@mui/material'
+import { FormControlLabel, Switch } from '@mui/material'
 import { SelectChangeEvent } from '@mui/material/Select'
 import { debounce } from 'lodash'
 import orderBy from 'lodash/orderBy'
 import * as React from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { DropdownProps, Grid, Table as SUITable } from 'semantic-ui-react'
+import {
+    Button,
+    Dropdown,
+    DropdownProps,
+    Grid,
+    Message,
+    Table as SUITable,
+} from 'semantic-ui-react'
 import {
     ColumnConfig,
     ColumnGroup,
@@ -115,7 +112,6 @@ const BillingCurrentCost = () => {
         React.useState<string[]>(initialGcpProjects)
 
     const [lastLoadedDay, setLastLoadedDay] = React.useState<string>()
-    const [exportAnchorEl, setExportAnchorEl] = React.useState<null | HTMLElement>(null)
 
     // Create a debounced version of getCosts for project selections
     const debouncedGetCosts = React.useMemo(
@@ -337,20 +333,13 @@ const BillingCurrentCost = () => {
 
     if (error)
         return (
-            <Alert
-                severity="error"
-                action={
-                    <Button
-                        color="inherit"
-                        size="small"
-                        onClick={() => getCosts(groupBy, invoiceMonth)}
-                    >
-                        Retry
-                    </Button>
-                }
-            >
+            <Message negative>
                 {error}
-            </Alert>
+                <br />
+                <Button negative onClick={() => getCosts(groupBy, invoiceMonth)}>
+                    Retry
+                </Button>
+            </Message>
         )
 
     const rowColor = (p: BillingCostBudgetRecord) => {
@@ -531,54 +520,33 @@ const BillingCurrentCost = () => {
                             }}
                         />
 
-                        <Button
-                            color="primary"
-                            variant="outlined"
-                            startIcon={<Download />}
-                            onClick={(e) => setExportAnchorEl(e.currentTarget)}
+                        <Dropdown
+                            button
+                            className="icon"
+                            floating
+                            labeled
+                            icon="download"
+                            text="Export"
                             style={{
                                 minWidth: '115px',
                                 height: '36px',
                             }}
                         >
-                            Export
-                        </Button>
-                        <Menu
-                            anchorEl={exportAnchorEl}
-                            open={Boolean(exportAnchorEl)}
-                            onClose={() => setExportAnchorEl(null)}
-                            anchorOrigin={{
-                                vertical: 'bottom',
-                                horizontal: 'left',
-                            }}
-                            transformOrigin={{
-                                vertical: 'top',
-                                horizontal: 'left',
-                            }}
-                        >
-                            <MenuItem
-                                onClick={() => {
-                                    exportToFile('csv')
-                                    setExportAnchorEl(null)
-                                }}
-                            >
-                                <ListItemIcon>
-                                    <Description fontSize="small" />
-                                </ListItemIcon>
-                                <ListItemText>Export to CSV</ListItemText>
-                            </MenuItem>
-                            <MenuItem
-                                onClick={() => {
-                                    exportToFile('tsv')
-                                    setExportAnchorEl(null)
-                                }}
-                            >
-                                <ListItemIcon>
-                                    <InsertDriveFile fontSize="small" />
-                                </ListItemIcon>
-                                <ListItemText>Export to TSV</ListItemText>
-                            </MenuItem>
-                        </Menu>
+                            <Dropdown.Menu>
+                                <Dropdown.Item
+                                    key="csv"
+                                    text="Export to CSV"
+                                    icon="file excel"
+                                    onClick={() => exportToFile('csv')}
+                                />
+                                <Dropdown.Item
+                                    key="tsv"
+                                    text="Export to TSV"
+                                    icon="file text outline"
+                                    onClick={() => exportToFile('tsv')}
+                                />
+                            </Dropdown.Menu>
+                        </Dropdown>
                     </div>
                 </Grid.Column>
             </Grid>
