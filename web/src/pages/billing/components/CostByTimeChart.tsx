@@ -47,4 +47,4 @@ const CostByTimeChart: React.FunctionComponent<ICostByTimeChartProps> = ({
     )
 }
 
-export default CostByTimeChart
+export default React.memo(CostByTimeChart)
