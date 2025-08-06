@@ -1,90 +1,8 @@
-import { KeyboardArrowDown, Search as SearchIcon, ViewColumn } from '@mui/icons-material'
-import {
-    Box,
-    Button,
-    Checkbox,
-    Divider,
-    FormControlLabel,
-    InputAdornment,
-    List,
-    ListItem,
-    ListSubheader,
-    MenuItem,
-    Paper,
-    Popover,
-    TextField,
-    Typography,
-} from '@mui/material'
-import { styled } from '@mui/material/styles'
 import React from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-
-// Styled components for better theme integration
-const StyledPopover = styled(Popover)(({ theme }) => ({
-    '& .MuiPaper-root': {
-        minWidth: 300,
-        maxHeight: 500,
-        overflow: 'hidden',
-        borderRadius: theme.shape.borderRadius,
-        boxShadow: theme.shadows[8],
-    },
-}))
-
-const StyledList = styled(List)(({ theme }) => ({
-    padding: 0,
-    maxHeight: 400,
-    overflow: 'auto',
-    '& .MuiListSubheader-root': {
-        backgroundColor: theme.palette.background.default,
-        borderBottom: `1px solid ${theme.palette.divider}`,
-        lineHeight: '36px',
-        fontSize: '0.75rem',
-        fontWeight: 600,
-        textTransform: 'uppercase',
-        letterSpacing: '0.5px',
-    },
-}))
-
-const HeaderSection = styled(Box)(({ theme }) => ({
-    padding: theme.spacing(2),
-    borderBottom: `1px solid ${theme.palette.divider}`,
-    backgroundColor: theme.palette.background.paper,
-    position: 'sticky',
-    top: 0,
-    zIndex: 1,
-}))
-
-const ToggleButtonsContainer = styled(Box)(({ theme }) => ({
-    display: 'flex',
-    gap: theme.spacing(1),
-    marginTop: theme.spacing(1),
-}))
-
-const StyledMenuItem = styled(MenuItem)(({ theme }) => ({
-    '&.column-checkbox-item': {
-        padding: theme.spacing(0.5, 2),
-        '&.selected': {
-            backgroundColor: theme.palette.action.selected,
-        },
-        '& .MuiFormControlLabel-root': {
-            margin: 0,
-            width: '100%',
-            '& .MuiFormControlLabel-label': {
-                fontSize: '0.875rem',
-                '&.visible': {
-                    fontWeight: 500,
-                },
-            },
-        },
-    },
-}))
-
-const NoResultsBox = styled(Box)(({ theme }) => ({
-    padding: theme.spacing(3),
-    textAlign: 'center',
-    color: theme.palette.text.secondary,
-    fontStyle: 'italic',
-}))
+import { useClickAway } from 'react-use'
+import { Button, Checkbox, CheckboxProps, Dropdown } from 'semantic-ui-react'
+import './ColumnVisibilityDropdown.css'
 
 export interface ColumnConfig {
     id: string
@@ -131,34 +49,41 @@ const ToggleButtons: React.FC<{
     onSelectAll: () => void
     onHideAll: () => void
     className?: string
-}> = ({ onSelectAll, onHideAll }) => (
-    <ToggleButtonsContainer>
-        <Button
-            size="small"
-            variant="contained"
-            color="primary"
-            onClick={(e: React.MouseEvent) => {
-                e.stopPropagation()
-                e.preventDefault()
-                onSelectAll()
-            }}
-            sx={{ fontSize: '0.75rem', minWidth: 'auto', px: 1 }}
-        >
-            Select All
-        </Button>
-        <Button
-            size="small"
-            variant="outlined"
-            onClick={(e: React.MouseEvent) => {
-                e.stopPropagation()
-                e.preventDefault()
-                onHideAll()
-            }}
-            sx={{ fontSize: '0.75rem', minWidth: 'auto', px: 1 }}
-        >
-            Hide All
-        </Button>
-    </ToggleButtonsContainer>
+}> = ({ onSelectAll, onHideAll, className = '' }) => (
+    <Dropdown.Item
+        onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        className={className}
+    >
+        <div className="toggle-buttons">
+            <Button
+                compact
+                size="mini"
+                color="blue"
+                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    onSelectAll()
+                }}
+            >
+                Select All
+            </Button>
+            <Button
+                compact
+                size="mini"
+                color="grey"
+                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    onHideAll()
+                }}
+            >
+                Hide All
+            </Button>
+        </div>
+    </Dropdown.Item>
 )
 
 const ColumnCheckbox: React.FC<{
@@ -173,7 +98,7 @@ const ColumnCheckbox: React.FC<{
         toggleColumn(column.id, e)
     }
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = (e: React.FormEvent<HTMLInputElement>, _data: CheckboxProps) => {
         e.stopPropagation()
         toggleColumn(column.id, e)
     }
@@ -184,29 +109,24 @@ const ColumnCheckbox: React.FC<{
     const label = labelFormatter ? labelFormatter(column) : column.label
 
     return (
-        <StyledMenuItem
+        <Dropdown.Item
             onClick={handleItemClick}
+            onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
             role="menuitemcheckbox"
             aria-checked={isVisible}
             disabled={isDisabled}
             className={`column-checkbox-item ${isVisible ? 'selected' : ''}`}
-            disableRipple
         >
-            <FormControlLabel
-                control={
-                    <Checkbox
-                        checked={isVisible}
-                        onChange={handleChange}
-                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                        disabled={isDisabled}
-                        size="small"
-                    />
-                }
-                label={
-                    <span className={`column-label ${isVisible ? 'visible' : ''}`}>{label}</span>
-                }
-            />
-        </StyledMenuItem>
+            <div className="column-checkbox-content">
+                <Checkbox
+                    checked={isVisible}
+                    onChange={handleChange}
+                    onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                    disabled={isDisabled}
+                />
+                <span className={`column-label ${isVisible ? 'visible' : ''}`}>{label}</span>
+            </div>
+        </Dropdown.Item>
     )
 }
 
@@ -225,7 +145,9 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
 }) => {
     const [isOpen, setIsOpen] = React.useState(false)
     const [searchTerm, setSearchTerm] = React.useState('')
+    const dropdownRef = React.useRef<HTMLDivElement>(null)
     const searchInputRef = React.useRef<HTMLInputElement>(null)
+    const stickyHeaderRef = React.useRef<HTMLDivElement>(null)
 
     // URL persistence hooks
     const location = useLocation()
@@ -293,6 +215,25 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
         },
         [onVisibilityChange, updateUrlWithColumns]
     )
+
+    // Handle outside clicks
+    useClickAway(dropdownRef, () => {
+        if (isOpen) {
+            setIsOpen(false)
+        }
+    })
+
+    // Handle keyboard events
+    React.useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && isOpen) {
+                setIsOpen(false)
+            }
+        }
+
+        document.addEventListener('keydown', handleKeyDown)
+        return () => document.removeEventListener('keydown', handleKeyDown)
+    }, [isOpen])
 
     // Focus search input when dropdown opens
     React.useEffect(() => {
@@ -392,6 +333,15 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
         return visibleColumns.has(columnId)
     }
 
+    // Group toggle buttons
+    const GroupToggleButtons: React.FC<{ group: ColumnGroup }> = ({ group }) => (
+        <ToggleButtons
+            onSelectAll={() => toggleGroup(group.columns, true)}
+            onHideAll={() => toggleGroup(group.columns, false)}
+            className="group-toggle-item"
+        />
+    )
+
     // Get columns by group
     const getColumnsByGroup = (groupId?: string) => {
         if (!groupId) {
@@ -411,156 +361,156 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
         ungroupedColumns.length > 0 ||
         filteredGroups.some((group) => filterColumns(getColumnsByGroup(group.id)).length > 0)
 
-    const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null)
+    // Update sticky positioning dynamically
+    React.useEffect(() => {
+        if (isOpen && stickyHeaderRef.current && dropdownRef.current) {
+            const stickyHeader = stickyHeaderRef.current
+            const menu = dropdownRef.current.querySelector('.dropdown-menu-content')
+
+            if (menu) {
+                const stickyHeaderHeight = stickyHeader.offsetHeight
+                const sectionHeaders = menu.querySelectorAll('.section-header')
+                const groupToggleButtons = menu.querySelectorAll('.group-toggle-item')
+
+                // Update section header positions
+                sectionHeaders.forEach((header) => {
+                    const headerElement = header as HTMLElement
+                    headerElement.style.top = `${stickyHeaderHeight}px`
+                })
+
+                // Update group toggle button positions
+                groupToggleButtons.forEach((button) => {
+                    const buttonElement = button as HTMLElement
+                    buttonElement.style.top = `${stickyHeaderHeight + 32}px` // +32px for section header height
+                })
+            }
+        }
+    }, [isOpen, showSearch, hasResults])
+
+    // Handle dynamic positioning based on viewport
+    React.useEffect(() => {
+        if (isOpen && dropdownRef.current) {
+            const dropdownElement = dropdownRef.current
+            const menuElement = dropdownElement.querySelector('.menu') as HTMLElement
+
+            if (menuElement) {
+                const rect = dropdownElement.getBoundingClientRect()
+                const menuRect = menuElement.getBoundingClientRect()
+                const viewportWidth = window.innerWidth
+
+                // Remove existing position classes
+                menuElement.classList.remove('position-left')
+
+                // Check if dropdown would overflow to the right
+                if (rect.left + menuRect.width > viewportWidth - 20) {
+                    menuElement.classList.add('position-left')
+                }
+            }
+        }
+    }, [isOpen])
 
     return (
-        <div className={className}>
-            <Button
-                variant="outlined"
-                startIcon={<ViewColumn />}
-                endIcon={<KeyboardArrowDown />}
-                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                    setAnchorEl(e.currentTarget)
+        <div ref={dropdownRef} className={className}>
+            <Dropdown
+                button
+                className="icon columns-dropdown"
+                floating
+                labeled
+                icon="columns"
+                text="Fields"
+                style={{ marginRight: '10px', ...buttonStyle }}
+                open={isOpen}
+                onClick={(e) => {
+                    const target = e.target as HTMLElement
+                    if (target && target.closest('.dropdown-menu-content')) {
+                        return
+                    }
                     setIsOpen(!isOpen)
                 }}
-                style={{ marginRight: '10px', ...buttonStyle }}
-                aria-haspopup="true"
-                aria-expanded={isOpen}
+                closeOnBlur={false}
+                closeOnChange={false}
+                closeOnEscape={true}
             >
-                Fields
-            </Button>
-            <StyledPopover
-                anchorEl={anchorEl}
-                open={isOpen}
-                onClose={() => {
-                    setIsOpen(false)
-                    setAnchorEl(null)
-                }}
-                anchorOrigin={{
-                    vertical: 'bottom',
-                    horizontal: 'left',
-                }}
-                transformOrigin={{
-                    vertical: 'top',
-                    horizontal: 'left',
-                }}
-                disableAutoFocus
-            >
-                <Paper>
-                    {/* Header section with search and toggle buttons */}
-                    <HeaderSection>
-                        <Typography
-                            variant="subtitle2"
-                            sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}
-                        >
-                            <ViewColumn fontSize="small" />
-                            Field Visibility
-                        </Typography>
+                <Dropdown.Menu
+                    className={`dropdown-menu-content${showSearch ? ' has-search' : ''}`}
+                >
+                    {/* Sticky header section - groups header, search, and toggle buttons */}
+                    <div ref={stickyHeaderRef} className="sticky-header-section">
+                        <Dropdown.Header
+                            icon="table"
+                            content="Field Visibility"
+                            className="dropdown-header"
+                        />
 
                         {/* Search input */}
                         {showSearch && (
-                            <TextField
-                                ref={searchInputRef}
-                                size="small"
-                                fullWidth
-                                placeholder={searchPlaceholder}
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                onClick={(e) => e.stopPropagation()}
-                                onKeyDown={(e) => e.stopPropagation()}
-                                variant="outlined"
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <SearchIcon fontSize="small" />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                                sx={{ mb: 1 }}
-                            />
+                            <div className="search-section">
+                                <input
+                                    ref={searchInputRef}
+                                    type="text"
+                                    className="search-input"
+                                    placeholder={searchPlaceholder}
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onKeyDown={(e) => e.stopPropagation()}
+                                />
+                            </div>
                         )}
 
-                        {/* Global toggle buttons */}
+                        {/* Global toggle buttons - only show if we have results */}
                         {hasResults && (
                             <ToggleButtons
                                 onSelectAll={() => toggleAllColumns(true)}
                                 onHideAll={() => toggleAllColumns(false)}
+                                className="global-toggle-item"
                             />
                         )}
-                    </HeaderSection>
+                    </div>
 
                     {/* Show no results message */}
                     {showSearch && searchTerm.trim() && !hasResults && (
-                        <NoResultsBox>
+                        <div className="no-results-message">
                             No fields found matching &ldquo;{searchTerm}&rdquo;
-                        </NoResultsBox>
+                        </div>
                     )}
 
-                    {/* Content List */}
-                    <StyledList>
-                        {/* Required columns */}
-                        {requiredColumns.length > 0 && (
-                            <>
-                                <ListSubheader>Required Columns</ListSubheader>
-                                {requiredColumns.map((column) => (
-                                    <ListItem key={column.id} dense>
-                                        <FormControlLabel
-                                            control={
-                                                <Checkbox checked={true} disabled size="small" />
-                                            }
-                                            label={
-                                                labelFormatter
-                                                    ? labelFormatter(column)
-                                                    : column.label
-                                            }
-                                            sx={{ margin: 0, width: '100%', opacity: 0.6 }}
-                                        />
-                                    </ListItem>
-                                ))}
-                                {(filteredGroups.length > 0 || ungroupedColumns.length > 0) && (
-                                    <Divider />
-                                )}
-                            </>
-                        )}
+                    {/* Required columns */}
+                    {requiredColumns.length > 0 && (
+                        <div className="required-columns-section">
+                            <Dropdown.Header
+                                content="Required Columns"
+                                className="section-header"
+                            />
+                            {requiredColumns.map((column) => (
+                                <Dropdown.Item
+                                    key={column.id}
+                                    disabled
+                                    className="required-column-item"
+                                >
+                                    <Checkbox
+                                        label={
+                                            labelFormatter ? labelFormatter(column) : column.label
+                                        }
+                                        checked={true}
+                                        readOnly
+                                        disabled
+                                    />
+                                </Dropdown.Item>
+                            ))}
+                        </div>
+                    )}
 
-                        {/* Grouped columns */}
-                        {filteredGroups.map((group, groupIndex) => {
-                            const groupColumns = filterColumns(getColumnsByGroup(group.id))
-                            if (groupColumns.length === 0) return null
+                    {/* Grouped columns */}
+                    {filteredGroups.map((group) => {
+                        const groupColumns = filterColumns(getColumnsByGroup(group.id))
+                        if (groupColumns.length === 0) return null
 
-                            return (
-                                <div key={group.id}>
-                                    <ListSubheader>{group.label}</ListSubheader>
-                                    <ListItem>
-                                        <ToggleButtons
-                                            onSelectAll={() => toggleGroup(group.columns, true)}
-                                            onHideAll={() => toggleGroup(group.columns, false)}
-                                        />
-                                    </ListItem>
-                                    {groupColumns.map((column) => (
-                                        <ColumnCheckbox
-                                            key={column.id}
-                                            column={column}
-                                            isColumnVisible={isColumnVisible}
-                                            toggleColumn={toggleColumn}
-                                            labelFormatter={labelFormatter}
-                                        />
-                                    ))}
-                                    {groupIndex < filteredGroups.length - 1 && <Divider />}
-                                </div>
-                            )
-                        })}
-
-                        {/* Ungrouped columns */}
-                        {ungroupedColumns.length > 0 && (
-                            <>
-                                {filteredGroups.length > 0 && (
-                                    <>
-                                        <Divider />
-                                        <ListSubheader>Other Columns</ListSubheader>
-                                    </>
-                                )}
-                                {ungroupedColumns.map((column) => (
+                        return (
+                            <div key={group.id} className="column-group-section">
+                                <Dropdown.Header content={group.label} className="section-header" />
+                                <GroupToggleButtons group={group} />
+                                {groupColumns.map((column) => (
                                     <ColumnCheckbox
                                         key={column.id}
                                         column={column}
@@ -569,11 +519,32 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
                                         labelFormatter={labelFormatter}
                                     />
                                 ))}
-                            </>
-                        )}
-                    </StyledList>
-                </Paper>
-            </StyledPopover>
+                            </div>
+                        )
+                    })}
+
+                    {/* Ungrouped columns */}
+                    {ungroupedColumns.length > 0 && (
+                        <div className="ungrouped-columns-section">
+                            {filteredGroups.length > 0 && (
+                                <Dropdown.Header
+                                    content="Other Columns"
+                                    className="section-header"
+                                />
+                            )}
+                            {ungroupedColumns.map((column) => (
+                                <ColumnCheckbox
+                                    key={column.id}
+                                    column={column}
+                                    isColumnVisible={isColumnVisible}
+                                    toggleColumn={toggleColumn}
+                                    labelFormatter={labelFormatter}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </Dropdown.Menu>
+            </Dropdown>
         </div>
     )
 }
