@@ -1,4 +1,3 @@
-import { FormControlLabel, Switch } from '@mui/material'
 import { SelectChangeEvent } from '@mui/material/Select'
 import { debounce } from 'lodash'
 import orderBy from 'lodash/orderBy'
@@ -6,6 +5,7 @@ import * as React from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import {
     Button,
+    Checkbox,
     Dropdown,
     DropdownProps,
     Grid,
@@ -482,15 +482,12 @@ const BillingCurrentCost = () => {
                 )}
 
                 <Grid.Column>
-                    <FormControlLabel
-                        control={
-                            <Switch
-                                checked={showAsChart}
-                                onChange={() => setShowAsChart(!showAsChart)}
-                                color="primary"
-                            />
-                        }
+                    <Checkbox
                         label="Show as Chart / Table"
+                        fitted
+                        toggle
+                        checked={showAsChart}
+                        onChange={() => setShowAsChart(!showAsChart)}
                     />
                 </Grid.Column>
                 <Grid.Column textAlign="right">
@@ -677,12 +674,12 @@ const BillingCurrentCost = () => {
                                     id={`total-row-${p.field}`}
                                 >
                                     <SUITable.Cell collapsing>
-                                        <Switch
+                                        <Checkbox
                                             // @ts-ignore
                                             checked={openRows.includes(p.field)}
+                                            slider
                                             // @ts-ignore
                                             onChange={() => handleToggle(p.field)}
-                                            size="small"
                                         />
                                     </SUITable.Cell>
                                     {HEADER_FIELDS.map((k) => {
