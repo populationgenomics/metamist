@@ -186,31 +186,7 @@ all_participants = [
                         technology='short-read',
                         platform='illumina',
                         meta={},
-                        assays=[
-                            AssayUpsertInternal(
-                                meta={
-                                    'reads': [
-                                        {
-                                            'basename': 'sample_id003.filename-R1.fastq.gz',
-                                            'checksum': None,
-                                            'class': 'File',
-                                            'location': '/path/to/sample_id003.filename-R1.fastq.gz',
-                                            'size': 111,
-                                        },
-                                        {
-                                            'basename': 'sample_id003.filename-R2.fastq.gz',
-                                            'checksum': None,
-                                            'class': 'File',
-                                            'location': '/path/to/sample_id003.filename-R2.fastq.gz',
-                                            'size': 111,
-                                        },
-                                    ],
-                                    'reads_type': 'fastq',
-                                    **default_assay_meta,
-                                },
-                                type='sequencing',
-                            )
-                        ],
+                        assays=[],
                     )
                 ],
                 type='blood',
@@ -297,3 +273,14 @@ class TestUpsert(DbIsolatedTest):
         for db_sg in db_sequencing_groups:
             self.assertIsNotNone(db_sg['sample_id'])
             # self.assertIsNotNone(db_sg['type'])
+
+        db_empty_sequencing_groups = await self.connection.connection.fetch_all(
+            'SELECT sg.id, pei.external_id \
+            FROM sequencing_group AS sg \
+            INNER JOIN sample AS s ON s.id = sg.sample_id \
+            INNER JOIN participant AS p ON p.id = s.participant_id \
+            INNER JOIN participant_external_id AS pei ON p.id = pei.participant_id \
+            WHERE pei = "Athena"'
+        )
+
+        self.assertEqual(0, len(db_empty_sequencing_groups))
