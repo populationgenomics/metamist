@@ -545,14 +545,9 @@ class BillingRunningCostQueryModel(SMBase):
     Used to query for billing running cost with filtering support
     """
 
-    # required
     field: BillingColumn
-
-    # optional
     invoice_month: str | None = None
     source: BillingSource | None = None
-
-    # optional filters, similar to BillingTotalCostQueryModel
     filters: dict[BillingColumn, str | list | dict] | None = None
 
     def __hash__(self):

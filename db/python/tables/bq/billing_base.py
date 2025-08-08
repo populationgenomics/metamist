@@ -18,6 +18,7 @@ from models.models import (
     BillingCostBudgetRecord,
     BillingCostDetailsRecord,
     BillingTotalCostQueryModel,
+    BillingRunningCostQueryModel,
 )
 
 # Label added to each Billing Big Query request,
@@ -738,7 +739,7 @@ class BillingBaseTable(BqDbBase):
 
     async def get_running_cost_with_filters(
         self,
-        query,  # BillingRunningCostQueryModel type annotation causes circular import
+        query: BillingRunningCostQueryModel,
     ) -> list[BillingCostBudgetRecord]:
         """
         Get currently running cost of selected field with filtering support
@@ -837,7 +838,7 @@ class BillingBaseTable(BqDbBase):
 
     async def _execute_running_cost_query_with_filters(
         self,
-        query,  # BillingRunningCostQueryModel type annotation causes circular import
+        query: BillingRunningCostQueryModel,
     ):
         """
         Run query to get running cost of selected field with filtering support

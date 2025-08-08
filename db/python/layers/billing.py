@@ -10,6 +10,7 @@ from models.models import (
     BillingColumn,
     BillingCostBudgetRecord,
     BillingTotalCostQueryModel,
+    BillingRunningCostQueryModel,
 )
 
 
@@ -203,7 +204,7 @@ class BillingLayer(BqBaseLayer):
 
     async def get_running_cost_with_filters(
         self,
-        query,  # BillingRunningCostQueryModel - avoiding circular import
+        query: BillingRunningCostQueryModel,
     ) -> list[BillingCostBudgetRecord]:
         """
         Get Running costs including monthly budget with filtering support
