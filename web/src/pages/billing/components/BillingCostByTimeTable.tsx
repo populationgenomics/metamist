@@ -11,6 +11,7 @@ import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
 import Table from '../../../shared/components/Table'
 import { convertFieldName } from '../../../shared/utilities/fieldName'
 import formatMoney from '../../../shared/utilities/formatMoney'
+import { BillingColumn } from '../../../sm-api'
 
 interface IBillingCostByTimeTableProps {
     heading: string
@@ -24,6 +25,8 @@ interface IBillingCostByTimeTableProps {
     expandCompute?: boolean
     setExpandCompute?: (expand: boolean) => void
     exportToFile: (format: 'csv' | 'tsv') => void
+    groupBy?: BillingColumn
+    selectedProjects?: string[]
 }
 
 const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({

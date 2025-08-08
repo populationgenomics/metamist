@@ -1,3 +1,5 @@
+import { SelectChangeEvent } from '@mui/material/Select'
+import { debounce } from 'lodash'
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, DropdownProps, Grid, Input, Message } from 'semantic-ui-react'
@@ -20,6 +22,7 @@ import {
 import BillingCostByTimeTable from './components/BillingCostByTimeTable'
 import CostByTimeChart from './components/CostByTimeChart'
 import FieldSelector from './components/FieldSelector'
+import MultiFieldSelector from './components/MultiFieldSelector'
 
 const BillingCostByTime: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
@@ -39,6 +42,9 @@ const BillingCostByTime: React.FunctionComponent = () => {
     )
     const [selectedData, setSelectedData] = React.useState<string | undefined>(inputSelectedData)
 
+    // State for multiple project selection
+    const [selectedProjects, setSelectedProjects] = React.useState<string[]>([])
+
     // Max Aggregated Data Points, rest will be aggregated into "Rest"
     const maxDataPoints = 7
 
@@ -55,6 +61,23 @@ const BillingCostByTime: React.FunctionComponent = () => {
     const [expandCompute, setExpandCompute] = React.useState<boolean>(
         searchParams.get('expand') === 'true'
     )
+
+    // Create a debounced version of getData for project selections
+    const debouncedGetData = React.useMemo(
+        () =>
+            debounce((query: BillingTotalCostQueryModel) => {
+                getData(query)
+            }, 1000), // 1000ms delay
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        []
+    )
+
+    // Cleanup debounced function on unmount
+    React.useEffect(() => {
+        return () => {
+            debouncedGetData.cancel()
+        }
+    }, [debouncedGetData])
 
     // use navigate and update url params
     const location = useLocation()
@@ -101,6 +124,10 @@ const BillingCostByTime: React.FunctionComponent = () => {
         if (typeof value == 'string') {
             setGroupBy(value as BillingColumn)
             setSelectedData(undefined)
+            // Clear project selections when switching away from GCP Project grouping
+            if (value !== BillingColumn.GcpProject) {
+                setSelectedProjects([])
+            }
             updateNav(value, undefined, start, end, expandCompute, visibleColumns)
         }
     }
@@ -112,6 +139,41 @@ const BillingCostByTime: React.FunctionComponent = () => {
             updateNav(groupBy, value, start, end, expandCompute, visibleColumns)
         }
     }
+
+    const onProjectsSelect = (
+        event: SelectChangeEvent<string[]> | undefined,
+        data: { value: string[] }
+    ) => {
+        // Update UI state immediately for responsive feedback
+        setSelectedProjects(data.value)
+        // Use debounced version for API calls to prevent excessive requests during rapid selections
+        if (Boolean(start) && Boolean(end) && groupBy === BillingColumn.GcpProject) {
+            const queryModel = buildProjectQueryModel(data.value)
+            debouncedGetData(queryModel)
+        }
+    }
+
+    const buildProjectQueryModel = React.useCallback(
+        (projects: string[]): BillingTotalCostQueryModel => {
+            const baseQuery: BillingTotalCostQueryModel = {
+                fields: [BillingColumn.Day, BillingColumn.CostCategory],
+                start_date: start,
+                end_date: end,
+                order_by: { day: false },
+                source: BillingSource.GcpBilling,
+            }
+
+            // Add project filter if projects are selected
+            if (projects.length > 0) {
+                baseQuery.filters = {
+                    gcp_project: projects,
+                }
+            }
+
+            return baseQuery
+        },
+        [start, end]
+    )
 
     const changeDate = (name: string, value: string) => {
         let start_update = start
@@ -134,99 +196,118 @@ const BillingCostByTime: React.FunctionComponent = () => {
         updateNav(groupBy, selectedData, start, end, expandCompute, columns)
     }
 
-    const getData = (query: BillingTotalCostQueryModel) => {
-        setIsLoading(true)
-        setError(undefined)
-        setMessage(undefined)
-        new BillingApi()
-            .getTotalCost(query)
-            .then((response) => {
-                setIsLoading(false)
+    const getData = React.useCallback(
+        (query: BillingTotalCostQueryModel) => {
+            setIsLoading(true)
+            setError(undefined)
+            setMessage(undefined)
+            new BillingApi()
+                .getTotalCost(query)
+                .then((response) => {
+                    setIsLoading(false)
 
-                // calc totals per cost_category
-                const recTotals: { [key: string]: number } = {}
-                response.data.forEach((item: BillingTotalCostRecord) => {
-                    const { cost_category, cost } = item
-                    if (cost_category !== undefined && cost_category !== null) {
-                        if (!recTotals[cost_category]) {
-                            recTotals[cost_category] = 0
+                    // calc totals per cost_category
+                    const recTotals: { [key: string]: number } = {}
+                    response.data.forEach((item: BillingTotalCostRecord) => {
+                        const { cost_category, cost } = item
+                        if (cost_category !== undefined && cost_category !== null) {
+                            if (!recTotals[cost_category]) {
+                                recTotals[cost_category] = 0
+                            }
+                            recTotals[cost_category] += cost
                         }
-                        recTotals[cost_category] += cost
-                    }
-                })
-                const sortedRecTotals: { [key: string]: number } = Object.fromEntries(
-                    Object.entries(recTotals).sort(([, a], [, b]) => b - a)
-                )
-                const rec_grps = Object.keys(sortedRecTotals)
-                const records: { [key: string]: { [key: string]: number } } = {}
-                response.data.forEach((item: BillingTotalCostRecord) => {
-                    const { day, cost_category, cost } = item
-                    if (
-                        day !== undefined &&
-                        day !== null &&
-                        cost_category !== undefined &&
-                        cost_category !== null
-                    ) {
-                        if (!records[day]) {
-                            // initial day structure
-                            records[day] = {}
-                            rec_grps.forEach((k) => {
-                                records[day][k] = 0
-                            })
+                    })
+                    const sortedRecTotals: { [key: string]: number } = Object.fromEntries(
+                        Object.entries(recTotals).sort(([, a], [, b]) => b - a)
+                    )
+                    const rec_grps = Object.keys(sortedRecTotals)
+                    const records: { [key: string]: { [key: string]: number } } = {}
+                    response.data.forEach((item: BillingTotalCostRecord) => {
+                        const { day, cost_category, cost } = item
+                        if (
+                            day !== undefined &&
+                            day !== null &&
+                            cost_category !== undefined &&
+                            cost_category !== null
+                        ) {
+                            if (!records[day]) {
+                                // initial day structure
+                                records[day] = {}
+                                rec_grps.forEach((k) => {
+                                    records[day][k] = 0
+                                })
+                            }
+                            records[day][cost_category] = cost
                         }
-                        records[day][cost_category] = cost
-                    }
-                })
-                const no_undefined: string[] = rec_grps.filter(
-                    (item): item is string => item !== undefined
-                )
-                setGroups(no_undefined)
+                    })
+                    const no_undefined: string[] = rec_grps.filter(
+                        (item): item is string => item !== undefined
+                    )
+                    setGroups(no_undefined)
 
-                // Include additional columns that will be added by the table component
-                const allColumns = [...no_undefined, 'Daily Total', 'Cloud Storage', 'Compute Cost']
+                    // Include additional columns that will be added by the table component
+                    const allColumns = [
+                        ...no_undefined,
+                        'Daily Total',
+                        'Cloud Storage',
+                        'Compute Cost',
+                    ]
 
-                // Check for URL parameters first
-                const urlColumns = searchParams.get('columns')
-                if (urlColumns) {
-                    const columnsFromUrl = urlColumns.split(',').filter(Boolean)
-                    const validColumns = columnsFromUrl.filter((col) => allColumns.includes(col))
-                    if (validColumns.length > 0) {
-                        setVisibleColumns(new Set(validColumns))
+                    // Check for URL parameters first
+                    const urlColumns = searchParams.get('columns')
+                    if (urlColumns) {
+                        const columnsFromUrl = urlColumns.split(',').filter(Boolean)
+                        const validColumns = columnsFromUrl.filter((col) =>
+                            allColumns.includes(col)
+                        )
+                        if (validColumns.length > 0) {
+                            setVisibleColumns(new Set(validColumns))
+                        } else {
+                            setVisibleColumns(new Set(allColumns))
+                        }
                     } else {
                         setVisibleColumns(new Set(allColumns))
                     }
-                } else {
-                    setVisibleColumns(new Set(allColumns))
-                }
-                setData(
-                    Object.keys(records).map((key) => ({
-                        date: new Date(key),
-                        values: records[key],
-                    }))
-                )
-                const aggData: IData[] = Object.entries(sortedRecTotals)
-                    .map(([label, value]) => ({ label, value }))
-                    .reduce((acc: IData[], curr: IData, index: number, arr: IData[]) => {
-                        if (index < maxDataPoints) {
-                            acc.push(curr)
-                        } else {
-                            const restValue = arr
-                                .slice(index)
-                                .reduce((sum, { value }) => sum + value, 0)
-
-                            if (acc.length === maxDataPoints) {
-                                acc.push({ label: 'Rest*', value: restValue })
+                    setData(
+                        Object.keys(records).map((key) => ({
+                            date: new Date(key),
+                            values: records[key],
+                        }))
+                    )
+                    const aggData: IData[] = Object.entries(sortedRecTotals)
+                        .map(([label, value]) => ({ label, value }))
+                        .reduce((acc: IData[], curr: IData, index: number, arr: IData[]) => {
+                            if (index < maxDataPoints) {
+                                acc.push(curr)
                             } else {
-                                acc[maxDataPoints].value += restValue
-                            }
-                        }
-                        return acc
-                    }, [])
+                                const restValue = arr
+                                    .slice(index)
+                                    .reduce((sum, { value }) => sum + value, 0)
 
-                setAggregatedData(aggData)
-            })
-            .catch((er) => setError(er.message))
-    }
+                                if (acc.length === maxDataPoints) {
+                                    acc.push({ label: 'Rest*', value: restValue })
+                                } else {
+                                    acc[maxDataPoints].value += restValue
+                                }
+                            }
+                            return acc
+                        }, [])
+
+                    setAggregatedData(aggData)
+                })
+                .catch((er) => setError(er.message))
+        },
+        [
+            searchParams,
+            setIsLoading,
+            setError,
+            setMessage,
+            setGroups,
+            setVisibleColumns,
+            setData,
+            setAggregatedData,
+        ]
+    )
 
     const messageComponent = () => {
         if (message) {
@@ -331,17 +412,18 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         expandCompute={expandCompute}
                         setExpandCompute={handleExpandChange}
                         exportToFile={exportToFile}
+                        groupBy={groupBy}
+                        selectedProjects={selectedProjects}
                     />
                 </Card>
             </>
         )
     }
 
+    // Separate useEffect for initial load and date/groupBy changes
     React.useEffect(() => {
+        // Check if we have valid date and groupBy selections
         if (
-            selectedData !== undefined &&
-            selectedData !== '' &&
-            selectedData !== null &&
             start !== undefined &&
             start !== '' &&
             start !== null &&
@@ -351,28 +433,37 @@ const BillingCostByTime: React.FunctionComponent = () => {
             groupBy !== undefined &&
             groupBy !== null
         ) {
-            // valid selection, retrieve data
-            let source = BillingSource.Aggregate
+            // For GCP Project grouping, use project selector logic
             if (groupBy === BillingColumn.GcpProject) {
-                source = BillingSource.GcpBilling
+                const queryModel = buildProjectQueryModel(selectedProjects)
+                getData(queryModel)
             }
-            if (selectedData.startsWith('All ')) {
-                getData({
-                    fields: [BillingColumn.Day, BillingColumn.CostCategory],
-                    start_date: start,
-                    end_date: end,
-                    order_by: { day: false },
-                    source: source,
-                })
+            // For other groupings, use the existing selectedData logic
+            else if (selectedData !== undefined && selectedData !== '' && selectedData !== null) {
+                const source = BillingSource.Aggregate
+                if (selectedData.startsWith('All ')) {
+                    getData({
+                        fields: [BillingColumn.Day, BillingColumn.CostCategory],
+                        start_date: start,
+                        end_date: end,
+                        order_by: { day: false },
+                        source: source,
+                    })
+                } else {
+                    getData({
+                        fields: [BillingColumn.Day, BillingColumn.CostCategory],
+                        start_date: start,
+                        end_date: end,
+                        filters: { [groupBy.replace('-', '_').toLowerCase()]: selectedData },
+                        order_by: { day: false },
+                        source: source,
+                    })
+                }
             } else {
-                getData({
-                    fields: [BillingColumn.Day, BillingColumn.CostCategory],
-                    start_date: start,
-                    end_date: end,
-                    filters: { [groupBy.replace('-', '_').toLowerCase()]: selectedData },
-                    order_by: { day: false },
-                    source: source,
-                })
+                // For non-GCP groupings, require selectedData
+                setIsLoading(false)
+                setError(undefined)
+                setMessage(`Please select ${groupBy}`)
             }
         } else {
             // invalid selection,
@@ -382,9 +473,6 @@ const BillingCostByTime: React.FunctionComponent = () => {
             if (groupBy === undefined || groupBy === null) {
                 // Group By not selected
                 setMessage('Please select Group By')
-            } else if (selectedData === undefined || selectedData === null || selectedData === '') {
-                // Top Level not selected
-                setMessage(`Please select ${groupBy}`)
             } else if (start === undefined || start === null || start === '') {
                 setMessage('Please select Start date')
             } else if (end === undefined || end === null || end === '') {
@@ -394,6 +482,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 setMessage('Please make selection')
             }
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [start, end, groupBy, selectedData])
 
     const exportToFile = (format: 'csv' | 'tsv') => {
@@ -477,14 +566,24 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     </Grid.Column>
 
                     <Grid.Column>
-                        <FieldSelector
-                            label={convertFieldName(groupBy)}
-                            fieldName={groupBy}
-                            onClickFunction={onSelect}
-                            selected={selectedData}
-                            includeAll={true}
-                            autoSelect={true}
-                        />
+                        {groupBy === BillingColumn.GcpProject ? (
+                            <MultiFieldSelector
+                                label="Filter GCP Projects"
+                                fieldName={BillingColumn.GcpProject}
+                                selected={selectedProjects}
+                                isApiLoading={isLoading}
+                                onClickFunction={onProjectsSelect}
+                            />
+                        ) : (
+                            <FieldSelector
+                                label={convertFieldName(groupBy)}
+                                fieldName={groupBy}
+                                onClickFunction={onSelect}
+                                selected={selectedData}
+                                includeAll={true}
+                                autoSelect={true}
+                            />
+                        )}
                     </Grid.Column>
                 </Grid>
 

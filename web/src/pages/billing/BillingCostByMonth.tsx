@@ -426,6 +426,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                                 minWidth: '115px',
                                 height: '36px',
                             }}
+                            buttonText="Topics"
                         />
 
                         <Dropdown
