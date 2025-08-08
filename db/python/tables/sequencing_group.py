@@ -469,17 +469,18 @@ class SequencingGroupTable(DbBase):
                 _query,
                 {**values, 'audit_log_id': await self.audit_log_id()},
             )
-            assay_id_insert_values = [
-                {
-                    'seqgroup': id_of_seq_group,
-                    'assayid': s,
-                    'audit_log_id': await self.audit_log_id(),
-                }
-                for s in assay_ids
-            ]
-            await self.connection.execute_many(
-                _seqg_linker_query, assay_id_insert_values
-            )
+            if assay_ids:
+                assay_id_insert_values = [
+                    {
+                        'seqgroup': id_of_seq_group,
+                        'assayid': s,
+                        'audit_log_id': await self.audit_log_id(),
+                    }
+                    for s in assay_ids
+                ]
+                await self.connection.execute_many(
+                    _seqg_linker_query, assay_id_insert_values
+                )
 
             return id_of_seq_group
 
