@@ -20,6 +20,7 @@ interface MultiFieldSelectorProps {
     includeAll?: boolean
     autoSelect?: boolean
     isApiLoading?: boolean
+    preloadedData?: string[] // Optional pre-fetched data to avoid API calls
     onClickFunction: (
         event: SelectChangeEvent<string[]> | undefined,
         data: { value: string[] }
@@ -33,6 +34,7 @@ const MultiFieldSelector: React.FunctionComponent<MultiFieldSelectorProps> = ({
     includeAll,
     autoSelect,
     isApiLoading = false,
+    preloadedData,
     onClickFunction,
 }) => {
     const [loading, setLoading] = React.useState<boolean>(true)
@@ -117,6 +119,14 @@ const MultiFieldSelector: React.FunctionComponent<MultiFieldSelectorProps> = ({
 
     /* eslint-disable react-hooks/exhaustive-deps -- this is missing a ton of deps, probably buggy but hard to fix */
     React.useEffect(() => {
+        // If preloaded data is available, use it instead of making API calls
+        if (preloadedData && preloadedData.length > 0) {
+            setRecords(preloadedData)
+            setLoading(false)
+            return
+        }
+
+        // Otherwise, proceed with normal API fetching
         if (fieldName === BillingColumn.Topic) getTopics()
         else if (fieldName === BillingColumn.GcpProject) getGcpProjects()
         else if (fieldName === BillingColumn.InvoiceMonth) getInvoiceMonths()
@@ -136,7 +146,7 @@ const MultiFieldSelector: React.FunctionComponent<MultiFieldSelectorProps> = ({
         } else {
             setError(`Could not load records for ${fieldName}`)
         }
-    }, [fieldName])
+    }, [fieldName, preloadedData])
     /* eslint-enable react-hooks/exhaustive-deps */
 
     const formatInvoiceMonth = (invoiceMonth: string): string => {

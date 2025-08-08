@@ -72,6 +72,14 @@ const BillingCurrentCost = () => {
             ? inputGcpProjects.split(',').filter((p) => p.trim() !== '')
             : []
 
+    // Topics are stored as comma-separated values in URL: topics=topic1,topic2,topic3
+    const inputTopics = searchParams.get('topics')
+    // Only use topics from URL if we're grouping by Topic
+    const initialTopics =
+        fixedGroupBy === BillingColumn.Topic && inputTopics
+            ? inputTopics.split(',').filter((t) => t.trim() !== '')
+            : []
+
     // use navigate and update url params
     const location = useLocation()
     const navigate = useNavigate()
@@ -79,7 +87,8 @@ const BillingCurrentCost = () => {
     const updateNav = (
         grp: BillingColumn,
         invoiceMonth: string | undefined,
-        gcpProjects?: string[]
+        gcpProjects?: string[],
+        topics?: string[]
     ) => {
         const url = generateUrl(location, {
             groupBy: grp,
@@ -88,6 +97,11 @@ const BillingCurrentCost = () => {
             gcpProjects:
                 grp === BillingColumn.GcpProject && gcpProjects && gcpProjects.length > 0
                     ? gcpProjects.join(',')
+                    : undefined,
+            // Only include topics in URL if grouping by Topic and there are selected topics
+            topics:
+                grp === BillingColumn.Topic && topics && topics.length > 0
+                    ? topics.join(',')
                     : undefined,
         })
         navigate(url)
@@ -110,22 +124,29 @@ const BillingCurrentCost = () => {
     const [invoiceMonth, setInvoiceMonth] = React.useState<string>(inputInvoiceMonth ?? thisMonth)
     const [selectedGcpProjects, setSelectedGcpProjects] =
         React.useState<string[]>(initialGcpProjects)
+    const [selectedTopics, setSelectedTopics] = React.useState<string[]>(initialTopics)
 
     const [lastLoadedDay, setLastLoadedDay] = React.useState<string>()
 
-    // Create a debounced version of getCosts for project selections
-    const debouncedGetCosts = React.useMemo(
+    // Pre-fetched data state for MultiFieldSelector components
+    const [availableGcpProjects, setAvailableGcpProjects] = React.useState<string[]>([])
+    const [availableTopics, setAvailableTopics] = React.useState<string[]>([])
+    const [_isPreFetching, setIsPreFetching] = React.useState<boolean>(true)
+
+    // Create a debounced version of getCosts for project and topic selections
+    const debouncedGetData = React.useMemo(
         () =>
             debounce(
                 (
                     grp: BillingColumn,
                     invoiceMth: string | undefined,
-                    gcpProjectFilters?: string[]
+                    gcpProjectFilters?: string[],
+                    topicFilters?: string[]
                 ) => {
-                    getCosts(grp, invoiceMth, gcpProjectFilters)
+                    getData(grp, invoiceMth, gcpProjectFilters, topicFilters)
                 },
-                500
-            ), // 500ms delay
+                1000
+            ), // 1000ms delay
         // eslint-disable-next-line react-hooks/exhaustive-deps
         []
     )
@@ -133,24 +154,58 @@ const BillingCurrentCost = () => {
     // Cleanup debounced function on unmount
     React.useEffect(() => {
         return () => {
-            debouncedGetCosts.cancel()
+            debouncedGetData.cancel()
         }
-    }, [debouncedGetCosts])
+    }, [debouncedGetData])
 
-    const getCosts = (
+    // Pre-fetch GCP projects and topics data on component mount
+    React.useEffect(() => {
+        const preFetchData = async () => {
+            setIsPreFetching(true)
+            try {
+                // Pre-fetch GCP projects and topics in parallel
+                const [gcpProjectsResponse, topicsResponse] = await Promise.all([
+                    new BillingApi().getGcpProjects(),
+                    new BillingApi().getTopics(),
+                ])
+
+                setAvailableGcpProjects(gcpProjectsResponse.data || [])
+                setAvailableTopics(topicsResponse.data || [])
+            } catch (error) {
+                console.error('Error pre-fetching data:', error)
+                // Fallback: let MultiFieldSelector handle individual fetching
+                setAvailableGcpProjects([])
+                setAvailableTopics([])
+            } finally {
+                setIsPreFetching(false)
+            }
+        }
+
+        preFetchData()
+    }, [])
+
+    const getData = (
         grp: BillingColumn,
         invoiceMth: string | undefined,
-        gcpProjectFilters?: string[]
+        gcpProjectFilters?: string[],
+        topicFilters?: string[]
     ) => {
-        // Use provided filters or fall back to current state, but only for GCP Project grouping
-        const filtersToUse =
+        // Use provided filters or fall back to current state
+        const gcpFiltersToUse =
             grp === BillingColumn.GcpProject
                 ? gcpProjectFilters !== undefined
                     ? gcpProjectFilters
                     : selectedGcpProjects
                 : []
 
-        updateNav(grp, invoiceMth, filtersToUse)
+        const topicFiltersToUse =
+            grp === BillingColumn.Topic
+                ? topicFilters !== undefined
+                    ? topicFilters
+                    : selectedTopics
+                : []
+
+        updateNav(grp, invoiceMth, gcpFiltersToUse, topicFiltersToUse)
         setIsLoading(true)
         setError(undefined)
         let source = BillingSource.Aggregate
@@ -158,14 +213,22 @@ const BillingCurrentCost = () => {
             source = BillingSource.GcpBilling
         }
 
-        // Create the query model with filters only for GCP Project grouping
+        // Create the query model with filters for both GCP Project and Topic grouping
         const queryModel = {
             field: grp,
             invoice_month: invoiceMth,
             source: source,
             filters:
-                grp === BillingColumn.GcpProject && filtersToUse.length > 0
-                    ? { gcp_project: filtersToUse }
+                (grp === BillingColumn.GcpProject && gcpFiltersToUse.length > 0) ||
+                (grp === BillingColumn.Topic && topicFiltersToUse.length > 0)
+                    ? {
+                          ...(grp === BillingColumn.GcpProject && gcpFiltersToUse.length > 0
+                              ? { gcp_project: gcpFiltersToUse }
+                              : {}),
+                          ...(grp === BillingColumn.Topic && topicFiltersToUse.length > 0
+                              ? { topic: topicFiltersToUse }
+                              : {}),
+                      }
                     : undefined,
         }
 
@@ -191,13 +254,14 @@ const BillingCurrentCost = () => {
         const value = data.value
         if (typeof value == 'string') {
             setGroupBy(value as BillingColumn)
-            // Clear project filters when switching away from GCP Project grouping
+            // Clear filters when switching groupBy
             if (value !== BillingColumn.GcpProject) {
                 setSelectedGcpProjects([])
-                getCosts(value as BillingColumn, invoiceMonth, [])
-            } else {
-                getCosts(value as BillingColumn, invoiceMonth)
             }
+            if (value !== BillingColumn.Topic) {
+                setSelectedTopics([])
+            }
+            getData(value as BillingColumn, invoiceMonth, [], [])
         }
     }
 
@@ -205,11 +269,13 @@ const BillingCurrentCost = () => {
         const value = data.value
         if (typeof value == 'string') {
             setInvoiceMonth(value)
-            // Only pass project filters if grouping by GCP Project
+            // Pass current filters based on groupBy
             if (groupBy === BillingColumn.GcpProject) {
-                getCosts(groupBy, value)
+                getData(groupBy, value, selectedGcpProjects, [])
+            } else if (groupBy === BillingColumn.Topic) {
+                getData(groupBy, value, [], selectedTopics)
             } else {
-                getCosts(groupBy, value, [])
+                getData(groupBy, value, [], [])
             }
         }
     }
@@ -221,15 +287,27 @@ const BillingCurrentCost = () => {
         // Update UI state immediately for responsive feedback
         setSelectedGcpProjects(data.value)
         // Use debounced version for API calls to prevent excessive requests during rapid selections
-        debouncedGetCosts(groupBy, invoiceMonth, data.value)
+        debouncedGetData(groupBy, invoiceMonth, data.value, [])
+    }
+
+    const onTopicsSelect = (
+        event: SelectChangeEvent<string[]> | undefined,
+        data: { value: string[] }
+    ) => {
+        // Update UI state immediately for responsive feedback
+        setSelectedTopics(data.value)
+        // Use debounced version for API calls to prevent excessive requests during rapid selections
+        debouncedGetData(groupBy, invoiceMonth, [], data.value)
     }
 
     React.useEffect(() => {
-        // Only pass project filters if grouping by GCP Project
+        // Pass current filters based on groupBy
         if (groupBy === BillingColumn.GcpProject) {
-            getCosts(groupBy, invoiceMonth, selectedGcpProjects)
+            getData(groupBy, invoiceMonth, selectedGcpProjects, [])
+        } else if (groupBy === BillingColumn.Topic) {
+            getData(groupBy, invoiceMonth, [], selectedTopics)
         } else {
-            getCosts(groupBy, invoiceMonth, [])
+            getData(groupBy, invoiceMonth, [], [])
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [groupBy, invoiceMonth])
@@ -336,7 +414,7 @@ const BillingCurrentCost = () => {
             <Message negative>
                 {error}
                 <br />
-                <Button negative onClick={() => getCosts(groupBy, invoiceMonth)}>
+                <Button negative onClick={() => getData(groupBy, invoiceMonth, [], [])}>
                     Retry
                 </Button>
             </Message>
@@ -476,7 +554,21 @@ const BillingCurrentCost = () => {
                             fieldName={BillingColumn.GcpProject}
                             selected={selectedGcpProjects}
                             isApiLoading={isLoading}
+                            preloadedData={availableGcpProjects}
                             onClickFunction={onGcpProjectsSelect}
+                        />
+                    </Grid.Column>
+                )}
+
+                {groupBy === BillingColumn.Topic && (
+                    <Grid.Column>
+                        <MultiFieldSelector
+                            label="Filter Topics"
+                            fieldName={BillingColumn.Topic}
+                            selected={selectedTopics}
+                            isApiLoading={isLoading}
+                            preloadedData={availableTopics}
+                            onClickFunction={onTopicsSelect}
                         />
                     </Grid.Column>
                 )}

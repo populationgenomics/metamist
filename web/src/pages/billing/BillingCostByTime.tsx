@@ -42,8 +42,24 @@ const BillingCostByTime: React.FunctionComponent = () => {
     )
     const [selectedData, setSelectedData] = React.useState<string | undefined>(inputSelectedData)
 
+    // Get initial projects and topics from URL parameters
+    const inputProjects = searchParams.get('projects')
+    const initialProjects = inputProjects
+        ? inputProjects.split(',').filter((p) => p.trim() !== '')
+        : []
+    const inputTopics = searchParams.get('topics')
+    const initialTopics = inputTopics ? inputTopics.split(',').filter((t) => t.trim() !== '') : []
+
     // State for multiple project selection
-    const [selectedProjects, setSelectedProjects] = React.useState<string[]>([])
+    const [selectedProjects, setSelectedProjects] = React.useState<string[]>(initialProjects)
+
+    // State for multiple topic selection
+    const [selectedTopics, setSelectedTopics] = React.useState<string[]>(initialTopics)
+
+    // Pre-fetched data state for MultiFieldSelector components
+    const [availableGcpProjects, setAvailableGcpProjects] = React.useState<string[]>([])
+    const [availableTopics, setAvailableTopics] = React.useState<string[]>([])
+    const [_isPreFetching, setIsPreFetching] = React.useState<boolean>(true)
 
     // Max Aggregated Data Points, rest will be aggregated into "Rest"
     const maxDataPoints = 7
@@ -79,6 +95,32 @@ const BillingCostByTime: React.FunctionComponent = () => {
         }
     }, [debouncedGetData])
 
+    // Pre-fetch GCP projects and topics data on component mount
+    React.useEffect(() => {
+        const preFetchData = async () => {
+            setIsPreFetching(true)
+            try {
+                // Pre-fetch GCP projects and topics in parallel
+                const [gcpProjectsResponse, topicsResponse] = await Promise.all([
+                    new BillingApi().getGcpProjects(),
+                    new BillingApi().getTopics(),
+                ])
+
+                setAvailableGcpProjects(gcpProjectsResponse.data || [])
+                setAvailableTopics(topicsResponse.data || [])
+            } catch (error) {
+                console.error('Error pre-fetching data:', error)
+                // Fallback: let MultiFieldSelector handle individual fetching
+                setAvailableGcpProjects([])
+                setAvailableTopics([])
+            } finally {
+                setIsPreFetching(false)
+            }
+        }
+
+        preFetchData()
+    }, [])
+
     // use navigate and update url params
     const location = useLocation()
     const navigate = useNavigate()
@@ -89,7 +131,9 @@ const BillingCostByTime: React.FunctionComponent = () => {
         st: string,
         ed: string,
         expand?: boolean,
-        columns?: Set<string>
+        columns?: Set<string>,
+        projects?: string[],
+        topics?: string[]
     ) => {
         const searchParams = new URLSearchParams(location.search)
 
@@ -108,6 +152,24 @@ const BillingCostByTime: React.FunctionComponent = () => {
             searchParams.set('columns', columnsArray.join(','))
         }
 
+        // Handle projects parameter
+        if (projects !== undefined) {
+            if (projects.length > 0) {
+                searchParams.set('projects', projects.join(','))
+            } else {
+                searchParams.delete('projects')
+            }
+        }
+
+        // Handle topics parameter
+        if (topics !== undefined) {
+            if (topics.length > 0) {
+                searchParams.set('topics', topics.join(','))
+            } else {
+                searchParams.delete('topics')
+            }
+        }
+
         const url = generateUrl(location, {
             groupBy: grp,
             selectedData: selData,
@@ -115,6 +177,8 @@ const BillingCostByTime: React.FunctionComponent = () => {
             end: ed,
             expand: searchParams.get('expand') || undefined,
             columns: searchParams.get('columns') || undefined,
+            projects: searchParams.get('projects') || undefined,
+            topics: searchParams.get('topics') || undefined,
         })
         navigate(url)
     }
@@ -124,11 +188,14 @@ const BillingCostByTime: React.FunctionComponent = () => {
         if (typeof value == 'string') {
             setGroupBy(value as BillingColumn)
             setSelectedData(undefined)
-            // Clear project selections when switching away from GCP Project grouping
+            // Clear filters when switching groupBy
             if (value !== BillingColumn.GcpProject) {
                 setSelectedProjects([])
             }
-            updateNav(value, undefined, start, end, expandCompute, visibleColumns)
+            if (value !== BillingColumn.Topic) {
+                setSelectedTopics([])
+            }
+            updateNav(value, undefined, start, end, expandCompute, visibleColumns, [], [])
         }
     }
 
@@ -136,7 +203,16 @@ const BillingCostByTime: React.FunctionComponent = () => {
         const value = data.value
         if (typeof value == 'string') {
             setSelectedData(value)
-            updateNav(groupBy, value, start, end, expandCompute, visibleColumns)
+            updateNav(
+                groupBy,
+                value,
+                start,
+                end,
+                expandCompute,
+                visibleColumns,
+                selectedProjects,
+                selectedTopics
+            )
         }
     }
 
@@ -146,33 +222,77 @@ const BillingCostByTime: React.FunctionComponent = () => {
     ) => {
         // Update UI state immediately for responsive feedback
         setSelectedProjects(data.value)
+        // Update URL with new project selection
+        updateNav(
+            groupBy,
+            selectedData,
+            start,
+            end,
+            expandCompute,
+            visibleColumns,
+            data.value,
+            selectedTopics
+        )
         // Use debounced version for API calls to prevent excessive requests during rapid selections
         if (Boolean(start) && Boolean(end) && groupBy === BillingColumn.GcpProject) {
-            const queryModel = buildProjectQueryModel(data.value)
+            const queryModel = buildFilteredQueryModel(data.value, [])
             debouncedGetData(queryModel)
         }
     }
 
-    const buildProjectQueryModel = React.useCallback(
-        (projects: string[]): BillingTotalCostQueryModel => {
+    const onTopicsSelect = (
+        event: SelectChangeEvent<string[]> | undefined,
+        data: { value: string[] }
+    ) => {
+        // Update UI state immediately for responsive feedback
+        setSelectedTopics(data.value)
+        // Update URL with new topic selection
+        updateNav(
+            groupBy,
+            selectedData,
+            start,
+            end,
+            expandCompute,
+            visibleColumns,
+            selectedProjects,
+            data.value
+        )
+        // Use debounced version for API calls to prevent excessive requests during rapid selections
+        if (Boolean(start) && Boolean(end) && groupBy === BillingColumn.Topic) {
+            const queryModel = buildFilteredQueryModel([], data.value)
+            debouncedGetData(queryModel)
+        }
+    }
+
+    const buildFilteredQueryModel = React.useCallback(
+        (projects: string[], topics: string[]): BillingTotalCostQueryModel => {
             const baseQuery: BillingTotalCostQueryModel = {
                 fields: [BillingColumn.Day, BillingColumn.CostCategory],
                 start_date: start,
                 end_date: end,
                 order_by: { day: false },
-                source: BillingSource.GcpBilling,
+                source:
+                    groupBy === BillingColumn.GcpProject
+                        ? BillingSource.GcpBilling
+                        : BillingSource.Aggregate,
             }
 
-            // Add project filter if projects are selected
+            // Add filters based on what's provided
+            const filters: Record<string, string[]> = {}
             if (projects.length > 0) {
-                baseQuery.filters = {
-                    gcp_project: projects,
-                }
+                filters.gcp_project = projects
+            }
+            if (topics.length > 0) {
+                filters.topic = topics
+            }
+
+            if (Object.keys(filters).length > 0) {
+                baseQuery.filters = filters
             }
 
             return baseQuery
         },
-        [start, end]
+        [start, end, groupBy]
     )
 
     const changeDate = (name: string, value: string) => {
@@ -182,18 +302,45 @@ const BillingCostByTime: React.FunctionComponent = () => {
         if (name === 'end') end_update = value
         setStart(start_update)
         setEnd(end_update)
-        updateNav(groupBy, selectedData, start_update, end_update, expandCompute, visibleColumns)
+        updateNav(
+            groupBy,
+            selectedData,
+            start_update,
+            end_update,
+            expandCompute,
+            visibleColumns,
+            selectedProjects,
+            selectedTopics
+        )
     }
 
     // Custom handlers that update URL
     const handleExpandChange = (expand: boolean) => {
         setExpandCompute(expand)
-        updateNav(groupBy, selectedData, start, end, expand, visibleColumns)
+        updateNav(
+            groupBy,
+            selectedData,
+            start,
+            end,
+            expand,
+            visibleColumns,
+            selectedProjects,
+            selectedTopics
+        )
     }
 
     const handleColumnsChange = (columns: Set<string>) => {
         setVisibleColumns(columns)
-        updateNav(groupBy, selectedData, start, end, expandCompute, columns)
+        updateNav(
+            groupBy,
+            selectedData,
+            start,
+            end,
+            expandCompute,
+            columns,
+            selectedProjects,
+            selectedTopics
+        )
     }
 
     const getData = React.useCallback(
@@ -435,7 +582,12 @@ const BillingCostByTime: React.FunctionComponent = () => {
         ) {
             // For GCP Project grouping, use project selector logic
             if (groupBy === BillingColumn.GcpProject) {
-                const queryModel = buildProjectQueryModel(selectedProjects)
+                const queryModel = buildFilteredQueryModel(selectedProjects, [])
+                getData(queryModel)
+            }
+            // For Topic grouping, use topic selector logic
+            else if (groupBy === BillingColumn.Topic) {
+                const queryModel = buildFilteredQueryModel([], selectedTopics)
                 getData(queryModel)
             }
             // For other groupings, use the existing selectedData logic
@@ -460,7 +612,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     })
                 }
             } else {
-                // For non-GCP groupings, require selectedData
+                // For non-GCP and non-Topic groupings, require selectedData
                 setIsLoading(false)
                 setError(undefined)
                 setMessage(`Please select ${groupBy}`)
@@ -573,6 +725,16 @@ const BillingCostByTime: React.FunctionComponent = () => {
                                 selected={selectedProjects}
                                 isApiLoading={isLoading}
                                 onClickFunction={onProjectsSelect}
+                                preloadedData={availableGcpProjects}
+                            />
+                        ) : groupBy === BillingColumn.Topic ? (
+                            <MultiFieldSelector
+                                label="Filter Topics"
+                                fieldName={BillingColumn.Topic}
+                                selected={selectedTopics}
+                                isApiLoading={isLoading}
+                                onClickFunction={onTopicsSelect}
+                                preloadedData={availableTopics}
                             />
                         ) : (
                             <FieldSelector
