@@ -1,5 +1,3 @@
-from test.testbase import DbIsolatedTest, run_as_sync
-
 from db.python.layers.participant import ParticipantLayer
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
@@ -8,6 +6,7 @@ from models.models import (
     SampleUpsertInternal,
     SequencingGroupUpsertInternal,
 )
+from test.testbase import DbIsolatedTest, run_as_sync
 
 default_assay_meta = {
     'sequencing_type': 'genome',
@@ -186,31 +185,7 @@ all_participants = [
                         technology='short-read',
                         platform='illumina',
                         meta={},
-                        assays=[
-                            AssayUpsertInternal(
-                                meta={
-                                    'reads': [
-                                        {
-                                            'basename': 'sample_id003.filename-R1.fastq.gz',
-                                            'checksum': None,
-                                            'class': 'File',
-                                            'location': '/path/to/sample_id003.filename-R1.fastq.gz',
-                                            'size': 111,
-                                        },
-                                        {
-                                            'basename': 'sample_id003.filename-R2.fastq.gz',
-                                            'checksum': None,
-                                            'class': 'File',
-                                            'location': '/path/to/sample_id003.filename-R2.fastq.gz',
-                                            'size': 111,
-                                        },
-                                    ],
-                                    'reads_type': 'fastq',
-                                    **default_assay_meta,
-                                },
-                                type='sequencing',
-                            )
-                        ],
+                        assays=[],
                     )
                 ],
                 type='blood',
@@ -290,10 +265,35 @@ class TestUpsert(DbIsolatedTest):
             self.assertIsNotNone(db_sg['sample_id'])
             self.assertIsNotNone(db_sg['type'])
 
-        db_sequencing = await self.connection.connection.fetch_all(
-            'SELECT * FROM assay'
+        db_assays = await self.connection.connection.fetch_all('SELECT * FROM assay')
+
+        self.assertEqual(4, len(db_assays))
+        for db_a in db_assays:
+            self.assertIsNotNone(db_a['sample_id'])
+            self.assertIsNotNone(db_a['type'])
+
+        db_participant_no_assays = await self.connection.connection.fetch_one(
+            """
+            SELECT COUNT(DISTINCT a.id) AS cnt
+            FROM sample AS s
+            INNER JOIN participant AS p ON p.id = s.participant_id
+            INNER JOIN participant_external_id AS pei ON p.id = pei.participant_id
+            LEFT JOIN assay AS a ON a.sample_id = s.id
+            WHERE pei.external_id = "Athena"
+            """
         )
-        self.assertEqual(5, len(db_sequencing))
-        for db_sg in db_sequencing_groups:
-            self.assertIsNotNone(db_sg['sample_id'])
-            # self.assertIsNotNone(db_sg['type'])
+
+        self.assertEqual(0, db_participant_no_assays['cnt'])
+
+        db_participant_has_assays = await self.connection.connection.fetch_one(
+            """
+            SELECT COUNT(DISTINCT a.id) AS cnt
+            FROM sample AS s
+            INNER JOIN participant AS p ON p.id = s.participant_id
+            INNER JOIN participant_external_id AS pei ON p.id = pei.participant_id
+            LEFT JOIN assay AS a ON a.sample_id = s.id
+            WHERE pei.external_id = "Apollo"
+            """
+        )
+
+        self.assertEqual(2, db_participant_has_assays['cnt'])
