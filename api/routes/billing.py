@@ -523,7 +523,7 @@ async def get_total_cost(
     response_model=list[BillingCostBudgetRecord],
     operation_id='getRunningCost',
 )
-@alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_running_costs(
     query: BillingRunningCostQueryModel,
     author: str = get_author,
