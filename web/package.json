@@ -11,6 +11,7 @@
         "@mui/icons-material": "^6.1.6",
         "@mui/material": "^6.1.6",
         "@mui/x-data-grid": "^7.22.2",
+        "@mui/x-date-pickers": "^8.9.0",
         "@observablehq/plot": "^0.6.16",
         "arquero": "^7.2.0",
         "axios": "^0.24.0",
