@@ -560,6 +560,16 @@ const BillingCurrentCost = () => {
                         selected={invoiceMonth}
                     />
                 </Grid.Column>
+                <Grid.Column>
+                    <Checkbox
+                        label="Show as Chart / Table"
+                        fitted
+                        toggle
+                        checked={showAsChart}
+                        onChange={() => setShowAsChart(!showAsChart)}
+                    />
+                </Grid.Column>
+
                 {groupBy === BillingColumn.GcpProject && (
                     <Grid.Column>
                         <MultiFieldSelector
@@ -586,15 +596,6 @@ const BillingCurrentCost = () => {
                     </Grid.Column>
                 )}
 
-                <Grid.Column>
-                    <Checkbox
-                        label="Show as Chart / Table"
-                        fitted
-                        toggle
-                        checked={showAsChart}
-                        onChange={() => setShowAsChart(!showAsChart)}
-                    />
-                </Grid.Column>
                 <Grid.Column textAlign="right">
                     <div
                         className="button-container"

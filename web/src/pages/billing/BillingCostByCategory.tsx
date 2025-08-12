@@ -626,6 +626,17 @@ const BillingCostByCategory: React.FunctionComponent = () => {
                     </Grid.Column>
 
                     <Grid.Column width={6}>
+                        <FieldSelector
+                            label="Cost Category"
+                            fieldName="cost_category"
+                            onClickFunction={onSelectCategory}
+                            selected={selectedCostCategory}
+                            includeAll={true}
+                            autoSelect={true}
+                        />
+                    </Grid.Column>
+
+                    <Grid.Column width={6}>
                         {groupBy === BillingColumn.GcpProject ? (
                             <MultiFieldSelector
                                 label="Filter GCP Projects"
@@ -654,17 +665,6 @@ const BillingCostByCategory: React.FunctionComponent = () => {
                                 autoSelect={true}
                             />
                         )}
-                    </Grid.Column>
-
-                    <Grid.Column width={6}>
-                        <FieldSelector
-                            label="Cost Category"
-                            fieldName="cost_category"
-                            onClickFunction={onSelectCategory}
-                            selected={selectedCostCategory}
-                            includeAll={true}
-                            autoSelect={true}
-                        />
                     </Grid.Column>
                 </Grid>
 
