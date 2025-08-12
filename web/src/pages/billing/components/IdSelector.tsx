@@ -28,7 +28,7 @@ type IdSelectorProps = {
 
 const cleanId = (id: string) => {
     return id
-        .replace(/[^\dA-z]/g, '')
+        .replace(/[^\dA-Za-z]/g, '')
         .trim()
         .toUpperCase()
 }
