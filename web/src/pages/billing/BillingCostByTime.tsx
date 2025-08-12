@@ -325,9 +325,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
         event: SelectChangeEvent<string[]> | undefined,
         data: { value: string[] }
     ) => {
-        // Update UI state immediately for responsive feedback
         setSelectedProjects(data.value)
-        // Update URL with new project selection
         updateNav(
             groupBy,
             selectedData,
@@ -338,7 +336,6 @@ const BillingCostByTime: React.FunctionComponent = () => {
             data.value,
             selectedTopics
         )
-        // No API call needed - filtering happens client-side
     }
 
     const onTopicsSelect = (
@@ -403,7 +400,6 @@ const BillingCostByTime: React.FunctionComponent = () => {
         )
     }
 
-    // Custom handlers that update URL
     const handleExpandChange = (expand: boolean) => {
         setExpandCompute(expand)
         updateNav(
