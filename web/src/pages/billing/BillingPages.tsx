@@ -69,7 +69,7 @@ const billingPages: IBillingPage[] = [
         name: 'costBySample',
         url: '/billing/costBySample',
         icon: <SampleIcon />,
-        description: 'Break down costs to the sample, sequencing group or cohort level',
+        description: 'Break down costs to the sample or sequencing group level',
     },
     {
         title: 'Seqr Prop Map',
