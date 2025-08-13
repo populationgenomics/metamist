@@ -359,6 +359,7 @@ function BillingCostBySampleTable(props: { entityType: EntityType; data: Billing
 
     const columns: GridColDef<BillingResultRow>[] = useMemo(() => {
         const firstRow = data[0]
+        if (!firstRow) return []
         const {
             cost: _cost,
             month: _month,
@@ -393,18 +394,20 @@ function BillingCostBySampleTable(props: { entityType: EntityType; data: Billing
     }, [data, entityType])
 
     return (
-        <DataGrid
-            slots={{ toolbar: CustomTableToolbar }}
-            slotProps={{
-                toolbar: {
-                    showQuickFilter: true,
-                },
-            }}
-            rows={data}
-            getRowId={(row) => Object.values(row).join('|||')}
-            columns={columns}
-            density="compact"
-        />
+        <Box minHeight={360} display={'flex'} flexDirection={'column'}>
+            <DataGrid
+                slots={{ toolbar: CustomTableToolbar }}
+                slotProps={{
+                    toolbar: {
+                        showQuickFilter: true,
+                    },
+                }}
+                rows={data}
+                getRowId={(row) => Object.values(row).join('|||')}
+                columns={columns}
+                density="compact"
+            />
+        </Box>
     )
 }
 
@@ -607,9 +610,9 @@ function BillingCostBySample() {
 
             {loading && <Loading />}
 
-            {data && (
+            {!loading && (
                 <Box mt={4}>
-                    <BillingCostBySampleTable entityType={entityType} data={data} />
+                    <BillingCostBySampleTable entityType={entityType} data={data ?? []} />
                 </Box>
             )}
         </PaddedPage>
