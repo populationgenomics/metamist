@@ -358,6 +358,10 @@ class SequencingGroupLayer(BaseLayer):
                 open_transaction=False,
             )
 
+            for s in sequencing_groups:
+                if sg.sample_id == s.sample_id:
+                    s.id = sg.id
+
         for sg in to_update:
             await self.seqgt.update_sequencing_group(
                 int(sg.id), meta=sg.meta, platform=sg.platform
