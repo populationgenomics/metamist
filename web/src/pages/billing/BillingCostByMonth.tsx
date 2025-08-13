@@ -1,3 +1,5 @@
+import { SelectChangeEvent } from '@mui/material/Select'
+import { debounce } from 'lodash'
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Dropdown, Grid, Message } from 'semantic-ui-react'
@@ -27,6 +29,7 @@ import {
 import BillingCostByMonthTable from './components/BillingCostByMonthTable'
 import './components/BillingCostByTimeTable.css'
 import FieldSelector from './components/FieldSelector'
+import MultiFieldSelector from './components/MultiFieldSelector'
 
 enum CloudSpendCategory {
     STORAGE_COST = 'Storage Cost',
@@ -37,12 +40,20 @@ enum CloudSpendCategory {
 const BillingCostByTime: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
 
+    // Pull search params for use in the component
+    const inputTopics = searchParams.get('topics')
+    const initialTopics = inputTopics ? inputTopics.split(',').filter((t) => t.trim() !== '') : []
+
     const [start, setStart] = React.useState<string>(
         searchParams.get('start') ?? getCurrentInvoiceYearStart()
     )
     const [end, setEnd] = React.useState<string>(
         searchParams.get('end') ?? getCurrentInvoiceMonth()
     )
+
+    // Topic filtering state
+    const [selectedTopics, setSelectedTopics] = React.useState<string[]>(initialTopics)
+    const [availableTopics, setAvailableTopics] = React.useState<string[]>([])
 
     // use navigate and update url params
     const location = useLocation()
@@ -59,9 +70,17 @@ const BillingCostByTime: React.FunctionComponent = () => {
     const [visibleColumns, setVisibleColumns] = React.useState<Set<string>>(new Set())
     const [urlInitialized, setUrlInitialized] = React.useState(false)
 
+    // Helper function to get topics in the order they appear in the data
+    const getOrderedTopics = React.useCallback(() => {
+        if (data && data._topicOrder) {
+            return data._topicOrder
+        }
+        return Object.keys(data)
+    }, [data])
+
     // Initialize visible columns when data changes
     React.useEffect(() => {
-        if (months.length > 0 && data && Object.keys(data).length > 0 && !urlInitialized) {
+        if (months.length > 0 && data && getOrderedTopics().length > 0 && !urlInitialized) {
             // Check if there are URL parameters to restore
             const searchParams = new URLSearchParams(location.search)
             const urlTopics = searchParams.get('topics')
@@ -69,7 +88,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
             if (urlTopics) {
                 // Parse topics from URL
                 const topicsFromUrl = new Set(urlTopics.split(',').filter(Boolean))
-                const availableTopics = Object.keys(data)
+                const availableTopics = getOrderedTopics()
                 const validTopics = Array.from(topicsFromUrl).filter((topic) =>
                     availableTopics.includes(topic)
                 )
@@ -84,12 +103,12 @@ const BillingCostByTime: React.FunctionComponent = () => {
             }
 
             // No valid URL parameters, set defaults
-            const allTopics = Object.keys(data)
+            const allTopics = getOrderedTopics()
             const allColumns = new Set(['compute_type', ...months, ...allTopics])
             setVisibleColumns(allColumns)
             setUrlInitialized(true)
         }
-    }, [months, data, urlInitialized, location.search])
+    }, [months, data, urlInitialized, location.search, getOrderedTopics])
 
     // Generate column configurations for the dropdown
     const getColumnConfigs = (): ColumnConfig[] => {
@@ -98,12 +117,10 @@ const BillingCostByTime: React.FunctionComponent = () => {
         ]
 
         // Add topic columns (these are the selectable ones)
-        if (data && Object.keys(data).length > 0) {
-            Object.keys(data)
-                .sort((a, b) => a.localeCompare(b))
-                .forEach((topic) => {
-                    configs.push({ id: topic, label: topic, group: 'topics' })
-                })
+        if (data && getOrderedTopics().length > 0) {
+            getOrderedTopics().forEach((topic: string) => {
+                configs.push({ id: topic, label: topic, group: 'topics' })
+            })
         }
 
         return configs
@@ -124,7 +141,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
             const searchParams = new URLSearchParams(location.search)
 
             if (topicColumns.length > 0) {
-                searchParams.set('topics', topicColumns.sort().join(','))
+                searchParams.set('topics', topicColumns.join(','))
             } else {
                 searchParams.delete('topics')
             }
@@ -135,14 +152,11 @@ const BillingCostByTime: React.FunctionComponent = () => {
         [setVisibleColumns, months, location.search, location.pathname, navigate]
     )
 
-    const updateNav = (st: string, ed: string) => {
-        const searchParams = new URLSearchParams(location.search)
-        const topicsParam = searchParams.get('topics')
+    const updateNav = (st: string, ed: string, topics?: string[]) => {
         const url = generateUrl(location, {
             start: st,
             end: ed,
-            // Preserve existing topics parameter if it exists
-            ...(topicsParam && { topics: topicsParam }),
+            topics: topics && topics.length > 0 ? topics.join(',') : undefined,
         })
         navigate(url)
     }
@@ -154,7 +168,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
         if (name === 'end') end_update = value
         setStart(start_update)
         setEnd(end_update)
-        updateNav(start_update, end_update)
+        updateNav(start_update, end_update, selectedTopics)
     }
 
     const convertInvoiceMonth = (invoiceMonth: string, start: boolean) => {
@@ -173,7 +187,22 @@ const BillingCostByTime: React.FunctionComponent = () => {
         return CloudSpendCategory.COMPUTE_COST
     }
 
-    const getData = (query: BillingTotalCostQueryModel) => {
+    // Pre-fetch topics data on component mount
+    React.useEffect(() => {
+        const preFetchTopics = async () => {
+            try {
+                const topicsResponse = await new BillingApi().getTopics()
+                setAvailableTopics(topicsResponse.data || [])
+            } catch (error) {
+                console.error('Error pre-fetching topics:', error)
+                setAvailableTopics([])
+            }
+        }
+
+        preFetchTopics()
+    }, [])
+
+    const getData = React.useCallback((query: BillingTotalCostQueryModel) => {
         setIsLoading(true)
         setError(undefined)
         setMessage(undefined)
@@ -192,6 +221,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 }
                 const recTotals: RecTotals = {}
                 const recMonths: string[] = []
+                const topicOrder: string[] = []
 
                 response.data.forEach((item: BillingTotalCostRecord) => {
                     const { day, cost_category, topic, cost } = item
@@ -203,6 +233,10 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     }
                     if (!recTotals[_topic]) {
                         recTotals[_topic] = {}
+                        // Track topic order as we first encounter them
+                        if (topicOrder.indexOf(_topic) === -1) {
+                            topicOrder.push(_topic)
+                        }
                     }
                     if (!recTotals[_topic][day]) {
                         recTotals[_topic][day] = {}
@@ -210,23 +244,58 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     if (!recTotals[_topic][day][ccat]) {
                         recTotals[_topic][day][ccat] = 0
                     }
-                    // Ensure recTotals[_topic] is initialized
-                    if (!recTotals[_topic]) {
-                        recTotals[_topic] = {}
-                    }
-                    // Ensure recTotals[_topic][day] is initialized
-                    if (!recTotals[_topic][day]) {
-                        recTotals[_topic][day] = {}
-                    }
                     // Ensure recTotals[_topic][day][ccat] is initialized and add cost
                     recTotals[_topic][day][ccat] = (recTotals[_topic][day][ccat] || 0) + cost
                 })
 
                 setMonths(recMonths)
-                setData(recTotals)
+                // Store both the data and the topic order as a property
+                const dataWithOrder = Object.assign(recTotals, { _topicOrder: topicOrder })
+                setData(dataWithOrder)
             })
             .catch((er) => setError(er.message))
+    }, [])
+
+    const onTopicsSelect = (
+        event: SelectChangeEvent<string[]> | undefined,
+        data: { value: string[] }
+    ) => {
+        setSelectedTopics(data.value)
+        updateNav(start, end, data.value)
     }
+
+    // Create a debounced version of getData for topic selections
+    const debouncedGetData = React.useMemo(
+        () =>
+            debounce((start: string, end: string, topics: string[]) => {
+                const queryFilters: any = {
+                    invoice_month: generateInvoiceMonths(start, end),
+                }
+
+                // Add topic filtering if topics are selected
+                if (topics.length > 0) {
+                    queryFilters.topic = topics
+                }
+
+                getData({
+                    fields: [BillingColumn.Topic, BillingColumn.CostCategory],
+                    start_date: getAdjustedDay(convertInvoiceMonth(start, true), -2),
+                    end_date: getAdjustedDay(convertInvoiceMonth(end, false), 3),
+                    order_by: { day: false, topic: false },
+                    source: BillingSource.Aggregate,
+                    time_periods: BillingTimePeriods.InvoiceMonth,
+                    filters: queryFilters,
+                })
+            }, 1000),
+        [getData]
+    )
+
+    // Cleanup debounced function on unmount
+    React.useEffect(() => {
+        return () => {
+            debouncedGetData.cancel()
+        }
+    }, [debouncedGetData])
 
     const messageComponent = () => {
         if (message) {
@@ -291,6 +360,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         data={data}
                         months={months}
                         visibleColumns={visibleColumns}
+                        orderedTopics={getOrderedTopics()}
                     />
                 </Card>
             </>
@@ -308,18 +378,8 @@ const BillingCostByTime: React.FunctionComponent = () => {
     /* eslint-disable react-hooks/exhaustive-deps */
     React.useEffect(() => {
         if (Boolean(start) && Boolean(end)) {
-            // valid selection, retrieve data
-            getData({
-                fields: [BillingColumn.Topic, BillingColumn.CostCategory],
-                start_date: getAdjustedDay(convertInvoiceMonth(start, true), -2),
-                end_date: getAdjustedDay(convertInvoiceMonth(end, false), 3),
-                order_by: { day: false },
-                source: BillingSource.Aggregate,
-                time_periods: BillingTimePeriods.InvoiceMonth,
-                filters: {
-                    invoice_month: generateInvoiceMonths(start, end),
-                },
-            })
+            // Use debounced function for topic filtering
+            debouncedGetData(start, end, selectedTopics)
         } else {
             // invalid selection,
             setIsLoading(false)
@@ -331,40 +391,38 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 setMessage('Please select End date')
             }
         }
-    }, [start, end])
+    }, [start, end, selectedTopics, debouncedGetData])
     /* eslint-enable react-hooks/exhaustive-deps */
 
     const exportToFile = (format: 'csv' | 'tsv') => {
         // All months are always visible - filter topics based on visibility
-        const visibleTopics = Object.keys(data).filter((topic) => isColumnVisible(topic))
+        const visibleTopics = getOrderedTopics().filter((topic: string) => isColumnVisible(topic))
         const headerFields = ['Topic', 'Cost Type', ...months]
 
         const matrix: string[][] = []
 
-        visibleTopics
-            .sort((a, b) => a.localeCompare(b))
-            .forEach((topic) => {
-                // Storage cost row
-                const storageRow: [string, string, ...string[]] = [
-                    topic,
-                    CloudSpendCategory.STORAGE_COST.toString(),
-                    ...months.map((m) => {
-                        const val = data[topic]?.[m]?.[CloudSpendCategory.STORAGE_COST]
-                        return val === undefined ? '' : val.toFixed(2)
-                    }),
-                ]
-                matrix.push(storageRow)
+        visibleTopics.forEach((topic: string) => {
+            // Storage cost row
+            const storageRow: [string, string, ...string[]] = [
+                topic,
+                CloudSpendCategory.STORAGE_COST.toString(),
+                ...months.map((m) => {
+                    const val = data[topic]?.[m]?.[CloudSpendCategory.STORAGE_COST]
+                    return val === undefined ? '' : val.toFixed(2)
+                }),
+            ]
+            matrix.push(storageRow)
 
-                const computeRow: [string, string, ...string[]] = [
-                    topic,
-                    CloudSpendCategory.COMPUTE_COST.toString(),
-                    ...months.map((m) => {
-                        const val = data[topic]?.[m]?.[CloudSpendCategory.COMPUTE_COST]
-                        return val === undefined ? '' : val.toFixed(2)
-                    }),
-                ]
-                matrix.push(computeRow)
-            })
+            const computeRow: [string, string, ...string[]] = [
+                topic,
+                CloudSpendCategory.COMPUTE_COST.toString(),
+                ...months.map((m) => {
+                    const val = data[topic]?.[m]?.[CloudSpendCategory.COMPUTE_COST]
+                    return val === undefined ? '' : val.toFixed(2)
+                }),
+            ]
+            matrix.push(computeRow)
+        })
 
         exportTable(
             {
@@ -414,7 +472,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                                 {
                                     id: 'topics',
                                     label: 'Topics',
-                                    columns: Object.keys(data).sort((a, b) => a.localeCompare(b)),
+                                    columns: getOrderedTopics(),
                                 },
                             ]}
                             visibleColumns={visibleColumns}
@@ -475,6 +533,17 @@ const BillingCostByTime: React.FunctionComponent = () => {
                             fieldName={BillingColumn.InvoiceMonth}
                             onClickFunction={onMonthEnd}
                             selected={end}
+                        />
+                    </Grid.Column>
+
+                    <Grid.Column className="field-selector-label">
+                        <MultiFieldSelector
+                            label="Filter Topics"
+                            fieldName={BillingColumn.Topic}
+                            selected={selectedTopics}
+                            isApiLoading={isLoading}
+                            preloadedData={availableTopics}
+                            onClickFunction={onTopicsSelect}
                         />
                     </Grid.Column>
                 </Grid>

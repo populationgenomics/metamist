@@ -1,3 +1,4 @@
+import { Pagination, ToggleButton, ToggleButtonGroup } from '@mui/material'
 import React from 'react'
 import { Checkbox, Dropdown, Header, Table as SUITable } from 'semantic-ui-react'
 import {
@@ -13,6 +14,8 @@ import { convertFieldName } from '../../../shared/utilities/fieldName'
 import formatMoney from '../../../shared/utilities/formatMoney'
 import { BillingColumn } from '../../../sm-api'
 
+type ViewMode = 'summary' | 'breakdown'
+
 interface IBillingCostByTimeTableProps {
     heading: string
     start: string
@@ -27,6 +30,11 @@ interface IBillingCostByTimeTableProps {
     exportToFile: (format: 'csv' | 'tsv') => void
     groupBy?: BillingColumn
     selectedProjects?: string[]
+    breakdownData?: { [date: string]: { [field: string]: { [category: string]: number } } }
+    openRows?: string[]
+    handleToggle?: (date: string) => void
+    onViewModeChange?: (viewMode: 'summary' | 'breakdown') => void
+    onExportRequest?: (viewMode: 'summary' | 'breakdown', format: 'csv' | 'tsv') => void
 }
 
 const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
@@ -41,9 +49,18 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     expandCompute: externalExpandCompute,
     setExpandCompute: externalSetExpandCompute,
     exportToFile,
+    groupBy,
+    breakdownData,
+    openRows: _openRows = [],
+    handleToggle: _handleToggle,
+    onViewModeChange,
+    onExportRequest,
 }) => {
     const [internalData, setInternalData] = React.useState<IStackedAreaByDateChartData[]>([])
     const [internalGroups, setInternalGroups] = React.useState<string[]>([])
+    const [viewMode, setViewMode] = React.useState<ViewMode>('summary')
+    const [currentPage, setCurrentPage] = React.useState<number>(1)
+    const [availableDates, setAvailableDates] = React.useState<string[]>([])
 
     // Use external expand state if provided, otherwise use internal state
     const [internalExpandCompute, setInternalExpandCompute] = React.useState<boolean>(false)
@@ -70,6 +87,37 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
 
         setInternalGroups(groups.concat(['Daily Total', 'Compute Cost']))
     }, [data, groups])
+
+    // Calculate total rows in breakdown view and determine if pagination is needed
+    const getTotalBreakdownRows = React.useCallback(() => {
+        if (!breakdownData) return 0
+        return Object.values(breakdownData).reduce(
+            (total, fieldData) => total + Object.keys(fieldData).length,
+            0
+        )
+    }, [breakdownData])
+
+    const shouldUsePagination = React.useMemo(() => {
+        return viewMode === 'breakdown' && getTotalBreakdownRows() > 100
+    }, [viewMode, getTotalBreakdownRows])
+
+    // Update available dates for pagination when breakdown data changes
+    React.useEffect(() => {
+        if (breakdownData && viewMode === 'breakdown') {
+            const dates = Object.keys(breakdownData).sort()
+            setAvailableDates(dates)
+            if (currentPage > dates.length) {
+                setCurrentPage(1)
+            }
+        }
+    }, [breakdownData, viewMode, currentPage])
+
+    // Reset pagination when switching to breakdown view
+    React.useEffect(() => {
+        if (viewMode === 'breakdown') {
+            setCurrentPage(1)
+        }
+    }, [viewMode])
 
     // Generate column configurations for the dropdown
     const getColumnConfigs = React.useCallback((): ColumnConfig[] => {
@@ -261,15 +309,117 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                 }, 0) as number // explicitly cast the result to a number
         )
 
-    const dataToBody = (data: IStackedAreaByDateChartData[]) => (
-        <>
-            {dataSort(
-                data,
-                sort.column ? [sort.column] : [],
-                sort.direction === 'ascending' ? ['asc'] : ['desc']
-            ).map((p) => (
-                <React.Fragment key={p.date.toISOString()}>
-                    <SUITable.Row>
+    const dataToBody = (_data: IStackedAreaByDateChartData[]) => {
+        if (viewMode === 'breakdown') {
+            if (!breakdownData) {
+                return <></>
+            }
+
+            if (shouldUsePagination) {
+                // Paginated breakdown view: Show projects/topics for the current page date only
+                if (availableDates.length === 0) {
+                    return <></>
+                }
+
+                const currentDateStr = availableDates[currentPage - 1]
+                if (!currentDateStr || !breakdownData[currentDateStr]) {
+                    return <></>
+                }
+
+                const currentDate = new Date(currentDateStr)
+                const fieldData = breakdownData[currentDateStr]
+
+                const breakdownRows: Array<{
+                    date: Date
+                    projectOrTopic: string
+                    values: { [key: string]: number }
+                }> = []
+
+                Object.entries(fieldData).forEach(([projectOrTopic, categories]) => {
+                    breakdownRows.push({
+                        date: currentDate,
+                        projectOrTopic,
+                        values: categories,
+                    })
+                })
+
+                breakdownRows.sort((a, b) => a.projectOrTopic.localeCompare(b.projectOrTopic))
+
+                return (
+                    <>
+                        {breakdownRows.map((row, index) => (
+                            <SUITable.Row key={`${row.date.toISOString()}-${row.projectOrTopic}`}>
+                                <SUITable.Cell collapsing>
+                                    <b>{row.date.toLocaleDateString()}</b>
+                                </SUITable.Cell>
+                                <SUITable.Cell collapsing>
+                                    <b>{row.projectOrTopic}</b>
+                                </SUITable.Cell>
+                                {headerFields().map((k) => (
+                                    <SUITable.Cell key={`${index}-${k.category}`}>
+                                        {formatMoney(row.values[k.category] || 0)}
+                                    </SUITable.Cell>
+                                ))}
+                            </SUITable.Row>
+                        ))}
+                    </>
+                )
+            } else {
+                // Non-paginated breakdown view: Show all projects/topics for all dates
+                const breakdownRows: Array<{
+                    date: Date
+                    projectOrTopic: string
+                    values: { [key: string]: number }
+                }> = []
+
+                Object.entries(breakdownData).forEach(([dateStr, fieldData]) => {
+                    const date = new Date(dateStr)
+                    Object.entries(fieldData).forEach(([projectOrTopic, categories]) => {
+                        breakdownRows.push({
+                            date,
+                            projectOrTopic,
+                            values: categories,
+                        })
+                    })
+                })
+
+                // Sort breakdown rows by date then by project/topic
+                breakdownRows.sort((a, b) => {
+                    const dateCompare = a.date.getTime() - b.date.getTime()
+                    if (dateCompare !== 0) return dateCompare
+                    return a.projectOrTopic.localeCompare(b.projectOrTopic)
+                })
+
+                return (
+                    <>
+                        {breakdownRows.map((row, index) => (
+                            <SUITable.Row key={`${row.date.toISOString()}-${row.projectOrTopic}`}>
+                                <SUITable.Cell collapsing>
+                                    <b>{row.date.toLocaleDateString()}</b>
+                                </SUITable.Cell>
+                                <SUITable.Cell collapsing>
+                                    <b>{row.projectOrTopic}</b>
+                                </SUITable.Cell>
+                                {headerFields().map((k) => (
+                                    <SUITable.Cell key={`${index}-${k.category}`}>
+                                        {formatMoney(row.values[k.category] || 0)}
+                                    </SUITable.Cell>
+                                ))}
+                            </SUITable.Row>
+                        ))}
+                    </>
+                )
+            }
+        }
+
+        return (
+            <>
+                {dataSort(
+                    internalData,
+                    sort.column ? [sort.column] : [],
+                    sort.direction === 'ascending' ? ['asc'] : ['desc']
+                ).map((p) => (
+                    <SUITable.Row key={p.date.toISOString()}>
                         <SUITable.Cell collapsing key={`Date - ${p.date.toISOString()}`}>
                             <b>{p.date.toLocaleDateString()}</b>
                         </SUITable.Cell>
@@ -279,10 +429,10 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                             </SUITable.Cell>
                         ))}
                     </SUITable.Row>
-                </React.Fragment>
-            ))}
-        </>
-    )
+                ))}
+            </>
+        )
+    }
 
     return (
         <>
@@ -304,9 +454,30 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                         display: 'flex',
                         gap: '10px',
                         flex: '0 0 auto',
-                        minWidth: '240px',
+                        minWidth: '340px',
                     }}
                 >
+                    <ToggleButtonGroup
+                        value={viewMode}
+                        exclusive
+                        onChange={(event, newMode) => {
+                            if (newMode !== null) {
+                                setViewMode(newMode)
+                                onViewModeChange?.(newMode)
+                            }
+                        }}
+                        aria-label="view mode"
+                        size="small"
+                        color="primary"
+                        style={{ height: '36px' }}
+                    >
+                        <ToggleButton value="summary" aria-label="summary view">
+                            Summary
+                        </ToggleButton>
+                        <ToggleButton value="breakdown" aria-label="breakdown view">
+                            Breakdown
+                        </ToggleButton>
+                    </ToggleButtonGroup>
                     <ColumnVisibilityDropdown
                         columns={getColumnConfigs()}
                         groups={getColumnGroups()}
@@ -337,13 +508,25 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                                 key="csv"
                                 text="Export to CSV"
                                 icon="file excel"
-                                onClick={() => exportToFile('csv')}
+                                onClick={() => {
+                                    if (onExportRequest) {
+                                        onExportRequest(viewMode, 'csv')
+                                    } else {
+                                        exportToFile('csv')
+                                    }
+                                }}
                             />
                             <Dropdown.Item
                                 key="tsv"
                                 text="Export to TSV"
                                 icon="file text outline"
-                                onClick={() => exportToFile('tsv')}
+                                onClick={() => {
+                                    if (onExportRequest) {
+                                        onExportRequest(viewMode, 'tsv')
+                                    } else {
+                                        exportToFile('tsv')
+                                    }
+                                }}
                             />
                         </Dropdown.Menu>
                     </Dropdown>
@@ -353,7 +536,15 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                 <SUITable.Header>
                     <SUITable.Row>
                         <SUITable.HeaderCell
-                            colSpan={isColumnVisible('Daily Total') ? 2 : 1}
+                            colSpan={
+                                viewMode === 'breakdown'
+                                    ? isColumnVisible('Daily Total')
+                                        ? 3
+                                        : 2
+                                    : isColumnVisible('Daily Total')
+                                      ? 2
+                                      : 1
+                            }
                             textAlign="center"
                         >
                             <Checkbox
@@ -399,6 +590,15 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                         >
                             Date
                         </SUITable.HeaderCell>
+                        {viewMode === 'breakdown' && (
+                            <SUITable.HeaderCell
+                                style={{
+                                    borderBottom: 'none',
+                                }}
+                            >
+                                {groupBy === BillingColumn.GcpProject ? 'Project' : 'Topic'}
+                            </SUITable.HeaderCell>
+                        )}
                         {headerFields().map((k) => (
                             <SUITable.HeaderCell
                                 key={k.category}
@@ -417,25 +617,101 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                 </SUITable.Header>
                 <SUITable.Body>
                     {dataToBody(internalData)}
-                    <SUITable.Row>
-                        <SUITable.Cell collapsing>
-                            <b>All Time Total</b>
-                        </SUITable.Cell>
-                        {headerFields().map((k) => (
-                            <SUITable.Cell key={`Total ${k.category}`}>
+                    {viewMode === 'summary' && (
+                        <SUITable.Row>
+                            <SUITable.Cell collapsing>
+                                <b>All Time Total</b>
+                            </SUITable.Cell>
+                            {headerFields().map((k) => (
+                                <SUITable.Cell key={`Total ${k.category}`}>
+                                    <b>
+                                        {formatMoney(
+                                            internalData.reduce(
+                                                (acc, cur) => acc + (cur.values[k.category] || 0),
+                                                0
+                                            )
+                                        )}
+                                    </b>
+                                </SUITable.Cell>
+                            ))}
+                        </SUITable.Row>
+                    )}
+                    {viewMode === 'breakdown' && breakdownData && (
+                        <SUITable.Row>
+                            <SUITable.Cell collapsing>
+                                <b>{shouldUsePagination ? 'Date Total' : 'All Time Total'}</b>
+                            </SUITable.Cell>
+                            <SUITable.Cell collapsing>
                                 <b>
-                                    {formatMoney(
-                                        internalData.reduce(
-                                            (acc, cur) => acc + cur.values[k.category],
-                                            0
-                                        )
-                                    )}
+                                    All{' '}
+                                    {groupBy === BillingColumn.GcpProject ? 'Projects' : 'Topics'}
                                 </b>
                             </SUITable.Cell>
-                        ))}
-                    </SUITable.Row>
+                            {headerFields().map((k) => {
+                                const total = shouldUsePagination
+                                    ? // Paginated view: show total for current date only
+                                      (() => {
+                                          const currentDateStr = availableDates[currentPage - 1]
+                                          return currentDateStr && breakdownData[currentDateStr]
+                                              ? Object.values(breakdownData[currentDateStr]).reduce(
+                                                    (fieldSum, categories) => {
+                                                        return (
+                                                            fieldSum + (categories[k.category] || 0)
+                                                        )
+                                                    },
+                                                    0
+                                                )
+                                              : 0
+                                      })()
+                                    : // Non-paginated view: show total for all dates
+                                      Object.values(breakdownData).reduce((dateSum, fieldData) => {
+                                          return (
+                                              dateSum +
+                                              Object.values(fieldData).reduce(
+                                                  (fieldSum, categories) => {
+                                                      return (
+                                                          fieldSum + (categories[k.category] || 0)
+                                                      )
+                                                  },
+                                                  0
+                                              )
+                                          )
+                                      }, 0)
+                                return (
+                                    <SUITable.Cell key={`Total ${k.category}`}>
+                                        <b>{formatMoney(total)}</b>
+                                    </SUITable.Cell>
+                                )
+                            })}
+                        </SUITable.Row>
+                    )}
                 </SUITable.Body>
             </Table>
+            {shouldUsePagination && availableDates.length > 1 && (
+                <div
+                    style={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        marginTop: '20px',
+                        gap: '10px',
+                    }}
+                >
+                    <Pagination
+                        count={availableDates.length}
+                        page={currentPage}
+                        onChange={(event, page) => setCurrentPage(page)}
+                        color="primary"
+                        showFirstButton
+                        showLastButton
+                        size="medium"
+                    />
+                    <span style={{ fontSize: '14px', color: '#666' }}>
+                        Page {currentPage} of {availableDates.length} dates (showing paginated view
+                        for {getTotalBreakdownRows()} total rows)
+                    </span>
+                </div>
+            )}
         </>
     )
 }
