@@ -394,7 +394,12 @@ function BillingCostBySampleTable(props: { entityType: EntityType; data: Billing
     }, [data, entityType])
 
     return (
-        <Box minHeight={360} display={'flex'} flexDirection={'column'}>
+        <Box
+            minHeight={360}
+            maxHeight={'calc(100vh - 100px)'}
+            display={'flex'}
+            flexDirection={'column'}
+        >
             <DataGrid
                 slots={{ toolbar: CustomTableToolbar }}
                 slotProps={{
