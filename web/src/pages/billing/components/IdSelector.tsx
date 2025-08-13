@@ -120,7 +120,15 @@ export default function IdSelector(props: IdSelectorProps) {
                 </Box>
             </Box>
             {invalidIds.length > 0 && (
-                <Alert severity="error">ID list contains {invalidIds.length} invalid ids</Alert>
+                <Alert severity="error" sx={{ marginTop: 2 }}>
+                    ID list contains {invalidIds.length} invalid ids
+                </Alert>
+            )}
+            {idList.length > MAX_IDS_TO_SHOW && (
+                <Alert severity="info" sx={{ marginTop: 2 }}>
+                    Only the last {MAX_IDS_TO_SHOW} IDs are shown above. All {idList.length} entered
+                    IDs are included in the results below.
+                </Alert>
             )}
         </Box>
     )
