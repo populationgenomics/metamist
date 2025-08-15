@@ -273,11 +273,7 @@ class SampleLayer(BaseLayer):
                         seqg.sample_id = sample.id
 
                     if process_sequencing_groups:
-                        sample.sequencing_groups = (
-                            await sglayer.upsert_sequencing_groups(
-                                sample.sequencing_groups
-                            )
-                        )
+                        await sglayer.upsert_sequencing_groups(sample.sequencing_groups)
 
                 if sample.non_sequencing_assays:
                     alayer = AssayLayer(self.connection)

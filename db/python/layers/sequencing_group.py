@@ -357,11 +357,6 @@ class SequencingGroupLayer(BaseLayer):
                 assay_ids=assay_ids,
                 open_transaction=False,
             )
-            # Now save this new id to sequencing_groups; we want these values returned
-            # sample_id maps sgs from to_insert with those in sequencing_groups
-            for sg_original in sequencing_groups:
-                if sg.sample_id == sg_original.sample_id:
-                    sg_original.id = sg.id
 
         for sg in to_update:
             await self.seqgt.update_sequencing_group(
