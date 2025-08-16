@@ -38,8 +38,24 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
         // set the dimensions and margins of the graph
         const margin = { top: 80, right: 20, bottom: 50, left: 250 }
         const width = 650 - margin.left - margin.right
-        const outsideHeight = 2850
-        const height = outsideHeight - margin.top - margin.bottom
+        // Calculate dynamic height based on number of data items
+        // For full datasets (many items), use original fixed height
+        // For smaller filtered datasets, use responsive sizing
+        const originalHeight = 2850 - margin.top - margin.bottom
+        const minItemsForFixedHeight = 40 // Threshold for using fixed vs dynamic height
+
+        let height: number
+        if (data.length >= minItemsForFixedHeight) {
+            // Use original fixed height for full datasets
+            height = originalHeight
+        } else {
+            // Use responsive height for smaller filtered datasets
+            const barHeight = 50
+            const minHeight = 400
+            height = Math.max(minHeight, data.length * barHeight)
+        }
+
+        const outsideHeight = height + margin.top + margin.bottom
 
         if (!containerDivRef.current) return
 

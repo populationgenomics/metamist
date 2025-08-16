@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines, too-many-nested-blocks, too-many-branches
 import re
 from abc import ABCMeta, abstractmethod
 from collections import Counter, defaultdict, namedtuple
@@ -18,6 +19,7 @@ from models.models import (
     BillingCostBudgetRecord,
     BillingCostDetailsRecord,
     BillingTotalCostQueryModel,
+    BillingRunningCostQueryModel,
 )
 
 # Label added to each Billing Big Query request,
@@ -363,6 +365,7 @@ class BillingBaseTable(BqDbBase):
         total_monthly_category: dict,
         total_daily_category: dict,
         results: list[BillingCostBudgetRecord],
+        filters: dict | None = None,
     ) -> list[BillingCostBudgetRecord]:
         """
         Add total row: compute + storage to the results
@@ -379,10 +382,20 @@ class BillingBaseTable(BqDbBase):
                 )
             )
 
+        # Generate appropriate title based on whether filters are applied
+        if filters and 'gcp_project' in filters:
+            gcp_projects = filters['gcp_project']
+            if isinstance(gcp_projects, list) and len(gcp_projects) > 0:
+                field_title = f'Total ({len(gcp_projects)} projects)'
+            else:
+                field_title = f'{BillingColumn.generate_all_title(field)}'
+        else:
+            field_title = f'{BillingColumn.generate_all_title(field)}'
+
         # add total row: compute + storage
         results.append(
             BillingCostBudgetRecord(
-                field=f'{BillingColumn.generate_all_title(field)}',
+                field=field_title,
                 total_monthly=(
                     total_monthly[COMPUTE]['ALL'] + total_monthly[STORAGE]['ALL']
                 ),
@@ -624,7 +637,24 @@ class BillingBaseTable(BqDbBase):
         query_job_result = self._execute_query(
             _query, query_parameters, results_as_list=False
         )
-        return self._convert_output(query_job_result)
+        raw_results = self._convert_output(query_job_result)
+
+        # Add total row if we have results and are grouping by a field
+        # But exclude when we have both Day and CostCategory in fields (time series analysis)
+        should_add_total = (
+            raw_results
+            and query.group_by
+            and len(query.fields) > 1
+            and not (
+                BillingColumn.DAY in query.fields
+                and BillingColumn.COST_CATEGORY in query.fields
+            )
+        )
+
+        if should_add_total:
+            raw_results = self._append_total_cost_row(raw_results, query)
+
+        return raw_results
 
     async def get_running_cost(
         self,
@@ -724,3 +754,343 @@ class BillingBaseTable(BqDbBase):
         )
 
         return results
+
+    async def get_running_cost_with_filters(
+        self,
+        query: BillingRunningCostQueryModel,
+    ) -> list[BillingCostBudgetRecord]:
+        """
+        Get currently running cost of selected field with filtering support
+        """
+
+        # accept only Topic, Dataset or Project at this stage
+        if query.field not in (
+            BillingColumn.TOPIC,
+            BillingColumn.GCP_PROJECT,
+            BillingColumn.DATASET,
+            BillingColumn.STAGE,
+            BillingColumn.COMPUTE_CATEGORY,
+            BillingColumn.WDL_TASK_NAME,
+            BillingColumn.CROMWELL_SUB_WORKFLOW_NAME,
+            BillingColumn.NAMESPACE,
+        ):
+            raise ValueError(
+                'Invalid field only topic, dataset, gcp-project, compute_category, '
+                'wdl_task_name, cromwell_sub_workflow_name & namespace are allowed'
+            )
+
+        (
+            is_current_month,
+            last_loaded_day,
+            query_job_result,
+        ) = await self._execute_running_cost_query_with_filters(query)
+        if not query_job_result:
+            # return empty list
+            return []
+
+        # prepare data
+        results: list[BillingCostBudgetRecord] = []
+
+        # reformat last_loaded_day if present
+        last_loaded_day = reformat_datetime(
+            last_loaded_day, '%Y-%m-%d %H:%M:%S+00:00', '%b %d'
+        )
+
+        total_monthly: dict[str, Counter[str]] = defaultdict(Counter)
+        total_daily: dict[str, Counter[str]] = defaultdict(Counter)
+        field_details: dict[str, list[Any]] = defaultdict(list)
+        total_monthly_category: Counter[str] = Counter()
+        total_daily_category: Counter[str] = Counter()
+
+        for row in query_job_result:
+            if row.field not in field_details:
+                field_details[row.field] = []
+
+            cost_group = abbrev_cost_category(row.cost_category)
+
+            field_details[row.field].append(
+                {
+                    'cost_group': cost_group,
+                    'cost_category': row.cost_category,
+                    'daily_cost': row.daily_cost if is_current_month else None,
+                    'monthly_cost': row.monthly_cost,
+                }
+            )
+
+            total_monthly_category[row.cost_category] += row.monthly_cost
+            if row.daily_cost:
+                total_daily_category[row.cost_category] += row.daily_cost
+
+            # cost groups totals
+            total_monthly[cost_group]['ALL'] += row.monthly_cost
+            total_monthly[cost_group][row.field] += row.monthly_cost
+            if row.daily_cost and is_current_month:
+                total_daily[cost_group]['ALL'] += row.daily_cost
+                total_daily[cost_group][row.field] += row.daily_cost
+
+        # add total row: compute + storage
+        results = await self._append_total_running_cost(
+            query.field,
+            is_current_month,
+            last_loaded_day,
+            total_monthly,
+            total_daily,
+            total_monthly_category,
+            total_daily_category,
+            results,
+            query.filters,
+        )
+
+        # add rest of the records: compute + storage
+        results = await self._append_running_cost_records(
+            query.field,
+            is_current_month,
+            last_loaded_day,
+            total_monthly,
+            total_daily,
+            field_details,
+            results,
+        )
+
+        return results
+
+    async def _execute_running_cost_query_with_filters(
+        self,
+        query: BillingRunningCostQueryModel,
+    ):
+        """
+        Run query to get running cost of selected field with filtering support
+        """
+
+        # check if invoice month is valid first
+        if not query.invoice_month or not re.match(r'^\d{6}$', query.invoice_month):
+            raise ValueError('Invalid invoice month')
+
+        invoice_month_date = datetime.strptime(query.invoice_month, '%Y%m')
+        if query.invoice_month != invoice_month_date.strftime('%Y%m'):
+            raise ValueError('Invalid invoice month')
+
+        # get start day and current day for given invoice month
+        # This is to optimise the query, BQ view is partitioned by day
+        # and not by invoice month
+        start_day_date, last_day_date = get_invoice_month_range(invoice_month_date)
+        start_day = start_day_date.strftime('%Y-%m-%d')
+        last_day = last_day_date.strftime('%Y-%m-%d')
+
+        # start_day and last_day are in to optimise the query
+        query_params = [
+            bigquery.ScalarQueryParameter('start_day', 'STRING', start_day),
+            bigquery.ScalarQueryParameter('last_day', 'STRING', last_day),
+        ]
+
+        current_day = datetime.now().strftime('%Y-%m-%d')
+        is_current_month = last_day >= current_day
+        last_loaded_day = None
+
+        if is_current_month:
+            # Only current month can have last 24 hours cost
+            # Last 24H in UTC time
+            # Find the last fully loaded day in the view
+            last_loaded_day = await self._last_loaded_day()
+            (
+                query_params,
+                daily_cost_field,
+                daily_cost_join,
+            ) = self._prepare_daily_cost_subquery(
+                query.field, query_params, last_loaded_day
+            )
+        else:
+            # Do not calculate last 24H cost
+            daily_cost_field = ', NULL as daily_cost'
+            daily_cost_join = ''
+
+        # prepare filter for query
+        query_filter = query.to_filter()
+        where_str, sql_parameters = query_filter.to_sql()
+
+        # extract only BQ Query parameter, keys are not used in BQ SQL
+        query_parameters: list[
+            bigquery.ScalarQueryParameter | bigquery.ArrayQueryParameter
+        ] = []
+        query_parameters.extend(sql_parameters.values())
+        query_parameters.extend(query_params)
+
+        # Add additional filters to where clause
+        additional_filters = [self._filter_to_optimise_query()]
+        if where_str:
+            additional_filters.append(where_str)
+
+        where_clause = ' AND '.join(additional_filters)
+
+        _query = f"""
+        SELECT
+            CASE WHEN month.field IS NULL THEN 'N/A' ELSE month.field END as field,
+            month.cost_category,
+            month.cost as monthly_cost
+            {daily_cost_field}
+        FROM
+        (
+            SELECT
+            {query.field.value} as field,
+            cost_category,
+            SUM(cost) as cost
+            FROM
+            `{self.get_table_name()}`
+            WHERE {where_clause}
+            AND invoice_month = @invoice_month
+            GROUP BY
+            field,
+            cost_category
+            HAVING cost > 0.1
+        ) month
+        {daily_cost_join}
+        ORDER BY field ASC, daily_cost DESC, monthly_cost DESC;
+        """
+
+        query_parameters.append(
+            bigquery.ScalarQueryParameter(
+                'invoice_month', 'STRING', query.invoice_month
+            )
+        )
+
+        return (
+            is_current_month,
+            last_loaded_day,
+            self._execute_query(_query, query_parameters),
+        )
+
+    @staticmethod
+    def _append_total_cost_row(
+        results: list[dict], query: BillingTotalCostQueryModel
+    ) -> list[dict]:
+        """
+        Add total row summarizing all costs to the results
+        """
+        if not results:
+            return results
+
+        # Determine the primary grouping field (exclude cost and day from consideration)
+        grouping_fields = [
+            f for f in query.fields if f not in (BillingColumn.COST, BillingColumn.DAY)
+        ]
+        primary_field = grouping_fields[0] if grouping_fields else None
+
+        if not primary_field:
+            # If no grouping field, don't add total row
+            return results
+
+        # Generate appropriate title for the total row
+        field_title = f'{BillingColumn.generate_all_title(primary_field)}'
+
+        # Check if cost_category is in the query fields
+        has_cost_category = BillingColumn.COST_CATEGORY in query.fields
+
+        # Get all unique days (months) in the results
+        unique_days = set(row.get('day') for row in results if row.get('day'))
+
+        if has_cost_category:
+            # Create separate total rows for each cost category and each day
+            cost_categories = set(
+                row.get('cost_category') for row in results if row.get('cost_category')
+            )
+            total_rows = []
+
+            for day in unique_days:
+                for cost_category in cost_categories:
+                    # Calculate total cost for this cost category and day
+                    category_cost = sum(
+                        row.get('cost', 0)
+                        for row in results
+                        if row.get('cost_category') == cost_category
+                        and row.get('day') == day
+                    )
+
+                    # Only create total row if there's actual cost for this day/category
+                    if category_cost > 0:
+                        # Create total row for this cost category and day
+                        total_row = {}
+
+                        # Initialize all possible fields
+                        for field in query.fields:
+                            if field == BillingColumn.COST:
+                                total_row['cost'] = category_cost
+                            elif field == BillingColumn.COST_CATEGORY:
+                                total_row['cost_category'] = cost_category
+                            elif field == BillingColumn.DAY:
+                                total_row['day'] = day
+                            elif field == primary_field:
+                                total_row[field.value] = field_title
+                            else:
+                                total_row[field.value] = None
+
+                        # Ensure cost and day are always present (they're added by the query even if not in fields)
+                        total_row['cost'] = category_cost
+                        total_row['day'] = day
+
+                        # Copy other fields from a matching row if they exist
+                        matching_row = next(
+                            (r for r in results if r.get('day') == day), None
+                        )
+                        if matching_row:
+                            for time_field in ['invoice_month']:
+                                if time_field in matching_row:
+                                    total_row[time_field] = matching_row[time_field]
+
+                            # Copy currency if it exists
+                            if 'currency' in matching_row:
+                                total_row['currency'] = matching_row['currency']
+
+                        total_rows.append(total_row)
+
+            # Insert total rows at the beginning, ordered by day and cost_category
+            total_rows.sort(
+                key=lambda x: (x.get('day', ''), x.get('cost_category', ''))
+            )
+            return total_rows + results
+
+        # Create single total row for each day without cost category breakdown
+        total_rows = []
+
+        for day in unique_days:
+            # Calculate total cost for this day
+            day_cost = sum(
+                row.get('cost', 0) for row in results if row.get('day') == day
+            )
+
+            # Only create total row if there's actual cost for this day
+            if day_cost > 0:
+                # Create total row dictionary with same structure as other rows
+                total_row = {}
+
+                # Initialize all possible fields
+                for field in query.fields:
+                    if field == BillingColumn.COST:
+                        total_row['cost'] = day_cost
+                    elif field == BillingColumn.DAY:
+                        total_row['day'] = day
+                    elif field == primary_field:
+                        total_row[field.value] = field_title
+                    else:
+                        # For other fields, use None or aggregate appropriately
+                        total_row[field.value] = None
+
+                # Ensure cost and day are always present (they're added by the query even if not in fields)
+                total_row['cost'] = day_cost
+                total_row['day'] = day
+
+                # Copy other fields from a matching row if they exist
+                matching_row = next((r for r in results if r.get('day') == day), None)
+                if matching_row:
+                    for time_field in ['invoice_month']:
+                        if time_field in matching_row:
+                            total_row[time_field] = matching_row[time_field]
+
+                    # Copy currency if it exists
+                    if 'currency' in matching_row:
+                        total_row['currency'] = matching_row['currency']
+
+                total_rows.append(total_row)
+
+        # Insert total rows at the beginning, ordered by day
+        total_rows.sort(key=lambda x: x.get('day', ''))
+        return total_rows + results
