@@ -30,6 +30,7 @@ from models.models.web import (
     ProjectParticipantGridField,
     ProjectParticipantGridResponse,
     ProjectSummary,
+    ProjectQcWebReport,
 )
 
 
@@ -144,6 +145,28 @@ async def export_project_participants(
         # content-disposition doesn't work here :(
         headers={},
     )
+
+
+@router.get(
+    '/{project}/webReports/{sequencing_type}',
+    operation_id='getProjectQcWebReports',
+    response_model=list[ProjectQcWebReport],
+)
+async def get_project_qc_web_reports(
+    sequencing_types: list[str] | None = None,
+    stages: list[str] | None = None,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
+) -> list[ProjectQcWebReport]:
+    """Get web reports for the project and sequencing type"""
+    if not connection.project_id:
+        raise ValueError('No project was detected through the authentication')
+
+    wlayer = WebLayer(connection)
+    reports = await wlayer.get_project_qc_web_reports(
+        sequencing_types=sequencing_types, stages=stages
+    )
+
+    return [r.to_external() for r in reports]
 
 
 def get_field_from_obj(obj, field: ProjectParticipantGridField) -> str | None:
