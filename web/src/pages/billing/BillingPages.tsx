@@ -5,6 +5,7 @@ import HomeIcon from '@mui/icons-material/Home'
 import QueryStatsIcon from '@mui/icons-material/QueryStats'
 import SellIcon from '@mui/icons-material/Sell'
 import SsidChartIcon from '@mui/icons-material/SsidChart'
+import SampleIcon from '../../shared/components/icons/SampleIcon'
 
 interface IBillingPage {
     title: string
@@ -62,6 +63,13 @@ const billingPages: IBillingPage[] = [
         icon: <CategoryIcon />,
         description:
             'Extremely granular cost breakdowns buy sku. Can filter by prject, topic and cost categories as well.',
+    },
+    {
+        title: 'Cost By Sample',
+        name: 'costBySample',
+        url: '/billing/costBySample',
+        icon: <SampleIcon />,
+        description: 'Break down costs to the sample or sequencing group level',
     },
     {
         title: 'Seqr Prop Map',

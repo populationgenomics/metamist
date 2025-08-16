@@ -1,4 +1,6 @@
 import { createTheme, ThemeProvider as MuiThemeProvider } from '@mui/material/styles'
+import { LocalizationProvider } from '@mui/x-date-pickers'
+import { AdapterLuxon } from '@mui/x-date-pickers/AdapterLuxon'
 import * as React from 'react'
 import { useMediaQuery } from 'react-responsive'
 
@@ -53,9 +55,11 @@ const ThemeProvider: React.FunctionComponent<{ children?: React.ReactNode }> = (
     return (
         <div>
             <MuiThemeProvider theme={muiTheme}>
-                <ThemeContext.Provider value={{ theme, toggleTheme }}>
-                    {children}
-                </ThemeContext.Provider>
+                <LocalizationProvider dateAdapter={AdapterLuxon}>
+                    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+                        {children}
+                    </ThemeContext.Provider>
+                </LocalizationProvider>
             </MuiThemeProvider>
         </div>
     )
