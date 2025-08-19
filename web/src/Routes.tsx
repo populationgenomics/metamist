@@ -9,6 +9,7 @@ import {
     BillingCostByAnalysis,
     BillingCostByCategory,
     BillingCostByMonth,
+    BillingCostBySample,
     BillingCostByTime,
     BillingHome,
     BillingInvoiceMonthCost,
@@ -105,6 +106,14 @@ const Routes: React.FunctionComponent = () => (
             element={
                 <ErrorBoundary>
                     <BillingCostByCategory />
+                </ErrorBoundary>
+            }
+        />
+        <Route
+            path="/billing/costBySample"
+            element={
+                <ErrorBoundary>
+                    <BillingCostBySample />
                 </ErrorBoundary>
             }
         />
