@@ -175,8 +175,8 @@ async def update_sample(
     """Update sample with id"""
     st = SampleLayer(connection)
     sample.id = id_
-    await st.upsert_sample(sample.to_internal())
-    return sample
+    upserted = await st.upsert_sample(sample.to_internal())
+    return upserted.to_external()
 
 
 @router.post('/samples-create-date', operation_id='getSamplesCreateDate')

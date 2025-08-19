@@ -89,7 +89,9 @@ class TestSequencingGroup(DbIsolatedTest):
             id=sample.sequencing_groups[0].id,
             meta={'another-meta': 'field'},
         )
-        await self.sglayer.upsert_sequencing_groups([upsert_sg])
+        # Check that id is being returned when seqg created
+        sg_return = await self.sglayer.upsert_sequencing_groups([upsert_sg])
+        self.assertEqual(sg_return[0].id, upsert_sg.id)
 
         sg = await self.sglayer.get_sequencing_group_by_id(
             sample.sequencing_groups[0].id
