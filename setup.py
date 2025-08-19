@@ -37,7 +37,7 @@ setup(
         'requests',
         # for get id-token
         'cpg-utils >= 5.0.5',
-        'gql[aiohttp,requests]',
+        'gql[aiohttp,requests]~=3.5',
         'tabulate >= 0.9.0',
     ],
     entry_points={
