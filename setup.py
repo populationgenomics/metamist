@@ -19,7 +19,7 @@ with open('README.md', encoding='utf-8') as f:
 setup(
     name=PKG,
     # This tag is automatically updated by bump2version
-    version='7.10.2',
+    version='7.10.3',
     description='Python API for interacting with the Sample API system',
     long_description=readme,
     long_description_content_type='text/markdown',
@@ -37,7 +37,7 @@ setup(
         'requests',
         # for get id-token
         'cpg-utils >= 5.0.5',
-        'gql[aiohttp,requests]',
+        'gql[aiohttp,requests]~=3.5',
         'tabulate >= 0.9.0',
     ],
     entry_points={
