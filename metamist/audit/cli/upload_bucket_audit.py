@@ -6,7 +6,7 @@ from typing import Optional
 import click
 from cpg_utils.config import config_retrieve
 
-from ..models import AuditConfig, FileType
+from ..models import AuditConfig
 from ..adapters import GraphQLClient, StorageClient
 from ..repositories import MetamistRepository, GCSRepository
 from ..services import AuditAnalyzer, ReportGenerator
@@ -47,7 +47,7 @@ class AuditOrchestrator:
             config: Audit configuration
         """
         self._log_initialization(config)
-        
+
         # 1. Fetch sequencing groups from Metamist
         self.logger.info('Getting sequencing groups'.center(50, '~'))
         sgs = await self.metamist_repo.get_sequencing_groups(
@@ -58,7 +58,7 @@ class AuditOrchestrator:
         )
         self.logger.info(f'Found {len(sgs)} sequencing groups')
         self._log_sg_summary(sgs)
-        
+
         # 2. Fetch analyses for sequencing groups
         self.logger.info('Getting analyses'.center(50, '~'))
         sg_ids = [sg.id for sg in sgs]
@@ -68,19 +68,21 @@ class AuditOrchestrator:
             list(config.analysis_types)
         )
         self.logger.info(f'Found {len(analyses)} analyses')
+        self.logger.info('')
         
         # 3. Get bucket name and list files
         self.logger.info('Scanning upload bucket'.center(50, '~'))
         bucket_name = self.gcs_repo.get_bucket_name(config.dataset, 'upload')
-        self.logger.info(f'Bucket: gs://{bucket_name}')
-        
+        self.logger.info(f'Target: gs://{bucket_name}')
+
         bucket_files = self.gcs_repo.list_files_in_bucket(
             bucket_name,
             list(config.file_types),
             config.excluded_prefixes
         )
         self.logger.info(f'Found {len(bucket_files)} files in bucket')
-        
+        self.logger.info('')
+
         # 4. Validate CRAM files exist
         if analyses:
             self.logger.info('Validating analysis existence'.center(50, '~'))
@@ -94,7 +96,8 @@ class AuditOrchestrator:
                 ('.cram',)
             )
             self.logger.info(f'Validated {len(existing_crams)} CRAM files')
-        
+            self.logger.info('')
+
         # 5. Run analysis
         self.logger.info('Analyzing audit data'.center(50, '~'))
         result = self.analyzer.analyze_sequencing_groups(
@@ -103,6 +106,8 @@ class AuditOrchestrator:
             analyses,
             list(config.excluded_sequencing_groups)
         )
+        self.logger.info('Analysis complete!')
+        self.logger.info('')
         
         # 6. Log summary
         self._log_summary(result)
@@ -189,63 +194,30 @@ async def validate_enum_values(
     Returns:
         Validated configuration
     """
-    # Validate sequencing types
-    if 'all' in config.sequencing_types:
-        valid_types = await graphql_client.get_enum_values('sequencing_type')
-        config = AuditConfig(
-            dataset=config.dataset,
-            sequencing_types=tuple(valid_types),
-            sequencing_technologies=config.sequencing_technologies,
-            sequencing_platforms=config.sequencing_platforms,
-            analysis_types=config.analysis_types,
-            file_types=config.file_types,
-            excluded_prefixes=config.excluded_prefixes,
-            excluded_sequencing_groups=config.excluded_sequencing_groups
-        )
-    
-    # Validate sequencing technologies
-    if 'all' in config.sequencing_technologies:
-        valid_techs = await graphql_client.get_enum_values('sequencing_technology')
-        config = AuditConfig(
-            dataset=config.dataset,
-            sequencing_types=config.sequencing_types,
-            sequencing_technologies=tuple(valid_techs),
-            sequencing_platforms=config.sequencing_platforms,
-            analysis_types=config.analysis_types,
-            file_types=config.file_types,
-            excluded_prefixes=config.excluded_prefixes,
-            excluded_sequencing_groups=config.excluded_sequencing_groups
-        )
-    
-    # Validate sequencing platforms
-    if 'all' in config.sequencing_platforms:
-        valid_platforms = await graphql_client.get_enum_values('sequencing_platform')
-        config = AuditConfig(
-            dataset=config.dataset,
-            sequencing_types=config.sequencing_types,
-            sequencing_technologies=config.sequencing_technologies,
-            sequencing_platforms=tuple(valid_platforms),
-            analysis_types=config.analysis_types,
-            file_types=config.file_types,
-            excluded_prefixes=config.excluded_prefixes,
-            excluded_sequencing_groups=config.excluded_sequencing_groups
-        )
-    
-    # Validate analysis types
-    if 'all' in config.analysis_types:
-        valid_analysis_types = await graphql_client.get_enum_values('analysis_type')
-        config = AuditConfig(
-            dataset=config.dataset,
-            sequencing_types=config.sequencing_types,
-            sequencing_technologies=config.sequencing_technologies,
-            sequencing_platforms=config.sequencing_platforms,
-            analysis_types=tuple(valid_analysis_types),
-            file_types=config.file_types,
-            excluded_prefixes=config.excluded_prefixes,
-            excluded_sequencing_groups=config.excluded_sequencing_groups
-        )
-    
-    return config
+    async def validate_enum_value(enum_type: str, config_values: tuple[str]) -> str:
+        valid_values = await graphql_client.get_enum_values(enum_type)
+        if 'all' in config_values:
+            return valid_values
+        if any(value.lower() not in valid_values for value in config_values):
+            raise ValueError(f"Invalid {enum_type} values: {', '.join(config_values)}. "
+                             f"Valid values are: {', '.join(valid_values)}.")
+        return tuple(config_values)
+
+    sequencing_types = await validate_enum_value('sequencing_type', config.sequencing_types)
+    sequencing_techs = await validate_enum_value('sequencing_technology', config.sequencing_technologies)
+    sequencing_platforms = await validate_enum_value('sequencing_platform', config.sequencing_platforms)
+    analysis_types = await validate_enum_value('analysis_type', config.analysis_types)
+
+    return AuditConfig(
+        dataset=config.dataset,
+        sequencing_types=sequencing_types,
+        sequencing_technologies=sequencing_techs,
+        sequencing_platforms=sequencing_platforms,
+        analysis_types=analysis_types,
+        file_types=config.file_types,
+        excluded_prefixes=config.excluded_prefixes,
+        excluded_sequencing_groups=config.excluded_sequencing_groups
+    )
 
 
 async def audit_upload_bucket_async(config: AuditConfig):

@@ -74,6 +74,7 @@ class Analysis:
     id: int
     type: str
     output_file: Optional[FileMetadata] = None
+    original_file: Optional[FileMetadata] = None
     sequencing_group_id: Optional[str] = None
     timestamp_completed: Optional[str] = None
     

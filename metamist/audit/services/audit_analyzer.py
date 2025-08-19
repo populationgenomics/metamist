@@ -64,6 +64,12 @@ class AuditAnalyzer:
             bucket_files
         )
         
+        # Find original analysis files
+        self.file_matcher.find_original_analysis_files(
+            analyses,
+            bucket_files,
+        )
+        
         # Find uningested files
         analysis_metadata = [a.output_file for a in analyses if a.output_file]
         uningested_files = self.file_matcher.find_uningested_files(
@@ -76,7 +82,9 @@ class AuditAnalyzer:
         # Generate report entries
         files_to_delete = self._generate_delete_entries(
             sequencing_groups,
+            bucket_files,
             moved_files,
+            analyses,
             excluded_sg_ids
         )
         
@@ -136,41 +144,45 @@ class AuditAnalyzer:
     def _generate_delete_entries(
         self,
         sequencing_groups: List[SequencingGroup],
+        bucket_files: List[FileMetadata],
         moved_files: Dict[str, MovedFile],
+        analyses: List[Analysis],
         excluded_sg_ids: List[str]
     ) -> List[AuditReportEntry]:
         """Generate report entries for files to delete."""
         entries = []
         
-        # Get already deleted files (in Metamist but not in bucket)
-        metamist_paths = set()
         bucket_paths = set()
-        
-        for sg in sequencing_groups:
-            for read_file in sg.get_all_read_files():
-                metamist_paths.add(str(read_file.filepath))
-        
+        for path in bucket_files:
+            bucket_paths.add(str(path.filepath))
         for path in moved_files.values():
             bucket_paths.add(str(path.new_path))
-        
-        # Files from completed SGs can be deleted
+
         for sg in sequencing_groups:
+            # Assay files from completed SGs can be deleted
             if sg.id in excluded_sg_ids or not sg.is_complete:
                 continue
-            
             for assay in sg.assays:
                 for read_file in assay.read_files:
-                    # Skip if file was moved
-                    if str(read_file.filepath) in moved_files:
+                    if str(read_file.filepath) not in bucket_paths:
                         continue
-                    
                     entry = self._create_report_entry(
                         sg=sg,
                         assay_id=assay.id,
                         file_metadata=read_file.metadata
                     )
                     entries.append(entry)
-        
+            
+            # Original files from ingested analyses can be deleted
+            for analysis in analyses:
+                if not analysis.original_file or analysis.sequencing_group_id != sg.id:
+                    continue
+                entry = self._create_report_entry(
+                    sg=sg,
+                    file_metadata=analysis.original_file
+                )
+                entries.append(entry)
+
         return entries
     
     def _generate_ingest_entries(

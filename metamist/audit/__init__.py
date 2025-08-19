@@ -16,7 +16,7 @@ Architecture:
 
 Usage:
     from metamist.audit import audit_upload_bucket, AuditConfig
-    
+
     config = AuditConfig(
         dataset='my-dataset',
         sequencing_types=('genome',),
@@ -25,7 +25,7 @@ Usage:
         analysis_types=('CRAM',),
         file_types=(FileType.FASTQ, FileType.BAM),
     )
-    
+
     audit_upload_bucket(config)
 """
 
@@ -73,7 +73,7 @@ __all__ = [
     'AuditConfig',
     # Enums
     'FileType',
-    'SequencingType', 
+    'SequencingType',
     'AnalysisType',
     # Core entities
     'SequencingGroup',

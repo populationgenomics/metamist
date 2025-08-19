@@ -2,9 +2,8 @@
 
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict
-from dataclasses import dataclass
 
-from ..models import FileMetadata, ReadFile, MovedFile, FilePath
+from ..models import Analysis, FileMetadata, ReadFile, MovedFile
 
 
 class FileMatcher(ABC):
@@ -157,7 +156,21 @@ class FileMatchingService:
                 )
         
         return moved_files
-    
+
+    def find_original_analysis_files(
+        self,
+        analyses: List[Analysis],
+        bucket_files: list[FileMetadata],
+    ):
+        """
+        Update the original files for the given analyses based on checksums.
+        """
+        for analysis in analyses:
+            for bucket_file in bucket_files:
+                if analysis.output_file.checksum == bucket_file.checksum:
+                    analysis.original_file = bucket_file
+
+
     def find_duplicate_files(
         self,
         files: List[FileMetadata]

@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path as PathLib
 from typing import Optional
 
 from cpg_utils import Path
@@ -99,10 +98,8 @@ class ExternalIds:
     
     def get_primary(self) -> Optional[str]:
         """Get the primary external ID if only one exists."""
-        if len(self.ids) == 1:
-            return next(iter(self.ids.values()))
-        return None
-    
+        return self.ids.get('')
+
     def __getitem__(self, key: str) -> Optional[str]:
         return self.ids.get(key)
     

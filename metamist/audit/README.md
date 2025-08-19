@@ -136,24 +136,24 @@ def test_checksum_matcher():
     matcher = ChecksumMatcher()
     file1 = FileMetadata(filepath=FilePath(...), checksum='abc123')
     file2 = FileMetadata(filepath=FilePath(...), checksum='abc123')
-    
+
     result = matcher.match(file1, [file2])
     assert result == file2
 
 # Test audit analyzer with mock data
 def test_audit_analyzer():
     analyzer = AuditAnalyzer()
-    
+
     # Create test data
     sgs = [create_test_sg()]
     bucket_files = [create_test_file()]
     analyses = [create_test_analysis()]
-    
+
     # Run analysis
     result = analyzer.analyze_sequencing_groups(
         sgs, bucket_files, analyses
     )
-    
+
     assert len(result.files_to_delete) == expected_count
 ```
 
