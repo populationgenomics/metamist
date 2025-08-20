@@ -6,10 +6,22 @@ Audit system for managing cloud storage buckets and the integrity of genomic dat
 
 This audit module provides tools for:
 
-- Identifying files that can be safely deleted (e.g., original reads where CRAMs exist)
+- Identifying files that can be safely deleted
 - Finding files that need ingestion into Metamist
 - Detecting sequencing groups requiring processing
 - Tracking file movements and duplications within buckets
+
+### Implementation Details
+
+Deleting files is a critical aspect of the audit process. The system identifies files that can be safely deleted, such as original reads where CRAMs exist. This helps in managing storage costs and maintaining an organized file structure.
+
+Other conditions which could be met to identify files for deletion:
+
+- If the file has been copied to the main bucket and recorded as an Analysis record
+- If the file is associated with a sequencing group that has been completed, e.g. additional VCF or BAM files provided on top of the original fastqs
+- If the file is a duplicate of a file recorded in Metamist or found elsewhere in the bucket
+
+In general, files are considered for deletion if they are no longer needed for analysis or if they have been superseded by newer versions. Any file which cannot be definitively considered as safe to delete should not be deleted without further review. Some manual review of the results may be necessary to ensure that no important data is lost.
 
 ## Architecture
 
