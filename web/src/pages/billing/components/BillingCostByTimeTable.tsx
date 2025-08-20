@@ -79,8 +79,6 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     onExportRequest,
     currentViewMode: externalCurrentViewMode,
 }) => {
-    const renderStartTime = performance.now()
-    console.log(`[${new Date().toISOString()}] TABLE RENDER START`)
     const [internalData, setInternalData] = React.useState<IStackedAreaByDateChartData[]>([])
     const [internalGroups, setInternalGroups] = React.useState<string[]>([])
     const [viewMode, setViewMode] = React.useState<ViewMode>(externalCurrentViewMode || 'summary')
@@ -97,19 +95,9 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
 
     // Sync internal viewMode with external currentViewMode
     React.useEffect(() => {
-        const startTime = performance.now()
-        console.log(
-            `[${new Date().toISOString()}] VIEW MODE SYNC START - external: ${externalCurrentViewMode}, internal: ${viewMode}`
-        )
-
         if (externalCurrentViewMode && externalCurrentViewMode !== viewMode) {
             setViewMode(externalCurrentViewMode)
         }
-
-        const endTime = performance.now()
-        console.log(
-            `[${new Date().toISOString()}] VIEW MODE SYNC END: ${(endTime - startTime).toFixed(2)}ms`
-        )
     }, [externalCurrentViewMode, viewMode])
 
     // No longer need expand toggling state since updates are immediate
@@ -127,10 +115,6 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
 
     // Memoize column configurations for performance
     const columnConfigs = React.useMemo((): ColumnConfig[] => {
-        const startTime = performance.now()
-        console.log(
-            `[${new Date().toISOString()}] COLUMN CONFIGS START - expand: ${expandCompute}, groups: ${groups.length}`
-        )
         const configs: ColumnConfig[] = [
             { id: 'Daily Total', label: 'Daily Total', group: 'summary' },
             { id: 'Cloud Storage', label: 'Cloud Storage', group: 'storage' },
@@ -149,18 +133,11 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
             configs.push({ id: 'Compute Cost', label: 'Compute Cost', group: 'compute' })
         }
 
-        const endTime = performance.now()
-        console.log(
-            `[${new Date().toISOString()}] COLUMN CONFIGS END: ${(endTime - startTime).toFixed(2)}ms`
-        )
-
         return configs
     }, [expandCompute, groups])
 
     // Memoize column groups for performance
     const columnGroups = React.useMemo((): ColumnGroup[] => {
-        const startTime = performance.now()
-        console.log(`[${new Date().toISOString()}] COLUMN GROUPS START`)
         const groups: ColumnGroup[] = [
             { id: 'summary', label: 'Summary', columns: ['Daily Total'] },
             { id: 'storage', label: 'Storage Cost', columns: ['Cloud Storage'] },
@@ -178,11 +155,6 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
             // Add compute cost to its own group instead of summary
             groups.push({ id: 'compute', label: 'Compute Cost', columns: ['Compute Cost'] })
         }
-
-        const endTime = performance.now()
-        console.log(
-            `[${new Date().toISOString()}] COLUMN GROUPS END: ${(endTime - startTime).toFixed(2)}ms`
-        )
 
         return groups
     }, [expandCompute, columnConfigs])
@@ -215,17 +187,8 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         [expandCompute]
     )
 
-    console.log(
-        `[${new Date().toISOString()}] ZERO FUNCTION CALLS - Using CSS display for ${internalGroups.length} columns`
-    )
-
     // Properly ordered header fields to match table header structure
     const headerFields = React.useMemo(() => {
-        const startTime = performance.now()
-        console.log(
-            `[${new Date().toISOString()}] HEADER FIELDS START - expand: ${expandCompute}, groups: ${internalGroups.length}`
-        )
-
         // Order columns correctly: Daily Total, Cloud Storage, then compute columns
         const orderedColumns = []
 
@@ -254,21 +217,12 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
             title: group,
         }))
 
-        const endTime = performance.now()
-        console.log(
-            `[${new Date().toISOString()}] HEADER FIELDS END: ${(endTime - startTime).toFixed(2)}ms`
-        )
-
         return result
     }, [expandCompute, internalGroups])
 
     // Memoize breakdown rows processing for performance
     const allBreakdownRows = React.useMemo(() => {
-        const startTime = performance.now()
-        console.log(`[${new Date().toISOString()}] BREAKDOWN ROWS START - mode: ${viewMode}`)
-
         if (!breakdownData || viewMode !== 'breakdown') {
-            console.log(`[${new Date().toISOString()}] BREAKDOWN ROWS SKIPPED`)
             return []
         }
 
@@ -296,23 +250,12 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
             return a.projectOrTopic.localeCompare(b.projectOrTopic)
         })
 
-        const endTime = performance.now()
-        console.log(
-            `[${new Date().toISOString()}] BREAKDOWN ROWS END: ${(endTime - startTime).toFixed(2)}ms - rows: ${rows.length}`
-        )
-
         return rows
     }, [breakdownData, viewMode])
 
     // Memoize sorted summary data for performance - don't recalculate on expand toggle
     const sortedSummaryData = React.useMemo(() => {
-        const startTime = performance.now()
-        console.log(
-            `[${new Date().toISOString()}] SORTED SUMMARY START - mode: ${viewMode}, data: ${internalData.length}`
-        )
-
         if (viewMode !== 'summary') {
-            console.log(`[${new Date().toISOString()}] SORTED SUMMARY SKIPPED`)
             return []
         }
 
@@ -333,11 +276,6 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
             }, 0) as number
         })
 
-        const endTime = performance.now()
-        console.log(
-            `[${new Date().toISOString()}] SORTED SUMMARY END: ${(endTime - startTime).toFixed(2)}ms`
-        )
-
         return result
     }, [viewMode, internalData, sort.column, sort.direction])
 
@@ -347,11 +285,6 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         index: number
         headerFields: Array<{ category: string; title: string }>
     }>(({ row, index }) => {
-        const rowRenderStart = performance.now()
-        if (index === 0) {
-            console.log(`[${new Date().toISOString()}] FIRST BREAKDOWN ROW RENDER START`)
-        }
-
         const result = (
             <SUITable.Row>
                 <SUITable.Cell collapsing>
@@ -371,13 +304,6 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
             </SUITable.Row>
         )
 
-        if (index === 0) {
-            const rowRenderEnd = performance.now()
-            console.log(
-                `[${new Date().toISOString()}] FIRST BREAKDOWN ROW RENDER END: ${(rowRenderEnd - rowRenderStart).toFixed(2)}ms`
-            )
-        }
-
         return result
     })
     BreakdownRow.displayName = 'BreakdownRow'
@@ -396,20 +322,12 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         const visibleRows = allBreakdownRows.slice(startIndex, endIndex)
         const totalHeight = allBreakdownRows.length * ROW_HEIGHT
 
-        console.log(
-            `[${new Date().toISOString()}] VIRTUALIZED BREAKDOWN - Rendering ${visibleRows.length} rows (${startIndex}-${endIndex}) of ${allBreakdownRows.length} total`
-        )
-
         return { visibleRows, startIndex, endIndex, totalHeight }
     }, [viewMode, allBreakdownRows, scrollTop])
 
     // Split data rendering into separate memoized components for better performance
     const breakdownTableBody = React.useMemo(() => {
-        const startTime = performance.now()
-        console.log(`[${new Date().toISOString()}] BREAKDOWN TABLE BODY START - Virtual rendering`)
-
         if (viewMode !== 'breakdown' || virtualizedBreakdownRows.visibleRows.length === 0) {
-            console.log(`[${new Date().toISOString()}] BREAKDOWN TABLE BODY SKIPPED`)
             return null
         }
 
@@ -449,11 +367,6 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
             </>
         )
 
-        const endTime = performance.now()
-        console.log(
-            `[${new Date().toISOString()}] BREAKDOWN TABLE BODY END: ${(endTime - startTime).toFixed(2)}ms`
-        )
-
         return result
     }, [
         viewMode,
@@ -465,13 +378,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     ])
 
     const summaryTableBody = React.useMemo(() => {
-        const startTime = performance.now()
-        console.log(
-            `[${new Date().toISOString()}] SUMMARY TABLE BODY START - ${sortedSummaryData.length} rows`
-        )
-
         if (viewMode !== 'summary') {
-            console.log(`[${new Date().toISOString()}] SUMMARY TABLE BODY SKIPPED`)
             return null
         }
 
@@ -495,20 +402,11 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
             </>
         )
 
-        const endTime = performance.now()
-        console.log(
-            `[${new Date().toISOString()}] SUMMARY TABLE BODY END: ${(endTime - startTime).toFixed(2)}ms`
-        )
-
         return result
     }, [viewMode, sortedSummaryData, headerFields])
 
     // Format data
     React.useEffect(() => {
-        const startTime = performance.now()
-        console.log(
-            `[${new Date().toISOString()}] FORMAT DATA START - data: ${data.length}, groups: ${groups.length}, triggered by data/groups change`
-        )
         setInternalData(
             data.map((p) => {
                 const newP = { ...p }
@@ -520,18 +418,10 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         )
 
         setInternalGroups(groups.concat(['Daily Total', 'Compute Cost']))
-
-        const endTime = performance.now()
-        console.log(
-            `[${new Date().toISOString()}] FORMAT DATA END: ${(endTime - startTime).toFixed(2)}ms`
-        )
     }, [data, groups])
 
     // DISABLED: Problematic visibility effect that was causing delayed re-renders
     // Column visibility is now handled entirely by parent component
-    console.log(
-        `[${new Date().toISOString()}] VISIBILITY MANAGEMENT DISABLED - columns handled by parent`
-    )
 
     // Early return for loading - must be after all hooks
     if (isLoading) {
@@ -562,11 +452,6 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         }
         return undefined
     }
-
-    const renderEndTime = performance.now()
-    console.log(
-        `[${new Date().toISOString()}] TABLE RENDER END: ${(renderEndTime - renderStartTime).toFixed(2)}ms`
-    )
 
     return (
         <>
@@ -703,9 +588,6 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                                     <Switch
                                         checked={expandCompute}
                                         onChange={(e) => {
-                                            console.log(
-                                                `[${new Date().toISOString()}] MUI SWITCH TOGGLE: ${e.target.checked}`
-                                            )
                                             setExpandCompute(e.target.checked)
                                         }}
                                         size="small"
