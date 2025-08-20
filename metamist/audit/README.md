@@ -1,4 +1,4 @@
-# Metamist Audit Module (Refactored)
+# Metamist Audit
 
 Audit system for managing cloud storage buckets and the integrity of genomic data.
 
@@ -12,8 +12,6 @@ This audit module provides tools for:
 - Tracking file movements and duplications within buckets
 
 ## Architecture
-
-The module follows clean architecture principles with clear separation of concerns:
 
 ```text
 audit/
@@ -34,15 +32,6 @@ audit/
     └── upload_bucket_audit.py      # Main CLI entry point
     └── delete_audit_results.py     # CLI for deleting audit results
 ```
-
-### Key Design Elements
-
-1. **Separation of Concerns**: Each layer has a single, well-defined responsibility
-2. **Dependency Injection**: All dependencies are injected, making testing easy
-3. **Immutable Data Models**: Using dataclasses and frozen configurations
-4. **Pure Business Logic**: Services contain no I/O or external dependencies
-5. **Strategy Pattern**: Flexible file matching with composable strategies
-6. **Repository Pattern**: Clean abstraction over data sources
 
 ## Usage
 
@@ -84,7 +73,18 @@ analysis-runner \
 ```
 
 
-### Programmatic Usage
+## Reports Generated
+
+The audit generates several reports in the upload bucket:
+
+1. **audit_metadata.tsv**: Configuration used for the audit
+2. **files_to_delete.csv**: Files that can be safely deleted
+3. **files_to_ingest.csv**: Files that need to be ingested
+4. **moved_files.csv**: Files that have been moved within the bucket
+5. **unaligned_sgs.tsv**: Sequencing groups without completed CRAMs
+
+
+## Programmatic Usage
 
 ```python
 from metamist.audit import audit_upload_bucket, AuditConfig, FileType
@@ -104,7 +104,7 @@ config = AuditConfig(
 audit_upload_bucket(config)
 ```
 
-### Advanced Usage with Custom Components
+## Advanced Usage with Custom Components
 
 ```python
 from metamist.audit.adapters import GraphQLClient, StorageClient
@@ -135,19 +135,9 @@ orchestrator = AuditOrchestrator(
 await orchestrator.run_audit(config)
 ```
 
-## Reports Generated
-
-The audit generates several reports in the upload bucket:
-
-1. **audit_metadata.tsv**: Configuration used for the audit
-2. **files_to_delete.csv**: Files that can be safely deleted
-3. **files_to_ingest.csv**: Files that need to be ingested
-4. **moved_files.csv**: Files that have been moved within the bucket
-5. **unaligned_sgs.tsv**: Sequencing groups without completed CRAMs
-
 ## Testing
 
-The refactored architecture makes testing straightforward:
+The architecture makes testing straightforward:
 
 ```python
 # Test file matching logic
