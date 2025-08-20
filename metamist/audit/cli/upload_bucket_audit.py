@@ -6,9 +6,9 @@ from typing import Optional
 import click
 from cpg_utils.config import config_retrieve
 
-from ..models import AuditConfig
+from ..models import AuditConfig, SequencingGroup
 from ..adapters import GraphQLClient, StorageClient
-from ..repositories import MetamistRepository, GCSRepository
+from ..data_access import MetamistDataAccess, GCSDataAccess
 from ..services import AuditAnalyzer, ReportGenerator
 
 
@@ -17,8 +17,8 @@ class AuditOrchestrator:
     
     def __init__(
         self,
-        metamist_repo: MetamistRepository,
-        gcs_repo: GCSRepository,
+        metamist_data: MetamistDataAccess,
+        gcs_data: GCSDataAccess,
         analyzer: AuditAnalyzer,
         report_writer: ReportGenerator,
         logger: logging.Logger
@@ -27,14 +27,14 @@ class AuditOrchestrator:
         Initialize the orchestrator.
         
         Args:
-            metamist_repo: Repository for Metamist data
-            gcs_repo: Repository for GCS data
+            metamist_data: Data access layer for Metamist data
+            gcs_data: Data access layer for GCS data
             analyzer: Audit analysis service
             report_writer: Report generation service
             logger: Logger instance
         """
-        self.metamist_repo = metamist_repo
-        self.gcs_repo = gcs_repo
+        self.metamist_data = metamist_data
+        self.gcs_data = gcs_data
         self.analyzer = analyzer
         self.report_writer = report_writer
         self.logger = logger
@@ -50,7 +50,7 @@ class AuditOrchestrator:
 
         # 1. Fetch sequencing groups from Metamist
         self.logger.info('Getting sequencing groups'.center(50, '~'))
-        sgs = await self.metamist_repo.get_sequencing_groups(
+        sgs = await self.metamist_data.get_sequencing_groups(
             config.dataset,
             list(config.sequencing_types),
             list(config.sequencing_technologies),
@@ -62,7 +62,7 @@ class AuditOrchestrator:
         # 2. Fetch analyses for sequencing groups
         self.logger.info('Getting analyses'.center(50, '~'))
         sg_ids = [sg.id for sg in sgs]
-        analyses = await self.metamist_repo.get_analyses_for_sequencing_groups(
+        analyses = await self.metamist_data.get_analyses_for_sequencing_groups(
             config.dataset,
             sg_ids,
             list(config.analysis_types)
@@ -72,10 +72,10 @@ class AuditOrchestrator:
         
         # 3. Get bucket name and list files
         self.logger.info('Scanning upload bucket'.center(50, '~'))
-        bucket_name = self.gcs_repo.get_bucket_name(config.dataset, 'upload')
+        bucket_name = self.gcs_data.get_bucket_name(config.dataset, 'upload')
         self.logger.info(f'Target: gs://{bucket_name}')
 
-        bucket_files = self.gcs_repo.list_files_in_bucket(
+        bucket_files = self.gcs_data.list_files_in_bucket(
             bucket_name,
             list(config.file_types),
             config.excluded_prefixes
@@ -91,7 +91,7 @@ class AuditOrchestrator:
                 for a in analyses 
                 if a.is_cram and a.output_file
             ]
-            existing_crams = self.gcs_repo.find_files_in_prefixes(
+            existing_crams = self.gcs_data.find_files_in_prefixes(
                 cram_paths,
                 ('.cram',)
             )
@@ -136,7 +136,7 @@ class AuditOrchestrator:
             self.logger.info(f'Excluded Prefixes:          {", ".join(sorted(config.excluded_prefixes))}')
         self.logger.info('')
     
-    def _log_sg_summary(self, sgs):
+    def _log_sg_summary(self, sgs: list[SequencingGroup]):
         """Log summary of sequencing groups by type/technology."""
         from collections import defaultdict
         
@@ -260,17 +260,17 @@ async def audit_upload_bucket_async(config: AuditConfig):
     config = await validate_enum_values(graphql_client, config)
     
     # Create repositories
-    metamist_repo = MetamistRepository(graphql_client)
-    gcs_repo = GCSRepository(storage_client)
-    
+    metamist_data = MetamistDataAccess(graphql_client)
+    gcs_data = GCSDataAccess(storage_client)
+
     # Create services
     analyzer = AuditAnalyzer(logger)
     report_writer = ReportGenerator(storage_client.client, logger)
     
     # Create orchestrator
     orchestrator = AuditOrchestrator(
-        metamist_repo,
-        gcs_repo,
+        metamist_data,
+        gcs_data,
         analyzer,
         report_writer,
         logger

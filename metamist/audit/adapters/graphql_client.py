@@ -73,6 +73,46 @@ class GraphQLClient:
         """Initialize GraphQL client."""
         self._enums_cache: Optional[Dict[str, List[str]]] = None
     
+    async def get_enums(self) -> Dict[str, List[str]]:
+        """
+        Get all available enum values from Metamist.
+        
+        Returns:
+            Dictionary of enum types and their values
+        """
+        if self._enums_cache is None:
+            result = await query_async(self.QUERY_ENUMS)
+            self._enums_cache = result['enum']
+        return self._enums_cache
+    
+    async def get_enum_values(self, enum_type: str) -> List[str]:
+        """
+        Get values for a specific enum type.
+        
+        Args:
+            enum_type: The enum type to get values for
+            
+        Returns:
+            List of enum values
+        """
+        enums = await self.get_enums()
+        
+        # Map common names to GraphQL field names
+        enum_map = {
+            'analysis_type': 'analysisType',
+            'sample_type': 'sampleType',
+            'sequencing_type': 'sequencingType',
+            'sequencing_platform': 'sequencingPlatform',
+            'sequencing_technology': 'sequencingTechnology',
+        }
+        
+        graphql_field = enum_map.get(enum_type, enum_type)
+        
+        if graphql_field not in enums:
+            raise KeyError(f'Enum {enum_type} not found in Metamist GraphQL API')
+
+        return enums[graphql_field]
+
     async def get_sequencing_groups(
         self,
         dataset: str,
@@ -129,43 +169,3 @@ class GraphQLClient:
             }
         )
         return result['project']['sequencingGroups']
-    
-    async def get_enums(self) -> Dict[str, List[str]]:
-        """
-        Get all available enum values from Metamist.
-        
-        Returns:
-            Dictionary of enum types and their values
-        """
-        if self._enums_cache is None:
-            result = await query_async(self.QUERY_ENUMS)
-            self._enums_cache = result['enum']
-        return self._enums_cache
-    
-    async def get_enum_values(self, enum_type: str) -> List[str]:
-        """
-        Get values for a specific enum type.
-        
-        Args:
-            enum_type: The enum type to get values for
-            
-        Returns:
-            List of enum values
-        """
-        enums = await self.get_enums()
-        
-        # Map common names to GraphQL field names
-        enum_map = {
-            'analysis_type': 'analysisType',
-            'sample_type': 'sampleType',
-            'sequencing_type': 'sequencingType',
-            'sequencing_platform': 'sequencingPlatform',
-            'sequencing_technology': 'sequencingTechnology',
-        }
-        
-        graphql_field = enum_map.get(enum_type, enum_type)
-        
-        if graphql_field not in enums:
-            raise KeyError(f'Enum {enum_type} not found in Metamist GraphQL API')
-        
-        return enums[graphql_field]

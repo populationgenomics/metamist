@@ -1,39 +1,41 @@
 # Metamist Audit Module (Refactored)
 
-A clean, maintainable implementation of the Metamist audit system for managing cloud storage buckets and metadata integrity.
+Audit system for managing cloud storage buckets and the integrity of genomic data.
 
 ## Overview
 
-This refactored audit module provides tools for:
+This audit module provides tools for:
+
 - Identifying files that can be safely deleted (e.g., original reads where CRAMs exist)
 - Finding files that need ingestion into Metamist
 - Detecting sequencing groups requiring processing
-- Tracking file movements within buckets
+- Tracking file movements and duplications within buckets
 
 ## Architecture
 
 The module follows clean architecture principles with clear separation of concerns:
 
-```
+```text
 audit/
-├── models/               # Pure data models (no external dependencies)
-│   ├── entities.py      # Core business entities
-│   └── value_objects.py # Immutable value objects
-├── adapters/            # External interface adapters
-│   ├── graphql_client.py # GraphQL API adapter
-│   └── storage_client.py # Google Cloud Storage adapter
-├── repositories/        # Data access layer
-│   ├── metamist_repository.py # Metamist data access
-│   └── gcs_repository.py      # GCS data access
-├── services/           # Business logic (pure functions)
-│   ├── file_matcher.py    # File matching strategies
-│   ├── audit_analyzer.py  # Core audit analysis
-│   └── report_generator.py # Report generation
-└── cli/                # Command-line interfaces
-    └── upload_bucket_audit.py # Main CLI entry point
+├── models/                     # Pure data models (no external dependencies)
+│   ├── entities.py                 # Core business entities
+│   └── value_objects.py            # Immutable value objects
+├── adapters/                   # External interface adapters
+│   ├── graphql_client.py           # GraphQL API adapter
+│   └── storage_client.py           # Google Cloud Storage adapter
+├── data_access/                # Data access layer
+│   ├── metamist_data_access.py     # Metamist data access
+│   └── gcs_data_access.py          # GCS data access
+├── services/                   # Business logic (pure functions)
+│   ├── file_matcher.py             # File matching strategies
+│   ├── audit_analyzer.py           # Core audit analysis
+│   └── report_generator.py         # Report generation
+└── cli/                        # Command-line interfaces
+    └── upload_bucket_audit.py      # Main CLI entry point
+    └── delete_audit_results.py     # CLI for deleting audit results
 ```
 
-### Key Design Improvements
+### Key Design Elements
 
 1. **Separation of Concerns**: Each layer has a single, well-defined responsibility
 2. **Dependency Injection**: All dependencies are injected, making testing easy
@@ -52,18 +54,35 @@ python -m metamist.audit.cli.upload_bucket_audit \
     --dataset my-dataset \
     --sequencing-types genome \
     --sequencing-technologies short-read \
-    --file-types fastq bam
+    --file-types fastq
 
-# With all options
+# With more complex options
 python -m metamist.audit.cli.upload_bucket_audit \
-    --dataset my-dataset \
-    --sequencing-types genome exome \
-    --sequencing-technologies short-read long-read \
-    --sequencing-platforms illumina pacbio \
-    --analysis-types CRAM \
-    --file-types all_reads \
-    --excluded-prefixes tmp/ test/
+    -d my-dataset \
+    -s all \
+    -t short-read -t long-read \
+    -p illumina -p pacbio -p oxford-nanopore \
+    -a CRAM -a pacbio_cram -a vcf -a pacbio_vcf \
+    -f all \
+    -e test/ -e tmp/
 ```
+
+### With analysis-runner
+
+```bash
+analysis-runner \
+  --access-level full \
+  --dataset my-dataset \
+  --description "Audit the dataset upload bucket" \
+  --output-dir "NA" \
+  --config /path/to/custom_config.toml \
+  python -m metamist.audit.cli.upload_bucket_audit \
+    --dataset my-dataset \
+    --sequencing-types genome \
+    --sequencing-technologies short-read \
+    --file-types fastq
+```
+
 
 ### Programmatic Usage
 
@@ -160,6 +179,7 @@ def test_audit_analyzer():
 ## Configuration
 
 ### File Types
+
 - `fastq`: FASTQ files (.fq.gz, .fastq.gz, .fq, .fastq)
 - `bam`: BAM files (.bam)
 - `cram`: CRAM files (.cram)
@@ -169,7 +189,9 @@ def test_audit_analyzer():
 - `all`: All supported file types
 
 ### Sequencing Types
-Use `all` to include all types, or specify:
+
+Use `all` to include all types, or specify sequencing types from the enum values.
+
 - genome
 - exome
 - totalrna
@@ -177,47 +199,20 @@ Use `all` to include all types, or specify:
 - singlecellrna
 
 ### Sequencing Technologies
+
 Use `all` to include all technologies, or specify from available enum values
 
 ### Analysis Types
-Default is `CRAM`, but can specify others like:
-- GVCF
-- VCF
-- QC
-- FASTQC
 
-## Migration from Original Module
+Default is `CRAM`, but you can specify others like `VCF`, `GVCF`, etc.
 
-The refactored module maintains functional compatibility while improving the architecture:
+### Excluded prefixes
 
-### Key Changes
-1. **UploadBucketAuditor removed**: Functionality moved to AuditOrchestrator
-2. **AuditHelper split**: Functionality distributed across repositories and services
-3. **GenericAuditor decomposed**: Logic separated into analyzer and repositories
-4. **Data classes modernized**: Using @dataclass instead of manual __init__
-5. **File matching extracted**: Now uses strategy pattern for flexibility
+Specify any prefixes to exclude from the audit (e.g., `tmp/`, `test/`).
 
-### Migration Path
-```python
-# Old way
-from metamist.audit.audit_upload_bucket import UploadBucketAuditor
-auditor = UploadBucketAuditor(dataset='my-dataset', ...)
-# Complex initialization and method calls
+Any files matching these prefixes will be ignored during the audit process.
 
-# New way
-from metamist.audit import audit_upload_bucket, AuditConfig
-config = AuditConfig(dataset='my-dataset', ...)
-audit_upload_bucket(config)
-```
-
-## Benefits of Refactoring
-
-1. **Testability**: Pure functions and dependency injection enable comprehensive unit testing
-2. **Maintainability**: Clear separation of concerns makes changes easier
-3. **Readability**: Smaller, focused functions with clear purposes
-4. **Flexibility**: Easy to add new file types, matching strategies, or data sources
-5. **Reliability**: Better error handling and validation
-6. **Performance**: Potential for async optimizations and caching
+E.g. `gs://cpg-my-dataset-main-upload/tmp/my_file.fastq` will be excluded.
 
 ## Future Enhancements
 

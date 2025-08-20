@@ -18,12 +18,12 @@ from ..models import (
 from ..adapters import GraphQLClient
 
 
-class MetamistRepository:
-    """Repository for accessing Metamist data."""
+class MetamistDataAccess:
+    """Layer for accessing Metamist data."""
     
     def __init__(self, graphql_client: GraphQLClient):
         """
-        Initialize the repository.
+        Initialize the data access layer.
         
         Args:
             graphql_client: GraphQL client adapter

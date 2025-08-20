@@ -1,5 +1,5 @@
 """
-Refactored Metamist Audit Module
+Metamist Audit Module
 
 This module provides tools for auditing Metamist datasets and their associated
 cloud storage buckets. The primary use case is identifying:
@@ -10,7 +10,7 @@ cloud storage buckets. The primary use case is identifying:
 Architecture:
 - models/: Data models and value objects
 - adapters/: External interface adapters (GraphQL, GCS)
-- repositories/: Data access layer
+- data_access/: Data access layer
 - services/: Business logic
 - cli/: Command-line interfaces
 
@@ -62,7 +62,7 @@ from .cli import (
     AuditOrchestrator,
 )
 
-__version__ = '2.0.0'  # Refactored version
+__version__ = '2.0.0'
 
 __all__ = [
     # Core functions

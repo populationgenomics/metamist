@@ -3,7 +3,8 @@
 from typing import List, Optional, Dict
 from collections import defaultdict
 from google.cloud import storage
-from cpg_utils import to_path, Path
+from typing import cast
+from cpg_utils import to_path
 
 from ..models import FileMetadata, FilePath
 
@@ -44,7 +45,8 @@ class StorageClient:
         bucket = self.client.bucket(bucket_name, user_project=self.project)
         
         files = []
-        for blob in self.client.list_blobs(bucket, prefix=prefix or ''):
+        for item in self.client.list_blobs(bucket, prefix=prefix or ''):
+            blob = cast(storage.Blob, item)
             # Skip if file doesn't match extensions
             if file_extensions and not blob.name.endswith(file_extensions):
                 continue
@@ -225,3 +227,29 @@ class StorageClient:
                 buckets_prefixes[bucket].append(prefix)
         
         return dict(buckets_prefixes)
+
+    def delete_blobs(
+        self,
+        paths: List[str],
+    ):
+        """
+        Delete blobs from Google Cloud Storage.
+        """
+        for path in paths:
+            self.delete_blob(path)
+
+    def delete_blob(
+        self,
+        path: str,
+    ):
+        """
+        Delete a blob from Google Cloud Storage.
+
+        Args:
+            path: The GCS path of the blob to delete.
+        """
+        path = to_path(path)
+        bucket_name, blob_name = path.bucket, path.blob
+        bucket = self.client.get_bucket(bucket_name)
+        blob = bucket.blob(blob_name)
+        blob.delete()

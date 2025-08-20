@@ -7,19 +7,20 @@ from ..models import FileMetadata, FileType
 from ..adapters import StorageClient
 
 
-class GCSRepository:
-    """Repository for accessing Google Cloud Storage."""
+class GCSDataAccess:
+    """Layer for accessing Google Cloud Storage."""
     
     def __init__(self, storage_client: StorageClient):
         """
-        Initialize the repository.
+        Initialize the data access layer.
         
         Args:
             storage_client: Storage client adapter
         """
         self.storage_client = storage_client
     
-    def get_bucket_name(self, dataset: str, category: str) -> str:
+    @staticmethod
+    def get_bucket_name(dataset: str, category: str) -> str:
         """
         Get the bucket name for a dataset and category.
         
