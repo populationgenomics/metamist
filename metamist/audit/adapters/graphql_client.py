@@ -6,7 +6,7 @@ from metamist.graphql import gql, query_async
 
 class GraphQLClient:
     """Adapter for GraphQL operations."""
-    
+
     # Query definitions
     QUERY_DATASET_SGS = gql(
         """
@@ -34,7 +34,7 @@ class GraphQLClient:
         }
         """
     )
-    
+
     QUERY_SG_ANALYSES = gql(
         """
         query sgAnalyses($dataset: String!, $sgIds: [String!], $analysisTypes: [String!]) {
@@ -54,7 +54,7 @@ class GraphQLClient:
         }
         """
     )
-    
+
     QUERY_ENUMS = gql(
         """
         query enumsQuery {
@@ -68,15 +68,15 @@ class GraphQLClient:
         }
         """
     )
-    
+
     def __init__(self):
         """Initialize GraphQL client."""
         self._enums_cache: Optional[Dict[str, List[str]]] = None
-    
+
     async def get_enums(self) -> Dict[str, List[str]]:
         """
         Get all available enum values from Metamist.
-        
+
         Returns:
             Dictionary of enum types and their values
         """
@@ -84,19 +84,19 @@ class GraphQLClient:
             result = await query_async(self.QUERY_ENUMS)
             self._enums_cache = result['enum']
         return self._enums_cache
-    
+
     async def get_enum_values(self, enum_type: str) -> List[str]:
         """
         Get values for a specific enum type.
-        
+
         Args:
             enum_type: The enum type to get values for
-            
+
         Returns:
             List of enum values
         """
         enums = await self.get_enums()
-        
+
         # Map common names to GraphQL field names
         enum_map = {
             'analysis_type': 'analysisType',
@@ -105,9 +105,9 @@ class GraphQLClient:
             'sequencing_platform': 'sequencingPlatform',
             'sequencing_technology': 'sequencingTechnology',
         }
-        
+
         graphql_field = enum_map.get(enum_type, enum_type)
-        
+
         if graphql_field not in enums:
             raise KeyError(f'Enum {enum_type} not found in Metamist GraphQL API')
 
@@ -118,17 +118,17 @@ class GraphQLClient:
         dataset: str,
         sequencing_types: List[str],
         sequencing_technologies: List[str],
-        sequencing_platforms: List[str]
+        sequencing_platforms: List[str],
     ) -> List[Dict[str, Any]]:
         """
         Fetch sequencing groups from Metamist.
-        
+
         Args:
             dataset: Dataset name
             sequencing_types: List of sequencing types to filter
             sequencing_technologies: List of sequencing technologies to filter
             sequencing_platforms: List of sequencing platforms to filter
-            
+
         Returns:
             List of sequencing group dictionaries
         """
@@ -139,24 +139,21 @@ class GraphQLClient:
                 'seqTypes': sequencing_types,
                 'seqTechs': sequencing_technologies,
                 'seqPlatforms': sequencing_platforms,
-            }
+            },
         )
         return result['project']['sequencingGroups']
-    
+
     async def get_analyses_for_sequencing_groups(
-        self,
-        dataset: str,
-        sg_ids: List[str],
-        analysis_types: List[str]
+        self, dataset: str, sg_ids: List[str], analysis_types: List[str]
     ) -> List[Dict[str, Any]]:
         """
         Fetch analyses for given sequencing groups.
-        
+
         Args:
             dataset: Dataset name
             sg_ids: List of sequencing group IDs
             analysis_types: List of analysis types to filter
-            
+
         Returns:
             List of sequencing groups with their analyses
         """
@@ -166,6 +163,6 @@ class GraphQLClient:
                 'dataset': dataset,
                 'sgIds': sg_ids,
                 'analysisTypes': analysis_types,
-            }
+            },
         )
         return result['project']['sequencingGroups']

@@ -24,15 +24,21 @@ def setup_logger(dataset: str) -> logging.Logger:
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
     logger.propagate = False
-    
+
     return logging.LoggerAdapter(logger, {'dataset': dataset})
 
 
-def delete_from_audit_results(dataset: str, results_folder: str, report: str = 'files_to_delete', filter_func: callable = None, dry_run: bool = False):
+def delete_from_audit_results(
+    dataset: str,
+    results_folder: str,
+    report: str = 'files_to_delete',
+    filter_func: callable = None,
+    dry_run: bool = False,
+):
     """Delete files listed in the audit results."""
     # Set up logger
     logger = setup_logger(dataset)
-    
+
     # Get GCP project
     gcp_project = config_retrieve(['workflow', dataset, 'gcp_project'])
     if not gcp_project:
@@ -55,7 +61,13 @@ def delete_from_audit_results(dataset: str, results_folder: str, report: str = '
     delete_filtered_files(storage_client, rows, filter_func, dry_run, logger)
 
 
-def delete_filtered_files(storage_client: StorageClient, rows: list[dict], filter_func: callable, dry_run: bool, logger: logging.Logger):
+def delete_filtered_files(
+    storage_client: StorageClient,
+    rows: list[dict],
+    filter_func: callable,
+    dry_run: bool,
+    logger: logging.Logger,
+):
     """Delete files from audit results based on filters."""
     total_files = 0
     total_bytes = 0
@@ -81,18 +93,22 @@ def delete_filtered_files(storage_client: StorageClient, rows: list[dict], filte
                 logger.error(f'Error deleting {file_path}: {e}')
 
     if dry_run:
-        logger.info(f'Dry run: would delete {total_files} files ({total_bytes / (1024**3):.2f} GiB)')
+        logger.info(
+            f'Dry run: would delete {total_files} files ({total_bytes / (1024**3):.2f} GiB)'
+        )
     else:
         logger.info(f'Deleted: {total_files} files ({total_bytes / (1024**3):.2f} GiB)')
 
 
 def parse_filter_expressions(filter_expressions: list[str]) -> callable:
     """Parse filter expressions into a callable filter function."""
+
     def matches_filters(row: dict) -> bool:
         for expr in filter_expressions:
             if not evaluate_filter_expression(expr, row):
                 return False
         return True
+
     return matches_filters
 
 
@@ -102,29 +118,47 @@ def evaluate_filter_expression(expr: str, row: dict) -> bool:
     if ' contains ' in expr:
         field, value = expr.split(' contains ', 1)
         return value.strip('"\'') in str(row.get(field.strip(), ''))
-    
+
     # Handle equality
     if '==' in expr:
         field, value = expr.split('==', 1)
         return str(row.get(field.strip(), '')).strip() == value.strip().strip('"\'')
-    
+
     # Handle inequality
     if '!=' in expr:
         field, value = expr.split('!=', 1)
         return str(row.get(field.strip(), '')).strip() != value.strip().strip('"\'')
-    
+
     return True
 
 
 @click.command()
 @click.option('--dataset', required=True, help='Dataset name for logging context')
-@click.option('--results-folder', help='Path to the folder containing audit results files')
-@click.option('--filter', 'filter_expressions', multiple=True, help='Filter expression like "SG Type==exome" or "File Path contains 2025-06-01"')
+@click.option(
+    '--results-folder', help='Path to the folder containing audit results files'
+)
+@click.option(
+    '--filter',
+    'filter_expressions',
+    multiple=True,
+    help='Filter expression like "SG Type==exome" or "File Path contains 2025-06-01"',
+)
 @click.option('--dry-run', is_flag=True, help='If set, will not delete objects.')
-def main(dataset: str, results_folder: str, filter_expressions: tuple = (), dry_run: bool = False):
+def main(
+    dataset: str,
+    results_folder: str,
+    filter_expressions: tuple = (),
+    dry_run: bool = False,
+):
     """Main function to delete objects."""
-    filter_func = parse_filter_expressions(list(filter_expressions)) if filter_expressions else None
-    delete_from_audit_results(dataset, results_folder, filters=filter_func, dry_run=dry_run)
+    filter_func = (
+        parse_filter_expressions(list(filter_expressions))
+        if filter_expressions
+        else None
+    )
+    delete_from_audit_results(
+        dataset, results_folder, filter_func=filter_func, dry_run=dry_run
+    )
 
 
 if __name__ == '__main__':
