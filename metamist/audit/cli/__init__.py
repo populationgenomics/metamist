@@ -1,4 +1,5 @@
 """CLI entry points for audit module."""
+
 from .delete_audit_results import (
     main as delete_main,
     delete_from_audit_results,
