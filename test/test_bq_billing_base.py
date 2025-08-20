@@ -21,6 +21,7 @@ from models.models import (
     BillingCostBudgetRecord,
     BillingCostDetailsRecord,
     BillingTotalCostQueryModel,
+    BillingRunningCostQueryModel,
 )
 
 
@@ -722,10 +723,12 @@ class TestBillingBaseTable(BqTest):
 
         # test invalid outputs
         with self.assertRaises(ValueError) as context:
-            await self.table_obj.get_running_cost(
+            await self.table_obj.get_running_cost_with_filters(
                 # not allowed field
-                field=BillingColumn.SKU,
-                invoice_month=None,
+                BillingRunningCostQueryModel(
+                    field=BillingColumn.SKU,
+                    invoice_month=None,
+                )
             )
 
         self.assertTrue(
@@ -741,9 +744,11 @@ class TestBillingBaseTable(BqTest):
         """Test get_running_cost"""
 
         # test empty cost (no BQ mockup data provided)
-        empty_results = await self.table_obj.get_running_cost(
-            field=BillingColumn.TOPIC,
-            invoice_month='202301',
+        empty_results = await self.table_obj.get_running_cost_with_filters(
+            BillingRunningCostQueryModel(
+                field=BillingColumn.TOPIC,
+                invoice_month='202301',
+            )
         )
 
         self.assertEqual([], empty_results)
@@ -757,9 +762,11 @@ class TestBillingBaseTable(BqTest):
             side_effect=mock_execute_query_running_cost
         )
 
-        one_record_result = await self.table_obj.get_running_cost(
-            field=BillingColumn.TOPIC,
-            invoice_month='202301',
+        one_record_result = await self.table_obj.get_running_cost_with_filters(
+            BillingRunningCostQueryModel(
+                field=BillingColumn.TOPIC,
+                invoice_month='202301',
+            )
         )
 
         self.assertEqual(
@@ -820,9 +827,11 @@ class TestBillingBaseTable(BqTest):
         # use the current month to test the current month branch
         current_month_as_string = datetime.now().strftime('%Y%m')
 
-        current_month_result = await self.table_obj.get_running_cost(
-            field=BillingColumn.TOPIC,
-            invoice_month=current_month_as_string,
+        current_month_result = await self.table_obj.get_running_cost_with_filters(
+            BillingRunningCostQueryModel(
+                field=BillingColumn.TOPIC,
+                invoice_month=current_month_as_string,
+            )
         )
 
         self.assertEqual(

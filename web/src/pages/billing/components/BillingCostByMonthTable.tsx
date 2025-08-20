@@ -36,6 +36,7 @@ interface IBillingCostByMonthTableProps {
     data: DataDict
     months: string[]
     visibleColumns: Set<string>
+    orderedTopics: string[]
 }
 
 const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
@@ -45,6 +46,7 @@ const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
     data,
     months,
     visibleColumns,
+    orderedTopics,
 }) => {
     if (isLoading) {
         return (
@@ -63,11 +65,9 @@ const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
         return visibleColumns.has(category)
     }
 
-    // Get only visible topics
+    // Get only visible topics in the order they were provided
     const getVisibleTopics = () => {
-        return Object.keys(data)
-            .filter((topic) => isColumnVisible(topic))
-            .sort((a, b) => a.localeCompare(b))
+        return orderedTopics.filter((topic) => isColumnVisible(topic))
     }
 
     const dataToBody = (data: DataDict) => {
