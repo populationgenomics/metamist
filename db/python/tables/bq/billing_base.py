@@ -656,7 +656,7 @@ class BillingBaseTable(BqDbBase):
 
         return raw_results
 
-    async def get_running_cost(
+    async def _get_running_cost(
         self,
         field: BillingColumn,
         invoice_month: str | None = None,

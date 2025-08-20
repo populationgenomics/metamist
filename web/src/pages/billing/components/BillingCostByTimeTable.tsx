@@ -403,7 +403,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         )
 
         return result
-    }, [viewMode, sortedSummaryData, headerFields])
+    }, [viewMode, sortedSummaryData, headerFields, getColumnDisplayStyle])
 
     // Format data
     React.useEffect(() => {
@@ -419,9 +419,6 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
 
         setInternalGroups(groups.concat(['Daily Total', 'Compute Cost']))
     }, [data, groups])
-
-    // DISABLED: Problematic visibility effect that was causing delayed re-renders
-    // Column visibility is now handled entirely by parent component
 
     // Early return for loading - must be after all hooks
     if (isLoading) {

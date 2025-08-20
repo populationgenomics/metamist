@@ -200,7 +200,9 @@ class BillingLayer(BqBaseLayer):
         Get Running costs including monthly budget
         """
         billing_table = self.table_factory(source, [field])
-        return await billing_table.get_running_cost(field, invoice_month)
+        return await billing_table.get_running_cost_with_filters(
+            BillingRunningCostQueryModel(field=field, invoice_month=invoice_month)
+        )
 
     async def get_running_cost_with_filters(
         self,
