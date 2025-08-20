@@ -11,6 +11,7 @@ from ..data_access.gcs_data_access import GCSDataAccess
 from cpg_utils import to_path
 from cpg_utils.config import config_retrieve
 
+
 def setup_logger(dataset: str) -> logging.Logger:
     """Set up logger for audit deletions."""
     handler = logging.StreamHandler()
@@ -76,13 +77,14 @@ def delete_filtered_files(storage_client: StorageClient, rows: list[dict], filte
             try:
                 storage_client.delete_blob(file_path)
                 logger.info(f'Successfully deleted {file_path}')
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error(f'Error deleting {file_path}: {e}')
 
     if dry_run:
         logger.info(f'Dry run: would delete {total_files} files ({total_bytes / (1024**3):.2f} GiB)')
     else:
         logger.info(f'Deleted: {total_files} files ({total_bytes / (1024**3):.2f} GiB)')
+
 
 def parse_filter_expressions(filter_expressions: list[str]) -> callable:
     """Parse filter expressions into a callable filter function."""
@@ -93,6 +95,7 @@ def parse_filter_expressions(filter_expressions: list[str]) -> callable:
         return True
     return matches_filters
 
+
 def evaluate_filter_expression(expr: str, row: dict) -> bool:
     """Evaluate a single filter expression against a row."""
     # Handle contains operator
@@ -101,16 +104,17 @@ def evaluate_filter_expression(expr: str, row: dict) -> bool:
         return value.strip('"\'') in str(row.get(field.strip(), ''))
     
     # Handle equality
-    elif '==' in expr:
+    if '==' in expr:
         field, value = expr.split('==', 1)
         return str(row.get(field.strip(), '')).strip() == value.strip().strip('"\'')
     
     # Handle inequality
-    elif '!=' in expr:
+    if '!=' in expr:
         field, value = expr.split('!=', 1)
         return str(row.get(field.strip(), '')).strip() != value.strip().strip('"\'')
     
     return True
+
 
 @click.command()
 @click.option('--dataset', required=True, help='Dataset name for logging context')

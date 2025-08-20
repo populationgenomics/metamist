@@ -9,22 +9,24 @@ from cpg_utils import Path
 
 class FileType(Enum):
     """File type enumeration with extensions."""
+
     FASTQ = ('.fq.gz', '.fastq.gz', '.fq', '.fastq')
     BAM = ('.bam',)
     CRAM = ('.cram',)
     GVCF = ('.g.vcf.gz',)
     VCF = ('.vcf', '.vcf.gz', '.vcf.bgz')
     ARCHIVE = ('.tar', '.tar.gz', '.zip')
-    
+
     @property
     def extensions(self) -> tuple[str, ...]:
+        """Get all file extensions for this file type."""
         return self.value
-    
+
     @classmethod
     def all_read_extensions(cls) -> tuple[str, ...]:
         """Get all read file extensions (FASTQ, BAM, CRAM)."""
         return cls.FASTQ.value + cls.BAM.value + cls.CRAM.value
-    
+
     @classmethod
     def all_extensions(cls) -> tuple[str, ...]:
         """Get all file extensions."""
@@ -33,6 +35,7 @@ class FileType(Enum):
 
 class SequencingType(Enum):
     """Sequencing type enumeration."""
+
     GENOME = 'genome'
     EXOME = 'exome'
     TOTAL_RNA = 'totalrna'
@@ -42,6 +45,7 @@ class SequencingType(Enum):
 
 class AnalysisType(Enum):
     """Analysis type enumeration."""
+
     CRAM = 'cram'
     GVCF = 'gvcf'
     VCF = 'vcf'
@@ -53,24 +57,29 @@ class AnalysisType(Enum):
 @dataclass(frozen=True)
 class FilePath:
     """Immutable file path value object."""
+
     path: Path
-    
+
     @property
     def name(self) -> str:
+        """Get the file name."""
         return self.path.name
-    
+
     @property
     def bucket(self) -> str:
+        """Get the bucket name."""
         return self.path.bucket
-    
+
     @property
     def blob(self) -> str:
+        """Get the blob name."""
         return self.path.blob
-    
+
     @property
     def uri(self) -> str:
+        """Get the URI."""
         return self.path.as_uri()
-    
+
     def __str__(self) -> str:
         return self.uri
 
@@ -78,14 +87,15 @@ class FilePath:
 @dataclass(frozen=True)
 class FileMetadata:
     """Immutable file metadata."""
+
     filepath: FilePath
     filesize: Optional[int] = None
     checksum: Optional[str] = None
-    
+
     def with_size(self, size: int) -> 'FileMetadata':
         """Create a new instance with updated size."""
         return FileMetadata(self.filepath, size, self.checksum)
-    
+
     def with_checksum(self, checksum: str) -> 'FileMetadata':
         """Create a new instance with updated checksum."""
         return FileMetadata(self.filepath, self.filesize, checksum)
@@ -94,22 +104,25 @@ class FileMetadata:
 @dataclass(frozen=True)
 class ExternalIds:
     """External ID collection."""
+
     ids: dict[str, str]
-    
+
     def get_primary(self) -> Optional[str]:
         """Get the primary external ID if only one exists."""
         return self.ids.get('')
 
     def __getitem__(self, key: str) -> Optional[str]:
         return self.ids.get(key)
-    
+
     def values(self) -> list[str]:
+        """Get all external ID values."""
         return list(self.ids.values())
 
 
 @dataclass(frozen=True)
-class AuditConfig:
+class AuditConfig:  # pylint: disable=too-many-instance-attributes
     """Immutable configuration for audit runs."""
+
     dataset: str
     sequencing_types: tuple[str, ...]
     sequencing_technologies: tuple[str, ...]
@@ -118,7 +131,7 @@ class AuditConfig:
     file_types: tuple[FileType, ...]
     excluded_prefixes: tuple[str, ...] = ()
     excluded_sequencing_groups: tuple[str, ...] = ()
-    
+
     @classmethod
     def from_cli_args(cls, args) -> 'AuditConfig':
         """Factory method from CLI arguments."""
@@ -127,22 +140,21 @@ class AuditConfig:
             if ft == 'all':
                 file_types = list(FileType)
                 break
-            elif ft == 'all_reads':
+            if ft == 'all_reads':
                 file_types = [FileType.FASTQ, FileType.BAM, FileType.CRAM]
                 break
-            else:
-                # Map string to FileType
-                ft_map = {
-                    'fastq': FileType.FASTQ,
-                    'bam': FileType.BAM,
-                    'cram': FileType.CRAM,
-                    'gvcf': FileType.GVCF,
-                    'vcf': FileType.VCF,
-                    'archive': FileType.ARCHIVE,
-                }
-                if ft in ft_map:
-                    file_types.append(ft_map[ft])
-        
+            # Map string to FileType
+            ft_map = {
+                'fastq': FileType.FASTQ,
+                'bam': FileType.BAM,
+                'cram': FileType.CRAM,
+                'gvcf': FileType.GVCF,
+                'vcf': FileType.VCF,
+                'archive': FileType.ARCHIVE,
+            }
+            if ft in ft_map:
+                file_types.append(ft_map[ft])
+
         return cls(
             dataset=args.dataset,
             sequencing_types=args.sequencing_types,
@@ -157,6 +169,7 @@ class AuditConfig:
 @dataclass(frozen=True)
 class MovedFile:
     """Represents a file that has been moved."""
+
     old_path: FilePath
     new_path: FilePath
     metadata: FileMetadata

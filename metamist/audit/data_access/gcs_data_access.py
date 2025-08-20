@@ -1,6 +1,7 @@
 """Repository for Google Cloud Storage data access."""
 
 from typing import List, Optional, Dict
+from cpg_utils import to_path
 from cpg_utils.config import config_retrieve, dataset_path
 
 from ..models import FileMetadata, FileType
@@ -79,8 +80,6 @@ class GCSDataAccess:
         Returns:
             True if file exists, False otherwise
         """
-        from cpg_utils import to_path
-        
         try:
             path = to_path(file_path)
             return self.storage_client.check_blob_exists(
@@ -146,8 +145,6 @@ class GCSDataAccess:
         Returns:
             FileMetadata object or None if file doesn't exist
         """
-        from cpg_utils import to_path
-        
         try:
             path = to_path(file_path)
             return self.storage_client.get_blob_metadata(

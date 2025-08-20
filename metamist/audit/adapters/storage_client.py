@@ -1,9 +1,8 @@
 """Google Cloud Storage client adapter."""
 
-from typing import List, Optional, Dict
+from typing import cast, List, Optional, Dict
 from collections import defaultdict
 from google.cloud import storage
-from typing import cast
 from cpg_utils import to_path
 
 from ..models import FileMetadata, FilePath
@@ -135,7 +134,7 @@ class StorageClient:
                             checksum=blob.crc32c
                         )
                     )
-                except Exception:
+                except Exception:  # pylint: disable=broad-exception-caught
                     # Blob doesn't exist or error accessing it
                     continue
         

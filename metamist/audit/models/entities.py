@@ -9,9 +9,10 @@ from .value_objects import FileMetadata, ExternalIds
 @dataclass
 class Participant:
     """Participant entity."""
+
     id: int
     external_ids: ExternalIds
-    
+
     @property
     def external_id(self) -> Optional[str]:
         """Get the primary external ID."""
@@ -21,10 +22,11 @@ class Participant:
 @dataclass
 class Sample:
     """Sample entity."""
+
     id: str
     external_ids: ExternalIds
     participant: Participant
-    
+
     @property
     def external_id(self) -> Optional[str]:
         """Get the primary external ID."""
@@ -34,20 +36,24 @@ class Sample:
 @dataclass
 class ReadFile:
     """Read file entity."""
+
     metadata: FileMetadata
-    
+
     @property
     def filepath(self):
+        """Get the file path."""
         return self.metadata.filepath
-    
+
     @property
     def filesize(self):
+        """Get the file size."""
         return self.metadata.filesize
-    
+
     @property
     def checksum(self):
+        """Get the file checksum."""
         return self.metadata.checksum
-    
+
     def update_metadata(self, metadata: FileMetadata):
         """Update the file metadata."""
         self.metadata = metadata
@@ -56,13 +62,14 @@ class ReadFile:
 @dataclass
 class Assay:
     """Assay entity."""
+
     id: int
     read_files: list[ReadFile] = field(default_factory=list)
-    
+
     def add_read_file(self, read_file: ReadFile):
         """Add a read file to the assay."""
         self.read_files.append(read_file)
-    
+
     def get_total_size(self) -> int:
         """Calculate total size of all read files."""
         return sum(f.filesize or 0 for f in self.read_files)
@@ -71,18 +78,19 @@ class Assay:
 @dataclass
 class Analysis:
     """Analysis entity."""
+
     id: int
     type: str
     output_file: Optional[FileMetadata] = None
     original_file: Optional[FileMetadata] = None
     sequencing_group_id: Optional[str] = None
     timestamp_completed: Optional[str] = None
-    
+
     @property
     def is_cram(self) -> bool:
         """Check if this is a CRAM analysis."""
         return self.type.upper() == 'CRAM'
-    
+
     @property
     def output_path(self) -> Optional[str]:
         """Get the output file path if it exists."""
@@ -92,6 +100,7 @@ class Analysis:
 @dataclass
 class SequencingGroup:
     """Sequencing group entity."""
+
     id: str
     type: str
     technology: str
@@ -99,42 +108,39 @@ class SequencingGroup:
     sample: Sample
     assays: list[Assay] = field(default_factory=list)
     cram_analysis: Optional[Analysis] = None
-    
+
     @property
     def is_complete(self) -> bool:
         """Check if the sequencing group has a completed CRAM."""
         return self.cram_analysis is not None
-    
+
     @property
     def cram_path(self) -> Optional[str]:
         """Get the CRAM file path if it exists."""
         return self.cram_analysis.output_path if self.cram_analysis else None
-    
+
     def add_assay(self, assay: Assay):
         """Add an assay to the sequencing group."""
         self.assays.append(assay)
-    
+
     def set_cram_analysis(self, analysis: Analysis):
         """Set the CRAM analysis for this sequencing group."""
         if analysis.is_cram:
             self.cram_analysis = analysis
-    
+
     def get_all_read_files(self) -> list[ReadFile]:
         """Get all read files from all assays."""
-        return [
-            read_file 
-            for assay in self.assays 
-            for read_file in assay.read_files
-        ]
-    
+        return [read_file for assay in self.assays for read_file in assay.read_files]
+
     def get_total_read_size(self) -> int:
         """Calculate total size of all read files."""
         return sum(assay.get_total_size() for assay in self.assays)
 
 
 @dataclass
-class AuditReportEntry:
+class AuditReportEntry:  # pylint: disable=too-many-instance-attributes
     """Entry for audit reports."""
+
     filepath: Optional[str] = None
     filesize: Optional[int] = None
     sg_id: Optional[str] = None
@@ -148,18 +154,18 @@ class AuditReportEntry:
     sample_external_ids: Optional[str] = None
     participant_id: Optional[int] = None
     participant_external_ids: Optional[str] = None
-    
+
     def to_report_dict(self) -> dict:
         """Convert to dictionary for report generation."""
         # Simplify external IDs if only one exists
         sample_ext = self.sample_external_ids
         if isinstance(sample_ext, dict) and len(sample_ext) == 1:
             sample_ext = next(iter(sample_ext.values()))
-        
+
         participant_ext = self.participant_external_ids
         if isinstance(participant_ext, dict) and len(participant_ext) == 1:
             participant_ext = next(iter(participant_ext.values()))
-        
+
         return {
             'File Path': self.filepath,
             'File Size': self.filesize,
@@ -180,21 +186,20 @@ class AuditReportEntry:
 @dataclass
 class AuditResult:
     """Result of an audit analysis."""
+
     files_to_delete: list[AuditReportEntry] = field(default_factory=list)
     files_to_ingest: list[AuditReportEntry] = field(default_factory=list)
     moved_files: list[AuditReportEntry] = field(default_factory=list)
     unaligned_sequencing_groups: list[SequencingGroup] = field(default_factory=list)
-    
+
     @property
     def total_files_to_delete(self) -> int:
         """Get total number of files to delete."""
         return len(self.files_to_delete) + len(self.moved_files)
-    
+
     @property
     def has_issues(self) -> bool:
         """Check if there are any issues found."""
         return bool(
-            self.files_to_ingest or 
-            self.unaligned_sequencing_groups or
-            self.moved_files
+            self.files_to_ingest or self.unaligned_sequencing_groups or self.moved_files
         )
