@@ -38,7 +38,7 @@ const BillingCostByCategory: React.FunctionComponent = () => {
 
     const inputSelectedGroup: string | undefined = searchParams.get('group') ?? undefined
     const inputCostCategory: string | undefined = searchParams.get('costCategory') ?? undefined
-    const inputPeriod: string | undefined = searchParams.get('period') ?? BillingTimePeriods.Month
+    const inputPeriod: string | undefined = searchParams.get('period') ?? BillingTimePeriods.Week
 
     // GCP projects are stored as comma-separated values in URL: gcpProjects=project1,project2,project3
     const inputGcpProjects = searchParams.get('gcpProjects')
@@ -88,7 +88,7 @@ const BillingCostByCategory: React.FunctionComponent = () => {
         fixedGroupBy ?? BillingColumn.GcpProject
     )
 
-    const [accumulate, setAccumulate] = React.useState<boolean>(true)
+    const [accumulate, setAccumulate] = React.useState<boolean>(false)
     const [visibleColumns, setVisibleColumns] = React.useState<Set<string>>(new Set())
     const [urlInitialized, setUrlInitialized] = React.useState(false)
 
