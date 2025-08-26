@@ -232,34 +232,34 @@ async def validate_enum_values(
     )
 
 
-async def audit_upload_bucket_async(config: AuditConfig):
+async def audit_upload_bucket_async(audit_config: AuditConfig):
     """
     Async entry point for upload bucket audit.
 
     Args:
-        config: Audit configuration
+        audit_config: Audit configuration
     """
     # Set up logger
-    logger = setup_logger(config.dataset)
+    logger = setup_logger(audit_config.dataset)
 
     # Get GCP project
-    gcp_project = config_retrieve(['workflow', config.dataset, 'gcp_project'])
+    gcp_project = config_retrieve(['workflow', audit_config.dataset, 'gcp_project'])
     if not gcp_project:
         raise ValueError('GCP project is required')
 
     # Get excluded sequencing groups from config if not provided
-    if not config.excluded_sequencing_groups:
+    if not audit_config.excluded_sequencing_groups:
         excluded_sgs = config_retrieve(
             ['metamist', 'audit', 'excluded_sequencing_groups'], default=[]
         )
-        config = AuditConfig(
-            dataset=config.dataset,
-            sequencing_types=config.sequencing_types,
-            sequencing_technologies=config.sequencing_technologies,
-            sequencing_platforms=config.sequencing_platforms,
-            analysis_types=config.analysis_types,
-            file_types=config.file_types,
-            excluded_prefixes=config.excluded_prefixes,
+        audit_config = AuditConfig(
+            dataset=audit_config.dataset,
+            sequencing_types=audit_config.sequencing_types,
+            sequencing_technologies=audit_config.sequencing_technologies,
+            sequencing_platforms=audit_config.sequencing_platforms,
+            analysis_types=audit_config.analysis_types,
+            file_types=audit_config.file_types,
+            excluded_prefixes=audit_config.excluded_prefixes,
             excluded_sequencing_groups=tuple(excluded_sgs),
         )
 
@@ -268,7 +268,7 @@ async def audit_upload_bucket_async(config: AuditConfig):
     storage_client = StorageClient(project=gcp_project)
 
     # Validate enum values
-    config = await validate_enum_values(graphql_client, config)
+    audit_config = await validate_enum_values(graphql_client, audit_config)  # TODO: do this alongside the file types validation
 
     # Create repositories
     metamist_data = MetamistDataAccess(graphql_client)
@@ -284,7 +284,7 @@ async def audit_upload_bucket_async(config: AuditConfig):
     )
 
     # Run audit
-    await orchestrator.run_audit(config)
+    await orchestrator.run_audit(audit_config)
 
 
 def audit_upload_bucket(config: AuditConfig):

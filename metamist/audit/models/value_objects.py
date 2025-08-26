@@ -33,27 +33,6 @@ class FileType(Enum):
         return tuple(ext for file_type in cls for ext in file_type.value)
 
 
-class SequencingType(Enum):
-    """Sequencing type enumeration."""
-
-    GENOME = 'genome'
-    EXOME = 'exome'
-    TOTAL_RNA = 'totalrna'
-    POLY_RNA = 'polyarna'
-    SINGLE_CELL_RNA = 'singlecellrna'
-
-
-class AnalysisType(Enum):
-    """Analysis type enumeration."""
-
-    CRAM = 'cram'
-    GVCF = 'gvcf'
-    VCF = 'vcf'
-    QC = 'qc'
-    FASTQC = 'fastqc'
-    MULTIQC = 'multiqc'
-
-
 @dataclass(frozen=True)
 class FilePath:
     """Immutable file path value object."""

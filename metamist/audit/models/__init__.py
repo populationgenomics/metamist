@@ -12,8 +12,6 @@ from .entities import (
 )
 from .value_objects import (
     FileType,
-    SequencingType,
-    AnalysisType,
     FilePath,
     FileMetadata,
     ExternalIds,
@@ -33,8 +31,6 @@ __all__ = [
     'AuditResult',
     # Value Objects
     'FileType',
-    'SequencingType',
-    'AnalysisType',
     'FilePath',
     'FileMetadata',
     'ExternalIds',

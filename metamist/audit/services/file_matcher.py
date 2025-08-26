@@ -50,7 +50,7 @@ class FilenameSizeMatcher(FileMatcher):
         self, file: FileMetadata, candidates: List[FileMetadata]
     ) -> Optional[FileMetadata]:
         """Match files by filename and size."""
-        if not file.filesize:
+        if not file.filesize and not file.filepath.name:
             return None
 
         for candidate in candidates:

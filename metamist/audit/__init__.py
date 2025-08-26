@@ -42,8 +42,6 @@ from .models import (
     # Value objects
     AuditConfig,
     FileType,
-    SequencingType,
-    AnalysisType,
     FileMetadata,
     FilePath,
     ExternalIds,
@@ -73,8 +71,6 @@ __all__ = [
     'AuditConfig',
     # Enums
     'FileType',
-    'SequencingType',
-    'AnalysisType',
     # Core entities
     'SequencingGroup',
     'Analysis',
