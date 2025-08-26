@@ -92,8 +92,7 @@ The audit generates several reports in the upload bucket:
 1. **audit_metadata.tsv**: Configuration used for the audit
 2. **files_to_delete.csv**: Files that can be safely deleted
 3. **files_to_ingest.csv**: Files that need to be ingested
-4. **moved_files.csv**: Files that have been moved within the bucket
-5. **unaligned_sgs.tsv**: Sequencing groups without completed CRAMs
+4. **unaligned_sgs.tsv**: Sequencing groups without completed CRAMs
 
 
 ## Programmatic Usage

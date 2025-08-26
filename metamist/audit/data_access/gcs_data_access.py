@@ -129,7 +129,7 @@ class GCSDataAccess:
 
         return all_files
 
-    def get_file_metadata(self, file_path: str) -> Optional[FileMetadata]:
+    def get_file_metadata(self, file_path: str) -> Optional[FileMetadata]: # Unused
         """
         Get metadata for a single file.
 
