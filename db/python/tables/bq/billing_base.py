@@ -912,9 +912,6 @@ class BillingBaseTable(BqDbBase):
                     'seq_groups': list(sequencing_groups_as_ids),
                 },
             )
-
-            print('records', records)
-
             sg_storage_cost = []
             for row in records:
                 for sk, sv in storage_cost.items():
@@ -947,9 +944,6 @@ class BillingBaseTable(BqDbBase):
                     'seq_groups': list(sequencing_groups_as_ids),
                 },
             )
-
-            print('records', records)
-
             sg_storage_cost = []
             for row in records:
                 for sk, sv in storage_cost.items():
@@ -969,12 +963,9 @@ class BillingBaseTable(BqDbBase):
 
         # Compute Calculation
 
-        # TODO temp
-        sequencing_groups = ['CPG280370', 'CPG280388']
-
         # 6. Get all ar-guid with min/max day for each of the seq group
 
-        query_parameters: list[bigquery.ArrayQueryParameter] = [
+        query_parameters = [
             bigquery.ArrayQueryParameter(
                 'sequencing_groups', 'STRING', sequencing_groups
             )
@@ -1007,7 +998,7 @@ class BillingBaseTable(BqDbBase):
 
         _query = f"""
         WITH ag as (
-            SELECT 
+            SELECT
             invoice_month,
             ar_guid,
             topic,
