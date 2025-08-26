@@ -1,3 +1,5 @@
+# pylint: disable=C0302
+
 import re
 from abc import ABCMeta, abstractmethod
 from collections import Counter, defaultdict, namedtuple
@@ -746,7 +748,7 @@ class BillingBaseTable(BqDbBase):
 
         return results
 
-    async def get_cost_by_sample(
+    async def get_cost_by_sample(  # pylint: disable=R0914
         self,
         connection: Connection,
         query: BillingTotalCostQueryModel,
