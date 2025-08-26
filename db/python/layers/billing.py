@@ -1,3 +1,6 @@
+from api.utils.db import (
+    Connection,
+)
 from db.python.layers.bq_base import BqBaseLayer
 from db.python.tables.bq.billing_ar_batch import BillingArBatchTable
 from db.python.tables.bq.billing_daily import BillingDailyTable
@@ -266,3 +269,14 @@ class BillingLayer(BqBaseLayer):
             start_day, end_day, batches, ar_guid
         )
         return results
+
+    async def get_cost_by_sample(
+        self,
+        connection: Connection,
+        query: BillingTotalCostQueryModel,
+    ) -> list[dict] | None:
+        """
+        Get Sample cost with selected fields for requested time interval
+        """
+        billing_table = self.table_factory(query.source, query.fields, query.filters)
+        return await billing_table.get_cost_by_sample(connection, query)

@@ -38,6 +38,7 @@ const billingApi = new BillingApi()
 
 // A map of billing column enums to titles, these are the supported fields to break down by
 const BILLING_COLUMN_MAP: Map<BillingColumn, string> = new Map([
+    [BillingColumn.SequencingGroup, 'SequencingGroup'],
     [BillingColumn.Topic, 'Topic'],
     [BillingColumn.ArGuid, 'AR guid'],
     [BillingColumn.CostCategory, 'Cost Category'],
@@ -119,7 +120,7 @@ function useBillingSampleSgMap(entityType: EntityType, ids: string[]): BillingSa
 // can be shown in the table
 function transformBillingResultRow(result: BillingTotalCostRecord, breakDownBy: BillingColumn[]) {
     const cost = result.cost
-    const month = result.day
+    const month = result.invoice_month
     const sequencingGroup = result.sequencing_group
 
     const breakDownCols = breakDownBy.reduce(
@@ -263,7 +264,7 @@ function useBillingCostBySampleData(
         }
 
         const query: BillingTotalCostQueryModel = {
-            fields: [...breakDownBy, BillingColumn.SequencingGroup],
+            fields: [...breakDownBy],
             start_date: start,
             end_date: end,
             order_by: { day: false },
@@ -279,7 +280,7 @@ function useBillingCostBySampleData(
         })
 
         billingApi
-            .getTotalCost(query)
+            .costBySample(query)
             .then((result) => {
                 // If this has been superseded by another request, then ignore it
                 if (ignore) return
@@ -419,10 +420,11 @@ function BillingCostBySampleTable(props: { entityType: EntityType; data: Billing
 function BillingCostBySample() {
     const [idList, setIdList] = useState<string[]>([])
     const [dateRange, setDateRange] = useState<[DateTime, DateTime]>([
-        DateTime.now().minus({ months: 1 }).startOf('month'),
+        // first month of collected AR-GUIDs
+        DateTime.fromISO('2023-10-01').startOf('month'),
         DateTime.now().startOf('month'),
     ])
-    const [breakDownBy, setBreakDownBy] = useState<BillingColumn[]>([BillingColumn.Topic])
+    const [breakDownBy, setBreakDownBy] = useState<BillingColumn[]>([BillingColumn.SequencingGroup])
     const viewer = useContext(ViewerContext)
 
     const idPrefixes: Record<EntityType, string> | undefined = viewer?.metamistSettings

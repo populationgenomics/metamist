@@ -6,18 +6,36 @@ from typing import Any
 
 from google.cloud import bigquery
 
-from api.settings import BQ_BUDGET_VIEW, BQ_COST_PER_TB, BQ_DAYS_BACK_OPTIMAL
+from api.settings import (
+    BQ_AGGREG_EXT_VIEW,
+    BQ_AGGREG_VIEW,
+    BQ_BATCHES_VIEW,
+    BQ_BUDGET_VIEW,
+    BQ_COST_PER_TB,
+    BQ_DAYS_BACK_OPTIMAL,
+    COHORT_PREFIX,
+    SAMPLE_PREFIX,
+    SEQUENCING_GROUP_PREFIX,
+)
 from api.utils.dates import get_invoice_month_range, reformat_datetime
+from api.utils.db import (
+    Connection,
+)
 from db.python.gcp_connect import BqDbBase
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.function_bq_filter import FunctionBQFilter
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
+from db.python.tables.sequencing_group import SequencingGroupTable
 from models.enums import BillingTimeColumn, BillingTimePeriods
 from models.models import (
     BillingColumn,
     BillingCostBudgetRecord,
     BillingCostDetailsRecord,
     BillingTotalCostQueryModel,
+)
+from models.utils.sequencing_group_id_format import (
+    sequencing_group_id_format,
+    sequencing_group_id_transform_to_raw,
 )
 
 # Label added to each Billing Big Query request,
@@ -126,6 +144,9 @@ class BillingBaseTable(BqDbBase):
         self._connection.cost += (
             query_job.total_bytes_processed / 1024**4
         ) * BQ_COST_PER_TB
+
+        print('query', query)
+        print('params', params)
 
         # now execute the query
         job_config.dry_run = False
@@ -724,3 +745,302 @@ class BillingBaseTable(BqDbBase):
         )
 
         return results
+
+    async def get_cost_by_sample(
+        self,
+        connection: Connection,
+        query: BillingTotalCostQueryModel,
+    ) -> list[dict] | None:
+        """
+        Get Sample cost of selected fields for requested time interval from BQ views
+
+        SAMPLE_PREFIX , e.g 'XPG'
+        SEQUENCING_GROUP_PREFIX , e.g 'CPG'
+        COHORT_PREFIX , e.g  'COH'
+
+        """
+        print('query:', query)
+        if not query.start_date or not query.end_date or not query.filters:
+            raise ValueError('Date and Filters are required')
+
+        # Get columns to select and to group by
+        fields_selected, _group_by = self._prepare_aggregation(query)
+
+        # 1. Extract all sequencing groups we need to include
+
+        records_filter = query.filters.get(BillingColumn.SEQUENCING_GROUP, [])
+
+        if not records_filter:
+            raise ValueError('Sequencing_group containing is required')
+
+        print('sequencing_group_id_format', sequencing_group_id_format(123))
+
+        sequencing_groups = []
+        sequencing_groups_as_ids: list[int] = []
+        seq_id_map: dict[int, str] = {}
+        for r in records_filter:
+            if r.startswith(SEQUENCING_GROUP_PREFIX):
+                sequencing_groups.append(r)
+                # convert SEQ to IDs
+                seq_id = sequencing_group_id_transform_to_raw(r)
+                seq_id_map[seq_id] = r
+                sequencing_groups_as_ids.append(seq_id)
+            elif r.startswith(COHORT_PREFIX):
+                # TODO: Get all seq groups for this cohort
+                continue
+            elif r.startswith(SAMPLE_PREFIX):
+                # TODO: get all seq groups for this sample
+                continue
+
+        # 2. locate which project metamist project_id, and GCP project
+
+        sgt = SequencingGroupTable(connection)
+        projects = await sgt.get_projects_by_sequencing_group_ids(
+            sequencing_groups_as_ids
+        )
+
+        if not projects:
+            return []
+
+        if len(projects) > 1:
+            raise ValueError('Sequencing_group from one project only')
+
+        # get the project dataset (GCP project names)
+        gcp_project_name = connection.project_id_map[list(projects)[0]].dataset
+        # TODO temp
+        gcp_project_name = 'ourdna-browser'
+
+        # Storage Calculation
+        print('gcp_project_name:', gcp_project_name)
+
+        # overrides time specific fields with relevant time column name
+        query.filters = {BillingColumn.DAY: query.filters.get(BillingColumn.DAY, None)}
+        query_filter = self._query_to_partitioned_filter(query)
+
+        # prepare where string and SQL parameters
+        where_str, sql_parameters = query_filter.to_sql()
+
+        print('query_filter', query_filter)
+        print('where_str', where_str)
+        print('sql_parameters', sql_parameters)
+
+        # 3. Get Total cost of cost_category = 'Cloud Storage' per invoice month for the project filtered by start and end date
+        storage_cost = {}
+        query_parameters: list[
+            bigquery.ScalarQueryParameter | bigquery.ArrayQueryParameter
+        ] = []
+        query_parameters.extend(sql_parameters.values())
+
+        # GCP project names can have a number suffix, so can only be matched using LIKE '%'
+        query_parameters.append(
+            bigquery.ScalarQueryParameter(
+                'gcp_project', 'STRING', f'{gcp_project_name}%'
+            )
+        )
+
+        _query = f"""
+        SELECT invoice_month, sum(cost) as cost
+        FROM `{BQ_AGGREG_VIEW}`
+        WHERE {where_str}
+        AND gcp_project LIKE @gcp_project
+        AND cost_category = 'Cloud Storage'
+        group by invoice_month
+        """
+
+        query_job_result = self._execute_query(_query, query_parameters)
+        if query_job_result:
+            for row in query_job_result:
+                storage_cost[row.invoice_month] = row.cost
+
+        print('storage_cost', storage_cost)
+
+        # 4. get number of seq group per project
+        _query = """
+            SELECT COUNT(distinct sg.id) as cnt
+            FROM sample s
+            INNER JOIN sequencing_group sg ON sg.sample_id = s.id
+            WHERE s.project IN :projects
+        """
+        info_record = await connection.connection.fetch_one(
+            _query,
+            {
+                'projects': list(projects),
+            },
+        )
+        number_of_seq_groups = dict(info_record).get('cnt', 0)
+
+        # 4. Get the cram size per project, total size and count cram files
+
+        _query = """
+            SELECT sum(f.size) as total_crams_size, count(*) as cram_files_cnt
+            FROM output_file f
+            INNER JOIN analysis_outputs o ON o.file_id = f.id
+            INNER JOIN analysis a ON a.id = o.analysis_id
+            where a.type = 'CRAM'
+            AND a.status = 'COMPLETED'
+            and a.project IN :projects
+        """
+        info_record = await connection.connection.fetch_one(
+            _query,
+            {
+                'projects': list(projects),
+            },
+        )
+
+        total_cram_info = dict(info_record)
+
+        print('total_cram_info', total_cram_info)
+        total_crams_size = total_cram_info.get('total_crams_size', 0)
+        _cram_files_cnt = total_cram_info.get('cram_files_cnt', 0)
+
+        # 5. Get individual seq group cram size, list all seq even they do not have cram files
+        if 'sequencing_group' in fields_selected:
+            _query = """
+                SELECT sg.id , sum(f.size) as crams_size
+                FROM sequencing_group sg
+                LEFT JOIN analysis_sequencing_group asg ON asg.sequencing_group_id = sg.id
+                LEFT JOIN analysis a ON asg.analysis_id = a.id AND a.type = 'CRAM' AND a.status = 'COMPLETED' AND a.project IN :projects
+                LEFT JOIN analysis_outputs o ON a.id = o.analysis_id
+                LEFT JOIN output_file f ON o.file_id = f.id
+                WHERE sg.id IN :seq_groups
+                GROUP BY sg.id
+            """
+            records = await connection.connection.fetch_all(
+                _query,
+                {
+                    'projects': list(projects),
+                    'seq_groups': list(sequencing_groups_as_ids),
+                },
+            )
+
+            print('records', records)
+
+            sg_storage_cost = []
+            for row in records:
+                for sk, sv in storage_cost.items():
+                    sg_storage_cost.append(
+                        {
+                            'invoice_month': sk,
+                            'cost_category': 'Cloud Storage',
+                            'sequencing_group': seq_id_map[row['id']],
+                            'cost': (
+                                sv * row['crams_size'] / total_crams_size
+                                if total_crams_size
+                                else sv / number_of_seq_groups
+                            ),
+                        }
+                    )
+        else:
+            _query = """
+                SELECT sum(f.size) as crams_size
+                FROM sequencing_group sg
+                LEFT JOIN analysis_sequencing_group asg ON asg.sequencing_group_id = sg.id
+                LEFT JOIN analysis a ON asg.analysis_id = a.id AND a.type = 'CRAM' AND a.status = 'COMPLETED' AND a.project IN :projects
+                LEFT JOIN analysis_outputs o ON a.id = o.analysis_id
+                LEFT JOIN output_file f ON o.file_id = f.id
+                WHERE sg.id IN :seq_groups
+            """
+            records = await connection.connection.fetch_all(
+                _query,
+                {
+                    'projects': list(projects),
+                    'seq_groups': list(sequencing_groups_as_ids),
+                },
+            )
+
+            print('records', records)
+
+            sg_storage_cost = []
+            for row in records:
+                for sk, sv in storage_cost.items():
+                    sg_storage_cost.append(
+                        {
+                            'invoice_month': sk,
+                            'cost_category': 'Cloud Storage',
+                            'cost': (
+                                sv * row['crams_size'] / total_crams_size
+                                if total_crams_size
+                                else len(list(sequencing_groups_as_ids))
+                                * sv
+                                / number_of_seq_groups
+                            ),
+                        }
+                    )
+
+        # Compute Calculation
+
+        # TODO temp
+        sequencing_groups = ['CPG280370', 'CPG280388']
+
+        # 6. Get all ar-guid with min/max day for each of the seq group
+
+        query_parameters: list[bigquery.ArrayQueryParameter] = [
+            bigquery.ArrayQueryParameter(
+                'sequencing_groups', 'STRING', sequencing_groups
+            )
+        ]
+
+        # get all ar-guid with min/max day for each of the seq group
+        # sequencing_group can be a comma separated list of seq group ids,
+        # so we need to use REGEXP_CONTAINS
+        _query = f"""
+        SELECT ar_guid, min(min_day) as min_day, max(min_day) as max_day
+        FROM `{BQ_BATCHES_VIEW}`
+        WHERE REGEXP_CONTAINS(sequencing_group, ARRAY_TO_STRING(@sequencing_groups, '|'))
+        group by ar_guid
+        """
+
+        ar_guids = {}
+        query_job_result = self._execute_query(_query, query_parameters)
+        if query_job_result:
+            for row in query_job_result:
+                ar_guids[row.ar_guid] = (row.min_day, row.max_day)
+
+        print('ar_guids', ar_guids)
+
+        # 7. Get total compute cost associated with ar-guid
+        where_filter = []
+        for k, v in ar_guids.items():
+            where_filter.append(
+                f"(ar_guid = '{k}' AND day >= TIMESTAMP('{v[0]}') AND day <= TIMESTAMP('{v[1]}'))"
+            )
+
+        _query = f"""
+        WITH ag as (
+            SELECT 
+            invoice_month,
+            ar_guid,
+            topic,
+            stage,
+            cost_category,
+            sequencing_group,
+            SUM(cost) as cost,
+            SUM(cost)/ARRAY_LENGTH(SPLIT(sequencing_group, ',')) as cost_adj
+            FROM `{BQ_AGGREG_EXT_VIEW}`
+            WHERE ({' OR '.join(where_filter) if where_filter else '1=1'})
+            AND sequencing_group IS NOT NULL
+            GROUP BY invoice_month,sequencing_group, ar_guid, topic, stage, cost_category
+        ),
+        t as (
+        SELECT invoice_month, ar_guid, topic, stage, cost_category, sg as sequencing_group, cost_adj
+        FROM ag, UNNEST(SPLIT(sequencing_group, ',')) as sg
+        WHERE sg IN UNNEST(@sequencing_groups)
+        )
+        SELECT invoice_month {',' if fields_selected else ''} {fields_selected}, sum(cost_adj) as cost
+        FROM t
+        GROUP BY invoice_month {',' if fields_selected else ''} {fields_selected}
+        """
+
+        print('_query', _query)
+
+        query_job_result = self._execute_query(
+            _query, query_parameters, results_as_list=False
+        )
+
+        # 8. Combine all together
+        result = self._convert_output(query_job_result)
+        result.extend(sg_storage_cost)
+
+        print('result', result)
+
+        return result
