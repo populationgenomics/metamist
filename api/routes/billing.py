@@ -8,7 +8,12 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 from api.settings import BILLING_CACHE_RESPONSE_TTL, BQ_AGGREG_VIEW
-from api.utils.db import BqConnection, get_author
+from api.utils.db import (
+    BqConnection,
+    Connection,
+    get_author,
+    get_projectless_db_connection,
+)
 from db.python.layers.billing import BillingLayer
 from models.enums import BillingSource
 from models.models import (
@@ -543,3 +548,33 @@ async def get_running_costs(
     billing_layer = _get_billing_layer_from(author)
     records = await billing_layer.get_running_cost(field, invoice_month, source)
     return records
+
+
+@router.post(
+    '/cost-by-sample',
+    response_model=list[BillingTotalCostRecord],
+    operation_id='costBySample',
+)
+@alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_cost_by_sample(
+    query: BillingTotalCostQueryModel,
+    author: str = get_author,
+    connection: Connection = get_projectless_db_connection,
+) -> list[BillingTotalCostRecord]:
+    """Get Total cost of selected fields for requested time interval
+
+    Here are few examples of requests:
+
+    1. Get total topic for month of March 2023, ordered by cost DESC:
+
+        {
+            "fields": ["topic"],
+            "start_date": "2023-03-01",
+            "end_date": "2023-03-31",
+            "order_by": {"cost": true},
+            "source": "aggregate"
+        }
+    """
+    billing_layer = _get_billing_layer_from(author)
+    records = await billing_layer.get_cost_by_sample(connection, query)
+    return [BillingTotalCostRecord.from_json(record) for record in records]
