@@ -1,5 +1,5 @@
 import * as d3 from 'd3'
-import React from 'react'
+import React, { useEffect } from 'react'
 import { BillingCostBudgetRecord } from '../../../sm-api'
 import LoadingDucks from '../LoadingDucks/LoadingDucks'
 
@@ -30,35 +30,22 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
     isLoading,
     showLegend,
 }) => {
-    const colorFunc: (t: number) => string | undefined = colors ?? d3.interpolateRainbow
-
-    // set the dimensions and margins of the graph
-    const margin = { top: 80, right: 20, bottom: 50, left: 250 }
-    const width = 650 - margin.left - margin.right
-    const outsideHeight = 2850
-    const height = outsideHeight - margin.top - margin.bottom
-
     const containerDivRef = React.useRef<HTMLDivElement | null>(null)
 
-    if (!isLoading && (!data || data.length === 0)) {
-        return <div>No data available</div>
-    }
+    useEffect(() => {
+        const colorFunc: (t: number) => string | undefined = colors ?? d3.interpolateRainbow
 
-    const contDiv = containerDivRef.current
-    if (contDiv) {
-        // reset svg
+        // set the dimensions and margins of the graph
+        const margin = { top: 80, right: 20, bottom: 50, left: 250 }
+        const width = 650 - margin.left - margin.right
+        const outsideHeight = 2850
+        const height = outsideHeight - margin.top - margin.bottom
+
+        if (!containerDivRef.current) return
+
+        const contDiv = containerDivRef.current
+
         contDiv.innerHTML = ''
-
-        if (isLoading) {
-            return (
-                <div>
-                    <LoadingDucks />
-                    <p style={{ textAlign: 'center', marginTop: '5px' }}>
-                        <em>This query takes a while...</em>
-                    </p>
-                </div>
-            )
-        }
 
         // prepare data
         // @ts-ignore
@@ -353,7 +340,35 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
                     .text('Budget')
             }
         }
+    }, [
+        containerDivRef,
+        data,
+        colors,
+        labels,
+        series,
+        showLegend,
+        sorted_by,
+        threshold_series,
+        threshold_values,
+        title,
+        total_series,
+    ])
+
+    if (!isLoading && (!data || data.length === 0)) {
+        return <div>No data available</div>
     }
+
+    if (isLoading) {
+        return (
+            <div>
+                <LoadingDucks />
+                <p style={{ textAlign: 'center', marginTop: '5px' }}>
+                    <em>This query takes a while...</em>
+                </p>
+            </div>
+        )
+    }
+
     return <div ref={containerDivRef}></div>
 }
 

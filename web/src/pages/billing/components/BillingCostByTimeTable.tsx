@@ -1,5 +1,11 @@
 import React from 'react'
-import { Checkbox, Header, Table as SUITable } from 'semantic-ui-react'
+import { Checkbox, Dropdown, Header, Table as SUITable } from 'semantic-ui-react'
+import {
+    ColumnConfig,
+    ColumnGroup,
+    ColumnVisibilityDropdown,
+    useColumnVisibility,
+} from '../../../shared/components/ColumnVisibilityDropdown'
 import { IStackedAreaByDateChartData } from '../../../shared/components/Graphs/StackedAreaByDateChart'
 import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
 import Table from '../../../shared/components/Table'
@@ -13,6 +19,11 @@ interface IBillingCostByTimeTableProps {
     groups: string[]
     isLoading: boolean
     data: IStackedAreaByDateChartData[]
+    visibleColumns: Set<string>
+    setVisibleColumns: (columns: Set<string>) => void
+    expandCompute?: boolean
+    setExpandCompute?: (expand: boolean) => void
+    exportToFile: (format: 'csv' | 'tsv') => void
 }
 
 const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
@@ -22,9 +33,25 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     groups,
     isLoading,
     data,
+    visibleColumns,
+    setVisibleColumns,
+    expandCompute: externalExpandCompute,
+    setExpandCompute: externalSetExpandCompute,
+    exportToFile,
 }) => {
     const [internalData, setInternalData] = React.useState<IStackedAreaByDateChartData[]>([])
     const [internalGroups, setInternalGroups] = React.useState<string[]>([])
+
+    // Use external expand state if provided, otherwise use internal state
+    const [internalExpandCompute, setInternalExpandCompute] = React.useState<boolean>(false)
+    const expandCompute = externalExpandCompute ?? internalExpandCompute
+    const setExpandCompute = externalSetExpandCompute ?? setInternalExpandCompute
+
+    // Properties
+    const [sort, setSort] = React.useState<{ column: string | null; direction: string | null }>({
+        column: null,
+        direction: null,
+    })
 
     // Format data
     React.useEffect(() => {
@@ -41,12 +68,110 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         setInternalGroups(groups.concat(['Daily Total', 'Compute Cost']))
     }, [data, groups])
 
-    // Properties
-    const [expandCompute, setExpandCompute] = React.useState<boolean>(false)
-    const [sort, setSort] = React.useState<{ column: string | null; direction: string | null }>({
-        column: null,
-        direction: null,
-    })
+    // Generate column configurations for the dropdown
+    const getColumnConfigs = React.useCallback((): ColumnConfig[] => {
+        const configs: ColumnConfig[] = [
+            { id: 'Daily Total', label: 'Daily Total', group: 'summary' },
+            { id: 'Cloud Storage', label: 'Cloud Storage', group: 'storage' },
+        ]
+
+        if (expandCompute) {
+            // When expanded, add individual compute categories (sorted alphabetically)
+            const computeGroups = groups
+                .filter((group) => group !== 'Cloud Storage')
+                .sort((a, b) => a.localeCompare(b))
+            computeGroups.forEach((group) => {
+                configs.push({ id: group, label: group, group: 'compute' })
+            })
+        } else {
+            // When collapsed, add summary compute cost
+            configs.push({ id: 'Compute Cost', label: 'Compute Cost', group: 'compute' })
+        }
+
+        return configs
+    }, [expandCompute, groups])
+
+    // Generate column groups for the dropdown
+    const getColumnGroups = React.useCallback((): ColumnGroup[] => {
+        const groups: ColumnGroup[] = [
+            { id: 'summary', label: 'Summary', columns: ['Daily Total'] },
+            { id: 'storage', label: 'Storage Cost', columns: ['Cloud Storage'] },
+        ]
+
+        if (expandCompute) {
+            const computeColumns = getColumnConfigs()
+                .filter((config) => config.group === 'compute')
+                .map((config) => config.id)
+                .sort((a, b) => a.localeCompare(b))
+            if (computeColumns.length > 0) {
+                groups.push({ id: 'compute', label: 'Compute Categories', columns: computeColumns })
+            }
+        } else {
+            // Add compute cost to its own group instead of summary
+            groups.push({ id: 'compute', label: 'Compute Cost', columns: ['Compute Cost'] })
+        }
+
+        return groups
+    }, [expandCompute, getColumnConfigs])
+
+    // Use the column visibility hook
+    const { isColumnVisible } = useColumnVisibility(getColumnConfigs(), visibleColumns)
+
+    // Handle expand toggle changes - only modify columns when user explicitly toggles expand
+    const [previousExpandState, setPreviousExpandState] = React.useState<boolean | null>(null)
+
+    React.useEffect(() => {
+        // Only respond to actual expand state changes, not initial load
+        if (previousExpandState !== null && previousExpandState !== expandCompute) {
+            const newVisibleColumns = new Set(visibleColumns)
+            let hasChanges = false
+
+            // Filter out 'Cloud Storage' from groups since it's always a storage cost, not compute cost
+            const computeGroups = groups.filter((group) => group !== 'Cloud Storage')
+
+            if (expandCompute) {
+                // Switching to expanded mode - remove 'Compute Cost' summary and add individual compute groups
+                if (newVisibleColumns.has('Compute Cost')) {
+                    newVisibleColumns.delete('Compute Cost')
+                    hasChanges = true
+                }
+                // Add all compute cost columns (excluding Cloud Storage)
+                computeGroups.forEach((group) => {
+                    if (!newVisibleColumns.has(group)) {
+                        newVisibleColumns.add(group)
+                        hasChanges = true
+                    }
+                })
+            } else {
+                // Switching to collapsed mode - remove individual compute groups and add 'Compute Cost' summary
+                computeGroups.forEach((group) => {
+                    if (newVisibleColumns.has(group)) {
+                        newVisibleColumns.delete(group)
+                        hasChanges = true
+                    }
+                })
+                if (!newVisibleColumns.has('Compute Cost')) {
+                    newVisibleColumns.add('Compute Cost')
+                    hasChanges = true
+                }
+            }
+
+            if (hasChanges) {
+                setVisibleColumns(newVisibleColumns)
+            }
+        }
+
+        setPreviousExpandState(expandCompute)
+    }, [expandCompute, groups, visibleColumns, setVisibleColumns, previousExpandState])
+
+    // Early return for loading - must be after all hooks
+    if (isLoading) {
+        return (
+            <div>
+                <LoadingDucks />
+            </div>
+        )
+    }
 
     // Header sort
     const priorityColumns = ['Daily Total', 'Cloud Storage', 'Compute Cost']
@@ -62,29 +187,31 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     }
 
     const headerFields = () => {
-        if (expandCompute) {
-            return internalGroups
-                .sort(headerSort)
-                .filter((group) => group != 'Compute Cost')
-                .map((group: string) => ({
-                    category: group,
-                    title: group,
-                }))
-        }
-        return [
-            {
-                category: 'Daily Total',
-                title: 'Daily Total',
-            },
-            {
-                category: 'Cloud Storage',
-                title: 'Cloud Storage',
-            },
-            {
-                category: 'Compute Cost',
-                title: 'Compute Cost',
-            },
-        ]
+        const baseFields = expandCompute
+            ? internalGroups
+                  .sort(headerSort)
+                  .filter((group) => group != 'Compute Cost')
+                  .map((group: string) => ({
+                      category: group,
+                      title: group,
+                  }))
+            : [
+                  {
+                      category: 'Daily Total',
+                      title: 'Daily Total',
+                  },
+                  {
+                      category: 'Cloud Storage',
+                      title: 'Cloud Storage',
+                  },
+                  {
+                      category: 'Compute Cost',
+                      title: 'Compute Cost',
+                  },
+              ]
+
+        // Filter by visible columns using our new hook
+        return baseFields.filter((field) => isColumnVisible(field.category))
     }
 
     const handleSort = (clickedColumn: string) => {
@@ -104,14 +231,6 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
             return sort.direction === 'ascending' ? 'ascending' : 'descending'
         }
         return undefined
-    }
-
-    if (isLoading) {
-        return (
-            <div>
-                <LoadingDucks />
-            </div>
-        )
     }
 
     const dataSort = (
@@ -164,13 +283,76 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
 
     return (
         <>
-            <Header as="h3">
-                {convertFieldName(heading)} costs from {start} to {end}
-            </Header>
+            <div
+                style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    marginBottom: '15px',
+                    flexWrap: 'wrap',
+                    gap: '10px',
+                }}
+            >
+                <Header as="h3" style={{ margin: 0, flex: '1 1 200px' }}>
+                    {convertFieldName(heading)} costs from {start} to {end}
+                </Header>
+                <div
+                    style={{
+                        display: 'flex',
+                        gap: '10px',
+                        flex: '0 0 auto',
+                        minWidth: '240px',
+                    }}
+                >
+                    <ColumnVisibilityDropdown
+                        columns={getColumnConfigs()}
+                        groups={getColumnGroups()}
+                        visibleColumns={visibleColumns}
+                        onVisibilityChange={setVisibleColumns}
+                        searchThreshold={8}
+                        searchPlaceholder="Search columns..."
+                        enableUrlPersistence={false}
+                        buttonStyle={{
+                            minWidth: '115px',
+                            height: '36px',
+                        }}
+                    />
+                    <Dropdown
+                        button
+                        className="icon"
+                        floating
+                        labeled
+                        icon="download"
+                        text="Export"
+                        style={{
+                            minWidth: '115px',
+                            height: '36px',
+                        }}
+                    >
+                        <Dropdown.Menu>
+                            <Dropdown.Item
+                                key="csv"
+                                text="Export to CSV"
+                                icon="file excel"
+                                onClick={() => exportToFile('csv')}
+                            />
+                            <Dropdown.Item
+                                key="tsv"
+                                text="Export to TSV"
+                                icon="file text outline"
+                                onClick={() => exportToFile('tsv')}
+                            />
+                        </Dropdown.Menu>
+                    </Dropdown>
+                </div>
+            </div>
             <Table celled compact sortable selectable>
                 <SUITable.Header>
                     <SUITable.Row>
-                        <SUITable.HeaderCell colSpan={2} textAlign="center">
+                        <SUITable.HeaderCell
+                            colSpan={isColumnVisible('Daily Total') ? 2 : 1}
+                            textAlign="center"
+                        >
                             <Checkbox
                                 label="Expand"
                                 fitted
@@ -179,8 +361,30 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                                 onChange={() => setExpandCompute(!expandCompute)}
                             />
                         </SUITable.HeaderCell>
-                        <SUITable.HeaderCell>Storage Cost</SUITable.HeaderCell>
-                        <SUITable.HeaderCell colSpan={headerFields().length - 1}>
+                        <SUITable.HeaderCell
+                            colSpan={isColumnVisible('Cloud Storage') ? 1 : 0}
+                            style={{
+                                display: isColumnVisible('Cloud Storage') ? 'table-cell' : 'none',
+                            }}
+                        >
+                            Storage Cost
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
+                            colSpan={
+                                headerFields().length -
+                                (isColumnVisible('Cloud Storage') ? 1 : 0) -
+                                (isColumnVisible('Daily Total') ? 1 : 0)
+                            }
+                            style={{
+                                display: headerFields().some(
+                                    (f) =>
+                                        f.category !== 'Daily Total' &&
+                                        f.category !== 'Cloud Storage'
+                                )
+                                    ? 'table-cell'
+                                    : 'none',
+                            }}
+                        >
                             Compute Cost
                         </SUITable.HeaderCell>
                     </SUITable.Row>
