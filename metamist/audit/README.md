@@ -91,7 +91,7 @@ The audit generates several reports in the upload bucket:
 
 1. **audit_metadata.tsv**: Configuration used for the audit
 2. **files_to_delete.csv**: Files that can be safely deleted
-3. **files_to_ingest.csv**: Files that need to be ingested
+3. **files_to_review.csv**: Files that need to be reviewed
 4. **unaligned_sgs.tsv**: Sequencing groups without completed CRAMs
 
 
@@ -192,12 +192,6 @@ def test_audit_analyzer():
 ### Sequencing Types
 
 Use `all` to include all types, or specify sequencing types from the enum values.
-
-- genome
-- exome
-- totalrna
-- polyarna
-- singlecellrna
 
 ### Sequencing Technologies
 

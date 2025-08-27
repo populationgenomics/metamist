@@ -65,13 +65,13 @@ class ReportGenerator:
                 'FILES TO DELETE',
             )
 
-        # Write files to ingest report
-        if audit_result.files_to_ingest:
+        # Write files to review report
+        if audit_result.files_to_review:
             self._write_csv_report(
                 bucket_name,
-                f'{output_dir}/files_to_ingest.csv',
-                audit_result.files_to_ingest,
-                'FILES TO INGEST',
+                f'{output_dir}/files_to_review.csv',
+                audit_result.files_to_review,
+                'FILES TO REVIEW',
             )
 
         # Write moved files report

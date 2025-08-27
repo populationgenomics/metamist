@@ -188,7 +188,7 @@ class AuditResult:
     """Result of an audit analysis."""
 
     files_to_delete: list[AuditReportEntry] = field(default_factory=list)
-    files_to_ingest: list[AuditReportEntry] = field(default_factory=list)
+    files_to_review: list[AuditReportEntry] = field(default_factory=list)
     moved_files: list[AuditReportEntry] = field(default_factory=list)
     unaligned_sequencing_groups: list[SequencingGroup] = field(default_factory=list)
 
