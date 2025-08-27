@@ -38,7 +38,7 @@ const billingApi = new BillingApi()
 
 // A map of billing column enums to titles, these are the supported fields to break down by
 const BILLING_COLUMN_MAP: Map<BillingColumn, string> = new Map([
-    [BillingColumn.SequencingGroup, 'SequencingGroup'],
+    [BillingColumn.SequencingGroup, 'Sequencing Group'],
     [BillingColumn.Topic, 'Topic'],
     [BillingColumn.ArGuid, 'AR guid'],
     [BillingColumn.CostCategory, 'Cost Category'],
@@ -347,13 +347,7 @@ const sampleCols: GridColDef<BillingResultRow>[] = [
     },
 ]
 
-const sgCols: GridColDef<BillingResultRow>[] = [
-    {
-        field: 'sequencingGroup',
-        headerName: 'Sequencing Group',
-        renderCell: (params) => params.row.sequencingGroup.join(', '),
-    },
-]
+const sgCols: GridColDef<BillingResultRow>[] = []
 
 function BillingCostBySampleTable(props: { entityType: EntityType; data: BillingResultRow[] }) {
     const { data, entityType } = props

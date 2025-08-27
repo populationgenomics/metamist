@@ -3,7 +3,7 @@
 import re
 from abc import ABCMeta, abstractmethod
 from collections import Counter, defaultdict, namedtuple
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from google.cloud import bigquery
@@ -35,10 +35,7 @@ from models.models import (
     BillingCostDetailsRecord,
     BillingTotalCostQueryModel,
 )
-from models.utils.sequencing_group_id_format import (
-    sequencing_group_id_format,
-    sequencing_group_id_transform_to_raw,
-)
+from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
 
 # Label added to each Billing Big Query request,
 # so we can track the cost of metamist-api BQ usage
@@ -748,7 +745,7 @@ class BillingBaseTable(BqDbBase):
 
         return results
 
-    async def get_cost_by_sample(  # pylint: disable=R0914
+    async def get_cost_by_sample(  # pylint: disable=R0914, R0912
         self,
         connection: Connection,
         query: BillingTotalCostQueryModel,
@@ -775,16 +772,14 @@ class BillingBaseTable(BqDbBase):
         if not records_filter:
             raise ValueError('Sequencing_group containing is required')
 
-        print('sequencing_group_id_format', sequencing_group_id_format(123))
-
         sequencing_groups = []
         sequencing_groups_as_ids: list[int] = []
         seq_id_map: dict[int, str] = {}
         for r in records_filter:
             if r.startswith(SEQUENCING_GROUP_PREFIX):
-                sequencing_groups.append(r)
+                sequencing_groups.append(r.upper())
                 # convert SEQ to IDs
-                seq_id = sequencing_group_id_transform_to_raw(r)
+                seq_id = sequencing_group_id_transform_to_raw(r.upper())
                 seq_id_map[seq_id] = r
                 sequencing_groups_as_ids.append(seq_id)
             elif r.startswith(COHORT_PREFIX):
@@ -800,7 +795,6 @@ class BillingBaseTable(BqDbBase):
         projects = await sgt.get_projects_by_sequencing_group_ids(
             sequencing_groups_as_ids
         )
-
         if not projects:
             return []
 
@@ -809,11 +803,35 @@ class BillingBaseTable(BqDbBase):
 
         # get the project dataset (GCP project names)
         gcp_project_name = connection.project_id_map[list(projects)[0]].dataset
-        # TODO temp
-        gcp_project_name = 'ourdna-browser'
 
         # Storage Calculation
-        print('gcp_project_name:', gcp_project_name)
+
+        # Find the minimum day when samples has been added
+        # using FOR SYSTEM_TIME ALL gives us full history
+        _query = """
+        SELECT MIN(l.timestamp) as start_date
+        FROM sequencing_group FOR SYSTEM_TIME ALL sg
+        INNER JOIN audit_log l on l.id = sg.audit_log_id
+        WHERE sg.id IN :seq_groups
+        """
+        info_record = await connection.connection.fetch_one(
+            _query,
+            {
+                'seq_groups': list(sequencing_groups_as_ids),
+            },
+        )
+        min_start_date = (
+            dict(info_record).get('start_date', datetime.now()).strftime('%Y-%m-01')
+        )
+
+        # do not include any data prior the seq group exist
+        query.start_date = max(query.start_date, min_start_date)
+
+        # if min date passes the end date, be sure we shift it so we have some data
+        if min_start_date > query.end_date:
+            query.end_date = (
+                datetime.strptime(min_start_date, '%Y-%m-%d') + timedelta(days=30)
+            ).strftime('%Y-%m-%d')
 
         # overrides time specific fields with relevant time column name
         query.filters = {BillingColumn.DAY: query.filters.get(BillingColumn.DAY, None)}
@@ -822,11 +840,8 @@ class BillingBaseTable(BqDbBase):
         # prepare where string and SQL parameters
         where_str, sql_parameters = query_filter.to_sql()
 
-        print('query_filter', query_filter)
-        print('where_str', where_str)
-        print('sql_parameters', sql_parameters)
-
         # 3. Get Total cost of cost_category = 'Cloud Storage' per invoice month for the project filtered by start and end date
+
         storage_cost = {}
         query_parameters: list[
             bigquery.ScalarQueryParameter | bigquery.ArrayQueryParameter
@@ -854,8 +869,7 @@ class BillingBaseTable(BqDbBase):
             for row in query_job_result:
                 storage_cost[row.invoice_month] = row.cost
 
-        print('storage_cost', storage_cost)
-
+        print('storage_cost', dict(sorted(storage_cost.items())))
         # 4. get number of seq group per project
         _query = """
             SELECT COUNT(distinct sg.id) as cnt
@@ -890,9 +904,7 @@ class BillingBaseTable(BqDbBase):
         )
 
         total_cram_info = dict(info_record)
-
-        print('total_cram_info', total_cram_info)
-        total_crams_size = total_cram_info.get('total_crams_size', 0)
+        total_crams_size = float(total_cram_info.get('total_crams_size', 0))
         _cram_files_cnt = total_cram_info.get('cram_files_cnt', 0)
 
         # 5. Get individual seq group cram size, list all seq even they do not have cram files
@@ -917,16 +929,19 @@ class BillingBaseTable(BqDbBase):
             sg_storage_cost = []
             for row in records:
                 for sk, sv in storage_cost.items():
+                    #
+                    if row['crams_size'] and total_crams_size:
+                        cost = sv * float(row['crams_size']) / total_crams_size
+                    else:
+                        cost = (
+                            0  # TODO should we calc as this? sv / number_of_seq_groups
+                        )
                     sg_storage_cost.append(
                         {
                             'invoice_month': sk,
                             'cost_category': 'Cloud Storage',
                             'sequencing_group': seq_id_map[row['id']],
-                            'cost': (
-                                sv * row['crams_size'] / total_crams_size
-                                if total_crams_size
-                                else sv / number_of_seq_groups
-                            ),
+                            'cost': cost,
                         }
                     )
         else:
@@ -954,7 +969,7 @@ class BillingBaseTable(BqDbBase):
                             'invoice_month': sk,
                             'cost_category': 'Cloud Storage',
                             'cost': (
-                                sv * row['crams_size'] / total_crams_size
+                                sv * float(row['crams_size']) / total_crams_size
                                 if total_crams_size
                                 else len(list(sequencing_groups_as_ids))
                                 * sv
@@ -979,7 +994,7 @@ class BillingBaseTable(BqDbBase):
         _query = f"""
         SELECT ar_guid, min(min_day) as min_day, max(min_day) as max_day
         FROM `{BQ_BATCHES_VIEW}`
-        WHERE REGEXP_CONTAINS(sequencing_group, ARRAY_TO_STRING(@sequencing_groups, '|'))
+        WHERE REGEXP_CONTAINS(UPPER(sequencing_group), ARRAY_TO_STRING(@sequencing_groups, '|'))
         group by ar_guid
         """
 
@@ -1016,7 +1031,7 @@ class BillingBaseTable(BqDbBase):
         ),
         t as (
         SELECT invoice_month, ar_guid, topic, stage, cost_category, sg as sequencing_group, cost_adj
-        FROM ag, UNNEST(SPLIT(sequencing_group, ',')) as sg
+        FROM ag, UNNEST(SPLIT(UPPER(sequencing_group), ',')) as sg
         WHERE sg IN UNNEST(@sequencing_groups)
         )
         SELECT invoice_month {',' if fields_selected else ''} {fields_selected}, sum(cost_adj) as cost
@@ -1033,6 +1048,8 @@ class BillingBaseTable(BqDbBase):
         # 8. Combine all together
         result = self._convert_output(query_job_result)
         result.extend(sg_storage_cost)
+
+        result = sorted(result, key=lambda k: k['invoice_month'])
 
         print('result', result)
 
