@@ -108,7 +108,8 @@ class AuditOrchestrator:
 
         # 7. Write reports
         self.logger.info('Writing reports'.center(50, '~'))
-        self.report_writer.write_audit_reports(result, bucket_name, config)
+        analysis_bucket_name = self.gcs_data.get_bucket_name(config.dataset, 'analysis')
+        self.report_writer.write_audit_reports(result, analysis_bucket_name, config)
 
         self.logger.info('Upload bucket audit complete')
 
@@ -166,22 +167,6 @@ class AuditOrchestrator:
         )
         self.logger.info(f'Unaligned SGs: {stats["unaligned_sgs"]}')
         self.logger.info('')
-
-
-# def setup_logger(dataset: str) -> logging.Logger:
-#     """Set up logger for audit."""
-#     handler = logging.StreamHandler()
-#     formatter = logging.Formatter(
-#         fmt='%(asctime)s %(levelname)s %(module)s:%(lineno)d - %(dataset)s :: %(message)s',
-#         datefmt='%Y-%m-%d %H:%M:%S',
-#     )
-#     handler.setFormatter(formatter)
-#     logger = logging.getLogger('audit')
-#     logger.addHandler(handler)
-#     logger.setLevel(logging.INFO)
-#     logger.propagate = False
-
-#     return logging.LoggerAdapter(logger, {'dataset': dataset})
 
 
 async def validate_enum_values(

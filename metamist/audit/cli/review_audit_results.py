@@ -33,7 +33,7 @@ def review_audit_results(
     gcs_data = GCSDataAccess(storage_client)
     report_generator = ReportGenerator(storage_client, results_folder, logger)
 
-    bucket_name = gcs_data.get_bucket_name(dataset, 'upload')
+    bucket_name = gcs_data.get_bucket_name(dataset, 'analysis')
 
     report_path = to_path(f'gs://{bucket_name}/{results_folder}/{report}.csv')
     if not report_path.exists():
