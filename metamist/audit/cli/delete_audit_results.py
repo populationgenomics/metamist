@@ -50,7 +50,9 @@ def delete_from_audit_results(
         reader = csv.DictReader(f)
         rows = list(reader)
 
-    deletion_result = delete_files(storage_client, report_name, rows, dry_run, logger)
+    deletion_result = delete_files(
+        storage_client, bucket_name, report_name, rows, dry_run, logger
+    )
 
     report_path = report_generator.write_deleted_files_report(
         deletion_result, bucket_name
@@ -65,12 +67,14 @@ def delete_from_audit_results(
 
 def delete_files(
     storage_client: StorageClient,
+    bucket_name: str,
     report_name: str,
     rows: list[AuditReportEntry],
     dry_run: bool,
     logger: logging.Logger,
 ) -> DeletionResult:
     """Delete files from audit results based on filters."""
+    bucket = storage_client.client.get_bucket(bucket_name)
     total_files = 0
     total_bytes = 0
     deleted_files_rows = []
@@ -99,7 +103,7 @@ def delete_files(
             logger.info(f'Dry run: would delete {file_path}')
         else:
             try:
-                storage_client.delete_blob(file_path)
+                storage_client.delete_blob(bucket, file_path.blob)
                 logger.info(f'Successfully deleted {file_path}')
                 deleted_files_rows.append(row)
             except Exception as e:  # pylint: disable=broad-exception-caught

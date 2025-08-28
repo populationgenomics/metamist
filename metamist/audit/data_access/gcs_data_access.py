@@ -82,7 +82,9 @@ class GCSDataAccess:
         """
         try:
             path = to_path(file_path)
-            return self.storage_client.check_blob_exists(path.bucket, path.blob)
+            return self.storage_client.check_blob_exists(
+                self.storage_client.client.bucket(path.bucket), path.blob
+            )
         except (ValueError, AttributeError):
             return False
 
@@ -128,22 +130,6 @@ class GCSDataAccess:
             all_files.extend(files)
 
         return all_files
-
-    def get_file_metadata(self, file_path: str) -> Optional[FileMetadata]:  # Unused
-        """
-        Get metadata for a single file.
-
-        Args:
-            file_path: GCS path
-
-        Returns:
-            FileMetadata object or None if file doesn't exist
-        """
-        try:
-            path = to_path(file_path)
-            return self.storage_client.get_blob_metadata(path.bucket, path.blob)
-        except (ValueError, AttributeError):
-            return None
 
     def batch_get_metadata(self, file_paths: List[str]) -> List[FileMetadata]:
         """

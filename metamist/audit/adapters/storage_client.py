@@ -129,19 +129,17 @@ class StorageClient:
 
         return results
 
-    def check_blob_exists(self, bucket_name: str, blob_name: str) -> bool:
+    def check_blob_exists(self, bucket: storage.Bucket, blob_name: str) -> bool:
         """
         Check if a blob exists.
 
         Args:
-            bucket_name: Name of the bucket
+            bucket: The bucket containing the blob.
             blob_name: Name of the blob
 
         Returns:
             True if blob exists, False otherwise
         """
-        bucket_name = bucket_name.removeprefix('gs://').removesuffix('/')
-        bucket = self.client.bucket(bucket_name, user_project=self.project)
         blob = bucket.blob(blob_name)
         return blob.exists()
 
@@ -207,28 +205,17 @@ class StorageClient:
 
         return dict(buckets_prefixes)
 
-    def delete_blobs(
-        self,
-        paths: List[str],
-    ):
-        """
-        Delete blobs from Google Cloud Storage.
-        """
-        for path in paths:
-            self.delete_blob(path)
-
     def delete_blob(
         self,
-        path: str,
+        bucket: storage.Bucket,
+        blob_name: str,
     ):
         """
         Delete a blob from Google Cloud Storage.
 
         Args:
-            path: The GCS path of the blob to delete.
+            bucket: The bucket containing the blob.
+            blob_name: The name of the blob to delete.
         """
-        path = to_path(path)
-        bucket_name, blob_name = path.bucket, path.blob
-        bucket = self.client.get_bucket(bucket_name)
         blob = bucket.blob(blob_name)
         blob.delete()
