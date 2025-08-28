@@ -11,7 +11,7 @@ from cpg_utils.config import config_retrieve
 from ..models import AuditConfig, SequencingGroup
 from ..adapters import GraphQLClient, StorageClient
 from ..data_access import MetamistDataAccess, GCSDataAccess
-from ..services import AuditAnalyzer, ReportGenerator
+from ..services import AuditAnalyzer, AuditLogger, ReportGenerator
 
 
 class AuditOrchestrator:
@@ -108,7 +108,7 @@ class AuditOrchestrator:
 
         # 7. Write reports
         self.logger.info('Writing reports'.center(50, '~'))
-        self.report_writer.write_reports(result, bucket_name, config)
+        self.report_writer.write_audit_reports(result, bucket_name, config)
 
         self.logger.info('Upload bucket audit complete')
 
@@ -168,20 +168,20 @@ class AuditOrchestrator:
         self.logger.info('')
 
 
-def setup_logger(dataset: str) -> logging.Logger:
-    """Set up logger for audit."""
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter(
-        fmt='%(asctime)s %(levelname)s %(module)s:%(lineno)d - %(dataset)s :: %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
-    )
-    handler.setFormatter(formatter)
-    logger = logging.getLogger('audit')
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
-    logger.propagate = False
+# def setup_logger(dataset: str) -> logging.Logger:
+#     """Set up logger for audit."""
+#     handler = logging.StreamHandler()
+#     formatter = logging.Formatter(
+#         fmt='%(asctime)s %(levelname)s %(module)s:%(lineno)d - %(dataset)s :: %(message)s',
+#         datefmt='%Y-%m-%d %H:%M:%S',
+#     )
+#     handler.setFormatter(formatter)
+#     logger = logging.getLogger('audit')
+#     logger.addHandler(handler)
+#     logger.setLevel(logging.INFO)
+#     logger.propagate = False
 
-    return logging.LoggerAdapter(logger, {'dataset': dataset})
+#     return logging.LoggerAdapter(logger, {'dataset': dataset})
 
 
 async def validate_enum_values(
@@ -240,7 +240,7 @@ async def audit_upload_bucket_async(audit_config: AuditConfig):
         audit_config: Audit configuration
     """
     # Set up logger
-    logger = setup_logger(audit_config.dataset)
+    logger = AuditLogger(audit_config.dataset, 'upload_bucket_audit').logger
 
     # Get GCP project
     gcp_project = config_retrieve(['workflow', audit_config.dataset, 'gcp_project'])
@@ -268,7 +268,9 @@ async def audit_upload_bucket_async(audit_config: AuditConfig):
     storage_client = StorageClient(project=gcp_project)
 
     # Validate enum values
-    audit_config = await validate_enum_values(graphql_client, audit_config)  # TODO: do this alongside the file types validation
+    audit_config = await validate_enum_values(
+        graphql_client, audit_config
+    )  # TODO: do this alongside the file types validation
 
     # Create repositories
     metamist_data = MetamistDataAccess(graphql_client)

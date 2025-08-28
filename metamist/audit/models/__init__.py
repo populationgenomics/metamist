@@ -9,6 +9,8 @@ from .entities import (
     SequencingGroup,
     AuditReportEntry,
     AuditResult,
+    ReviewResult,
+    DeletionResult,
 )
 from .value_objects import (
     FileType,
@@ -29,6 +31,8 @@ __all__ = [
     'SequencingGroup',
     'AuditReportEntry',
     'AuditResult',
+    'ReviewResult',
+    'DeletionResult',
     # Value Objects
     'FileType',
     'FilePath',

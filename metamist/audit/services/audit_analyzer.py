@@ -80,7 +80,7 @@ class AuditAnalyzer:
             sequencing_groups, bucket_files, moved_files, analyses, excluded_sg_ids
         )
 
-        files_to_ingest = self._generate_ingest_entries(
+        files_to_review = self._generate_review_entries(
             sequencing_groups, uningested_files
         )
 
@@ -90,7 +90,7 @@ class AuditAnalyzer:
 
         return AuditResult(
             files_to_delete=files_to_delete,
-            files_to_ingest=files_to_ingest,
+            files_to_review=files_to_review,
             moved_files=moved_entries,
             unaligned_sequencing_groups=unaligned_sgs,
         )
@@ -170,12 +170,12 @@ class AuditAnalyzer:
 
         return entries
 
-    def _generate_ingest_entries(
+    def _generate_review_entries(
         self,
         sequencing_groups: List[SequencingGroup],
         uningested_files: List[FileMetadata],
     ) -> List[AuditReportEntry]:
-        """Generate report entries for files to ingest."""
+        """Generate report entries for files to review."""
         entries = []
 
         # Build lookup of external IDs to completed SGs

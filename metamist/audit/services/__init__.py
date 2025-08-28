@@ -9,6 +9,7 @@ from .file_matcher import (
 )
 from .audit_analyzer import AuditAnalyzer
 from .report_generator import ReportGenerator
+from .audit_logging import AuditLogger
 
 __all__ = [
     # File matching
@@ -20,4 +21,5 @@ __all__ = [
     # Core services
     'AuditAnalyzer',
     'ReportGenerator',
+    'AuditLogger',
 ]

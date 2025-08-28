@@ -10,6 +10,8 @@ from google.cloud import storage
 
 from ..models import (
     AuditResult,
+    ReviewResult,
+    DeletionResult,
     AuditReportEntry,
     SequencingGroup,
     AuditConfig,
@@ -20,7 +22,10 @@ class ReportGenerator:
     """Service for generating and writing audit reports."""
 
     def __init__(
-        self, storage_client: storage.Client, logger: Optional[logging.Logger] = None
+        self,
+        storage_client: storage.Client,
+        timestamp: Optional[str] = None,
+        logger: Optional[logging.Logger] = None,
     ):
         """
         Initialize the report generator.
@@ -31,8 +36,9 @@ class ReportGenerator:
         """
         self.storage_client = storage_client
         self.logger = logger or logging.getLogger(__name__)
+        self.timestamp = timestamp or datetime.now().strftime('%Y-%m-%d_%H%M%S')
 
-    def write_reports(
+    def write_audit_reports(
         self,
         audit_result: AuditResult,
         bucket_name: str,
@@ -48,12 +54,11 @@ class ReportGenerator:
             config: Audit configuration
             output_prefix: Optional prefix for output paths
         """
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
-        output_dir = f"{output_prefix or 'audit_results'}/{timestamp}"
+        output_dir = f"{output_prefix or 'audit_results'}/{self.timestamp}"
 
         # Write metadata report
         self._write_metadata_report(
-            bucket_name, f'{output_dir}/audit_metadata.tsv', config
+            bucket_name, f'{output_dir}/audit_metadata.txt', config
         )
 
         # Write files to delete report
@@ -93,36 +98,83 @@ class ReportGenerator:
 
         self.logger.info(f'Reports written to gs://{bucket_name}/{output_dir}')
 
+    def write_reviewed_files_report(
+        self,
+        review_result: ReviewResult,
+        bucket_name: str,
+        output_prefix: Optional[str] = None,
+    ):
+        """
+        Write reviewed files report to GCS.
+
+        Args:
+            review_result: The review analysis results
+            bucket_name: GCS bucket name for reports
+            output_prefix: Optional prefix for output paths
+        """
+        output_dir = f'{output_prefix or "audit_results"}/{self.timestamp}'
+
+        if review_result.reviewed_files:
+            self._write_csv_report(
+                bucket_name,
+                f'{output_dir}/reviewed_files.csv',
+                review_result.reviewed_files,
+                'FILES REVIEWED',
+            )
+
+        self.logger.info(
+            f'Reviewed files report written to gs://{bucket_name}/{output_dir}'
+        )
+
+    def write_deleted_files_report(
+        self,
+        deletion_result: DeletionResult,
+        bucket_name: str,
+        output_prefix: Optional[str] = None,
+    ):
+        """
+        Write deleted files report to GCS.
+
+        Args:
+            deleted_files: The deleted files entries
+            bucket_name: GCS bucket name for reports
+            output_prefix: Optional prefix for output paths
+        """
+        output_dir = f'{output_prefix or "audit_results"}/{self.timestamp}'
+        output_path = f'gs://{bucket_name}/{output_dir}/deleted_files.csv'
+
+        if deletion_result.deleted_files:
+            self._write_csv_report(
+                bucket_name,
+                f'{output_dir}/deleted_files.csv',
+                deletion_result.deleted_files,
+                'FILES DELETED',
+            )
+
+        self.logger.info(f'Deleted files report written to {output_path}')
+        return output_path
+
     def _write_metadata_report(
         self, bucket_name: str, blob_path: str, config: AuditConfig
     ):
         """Write audit configuration metadata."""
         buffer = StringIO()
-        writer = csv.writer(buffer, delimiter='\t')
 
-        writer.writerow(
-            [
-                'Sequencing Type',
-                'Sequencing Technology',
-                'Sequencing Platform',
-                'File Type',
-                'Analysis Type',
-                'Excluded Prefixes',
-            ]
-        )
+        lines = [
+            f"Sequencing Types: {', '.join(sorted(config.sequencing_types))}",
+            f"Sequencing Technologies: {', '.join(sorted(config.sequencing_technologies))}",
+            f"Sequencing Platforms: {', '.join(sorted(config.sequencing_platforms))}",
+            f"File Types: {', '.join(sorted(ft.name for ft in config.file_types))}",
+            f"Analysis Types: {', '.join(sorted(config.analysis_types))}",
+        ]
+        if config.excluded_prefixes:
+            lines.append(
+                f"Excluded Prefixes: {', '.join(sorted(config.excluded_prefixes))}"
+            )
 
-        writer.writerow(
-            [
-                ', '.join(config.sequencing_types),
-                ', '.join(config.sequencing_technologies),
-                ', '.join(config.sequencing_platforms),
-                ', '.join(ft.name for ft in config.file_types),
-                ', '.join(config.analysis_types),
-                ', '.join(config.excluded_prefixes) if config.excluded_prefixes else '',
-            ]
-        )
+        buffer.write('\n'.join(lines))
 
-        self._upload_buffer(bucket_name, blob_path, buffer, 'text/tab-separated-values')
+        self._upload_buffer(bucket_name, blob_path, buffer, 'text/plain')
         self.logger.info(f'Metadata report written to gs://{bucket_name}/{blob_path}')
 
     def _write_csv_report(
@@ -132,7 +184,7 @@ class ReportGenerator:
         entries: List[AuditReportEntry],
         report_name: str,
     ):
-        """Write a CSV report for audit entries."""
+        """Create or update a CSV report for audit entries."""
         if not entries:
             self.logger.info(f'{report_name} - SKIPPED - No data to write')
             return
@@ -141,15 +193,40 @@ class ReportGenerator:
 
         # Get fieldnames from first entry
         fieldnames = list(entries[0].to_report_dict().keys())
-        writer = csv.DictWriter(buffer, fieldnames=fieldnames)
 
-        writer.writeheader()
+        # Check if the file exists and has content, if so, don't write header
+        blob = self.storage_client.bucket(bucket_name).blob(blob_path)
+        if blob.exists() and blob.size > 0:
+            self.logger.info(
+                f'File exists, appending to: gs://{bucket_name}/{blob_path}'
+            )
+            # Download existing data and decode it, handling potential BOM
+            existing_data = blob.download_as_text(encoding='utf-8-sig')
+            buffer = StringIO(existing_data)
+            reader = csv.DictReader(buffer)
+
+            # Collect all rows from the existing CSV
+            rows = list(reader)
+
+            # Reset the buffer to be written to from the beginning
+            buffer = StringIO()
+            writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+            # writer.writeheader() # Don't write header again
+
+        else:
+            self.logger.info(
+                f'File does not exist, writing to: gs://{bucket_name}/{blob_path}'
+            )
+            rows = []
+            writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+            writer.writeheader()
 
         # Sort files to delete by SG ID for easier review
-        rows = [entry.to_report_dict() for entry in entries]
+        rows.extend([entry.to_report_dict() for entry in entries])
         if report_name == 'FILES TO DELETE':
             rows = sorted(rows, key=lambda x: x.get('SG ID', ''))
 
+        # Write all rows including new and existing to buffer
         writer.writerows(rows)
 
         self._upload_buffer(bucket_name, blob_path, buffer, 'text/csv')
@@ -244,15 +321,15 @@ class ReportGenerator:
             for entry in audit_result.files_to_delete + audit_result.moved_files
         )
 
-        total_size_to_ingest = sum(
-            entry.filesize or 0 for entry in audit_result.files_to_ingest
+        total_size_to_review = sum(
+            entry.filesize or 0 for entry in audit_result.files_to_review
         )
 
         return {
             'files_to_delete': len(audit_result.files_to_delete),
             'files_to_delete_size_gb': total_size_to_delete / (1024**3),
             'moved_files': len(audit_result.moved_files),
-            'files_to_ingest': len(audit_result.files_to_ingest),
-            'files_to_ingest_size_gb': total_size_to_ingest / (1024**3),
+            'files_to_review': len(audit_result.files_to_review),
+            'files_to_review_size_gb': total_size_to_review / (1024**3),
             'unaligned_sgs': len(audit_result.unaligned_sequencing_groups),
         }

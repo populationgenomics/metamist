@@ -7,11 +7,13 @@ Audit system for managing cloud storage buckets and the integrity of genomic dat
 This audit module provides tools for:
 
 - Identifying files that can be safely deleted
-- Finding files that need ingestion into Metamist
+- Identifying files that require manual review
 - Detecting sequencing groups requiring processing
 - Tracking file movements and duplications within buckets
 
 ### Implementation Details
+
+#### Deletions
 
 Deleting files is a critical aspect of the audit process. The system identifies files that can be safely deleted, such as original reads where CRAMs exist. This helps in managing storage costs and maintaining an organized file structure.
 
@@ -22,6 +24,40 @@ Other conditions which could be met to identify files for deletion:
 - If the file is a duplicate of a file recorded in Metamist or found elsewhere in the bucket
 
 In general, files are considered for deletion if they are no longer needed for analysis or if they have been superseded by newer versions. Any file which cannot be definitively considered as safe to delete should not be deleted without further review. Some manual review of the results may be necessary to ensure that no important data is lost.
+
+Deletions are handled via the `delete_audit_results.py` CLI entrypoint. This script allows deletion from the `files_to_delete` report, which is generated during the audit process. It will also enable deletion of files from the `files_to_review` report, if the user has reviewed and annotated the report marking the rows intended for deletion.
+
+Using the deletion script will create or update a report `deleted_files` and a corresponding analysis record in Metamist, of analysis type `audit_deletion`. The analysis meta tracks the deletion stats for the audit, separating the deletion actions depending on their source report.
+
+An example analysis record might look like this:
+
+```json
+{
+  "id": 12345,
+  "type": "audit_deletion",
+  "output": "gs://cpg-dataset-main-analysis/audit_results/2025-01-01_123456/deleted_files.csv",
+  "meta": {
+    "report_stats": {
+      "files_to_delete": {
+        "deleted_files": 200,
+        "deleted_bytes": 4011744806301
+      },
+      "files_to_review": {
+        "deleted_files": 100,
+        "deleted_bytes": 2005872403150
+      }
+    }
+  }
+}
+```
+
+#### Reviews
+
+If a file is found and not identified as a 'safe' deletion candidate, it must be manually reviewed. These review candidates are saved to the 'files_to_review' report.
+
+Naturally, some of the files in this report will be candidates for deletion. To mark these files for deletion, the user must review and annotate the report, indicating which files are safe to delete. Reviews are conducted through the CLI entrypoint `review_audit_results.py`. Users must provide their annotations and justifications for each file marked for deletion via input filters and input comments.
+
+Using this CLI tool, a new report will be created or updated, called `reviewed_files.csv`. This report will contain the user's annotations and justifications for each file marked for deletion, and is a valid input for the deletion process.
 
 ## Architecture
 
@@ -37,17 +73,21 @@ audit/
 │   ├── metamist_data_access.py     # Metamist data access
 │   └── gcs_data_access.py          # GCS data access
 ├── services/                   # Business logic (pure functions)
-│   ├── file_matcher.py             # File matching strategies
 │   ├── audit_analyzer.py           # Core audit analysis
+│   ├── audit_logging.py            # Logging utilities
+│   ├── file_matcher.py             # File matching strategies
 │   └── report_generator.py         # Report generation
 └── cli/                        # Command-line interfaces
     └── upload_bucket_audit.py      # Main CLI entry point
+    └── review_audit_results.py     # CLI for reviewing audit results
     └── delete_audit_results.py     # CLI for deleting audit results
 ```
 
 ## Usage
 
 ### Command Line
+
+#### Audit Upload Bucket
 
 ```bash
 # Basic usage
@@ -84,16 +124,56 @@ analysis-runner \
     --file-types fastq
 ```
 
+#### Review Audit Results
+
+Users can review the audit results using the CLI entrypoint `review_audit_results.py`. This tool allows users to provide annotated justifications for each file marked for deletion.
+
+```bash
+python -m metamist.audit.cli.review_audit_results \
+    --dataset my-dataset \
+    --results-folder "2025-01-01_123456" \
+    --comment "Unnecessary BAMs and VCFs for aligned exome sequencing groups" \
+    --filter "SG Type==exome" \
+    --filter "File Type==BAM" \
+    --filter "File Type==VCF"
+```
+
+#### Delete Audit Results
+
+Users can delete the audit results using the CLI entrypoint `delete_audit_results.py`. This tool allows users to specify which files should be deleted based on the audit results.
+
+```bash
+# To delete from the 'files_to_delete' report
+python -m metamist.audit.cli.delete_audit_results \
+    --dataset my-dataset \
+    --results-folder "2025-01-01_123456"
+
+# To delete files marked for deletion from the annotated 'reviewed_files.csv' report
+python -m metamist.audit.cli.delete_audit_results \
+    --dataset my-dataset \
+    --results-folder "2025-01-01_123456" \
+    --report-name "reviewed_files"
+```
 
 ## Reports Generated
 
-The audit generates several reports in the upload bucket:
+The audit generates several reports in the analysis bucket:
+
+### From the `upload_bucket_audit.py` script
 
 1. **audit_metadata.tsv**: Configuration used for the audit
 2. **files_to_delete.csv**: Files that can be safely deleted
 3. **files_to_review.csv**: Files that need to be reviewed
 4. **unaligned_sgs.tsv**: Sequencing groups without completed CRAMs
 
+### From the `review_audit_results.py` script
+
+1. **reviewed_files.csv**: User annotations and justifications for files marked for deletion
+
+### From the `delete_audit_results.py` script
+
+1. **deleted_files.csv**: List of files that were deleted
+2. An analysis record in Metamist of type `audit_deletion`
 
 ## Programmatic Usage
 

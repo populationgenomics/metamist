@@ -119,10 +119,6 @@ class SequencingGroup:
         """Get the CRAM file path if it exists."""
         return self.cram_analysis.output_path if self.cram_analysis else None
 
-    def add_assay(self, assay: Assay):
-        """Add an assay to the sequencing group."""
-        self.assays.append(assay)
-
     def set_cram_analysis(self, analysis: Analysis):
         """Set the CRAM analysis for this sequencing group."""
         if analysis.is_cram:
@@ -154,6 +150,8 @@ class AuditReportEntry:  # pylint: disable=too-many-instance-attributes
     sample_external_ids: Optional[str] = None
     participant_id: Optional[int] = None
     participant_external_ids: Optional[str] = None
+    action: Optional[str] = None
+    review_comment: Optional[str] = None
 
     def to_report_dict(self) -> dict:
         """Convert to dictionary for report generation."""
@@ -180,7 +178,17 @@ class AuditReportEntry:  # pylint: disable=too-many-instance-attributes
             'Participant External ID': participant_ext,
             'CRAM Analysis ID': self.cram_analysis_id,
             'CRAM Path': self.cram_file_path,
+            'Action': self.action,
+            'Review Comment': self.review_comment,
         }
+
+    def update_action(self, action: str):
+        """Update the action for this audit report entry."""
+        self.action = action
+
+    def update_review_comment(self, comment: str):
+        """Update the review comment for this audit report entry."""
+        self.review_comment = comment
 
 
 @dataclass
@@ -192,14 +200,16 @@ class AuditResult:
     moved_files: list[AuditReportEntry] = field(default_factory=list)
     unaligned_sequencing_groups: list[SequencingGroup] = field(default_factory=list)
 
-    @property
-    def total_files_to_delete(self) -> int:
-        """Get total number of files to delete."""
-        return len(self.files_to_delete) + len(self.moved_files)
 
-    @property
-    def has_issues(self) -> bool:
-        """Check if there are any issues found."""
-        return bool(
-            self.files_to_ingest or self.unaligned_sequencing_groups or self.moved_files
-        )
+@dataclass
+class ReviewResult:
+    """Result of a review of audit results."""
+
+    reviewed_files: list[AuditReportEntry] = field(default_factory=list)
+
+
+@dataclass
+class DeletionResult:
+    """Result of a deletion of audit results."""
+
+    deleted_files: list[AuditReportEntry] = field(default_factory=list)
