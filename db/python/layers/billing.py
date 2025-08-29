@@ -278,5 +278,41 @@ class BillingLayer(BqBaseLayer):
         """
         Get Sample cost with selected fields for requested time interval
         """
-        billing_table = self.table_factory(query.source, query.fields, query.filters)
-        return await billing_table.get_cost_by_sample(connection, query)
+        if not query.start_date or not query.end_date or not query.filters:
+            raise ValueError('Date and Filters are required')
+
+        ar_batch_able = BillingArBatchTable(self.connection)
+
+        # Get sequencing groups
+        records_filter: list[str] = list(
+            query.filters.get(BillingColumn.SEQUENCING_GROUP, [])
+        )
+        print('records_filter', type(records_filter))
+        (
+            sequencing_groups,
+            sequencing_groups_as_ids,
+            seq_id_map,
+        ) = await ar_batch_able.get_sequencing_groups(records_filter)
+
+        # Get metamist project id and gcp project prefix
+        (project_id, project_name) = await ar_batch_able.get_project_name(
+            connection, sequencing_groups_as_ids
+        )
+        if not project_name:
+            return []
+
+        # 6. Get all ar-guid with min/max day for each of the seq group
+        ar_guids = ar_batch_able.get_ar_guid_by_seq_groups(sequencing_groups)
+        if not ar_guids:
+            return []
+
+        return await ar_batch_able.get_cost_by_sample(
+            connection,
+            query,
+            ar_guids,
+            sequencing_groups,
+            sequencing_groups_as_ids,
+            seq_id_map,
+            project_id,
+            project_name,
+        )
