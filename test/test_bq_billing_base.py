@@ -557,20 +557,28 @@ class TestBillingBaseTable(BqTest):
 
         # test invalid inputs
         with self.assertRaises(ValueError) as context:
-            await self.table_obj._execute_running_cost_query(BillingColumn.TOPIC, None)
-
-        self.assertTrue('Invalid invoice month' in str(context.exception))
-
-        with self.assertRaises(ValueError) as context:
-            await self.table_obj._execute_running_cost_query(
-                BillingColumn.TOPIC, '12345678'
+            await self.table_obj._execute_running_cost_query_with_filters(
+                BillingRunningCostQueryModel(
+                    field=BillingColumn.TOPIC, invoice_month=None
+                )
             )
 
         self.assertTrue('Invalid invoice month' in str(context.exception))
 
         with self.assertRaises(ValueError) as context:
-            await self.table_obj._execute_running_cost_query(
-                BillingColumn.TOPIC, '1024AA'
+            await self.table_obj._execute_running_cost_query_with_filters(
+                BillingRunningCostQueryModel(
+                    field=BillingColumn.TOPIC, invoice_month='12345678'
+                )
+            )
+
+        self.assertTrue('Invalid invoice month' in str(context.exception))
+
+        with self.assertRaises(ValueError) as context:
+            await self.table_obj._execute_running_cost_query_with_filters(
+                BillingRunningCostQueryModel(
+                    field=BillingColumn.TOPIC, invoice_month='1024AA'
+                )
             )
         self.assertTrue('Invalid invoice month' in str(context.exception))
 
@@ -583,8 +591,10 @@ class TestBillingBaseTable(BqTest):
             is_current_month,
             last_loaded_day,
             query_job_result,
-        ) = await self.table_obj._execute_running_cost_query(
-            BillingColumn.TOPIC, '202101'
+        ) = await self.table_obj._execute_running_cost_query_with_filters(
+            BillingRunningCostQueryModel(
+                field=BillingColumn.TOPIC, invoice_month='202101'
+            )
         )
 
         self.assertEqual(False, is_current_month)
@@ -602,8 +612,10 @@ class TestBillingBaseTable(BqTest):
             is_current_month,
             last_loaded_day,
             query_job_result,
-        ) = await self.table_obj._execute_running_cost_query(
-            BillingColumn.TOPIC, current_month_as_string
+        ) = await self.table_obj._execute_running_cost_query_with_filters(
+            BillingRunningCostQueryModel(
+                field=BillingColumn.TOPIC, invoice_month=current_month_as_string
+            )
         )
 
         self.assertEqual(True, is_current_month)

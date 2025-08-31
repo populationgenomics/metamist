@@ -272,20 +272,20 @@ class BillingBaseTable(BqDbBase):
         )
         return (query_params, daily_cost_field, daily_cost_join)
 
-    async def _execute_running_cost_query(
+    async def _execute_running_cost_query_with_filters(
         self,
-        field: BillingColumn,
-        invoice_month: str | None = None,
+        query: BillingRunningCostQueryModel,
     ):
         """
-        Run query to get running cost of selected field
+        Run query to get running cost of selected field with filtering support
         """
+
         # check if invoice month is valid first
-        if not invoice_month or not re.match(r'^\d{6}$', invoice_month):
+        if not query.invoice_month or not re.match(r'^\d{6}$', query.invoice_month):
             raise ValueError('Invalid invoice month')
 
-        invoice_month_date = datetime.strptime(invoice_month, '%Y%m')
-        if invoice_month != invoice_month_date.strftime('%Y%m'):
+        invoice_month_date = datetime.strptime(query.invoice_month, '%Y%m')
+        if query.invoice_month != invoice_month_date.strftime('%Y%m'):
             raise ValueError('Invalid invoice month')
 
         # get start day and current day for given invoice month
@@ -314,11 +314,31 @@ class BillingBaseTable(BqDbBase):
                 query_params,
                 daily_cost_field,
                 daily_cost_join,
-            ) = self._prepare_daily_cost_subquery(field, query_params, last_loaded_day)
+            ) = self._prepare_daily_cost_subquery(
+                query.field, query_params, last_loaded_day
+            )
         else:
             # Do not calculate last 24H cost
             daily_cost_field = ', NULL as daily_cost'
             daily_cost_join = ''
+
+        # prepare filter for query
+        query_filter = query.to_filter()
+        where_str, sql_parameters = query_filter.to_sql()
+
+        # extract only BQ Query parameter, keys are not used in BQ SQL
+        query_parameters: list[
+            bigquery.ScalarQueryParameter | bigquery.ArrayQueryParameter
+        ] = []
+        query_parameters.extend(sql_parameters.values())
+        query_parameters.extend(query_params)
+
+        # Add additional filters to where clause
+        additional_filters = [self._filter_to_optimise_query()]
+        if where_str:
+            additional_filters.append(where_str)
+
+        where_clause = ' AND '.join(additional_filters)
 
         _query = f"""
         SELECT
@@ -329,12 +349,12 @@ class BillingBaseTable(BqDbBase):
         FROM
         (
             SELECT
-            {field.value} as field,
+            {query.field.value} as field,
             cost_category,
             SUM(cost) as cost
             FROM
             `{self.get_table_name()}`
-            WHERE {self._filter_to_optimise_query()}
+            WHERE {where_clause}
             AND invoice_month = @invoice_month
             GROUP BY
             field,
@@ -345,14 +365,16 @@ class BillingBaseTable(BqDbBase):
         ORDER BY field ASC, daily_cost DESC, monthly_cost DESC;
         """
 
-        query_params.append(
-            bigquery.ScalarQueryParameter('invoice_month', 'STRING', invoice_month)
+        query_parameters.append(
+            bigquery.ScalarQueryParameter(
+                'invoice_month', 'STRING', query.invoice_month
+            )
         )
 
         return (
             is_current_month,
             last_loaded_day,
-            self._execute_query(_query, query_params),
+            self._execute_query(_query, query_parameters),
         )
 
     @staticmethod
@@ -656,105 +678,6 @@ class BillingBaseTable(BqDbBase):
 
         return raw_results
 
-    async def _get_running_cost(
-        self,
-        field: BillingColumn,
-        invoice_month: str | None = None,
-    ) -> list[BillingCostBudgetRecord]:
-        """
-        Get currently running cost of selected field
-        """
-
-        # accept only Topic, Dataset or Project at this stage
-        if field not in (
-            BillingColumn.TOPIC,
-            BillingColumn.GCP_PROJECT,
-            BillingColumn.DATASET,
-            BillingColumn.STAGE,
-            BillingColumn.COMPUTE_CATEGORY,
-            BillingColumn.WDL_TASK_NAME,
-            BillingColumn.CROMWELL_SUB_WORKFLOW_NAME,
-            BillingColumn.NAMESPACE,
-        ):
-            raise ValueError(
-                'Invalid field only topic, dataset, gcp-project, compute_category, '
-                'wdl_task_name, cromwell_sub_workflow_name & namespace are allowed'
-            )
-
-        (
-            is_current_month,
-            last_loaded_day,
-            query_job_result,
-        ) = await self._execute_running_cost_query(field, invoice_month)
-        if not query_job_result:
-            # return empty list
-            return []
-
-        # prepare data
-        results: list[BillingCostBudgetRecord] = []
-
-        # reformat last_loaded_day if present
-        last_loaded_day = reformat_datetime(
-            last_loaded_day, '%Y-%m-%d %H:%M:%S+00:00', '%b %d'
-        )
-
-        total_monthly: dict[str, Counter[str]] = defaultdict(Counter)
-        total_daily: dict[str, Counter[str]] = defaultdict(Counter)
-        field_details: dict[str, list[Any]] = defaultdict(list)
-        total_monthly_category: Counter[str] = Counter()
-        total_daily_category: Counter[str] = Counter()
-
-        for row in query_job_result:
-            if row.field not in field_details:
-                field_details[row.field] = []
-
-            cost_group = abbrev_cost_category(row.cost_category)
-
-            field_details[row.field].append(
-                {
-                    'cost_group': cost_group,
-                    'cost_category': row.cost_category,
-                    'daily_cost': row.daily_cost if is_current_month else None,
-                    'monthly_cost': row.monthly_cost,
-                }
-            )
-
-            total_monthly_category[row.cost_category] += row.monthly_cost
-            if row.daily_cost:
-                total_daily_category[row.cost_category] += row.daily_cost
-
-            # cost groups totals
-            total_monthly[cost_group]['ALL'] += row.monthly_cost
-            total_monthly[cost_group][row.field] += row.monthly_cost
-            if row.daily_cost and is_current_month:
-                total_daily[cost_group]['ALL'] += row.daily_cost
-                total_daily[cost_group][row.field] += row.daily_cost
-
-        # add total row: compute + storage
-        results = await self._append_total_running_cost(
-            field,
-            is_current_month,
-            last_loaded_day,
-            total_monthly,
-            total_daily,
-            total_monthly_category,
-            total_daily_category,
-            results,
-        )
-
-        # add rest of the records: compute + storage
-        results = await self._append_running_cost_records(
-            field,
-            is_current_month,
-            last_loaded_day,
-            total_monthly,
-            total_daily,
-            field_details,
-            results,
-        )
-
-        return results
-
     async def get_running_cost_with_filters(
         self,
         query: BillingRunningCostQueryModel,
@@ -853,111 +776,6 @@ class BillingBaseTable(BqDbBase):
         )
 
         return results
-
-    async def _execute_running_cost_query_with_filters(
-        self,
-        query: BillingRunningCostQueryModel,
-    ):
-        """
-        Run query to get running cost of selected field with filtering support
-        """
-
-        # check if invoice month is valid first
-        if not query.invoice_month or not re.match(r'^\d{6}$', query.invoice_month):
-            raise ValueError('Invalid invoice month')
-
-        invoice_month_date = datetime.strptime(query.invoice_month, '%Y%m')
-        if query.invoice_month != invoice_month_date.strftime('%Y%m'):
-            raise ValueError('Invalid invoice month')
-
-        # get start day and current day for given invoice month
-        # This is to optimise the query, BQ view is partitioned by day
-        # and not by invoice month
-        start_day_date, last_day_date = get_invoice_month_range(invoice_month_date)
-        start_day = start_day_date.strftime('%Y-%m-%d')
-        last_day = last_day_date.strftime('%Y-%m-%d')
-
-        # start_day and last_day are in to optimise the query
-        query_params = [
-            bigquery.ScalarQueryParameter('start_day', 'STRING', start_day),
-            bigquery.ScalarQueryParameter('last_day', 'STRING', last_day),
-        ]
-
-        current_day = datetime.now().strftime('%Y-%m-%d')
-        is_current_month = last_day >= current_day
-        last_loaded_day = None
-
-        if is_current_month:
-            # Only current month can have last 24 hours cost
-            # Last 24H in UTC time
-            # Find the last fully loaded day in the view
-            last_loaded_day = await self._last_loaded_day()
-            (
-                query_params,
-                daily_cost_field,
-                daily_cost_join,
-            ) = self._prepare_daily_cost_subquery(
-                query.field, query_params, last_loaded_day
-            )
-        else:
-            # Do not calculate last 24H cost
-            daily_cost_field = ', NULL as daily_cost'
-            daily_cost_join = ''
-
-        # prepare filter for query
-        query_filter = query.to_filter()
-        where_str, sql_parameters = query_filter.to_sql()
-
-        # extract only BQ Query parameter, keys are not used in BQ SQL
-        query_parameters: list[
-            bigquery.ScalarQueryParameter | bigquery.ArrayQueryParameter
-        ] = []
-        query_parameters.extend(sql_parameters.values())
-        query_parameters.extend(query_params)
-
-        # Add additional filters to where clause
-        additional_filters = [self._filter_to_optimise_query()]
-        if where_str:
-            additional_filters.append(where_str)
-
-        where_clause = ' AND '.join(additional_filters)
-
-        _query = f"""
-        SELECT
-            CASE WHEN month.field IS NULL THEN 'N/A' ELSE month.field END as field,
-            month.cost_category,
-            month.cost as monthly_cost
-            {daily_cost_field}
-        FROM
-        (
-            SELECT
-            {query.field.value} as field,
-            cost_category,
-            SUM(cost) as cost
-            FROM
-            `{self.get_table_name()}`
-            WHERE {where_clause}
-            AND invoice_month = @invoice_month
-            GROUP BY
-            field,
-            cost_category
-            HAVING cost > 0.1
-        ) month
-        {daily_cost_join}
-        ORDER BY field ASC, daily_cost DESC, monthly_cost DESC;
-        """
-
-        query_parameters.append(
-            bigquery.ScalarQueryParameter(
-                'invoice_month', 'STRING', query.invoice_month
-            )
-        )
-
-        return (
-            is_current_month,
-            last_loaded_day,
-            self._execute_query(_query, query_parameters),
-        )
 
     @staticmethod
     def _append_total_cost_row(
