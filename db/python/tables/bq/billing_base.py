@@ -1,4 +1,5 @@
 # pylint: disable=too-many-lines, too-many-nested-blocks, too-many-branches
+import logging
 import re
 from abc import ABCMeta, abstractmethod
 from collections import Counter, defaultdict, namedtuple
@@ -26,6 +27,9 @@ from models.models import (
 # so we can track the cost of metamist-api BQ usage
 BQ_LABELS = {'source': 'metamist-api'}
 
+# Set up logging for debugging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 # Day Time details used in grouping and parsing formulas
 TimeGroupingDetails = namedtuple(
@@ -632,9 +636,9 @@ class BillingBaseTable(BqDbBase):
             FROM `{self.get_table_name()}`
             {where_str}
             {group_by}
-            {order_by_str}
         )
         SELECT {time_group.formula}{time_group.separator} {fields_selected}, cost FROM t
+        {order_by_str}
         """
 
         # append min cost condition
@@ -659,24 +663,8 @@ class BillingBaseTable(BqDbBase):
         query_job_result = self._execute_query(
             _query, query_parameters, results_as_list=False
         )
-        raw_results = self._convert_output(query_job_result)
-
-        # Add total row if we have results and are grouping by a field
-        # But exclude when we have both Day and CostCategory in fields (time series analysis)
-        should_add_total = (
-            raw_results
-            and query.group_by
-            and len(query.fields) > 1
-            and not (
-                BillingColumn.DAY in query.fields
-                and BillingColumn.COST_CATEGORY in query.fields
-            )
-        )
-
-        if should_add_total:
-            raw_results = self._append_total_cost_row(raw_results, query)
-
-        return raw_results
+        results = self._convert_output(query_job_result)
+        return results
 
     async def get_running_cost_with_filters(
         self,
@@ -776,139 +764,3 @@ class BillingBaseTable(BqDbBase):
         )
 
         return results
-
-    @staticmethod
-    def _append_total_cost_row(
-        results: list[dict], query: BillingTotalCostQueryModel
-    ) -> list[dict]:
-        """
-        Add total row summarizing all costs to the results
-        """
-        if not results:
-            return results
-
-        # Determine the primary grouping field (exclude cost and day from consideration)
-        grouping_fields = [
-            f for f in query.fields if f not in (BillingColumn.COST, BillingColumn.DAY)
-        ]
-        primary_field = grouping_fields[0] if grouping_fields else None
-
-        if not primary_field:
-            # If no grouping field, don't add total row
-            return results
-
-        # Generate appropriate title for the total row
-        field_title = f'{BillingColumn.generate_all_title(primary_field)}'
-
-        # Check if cost_category is in the query fields
-        has_cost_category = BillingColumn.COST_CATEGORY in query.fields
-
-        # Get all unique days (months) in the results
-        unique_days = set(row.get('day') for row in results if row.get('day'))
-
-        if has_cost_category:
-            # Create separate total rows for each cost category and each day
-            cost_categories = set(
-                row.get('cost_category') for row in results if row.get('cost_category')
-            )
-            total_rows = []
-
-            for day in unique_days:
-                for cost_category in cost_categories:
-                    # Calculate total cost for this cost category and day
-                    category_cost = sum(
-                        row.get('cost', 0)
-                        for row in results
-                        if row.get('cost_category') == cost_category
-                        and row.get('day') == day
-                    )
-
-                    # Only create total row if there's actual cost for this day/category
-                    if category_cost > 0:
-                        # Create total row for this cost category and day
-                        total_row = {}
-
-                        # Initialize all possible fields
-                        for field in query.fields:
-                            if field == BillingColumn.COST:
-                                total_row['cost'] = category_cost
-                            elif field == BillingColumn.COST_CATEGORY:
-                                total_row['cost_category'] = cost_category
-                            elif field == BillingColumn.DAY:
-                                total_row['day'] = day
-                            elif field == primary_field:
-                                total_row[field.value] = field_title
-                            else:
-                                total_row[field.value] = None
-
-                        # Ensure cost and day are always present (they're added by the query even if not in fields)
-                        total_row['cost'] = category_cost
-                        total_row['day'] = day
-
-                        # Copy other fields from a matching row if they exist
-                        matching_row = next(
-                            (r for r in results if r.get('day') == day), None
-                        )
-                        if matching_row:
-                            for time_field in ['invoice_month']:
-                                if time_field in matching_row:
-                                    total_row[time_field] = matching_row[time_field]
-
-                            # Copy currency if it exists
-                            if 'currency' in matching_row:
-                                total_row['currency'] = matching_row['currency']
-
-                        total_rows.append(total_row)
-
-            # Insert total rows at the beginning, ordered by day and cost_category
-            total_rows.sort(
-                key=lambda x: (x.get('day', ''), x.get('cost_category', ''))
-            )
-            return total_rows + results
-
-        # Create single total row for each day without cost category breakdown
-        total_rows = []
-
-        for day in unique_days:
-            # Calculate total cost for this day
-            day_cost = sum(
-                row.get('cost', 0) for row in results if row.get('day') == day
-            )
-
-            # Only create total row if there's actual cost for this day
-            if day_cost > 0:
-                # Create total row dictionary with same structure as other rows
-                total_row = {}
-
-                # Initialize all possible fields
-                for field in query.fields:
-                    if field == BillingColumn.COST:
-                        total_row['cost'] = day_cost
-                    elif field == BillingColumn.DAY:
-                        total_row['day'] = day
-                    elif field == primary_field:
-                        total_row[field.value] = field_title
-                    else:
-                        # For other fields, use None or aggregate appropriately
-                        total_row[field.value] = None
-
-                # Ensure cost and day are always present (they're added by the query even if not in fields)
-                total_row['cost'] = day_cost
-                total_row['day'] = day
-
-                # Copy other fields from a matching row if they exist
-                matching_row = next((r for r in results if r.get('day') == day), None)
-                if matching_row:
-                    for time_field in ['invoice_month']:
-                        if time_field in matching_row:
-                            total_row[time_field] = matching_row[time_field]
-
-                    # Copy currency if it exists
-                    if 'currency' in matching_row:
-                        total_row['currency'] = matching_row['currency']
-
-                total_rows.append(total_row)
-
-        # Insert total rows at the beginning, ordered by day
-        total_rows.sort(key=lambda x: x.get('day', ''))
-        return total_rows + results

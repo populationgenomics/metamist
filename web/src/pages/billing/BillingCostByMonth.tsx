@@ -223,7 +223,35 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 const recMonths: string[] = []
                 const topicOrder: string[] = []
 
-                response.data.forEach((item: BillingTotalCostRecord) => {
+                console.log(`Processing ${response.data.length} billing records`)
+
+                // Separate All Topics rows for debugging
+                const allTopicsRows = response.data.filter((item: BillingTotalCostRecord) =>
+                    item.topic?.startsWith('All ')
+                )
+                const regularRows = response.data.filter(
+                    (item: BillingTotalCostRecord) => !item.topic?.startsWith('All ')
+                )
+
+                console.log(`Found ${allTopicsRows.length} All Topics rows`)
+                console.log(`Found ${regularRows.length} regular topic rows`)
+
+                // Debug: Log sample All Topics rows
+                allTopicsRows.slice(0, 5).forEach((row, i) => {
+                    console.log(`All Topics row ${i}:`, {
+                        topic: row.topic,
+                        day: row.day,
+                        cost_category: row.cost_category,
+                        cost: row.cost,
+                    })
+                })
+
+                // Process only regular rows (no All Topics from backend)
+                const filteredRows = response.data.filter(
+                    (item: BillingTotalCostRecord) => !item.topic?.startsWith('All ')
+                )
+
+                filteredRows.forEach((item: BillingTotalCostRecord) => {
                     const { day, cost_category, topic, cost } = item
                     const ccat = convertCostCategory(cost_category)
                     const _topic = topic || ''
@@ -244,8 +272,72 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     if (!recTotals[_topic][day][ccat]) {
                         recTotals[_topic][day][ccat] = 0
                     }
-                    // Ensure recTotals[_topic][day][ccat] is initialized and add cost
+
                     recTotals[_topic][day][ccat] = (recTotals[_topic][day][ccat] || 0) + cost
+                })
+
+                // Create All Topics rows by aggregating across topics for each day/category
+                const allTopicsKey = 'All Topics'
+                if (!recTotals[allTopicsKey]) {
+                    recTotals[allTopicsKey] = {}
+                    topicOrder.unshift(allTopicsKey) // Add to beginning
+                }
+
+                recMonths.forEach((month) => {
+                    if (!recTotals[allTopicsKey][month]) {
+                        recTotals[allTopicsKey][month] = {}
+                    }
+
+                    Object.values(CloudSpendCategory).forEach((category) => {
+                        // Sum costs across all regular topics for this month/category
+                        let totalCost = 0
+                        Object.keys(recTotals).forEach((topic) => {
+                            if (topic !== allTopicsKey && recTotals[topic][month]?.[category]) {
+                                totalCost += recTotals[topic][month][category]
+                            }
+                        })
+
+                        if (totalCost > 0) {
+                            recTotals[allTopicsKey][month][category] = totalCost
+                        }
+                    })
+                })
+
+                // Sort topics with "All Topics" at the top
+                topicOrder.sort((a, b) => {
+                    // Move "All Topics" to the top
+                    if (a.startsWith('All ')) return -1
+                    if (b.startsWith('All ')) return 1
+                    return a.localeCompare(b)
+                })
+
+                // Debug logging: Verify the data structure
+                console.log('=== FRONTEND AGGREGATION RESULTS ===')
+                console.log(`Created data structure with ${Object.keys(recTotals).length} topics`)
+
+                // Verify totals match
+                recMonths.forEach((month) => {
+                    Object.values(CloudSpendCategory).forEach((category) => {
+                        // Calculate sum from regular topics only
+                        let regularSum = 0
+                        Object.keys(recTotals).forEach((topic) => {
+                            if (!topic.startsWith('All ') && recTotals[topic][month]?.[category]) {
+                                regularSum += recTotals[topic][month][category]
+                            }
+                        })
+
+                        // Get All Topics value (frontend calculated)
+                        const allTopicsValue = recTotals['All Topics']?.[month]?.[category] || 0
+
+                        if (regularSum > 0 || allTopicsValue > 0) {
+                            console.log(`${month} ${category}:`)
+                            console.log(`  Regular topics sum: $${regularSum.toFixed(2)}`)
+                            console.log(`  All Topics (frontend): $${allTopicsValue.toFixed(2)}`)
+                            console.log(
+                                `  Match: ${Math.abs(allTopicsValue - regularSum) < 0.01 ? '✓' : '✗'}`
+                            )
+                        }
+                    })
                 })
 
                 setMonths(recMonths)
