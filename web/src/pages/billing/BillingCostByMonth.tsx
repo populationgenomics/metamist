@@ -141,7 +141,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
 
                 // Process only regular rows (no All Topics from backend)
                 const filteredRows = response.data.filter(
-                    (item: BillingTotalCostRecord) => !item.topic?.startsWith('All ')
+                    (item: BillingTotalCostRecord) => !item.topic?.startsWith('All Topics')
                 )
 
                 filteredRows.forEach((item: BillingTotalCostRecord) => {
@@ -199,8 +199,8 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 // Sort topics with "All Topics" at the top
                 topicOrder.sort((a, b) => {
                     // Move "All Topics" to the top
-                    if (a.startsWith('All ')) return -1
-                    if (b.startsWith('All ')) return 1
+                    if (a.startsWith('All Topics')) return -1
+                    if (b.startsWith('All Topics')) return 1
                     return a.localeCompare(b)
                 })
 

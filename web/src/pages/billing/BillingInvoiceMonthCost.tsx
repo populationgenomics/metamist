@@ -170,7 +170,6 @@ const BillingCurrentCost = () => {
             })
             .catch((error) => {
                 console.error('Error pre-fetching data:', error)
-                // Fallback: let FieldSelector handle individual fetching
                 setAvailableGcpProjects([])
                 setAvailableTopics([])
             })
@@ -246,7 +245,6 @@ const BillingCurrentCost = () => {
                 }
             })
             .catch((er) => {
-                console.error('API error:', er) // Debug log
                 setIsLoading(false)
                 setError(er.message)
             })
@@ -527,7 +525,6 @@ const BillingCurrentCost = () => {
         <>
             <h1>Cost By Invoice Month</h1>
 
-            {/* First row: Data selection controls */}
             <Grid stackable doubling style={{ marginBottom: '1rem' }}>
                 <Grid.Row>
                     <Grid.Column width={3}>
@@ -640,7 +637,6 @@ const BillingCurrentCost = () => {
                 </Grid.Row>
             </Grid>
 
-            {/* Second row: View toggle */}
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2rem' }}>
                 <ToggleButtonGroup
                     value={showAsChart ? 'chart' : 'table'}
@@ -666,7 +662,6 @@ const BillingCurrentCost = () => {
             {(() => {
                 if (!showAsChart) return null
 
-                // Clear data during loading to show loading state instead of stale data
                 const chartData = isLoading ? [] : costRecords
 
                 if (String(invoiceMonth) === String(thisMonth)) {
