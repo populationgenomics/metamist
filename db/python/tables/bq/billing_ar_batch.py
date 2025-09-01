@@ -4,7 +4,6 @@ from google.cloud import bigquery
 
 from api.settings import (
     BQ_BATCHES_VIEW,
-    COHORT_PREFIX,
     SAMPLE_PREFIX,
     SEQUENCING_GROUP_PREFIX,
 )
@@ -14,6 +13,7 @@ from api.utils.db import (
 from db.python.tables.bq.billing_base import BillingBaseTable
 from db.python.tables.sequencing_group import SequencingGroupTable
 from models.models import BillingColumn, BillingTotalCostQueryModel
+from models.utils.sample_id_format import sample_id_transform_to_raw
 from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
 
 
@@ -117,11 +117,9 @@ class BillingArBatchTable(BillingBaseTable):
                 seq_id = sequencing_group_id_transform_to_raw(r.upper())
                 seq_id_map[seq_id] = r
                 sequencing_groups_as_ids.append(seq_id)
-            elif r.startswith(COHORT_PREFIX):
-                # TODO: Get all seq groups for this cohort
-                continue
             elif r.startswith(SAMPLE_PREFIX):
                 # TODO: get all seq groups for this sample
+                _sample_id = sample_id_transform_to_raw(r.upper())
                 continue
 
         return (sequencing_groups, sequencing_groups_as_ids, seq_id_map)
@@ -252,7 +250,4 @@ class BillingArBatchTable(BillingBaseTable):
         # combine
         result = compute_results + sg_storage_cost
         result = sorted(result, key=lambda k: k['invoice_month'])
-
-        print('result', result)
-
         return result

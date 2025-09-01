@@ -287,7 +287,6 @@ class BillingLayer(BqBaseLayer):
         records_filter: list[str] = list(
             query.filters.get(BillingColumn.SEQUENCING_GROUP, [])
         )
-        print('records_filter', type(records_filter))
         (
             sequencing_groups,
             sequencing_groups_as_ids,
