@@ -106,17 +106,16 @@ const BillingCostByTime: React.FunctionComponent = () => {
 
     // Pre-fetch topics data on component mount
     React.useEffect(() => {
-        const preFetchTopics = async () => {
-            try {
-                const topicsResponse = await new BillingApi().getTopics()
+        // Pre-fetch topics in parallel (consistent with other files pattern)
+        Promise.all([new BillingApi().getTopics()])
+            .then(([topicsResponse]) => {
                 setAvailableTopics(topicsResponse.data || [])
-            } catch (error) {
-                console.error('Error pre-fetching topics:', error)
+            })
+            .catch((error) => {
+                console.error('Error pre-fetching data:', error)
                 setAvailableTopics([])
-            }
-        }
-
-        preFetchTopics()
+            })
+            .finally(() => {})
     }, [])
 
     const getData = React.useCallback((query: BillingTotalCostQueryModel) => {
