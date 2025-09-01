@@ -636,9 +636,9 @@ class BillingBaseTable(BqDbBase):
             FROM `{self.get_table_name()}`
             {where_str}
             {group_by}
+            {order_by_str}
         )
         SELECT {time_group.formula}{time_group.separator} {fields_selected}, cost FROM t
-        {order_by_str}
         """
 
         # append min cost condition

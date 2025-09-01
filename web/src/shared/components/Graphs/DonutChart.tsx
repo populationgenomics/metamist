@@ -38,6 +38,20 @@ function calcTranslate(data: IDonutChartPreparadData, move = 4) {
     })`
 }
 
+function createViewBox(legSize: number | undefined, w: number) {
+    // calculate the viewbox of Legend
+    const minX = 0
+    const minY = 0
+    let width = 200
+    let height = 200
+    if (legSize) {
+        width = legSize * w
+        height = legSize * w
+    }
+
+    return `${minX} ${minY} ${width} ${height}`
+}
+
 export const DonutChart: React.FC<IDonutChartProps> = ({
     id,
     data,
@@ -249,20 +263,6 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
         showLegend,
         legendSize,
     ])
-
-    function createViewBox(legSize: number | undefined, w: number) {
-        // calculate the viewbox of Legend
-        const minX = 0
-        const minY = 0
-        let width = 200
-        let height = 200
-        if (legSize) {
-            width = legSize * w
-            height = legSize * w
-        }
-
-        return `${minX} ${minY} ${width} ${height}`
-    }
 
     if (isLoading) {
         return (

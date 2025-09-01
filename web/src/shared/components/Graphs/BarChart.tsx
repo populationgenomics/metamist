@@ -3,6 +3,8 @@ import React from 'react'
 import formatMoney from '../../utilities/formatMoney'
 import LoadingDucks from '../LoadingDucks/LoadingDucks'
 
+const margin = { top: 50, right: 0, bottom: 150, left: 100 }
+
 export interface IData {
     label: string
     value: number
@@ -17,7 +19,6 @@ interface BarChartProps {
 
 export const BarChart: React.FC<BarChartProps> = ({ data, maxSlices, colors, isLoading }) => {
     const colorFunc: (t: number) => string | undefined = colors ?? interpolateRainbow
-    const margin = React.useMemo(() => ({ top: 50, right: 0, bottom: 150, left: 100 }), [])
     //   const width = 1000 - margin.left - margin.right;
     const height = 400 - margin.top - margin.bottom
 
@@ -114,7 +115,7 @@ export const BarChart: React.FC<BarChartProps> = ({ data, maxSlices, colors, isL
             .join('tspan')
             .attr('font-weight', (_, i) => (i ? null : 'normal'))
             .text((d) => d)
-    }, [data, width, isLoading, maxSlices, colorFunc, height, margin])
+    }, [data, width, isLoading, maxSlices, colorFunc, height])
 
     if (isLoading) {
         return (

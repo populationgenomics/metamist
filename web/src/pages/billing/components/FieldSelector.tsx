@@ -1,18 +1,29 @@
+import {
+    CircularProgress,
+    Divider,
+    FormControl,
+    InputLabel,
+    MenuItem,
+    OutlinedInput,
+    Select,
+    SelectChangeEvent,
+} from '@mui/material'
 import * as React from 'react'
-import { SyntheticEvent } from 'react'
-import { Dropdown, DropdownProps, Input, Message } from 'semantic-ui-react'
+import { Message } from 'semantic-ui-react'
 import { convertFieldName } from '../../../shared/utilities/fieldName'
 import { BillingApi, BillingColumn, BillingTimePeriods } from '../../../sm-api'
 
 interface FieldSelectorProps {
     label: string
     fieldName: string
-    selected?: string
+    selected?: string | string[]
     includeAll?: boolean
     autoSelect?: boolean
+    multiple?: boolean
+    preloadedData?: string[]
     onClickFunction: (
-        event: SyntheticEvent<HTMLElement, Event> | undefined,
-        data: DropdownProps
+        event: SelectChangeEvent<string | string[]> | undefined,
+        data: { value: string | string[] }
     ) => void
 }
 
@@ -22,6 +33,8 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
     selected,
     includeAll,
     autoSelect,
+    multiple = false,
+    preloadedData,
     onClickFunction,
 }) => {
     const [loading, setLoading] = React.useState<boolean>(true)
@@ -44,8 +57,11 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
         const extRecords = extendRecords(response_data)
         setRecords(extRecords)
         if (!selected && autoSelect) {
-            // set the first option as the default
-            onClickFunction(undefined, { value: extRecords[0] })
+            if (multiple) {
+                onClickFunction(undefined, { value: [extRecords[0]] })
+            } else {
+                onClickFunction(undefined, { value: extRecords[0] })
+            }
         }
     }
 
@@ -106,6 +122,14 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
 
     /* eslint-disable react-hooks/exhaustive-deps -- this is missing a ton of deps, probably buggy but hard to fix */
     React.useEffect(() => {
+        // If preloaded data is available, use it instead of making API calls
+        if (preloadedData && preloadedData.length > 0) {
+            setRecords(preloadedData)
+            setLoading(false)
+            return
+        }
+
+        // Otherwise, proceed with normal API fetching
         if (fieldName === BillingColumn.Topic) getTopics()
         else if (fieldName === BillingColumn.GcpProject) getGcpProjects()
         else if (fieldName === BillingColumn.InvoiceMonth) getInvoiceMonths()
@@ -125,7 +149,7 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
         } else {
             setError(`Could not load records for ${fieldName}`)
         }
-    }, [fieldName])
+    }, [fieldName, preloadedData])
     /* eslint-enable react-hooks/exhaustive-deps */
 
     const formatInvoiceMonth = (invoiceMonth: string): string => {
@@ -174,6 +198,53 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
         }))
     }
 
+    const getSortedOptions = (options: { key: string; text: string; value: string }[]) => {
+        if (!multiple || !Array.isArray(selected)) return options
+
+        // Sort options to show selected items at the top, maintaining original order within each group
+        const selectedOptions = options.filter((option) => selected.includes(option.value))
+        const unselectedOptions = options.filter((option) => !selected.includes(option.value))
+
+        return [...selectedOptions, ...unselectedOptions]
+    }
+
+    const handleSelectChange = (event: SelectChangeEvent<string | string[]>) => {
+        let value: string | string[]
+
+        if (multiple) {
+            value = Array.isArray(event.target.value) ? event.target.value : [event.target.value]
+        } else {
+            value = Array.isArray(event.target.value) ? event.target.value[0] : event.target.value
+        }
+
+        onClickFunction(event, { value })
+    }
+
+    const renderValue = (selectedValues: string | string[]) => {
+        if (multiple && Array.isArray(selectedValues)) {
+            if (selectedValues.length === 0) {
+                return `Select ${convertFieldName(fieldName)}`
+            }
+            if (selectedValues.length === 1) {
+                const options = recordsMap(records as BillingColumn[])
+                const option = options.find((opt) => opt.value === selectedValues[0])
+                return option?.text || selectedValues[0]
+            }
+            return `${selectedValues.length} ${convertFieldName(fieldName)}s selected`
+        }
+
+        if (!multiple && typeof selectedValues === 'string') {
+            if (!selectedValues) {
+                return `Select ${convertFieldName(fieldName)}`
+            }
+            const options = recordsMap(records as BillingColumn[])
+            const option = options.find((opt) => opt.value === selectedValues)
+            return option?.text || selectedValues
+        }
+
+        return `Select ${convertFieldName(fieldName)}`
+    }
+
     if (error) {
         return (
             <Message negative>
@@ -183,27 +254,101 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
         )
     }
 
+    const options = recordsMap(records as BillingColumn[])
+    const sortedOptions = getSortedOptions(options)
+
+    // Ensure selected values exist in available options to avoid warnings
+    const availableValues = options.map((opt) => opt.value)
+
+    const selectedValue = multiple
+        ? Array.isArray(selected)
+            ? selected.filter((val) => availableValues.includes(val))
+            : []
+        : Array.isArray(selected)
+          ? availableValues.includes(selected[0])
+              ? selected[0]
+              : ''
+          : availableValues.includes(selected || '')
+            ? selected || ''
+            : ''
+
     return (
-        <Input
-            label={label}
-            fluid
-            input={
-                <Dropdown
-                    id="group-by-dropdown"
-                    loading={loading}
-                    search
-                    selection
-                    fluid
-                    onChange={onClickFunction}
-                    placeholder={`Select ${convertFieldName(fieldName)}`}
-                    value={selected ?? ''}
-                    options={records && recordsMap(records as BillingColumn[])}
-                    style={{
-                        borderRadius: '0 4px 4px 0',
-                    }}
-                />
-            }
-        />
+        <FormControl fullWidth variant="outlined" disabled={loading}>
+            <InputLabel id={`${fieldName}-select-label`}>{label}</InputLabel>
+            <Select
+                labelId={`${fieldName}-select-label`}
+                id={`${fieldName}-select`}
+                multiple={multiple}
+                value={selectedValue}
+                onChange={handleSelectChange}
+                input={<OutlinedInput label={label} />}
+                renderValue={renderValue}
+                startAdornment={loading ? <CircularProgress size={20} /> : null}
+                MenuProps={{
+                    PaperProps: {
+                        style: {
+                            maxHeight: 300,
+                        },
+                    },
+                }}
+            >
+                {records &&
+                    (() => {
+                        const elements: React.ReactNode[] = []
+                        const selectedCount =
+                            multiple && Array.isArray(selected) ? selected.length : 0
+
+                        sortedOptions.forEach((option, index) => {
+                            const isSelected = multiple
+                                ? Array.isArray(selected) && selected.includes(option.value)
+                                : selected === option.value
+
+                            const shouldShowDivider =
+                                multiple &&
+                                index === selectedCount &&
+                                selectedCount > 0 &&
+                                selectedCount < options.length
+
+                            if (shouldShowDivider) {
+                                elements.push(<Divider key={`divider-${index}`} sx={{ my: 0.5 }} />)
+                            }
+
+                            elements.push(
+                                <MenuItem
+                                    key={option.key}
+                                    value={option.value}
+                                    sx={{
+                                        fontWeight: isSelected ? 600 : 400,
+                                        backgroundColor: isSelected
+                                            ? 'rgba(25, 118, 210, 0.08)'
+                                            : 'transparent',
+                                        '&:hover': {
+                                            backgroundColor: isSelected
+                                                ? 'rgba(25, 118, 210, 0.12)'
+                                                : 'rgba(0, 0, 0, 0.04)',
+                                        },
+                                        position: 'relative',
+                                        '&::after':
+                                            multiple && isSelected
+                                                ? {
+                                                      content: '"✓"',
+                                                      position: 'absolute',
+                                                      right: '16px',
+                                                      color: 'primary.main',
+                                                      fontWeight: 'bold',
+                                                  }
+                                                : {},
+                                    }}
+                                >
+                                    {option.text}
+                                </MenuItem>
+                            )
+                        })
+
+                        return elements
+                    })()}
+            </Select>
+        </FormControl>
     )
 }
 

@@ -1,3 +1,4 @@
+import { ToggleButton, ToggleButtonGroup } from '@mui/material'
 import { SelectChangeEvent } from '@mui/material/Select'
 import { debounce } from 'lodash'
 import orderBy from 'lodash/orderBy'
@@ -28,7 +29,6 @@ import generateUrl from '../../shared/utilities/generateUrl'
 import { BillingApi, BillingColumn, BillingCostBudgetRecord, BillingSource } from '../../sm-api'
 import './components/BillingCostByTimeTable.css'
 import FieldSelector from './components/FieldSelector'
-import MultiFieldSelector from './components/MultiFieldSelector'
 
 const BillingCurrentCost = () => {
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
@@ -128,7 +128,7 @@ const BillingCurrentCost = () => {
 
     const [lastLoadedDay, setLastLoadedDay] = React.useState<string>()
 
-    // Pre-fetched data state for MultiFieldSelector components
+    // Pre-fetched data state for FieldSelector components
     const [availableGcpProjects, setAvailableGcpProjects] = React.useState<string[]>([])
     const [availableTopics, setAvailableTopics] = React.useState<string[]>([])
     const [_isPreFetching, setIsPreFetching] = React.useState<boolean>(true)
@@ -160,28 +160,23 @@ const BillingCurrentCost = () => {
 
     // Pre-fetch GCP projects and topics data on component mount
     React.useEffect(() => {
-        const preFetchData = async () => {
-            setIsPreFetching(true)
-            try {
-                // Pre-fetch GCP projects and topics in parallel
-                const [gcpProjectsResponse, topicsResponse] = await Promise.all([
-                    new BillingApi().getGcpProjects(),
-                    new BillingApi().getTopics(),
-                ])
+        setIsPreFetching(true)
 
+        // Pre-fetch GCP projects and topics in parallel
+        Promise.all([new BillingApi().getGcpProjects(), new BillingApi().getTopics()])
+            .then(([gcpProjectsResponse, topicsResponse]) => {
                 setAvailableGcpProjects(gcpProjectsResponse.data || [])
                 setAvailableTopics(topicsResponse.data || [])
-            } catch (error) {
+            })
+            .catch((error) => {
                 console.error('Error pre-fetching data:', error)
-                // Fallback: let MultiFieldSelector handle individual fetching
+                // Fallback: let FieldSelector handle individual fetching
                 setAvailableGcpProjects([])
                 setAvailableTopics([])
-            } finally {
+            })
+            .finally(() => {
                 setIsPreFetching(false)
-            }
-        }
-
-        preFetchData()
+            })
     }, [])
 
     const getData = (
@@ -214,22 +209,29 @@ const BillingCurrentCost = () => {
         }
 
         // Create the query model with filters for both GCP Project and Topic grouping
+
+        // Determine if we need any filters
+        const hasGcpProjectFilter = grp === BillingColumn.GcpProject && gcpFiltersToUse.length > 0
+        const hasTopicFilter = grp === BillingColumn.Topic && topicFiltersToUse.length > 0
+        const hasAnyFilters = hasGcpProjectFilter || hasTopicFilter
+
+        // Build the filters object
+        let filters: { gcp_project?: string[]; topic?: string[] } | undefined = undefined
+        if (hasAnyFilters) {
+            filters = {}
+            if (hasGcpProjectFilter) {
+                filters.gcp_project = gcpFiltersToUse
+            }
+            if (hasTopicFilter) {
+                filters.topic = topicFiltersToUse
+            }
+        }
+
         const queryModel = {
             field: grp,
             invoice_month: invoiceMth,
             source: source,
-            filters:
-                (grp === BillingColumn.GcpProject && gcpFiltersToUse.length > 0) ||
-                (grp === BillingColumn.Topic && topicFiltersToUse.length > 0)
-                    ? {
-                          ...(grp === BillingColumn.GcpProject && gcpFiltersToUse.length > 0
-                              ? { gcp_project: gcpFiltersToUse }
-                              : {}),
-                          ...(grp === BillingColumn.Topic && topicFiltersToUse.length > 0
-                              ? { topic: topicFiltersToUse }
-                              : {}),
-                      }
-                    : undefined,
+            filters: filters,
         }
 
         new BillingApi()
@@ -281,36 +283,31 @@ const BillingCurrentCost = () => {
     }
 
     const onGcpProjectsSelect = (
-        event: SelectChangeEvent<string[]> | undefined,
-        data: { value: string[] }
+        event: SelectChangeEvent<string | string[]> | undefined,
+        data: { value: string | string[] }
     ) => {
-        // Update UI state immediately for responsive feedback
-        setSelectedGcpProjects(data.value)
-        // Use debounced version for API calls to prevent excessive requests during rapid selections
-        debouncedGetData(groupBy, invoiceMonth, data.value, [])
+        const value = Array.isArray(data.value) ? data.value : [data.value]
+        setSelectedGcpProjects(value)
     }
 
     const onTopicsSelect = (
-        event: SelectChangeEvent<string[]> | undefined,
-        data: { value: string[] }
+        event: SelectChangeEvent<string | string[]> | undefined,
+        data: { value: string | string[] }
     ) => {
-        // Update UI state immediately for responsive feedback
-        setSelectedTopics(data.value)
-        // Use debounced version for API calls to prevent excessive requests during rapid selections
-        debouncedGetData(groupBy, invoiceMonth, [], data.value)
+        const value = Array.isArray(data.value) ? data.value : [data.value]
+        setSelectedTopics(value)
     }
 
     React.useEffect(() => {
         // Pass current filters based on groupBy
         if (groupBy === BillingColumn.GcpProject) {
-            getData(groupBy, invoiceMonth, selectedGcpProjects, [])
+            debouncedGetData(groupBy, invoiceMonth, selectedGcpProjects, [])
         } else if (groupBy === BillingColumn.Topic) {
-            getData(groupBy, invoiceMonth, [], selectedTopics)
+            debouncedGetData(groupBy, invoiceMonth, [], selectedTopics)
         } else {
-            getData(groupBy, invoiceMonth, [], [])
+            debouncedGetData(groupBy, invoiceMonth, [], [])
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [groupBy, invoiceMonth])
+    }, [groupBy, invoiceMonth, selectedGcpProjects, selectedTopics, debouncedGetData])
 
     // Define column groups for easier management
     const DAILY_COLUMNS = ['compute_daily', 'storage_daily', 'total_daily']
@@ -530,126 +527,154 @@ const BillingCurrentCost = () => {
         <>
             <h1>Cost By Invoice Month</h1>
 
-            <Grid columns="equal" stackable doubling>
-                <Grid.Column>
-                    <FieldSelector
-                        label="Group By"
-                        fieldName="Group"
-                        onClickFunction={onGroupBySelect}
-                        selected={groupBy}
-                    />
-                </Grid.Column>
-                <Grid.Column>
-                    <FieldSelector
-                        label="Invoice Month"
-                        fieldName={BillingColumn.InvoiceMonth}
-                        onClickFunction={onInvoiceMonthSelect}
-                        selected={invoiceMonth}
-                    />
-                </Grid.Column>
-
-                <Grid.Column>
-                    <Checkbox
-                        label="Show as Chart / Table"
-                        fitted
-                        toggle
-                        checked={showAsChart}
-                        onChange={() => setShowAsChart(!showAsChart)}
-                    />
-                </Grid.Column>
-
-                {groupBy === BillingColumn.GcpProject && (
-                    <Grid.Column>
-                        <MultiFieldSelector
-                            label="Filter GCP Projects"
-                            fieldName={BillingColumn.GcpProject}
-                            selected={selectedGcpProjects}
-                            isApiLoading={isLoading}
-                            preloadedData={availableGcpProjects}
-                            onClickFunction={onGcpProjectsSelect}
-                        />
+            {/* First row: Data selection controls */}
+            <Grid stackable doubling style={{ marginBottom: '1rem' }}>
+                <Grid.Row>
+                    <Grid.Column width={3}>
+                        <div style={{ marginLeft: '1rem' }}>
+                            <FieldSelector
+                                label="Group By"
+                                fieldName="Group"
+                                onClickFunction={onGroupBySelect}
+                                selected={groupBy}
+                            />
+                        </div>
                     </Grid.Column>
-                )}
-
-                {groupBy === BillingColumn.Topic && (
-                    <Grid.Column>
-                        <MultiFieldSelector
-                            label="Filter Topics"
-                            fieldName={BillingColumn.Topic}
-                            selected={selectedTopics}
-                            isApiLoading={isLoading}
-                            preloadedData={availableTopics}
-                            onClickFunction={onTopicsSelect}
-                        />
+                    <Grid.Column width={3}>
+                        <div style={{ marginLeft: '1rem' }}>
+                            <FieldSelector
+                                label="Invoice Month"
+                                fieldName={BillingColumn.InvoiceMonth}
+                                onClickFunction={onInvoiceMonthSelect}
+                                selected={invoiceMonth}
+                            />
+                        </div>
                     </Grid.Column>
-                )}
-
-                <Grid.Column textAlign="right">
-                    <div
-                        className="button-container"
-                        style={{
-                            display: 'flex',
-                            gap: '10px',
-                            alignItems: 'stretch',
-                            justifyContent: 'flex-end',
-                            flex: '0 0 auto',
-                            minWidth: '240px',
-                        }}
+                    {groupBy === BillingColumn.GcpProject && (
+                        <Grid.Column width={3}>
+                            <div style={{ marginLeft: '1rem' }}>
+                                <FieldSelector
+                                    label="Filter GCP Projects"
+                                    fieldName={BillingColumn.GcpProject}
+                                    selected={selectedGcpProjects}
+                                    multiple={true}
+                                    preloadedData={availableGcpProjects}
+                                    onClickFunction={onGcpProjectsSelect}
+                                />
+                            </div>
+                        </Grid.Column>
+                    )}
+                    {groupBy === BillingColumn.Topic && (
+                        <Grid.Column width={3}>
+                            <div style={{ marginLeft: '1rem' }}>
+                                <FieldSelector
+                                    label="Filter Topics"
+                                    fieldName={BillingColumn.Topic}
+                                    selected={selectedTopics}
+                                    multiple={true}
+                                    preloadedData={availableTopics}
+                                    onClickFunction={onTopicsSelect}
+                                />
+                            </div>
+                        </Grid.Column>
+                    )}
+                    <Grid.Column
+                        width={7}
+                        textAlign="right"
+                        style={{ display: 'flex', justifyContent: 'flex-end' }}
                     >
-                        <ColumnVisibilityDropdown
-                            columns={getColumnConfigs()}
-                            groups={getColumnGroups()}
-                            visibleColumns={visibleColumns}
-                            onVisibilityChange={setVisibleColumns}
-                            searchThreshold={8}
-                            searchPlaceholder="Search topics and months..."
-                            enableUrlPersistence={true}
-                            urlParamName="columns"
-                            buttonStyle={{
-                                minWidth: '115px',
-                                height: '36px',
-                            }}
-                        />
-
-                        <Dropdown
-                            button
-                            className="icon"
-                            floating
-                            labeled
-                            icon="download"
-                            text="Export"
+                        <div
+                            className="button-container"
                             style={{
-                                minWidth: '115px',
-                                height: '36px',
+                                display: 'flex',
+                                gap: '10px',
+                                alignItems: 'center',
+                                justifyContent: 'flex-end',
+                                width: 'auto',
                             }}
                         >
-                            <Dropdown.Menu>
-                                <Dropdown.Item
-                                    key="csv"
-                                    text="Export to CSV"
-                                    icon="file excel"
-                                    onClick={() => exportToFile('csv')}
-                                />
-                                <Dropdown.Item
-                                    key="tsv"
-                                    text="Export to TSV"
-                                    icon="file text outline"
-                                    onClick={() => exportToFile('tsv')}
-                                />
-                            </Dropdown.Menu>
-                        </Dropdown>
-                    </div>
-                </Grid.Column>
+                            <ColumnVisibilityDropdown
+                                columns={getColumnConfigs()}
+                                groups={getColumnGroups()}
+                                visibleColumns={visibleColumns}
+                                onVisibilityChange={setVisibleColumns}
+                                searchThreshold={8}
+                                searchPlaceholder="Search topics and months..."
+                                enableUrlPersistence={true}
+                                urlParamName="columns"
+                                buttonStyle={{
+                                    minWidth: '115px',
+                                    height: '36px',
+                                }}
+                            />
+
+                            <Dropdown
+                                button
+                                className="icon"
+                                floating
+                                labeled
+                                icon="download"
+                                text="Export"
+                                style={{
+                                    minWidth: '115px',
+                                    height: '36px',
+                                }}
+                            >
+                                <Dropdown.Menu>
+                                    <Dropdown.Item
+                                        key="csv"
+                                        text="Export to CSV"
+                                        icon="file excel"
+                                        onClick={() => exportToFile('csv')}
+                                    />
+                                    <Dropdown.Item
+                                        key="tsv"
+                                        text="Export to TSV"
+                                        icon="file text outline"
+                                        onClick={() => exportToFile('tsv')}
+                                    />
+                                </Dropdown.Menu>
+                            </Dropdown>
+                        </div>
+                    </Grid.Column>
+                </Grid.Row>
             </Grid>
+
+            {/* Second row: View toggle */}
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2rem' }}>
+                <ToggleButtonGroup
+                    value={showAsChart ? 'chart' : 'table'}
+                    exclusive
+                    onChange={(event, newValue) => {
+                        if (newValue !== null) {
+                            setShowAsChart(newValue === 'chart')
+                        }
+                    }}
+                    aria-label="view mode"
+                    size="small"
+                    color="primary"
+                >
+                    <ToggleButton value="chart" aria-label="chart view">
+                        Chart
+                    </ToggleButton>
+                    <ToggleButton value="table" aria-label="table view">
+                        Table
+                    </ToggleButton>
+                </ToggleButtonGroup>
+            </div>
 
             {(() => {
                 if (!showAsChart) return null
+
+                // Clear data during loading to show loading state instead of stale data
+                const chartData = isLoading ? [] : costRecords
+
                 if (String(invoiceMonth) === String(thisMonth)) {
                     return (
                         <Grid columns={2} stackable doubling>
                             <Grid.Column width={8} className="chart-card">
                                 <HorizontalStackedBarChart
-                                    data={costRecords}
+                                    data={chartData}
                                     title={`24H (day UTC ${lastLoadedDay})`}
                                     series={['compute_daily', 'storage_daily']}
                                     labels={['Compute', 'Storage']}
@@ -663,7 +688,7 @@ const BillingCurrentCost = () => {
                             </Grid.Column>
                             <Grid.Column width={8} className="chart-card donut-chart">
                                 <HorizontalStackedBarChart
-                                    data={costRecords}
+                                    data={chartData}
                                     title="Invoice Month (Acc)"
                                     series={['compute_monthly', 'storage_monthly']}
                                     labels={['Compute', 'Storage']}
@@ -682,7 +707,7 @@ const BillingCurrentCost = () => {
                     <Grid>
                         <Grid.Column width={12}>
                             <HorizontalStackedBarChart
-                                data={costRecords}
+                                data={chartData}
                                 title="Invoice Month (Acc)"
                                 series={['compute_monthly', 'storage_monthly']}
                                 labels={['Compute', 'Storage']}

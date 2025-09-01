@@ -25,7 +25,6 @@ import {
 import './components/BillingCostByTimeTable.css'
 import CostByTimeBarChart from './components/CostByTimeBarChart'
 import FieldSelector from './components/FieldSelector'
-import MultiFieldSelector from './components/MultiFieldSelector'
 
 /* eslint-disable @typescript-eslint/no-explicit-any  -- too many anys in the file to fix right now but would be good to sort out when we can */
 const BillingCostByCategory: React.FunctionComponent = () => {
@@ -74,7 +73,7 @@ const BillingCostByCategory: React.FunctionComponent = () => {
     // State for multiple topic selection
     const [selectedTopics, setSelectedTopics] = React.useState<string[]>(initialTopics)
 
-    // Pre-fetched data state for MultiFieldSelector components
+    // Pre-fetched data state for FieldSelector components
     const [availableGcpProjects, setAvailableGcpProjects] = React.useState<string[]>([])
     const [availableTopics, setAvailableTopics] = React.useState<string[]>([])
     const [_isPreFetching, setIsPreFetching] = React.useState<boolean>(true)
@@ -110,27 +109,22 @@ const BillingCostByCategory: React.FunctionComponent = () => {
 
     // Pre-fetch GCP projects and topics data on component mount
     React.useEffect(() => {
-        const preFetchData = async () => {
-            setIsPreFetching(true)
-            try {
-                // Pre-fetch GCP projects and topics in parallel
-                const [gcpProjectsResponse, topicsResponse] = await Promise.all([
-                    new BillingApi().getGcpProjects(),
-                    new BillingApi().getTopics(),
-                ])
+        setIsPreFetching(true)
 
+        // Pre-fetch GCP projects and topics in parallel
+        Promise.all([new BillingApi().getGcpProjects(), new BillingApi().getTopics()])
+            .then(([gcpProjectsResponse, topicsResponse]) => {
                 setAvailableGcpProjects(gcpProjectsResponse.data || [])
                 setAvailableTopics(topicsResponse.data || [])
-            } catch (error) {
+            })
+            .catch((error) => {
                 console.error('Error pre-fetching data:', error)
                 setAvailableGcpProjects([])
                 setAvailableTopics([])
-            } finally {
+            })
+            .finally(() => {
                 setIsPreFetching(false)
-            }
-        }
-
-        preFetchData()
+            })
     }, [])
 
     // use navigate and update url params
@@ -193,12 +187,6 @@ const BillingCostByCategory: React.FunctionComponent = () => {
             recs.value === BillingColumn.GcpProject ? selectedProjects : [],
             recs.value === BillingColumn.Topic ? selectedTopics : []
         )
-        // Show loading immediately to prevent flash of old data
-        if (Boolean(start) && Boolean(end)) {
-            setIsLoading(true)
-            const query = buildFilteredQueryModel()
-            debouncedGetData(query)
-        }
     }
 
     const onSelectGroup = (event: any, recs: any) => {
@@ -213,12 +201,6 @@ const BillingCostByCategory: React.FunctionComponent = () => {
             selectedProjects,
             selectedTopics
         )
-        // Show loading immediately to prevent flash of old data
-        if (Boolean(start) && Boolean(end)) {
-            setIsLoading(true)
-            const query = buildFilteredQueryModel()
-            debouncedGetData(query)
-        }
     }
 
     const onSelectCategory = (event: any, recs: any) => {
@@ -233,12 +215,6 @@ const BillingCostByCategory: React.FunctionComponent = () => {
             selectedProjects,
             selectedTopics
         )
-        // Show loading immediately to prevent flash of old data
-        if (Boolean(start) && Boolean(end)) {
-            setIsLoading(true)
-            const query = buildFilteredQueryModel()
-            debouncedGetData(query)
-        }
     }
 
     const onSelectPeriod = (event: any, recs: any) => {
@@ -253,19 +229,14 @@ const BillingCostByCategory: React.FunctionComponent = () => {
             selectedProjects,
             selectedTopics
         )
-        // Show loading immediately to prevent flash of old data
-        if (Boolean(start) && Boolean(end)) {
-            setIsLoading(true)
-            const query = buildFilteredQueryModel()
-            debouncedGetData(query)
-        }
     }
 
     const onProjectsSelect = (
-        event: SelectChangeEvent<string[]> | undefined,
-        data: { value: string[] }
+        event: SelectChangeEvent<string | string[]> | undefined,
+        data: { value: string | string[] }
     ) => {
-        setSelectedProjects(data.value)
+        const value = Array.isArray(data.value) ? data.value : [data.value]
+        setSelectedProjects(value)
         updateNav(
             groupBy,
             selectedGroup,
@@ -273,26 +244,17 @@ const BillingCostByCategory: React.FunctionComponent = () => {
             selectedPeriod,
             start,
             end,
-            data.value,
+            value,
             selectedTopics
         )
-        // Show loading immediately to prevent flash of old data
-        if (Boolean(start) && Boolean(end)) {
-            setIsLoading(true)
-            const filters = {
-                ...buildCurrentFilters(),
-                [BillingColumn.GcpProject]: data.value,
-            }
-            const query = buildFilteredQueryModel(filters)
-            debouncedGetData(query)
-        }
     }
 
     const onTopicsSelect = (
-        event: SelectChangeEvent<string[]> | undefined,
-        data: { value: string[] }
+        event: SelectChangeEvent<string | string[]> | undefined,
+        data: { value: string | string[] }
     ) => {
-        setSelectedTopics(data.value)
+        const value = Array.isArray(data.value) ? data.value : [data.value]
+        setSelectedTopics(value)
         updateNav(
             groupBy,
             selectedGroup,
@@ -301,18 +263,8 @@ const BillingCostByCategory: React.FunctionComponent = () => {
             start,
             end,
             selectedProjects,
-            data.value
+            value
         )
-        // Show loading immediately to prevent flash of old data
-        if (Boolean(start) && Boolean(end)) {
-            setIsLoading(true)
-            const filters = {
-                ...buildCurrentFilters(),
-                [BillingColumn.Topic]: data.value,
-            }
-            const query = buildFilteredQueryModel(filters)
-            debouncedGetData(query)
-        }
     }
 
     const buildCurrentFilters = React.useCallback((): { [key: string]: string | string[] } => {
@@ -370,12 +322,6 @@ const BillingCostByCategory: React.FunctionComponent = () => {
             selectedProjects,
             selectedTopics
         )
-        // Show loading immediately to prevent flash of old data
-        if (Boolean(start_update) && Boolean(end_update)) {
-            setIsLoading(true)
-            const query = buildFilteredQueryModel()
-            debouncedGetData(query)
-        }
     }
 
     const getData = (query: BillingTotalCostQueryModel) => {
@@ -426,15 +372,31 @@ const BillingCostByCategory: React.FunctionComponent = () => {
             .catch((er) => setError(er.message))
     }
 
-    // Single useEffect for initial data load only
-    // All subsequent changes are handled by debounced handlers
+    // Central useEffect for data fetching whenever relevant state changes
     React.useEffect(() => {
-        if (selectedPeriod && selectedPeriod !== '' && selectedPeriod !== null) {
+        if (
+            selectedPeriod &&
+            selectedPeriod !== '' &&
+            selectedPeriod !== null &&
+            Boolean(start) &&
+            Boolean(end)
+        ) {
+            setIsLoading(true)
             const query = buildFilteredQueryModel()
-            getData(query)
+            debouncedGetData(query)
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []) // Empty dependency array - only run on mount
+    }, [
+        selectedPeriod,
+        start,
+        end,
+        groupBy,
+        selectedGroup,
+        selectedCostCategory,
+        selectedProjects,
+        selectedTopics,
+        buildFilteredQueryModel,
+        debouncedGetData,
+    ])
 
     // Generate column configurations for the dropdown
     const getColumnConfigs = React.useCallback((): ColumnConfig[] => {
@@ -638,20 +600,20 @@ const BillingCostByCategory: React.FunctionComponent = () => {
 
                     <Grid.Column width={6}>
                         {groupBy === BillingColumn.GcpProject ? (
-                            <MultiFieldSelector
+                            <FieldSelector
                                 label="Filter GCP Projects"
                                 fieldName={BillingColumn.GcpProject}
                                 selected={selectedProjects}
-                                isApiLoading={isLoading}
+                                multiple={true}
                                 onClickFunction={onProjectsSelect}
                                 preloadedData={availableGcpProjects}
                             />
                         ) : groupBy === BillingColumn.Topic ? (
-                            <MultiFieldSelector
+                            <FieldSelector
                                 label="Filter Topics"
                                 fieldName={BillingColumn.Topic}
                                 selected={selectedTopics}
-                                isApiLoading={isLoading}
+                                multiple={true}
                                 onClickFunction={onTopicsSelect}
                                 preloadedData={availableTopics}
                             />

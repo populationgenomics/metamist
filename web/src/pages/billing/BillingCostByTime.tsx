@@ -22,7 +22,6 @@ import {
 import BillingCostByTimeTable, { ExportData } from './components/BillingCostByTimeTable'
 import CostByTimeChart from './components/CostByTimeChart'
 import FieldSelector from './components/FieldSelector'
-import MultiFieldSelector from './components/MultiFieldSelector'
 
 const BillingCostByTime: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
@@ -56,7 +55,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
     // State for multiple topic selection
     const [selectedTopics, setSelectedTopics] = React.useState<string[]>(initialTopics)
 
-    // Pre-fetched data state for MultiFieldSelector components
+    // Pre-fetched data state for FieldSelector components
     const [availableGcpProjects, setAvailableGcpProjects] = React.useState<string[]>([])
     const [availableTopics, setAvailableTopics] = React.useState<string[]>([])
     const [_isPreFetching, setIsPreFetching] = React.useState<boolean>(true)
@@ -79,28 +78,8 @@ const BillingCostByTime: React.FunctionComponent = () => {
         [date: string]: { [field: string]: { [category: string]: number } }
     }>({})
 
-    // State for tracking which rows are expanded for breakdown
-    const [openRows, setOpenRows] = React.useState<string[]>([])
-
     // State for tracking current view mode
     const [currentViewMode, setCurrentViewMode] = React.useState<'summary' | 'breakdown'>('summary')
-
-    // Handle toggle for breakdown expansion
-    const handleToggle = (date: string) => {
-        const startTime = performance.now()
-        console.log(`[${new Date().toISOString()}] ROW TOGGLE START: ${date}`)
-
-        if (!openRows.includes(date)) {
-            setOpenRows([...openRows, date])
-        } else {
-            setOpenRows(openRows.filter((i) => i !== date))
-        }
-
-        const endTime = performance.now()
-        console.log(
-            `[${new Date().toISOString()}] ROW TOGGLE END: ${(endTime - startTime).toFixed(2)}ms`
-        )
-    }
 
     // Add expand state management
     const [expandCompute, setExpandCompute] = React.useState<boolean>(
@@ -126,28 +105,23 @@ const BillingCostByTime: React.FunctionComponent = () => {
 
     // Pre-fetch GCP projects and topics data on component mount
     React.useEffect(() => {
-        const preFetchData = async () => {
-            setIsPreFetching(true)
-            try {
-                // Pre-fetch GCP projects and topics in parallel
-                const [gcpProjectsResponse, topicsResponse] = await Promise.all([
-                    new BillingApi().getGcpProjects(),
-                    new BillingApi().getTopics(),
-                ])
+        setIsPreFetching(true)
 
+        // Pre-fetch GCP projects and topics in parallel
+        Promise.all([new BillingApi().getGcpProjects(), new BillingApi().getTopics()])
+            .then(([gcpProjectsResponse, topicsResponse]) => {
                 setAvailableGcpProjects(gcpProjectsResponse.data || [])
                 setAvailableTopics(topicsResponse.data || [])
-            } catch (error) {
+            })
+            .catch((error) => {
                 console.error('Error pre-fetching data:', error)
-                // Fallback: let MultiFieldSelector handle individual fetching
+                // Fallback: let FieldSelector handle individual fetching
                 setAvailableGcpProjects([])
                 setAvailableTopics([])
-            } finally {
+            })
+            .finally(() => {
                 setIsPreFetching(false)
-            }
-        }
-
-        preFetchData()
+            })
     }, [])
 
     // use navigate and update url params
@@ -249,11 +223,11 @@ const BillingCostByTime: React.FunctionComponent = () => {
     }
 
     const onProjectsSelect = (
-        event: SelectChangeEvent<string[]> | undefined,
-        data: { value: string[] }
+        event: SelectChangeEvent<string | string[]> | undefined,
+        data: { value: string | string[] }
     ) => {
-        // Update UI state immediately for responsive feedback
-        setSelectedProjects(data.value)
+        const value = Array.isArray(data.value) ? data.value : [data.value]
+        setSelectedProjects(value)
         // Update URL with new project selection
         updateNav(
             groupBy,
@@ -262,22 +236,17 @@ const BillingCostByTime: React.FunctionComponent = () => {
             end,
             expandCompute,
             visibleColumns,
-            data.value,
+            value,
             selectedTopics
         )
-        // Use debounced version for API calls to prevent excessive requests during rapid selections
-        if (Boolean(start) && Boolean(end) && groupBy === BillingColumn.GcpProject) {
-            const queryModel = buildFilteredQueryModel(data.value, [])
-            debouncedGetData(queryModel)
-        }
     }
 
     const onTopicsSelect = (
-        event: SelectChangeEvent<string[]> | undefined,
-        data: { value: string[] }
+        event: SelectChangeEvent<string | string[]> | undefined,
+        data: { value: string | string[] }
     ) => {
-        // Update UI state immediately for responsive feedback
-        setSelectedTopics(data.value)
+        const value = Array.isArray(data.value) ? data.value : [data.value]
+        setSelectedTopics(value)
         // Update URL with new topic selection
         updateNav(
             groupBy,
@@ -287,13 +256,8 @@ const BillingCostByTime: React.FunctionComponent = () => {
             expandCompute,
             visibleColumns,
             selectedProjects,
-            data.value
+            value
         )
-        // Use debounced version for API calls to prevent excessive requests during rapid selections
-        if (Boolean(start) && Boolean(end) && groupBy === BillingColumn.Topic) {
-            const queryModel = buildFilteredQueryModel([], data.value)
-            debouncedGetData(queryModel)
-        }
     }
 
     const buildFilteredQueryModel = React.useCallback(
@@ -764,8 +728,6 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         groupBy={groupBy}
                         selectedProjects={selectedProjects}
                         breakdownData={breakdownData}
-                        openRows={openRows}
-                        handleToggle={handleToggle}
                         onViewModeChange={handleViewModeChange}
                         onExportRequest={(viewMode, format, exportData) =>
                             exportToFile(format, viewMode, exportData)
@@ -935,20 +897,20 @@ const BillingCostByTime: React.FunctionComponent = () => {
 
                     <Grid.Column>
                         {groupBy === BillingColumn.GcpProject ? (
-                            <MultiFieldSelector
+                            <FieldSelector
                                 label="Filter GCP Projects"
                                 fieldName={BillingColumn.GcpProject}
                                 selected={selectedProjects}
-                                isApiLoading={isLoading}
+                                multiple={true}
                                 onClickFunction={onProjectsSelect}
                                 preloadedData={availableGcpProjects}
                             />
                         ) : groupBy === BillingColumn.Topic ? (
-                            <MultiFieldSelector
+                            <FieldSelector
                                 label="Filter Topics"
                                 fieldName={BillingColumn.Topic}
                                 selected={selectedTopics}
-                                isApiLoading={isLoading}
+                                multiple={true}
                                 onClickFunction={onTopicsSelect}
                                 preloadedData={availableTopics}
                             />
