@@ -113,8 +113,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 setAvailableGcpProjects(gcpProjectsResponse.data || [])
                 setAvailableTopics(topicsResponse.data || [])
             })
-            .catch((error) => {
-                console.error('Error pre-fetching data:', error)
+            .catch(() => {
                 // Fallback: let FieldSelector handle individual fetching
                 setAvailableGcpProjects([])
                 setAvailableTopics([])
@@ -319,9 +318,6 @@ const BillingCostByTime: React.FunctionComponent = () => {
     // Custom handlers that update URL
     const handleExpandChange = React.useCallback(
         (expand: boolean) => {
-            const startTime = performance.now()
-            console.log(`[${new Date().toISOString()}] EXPAND TOGGLE START: ${expand}`)
-
             // Only update expand state - let table handle column visibility internally
             setExpandCompute(expand)
 
@@ -334,11 +330,6 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 visibleColumns, // Keep current visible columns for URL
                 selectedProjects,
                 selectedTopics
-            )
-
-            const endTime = performance.now()
-            console.log(
-                `[${new Date().toISOString()}] EXPAND TOGGLE END: ${(endTime - startTime).toFixed(2)}ms`
             )
         },
         [
@@ -354,9 +345,6 @@ const BillingCostByTime: React.FunctionComponent = () => {
     )
 
     const handleColumnsChange = (columns: Set<string>) => {
-        const startTime = performance.now()
-        console.log(`[${new Date().toISOString()}] COLUMNS CHANGE START: ${columns.size} columns`)
-
         setVisibleColumns(columns)
         updateNav(
             groupBy,
@@ -368,26 +356,13 @@ const BillingCostByTime: React.FunctionComponent = () => {
             selectedProjects,
             selectedTopics
         )
-
-        const endTime = performance.now()
-        console.log(
-            `[${new Date().toISOString()}] COLUMNS CHANGE END: ${(endTime - startTime).toFixed(2)}ms`
-        )
     }
 
     // Handle view mode change
     const handleViewModeChange = React.useCallback(
         (viewMode: 'summary' | 'breakdown') => {
             if (viewMode !== currentViewMode) {
-                const startTime = performance.now()
-                console.log(`[${new Date().toISOString()}] VIEW MODE CHANGE START: ${viewMode}`)
-
                 setCurrentViewMode(viewMode)
-
-                const endTime = performance.now()
-                console.log(
-                    `[${new Date().toISOString()}] VIEW MODE CHANGE END: ${(endTime - startTime).toFixed(2)}ms`
-                )
             }
         },
         [currentViewMode]
@@ -395,27 +370,18 @@ const BillingCostByTime: React.FunctionComponent = () => {
 
     const getData = React.useCallback(
         (query: BillingTotalCostQueryModel) => {
-            const dataStartTime = performance.now()
-            console.log(`[${new Date().toISOString()}] GET DATA START`)
-
             setIsLoading(true)
             setError(undefined)
             setMessage(undefined)
             new BillingApi()
                 .getTotalCost(query)
                 .then((response) => {
-                    const processStartTime = performance.now()
-                    console.log(
-                        `[${new Date().toISOString()}] DATA PROCESSING START - Records: ${response.data.length}`
-                    )
-
                     setIsLoading(false)
 
                     // Store raw data for breakdown processing
                     _setAllData(response.data)
 
                     // Generate breakdown data
-                    const breakdownStartTime = performance.now()
                     const breakdown: {
                         [date: string]: { [field: string]: { [category: string]: number } }
                     } = {}
@@ -447,13 +413,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         }
                     })
 
-                    const breakdownEndTime = performance.now()
-                    console.log(
-                        `[${new Date().toISOString()}] BREAKDOWN DATA GENERATION: ${(breakdownEndTime - breakdownStartTime).toFixed(2)}ms`
-                    )
-
                     // Fill in zeros for missing combinations and add calculated fields
-                    const fillStartTime = performance.now()
                     Object.keys(breakdown).forEach((day) => {
                         allProjects.forEach((project) => {
                             if (!breakdown[day][project]) {
@@ -478,15 +438,10 @@ const BillingCostByTime: React.FunctionComponent = () => {
                             breakdown[day][project]['Compute Cost'] = computeCost
                         })
                     })
-                    const fillEndTime = performance.now()
-                    console.log(
-                        `[${new Date().toISOString()}] BREAKDOWN FILL ZEROS: ${(fillEndTime - fillStartTime).toFixed(2)}ms`
-                    )
 
                     setBreakdownData(breakdown)
 
                     // calc totals per cost_category
-                    const totalsStartTime = performance.now()
                     const recTotals: { [key: string]: number } = {}
                     response.data.forEach((item: BillingTotalCostRecord) => {
                         const { cost_category, cost } = item
@@ -500,12 +455,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     const sortedRecTotals: { [key: string]: number } = Object.fromEntries(
                         Object.entries(recTotals).sort(([, a], [, b]) => b - a)
                     )
-                    const totalsEndTime = performance.now()
-                    console.log(
-                        `[${new Date().toISOString()}] TOTALS CALCULATION: ${(totalsEndTime - totalsStartTime).toFixed(2)}ms`
-                    )
                     const rec_grps = Object.keys(sortedRecTotals)
-                    const recordsStartTime = performance.now()
                     const records: { [key: string]: { [key: string]: number } } = {}
                     response.data.forEach((item: BillingTotalCostRecord) => {
                         const { day, cost_category, cost } = item
@@ -525,17 +475,12 @@ const BillingCostByTime: React.FunctionComponent = () => {
                             records[day][cost_category] += cost
                         }
                     })
-                    const recordsEndTime = performance.now()
-                    console.log(
-                        `[${new Date().toISOString()}] RECORDS PROCESSING: ${(recordsEndTime - recordsStartTime).toFixed(2)}ms`
-                    )
                     const no_undefined: string[] = rec_grps.filter(
                         (item): item is string => item !== undefined
                     )
                     setGroups(no_undefined)
 
                     // Include additional columns that will be added by the table component
-                    const columnsStartTime = performance.now()
                     const allColumns = [
                         ...no_undefined,
                         'Daily Total',
@@ -558,11 +503,6 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     } else {
                         setVisibleColumns(new Set(allColumns))
                     }
-                    const columnsEndTime = performance.now()
-                    console.log(
-                        `[${new Date().toISOString()}] COLUMNS SETUP: ${(columnsEndTime - columnsStartTime).toFixed(2)}ms`
-                    )
-                    const dataTransformStartTime = performance.now()
                     setData(
                         Object.keys(records).map((key) => ({
                             date: new Date(key),
@@ -589,20 +529,6 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         }, [])
 
                     setAggregatedData(aggData)
-                    const dataTransformEndTime = performance.now()
-                    console.log(
-                        `[${new Date().toISOString()}] DATA TRANSFORM: ${(dataTransformEndTime - dataTransformStartTime).toFixed(2)}ms`
-                    )
-
-                    const processEndTime = performance.now()
-                    console.log(
-                        `[${new Date().toISOString()}] TOTAL DATA PROCESSING: ${(processEndTime - processStartTime).toFixed(2)}ms`
-                    )
-
-                    const dataEndTime = performance.now()
-                    console.log(
-                        `[${new Date().toISOString()}] GET DATA COMPLETE: ${(dataEndTime - dataStartTime).toFixed(2)}ms`
-                    )
                 })
                 .catch((er) => setError(er.message))
         },
