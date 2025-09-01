@@ -136,9 +136,6 @@ class BillingBaseTable(BqDbBase):
             query_job.total_bytes_processed / 1024**4
         ) * BQ_COST_PER_TB
 
-        print('query', query)
-        print('params', params)
-
         # now execute the query
         job_config.dry_run = False
         job_config.use_query_cache = True
@@ -784,8 +781,6 @@ class BillingBaseTable(BqDbBase):
         GROUP BY invoice_month {',' if fields_selected else ''} {fields_selected}
         """
 
-        print('_query', _query)
-
         query_job_result = self._execute_query(
             _query, query_parameters, results_as_list=False
         )
@@ -835,8 +830,6 @@ class BillingBaseTable(BqDbBase):
         if query_job_result:
             for row in query_job_result:
                 storage_cost[row.invoice_month] = row.cost
-
-        print('storage_cost', dict(sorted(storage_cost.items())))
 
         return storage_cost
 
