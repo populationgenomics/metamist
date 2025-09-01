@@ -1,83 +1,70 @@
 """CLI entry point for deleting files in audit results."""
 
 import logging
-import csv
 
 import click
 
-from ..adapters import StorageClient
-from ..data_access.gcs_data_access import GCSDataAccess
+from ..data_access import GCSDataAccess, MetamistDataAccess
 from ..models import AuditReportEntry, DeletionResult
 from ..services import AuditLogger, ReportGenerator
 
 from metamist.apis import AnalysisApi
 from metamist.models import (
     Analysis,
-    AnalysisQueryModel,
     AnalysisStatus,
     AnalysisUpdateModel,
 )
 
-from cpg_utils import Path, to_path
+from cpg_utils import to_path
 from cpg_utils.config import config_retrieve
 
 
 def delete_from_audit_results(
     dataset: str,
+    gcp_project: str,
     results_folder: str,
-    report_name: str = 'files_to_delete',
+    report_name: str,
     dry_run: bool = False,
 ):
     """Delete files listed in the audit results."""
     logger = AuditLogger(dataset, 'audit_deletions').logger
 
-    gcp_project = config_retrieve(['workflow', dataset, 'gcp_project'])
-    if not gcp_project:
-        raise ValueError('GCP project is required')
+    gcs_client = GCSDataAccess(dataset, gcp_project)
+    report_generator = ReportGenerator(gcs_client, results_folder, logger)
 
-    storage_client = StorageClient(project=gcp_project)
-    gcs_data = GCSDataAccess(storage_client)
-    report_generator = ReportGenerator(storage_client, results_folder, logger)
-
-    bucket_name = gcs_data.get_bucket_name(dataset, 'analysis')
-
-    report_path = to_path(f'gs://{bucket_name}/{results_folder}/{report_name}.csv')
-    if not report_path.exists():
-        logger.error(f'Report file {report_path} does not exist.')
-        return
-
-    with report_path.open('r') as f:
-        reader = csv.DictReader(f)
-        rows = list(reader)
-
-    deletion_result = delete_files(
-        storage_client, bucket_name, report_name, rows, dry_run, logger
+    report_rows = report_generator.get_report_rows(
+        report_path=to_path(
+            f'gs://{gcs_client.analysis_bucket}/{results_folder}/{report_name}.csv'
+        )
     )
 
-    report_path = report_generator.write_deleted_files_report(
-        deletion_result, bucket_name
+    deletion_result = delete_files_from_report(
+        gcs_client, report_name, report_rows, dry_run, logger
     )
 
-    # Get the stats from the report by reading it again
-    stats = get_report_stats(to_path(report_path))
+    deletion_report = report_generator.write_deleted_files_report(deletion_result)
+    stats = report_generator.get_report_stats(deletion_report)
 
-    logger.info('Upserting analysis record for deleted files report.')
-    upsert_deleted_files_analysis(dataset, report_name, report_path, stats, logger)
+    if not dry_run:
+        upsert_deleted_files_analysis(
+            dataset, report_name, str(deletion_report), stats, logger
+        )
 
 
-def delete_files(
-    storage_client: StorageClient,
-    bucket_name: str,
+def delete_files_from_report(
+    gcs_client: GCSDataAccess,
     report_name: str,
     rows: list[AuditReportEntry],
     dry_run: bool,
     logger: logging.Logger,
 ) -> DeletionResult:
-    """Delete files from audit results based on filters."""
-    bucket = storage_client.client.get_bucket(bucket_name)
-    total_files = 0
-    total_bytes = 0
-    deleted_files_rows = []
+    """
+    Delete files in the upload bucket from the audit results.
+    Only delete files from rows marked with 'DELETE' action.
+
+    If deleting from 'files_to_delete', automatically add this action.
+    """
+    delete_file_rows: list[AuditReportEntry] = []
     for row in rows:
         if report_name == 'files_to_delete':
             row.update_action('DELETE')
@@ -88,118 +75,107 @@ def delete_files(
 
         if not row.review_comment:
             raise ValueError(
-                "Review Comment is required for rows outside the 'files_to_delete' report."
-                "Use the 'review_audit_results.py' script to add comments justifying the deletion."
+                "Review Comment is required for rows outside the 'files_to_delete' report. "
+                'Use `review_audit_results.py` to add comments justifying the deletion, then try again.'
             )
 
         file_path = to_path(row.filepath)
         if not file_path.exists():
             logger.warning(f'File {file_path} does not exist, skipping deletion.')
             continue
-        total_files += 1
-        total_bytes += int(row.filesize)
 
-        if dry_run:
-            logger.info(f'Dry run: would delete {file_path}')
-        else:
-            try:
-                storage_client.delete_blob(bucket, file_path.blob)
-                logger.info(f'Successfully deleted {file_path}')
-                deleted_files_rows.append(row)
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                logger.error(f'Error deleting {file_path}: {e}')
+        delete_file_rows.append(row)
 
+    total_bytes = sum(int(row.filesize) for row in delete_file_rows)
     if dry_run:
         logger.info(
-            f'Dry run: would delete {total_files} files ({total_bytes / (1024**3):.2f} GiB)'
+            f'Dry run: would have deleted {len(delete_file_rows)} files ({total_bytes / (1024**3):.2f} GiB)'
         )
     else:
-        logger.info(f'Deleted: {total_files} files ({total_bytes / (1024**3):.2f} GiB)')
+        gcs_client.delete_blobs(
+            gcs_client.upload_bucket,
+            [to_path(row.filepath).blob for row in delete_file_rows],
+        )
+        logger.info(
+            f'Deleted: {len(delete_file_rows)} files ({total_bytes / (1024**3):.2f} GiB)'
+        )
 
-    return DeletionResult(deleted_files=deleted_files_rows)
-
-
-def get_report_stats(report_path: Path) -> dict:
-    """Count the rows and sum the total file size for all rows in the report"""
-    with report_path.open('r') as f:
-        reader = csv.DictReader(f)
-        total_size = sum(int(row['File Size']) for row in reader)
-        row_count = sum(1 for _ in reader)
-    return {'total_size': total_size, 'file_count': row_count}
+    return DeletionResult(deleted_files=delete_file_rows)
 
 
-def upsert_deleted_files_analysis(
+async def upsert_deleted_files_analysis(
     dataset: str,
-    report_name: str,
-    report_path: str,
+    audited_report_name: str,
+    deletion_report_path: str,
     stats: dict,
     logger: logging.Logger,
 ):
-    """Inserts or updates an analysis record for deleted files."""
-    if existing_analysis := get_existing_analysis(dataset, report_path):
+    """
+    Inserts or updates an analysis record for deleted files.
+    Populates the meta dict with deleted files stats.
+    """
+    logger.info('Upserting analysis record for deleted files report.')
+    if existing_analysis := await MetamistDataAccess().get_audit_deletion_analysis(
+        dataset, deletion_report_path
+    ):
         logger.info(
-            f'Found existing analysis record for {report_path}, ID: {existing_analysis["id"]}. Updating...'
+            f'Found existing analysis record for {deletion_report_path}, ID: {existing_analysis["id"]}. Updating...'
         )
         analysis_update = AnalysisUpdateModel(
             status=AnalysisStatus('completed'),
             output=existing_analysis['output'],
-            meta=existing_analysis['meta'] | {report_name: stats},
+            meta=existing_analysis['meta'] | {audited_report_name: stats},
         )
         AnalysisApi().update_analysis(existing_analysis['id'], analysis_update)
 
     else:
         logger.info(
-            f'No existing analysis record for {report_path}. Creating new record...'
+            f'No existing analysis record for {deletion_report_path}. Creating new record...'
         )
         analysis = Analysis(
             type='audit_deletion',
-            output=str(report_path),
+            output=str(deletion_report_path),
             status=AnalysisStatus('completed'),
-            meta={report_name: stats},
+            meta={audited_report_name: stats},
         )
         AnalysisApi().create_analysis(dataset, analysis)
-    logger.info(f'Upserted analysis record for {report_path}')
 
-
-def get_existing_analysis(dataset: str, report_path: str) -> Analysis | None:
-    """Retrieve an existing analysis record for the given dataset and report path."""
-    analyses = AnalysisApi().query_analyses(
-        AnalysisQueryModel(
-            projects=[
-                dataset,
-            ],
-            sequencing_group_ids=[],
-            type='audit_deletion',
-            status='completed',
-            active=True,
-        )
-    )
-
-    for analysis in analyses:
-        if analysis['output'] == report_path:
-            return analysis
-    return None
+    logger.info(f'Upserted analysis record for {deletion_report_path}')
 
 
 @click.command()
-@click.option('--dataset', required=True, help='Dataset name for logging context')
-@click.option(
-    '--results-folder', help='Path to the folder containing audit results files'
-)
+@click.option('--dataset', '-d', required=True, help='Dataset name')
+@click.option('--gcp-project', '-g', help='GCP project')
+@click.option('--results-folder', '-r', required=True, help='Audit results folder')
 @click.option(
     '--report-name',
-    default='files_to_delete',
-    help='Name of the report to delete files from',
+    '-n',
+    required=True,
+    help="The report to delete files from. e.g. 'files_to_delete'.",
 )
 @click.option('--dry-run', is_flag=True, help='If set, will not delete objects.')
 def main(
     dataset: str,
+    gcp_project: str | None,
     results_folder: str,
-    report_name: str = 'files_to_delete',
+    report_name: str,
     dry_run: bool = False,
 ):
-    """Main function to delete objects."""
-    delete_from_audit_results(dataset, results_folder, report_name, dry_run)
+    """
+    Reads the report at location gs://cpg-dataset-main-analysis/audit_results/{results_folder}/{report_name}.csv
+
+    If the report is 'files_to_delete', it will delete the files listed in the report.
+
+    For any other report, files must be marked for deletion in the report, alongside a
+    comment justifying the deletion.
+    """
+    gcp_project = gcp_project or config_retrieve(['workflow', dataset, 'gcp_project'])
+    if not gcp_project:
+        raise ValueError('GCP project is required from analysis-runner config or CLI.')
+
+    delete_from_audit_results(
+        dataset, gcp_project, results_folder, report_name, dry_run
+    )
 
 
 if __name__ == '__main__':

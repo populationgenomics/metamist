@@ -1,24 +1,28 @@
 """Repository for Google Cloud Storage data access."""
 
-from typing import List, Optional, Dict
-from cpg_utils import to_path
 from cpg_utils.config import config_retrieve, dataset_path
 
-from ..models import FileMetadata, FileType
+from ..models import FileMetadata, FileType, FilePath
 from ..adapters import StorageClient
 
 
 class GCSDataAccess:
     """Layer for accessing Google Cloud Storage."""
 
-    def __init__(self, storage_client: StorageClient):
+    def __init__(self, dataset: str, gcp_project: str):
         """
         Initialize the data access layer.
 
         Args:
-            storage_client: Storage client adapter
+            dataset: Dataset name
+            storage: Storage client adapter
         """
-        self.storage_client = storage_client
+        self.dataset = dataset
+        self.gcp_project = gcp_project
+        self.storage = StorageClient(project=gcp_project)
+        self.main_bucket = self.get_bucket_name(self.dataset, 'default')
+        self.upload_bucket = self.get_bucket_name(self.dataset, 'upload')
+        self.analysis_bucket = self.get_bucket_name(self.dataset, 'analysis')
 
     @staticmethod
     def get_bucket_name(dataset: str, category: str) -> str:
@@ -27,7 +31,7 @@ class GCSDataAccess:
 
         Args:
             dataset: Dataset name
-            category: Bucket category (e.g., 'upload', 'main')
+            category: Bucket category (e.g., 'upload', 'analysis', 'web')
 
         Returns:
             Bucket name
@@ -45,9 +49,9 @@ class GCSDataAccess:
     def list_files_in_bucket(
         self,
         bucket_name: str,
-        file_types: List[FileType],
-        excluded_prefixes: Optional[tuple[str, ...]] = None,
-    ) -> List[FileMetadata]:
+        file_types: list[FileType],
+        excluded_prefixes: tuple[str, ...] | None = None,
+    ) -> list[FileMetadata]:
         """
         List files in a bucket with specified file types.
 
@@ -64,50 +68,15 @@ class GCSDataAccess:
         for file_type in file_types:
             extensions.extend(file_type.extensions)
 
-        return self.storage_client.list_blobs(
+        return self.storage.find_blobs(
             bucket_name,
             file_extensions=tuple(extensions),
             excluded_prefixes=excluded_prefixes,
         )
 
-    def check_file_exists(self, file_path: str) -> bool:
+    def validate_cram_files(self, cram_paths: list[FilePath]) -> list[str]:
         """
-        Check if a file exists in GCS.
-
-        Args:
-            file_path: GCS path to check
-
-        Returns:
-            True if file exists, False otherwise
-        """
-        try:
-            path = to_path(file_path)
-            return self.storage_client.check_blob_exists(
-                self.storage_client.client.bucket(path.bucket), path.blob
-            )
-        except (ValueError, AttributeError):
-            return False
-
-    def check_files_exist(self, file_paths: List[str]) -> Dict[str, bool]:
-        """
-        Check if multiple files exist in GCS.
-
-        Args:
-            file_paths: List of GCS paths to check
-
-        Returns:
-            Dictionary mapping file paths to existence status
-        """
-        results = {}
-        for file_path in file_paths:
-            results[file_path] = self.check_file_exists(file_path)
-        return results
-
-    def find_files_in_prefixes(
-        self, cram_paths: List[str], file_extensions: tuple[str, ...] = ('.cram',)
-    ) -> List[str]:
-        """
-        Find files with specific extensions in the prefixes of given paths.
+        Validate the existence of CRAM files in the bucket.
 
         Args:
             cram_paths: List of CRAM file paths
@@ -116,29 +85,19 @@ class GCSDataAccess:
         Returns:
             List of found file paths
         """
-        # Extract bucket and prefixes from paths
-        bucket_prefixes = self.storage_client.extract_bucket_and_prefixes(cram_paths)
-
-        # Find files in those prefixes
-        files_by_prefix = self.storage_client.find_files_in_prefixes(
-            bucket_prefixes, file_extensions
+        assert all(
+            p.path.bucket == self.main_bucket for p in cram_paths
+        ), 'All CRAM paths must be in the main(|test) bucket'
+        return self.storage.check_blobs(
+            self.main_bucket, [p.path.blob for p in cram_paths]
         )
 
-        # Flatten the results
-        all_files = []
-        for files in files_by_prefix.values():
-            all_files.extend(files)
-
-        return all_files
-
-    def batch_get_metadata(self, file_paths: List[str]) -> List[FileMetadata]:
+    def delete_blobs(self, bucket_name: str, blobs: list[str]):
         """
-        Get metadata for multiple files.
+        Delete blobs from a GCS bucket.
 
         Args:
-            file_paths: List of GCS paths
-
-        Returns:
-            List of FileMetadata objects
+            bucket_name: Name of the bucket
+            blobs: List of blob names to delete
         """
-        return self.storage_client.batch_get_metadata(file_paths)
+        self.storage.delete_blobs(bucket_name, blobs)

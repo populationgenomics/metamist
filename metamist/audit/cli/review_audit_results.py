@@ -5,7 +5,6 @@ import csv
 
 import click
 
-from ..adapters import StorageClient
 from ..data_access.gcs_data_access import GCSDataAccess
 from ..models import AuditReportEntry, ReviewResult
 from ..services import AuditLogger, ReportGenerator
@@ -14,7 +13,7 @@ from cpg_utils import to_path
 from cpg_utils.config import config_retrieve
 
 
-def review_audit_results(
+def review_audit_report(
     dataset: str,
     results_folder: str,
     report: str = 'files_to_review',
@@ -29,13 +28,12 @@ def review_audit_results(
     if not gcp_project:
         raise ValueError('GCP project is required')
 
-    storage_client = StorageClient(project=gcp_project)
-    gcs_data = GCSDataAccess(storage_client)
-    report_generator = ReportGenerator(storage_client, results_folder, logger)
+    gcs_data = GCSDataAccess(dataset, gcp_project)
+    report_generator = ReportGenerator(gcs_data, results_folder, logger)
 
-    bucket_name = gcs_data.get_bucket_name(dataset, 'analysis')
-
-    report_path = to_path(f'gs://{bucket_name}/{results_folder}/{report}.csv')
+    report_path = to_path(
+        f'gs://{gcs_data.analysis_bucket}/{results_folder}/{report}.csv'
+    )
     if not report_path.exists():
         logger.error(f'Report file {report_path} does not exist.')
         return
@@ -49,9 +47,7 @@ def review_audit_results(
         f'Added comments to {len(review_result.reviewed_files)} / {len(rows)} files.'
     )
 
-    report_generator.write_reviewed_files_report(
-        review_result, bucket_name, results_folder
-    )
+    report_generator.write_reviewed_files_report(review_result)
 
 
 def review_filtered_files(
@@ -142,7 +138,7 @@ def main(
         if filter_expressions
         else None
     )
-    review_audit_results(
+    review_audit_report(
         dataset, results_folder, action=action, comment=comment, filter_func=filter_func
     )
 

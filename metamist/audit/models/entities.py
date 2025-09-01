@@ -1,7 +1,6 @@
 """Core business entities for the audit module."""
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 from .value_objects import FileMetadata, ExternalIds
 
@@ -14,7 +13,7 @@ class Participant:
     external_ids: ExternalIds
 
     @property
-    def external_id(self) -> Optional[str]:
+    def external_id(self) -> str | None:
         """Get the primary external ID."""
         return self.external_ids.get_primary()
 
@@ -28,7 +27,7 @@ class Sample:
     participant: Participant
 
     @property
-    def external_id(self) -> Optional[str]:
+    def external_id(self) -> str | None:
         """Get the primary external ID."""
         return self.external_ids.get_primary()
 
@@ -81,10 +80,10 @@ class Analysis:
 
     id: int
     type: str
-    output_file: Optional[FileMetadata] = None
-    original_file: Optional[FileMetadata] = None
-    sequencing_group_id: Optional[str] = None
-    timestamp_completed: Optional[str] = None
+    output_file: FileMetadata | None = None
+    original_file: FileMetadata | None = None
+    sequencing_group_id: str | None = None
+    timestamp_completed: str | None = None
 
     @property
     def is_cram(self) -> bool:
@@ -92,7 +91,7 @@ class Analysis:
         return self.type.upper() == 'CRAM'
 
     @property
-    def output_path(self) -> Optional[str]:
+    def output_path(self) -> str | None:
         """Get the output file path if it exists."""
         return str(self.output_file.filepath) if self.output_file else None
 
@@ -107,7 +106,7 @@ class SequencingGroup:
     platform: str
     sample: Sample
     assays: list[Assay] = field(default_factory=list)
-    cram_analysis: Optional[Analysis] = None
+    cram_analysis: Analysis | None = None
 
     @property
     def is_complete(self) -> bool:
@@ -115,7 +114,7 @@ class SequencingGroup:
         return self.cram_analysis is not None
 
     @property
-    def cram_path(self) -> Optional[str]:
+    def cram_path(self) -> str | None:
         """Get the CRAM file path if it exists."""
         return self.cram_analysis.output_path if self.cram_analysis else None
 
@@ -137,21 +136,25 @@ class SequencingGroup:
 class AuditReportEntry:  # pylint: disable=too-many-instance-attributes
     """Entry for audit reports."""
 
-    filepath: Optional[str] = None
-    filesize: Optional[int] = None
-    sg_id: Optional[str] = None
-    sg_type: Optional[str] = None
-    sg_tech: Optional[str] = None
-    sg_platform: Optional[str] = None
-    assay_id: Optional[int] = None
-    cram_analysis_id: Optional[int] = None
-    cram_file_path: Optional[str] = None
-    sample_id: Optional[str] = None
-    sample_external_ids: Optional[str] = None
-    participant_id: Optional[int] = None
-    participant_external_ids: Optional[str] = None
-    action: Optional[str] = None
-    review_comment: Optional[str] = None
+    filepath: str | None = None
+    filesize: int | None = None
+    sg_id: str | None = None
+    sg_type: str | None = None
+    sg_tech: str | None = None
+    sg_platform: str | None = None
+    assay_id: int | None = None
+    cram_analysis_id: int | None = None
+    cram_file_path: str | None = None
+    sample_id: str | None = None
+    sample_external_ids: str | None = None
+    participant_id: int | None = None
+    participant_external_ids: str | None = None
+    action: str | None = None
+    review_comment: str | None = None
+
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     def to_report_dict(self) -> dict:
         """Convert to dictionary for report generation."""
@@ -181,6 +184,10 @@ class AuditReportEntry:  # pylint: disable=too-many-instance-attributes
             'Action': self.action,
             'Review Comment': self.review_comment,
         }
+
+    def fieldnames(self) -> list[str]:
+        """Get the field names for the audit report entry."""
+        return list(self.to_report_dict().keys())
 
     def update_action(self, action: str):
         """Update the action for this audit report entry."""

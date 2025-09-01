@@ -1,6 +1,5 @@
 """GraphQL client adapter for Metamist API."""
 
-from typing import Any, Dict, List, Optional
 from metamist.graphql import gql, query_async
 
 
@@ -55,6 +54,21 @@ class GraphQLClient:
         """
     )
 
+    QUERY_AUDIT_DELETION_ANALYSES = gql(
+        """
+        query auditDeletions($dataset: String!) {
+            project(name: $dataset) {
+                analyses(type: {eq: "audit_deletion"}, status: {eq: COMPLETED}, active: true) {
+                    id
+                    timestamp
+                    output
+                    meta
+                }
+            }
+        }
+        """
+    )
+
     QUERY_ENUMS = gql(
         """
         query enumsQuery {
@@ -71,9 +85,9 @@ class GraphQLClient:
 
     def __init__(self):
         """Initialize GraphQL client."""
-        self._enums_cache: Optional[Dict[str, List[str]]] = None
+        self._enums_cache: dict[str, list[str]] | None = None
 
-    async def get_enums(self) -> Dict[str, List[str]]:
+    async def get_enums(self) -> dict[str, list[str]]:
         """
         Get all available enum values from Metamist.
 
@@ -85,7 +99,7 @@ class GraphQLClient:
             self._enums_cache = result['enum']
         return self._enums_cache
 
-    async def get_enum_values(self, enum_type: str) -> List[str]:
+    async def get_enum_values(self, enum_type: str) -> list[str]:
         """
         Get values for a specific enum type.
 
@@ -116,10 +130,10 @@ class GraphQLClient:
     async def get_sequencing_groups(
         self,
         dataset: str,
-        sequencing_types: List[str],
-        sequencing_technologies: List[str],
-        sequencing_platforms: List[str],
-    ) -> List[Dict[str, Any]]:
+        sequencing_types: list[str],
+        sequencing_technologies: list[str],
+        sequencing_platforms: list[str],
+    ) -> list[dict]:
         """
         Fetch sequencing groups from Metamist.
 
@@ -144,8 +158,8 @@ class GraphQLClient:
         return result['project']['sequencingGroups']
 
     async def get_analyses_for_sequencing_groups(
-        self, dataset: str, sg_ids: List[str], analysis_types: List[str]
-    ) -> List[Dict[str, Any]]:
+        self, dataset: str, sg_ids: list[str], analysis_types: list[str]
+    ) -> list[dict]:
         """
         Fetch analyses for given sequencing groups.
 
@@ -166,3 +180,21 @@ class GraphQLClient:
             },
         )
         return result['project']['sequencingGroups']
+
+    async def get_audit_deletion_analyses(self, dataset: str) -> list[dict]:
+        """
+        Fetch completed audit deletion analyses for a dataset.
+
+        Args:
+            dataset: Dataset name
+
+        Returns:
+            List of audit deletion analyses
+        """
+        result = await query_async(
+            self.QUERY_AUDIT_DELETION_ANALYSES,
+            {
+                'dataset': dataset,
+            },
+        )
+        return result['project']['analyses']

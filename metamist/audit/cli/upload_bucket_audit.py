@@ -3,13 +3,12 @@
 import asyncio
 import logging
 from collections import defaultdict
-from typing import Optional
 from types import SimpleNamespace
 import click
 from cpg_utils.config import config_retrieve
 
 from ..models import AuditConfig, SequencingGroup
-from ..adapters import GraphQLClient, StorageClient
+from ..adapters import GraphQLClient
 from ..data_access import MetamistDataAccess, GCSDataAccess
 from ..services import AuditAnalyzer, AuditLogger, ReportGenerator
 
@@ -85,13 +84,17 @@ class AuditOrchestrator:
         if analyses:
             self.logger.info('Validating analysis existence'.center(50, '~'))
             cram_paths = [
-                str(a.output_file.filepath)
-                for a in analyses
-                if a.is_cram and a.output_file
+                a.output_file.filepath for a in analyses if a.is_cram and a.output_file
             ]
-            existing_crams = self.gcs_data.find_files_in_prefixes(
-                cram_paths, ('.cram',)
-            )
+            existing_crams = self.gcs_data.validate_cram_files(cram_paths)
+            if any(
+                a.output_file and a.output_file.filepath.blob not in existing_crams
+                for a in analyses
+                if a.is_cram
+            ):
+                self.logger.warning(
+                    f'Missing expected CRAM files: {set(cram_paths) - set(existing_crams)}'
+                )
             self.logger.info(f'Validated {len(existing_crams)} CRAM files')
             self.logger.info('')
 
@@ -111,7 +114,7 @@ class AuditOrchestrator:
         analysis_bucket_name = self.gcs_data.get_bucket_name(config.dataset, 'analysis')
         self.report_writer.write_audit_reports(result, analysis_bucket_name, config)
 
-        self.logger.info('Upload bucket audit complete')
+        self.logger.info('Upload bucket audit complete!')
 
     def _log_initialization(self, config: AuditConfig):
         """Log audit initialization details."""
@@ -170,13 +173,13 @@ class AuditOrchestrator:
 
 
 async def validate_enum_values(
-    graphql_client: GraphQLClient, config: AuditConfig
+    graphql: GraphQLClient, config: AuditConfig
 ) -> AuditConfig:
     """
     Validate enum values against Metamist API.
 
     Args:
-        graphql_client: GraphQL client
+        graphql: GraphQL client
         config: Audit configuration
 
     Returns:
@@ -184,7 +187,7 @@ async def validate_enum_values(
     """
 
     async def validate_enum_value(enum_type: str, config_values: tuple[str]) -> str:
-        valid_values = await graphql_client.get_enum_values(enum_type)
+        valid_values = await graphql.get_enum_values(enum_type)
         if 'all' in config_values:
             return valid_values
         if any(value.lower() not in valid_values for value in config_values):
@@ -246,24 +249,20 @@ async def audit_upload_bucket_async(audit_config: AuditConfig):
             file_types=audit_config.file_types,
             excluded_prefixes=audit_config.excluded_prefixes,
             excluded_sequencing_groups=tuple(excluded_sgs),
+            results_folder=audit_config.results_folder,
         )
 
-    # Create adapters
-    graphql_client = GraphQLClient()
-    storage_client = StorageClient(project=gcp_project)
-
-    # Validate enum values
+    # Create repositories
+    metamist_data = MetamistDataAccess()
     audit_config = await validate_enum_values(
-        graphql_client, audit_config
+        metamist_data.graphql_client, audit_config
     )  # TODO: do this alongside the file types validation
 
-    # Create repositories
-    metamist_data = MetamistDataAccess(graphql_client)
-    gcs_data = GCSDataAccess(storage_client)
+    gcs_data = GCSDataAccess(audit_config.dataset, gcp_project)
 
     # Create services
     analyzer = AuditAnalyzer(logger)
-    report_writer = ReportGenerator(storage_client.client, logger)
+    report_writer = ReportGenerator(gcs_data, audit_config.results_folder, logger)
 
     # Create orchestrator
     orchestrator = AuditOrchestrator(
@@ -308,7 +307,6 @@ def audit_upload_bucket(config: AuditConfig):
     '--sequencing-platforms',
     '-p',
     multiple=True,
-    required=False,
     default=('all',),
     help='"all", or any of the enum sequencing platforms',
 )
@@ -332,6 +330,11 @@ def audit_upload_bucket(config: AuditConfig):
     multiple=True,
     help='Exclude files with these prefixes from the audit',
 )
+@click.option(
+    '--results-folder',
+    '-r',
+    help='Name of the results directory, overwriting default timestamp',
+)
 def main(
     dataset: str,
     sequencing_types: tuple[str],
@@ -339,7 +342,8 @@ def main(
     sequencing_platforms: tuple[str],
     analysis_types: tuple[str],
     file_types: tuple[str],
-    excluded_prefixes: Optional[tuple[str]] = None,
+    excluded_prefixes: tuple[str] | None = None,
+    results_folder: str | None = None,
 ):
     """Run upload bucket audit for a Metamist dataset."""
     # Create configuration from CLI args
@@ -351,6 +355,7 @@ def main(
         analysis_types=analysis_types,
         file_types=file_types,
         excluded_prefixes=excluded_prefixes,
+        results_folder=results_folder,
     )
 
     config = AuditConfig.from_cli_args(args)

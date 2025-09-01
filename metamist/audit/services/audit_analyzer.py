@@ -1,6 +1,5 @@
 """Core audit analysis business logic."""
 
-from typing import List, Dict, Optional
 import logging
 
 from ..models import (
@@ -18,7 +17,7 @@ from .file_matcher import FileMatchingService
 class AuditAnalyzer:
     """Core audit analysis service with pure business logic."""
 
-    def __init__(self, logger: Optional[logging.Logger] = None):
+    def __init__(self, logger: logging.Logger | None = None):
         """
         Initialize the audit analyzer.
 
@@ -30,10 +29,10 @@ class AuditAnalyzer:
 
     def analyze_sequencing_groups(
         self,
-        sequencing_groups: List[SequencingGroup],
-        bucket_files: List[FileMetadata],
-        analyses: List[Analysis],
-        excluded_sg_ids: Optional[List[str]] = None,
+        sequencing_groups: list[SequencingGroup],
+        bucket_files: list[FileMetadata],
+        analyses: list[Analysis],
+        excluded_sg_ids: list[str] | None = None,
     ) -> AuditResult:
         """
         Main analysis entry point for audit.
@@ -96,24 +95,17 @@ class AuditAnalyzer:
         )
 
     def _update_sgs_with_cram_analyses(
-        self, sequencing_groups: List[SequencingGroup], analyses: List[Analysis]
+        self, sequencing_groups: list[SequencingGroup], analyses: list[Analysis]
     ):
         """Update sequencing groups with their CRAM analyses."""
         # Create lookup of analyses by SG ID
-        cram_by_sg: Dict[str, Analysis] = {}
+        cram_by_sg: dict[str, Analysis] = {}
         for analysis in analyses:
             if analysis.is_cram and analysis.sequencing_group_id:
                 sg_id = analysis.sequencing_group_id
                 # Keep the latest if multiple exist
                 if sg_id not in cram_by_sg:
                     cram_by_sg[sg_id] = analysis
-                elif analysis.timestamp_completed:
-                    existing = cram_by_sg[sg_id]
-                    if (
-                        not existing.timestamp_completed
-                        or analysis.timestamp_completed > existing.timestamp_completed
-                    ):
-                        cram_by_sg[sg_id] = analysis
 
         # Update SGs
         for sg in sequencing_groups:
@@ -121,8 +113,8 @@ class AuditAnalyzer:
                 sg.set_cram_analysis(cram_by_sg[sg.id])
 
     def _get_all_read_files(
-        self, sequencing_groups: List[SequencingGroup]
-    ) -> List[ReadFile]:
+        self, sequencing_groups: list[SequencingGroup]
+    ) -> list[ReadFile]:
         """Get all read files from all sequencing groups."""
         read_files = []
         for sg in sequencing_groups:
@@ -131,12 +123,12 @@ class AuditAnalyzer:
 
     def _generate_delete_entries(
         self,
-        sequencing_groups: List[SequencingGroup],
-        bucket_files: List[FileMetadata],
-        moved_files: Dict[str, MovedFile],
-        analyses: List[Analysis],
-        excluded_sg_ids: List[str],
-    ) -> List[AuditReportEntry]:
+        sequencing_groups: list[SequencingGroup],
+        bucket_files: list[FileMetadata],
+        moved_files: dict[str, MovedFile],
+        analyses: list[Analysis],
+        excluded_sg_ids: list[str],
+    ) -> list[AuditReportEntry]:
         """Generate report entries for files to delete."""
         entries = []
 
@@ -172,15 +164,15 @@ class AuditAnalyzer:
 
     def _generate_review_entries(
         self,
-        sequencing_groups: List[SequencingGroup],
-        uningested_files: List[FileMetadata],
-    ) -> List[AuditReportEntry]:
+        sequencing_groups: list[SequencingGroup],
+        uningested_files: list[FileMetadata],
+    ) -> list[AuditReportEntry]:
         """Generate report entries for files to review."""
         entries = []
 
         # Build lookup of external IDs to completed SGs
-        completed_sgs_by_sample_id: Dict[str, SequencingGroup] = {}
-        completed_sgs_by_participant_id: Dict[str, SequencingGroup] = {}
+        completed_sgs_by_sample_id: dict[str, SequencingGroup] = {}
+        completed_sgs_by_participant_id: dict[str, SequencingGroup] = {}
 
         for sg in sequencing_groups:
             if not sg.is_complete:
@@ -228,15 +220,15 @@ class AuditAnalyzer:
 
     def _generate_moved_entries(
         self,
-        sequencing_groups: List[SequencingGroup],
-        moved_files: Dict[str, MovedFile],
-        excluded_sg_ids: List[str],
-    ) -> List[AuditReportEntry]:
+        sequencing_groups: list[SequencingGroup],
+        moved_files: dict[str, MovedFile],
+        excluded_sg_ids: list[str],
+    ) -> list[AuditReportEntry]:
         """Generate report entries for moved files."""
         entries = []
 
         # Build lookup of file paths to assays and SGs
-        path_to_sg_assay: Dict[str, tuple[SequencingGroup, int]] = {}
+        path_to_sg_assay: dict[str, tuple[SequencingGroup, int]] = {}
 
         for sg in sequencing_groups:
             for assay in sg.assays:
@@ -265,11 +257,11 @@ class AuditAnalyzer:
         self,
         sg: SequencingGroup,
         file_metadata: FileMetadata,
-        assay_id: Optional[int] = None,
+        assay_id: int | None = None,
     ) -> AuditReportEntry:
         """Create a report entry from sequencing group and file data."""
         return AuditReportEntry(
-            filepath=str(file_metadata.filepath),
+            filepath=file_metadata.filepath.uri,
             filesize=file_metadata.filesize,
             sg_id=sg.id,
             sg_type=sg.type,

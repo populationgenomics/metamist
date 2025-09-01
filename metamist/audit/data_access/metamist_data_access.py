@@ -1,6 +1,5 @@
 """Repository for Metamist data access."""
 
-from typing import List, Optional, Dict, Any
 from datetime import datetime
 from cpg_utils import to_path
 
@@ -21,22 +20,22 @@ from ..adapters import GraphQLClient
 class MetamistDataAccess:
     """Layer for accessing Metamist data."""
 
-    def __init__(self, graphql_client: GraphQLClient):
+    def __init__(self, graphql_client: GraphQLClient = None):
         """
         Initialize the data access layer.
 
         Args:
             graphql_client: GraphQL client adapter
         """
-        self.graphql_client = graphql_client
+        self.graphql_client = graphql_client or GraphQLClient()
 
     async def get_sequencing_groups(
         self,
         dataset: str,
-        sequencing_types: List[str],
-        sequencing_technologies: List[str],
-        sequencing_platforms: List[str],
-    ) -> List[SequencingGroup]:
+        sequencing_types: list[str],
+        sequencing_technologies: list[str],
+        sequencing_platforms: list[str],
+    ) -> list[SequencingGroup]:
         """
         Fetch sequencing groups from Metamist.
 
@@ -56,8 +55,8 @@ class MetamistDataAccess:
         return [self._parse_sequencing_group(sg) for sg in raw_sgs]
 
     async def get_analyses_for_sequencing_groups(
-        self, dataset: str, sg_ids: List[str], analysis_types: List[str]
-    ) -> List[Analysis]:
+        self, dataset: str, sg_ids: list[str], analysis_types: list[str]
+    ) -> list[Analysis]:
         """
         Fetch analyses for sequencing groups.
 
@@ -84,8 +83,8 @@ class MetamistDataAccess:
         return analyses
 
     async def get_latest_cram_analyses(
-        self, dataset: str, sg_ids: List[str]
-    ) -> Dict[str, Analysis]:
+        self, dataset: str, sg_ids: list[str]
+    ) -> dict[str, Analysis]:
         """
         Get the latest CRAM analysis for each sequencing group.
 
@@ -101,7 +100,7 @@ class MetamistDataAccess:
         )
 
         # Group by SG and find latest
-        analyses_by_sg: Dict[str, List[Analysis]] = {}
+        analyses_by_sg: dict[str, list[Analysis]] = {}
         for analysis in analyses:
             if analysis.sequencing_group_id:
                 if analysis.sequencing_group_id not in analyses_by_sg:
@@ -122,7 +121,38 @@ class MetamistDataAccess:
 
         return latest_analyses
 
-    async def get_enum_values(self, enum_type: str) -> List[str]:
+    async def get_audit_deletion_analysis(
+        self, dataset: str, output_path: str
+    ) -> dict | None:
+        """
+        Fetch a specific audit deletion analysis by output path.
+
+        Args:
+            dataset: Dataset name
+            output_path: Output path of the analysis
+
+        Returns:
+            analysis dict or None if not found
+        """
+        analyses = await self.get_audit_deletion_analyses(dataset)
+        for analysis in analyses:
+            if analysis['output'] == output_path:
+                return analysis
+        return None
+
+    async def get_audit_deletion_analyses(self, dataset: str) -> list[dict]:
+        """
+        Fetch completed audit deletion analyses for a dataset.
+
+        Args:
+            dataset: Dataset name
+
+        Returns:
+            List of audit deletion analyses
+        """
+        return await self.graphql_client.get_audit_deletion_analyses(dataset)
+
+    async def get_enum_values(self, enum_type: str) -> list[str]:
         """
         Get valid values for an enum type.
 
@@ -134,7 +164,7 @@ class MetamistDataAccess:
         """
         return await self.graphql_client.get_enum_values(enum_type)
 
-    def _parse_sequencing_group(self, data: Dict[str, Any]) -> SequencingGroup:
+    def _parse_sequencing_group(self, data: dict) -> SequencingGroup:
         """Parse raw sequencing group data into entity."""
         # Parse participant
         participant_data = data['sample']['participant']
@@ -166,7 +196,7 @@ class MetamistDataAccess:
             assays=assays,
         )
 
-    def _parse_assay(self, data: Dict[str, Any]) -> Optional[Assay]:
+    def _parse_assay(self, data: dict) -> Assay | None:
         """Parse raw assay data into entity."""
         assay = Assay(id=data['id'])
 
@@ -191,7 +221,7 @@ class MetamistDataAccess:
 
         return assay if assay.read_files else None
 
-    def _parse_read_file(self, data: Dict[str, Any]) -> Optional[ReadFile]:
+    def _parse_read_file(self, data: dict) -> ReadFile | None:
         """Parse raw read file data into entity."""
         location = data.get('location')
         if not location:
@@ -208,7 +238,7 @@ class MetamistDataAccess:
         except (ValueError, AttributeError):
             return None
 
-    def _parse_analysis(self, data: Dict[str, Any], sg_id: str) -> Optional[Analysis]:
+    def _parse_analysis(self, data: dict, sg_id: str) -> Analysis | None:
         """Parse raw analysis data into entity."""
         # Handle different output formats
         output_path = None

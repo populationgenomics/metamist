@@ -1,7 +1,6 @@
 """File matching service for finding moved and duplicate files."""
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict
 
 from ..models import Analysis, FileMetadata, ReadFile, MovedFile
 
@@ -11,8 +10,8 @@ class FileMatcher(ABC):
 
     @abstractmethod
     def match(
-        self, file: FileMetadata, candidates: List[FileMetadata]
-    ) -> Optional[FileMetadata]:
+        self, file: FileMetadata, candidates: list[FileMetadata]
+    ) -> FileMetadata | None:
         """
         Match a file against a list of candidates.
 
@@ -30,8 +29,8 @@ class ChecksumMatcher(FileMatcher):
     """Match files by checksum."""
 
     def match(
-        self, file: FileMetadata, candidates: List[FileMetadata]
-    ) -> Optional[FileMetadata]:
+        self, file: FileMetadata, candidates: list[FileMetadata]
+    ) -> FileMetadata | None:
         """Match files by checksum."""
         if not file.checksum:
             return None
@@ -47,8 +46,8 @@ class FilenameSizeMatcher(FileMatcher):
     """Match files by filename and size."""
 
     def match(
-        self, file: FileMetadata, candidates: List[FileMetadata]
-    ) -> Optional[FileMetadata]:
+        self, file: FileMetadata, candidates: list[FileMetadata]
+    ) -> FileMetadata | None:
         """Match files by filename and size."""
         if not file.filesize and not file.filepath.name:
             return None
@@ -66,7 +65,7 @@ class FilenameSizeMatcher(FileMatcher):
 class CompositeFileMatcher:
     """Try multiple matching strategies in order."""
 
-    def __init__(self, matchers: List[FileMatcher]):
+    def __init__(self, matchers: list[FileMatcher]):
         """
         Initialize with list of matchers.
 
@@ -76,8 +75,8 @@ class CompositeFileMatcher:
         self.matchers = matchers
 
     def match(
-        self, file: FileMetadata, candidates: List[FileMetadata]
-    ) -> Optional[FileMetadata]:
+        self, file: FileMetadata, candidates: list[FileMetadata]
+    ) -> FileMetadata | None:
         """
         Try each matcher until a match is found.
 
@@ -103,8 +102,8 @@ class FileMatchingService:
         self.matcher = CompositeFileMatcher([ChecksumMatcher(), FilenameSizeMatcher()])
 
     def find_moved_files(
-        self, metamist_files: List[ReadFile], bucket_files: List[FileMetadata]
-    ) -> Dict[str, MovedFile]:
+        self, metamist_files: list[ReadFile], bucket_files: list[FileMetadata]
+    ) -> dict[str, MovedFile]:
         """
         Find files that have been moved within the bucket.
 
@@ -146,7 +145,7 @@ class FileMatchingService:
 
     def find_original_analysis_files(
         self,
-        analyses: List[Analysis],
+        analyses: list[Analysis],
         bucket_files: list[FileMetadata],
     ):
         """
@@ -158,8 +157,8 @@ class FileMatchingService:
                     analysis.original_file = bucket_file
 
     def find_duplicate_files(
-        self, files: List[FileMetadata]
-    ) -> Dict[str, List[FileMetadata]]:
+        self, files: list[FileMetadata]
+    ) -> dict[str, list[FileMetadata]]:
         """
         Find duplicate files based on checksum.
 
@@ -186,11 +185,11 @@ class FileMatchingService:
 
     def find_uningested_files(
         self,
-        metamist_files: List[ReadFile],
-        bucket_files: List[FileMetadata],
-        moved_files: Dict[str, MovedFile],
-        analysis_files: Optional[List[FileMetadata]] = None,
-    ) -> List[FileMetadata]:
+        metamist_files: list[ReadFile],
+        bucket_files: list[FileMetadata],
+        moved_files: dict[str, MovedFile],
+        analysis_files: list[FileMetadata] | None = None,
+    ) -> list[FileMetadata]:
         """
         Find files in the bucket that are not in Metamist.
 

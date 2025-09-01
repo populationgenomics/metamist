@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 from cpg_utils import Path
 
@@ -68,8 +67,8 @@ class FileMetadata:
     """Immutable file metadata."""
 
     filepath: FilePath
-    filesize: Optional[int] = None
-    checksum: Optional[str] = None
+    filesize: int | None = None
+    checksum: str | None = None
 
     def with_size(self, size: int) -> 'FileMetadata':
         """Create a new instance with updated size."""
@@ -86,11 +85,11 @@ class ExternalIds:
 
     ids: dict[str, str]
 
-    def get_primary(self) -> Optional[str]:
+    def get_primary(self) -> str | None:
         """Get the primary external ID if only one exists."""
         return self.ids.get('')
 
-    def __getitem__(self, key: str) -> Optional[str]:
+    def __getitem__(self, key: str) -> str | None:
         return self.ids.get(key)
 
     def values(self) -> list[str]:
@@ -110,6 +109,7 @@ class AuditConfig:  # pylint: disable=too-many-instance-attributes
     file_types: tuple[FileType, ...]
     excluded_prefixes: tuple[str, ...] = ()
     excluded_sequencing_groups: tuple[str, ...] = ()
+    results_folder: str | None = None
 
     @classmethod
     def from_cli_args(cls, args) -> 'AuditConfig':
@@ -142,6 +142,7 @@ class AuditConfig:  # pylint: disable=too-many-instance-attributes
             analysis_types=args.analysis_types or ('CRAM',),
             file_types=tuple(file_types),
             excluded_prefixes=args.excluded_prefixes or (),
+            results_folder=args.results_folder,
         )
 
 
