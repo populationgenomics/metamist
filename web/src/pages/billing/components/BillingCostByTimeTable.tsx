@@ -19,7 +19,6 @@ import { convertFieldName } from '../../../shared/utilities/fieldName'
 import formatMoney from '../../../shared/utilities/formatMoney'
 import { BillingColumn } from '../../../sm-api'
 
-// Type for breakdown row data in virtuoso
 type BreakdownRowData = {
     date: Date | null // null for total row
     projectOrTopic: string
@@ -29,7 +28,6 @@ type BreakdownRowData = {
     isTotal?: boolean
 }
 
-// Type for summary row data in virtuoso
 type SummaryRowData = {
     date: Date
     values: { [key: string]: number }
@@ -37,7 +35,6 @@ type SummaryRowData = {
     getColumnDisplayStyle: (category: string) => React.CSSProperties
 }
 
-// Breakdown row component for react-virtuoso
 const BreakdownTableRow: React.FC<{ item: BreakdownRowData }> = ({ item: row, ...props }) => {
     return (
         <TableRow
@@ -65,7 +62,6 @@ const BreakdownTableRow: React.FC<{ item: BreakdownRowData }> = ({ item: row, ..
     )
 }
 
-// Summary row component for react-virtuoso
 const SummaryTableRow: React.FC<{ item: SummaryRowData }> = ({ item: row, ...props }) => {
     return (
         <TableRow {...props} className="ui table row">
@@ -84,7 +80,6 @@ const SummaryTableRow: React.FC<{ item: SummaryRowData }> = ({ item: row, ...pro
     )
 }
 
-// Table components for react-virtuoso breakdown view
 const VirtuosoBreakdownTableComponents: TableComponents<BreakdownRowData> = {
     Scroller: React.forwardRef(function TableContainerWrapper(props, ref) {
         return (
@@ -114,7 +109,6 @@ const VirtuosoBreakdownTableComponents: TableComponents<BreakdownRowData> = {
     }),
 }
 
-// Table components for react-virtuoso summary view
 const VirtuosoSummaryTableComponents: TableComponents<SummaryRowData> = {
     Scroller: React.forwardRef(function TableContainerWrapper(props, ref) {
         return (
@@ -225,6 +219,21 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         column: null,
         direction: null,
     })
+
+    // Format data
+    React.useEffect(() => {
+        setInternalData(
+            data.map((p) => {
+                const newP = { ...p }
+                const total = Object.values(p.values).reduce((acc, cur) => acc + cur, 0)
+                newP.values['Daily Total'] = total
+                newP.values['Compute Cost'] = total - p.values['Cloud Storage']
+                return newP
+            })
+        )
+
+        setInternalGroups(groups.concat(['Daily Total', 'Compute Cost']))
+    }, [data, groups])
 
     // Memoize column configurations for performance
     const columnConfigs = React.useMemo((): ColumnConfig[] => {
@@ -415,21 +424,6 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
             getColumnDisplayStyle,
         }))
     }, [viewMode, sortedSummaryData, headerFields, getColumnDisplayStyle])
-
-    // Format data
-    React.useEffect(() => {
-        setInternalData(
-            data.map((p) => {
-                const newP = { ...p }
-                const total = Object.values(p.values).reduce((acc, cur) => acc + cur, 0)
-                newP.values['Daily Total'] = total
-                newP.values['Compute Cost'] = total - p.values['Cloud Storage']
-                return newP
-            })
-        )
-
-        setInternalGroups(groups.concat(['Daily Total', 'Compute Cost']))
-    }, [data, groups])
 
     const handleSort = (clickedColumn: string) => {
         if (sort.column !== clickedColumn) {
