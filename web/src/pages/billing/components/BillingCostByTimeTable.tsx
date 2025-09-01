@@ -431,17 +431,6 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         setInternalGroups(groups.concat(['Daily Total', 'Compute Cost']))
     }, [data, groups])
 
-    // Early return for loading - must be after all hooks
-    if (isLoading) {
-        return (
-            <div>
-                <p style={{ textAlign: 'center', marginTop: '20px' }}>
-                    <em>Loading table...</em>
-                </p>
-            </div>
-        )
-    }
-
     const handleSort = (clickedColumn: string) => {
         if (sort.column !== clickedColumn) {
             setSort({ column: clickedColumn, direction: 'ascending' })
@@ -459,6 +448,45 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
             return sort.direction === 'ascending' ? 'ascending' : 'descending'
         }
         return undefined
+    }
+
+    const handleExport = React.useCallback(
+        (format: 'csv' | 'tsv') => {
+            const exportData: ExportData = {
+                headerFields,
+                summaryData: sortedSummaryData,
+                breakdownRows: allBreakdownRows,
+                viewMode,
+                expandCompute,
+                groupBy,
+            }
+            if (onExportRequest) {
+                onExportRequest(viewMode, format, exportData)
+            } else {
+                exportToFile(format, exportData)
+            }
+        },
+        [
+            headerFields,
+            sortedSummaryData,
+            allBreakdownRows,
+            viewMode,
+            expandCompute,
+            groupBy,
+            onExportRequest,
+            exportToFile,
+        ]
+    )
+
+    // Early return for loading - must be after all hooks
+    if (isLoading) {
+        return (
+            <div>
+                <p style={{ textAlign: 'center', marginTop: '20px' }}>
+                    <em>Loading table...</em>
+                </p>
+            </div>
+        )
     }
 
     return (
@@ -535,41 +563,13 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                                 key="csv"
                                 text="Export to CSV"
                                 icon="file excel"
-                                onClick={() => {
-                                    const exportData: ExportData = {
-                                        headerFields,
-                                        summaryData: sortedSummaryData,
-                                        breakdownRows: allBreakdownRows,
-                                        viewMode,
-                                        expandCompute,
-                                        groupBy,
-                                    }
-                                    if (onExportRequest) {
-                                        onExportRequest(viewMode, 'csv', exportData)
-                                    } else {
-                                        exportToFile('csv', exportData)
-                                    }
-                                }}
+                                onClick={() => handleExport('csv')}
                             />
                             <Dropdown.Item
                                 key="tsv"
                                 text="Export to TSV"
                                 icon="file text outline"
-                                onClick={() => {
-                                    const exportData: ExportData = {
-                                        headerFields,
-                                        summaryData: sortedSummaryData,
-                                        breakdownRows: allBreakdownRows,
-                                        viewMode,
-                                        expandCompute,
-                                        groupBy,
-                                    }
-                                    if (onExportRequest) {
-                                        onExportRequest(viewMode, 'tsv', exportData)
-                                    } else {
-                                        exportToFile('tsv', exportData)
-                                    }
-                                }}
+                                onClick={() => handleExport('tsv')}
                             />
                         </Dropdown.Menu>
                     </Dropdown>
