@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from sys import platform
 
 from google.cloud import bigquery
 
@@ -235,6 +234,58 @@ class BillingArBatchTable(BillingBaseTable):
         }
         return sample_to_seq_groups
 
+    def aggregate_per_sample(
+        self, result, sequencing_groups, sample_id_map, sample_to_seq_grp
+    ) -> list[dict]:
+        """
+        Aggregate results per sample if needed
+        """
+        # remap results to sample if needed
+        mapped_results = []
+        included_seq_groups = []
+        for sample_id, seq_groups in sample_to_seq_grp.items():
+            # aggregate all seq_groups into one record
+            # sequencing_group contain formatted id
+            # Group by all fields except 'sequencing_group', and 'cost'
+            # Aggregate cost for each unique combination of other fields
+            grouped = {}
+            for r in result:
+                # Build a key from all fields except 'sequencing_group' and 'cost'
+                key = tuple(
+                    (k, v)
+                    for k, v in r.items()
+                    if k not in ('sequencing_group', 'cost')
+                )
+                grouped.setdefault(key, []).append(r)
+
+            for sample_id, seq_groups in sample_to_seq_grp.items():
+                included_seq_groups.extend(seq_groups)
+                for key, records in grouped.items():
+                    # Filter records for this sample's seq_groups
+                    filtered = [
+                        r for r in records if r['sequencing_group'] in seq_groups
+                    ]
+                    if filtered:
+                        # Use the first record for other fields
+                        base = dict(dict(key).items())
+                        mapped_results.append(
+                            {
+                                **base,
+                                'sequencing_group': ','.join(seq_groups),
+                                'sample': sample_id_map[sample_id],
+                                'cost': sum(r['cost'] for r in filtered),
+                            }
+                        )
+
+        # append to mapped results the seq groups which do not belong to any samples
+        remaining_seq_groups = set(sequencing_groups) - set(included_seq_groups)
+        for seq_group in remaining_seq_groups:
+            # append all the records from result where sequencing_group == seq_group
+            filtered = [r for r in result if r['sequencing_group'] == seq_group]
+            mapped_results.extend(filtered)
+
+        return mapped_results
+
     async def get_cost_by_sample(
         self,
         connection: Connection,
@@ -328,52 +379,10 @@ class BillingArBatchTable(BillingBaseTable):
 
         # combine
         result = compute_results + sg_storage_cost
-        # remap results to sample if needed
         if 'sequencing_group' in query.fields and sample_to_seq_grp:
-            mapped_results = []
-            included_seq_groups = []
-            for sample_id, seq_groups in sample_to_seq_grp.items():
-                # aggregate all seq_groups into one record
-                # sequencing_group contain formatted id
-                # Group by all fields except 'sequencing_group', and 'cost'
-                # Aggregate cost for each unique combination of other fields
-                grouped = {}
-                for r in result:
-                    # Build a key from all fields except 'sequencing_group' and 'cost'
-                    key = tuple(
-                        (k, v)
-                        for k, v in r.items()
-                        if k not in ('sequencing_group', 'cost')
-                    )
-                    grouped.setdefault(key, []).append(r)
-
-                for sample_id, seq_groups in sample_to_seq_grp.items():
-                    included_seq_groups.extend(seq_groups)
-                    for key, records in grouped.items():
-                        # Filter records for this sample's seq_groups
-                        filtered = [
-                            r for r in records if r['sequencing_group'] in seq_groups
-                        ]
-                        if filtered:
-                            # Use the first record for other fields
-                            base = {k: v for k, v in dict(key).items()}
-                            mapped_results.append(
-                                {
-                                    **base,
-                                    'sequencing_group': ','.join(seq_groups),
-                                    'sample': sample_id_map[sample_id],
-                                    'cost': sum(r['cost'] for r in filtered),
-                                }
-                            )
-
-            # append to mapped results the seq groups which do not belong to any samples
-            remaining_seq_groups = set(sequencing_groups) - set(included_seq_groups)
-            for seq_group in remaining_seq_groups:
-                # append all the records from result where sequencing_group == seq_group
-                filtered = [r for r in result if r['sequencing_group'] == seq_group]
-                mapped_results.extend(filtered)
-
-            result = mapped_results
+            result = self.aggregate_per_sample(
+                result, sequencing_groups, sample_id_map, sample_to_seq_grp
+            )
 
         # sort by invoice month
         result = sorted(result, key=lambda k: k['invoice_month'])

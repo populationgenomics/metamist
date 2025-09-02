@@ -190,14 +190,14 @@ function BillingCostBySampleTable(props: { data: BillingResultRow[] }) {
     const columns: GridColDef<BillingResultRow>[] = useMemo(() => {
         const firstRow = data[0]
         if (!firstRow) return []
-        const {            
+        const {
             cost: _cost,
             month: _month,
             sequencingGroup: _sequencingGroup,
             sample: _sample,
             ...breakDownCols
         } = firstRow
-        
+
         // check if any of data record contains a non-empty sample string
         const hasSample = data.some((row) => typeof row.sample === 'string')
 

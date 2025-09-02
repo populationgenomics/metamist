@@ -1,5 +1,3 @@
-from datetime import datetime, timedelta
-
 from api.utils.db import (
     Connection,
 )
