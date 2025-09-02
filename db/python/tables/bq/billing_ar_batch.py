@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from sys import platform
 
 from google.cloud import bigquery
 
@@ -12,9 +13,14 @@ from api.utils.db import (
 )
 from db.python.tables.bq.billing_base import BillingBaseTable
 from db.python.tables.sequencing_group import SequencingGroupTable
-from models.models import BillingColumn, BillingTotalCostQueryModel
+from models.enums.billing import BillingSource
+from models.models import BillingSampleQueryModel, BillingTotalCostQueryModel
 from models.utils.sample_id_format import sample_id_transform_to_raw
-from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
+from models.utils.sequencing_group_id_format import (
+    sequencing_group_id_format,
+    sequencing_group_id_format_list,
+    sequencing_group_id_transform_to_raw,
+)
 
 
 class BillingArBatchTable(BillingBaseTable):
@@ -99,8 +105,9 @@ class BillingArBatchTable(BillingBaseTable):
 
     async def get_sequencing_groups(
         self,
+        connection: Connection,
         records_filter: list[str],
-    ) -> tuple[list[str], list[int], dict[int, str]]:
+    ) -> tuple[list[str], list[int], dict[int, str], dict[int, list[int]]]:
         """
         Get sequencing groups from records filter
         """
@@ -110,6 +117,9 @@ class BillingArBatchTable(BillingBaseTable):
         sequencing_groups: list[str] = []
         sequencing_groups_as_ids: list[int] = []
         seq_id_map: dict[int, str] = {}
+        sample_id_map: dict[int, str] = {}
+        sample_ids: list[int] = []
+        sample_to_seq_grp: dict[int, list[int]] = {}
         for r in records_filter:
             if r.startswith(SEQUENCING_GROUP_PREFIX):
                 sequencing_groups.append(r.upper())
@@ -118,11 +128,36 @@ class BillingArBatchTable(BillingBaseTable):
                 seq_id_map[seq_id] = r
                 sequencing_groups_as_ids.append(seq_id)
             elif r.startswith(SAMPLE_PREFIX):
-                # TODO: get all seq groups for this sample
-                _sample_id = sample_id_transform_to_raw(r.upper())
-                continue
+                # get all seq groups for this sample
+                sample_id = sample_id_transform_to_raw(r.upper())
+                sample_id_map[sample_id] = r
+                sample_ids.append(sample_id)
 
-        return (sequencing_groups, sequencing_groups_as_ids, seq_id_map)
+        # map sample to seq groups
+        if sample_ids:
+            sample_to_seq_grp = await self.get_seq_groups_per_sample(
+                connection, sample_ids
+            )
+            # append to sequencing_groups_as_ids
+            for sample_id, seq_groups in sample_to_seq_grp.items():
+                sequencing_groups_as_ids.extend(seq_groups)
+                for seq_id in seq_groups:
+                    r = sequencing_group_id_format(seq_id)
+                    seq_id_map[seq_id] = r
+                    sequencing_groups.append(r)
+
+            # reformat the map, keep formatted list
+            sample_to_seq_grp = {
+                k: sequencing_group_id_format_list(v)
+                for k, v in sample_to_seq_grp.items()
+            }
+        return (
+            sequencing_groups,
+            sequencing_groups_as_ids,
+            seq_id_map,
+            sample_id_map,
+            sample_to_seq_grp,
+        )
 
     def get_ar_guid_by_seq_groups(
         self, sequencing_groups: list[str]
@@ -173,16 +208,37 @@ class BillingArBatchTable(BillingBaseTable):
         project_name = connection.project_id_map[project_id].dataset
         return (project_id, project_name)
 
+    async def get_seq_groups_per_sample(
+        self, connection: Connection, sample_ids: list[int]
+    ) -> dict[int, list[int]]:
+        """
+        Get sequencing groups per sample ids
+        Return map of Sample id -> seq group
+        """
+        query = """
+            SELECT sample_id, GROUP_CONCAT(id ORDER BY id ASC SEPARATOR ',') as seq_grps
+            FROM sequencing_group
+            WHERE
+                sample_id IN :sample_ids
+                AND NOT archived
+            GROUP BY sample_id
+        """
+        sample_seq_records = await connection.connection.fetch_all(
+            query,
+            {
+                'sample_ids': sample_ids,
+            },
+        )
+        sample_to_seq_groups = {
+            row.sample_id: [int(seq_id) for seq_id in row.seq_grps.split(',')]
+            for row in sample_seq_records
+        }
+        return sample_to_seq_groups
+
     async def get_cost_by_sample(
         self,
         connection: Connection,
-        query: BillingTotalCostQueryModel,
-        ar_guids,
-        sequencing_groups,
-        sequencing_groups_as_ids,
-        seq_id_map,
-        project_id,
-        project_name,
+        query: BillingSampleQueryModel,
     ) -> list[dict] | None:
         """
         Get Sample cost of selected fields for requested time interval from BQ views
@@ -192,14 +248,31 @@ class BillingArBatchTable(BillingBaseTable):
         COHORT_PREFIX , e.g  'COH'
 
         """
-        # Get columns to select and to group by
-        fields_selected, _group_by = self._prepare_aggregation(query)
+        # Get sequencing groups
+        (
+            sequencing_groups,
+            sequencing_groups_as_ids,
+            seq_id_map,
+            sample_id_map,
+            sample_to_seq_grp,
+        ) = await self.get_sequencing_groups(connection, query.search_ids)
 
-        # 1. Extract all sequencing groups we need to include
+        # Get metamist project id and gcp project prefix
+        (project_id, project_name) = await self.get_project_name(
+            connection, sequencing_groups_as_ids
+        )
+        if not project_name:
+            return []
 
+        # 6. Get all ar-guid with min/max day for each of the seq group
+        ar_guids = self.get_ar_guid_by_seq_groups(sequencing_groups)
+        if not ar_guids:
+            return []
+
+        # get storage cost
         # 7. Get total compute cost associated with ar-guid
         compute_results = self.get_compute_costs_by_seq_groups(
-            ar_guids, sequencing_groups, fields_selected
+            ar_guids, sequencing_groups, ','.join(query.fields)
         )
 
         # get the min date from compute_results
@@ -217,10 +290,16 @@ class BillingArBatchTable(BillingBaseTable):
         )
 
         # adjust Query dates filter
-        query.start_date = start_date.strftime('%Y-%m-%d')
-        query.end_date = end_date.strftime('%Y-%m-%d')
+        start_date = start_date.strftime('%Y-%m-%d')
+        end_date = end_date.strftime('%Y-%m-%d')
         # overrides time specific fields with relevant time column name
-        query.filters = {BillingColumn.DAY: query.filters.get(BillingColumn.DAY, None)}
+
+        query = BillingTotalCostQueryModel(
+            fields=query.fields,
+            start_date=start_date,
+            end_date=end_date,
+            source=BillingSource.AGGREGATE,
+        )
 
         # Storage Calculation
         storage_cost = self.get_storage_costs_by_project(query, project_name)
@@ -244,10 +323,58 @@ class BillingArBatchTable(BillingBaseTable):
             storage_cost,
             total_crams_size,
             seq_id_map,
-            'sequencing_group' in fields_selected,
+            'sequencing_group' in query.fields,
         )
 
         # combine
         result = compute_results + sg_storage_cost
+        # remap results to sample if needed
+        if 'sequencing_group' in query.fields and sample_to_seq_grp:
+            mapped_results = []
+            included_seq_groups = []
+            for sample_id, seq_groups in sample_to_seq_grp.items():
+                # aggregate all seq_groups into one record
+                # sequencing_group contain formatted id
+                # Group by all fields except 'sequencing_group', and 'cost'
+                # Aggregate cost for each unique combination of other fields
+                grouped = {}
+                for r in result:
+                    # Build a key from all fields except 'sequencing_group' and 'cost'
+                    key = tuple(
+                        (k, v)
+                        for k, v in r.items()
+                        if k not in ('sequencing_group', 'cost')
+                    )
+                    grouped.setdefault(key, []).append(r)
+
+                for sample_id, seq_groups in sample_to_seq_grp.items():
+                    included_seq_groups.extend(seq_groups)
+                    for key, records in grouped.items():
+                        # Filter records for this sample's seq_groups
+                        filtered = [
+                            r for r in records if r['sequencing_group'] in seq_groups
+                        ]
+                        if filtered:
+                            # Use the first record for other fields
+                            base = {k: v for k, v in dict(key).items()}
+                            mapped_results.append(
+                                {
+                                    **base,
+                                    'sequencing_group': ','.join(seq_groups),
+                                    'sample': sample_id_map[sample_id],
+                                    'cost': sum(r['cost'] for r in filtered),
+                                }
+                            )
+
+            # append to mapped results the seq groups which do not belong to any samples
+            remaining_seq_groups = set(sequencing_groups) - set(included_seq_groups)
+            for seq_group in remaining_seq_groups:
+                # append all the records from result where sequencing_group == seq_group
+                filtered = [r for r in result if r['sequencing_group'] == seq_group]
+                mapped_results.extend(filtered)
+
+            result = mapped_results
+
+        # sort by invoice month
         result = sorted(result, key=lambda k: k['invoice_month'])
         return result

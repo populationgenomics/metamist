@@ -20,6 +20,7 @@ from models.models import (
     AnalysisCostRecord,
     BillingColumn,
     BillingCostBudgetRecord,
+    BillingSampleQueryModel,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 )
@@ -557,11 +558,11 @@ async def get_running_costs(
 )
 @alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_cost_by_sample(
-    query: BillingTotalCostQueryModel,
+    query: BillingSampleQueryModel,
     author: str = get_author,
     connection: Connection = get_projectless_db_connection,
 ) -> list[BillingTotalCostRecord]:
-    """Get Total cost of selected fields for requested time interval
+    """Get Total cost of selected fields for requested sample or sequencing group
 
     Here are few examples of requests:
 
@@ -571,8 +572,7 @@ async def get_cost_by_sample(
             "fields": ["topic"],
             "start_date": "2023-03-01",
             "end_date": "2023-03-31",
-            "order_by": {"cost": true},
-            "source": "aggregate"
+            "search_ids": ["sample1", "sample2"]
         }
     """
     billing_layer = _get_billing_layer_from(author)

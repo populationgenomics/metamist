@@ -84,6 +84,7 @@ class BillingColumn(str, Enum):
     GOOG_PIPELINES_WORKER = 'goog_pipelines_worker'
     WDL_TASK_NAME = 'wdl_task_name'
     NAMESPACE = 'namespace'
+    SAMPLE = 'sample'
 
     @classmethod
     def can_group_by(cls, value: 'BillingColumn') -> bool:
@@ -103,7 +104,7 @@ class BillingColumn(str, Enum):
             BillingColumn.USAGE,
             BillingColumn.CREDITS,
             BillingColumn.INVOICE,
-            BillingColumn.ADJUSTMENT_INFO,
+            BillingColumn.SAMPLE,
         )
 
     @classmethod
@@ -267,6 +268,8 @@ class BillingTotalCostRecord(SMBase):
     cost: float
     currency: str | None
 
+    sample: str | None = None
+
     @staticmethod
     def from_json(record):
         """Create BillingTopicCostCategoryRecord from json"""
@@ -291,6 +294,7 @@ class BillingTotalCostRecord(SMBase):
             namespace=record.get('namespace'),
             cost=record.get('cost'),
             currency=record.get('currency'),
+            sample=record.get('sample'),
         )
 
 
@@ -538,3 +542,20 @@ class AnalysisCostRecord(SMBase):
             ],
             dataproc=d.get('dataproc'),
         )
+
+
+class BillingSampleQueryModel(SMBase):
+    """
+    Used to query for billing total cost per sample or seq group
+    """
+
+    # required
+    fields: list[BillingColumn]
+    start_date: str
+    end_date: str
+    # sample ids or seq group ids
+    search_ids: list[str] | None = None
+
+    def __hash__(self):
+        """Create hash for this object to use in caching"""
+        return hash(self.model_dump_json())
