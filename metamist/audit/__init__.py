@@ -49,6 +49,7 @@ from .models import (
 )
 
 from .services import (
+    AuditLogs,
     AuditAnalyzer,
     ReportGenerator,
     FileMatchingService,

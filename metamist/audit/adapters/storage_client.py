@@ -50,22 +50,23 @@ class StorageClient:
     def check_blobs(
         self,
         bucket_name: str,
-        blobs: list[str],
-    ) -> list[str]:
+        paths: list[FilePath],
+    ) -> list[FilePath]:
         """
         Check the existence of blobs in a bucket.
 
         Args:
             bucket: Name of the bucket
             blobs: List of blob names to check
+
+        Returns:
+            List of found blob names
         """
         prefixes = set()
-        for blob_name in blobs:
-            prefixes.add(blob_name.rsplit('/', 1)[0])
+        for p in paths:
+            prefixes.add(p.blob.rsplit('/', 1)[0])
         bucket_blobs = self.find_blobs(bucket_name, prefixes)
-        return [
-            blob for blob in blobs if blob in [b.filepath.name for b in bucket_blobs]
-        ]
+        return [p for p in paths if p in [b.filepath for b in bucket_blobs]]
 
     def find_blobs(
         self,

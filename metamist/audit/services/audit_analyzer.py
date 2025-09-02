@@ -1,7 +1,5 @@
 """Core audit analysis business logic."""
 
-import logging
-
 from ..models import (
     SequencingGroup,
     Analysis,
@@ -17,14 +15,10 @@ from .file_matcher import FileMatchingService
 class AuditAnalyzer:
     """Core audit analysis service with pure business logic."""
 
-    def __init__(self, logger: logging.Logger | None = None):
+    def __init__(self):
         """
         Initialize the audit analyzer.
-
-        Args:
-            logger: Optional logger instance
         """
-        self.logger = logger or logging.getLogger(__name__)
         self.file_matcher = FileMatchingService()
 
     def analyze_sequencing_groups(

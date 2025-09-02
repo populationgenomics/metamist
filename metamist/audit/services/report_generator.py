@@ -3,11 +3,11 @@
 import csv
 from datetime import datetime
 from io import StringIO
-import logging
 
 from cpg_utils import Path, to_path
 
 from ..data_access import GCSDataAccess
+from ..services import AuditLogs
 
 from ..models import (
     AuditResult,
@@ -25,8 +25,8 @@ class ReportGenerator:
     def __init__(
         self,
         gcs_data: GCSDataAccess,
+        audit_logs: AuditLogs,
         timestamp: str | None = None,
-        logger: logging.Logger | None = None,
     ):
         """
         Initialize the report generator.
@@ -34,11 +34,12 @@ class ReportGenerator:
         Args:
             storage_client: Google Cloud Storage client
             timestamp: Optional timestamp for report file prefix
-            logger: Optional logger instance
+            audit_logs: Audit logs instance
         """
         self.gcs_data = gcs_data
+        self.audit_logs = audit_logs
         self.timestamp = timestamp or datetime.now().strftime('%Y-%m-%d_%H%M%S')
-        self.logger = logger or logging.getLogger(__name__)
+        self.output_dir = f'audit_results/{self.timestamp}'
 
     def write_audit_reports(
         self,
@@ -54,20 +55,19 @@ class ReportGenerator:
             config: Audit configuration
             output_prefix: Optional prefix for output paths
         """
-        output_dir = f'audit_results/{self.timestamp}'
 
-        self._write_audit_config(f'{output_dir}/audit_config.txt', config)
+        self._write_audit_config(f'{self.output_dir}/audit_config.txt', config)
 
         if audit_result.files_to_delete:
             self._write_csv_report(
-                f'{output_dir}/files_to_delete.csv',
+                f'{self.output_dir}/files_to_delete.csv',
                 audit_result.files_to_delete,
                 'FILES TO DELETE',
             )
 
         if audit_result.files_to_review:
             self._write_csv_report(
-                f'{output_dir}/files_to_review.csv',
+                f'{self.output_dir}/files_to_review.csv',
                 audit_result.files_to_review,
                 'FILES TO REVIEW',
             )
@@ -75,7 +75,7 @@ class ReportGenerator:
         # Write moved files report
         if audit_result.moved_files:
             self._write_csv_report(
-                f'{output_dir}/moved_files.csv',
+                f'{self.output_dir}/moved_files.csv',
                 audit_result.moved_files,
                 'MOVED FILES',
             )
@@ -83,12 +83,12 @@ class ReportGenerator:
         # Write unaligned SGs report
         if audit_result.unaligned_sequencing_groups:
             self._write_unaligned_sgs_report(
-                f'{output_dir}/unaligned_sgs.tsv',
+                f'{self.output_dir}/unaligned_sgs.tsv',
                 audit_result.unaligned_sequencing_groups,
             )
 
-        self.logger.info(
-            f'Reports written to gs://{self.gcs_data.analysis_bucket}/{output_dir}'
+        self.audit_logs.info_nl(
+            f'Reports written to gs://{self.gcs_data.analysis_bucket}/{self.output_dir}'
         )
 
     def write_reviewed_files_report(
@@ -148,7 +148,7 @@ class ReportGenerator:
         blob = self.gcs_data.storage.get_blob(self.gcs_data.analysis_bucket, blob_path)
         self.gcs_data.storage.upload_from_buffer(blob, buffer)
 
-        self.logger.info(
+        self.audit_logs.info_nl(
             f'Metadata report written to gs://{self.gcs_data.analysis_bucket}/{blob_path}'
         )
 
@@ -159,7 +159,7 @@ class ReportGenerator:
         report_name: str,
     ) -> Path:
         """Create or update a CSV report for audit entries."""
-        self.logger.info(f'Writing {report_name} report.')
+        self.audit_logs.info(f'Writing {report_name} report.')
 
         fieldnames = entries[0].fieldnames()
         rows = [entry.to_report_dict() for entry in entries]
@@ -169,7 +169,7 @@ class ReportGenerator:
         blob = self.gcs_data.storage.get_blob(self.gcs_data.analysis_bucket, blob_path)
         output_path = f'gs://{self.gcs_data.analysis_bucket}/{blob_path}'
         if blob and blob.size > 0:
-            self.logger.info(
+            self.audit_logs.info_nl(
                 f'Existing report found, appending new rows to: {output_path}'
             )
             existing_data = blob.download_as_text(encoding='utf-8-sig')
@@ -178,7 +178,7 @@ class ReportGenerator:
             rows = list(reader) + rows
             buffer.close()
         else:
-            self.logger.info(f'Creating new report at: {output_path}')
+            self.audit_logs.info_nl(f'Creating new report at: {output_path}')
 
         buffer = StringIO()
         writer = csv.DictWriter(buffer, fieldnames=fieldnames)
@@ -188,7 +188,7 @@ class ReportGenerator:
         blob = self.gcs_data.storage.get_blob(self.gcs_data.analysis_bucket, blob_path)
         self.gcs_data.storage.upload_from_buffer(blob, buffer, 'text/csv')
 
-        self.logger.info(
+        self.audit_logs.info_nl(
             f'{report_name}: {len(entries)} entries written to {output_path}'
         )
 
@@ -201,7 +201,9 @@ class ReportGenerator:
     ):
         """Write report of sequencing groups without completed CRAMs."""
         if not unaligned_sgs:
-            self.logger.info('UNALIGNED SEQUENCING GROUPS - SKIPPED - No data to write')
+            self.audit_logs.info_nl(
+                'UNALIGNED SEQUENCING GROUPS - SKIPPED - No data to write'
+            )
             return
 
         buffer = StringIO()
@@ -250,21 +252,34 @@ class ReportGenerator:
         self.gcs_data.storage.upload_from_buffer(
             blob, buffer, 'text/tab-separated-values'
         )
-        self.logger.info(
+        self.audit_logs.info(
             f'UNALIGNED SEQUENCING GROUPS: {len(unaligned_sgs)} entries written to '
             f'gs://{self.gcs_data.analysis_bucket}/{blob_path}'
         )
 
+    def write_log_file(self, log_file: str, save_path: str):
+        """Write audit logs to a file."""
+        # Upload the log file to GCS
+        blob = self.gcs_data.storage.get_blob(self.gcs_data.analysis_bucket, save_path)
+        blob.upload_from_filename(log_file)
+
     def get_report_rows(self, report_path: Path) -> list[AuditReportEntry]:
         """Retrieve rows from the audit report CSV."""
         if not report_path.exists():
-            self.logger.error(f'Report file {report_path} does not exist.')
+            self.audit_logs.error(f'Report file {report_path} does not exist.')
             return []
 
         with report_path.open('r') as f:
             reader = csv.DictReader(f)
             rows = [AuditReportEntry(**row) for row in reader]
         return rows
+
+    def get_report_rows_from_name(self, name: str) -> list[AuditReportEntry]:
+        """Retrieve rows from the audit report CSV by name."""
+        report_path = to_path(
+            f'gs://{self.gcs_data.analysis_bucket}/audit_results/{self.timestamp}/{name}.csv'
+        )
+        return self.get_report_rows(report_path)
 
     def get_report_stats(self, report_path: Path) -> dict:
         """Count the rows and sum the total file size for all rows in the report"""

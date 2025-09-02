@@ -1,12 +1,10 @@
 """CLI entry point for deleting files in audit results."""
 
-import logging
-
 import click
 
 from ..data_access import GCSDataAccess, MetamistDataAccess
 from ..models import AuditReportEntry, DeletionResult
-from ..services import AuditLogger, ReportGenerator
+from ..services import AuditLogs, ReportGenerator
 
 from metamist.apis import AnalysisApi
 from metamist.models import (
@@ -16,47 +14,42 @@ from metamist.models import (
 )
 
 from cpg_utils import to_path
-from cpg_utils.config import config_retrieve
 
 
 def delete_from_audit_results(
     dataset: str,
-    gcp_project: str,
+    gcp_project: str | None,
     results_folder: str,
     report_name: str,
     dry_run: bool = False,
 ):
     """Delete files listed in the audit results."""
-    logger = AuditLogger(dataset, 'audit_deletions').logger
+    audit_logs = AuditLogs(dataset, 'audit_deletions')
 
-    gcs_client = GCSDataAccess(dataset, gcp_project)
-    report_generator = ReportGenerator(gcs_client, results_folder, logger)
+    gcs = GCSDataAccess(dataset, gcp_project=gcp_project)
+    reporter = ReportGenerator(gcs, results_folder, audit_logs)
 
-    report_rows = report_generator.get_report_rows(
-        report_path=to_path(
-            f'gs://{gcs_client.analysis_bucket}/{results_folder}/{report_name}.csv'
-        )
-    )
+    report_rows = reporter.get_report_rows(report_name)
 
     deletion_result = delete_files_from_report(
-        gcs_client, report_name, report_rows, dry_run, logger
+        gcs, report_name, report_rows, dry_run, audit_logs
     )
 
-    deletion_report = report_generator.write_deleted_files_report(deletion_result)
-    stats = report_generator.get_report_stats(deletion_report)
+    deletion_report = reporter.write_deleted_files_report(deletion_result)
+    stats = reporter.get_report_stats(deletion_report)
 
     if not dry_run:
         upsert_deleted_files_analysis(
-            dataset, report_name, str(deletion_report), stats, logger
+            dataset, report_name, str(deletion_report), stats, audit_logs
         )
 
 
 def delete_files_from_report(
-    gcs_client: GCSDataAccess,
+    gcs: GCSDataAccess,
     report_name: str,
     rows: list[AuditReportEntry],
     dry_run: bool,
-    logger: logging.Logger,
+    audit_logs: AuditLogs,
 ) -> DeletionResult:
     """
     Delete files in the upload bucket from the audit results.
@@ -64,7 +57,7 @@ def delete_files_from_report(
 
     If deleting from 'files_to_delete', automatically add this action.
     """
-    delete_file_rows: list[AuditReportEntry] = []
+    to_delete: list[AuditReportEntry] = []
     for row in rows:
         if report_name == 'files_to_delete':
             row.update_action('DELETE')
@@ -81,26 +74,26 @@ def delete_files_from_report(
 
         file_path = to_path(row.filepath)
         if not file_path.exists():
-            logger.warning(f'File {file_path} does not exist, skipping deletion.')
+            audit_logs.warning(f'File {file_path} does not exist, skipping deletion.')
             continue
 
-        delete_file_rows.append(row)
+        to_delete.append(row)
 
-    total_bytes = sum(int(row.filesize) for row in delete_file_rows)
+    total_bytes = sum(int(row.filesize) for row in to_delete)
     if dry_run:
-        logger.info(
-            f'Dry run: would have deleted {len(delete_file_rows)} files ({total_bytes / (1024**3):.2f} GiB)'
+        audit_logs.info_nl(
+            f'Dry run: would have deleted {len(to_delete)} files ({total_bytes / (1024**3):.2f} GiB)'
         )
     else:
-        gcs_client.delete_blobs(
-            gcs_client.upload_bucket,
-            [to_path(row.filepath).blob for row in delete_file_rows],
+        gcs.delete_blobs(
+            gcs.upload_bucket,
+            [to_path(row.filepath).blob for row in to_delete],
         )
-        logger.info(
-            f'Deleted: {len(delete_file_rows)} files ({total_bytes / (1024**3):.2f} GiB)'
+        audit_logs.info_nl(
+            f'Deleted: {len(to_delete)} files ({total_bytes / (1024**3):.2f} GiB)'
         )
 
-    return DeletionResult(deleted_files=delete_file_rows)
+    return DeletionResult(deleted_files=to_delete)
 
 
 async def upsert_deleted_files_analysis(
@@ -108,17 +101,17 @@ async def upsert_deleted_files_analysis(
     audited_report_name: str,
     deletion_report_path: str,
     stats: dict,
-    logger: logging.Logger,
+    audit_logs: AuditLogs,
 ):
     """
     Inserts or updates an analysis record for deleted files.
     Populates the meta dict with deleted files stats.
     """
-    logger.info('Upserting analysis record for deleted files report.')
+    audit_logs.info_nl('Upserting analysis record for deleted files report.')
     if existing_analysis := await MetamistDataAccess().get_audit_deletion_analysis(
         dataset, deletion_report_path
     ):
-        logger.info(
+        audit_logs.info_nl(
             f'Found existing analysis record for {deletion_report_path}, ID: {existing_analysis["id"]}. Updating...'
         )
         analysis_update = AnalysisUpdateModel(
@@ -129,7 +122,7 @@ async def upsert_deleted_files_analysis(
         AnalysisApi().update_analysis(existing_analysis['id'], analysis_update)
 
     else:
-        logger.info(
+        audit_logs.info_nl(
             f'No existing analysis record for {deletion_report_path}. Creating new record...'
         )
         analysis = Analysis(
@@ -140,7 +133,7 @@ async def upsert_deleted_files_analysis(
         )
         AnalysisApi().create_analysis(dataset, analysis)
 
-    logger.info(f'Upserted analysis record for {deletion_report_path}')
+    audit_logs.info_nl(f'Upserted analysis record for {deletion_report_path}')
 
 
 @click.command()
@@ -169,10 +162,6 @@ def main(
     For any other report, files must be marked for deletion in the report, alongside a
     comment justifying the deletion.
     """
-    gcp_project = gcp_project or config_retrieve(['workflow', dataset, 'gcp_project'])
-    if not gcp_project:
-        raise ValueError('GCP project is required from analysis-runner config or CLI.')
-
     delete_from_audit_results(
         dataset, gcp_project, results_folder, report_name, dry_run
     )

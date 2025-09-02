@@ -1,16 +1,13 @@
 """CLI entry point for upload bucket audit."""
 
 import asyncio
-import logging
+import click
 from collections import defaultdict
 from types import SimpleNamespace
-import click
-from cpg_utils.config import config_retrieve
 
 from ..models import AuditConfig, SequencingGroup
-from ..adapters import GraphQLClient
 from ..data_access import MetamistDataAccess, GCSDataAccess
-from ..services import AuditAnalyzer, AuditLogger, ReportGenerator
+from ..services import AuditAnalyzer, AuditLogs, ReportGenerator
 
 
 class AuditOrchestrator:
@@ -18,27 +15,27 @@ class AuditOrchestrator:
 
     def __init__(
         self,
-        metamist_data: MetamistDataAccess,
-        gcs_data: GCSDataAccess,
+        metamist_data_access: MetamistDataAccess,
+        gcs_data_access: GCSDataAccess,
         analyzer: AuditAnalyzer,
-        report_writer: ReportGenerator,
-        logger: logging.Logger,
+        reporter: ReportGenerator,
+        audit_logs: AuditLogs,
     ):
         """
         Initialize the orchestrator.
 
         Args:
-            metamist_data: Data access layer for Metamist data
-            gcs_data: Data access layer for GCS data
+            metamist_data_access: Data access layer for Metamist data
+            gcs_data_access: Data access layer for GCS data
             analyzer: Audit analysis service
-            report_writer: Report generation service
-            logger: Logger instance
+            writer: Report generation service
+            audit_logs: audit_logs instance
         """
-        self.metamist_data = metamist_data
-        self.gcs_data = gcs_data
+        self.metamist = metamist_data_access
+        self.gcs = gcs_data_access
         self.analyzer = analyzer
-        self.report_writer = report_writer
-        self.logger = logger
+        self.reporter = reporter
+        self.audit_logs = audit_logs
 
     async def run_audit(self, config: AuditConfig) -> None:
         """
@@ -50,97 +47,91 @@ class AuditOrchestrator:
         self._log_initialization(config)
 
         # 1. Fetch sequencing groups from Metamist
-        self.logger.info('Getting sequencing groups'.center(50, '~'))
-        sgs = await self.metamist_data.get_sequencing_groups(
+        self.audit_logs.info_nl('Getting sequencing groups'.center(50, '~'))
+        sgs = await self.metamist.get_sequencing_groups(
             config.dataset,
             list(config.sequencing_types),
             list(config.sequencing_technologies),
             list(config.sequencing_platforms),
         )
-        self.logger.info(f'Found {len(sgs)} sequencing groups')
+        self.audit_logs.info_nl(f'Found {len(sgs)} sequencing groups')
         self._log_sg_summary(sgs)
 
         # 2. Fetch analyses for sequencing groups
-        self.logger.info('Getting analyses'.center(50, '~'))
+        self.audit_logs.info_nl('Getting analyses'.center(50, '~'))
         sg_ids = [sg.id for sg in sgs]
-        analyses = await self.metamist_data.get_analyses_for_sequencing_groups(
+        analyses = await self.metamist.get_analyses_for_sequencing_groups(
             config.dataset, sg_ids, list(config.analysis_types)
         )
-        self.logger.info(f'Found {len(analyses)} analyses')
-        self.logger.info('')
+        self.audit_logs.info_nl(f'Found {len(analyses)} analyses')
 
         # 3. Get bucket name and list files
-        self.logger.info('Scanning upload bucket'.center(50, '~'))
-        bucket_name = self.gcs_data.get_bucket_name(config.dataset, 'upload')
-        self.logger.info(f'Target: gs://{bucket_name}')
+        self.audit_logs.info_nl('Scanning upload bucket'.center(50, '~'))
+        self.audit_logs.info_nl(f'Target: gs://{self.gcs.upload_bucket}')
 
-        bucket_files = self.gcs_data.list_files_in_bucket(
-            bucket_name, list(config.file_types), config.excluded_prefixes
+        bucket_files = self.gcs.list_files_in_bucket(
+            self.gcs.upload_bucket, list(config.file_types), config.excluded_prefixes
         )
-        self.logger.info(f'Found {len(bucket_files)} files in bucket')
-        self.logger.info('')
+        self.audit_logs.info_nl(f'Found {len(bucket_files)} files in bucket')
 
         # 4. Validate CRAM files exist
         if analyses:
-            self.logger.info('Validating analysis existence'.center(50, '~'))
+            self.audit_logs.info_nl('Validating analysis existence'.center(50, '~'))
             cram_paths = [
                 a.output_file.filepath for a in analyses if a.is_cram and a.output_file
             ]
-            existing_crams = self.gcs_data.validate_cram_files(cram_paths)
-            if any(
-                a.output_file and a.output_file.filepath.blob not in existing_crams
-                for a in analyses
-                if a.is_cram
-            ):
-                self.logger.warning(
-                    f'Missing expected CRAM files: {set(cram_paths) - set(existing_crams)}'
-                )
-            self.logger.info(f'Validated {len(existing_crams)} CRAM files')
-            self.logger.info('')
+            found, missing = self.gcs.validate_cram_files(cram_paths)
+            for p in missing:
+                self.audit_logs.warning(f'Missing expected CRAM file: {p}')
+
+            self.audit_logs.info_nl(f'Validated {len(found)} CRAM files')
 
         # 5. Run analysis
-        self.logger.info('Analyzing audit data'.center(50, '~'))
+        self.audit_logs.info_nl('Analyzing audit data'.center(50, '~'))
         result = self.analyzer.analyze_sequencing_groups(
-            sgs, bucket_files, analyses, list(config.excluded_sequencing_groups)
+            sgs,
+            bucket_files,
+            analyses,
         )
-        self.logger.info('Analysis complete!')
-        self.logger.info('')
+        self.audit_logs.info_nl('Analysis complete!')
 
         # 6. Log summary
         self._log_summary(result)
 
-        # 7. Write reports
-        self.logger.info('Writing reports'.center(50, '~'))
-        analysis_bucket_name = self.gcs_data.get_bucket_name(config.dataset, 'analysis')
-        self.report_writer.write_audit_reports(result, analysis_bucket_name, config)
+        # 7. Write reports and log to the analysis bucket
+        self.audit_logs.info('Writing reports'.center(50, '~'))
+        self.reporter.write_audit_reports(result, self.gcs.analysis_bucket, config)
+        self.reporter.write_log_file(
+            self.audit_logs.log_file, f'{self.reporter.output_dir}/log.txt'
+        )
 
-        self.logger.info('Upload bucket audit complete!')
+        self.audit_logs.info('Upload bucket audit complete!')
 
     def _log_initialization(self, config: AuditConfig):
         """Log audit initialization details."""
-        self.logger.info('Initializing audit'.center(50, '~'))
-        self.logger.info('')
-        self.logger.info(f'Dataset:                    {config.dataset}')
-        self.logger.info(
+        self.audit_logs.info('Initializing audit'.center(50, '~'))
+        self.audit_logs.info('')
+        self.audit_logs.info(f'Dataset:                    {config.dataset}')
+        self.audit_logs.info(
             f'Sequencing Types:           {", ".join(sorted(config.sequencing_types))}'
         )
-        self.logger.info(
+        self.audit_logs.info(
             f'Sequencing Technologies:    {", ".join(sorted(config.sequencing_technologies))}'
         )
-        self.logger.info(
+        self.audit_logs.info(
             f'Sequencing Platforms:       {", ".join(sorted(config.sequencing_platforms))}'
         )
-        self.logger.info(
+        self.audit_logs.info(
             f'Analysis Types:             {", ".join(sorted(config.analysis_types))}'
         )
-        self.logger.info(
+        self.audit_logs.info(
             f'File Types:                 {", ".join(sorted(ft.name for ft in config.file_types))}'
         )
         if config.excluded_prefixes:
-            self.logger.info(
+            self.audit_logs.info(
                 f'Excluded Prefixes:          {", ".join(sorted(config.excluded_prefixes))}'
             )
-        self.logger.info('')
+        self.audit_logs.info('')
 
     def _log_sg_summary(self, sgs: list[SequencingGroup]):
         """Log summary of sequencing groups by type/technology."""
@@ -151,126 +142,47 @@ class AuditOrchestrator:
 
         for key, count in sorted(counts.items()):
             tech, typ, platform = key.split('|')
-            self.logger.info(f'  {count:5} ({tech}, {typ}, {platform})')
-        self.logger.info('')
+            self.audit_logs.info(f'  {count:5} ({tech}, {typ}, {platform})')
+        self.audit_logs.info('')
 
     def _log_summary(self, result):
         """Log audit result summary."""
-        stats = self.report_writer.generate_summary_statistics(result)
+        stats = self.reporter.generate_summary_statistics(result)
 
-        self.logger.info('Audit Summary'.center(50, '~'))
-        self.logger.info(
+        self.audit_logs.info('Audit Summary'.center(50, '~'))
+        self.audit_logs.info(
             f'Files to delete: {stats["files_to_delete"]} '
             f'({stats["files_to_delete_size_gb"]:.2f} GB)'
         )
-        self.logger.info(f'Moved files: {stats["moved_files"]}')
-        self.logger.info(
+        self.audit_logs.info(f'Moved files: {stats["moved_files"]}')
+        self.audit_logs.info(
             f'Files to ingest: {stats["files_to_ingest"]} '
             f'({stats["files_to_ingest_size_gb"]:.2f} GB)'
         )
-        self.logger.info(f'Unaligned SGs: {stats["unaligned_sgs"]}')
-        self.logger.info('')
+        self.audit_logs.info(f'Unaligned SGs: {stats["unaligned_sgs"]}')
+        self.audit_logs.info('')
 
 
-async def validate_enum_values(
-    graphql: GraphQLClient, config: AuditConfig
-) -> AuditConfig:
-    """
-    Validate enum values against Metamist API.
-
-    Args:
-        graphql: GraphQL client
-        config: Audit configuration
-
-    Returns:
-        Validated configuration
-    """
-
-    async def validate_enum_value(enum_type: str, config_values: tuple[str]) -> str:
-        valid_values = await graphql.get_enum_values(enum_type)
-        if 'all' in config_values:
-            return valid_values
-        if any(value.lower() not in valid_values for value in config_values):
-            raise ValueError(
-                f"Invalid {enum_type} values: {', '.join(config_values)}. "
-                f"Valid values are: {', '.join(valid_values)}."
-            )
-        return tuple(config_values)
-
-    sequencing_types = await validate_enum_value(
-        'sequencing_type', config.sequencing_types
-    )
-    sequencing_techs = await validate_enum_value(
-        'sequencing_technology', config.sequencing_technologies
-    )
-    sequencing_platforms = await validate_enum_value(
-        'sequencing_platform', config.sequencing_platforms
-    )
-    analysis_types = await validate_enum_value('analysis_type', config.analysis_types)
-
-    return AuditConfig(
-        dataset=config.dataset,
-        sequencing_types=sequencing_types,
-        sequencing_technologies=sequencing_techs,
-        sequencing_platforms=sequencing_platforms,
-        analysis_types=analysis_types,
-        file_types=config.file_types,
-        excluded_prefixes=config.excluded_prefixes,
-        excluded_sequencing_groups=config.excluded_sequencing_groups,
-    )
-
-
-async def audit_upload_bucket_async(audit_config: AuditConfig):
+async def audit_upload_bucket_async(audit: AuditConfig):
     """
     Async entry point for upload bucket audit.
 
     Args:
-        audit_config: Audit configuration
+        audit: Audit configuration
     """
-    # Set up logger
-    logger = AuditLogger(audit_config.dataset, 'upload_bucket_audit').logger
-
-    # Get GCP project
-    gcp_project = config_retrieve(['workflow', audit_config.dataset, 'gcp_project'])
-    if not gcp_project:
-        raise ValueError('GCP project is required')
-
-    # Get excluded sequencing groups from config if not provided
-    if not audit_config.excluded_sequencing_groups:
-        excluded_sgs = config_retrieve(
-            ['metamist', 'audit', 'excluded_sequencing_groups'], default=[]
-        )
-        audit_config = AuditConfig(
-            dataset=audit_config.dataset,
-            sequencing_types=audit_config.sequencing_types,
-            sequencing_technologies=audit_config.sequencing_technologies,
-            sequencing_platforms=audit_config.sequencing_platforms,
-            analysis_types=audit_config.analysis_types,
-            file_types=audit_config.file_types,
-            excluded_prefixes=audit_config.excluded_prefixes,
-            excluded_sequencing_groups=tuple(excluded_sgs),
-            results_folder=audit_config.results_folder,
-        )
-
-    # Create repositories
-    metamist_data = MetamistDataAccess()
-    audit_config = await validate_enum_values(
-        metamist_data.graphql_client, audit_config
-    )  # TODO: do this alongside the file types validation
-
-    gcs_data = GCSDataAccess(audit_config.dataset, gcp_project)
-
-    # Create services
-    analyzer = AuditAnalyzer(logger)
-    report_writer = ReportGenerator(gcs_data, audit_config.results_folder, logger)
-
-    # Create orchestrator
+    audit_logs = AuditLogs(audit.dataset, 'upload_bucket_audit')
+    metamist = MetamistDataAccess()
+    gcs = GCSDataAccess(audit.dataset)
+    reporter = ReportGenerator(gcs, audit.results_folder, audit_logs)
     orchestrator = AuditOrchestrator(
-        metamist_data, gcs_data, analyzer, report_writer, logger
+        metamist_data_access=metamist,
+        gcs_data_access=gcs,
+        analyzer=AuditAnalyzer(),
+        reporter=reporter,
+        audit_logs=audit_logs,
     )
-
     # Run audit
-    await orchestrator.run_audit(audit_config)
+    await orchestrator.run_audit(audit)
 
 
 def audit_upload_bucket(config: AuditConfig):
@@ -346,7 +258,6 @@ def main(
     results_folder: str | None = None,
 ):
     """Run upload bucket audit for a Metamist dataset."""
-    # Create configuration from CLI args
     args = SimpleNamespace(
         dataset=dataset,
         sequencing_types=sequencing_types,
@@ -357,7 +268,6 @@ def main(
         excluded_prefixes=excluded_prefixes,
         results_folder=results_folder,
     )
-
     config = AuditConfig.from_cli_args(args)
 
     # Run audit

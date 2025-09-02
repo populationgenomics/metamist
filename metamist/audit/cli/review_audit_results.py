@@ -1,20 +1,17 @@
 """CLI entry point for reviewing audit results."""
 
-import logging
-import csv
-
 import click
 
 from ..data_access.gcs_data_access import GCSDataAccess
 from ..models import AuditReportEntry, ReviewResult
-from ..services import AuditLogger, ReportGenerator
+from ..services import AuditLogs, ReportGenerator
 
 from cpg_utils import to_path
-from cpg_utils.config import config_retrieve
 
 
 def review_audit_report(
     dataset: str,
+    gcp_project: str,
     results_folder: str,
     report: str = 'files_to_review',
     action: str = 'DELETE',
@@ -22,32 +19,21 @@ def review_audit_report(
     filter_func: callable = None,
 ):
     """Review files listed in the audit results."""
-    logger = AuditLogger(dataset, 'audit_review').logger
-
-    gcp_project = config_retrieve(['workflow', dataset, 'gcp_project'])
-    if not gcp_project:
-        raise ValueError('GCP project is required')
+    audit_logs = AuditLogs(dataset, 'audit_review')
 
     gcs_data = GCSDataAccess(dataset, gcp_project)
-    report_generator = ReportGenerator(gcs_data, results_folder, logger)
+    reporter = ReportGenerator(gcs_data, results_folder, audit_logs)
 
-    report_path = to_path(
-        f'gs://{gcs_data.analysis_bucket}/{results_folder}/{report}.csv'
+    rows = reporter.get_report_rows_from_name(report)
+
+    review_result = review_filtered_files(
+        rows, filter_func, action, comment, audit_logs.logger
     )
-    if not report_path.exists():
-        logger.error(f'Report file {report_path} does not exist.')
-        return
-
-    with report_path.open('r') as f:
-        reader = csv.DictReader(f)
-        rows = list(reader)
-
-    review_result = review_filtered_files(rows, filter_func, action, comment, logger)
-    logger.info(
+    audit_logs.info(
         f'Added comments to {len(review_result.reviewed_files)} / {len(rows)} files.'
     )
 
-    report_generator.write_reviewed_files_report(review_result)
+    reporter.write_reviewed_files_report(review_result)
 
 
 def review_filtered_files(
@@ -55,19 +41,21 @@ def review_filtered_files(
     filter_func: callable,
     action: str,
     comment: str,
-    logger: logging.Logger,
+    audit_logs: AuditLogs,
 ) -> ReviewResult:
     """Review files from audit results based on filters and comments."""
-    logger.info(f'Annotating rows with comment: {comment}')
+    audit_logs.info(f'Annotating rows with comment: {comment}')
     reviewed_rows: list[AuditReportEntry] = []
     for row in rows:
         if filter_func and not filter_func(row):
-            logger.info(f'Skipping {row["File Path"]} due to filters: {filter_func}')
+            audit_logs.info(
+                f'Skipping {row["File Path"]} due to filters: {filter_func}'
+            )
             continue
 
         file_path = to_path(row['File Path'])
         if not file_path.exists():
-            logger.warning(f'File {file_path} does not exist, skipping review.')
+            audit_logs.warning(f'File {file_path} does not exist, skipping review.')
             continue
 
         row.update_action(action)
@@ -114,6 +102,7 @@ def evaluate_filter_expression(expr: str, row: dict) -> bool:
 
 @click.command()
 @click.option('--dataset', required=True, help='Dataset name for logging context')
+@click.option('--gcp-project', required=True, help='GCP project ID')
 @click.option(
     '--results-folder', help='Path to the folder containing audit results files'
 )
@@ -127,6 +116,7 @@ def evaluate_filter_expression(expr: str, row: dict) -> bool:
 )
 def main(
     dataset: str,
+    gcp_project: str,
     results_folder: str,
     action: str,
     comment: str,
@@ -139,7 +129,12 @@ def main(
         else None
     )
     review_audit_report(
-        dataset, results_folder, action=action, comment=comment, filter_func=filter_func
+        dataset,
+        gcp_project,
+        results_folder,
+        action=action,
+        comment=comment,
+        filter_func=filter_func,
     )
 
 

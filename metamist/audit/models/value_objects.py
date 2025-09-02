@@ -5,6 +5,8 @@ from enum import Enum
 
 from cpg_utils import Path
 
+from ..data_access import MetamistDataAccess
+
 
 class FileType(Enum):
     """File type enumeration with extensions."""
@@ -108,8 +110,15 @@ class AuditConfig:  # pylint: disable=too-many-instance-attributes
     analysis_types: tuple[str, ...]
     file_types: tuple[FileType, ...]
     excluded_prefixes: tuple[str, ...] = ()
-    excluded_sequencing_groups: tuple[str, ...] = ()
     results_folder: str | None = None
+
+    @classmethod
+    async def from_cli_args_validated(
+        cls, args, metamist: MetamistDataAccess
+    ) -> 'AuditConfig':
+        """Factory method that creates and validates config from CLI args."""
+        config = cls.from_cli_args(args)
+        return await config.validate_metamist_enums(metamist)
 
     @classmethod
     def from_cli_args(cls, args) -> 'AuditConfig':
@@ -143,6 +152,52 @@ class AuditConfig:  # pylint: disable=too-many-instance-attributes
             file_types=tuple(file_types),
             excluded_prefixes=args.excluded_prefixes or (),
             results_folder=args.results_folder,
+        )
+
+    async def validate_metamist_enums(
+        self,
+        metamist: MetamistDataAccess,
+    ) -> 'AuditConfig':
+        """
+        Validate enum values against Metamist API.
+
+        Args:
+            metamist: Metamist data access object
+
+        Returns:
+            Validated configuration
+        """
+
+        async def validate_enum_value(enum_type: str, config_values: tuple[str]) -> str:
+            valid_values = await metamist.graphql_client.get_enum_values(enum_type)
+            if 'all' in config_values:
+                return valid_values
+            if any(value.lower() not in valid_values for value in config_values):
+                raise ValueError(
+                    f"Invalid {enum_type} values: {', '.join(config_values)}. "
+                    f"Valid values are: {', '.join(valid_values)}."
+                )
+            return tuple(config_values)
+
+        sequencing_types = await validate_enum_value(
+            'sequencing_type', self.sequencing_types
+        )
+        sequencing_techs = await validate_enum_value(
+            'sequencing_technology', self.sequencing_technologies
+        )
+        sequencing_platforms = await validate_enum_value(
+            'sequencing_platform', self.sequencing_platforms
+        )
+        analysis_types = await validate_enum_value('analysis_type', self.analysis_types)
+
+        return AuditConfig(
+            dataset=self.dataset,
+            sequencing_types=sequencing_types,
+            sequencing_technologies=sequencing_techs,
+            sequencing_platforms=sequencing_platforms,
+            analysis_types=analysis_types,
+            file_types=self.file_types,
+            excluded_prefixes=self.excluded_prefixes,
         )
 
 

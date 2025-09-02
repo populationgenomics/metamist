@@ -9,7 +9,7 @@ from ..adapters import StorageClient
 class GCSDataAccess:
     """Layer for accessing Google Cloud Storage."""
 
-    def __init__(self, dataset: str, gcp_project: str):
+    def __init__(self, dataset: str, gcp_project: str | None = None):
         """
         Initialize the data access layer.
 
@@ -18,8 +18,8 @@ class GCSDataAccess:
             storage: Storage client adapter
         """
         self.dataset = dataset
-        self.gcp_project = gcp_project
-        self.storage = StorageClient(project=gcp_project)
+        self.gcp_project = gcp_project or config_retrieve(['workflow', 'gcp_project'])
+        self.storage = StorageClient(project=self.gcp_project)
         self.main_bucket = self.get_bucket_name(self.dataset, 'default')
         self.upload_bucket = self.get_bucket_name(self.dataset, 'upload')
         self.analysis_bucket = self.get_bucket_name(self.dataset, 'analysis')
@@ -74,7 +74,9 @@ class GCSDataAccess:
             excluded_prefixes=excluded_prefixes,
         )
 
-    def validate_cram_files(self, cram_paths: list[FilePath]) -> list[str]:
+    def validate_cram_files(
+        self, cram_paths: list[FilePath]
+    ) -> tuple[list[str], list[str]]:
         """
         Validate the existence of CRAM files in the bucket.
 
@@ -83,14 +85,17 @@ class GCSDataAccess:
             file_extensions: Extensions to search for
 
         Returns:
-            List of found file paths
+            Dict mapping found and missing crams
         """
         assert all(
             p.path.bucket == self.main_bucket for p in cram_paths
         ), 'All CRAM paths must be in the main(|test) bucket'
-        return self.storage.check_blobs(
-            self.main_bucket, [p.path.blob for p in cram_paths]
-        )
+        crams_in_bucket = self.storage.check_blobs(self.main_bucket, cram_paths)
+        # Check that all cram_paths were found
+        if not all(p in crams_in_bucket for p in cram_paths):
+            missing = [p.uri for p in cram_paths if p not in crams_in_bucket]
+            return crams_in_bucket, missing
+        return crams_in_bucket, []
 
     def delete_blobs(self, bucket_name: str, blobs: list[str]):
         """
