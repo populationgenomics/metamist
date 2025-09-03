@@ -28,7 +28,7 @@ class AuditOrchestrator:
             metamist_data_access: Data access layer for Metamist data
             gcs_data_access: Data access layer for GCS data
             analyzer: Audit analysis service
-            writer: Report generation service
+            reporter: Report generation service
             audit_logs: audit_logs instance
         """
         self.metamist = metamist_data_access
@@ -59,7 +59,6 @@ class AuditOrchestrator:
 
         # 2. Fetch analyses for sequencing groups
         self.audit_logs.info_nl('Getting analyses'.center(50, '~'))
-        self.audit_logs.info_nl(f'Target: gs://{self.gcs.main_bucket}/')
         sg_ids = [sg.id for sg in sgs]
         analyses = await self.metamist.get_analyses_for_sequencing_groups(
             config.dataset, sg_ids, list(config.analysis_types)
@@ -151,7 +150,7 @@ class AuditOrchestrator:
         """Log audit result summary."""
         stats = self.reporter.generate_summary_statistics(result)
 
-        # self.audit_logs.info_nl('Audit Summary'.center(50, '~'))
+        self.audit_logs.info_nl('Audit Summary'.center(50, '~'))
         self.audit_logs.info(
             f'Files to delete:           {stats["files_to_delete"]} '
             f'({stats["files_to_delete_size_gb"]:.2f} GB)'
@@ -168,8 +167,9 @@ async def audit_upload_bucket_async(config_args: SimpleNamespace):
     Async entry point for upload bucket audit.
 
     Args:
-        audit: Audit configuration
+        config_args: Audit configuration
     """
+    # Validate audit config against Metamist before proceeding
     metamist = MetamistDataAccess()
     audit = await metamist.validate_metamist_enums(
         AuditConfig.from_cli_args(config_args)
@@ -189,14 +189,14 @@ async def audit_upload_bucket_async(config_args: SimpleNamespace):
     await orchestrator.run_audit(audit)
 
 
-def audit_upload_bucket(config: AuditConfig):
+def audit_upload_bucket(config_args: SimpleNamespace):
     """
     Synchronous entry point for upload bucket audit.
 
     Args:
-        config: Audit configuration
+        config_args: Audit arguments for configuration
     """
-    asyncio.run(audit_upload_bucket_async(config))
+    asyncio.run(audit_upload_bucket_async(config_args))
 
 
 @click.command()

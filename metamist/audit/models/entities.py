@@ -152,9 +152,46 @@ class AuditReportEntry:  # pylint: disable=too-many-instance-attributes
     action: str | None = None
     review_comment: str | None = None
 
+    # Mapping from human-readable headers to field names
+    HEADER_TO_FIELD_MAP = {
+        'File Path': 'filepath',
+        'File Size': 'filesize',
+        'SG ID': 'sg_id',
+        'SG Type': 'sg_type',
+        'SG Technology': 'sg_tech',
+        'SG Platform': 'sg_platform',
+        'Assay ID': 'assay_id',
+        'Sample ID': 'sample_id',
+        'Sample External ID': 'sample_external_ids',
+        'Participant ID': 'participant_id',
+        'Participant External ID': 'participant_external_ids',
+        'CRAM Analysis ID': 'cram_analysis_id',
+        'CRAM Path': 'cram_file_path',
+        'Action': 'action',
+        'Review Comment': 'review_comment',
+    }
+
     def __init__(self, **kwargs):
+        """Initialize an AuditReportEntry from keyword arguments."""
         for key, value in kwargs.items():
-            setattr(self, key, value)
+            key_name = self.HEADER_TO_FIELD_MAP.get(key, key.lower().replace(' ', '_'))
+            setattr(self, key_name, value)
+
+    @classmethod
+    def from_report_dict(cls, report_dict: dict) -> 'AuditReportEntry':
+        """Create an AuditReportEntry from a report dictionary with human-readable headers."""
+        kwargs = {}
+        for header, value in report_dict.items():
+            field_name = cls.HEADER_TO_FIELD_MAP.get(
+                header, header.lower().replace(' ', '_')
+            )
+            kwargs[field_name] = value
+        return cls(**kwargs)
+
+    @classmethod
+    def get_field_to_header_map(cls) -> dict[str, str]:
+        """Get the reverse mapping from field names to human-readable headers."""
+        return {field: header for header, field in cls.HEADER_TO_FIELD_MAP.items()}
 
     def to_report_dict(self) -> dict:
         """Convert to dictionary for report generation."""
@@ -167,23 +204,37 @@ class AuditReportEntry:  # pylint: disable=too-many-instance-attributes
         if isinstance(participant_ext, dict) and len(participant_ext) == 1:
             participant_ext = next(iter(participant_ext.values()))
 
-        return {
-            'File Path': self.filepath,
-            'File Size': self.filesize,
-            'SG ID': self.sg_id,
-            'SG Type': self.sg_type,
-            'SG Technology': self.sg_tech,
-            'SG Platform': self.sg_platform,
-            'Assay ID': self.assay_id,
-            'Sample ID': self.sample_id,
-            'Sample External ID': sample_ext,
-            'Participant ID': self.participant_id,
-            'Participant External ID': participant_ext,
-            'CRAM Analysis ID': self.cram_analysis_id,
-            'CRAM Path': self.cram_file_path,
-            'Action': self.action,
-            'Review Comment': self.review_comment,
+        # Use the mapping to ensure consistency
+        field_to_header = self.get_field_to_header_map()
+        result = {}
+
+        # Get all field values
+        field_values = {
+            'filepath': self.filepath,
+            'filesize': self.filesize,
+            'sg_id': self.sg_id,
+            'sg_type': self.sg_type,
+            'sg_tech': self.sg_tech,
+            'sg_platform': self.sg_platform,
+            'assay_id': self.assay_id,
+            'sample_id': self.sample_id,
+            'sample_external_ids': sample_ext,
+            'participant_id': self.participant_id,
+            'participant_external_ids': participant_ext,
+            'cram_analysis_id': self.cram_analysis_id,
+            'cram_file_path': self.cram_file_path,
+            'action': self.action,
+            'review_comment': self.review_comment,
         }
+
+        # Map to human-readable headers
+        for field_name, value in field_values.items():
+            header = field_to_header.get(
+                field_name, field_name.replace('_', ' ').title()
+            )
+            result[header] = value
+
+        return result
 
     def fieldnames(self) -> list[str]:
         """Get the field names for the audit report entry."""

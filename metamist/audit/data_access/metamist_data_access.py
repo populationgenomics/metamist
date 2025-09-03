@@ -129,7 +129,7 @@ class MetamistDataAccess:
 
         return latest_analyses
 
-    async def get_audit_deletion_analysis(
+    def get_audit_deletion_analysis(
         self, dataset: str, output_path: str
     ) -> dict | None:
         """
@@ -142,13 +142,13 @@ class MetamistDataAccess:
         Returns:
             analysis dict or None if not found
         """
-        analyses = await self.get_audit_deletion_analyses(dataset)
+        analyses = self.get_audit_deletion_analyses(dataset)
         for analysis in analyses:
             if analysis['output'] == output_path:
                 return analysis
         return None
 
-    async def get_audit_deletion_analyses(self, dataset: str) -> list[dict]:
+    def get_audit_deletion_analyses(self, dataset: str) -> list[dict]:
         """
         Fetch completed audit deletion analyses for a dataset.
 
@@ -158,11 +158,12 @@ class MetamistDataAccess:
         Returns:
             List of audit deletion analyses
         """
-        return await self.graphql_client.get_audit_deletion_analyses(dataset)
+        return self.graphql_client.get_audit_deletion_analyses(dataset)
 
-    async def create_audit_deletion_analysis(
+    def create_audit_deletion_analysis(
         self,
         dataset: str,
+        cohort_name: str,
         audited_report_name: str,
         deletion_report_path: str,
         stats: dict,
@@ -172,19 +173,22 @@ class MetamistDataAccess:
 
         Args:
             dataset: Dataset name
+            cohort_name: Name of the cohort
             audited_report_name: Name of the audited report
             deletion_report_path: Path to the deletion report
             stats: Statistics for the analysis
         """
+        cohort_id = self.graphql_client.get_dataset_cohort(dataset, cohort_name)
         analysis = Analysis(
+            cohort_ids=[cohort_id],
             type='audit_deletion',
             output=deletion_report_path,
             status=AnalysisStatus('completed'),
             meta={audited_report_name: stats},
         )
-        return await AnalysisApi().create_analysis_async(dataset, analysis)
+        return AnalysisApi().create_analysis(dataset, analysis)
 
-    async def update_audit_deletion_analysis(
+    def update_audit_deletion_analysis(
         self,
         existing_analysis: dict,
         audited_report_name: str,
@@ -199,14 +203,19 @@ class MetamistDataAccess:
             audited_report_name: Name of the audited report
             stats: Statistics for the analysis
         """
+        current_stats = existing_analysis['meta'].get(audited_report_name, {})
+        new_stats = {  # Sum the old and new stats
+            'total_size': stats.get('total_size', 0)
+            + current_stats.get('total_size', 0),
+            'file_count': stats.get('file_count', 0)
+            + current_stats.get('file_count', 0),
+        }
         analysis_update = AnalysisUpdateModel(
             status=AnalysisStatus('completed'),
             output=existing_analysis['output'],
-            meta=existing_analysis['meta'] | {audited_report_name: stats},
+            meta=existing_analysis['meta'] | {audited_report_name: new_stats},
         )
-        await AnalysisApi().update_analysis_async(
-            existing_analysis['id'], analysis_update
-        )
+        AnalysisApi().update_analysis(existing_analysis['id'], analysis_update)
 
     async def get_enum_values(self, enum_type: str) -> list[str]:
         """

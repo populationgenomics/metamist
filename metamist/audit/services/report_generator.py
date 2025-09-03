@@ -108,8 +108,7 @@ class ReportGenerator:
         )
 
     def write_deleted_files_report(
-        self,
-        deletion_result: DeletionResult,
+        self, deletion_result: DeletionResult, dry_run: bool
     ) -> Path:
         """
         Write deleted files report to GCS.
@@ -117,10 +116,14 @@ class ReportGenerator:
         Args:
             deleted_files: The deleted files entries
             bucket: GCS bucket for reports
-            output_prefix: Optional prefix for output paths
+            dry_run: If True, will write to a dry run report
         """
+        if dry_run:
+            blob_path = f'audit_results/{self.timestamp}/deleted_files_dry_run.csv'
+        else:
+            blob_path = f'audit_results/{self.timestamp}/deleted_files.csv'
         return self._write_csv_report(
-            blob_path=f'audit_results/{self.timestamp}/deleted_files.csv',
+            blob_path=blob_path,
             entries=deletion_result.deleted_files,
             report_name='FILES DELETED',
         )
@@ -167,13 +170,15 @@ class ReportGenerator:
         blob = self.gcs_data.storage.get_blob(self.gcs_data.analysis_bucket, blob_path)
         output_path = f'gs://{self.gcs_data.analysis_bucket}/{blob_path}'
         if blob.exists() and blob.size > 0:
-            self.audit_logs.info(
+            self.audit_logs.info_nl(
                 f'Existing report found, appending new rows to: {output_path}'
             )
             existing_data = blob.download_as_text(encoding='utf-8-sig')
             buffer = StringIO(existing_data)
             reader = csv.DictReader(buffer)
-            rows = list(reader) + rows
+            existing_rows = list(reader)
+            # Prevent duplicates
+            rows = existing_rows + [row for row in rows if row not in existing_rows]
             buffer.close()
 
         buffer = StringIO()
@@ -266,8 +271,10 @@ class ReportGenerator:
             return []
 
         with report_path.open('r') as f:
-            reader = csv.DictReader(f)
+            reader = csv.DictReader(f, fieldnames=AuditReportEntry().fieldnames())
+            next(reader)  # Skip header row
             rows = [AuditReportEntry(**row) for row in reader]
+
         return rows
 
     def get_report_rows_from_name(self, name: str) -> list[AuditReportEntry]:
@@ -280,8 +287,12 @@ class ReportGenerator:
     def get_report_stats(self, report_path: Path) -> dict:
         """Count the rows and sum the total file size for all rows in the report"""
         rows = self.get_report_rows(report_path)
-        total_size = sum(entry.filesize or 0 for entry in rows)
-        return {'total_size': total_size, 'file_count': len(rows)}
+        return self.get_report_entries_stats(rows)
+
+    def get_report_entries_stats(self, entries: list[AuditReportEntry]) -> dict:
+        """Get statistics for the given report entries."""
+        total_size = sum(int(entry.filesize) or 0 for entry in entries)
+        return {'total_size': total_size, 'file_count': len(entries)}
 
     def generate_summary_statistics(self, audit_result: AuditResult) -> dict[str, int]:
         """

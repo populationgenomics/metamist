@@ -63,24 +63,24 @@ Using this CLI tool, a new report will be created or updated, called `reviewed_f
 
 ```text
 audit/
-├── models/                     # Pure data models (no external dependencies)
-│   ├── entities.py                 # Core business entities
-│   └── value_objects.py            # Immutable value objects
-├── adapters/                   # External interface adapters
-│   ├── graphql_client.py           # GraphQL API adapter
-│   └── storage_client.py           # Google Cloud Storage adapter
-├── data_access/                # Data access layer
-│   ├── metamist_data_access.py     # Metamist data access
-│   └── gcs_data_access.py          # GCS data access
-├── services/                   # Business logic (pure functions)
-│   ├── audit_analyzer.py           # Core audit analysis
-│   ├── audit_logging.py            # Logging utilities
-│   ├── file_matcher.py             # File matching strategies
-│   └── report_generator.py         # Report generation
-└── cli/                        # Command-line interfaces
-    └── upload_bucket_audit.py      # Main CLI entry point
-    └── review_audit_results.py     # CLI for reviewing audit results
-    └── delete_audit_results.py     # CLI for deleting audit results
+├── models/                        # Pure data models (no external dependencies)
+│   ├── entities.py                   # Core business entities
+│   └── value_objects.py              # Immutable value objects
+├── adapters/                      # External interface adapters
+│   ├── graphql_client.py             # GraphQL API adapter
+│   └── storage_client.py             # Google Cloud Storage adapter
+├── data_access/                   # Data access layer
+│   ├── metamist_data_access.py       # Metamist data access
+│   └── gcs_data_access.py            # GCS data access
+├── services/                      # Business logic (pure functions)
+│   ├── audit_analyzer.py             # Core audit analysis
+│   ├── audit_logging.py              # Logging utilities
+│   ├── file_matcher.py               # File matching strategies
+│   └── report_generator.py           # Report generation
+└── cli/                           # Command-line interfaces
+    └── upload_bucket_audit.py        # Main CLI entry point
+    └── review_audit_results.py       # CLI for reviewing audit results
+    └── delete_from_audit_results.py  # CLI for deleting audit results
 ```
 
 ## Usage
@@ -132,6 +132,7 @@ Users can review the audit results using the CLI entrypoint `review_audit_result
 python -m metamist.audit.cli.review_audit_results \
     --dataset my-dataset \
     --results-folder "2025-01-01_123456" \
+    --action "DELETE" \
     --comment "Unnecessary BAMs and VCFs for aligned exome sequencing groups" \
     --filter "SG Type==exome" \
     --filter "File Type==BAM" \
@@ -170,7 +171,7 @@ The audit generates several reports in the analysis bucket:
 
 1. **reviewed_files.csv**: User annotations and justifications for files marked for deletion
 
-### From the `delete_audit_results.py` script
+### From the `delete_from_audit_results.py` script
 
 1. **deleted_files.csv**: List of files that were deleted
 2. An analysis record in Metamist of type `audit_deletion`
@@ -198,28 +199,26 @@ audit_upload_bucket(config)
 ## Advanced Usage with Custom Components
 
 ```python
-from metamist.audit.adapters import GraphQLClient, StorageClient
-from metamist.audit.repositories import MetamistRepository, GCSRepository
-from metamist.audit.services import AuditAnalyzer, ReportGenerator
+from metamist.audit.data_access import MetamistDataAccess, GCSDataAccess
+from metamist.audit.models import AuditConfig, SequencingGroup
+from metamist.audit.services import AuditAnalyzer, AuditLogs, ReportGenerator
 from metamist.audit.cli import AuditOrchestrator
 
 # Create custom components
-graphql_client = GraphQLClient()
-storage_client = StorageClient(project='my-gcp-project')
+metamist = MetamistDataAccess()
+gcs = GCSDataAccess()
+analyzer = AuditAnalyzer()
+audit_logs = AuditLogs()
+reporter = ReportGenerator(gcs, audit_logs)
 
-metamist_repo = MetamistRepository(graphql_client)
-gcs_repo = GCSRepository(storage_client)
-
-analyzer = AuditAnalyzer(logger=custom_logger)
-report_writer = ReportGenerator(storage_client.client, logger=custom_logger)
 
 # Create orchestrator
 orchestrator = AuditOrchestrator(
-    metamist_repo,
-    gcs_repo,
+    metamist,
+    gcs,
     analyzer,
-    report_writer,
-    custom_logger
+    reporter,
+    audit_logs
 )
 
 # Run audit

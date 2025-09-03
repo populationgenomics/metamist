@@ -1,6 +1,6 @@
 """GraphQL client adapter for Metamist API."""
 
-from metamist.graphql import gql, query_async
+from metamist.graphql import gql, query, query_async
 
 
 class GraphQLClient:
@@ -58,11 +58,24 @@ class GraphQLClient:
         """
         query auditDeletions($dataset: String!) {
             project(name: $dataset) {
-                analyses(type: {eq: "audit_deletion"}, status: {eq: COMPLETED}, active: true) {
+                analyses(status: {eq: COMPLETED}, type: {eq: "audit_deletion"}) {
                     id
-                    timestamp
+                    timestampCompleted
                     output
                     meta
+                }
+            }
+        }
+        """
+    )
+
+    QUERY_COHORTS = gql(
+        """
+        query cohorts($dataset: String!) {
+            project(name: $dataset) {
+                cohorts {
+                    id
+                    name
                 }
             }
         }
@@ -79,6 +92,22 @@ class GraphQLClient:
                 sequencingPlatform
                 sequencingTechnology
             }
+        }
+        """
+    )
+
+    CREATE_COHORT_MUTATION = gql(
+        """
+        mutation createCohortMutation($dataset: String!, $name: String!) {
+          cohort {
+            createCohortFromCriteria(
+              cohortSpec: {name: $name, description: "all_sgs_audit"}
+              project: $dataset
+              cohortCriteria: {projects: [$dataset]}
+            ) {
+              id
+            }
+          }
         }
         """
     )
@@ -181,7 +210,7 @@ class GraphQLClient:
         )
         return result['project']['sequencingGroups']
 
-    async def get_audit_deletion_analyses(self, dataset: str) -> list[dict]:
+    def get_audit_deletion_analyses(self, dataset: str) -> list[dict]:
         """
         Fetch completed audit deletion analyses for a dataset.
 
@@ -191,10 +220,40 @@ class GraphQLClient:
         Returns:
             List of audit deletion analyses
         """
-        result = await query_async(
+        result = query(
             self.QUERY_AUDIT_DELETION_ANALYSES,
             {
                 'dataset': dataset,
             },
         )
         return result['project']['analyses']
+
+    def get_dataset_cohort(self, dataset: str, name: str) -> str:
+        """
+        Fetch or create the cohort associated with a dataset.
+
+        Args:
+            dataset: Dataset name
+
+        Returns:
+            Cohort ID
+        """
+        results = query(
+            self.QUERY_COHORTS,
+            {
+                'dataset': dataset,
+            },
+        )
+        for result in results['project']['cohorts']:
+            if result['name'] == name:
+                return result['id']
+
+        # If not found, create the cohort
+        result = query(
+            self.CREATE_COHORT_MUTATION,
+            {
+                'dataset': dataset,
+                'name': name,
+            },
+        )
+        return result['cohort']['createCohortFromCriteria']['id']

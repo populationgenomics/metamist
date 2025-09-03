@@ -11,40 +11,49 @@ from cpg_utils import to_path
 
 def delete_from_audit_results(
     dataset: str,
-    gcp_project: str | None,
     results_folder: str,
-    report_name: str,
+    report: str,
     dry_run: bool = False,
 ):
     """Delete files listed in the audit results."""
     audit_logs = AuditLogs(dataset, 'audit_deletions')
 
-    gcs = GCSDataAccess(dataset, gcp_project=gcp_project)
-    reporter = ReportGenerator(gcs, results_folder, audit_logs)
+    gcs = GCSDataAccess(dataset)
+    reporter = ReportGenerator(gcs, audit_logs, results_folder)
 
-    report_rows = reporter.get_report_rows(report_name)
+    audit_logs.info_nl(f"Reading report '{report}'".center(50, '~'))
+
+    report_rows = reporter.get_report_rows_from_name(report)
 
     deletion_result = delete_files_from_report(
-        gcs, report_name, report_rows, dry_run, audit_logs
+        gcs, report, report_rows, audit_logs, dry_run
     )
 
-    deletion_report = reporter.write_deleted_files_report(deletion_result)
-    stats = reporter.get_report_stats(deletion_report)
+    deletion_report = reporter.write_deleted_files_report(deletion_result, dry_run)
+    stats = reporter.get_report_entries_stats(deletion_result.deleted_files)
 
     if not dry_run:
         upsert_deleted_files_analysis(
-            dataset, report_name, deletion_report.as_uri(), stats, audit_logs
+            dataset, report, results_folder, deletion_report.as_uri(), stats, audit_logs
         )
 
-    audit_logs.info_nl(f'Finished processing deletes from report: {report_name}')
+    all_stats = reporter.get_report_stats(deletion_report)
+
+    audit_logs.info_nl(f"Finished processing deletes from report: '{report}'")
+    audit_logs.info_nl(
+        f'New deletions: {stats["file_count"]} files, {stats["total_size"] / (1024**3):.2f} GiB'
+    )
+    audit_logs.info_nl(
+        f'Total deletions: {all_stats["file_count"]} files, {all_stats["total_size"] / (1024**3):.2f} GiB'
+    )
 
 
 def delete_files_from_report(
     gcs: GCSDataAccess,
     report_name: str,
     rows: list[AuditReportEntry],
-    dry_run: bool,
     audit_logs: AuditLogs,
+    dry_run: bool,
 ) -> DeletionResult:
     """
     Delete files in the upload bucket from the audit results.
@@ -91,9 +100,10 @@ def delete_files_from_report(
     return DeletionResult(deleted_files=to_delete)
 
 
-async def upsert_deleted_files_analysis(
+def upsert_deleted_files_analysis(
     dataset: str,
     audited_report_name: str,
+    results_folder: str,
     deletion_report_path: str,
     stats: dict,
     audit_logs: AuditLogs,
@@ -103,54 +113,54 @@ async def upsert_deleted_files_analysis(
     Populates the meta dict with deleted files stats.
     """
     audit_logs.info_nl('Upserting analysis record for deleted files report.')
-    if existing_analysis := await MetamistDataAccess().get_audit_deletion_analysis(
+    if existing_analysis := MetamistDataAccess().get_audit_deletion_analysis(
         dataset, deletion_report_path
     ):
         audit_logs.info_nl(
             f'Found existing analysis record (ID: {existing_analysis["id"]}) for {deletion_report_path}. Updating...'
         )
-        await MetamistDataAccess().update_audit_deletion_analysis(
+        MetamistDataAccess().update_audit_deletion_analysis(
             existing_analysis, audited_report_name, stats
         )
         audit_logs.info_nl(f'Updated analysis {existing_analysis["id"]}.')
 
     else:
         audit_logs.info_nl(f'Creating new record for {deletion_report_path}')
-        aid = await MetamistDataAccess().create_audit_deletion_analysis(
-            dataset, audited_report_name, deletion_report_path, stats
+        cohort_name = f'{dataset}_{results_folder}'
+        aid = MetamistDataAccess().create_audit_deletion_analysis(
+            dataset, cohort_name, audited_report_name, deletion_report_path, stats
         )
         audit_logs.info_nl(f'Created analysis {aid}.')
 
 
 @click.command()
 @click.option('--dataset', '-d', required=True, help='Dataset name')
-@click.option('--gcp-project', '-g', help='GCP project')
 @click.option('--results-folder', '-r', required=True, help='Audit results folder')
 @click.option(
     '--report-name',
     '-n',
-    required=True,
     help="The report to delete files from. e.g. 'files_to_delete'.",
+    default='files_to_delete',
 )
 @click.option('--dry-run', is_flag=True, help='If set, will not delete objects.')
 def main(
     dataset: str,
-    gcp_project: str | None,
     results_folder: str,
-    report_name: str,
+    report_name: str = 'files_to_delete',
     dry_run: bool = False,
 ):
     """
-    Reads the report at location gs://cpg-dataset-main-analysis/audit_results/{results_folder}/{report_name}.csv
+    Reads the report at location:
+        gs://cpg-dataset-main-analysis/audit_results/{results_folder}/{report_name}.csv
 
     If the report is 'files_to_delete', it will delete the files listed in the report.
 
     For any other report, files must be marked for deletion in the report, alongside a
     comment justifying the deletion.
+
+    Deleting files will create or update an analysis record of type 'audit_deletions'.
     """
-    delete_from_audit_results(
-        dataset, gcp_project, results_folder, report_name, dry_run
-    )
+    delete_from_audit_results(dataset, results_folder, report_name, dry_run)
 
 
 if __name__ == '__main__':
