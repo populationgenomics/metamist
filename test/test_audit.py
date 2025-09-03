@@ -36,7 +36,7 @@ class TestAudit(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.metamist_data_access = MetamistDataAccess()
-        self.gcs_data_access = GCSDataAccess('test')
+        self.gcs_data_access = GCSDataAccess('test', 'test')
         self.audit_analyzer = AuditAnalyzer()
         self.file_matcher = FileMatchingService()
 
