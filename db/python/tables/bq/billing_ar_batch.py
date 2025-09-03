@@ -11,7 +11,6 @@ from api.utils.db import (
     Connection,
 )
 from db.python.tables.bq.billing_base import BillingBaseTable
-from db.python.tables.sequencing_group import SequencingGroupTable
 from models.enums.billing import BillingSource
 from models.models import BillingSampleQueryModel, BillingTotalCostQueryModel
 from models.utils.sample_id_format import sample_id_transform_to_raw
@@ -106,7 +105,9 @@ class BillingArBatchTable(BillingBaseTable):
         self,
         connection: Connection,
         records_filter: list[str],
-    ) -> tuple[list[str], list[int], dict[int, str], dict[int, list[int]]]:
+    ) -> tuple[
+        list[str], list[int], dict[int, str], dict[int, str], dict[int, list[str]]
+    ]:
         """
         Get sequencing groups from records filter
         """
@@ -118,7 +119,7 @@ class BillingArBatchTable(BillingBaseTable):
         seq_id_map: dict[int, str] = {}
         sample_id_map: dict[int, str] = {}
         sample_ids: list[int] = []
-        sample_to_seq_grp: dict[int, list[int]] = {}
+        sample_to_seq_grp: dict[int, list[str]] = {}
         for r in records_filter:
             if r.startswith(SEQUENCING_GROUP_PREFIX):
                 sequencing_groups.append(r.upper())
@@ -134,11 +135,11 @@ class BillingArBatchTable(BillingBaseTable):
 
         # map sample to seq groups
         if sample_ids:
-            sample_to_seq_grp = await self.get_seq_groups_per_sample(
+            sample_id_to_seq_grp = await self.get_seq_groups_per_sample(
                 connection, sample_ids
             )
             # append to sequencing_groups_as_ids
-            for sample_id, seq_groups in sample_to_seq_grp.items():
+            for sample_id, seq_groups in sample_id_to_seq_grp.items():
                 sequencing_groups_as_ids.extend(seq_groups)
                 for seq_id in seq_groups:
                     r = sequencing_group_id_format(seq_id)
@@ -148,7 +149,7 @@ class BillingArBatchTable(BillingBaseTable):
             # reformat the map, keep formatted list
             sample_to_seq_grp = {
                 k: sequencing_group_id_format_list(v)
-                for k, v in sample_to_seq_grp.items()
+                for k, v in sample_id_to_seq_grp.items()
             }
         return (
             sequencing_groups,
@@ -186,26 +187,34 @@ class BillingArBatchTable(BillingBaseTable):
 
         return ar_guids
 
-    async def get_project_name(
+    async def get_projects_per_sq(
         self, connection: Connection, sequencing_groups_as_ids
-    ) -> tuple[int | None, str | None]:
+    ) -> tuple[dict[int, list[int]], dict[int, str]]:
         """
         Get GCP project name by sequencing groups
         """
-        sgt = SequencingGroupTable(connection)
-        projects = await sgt.get_projects_by_sequencing_group_ids(
-            sequencing_groups_as_ids
+        _query = """
+            SELECT s.project, GROUP_CONCAT(sg.id ORDER BY sg.id ASC SEPARATOR ',') as seq_grps
+            FROM sequencing_group sg
+            INNER JOIN sample s ON s.id = sg.sample_id
+            WHERE sg.id in :sequencing_group_ids
+            GROUP BY s.project
+        """
+        rows = await connection.connection.fetch_all(
+            _query, {'sequencing_group_ids': sequencing_groups_as_ids}
         )
+        projects = {
+            row.project: [int(seq_id) for seq_id in row.seq_grps.split(',')]
+            for row in rows
+        }
         if not projects:
             return (None, None)
 
-        if len(projects) > 1:
-            raise ValueError('Sequencing_group from one project only')
-
         # get the project dataset (GCP project names)
-        project_id = list(projects)[0]
-        project_name = connection.project_id_map[project_id].dataset
-        return (project_id, project_name)
+        project_names: dict[int, str] = {}
+        for project_id in projects.keys():
+            project_names[project_id] = connection.project_id_map[project_id].dataset
+        return (projects, project_names)
 
     async def get_seq_groups_per_sample(
         self, connection: Connection, sample_ids: list[int]
@@ -248,7 +257,7 @@ class BillingArBatchTable(BillingBaseTable):
             # sequencing_group contain formatted id
             # Group by all fields except 'sequencing_group', and 'cost'
             # Aggregate cost for each unique combination of other fields
-            grouped = {}
+            grouped: dict[tuple, list[dict]] = {}
             for r in result:
                 # Build a key from all fields except 'sequencing_group' and 'cost'
                 key = tuple(
@@ -286,6 +295,36 @@ class BillingArBatchTable(BillingBaseTable):
 
         return mapped_results
 
+    async def get_storage_info(
+        self,
+        connection: Connection,
+        query: BillingTotalCostQueryModel,
+        projects: dict,
+        project_names: dict,
+    ) -> tuple[dict[int, dict], dict, dict]:
+        """
+        Get storage information for the specified projects.
+        """
+        storage_cost = {}
+        number_of_seq_groups = {}
+        total_crams_size = {}
+        for project_id in projects.keys():
+            storage_cost[project_id] = self.get_storage_costs_by_project(
+                query, project_names[project_id]
+            )
+
+            # 4. get number of seq groups
+            number_of_seq_groups[
+                project_id
+            ] = await self.get_number_of_sequencing_groups(connection, project_id)
+
+            # 4. Get the cram size per project, total size and count cram files
+            (
+                total_crams_size[project_id],
+                _cram_files_cnt,
+            ) = await self.get_total_crams_info(connection, project_id)
+        return (storage_cost, number_of_seq_groups, total_crams_size)
+
     async def get_cost_by_sample(
         self,
         connection: Connection,
@@ -309,10 +348,10 @@ class BillingArBatchTable(BillingBaseTable):
         ) = await self.get_sequencing_groups(connection, query.search_ids)
 
         # Get metamist project id and gcp project prefix
-        (project_id, project_name) = await self.get_project_name(
+        (projects, project_names) = await self.get_projects_per_sq(
             connection, sequencing_groups_as_ids
         )
-        if not project_name:
+        if not projects:
             return []
 
         # 6. Get all ar-guid with min/max day for each of the seq group
@@ -325,6 +364,8 @@ class BillingArBatchTable(BillingBaseTable):
         compute_results = self.get_compute_costs_by_seq_groups(
             ar_guids, sequencing_groups, ','.join(query.fields)
         )
+
+        # TODO min compute per seq group !!!
 
         # get the min date from compute_results
         min_compute_date = datetime.strptime(
@@ -341,44 +382,35 @@ class BillingArBatchTable(BillingBaseTable):
         )
 
         # adjust Query dates filter
-        start_date = start_date.strftime('%Y-%m-%d')
-        end_date = end_date.strftime('%Y-%m-%d')
         # overrides time specific fields with relevant time column name
-
-        query = BillingTotalCostQueryModel(
+        q = BillingTotalCostQueryModel(
             fields=query.fields,
-            start_date=start_date,
-            end_date=end_date,
+            start_date=start_date.strftime('%Y-%m-%d'),
+            end_date=end_date.strftime('%Y-%m-%d'),
             source=BillingSource.AGGREGATE,
         )
 
-        # Storage Calculation
-        storage_cost = self.get_storage_costs_by_project(query, project_name)
-
-        # 4. get number of seq groups
-        number_of_seq_groups = await self.get_number_of_sequencing_groups(
-            connection, project_id
-        )
-
-        # 4. Get the cram size per project, total size and count cram files
-        total_crams_size, _cram_files_cnt = await self.get_total_crams_info(
-            connection, project_id
-        )
+        # Storage Calculation per project
+        (
+            storage_cost,
+            number_of_seq_groups,
+            total_crams_size,
+        ) = await self.get_storage_info(connection, q, projects, project_names)
 
         # 5. Get individual seq group cram size, list all seq even they do not have cram files
-        sg_storage_cost = await self.get_cram_files_info(
-            connection,
-            project_id,
-            sequencing_groups_as_ids,
-            number_of_seq_groups,
-            storage_cost,
-            total_crams_size,
-            seq_id_map,
-            'sequencing_group' in query.fields,
-        )
+        result = compute_results
+        for project_id in projects.keys():
+            result += await self.get_cram_files_info(
+                connection,
+                project_id,
+                sequencing_groups_as_ids,
+                number_of_seq_groups[project_id],
+                storage_cost[project_id],
+                total_crams_size[project_id],
+                seq_id_map,
+                'sequencing_group' in query.fields,
+            )
 
-        # combine
-        result = compute_results + sg_storage_cost
         if 'sequencing_group' in query.fields and sample_to_seq_grp:
             result = self.aggregate_per_sample(
                 result, sequencing_groups, sample_id_map, sample_to_seq_grp
