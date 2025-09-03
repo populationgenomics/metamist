@@ -156,33 +156,6 @@ class FileMatchingService:
                 if analysis.output_file.checksum == bucket_file.checksum:
                     analysis.original_file = bucket_file
 
-    def find_duplicate_files(
-        self, files: list[FileMetadata]
-    ) -> dict[str, list[FileMetadata]]:
-        """
-        Find duplicate files based on checksum.
-
-        Args:
-            files: List of files to check for duplicates
-
-        Returns:
-            Dictionary mapping checksum to list of duplicate files
-        """
-        duplicates = {}
-
-        for file in files:
-            if not file.checksum:
-                continue
-
-            if file.checksum not in duplicates:
-                duplicates[file.checksum] = []
-            duplicates[file.checksum].append(file)
-
-        # Only keep checksums with multiple files
-        return {
-            checksum: files for checksum, files in duplicates.items() if len(files) > 1
-        }
-
     def find_uningested_files(
         self,
         metamist_files: list[ReadFile],

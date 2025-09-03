@@ -90,44 +90,17 @@ class MetamistDataAccess:
 
         return analyses
 
-    async def get_latest_cram_analyses(
-        self, dataset: str, sg_ids: list[str]
-    ) -> dict[str, AuditAnalysis]:
+    def get_audit_deletion_analyses(self, dataset: str) -> list[dict]:
         """
-        Get the latest CRAM analysis for each sequencing group.
+        Fetch completed audit deletion analyses for a dataset.
 
         Args:
             dataset: Dataset name
-            sg_ids: List of sequencing group IDs
 
         Returns:
-            Dictionary mapping SG ID to its latest CRAM analysis
+            List of audit deletion analyses
         """
-        analyses = await self.get_analyses_for_sequencing_groups(
-            dataset, sg_ids, ['CRAM', 'cram']
-        )
-
-        # Group by SG and find latest
-        analyses_by_sg: dict[str, list[AuditAnalysis]] = {}
-        for analysis in analyses:
-            if analysis.sequencing_group_id:
-                if analysis.sequencing_group_id not in analyses_by_sg:
-                    analyses_by_sg[analysis.sequencing_group_id] = []
-                analyses_by_sg[analysis.sequencing_group_id].append(analysis)
-
-        # Get latest analysis for each SG
-        latest_analyses = {}
-        for sg_id, sg_analyses in analyses_by_sg.items():
-            if sg_analyses:
-                # Sort by timestamp and get the latest
-                sorted_analyses = sorted(
-                    sg_analyses,
-                    key=lambda a: self._parse_timestamp(a.timestamp_completed or ''),
-                    reverse=True,
-                )
-                latest_analyses[sg_id] = sorted_analyses[0]
-
-        return latest_analyses
+        return self.graphql_client.get_audit_deletion_analyses(dataset)
 
     def get_audit_deletion_analysis(
         self, dataset: str, output_path: str
@@ -147,18 +120,6 @@ class MetamistDataAccess:
             if analysis['output'] == output_path:
                 return analysis
         return None
-
-    def get_audit_deletion_analyses(self, dataset: str) -> list[dict]:
-        """
-        Fetch completed audit deletion analyses for a dataset.
-
-        Args:
-            dataset: Dataset name
-
-        Returns:
-            List of audit deletion analyses
-        """
-        return self.graphql_client.get_audit_deletion_analyses(dataset)
 
     def create_audit_deletion_analysis(
         self,

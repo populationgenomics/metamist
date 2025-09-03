@@ -57,10 +57,16 @@ from .services import (
     FileMatchingService,
 )
 
-from .cli import (
+from .cli.upload_bucket_audit import (
     audit_upload_bucket,
     audit_upload_bucket_async,
     AuditOrchestrator,
+)
+from .cli.review_audit_results import review_audit_report, review_filtered_files
+from .cli.delete_from_audit_results import (
+    delete_from_audit_results,
+    delete_files_from_report,
+    upsert_deleted_files_analysis,
 )
 
 __version__ = '2.0.0'
@@ -70,6 +76,11 @@ __all__ = [
     'audit_upload_bucket',
     'audit_upload_bucket_async',
     'AuditOrchestrator',
+    'review_audit_report',
+    'review_filtered_files',
+    'delete_from_audit_results',
+    'delete_files_from_report',
+    'upsert_deleted_files_analysis',
     # Configuration
     'AuditConfig',
     # Enums
