@@ -120,22 +120,22 @@ class FileMatchingService:
         moved_files = {}
 
         # Convert ReadFiles to FileMetadata for comparison
-        metamist_metadata = [f.metadata for f in metamist_files]
+        metamist_files_metadata = [f.metadata for f in metamist_files]
 
         # Create lookup structures
-        metamist_by_path = {str(f.filepath): f for f in metamist_metadata}
+        metamist_files_by_path = {f.filepath.uri: f for f in metamist_files_metadata}
 
         for bucket_file in bucket_files:
             # Skip if file is at the expected location
-            if str(bucket_file.filepath) in metamist_by_path:
+            if bucket_file.filepath.uri in metamist_files_by_path:
                 continue
 
             # Try to find a match in Metamist files
-            match = self.matcher.match(bucket_file, metamist_metadata)
+            match = self.matcher.match(bucket_file, metamist_files_metadata)
 
-            if match and str(match.filepath) != str(bucket_file.filepath):
+            if match and match.filepath.uri != bucket_file.filepath.uri:
                 # File has been moved
-                moved_files[str(match.filepath)] = MovedFile(
+                moved_files[match.filepath.uri] = MovedFile(
                     old_path=match.filepath,
                     new_path=bucket_file.filepath,
                     metadata=bucket_file,
@@ -180,16 +180,16 @@ class FileMatchingService:
 
         # Add Metamist file paths
         for f in metamist_files:
-            known_paths.add(str(f.filepath))
+            known_paths.add(f.filepath.uri)
 
         # Add moved file new paths
         for moved in moved_files.values():
-            known_paths.add(str(moved.new_path))
+            known_paths.add(moved.new_path.uri)
 
         # Find files not in known paths
         uningested = []
         for bucket_file in bucket_files:
-            if str(bucket_file.filepath) not in known_paths:
+            if bucket_file.filepath.uri not in known_paths:
                 # Check if it matches an analysis file
                 is_analysis_file = False
                 if analysis_files and bucket_file.checksum:

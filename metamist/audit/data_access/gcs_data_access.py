@@ -76,7 +76,7 @@ class GCSDataAccess:
 
     def validate_cram_files(
         self, cram_paths: list[FilePath]
-    ) -> tuple[list[str], list[str]]:
+    ) -> tuple[list[FilePath], list[FilePath]]:
         """
         Validate the existence of CRAM files in the bucket.
 
@@ -85,7 +85,7 @@ class GCSDataAccess:
             file_extensions: Extensions to search for
 
         Returns:
-            Dict mapping found and missing crams
+            Lists of found CRAM paths and missing CRAM paths
         """
         assert all(
             p.path.bucket == self.main_bucket for p in cram_paths
@@ -93,7 +93,7 @@ class GCSDataAccess:
         crams_in_bucket = self.storage.check_blobs(self.main_bucket, cram_paths)
         # Check that all cram_paths were found
         if not all(p in crams_in_bucket for p in cram_paths):
-            missing = [p.uri for p in cram_paths if p not in crams_in_bucket]
+            missing = [p for p in cram_paths if p not in crams_in_bucket]
             return crams_in_bucket, missing
         return crams_in_bucket, []
 

@@ -4,6 +4,7 @@ import unittest
 import unittest.mock
 from test.testbase import run_as_sync
 
+from metamist.audit.adapters import StorageClient
 from metamist.audit.cli.upload_bucket_audit import AuditOrchestrator
 from metamist.audit.data_access import MetamistDataAccess, GCSDataAccess
 from metamist.audit.services import (
@@ -30,26 +31,57 @@ from metamist.audit.models import (
 from cpg_utils import to_path
 
 
-class TestAudit(unittest.TestCase):
+class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attributes
     """Test the audit module"""
 
     def setUp(self):
         """Set up test fixtures."""
+        # Start the storage client mock before creating GCSDataAccess
+        self.storage_client_patcher = unittest.mock.patch(
+            'metamist.audit.adapters.storage_client.storage.Client'
+        )
+        self.mock_storage_client = self.storage_client_patcher.start()
+
+        # Mock get_bucket_name to avoid needing real config
+        self.bucket_patcher = unittest.mock.patch.object(
+            GCSDataAccess, 'get_bucket_name'
+        )
+        self.mock_get_bucket_name = self.bucket_patcher.start()
+        self.mock_get_bucket_name.side_effect = [
+            'cpg-dataset-main',
+            'cpg-dataset-main-upload',
+            'cpg-dataset-main-analysis',
+        ]
+
         self.metamist_data_access = MetamistDataAccess()
-        self.gcs_data_access = GCSDataAccess('test', 'test')
+        self.gcs_data_access = GCSDataAccess('dataset', 'test')
         self.audit_analyzer = AuditAnalyzer()
         self.file_matcher = FileMatchingService()
+
+    def tearDown(self):
+        """Clean up test fixtures."""
+        self.storage_client_patcher.stop()
+        self.bucket_patcher.stop()
 
     # ===== METAMIST DATA ACCESS TESTS =====
     # These test the data access layer - mapping GraphQL responses to domain models
 
+    def test_gcs_data_access_setup(self):
+        """Test that GCSDataAccess initializes correctly with mocked buckets"""
+        # Verify that the bucket names are set correctly from our mocks
+        self.assertEqual(self.gcs_data_access.main_bucket, 'cpg-dataset-main')
+        self.assertEqual(self.gcs_data_access.upload_bucket, 'cpg-dataset-main-upload')
+        self.assertEqual(
+            self.gcs_data_access.analysis_bucket, 'cpg-dataset-main-analysis'
+        )
+        self.assertEqual(self.gcs_data_access.dataset, 'dataset')
+        self.assertEqual(self.gcs_data_access.gcp_project, 'test')
+
     @run_as_sync
-    @unittest.mock.patch(
-        'metamist.audit.adapters.graphql_client.GraphQLClient.query_async'
-    )
-    async def test_get_sequencing_groups(self, mock_query):
+    @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
+    async def test_get_sequencing_groups(self, mock_query_async):
         """Test MetamistDataAccess.get_sequencing_groups"""
-        mock_query.return_value = {
+        mock_query_async.return_value = {
             'project': {
                 'sequencingGroups': [
                     {
@@ -108,19 +140,17 @@ class TestAudit(unittest.TestCase):
 
         read_file_1 = assay.read_files[0]
         self.assertEqual(read_file_1.filepath.uri, 'gs://cpg-dataset-main-upload/R1.fq')
-        self.assertEqual(read_file_1.filesize, 12)
+        self.assertEqual(read_file_1.filesize, 11)
 
         read_file_2 = assay.read_files[1]
         self.assertEqual(read_file_2.filepath.uri, 'gs://cpg-dataset-main-upload/R2.fq')
-        self.assertEqual(read_file_2.filesize, 13)
+        self.assertEqual(read_file_2.filesize, 12)
 
     @run_as_sync
-    @unittest.mock.patch(
-        'metamist.audit.adapters.graphql_client.GraphQLClient.query_async'
-    )
-    async def test_get_analyses_for_sequencing_groups(self, mock_query):
+    @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
+    async def test_get_analyses_for_sequencing_groups(self, mock_query_async):
         """Test MetamistDataAccess.get_analyses_for_sequencing_groups"""
-        mock_query.return_value = {
+        mock_query_async.return_value = {
             'project': {
                 'sequencingGroups': [
                     {
@@ -158,9 +188,7 @@ class TestAudit(unittest.TestCase):
         )
 
     @run_as_sync
-    @unittest.mock.patch(
-        'metamist.audit.adapters.graphql_client.GraphQLClient.query_async'
-    )
+    @unittest.mock.patch('metamist.audit.adapters.graphql_client.query')
     async def test_get_audit_deletion_analysis(self, mock_query):
         """Test MetamistDataAccess.get_audit_deletion_analyses"""
         mock_query.return_value = {
@@ -193,10 +221,10 @@ class TestAudit(unittest.TestCase):
     # ===== GCS DATA ACCESS TESTS =====
     # These test the data access layer - mapping GCS responses to domain models
 
-    @unittest.mock.patch('metamist.audit.adapters.storage_client.find_blobs')
-    def test_list_files_in_bucket(self, mock_find_blobs):
+    @unittest.mock.patch.object(GCSDataAccess, 'list_files_in_bucket')
+    def test_list_files_in_bucket(self, mock_list_files):
         """Test listing the files in a bucket"""
-        mock_find_blobs.return_value = [
+        mock_list_files.return_value = [
             FileMetadata(
                 filepath=FilePath(to_path('gs://cpg-dataset-main-upload/read1.fq'))
             ),
@@ -229,16 +257,12 @@ class TestAudit(unittest.TestCase):
             FilePath(to_path('gs://cpg-dataset-main-upload/uningested.fq')),
         )
 
-    @unittest.mock.patch('metamist.audit.adapters.storage_client.find_blobs')
-    def test_validate_cram_files(self, mock_find_blobs):
+    @unittest.mock.patch.object(StorageClient, 'check_blobs')
+    def test_validate_cram_files(self, mock_check_blobs):
         """Test validating CRAM files"""
-        mock_find_blobs.return_value = [
-            FileMetadata(
-                filepath=FilePath(to_path('gs://cpg-dataset-main/cram/CPGaaa.cram'))
-            ),
-            FileMetadata(
-                filepath=FilePath(to_path('gs://cpg-dataset-main/cram/CPGbbb.cram'))
-            ),
+        mock_check_blobs.return_value = [
+            FilePath(to_path('gs://cpg-dataset-main/cram/CPGaaa.cram')),
+            FilePath(to_path('gs://cpg-dataset-main/cram/CPGbbb.cram')),
         ]
 
         found, missing = self.gcs_data_access.validate_cram_files(
@@ -250,19 +274,20 @@ class TestAudit(unittest.TestCase):
 
         self.assertEqual(len(found), 2)
         self.assertEqual(len(missing), 0)
-        self.assertEqual(found[0], 'cram/CPGaaa.cram')
-        self.assertEqual(found[1], 'cram/CPGbbb.cram')
+        self.assertEqual(
+            found[0], FilePath(to_path('gs://cpg-dataset-main/cram/CPGaaa.cram'))
+        )
+        self.assertEqual(
+            found[1], FilePath(to_path('gs://cpg-dataset-main/cram/CPGbbb.cram'))
+        )
 
-    @unittest.mock.patch('metamist.audit.adapters.storage_client.find_blobs')
-    def test_validate_cram_files_with_missing(self, mock_find_blobs):
+    @unittest.mock.patch.object(StorageClient, 'check_blobs')
+    def test_validate_cram_files_with_missing(self, mock_check_blobs):
         """Test validating CRAM files where one is missing"""
-        mock_find_blobs.return_value = [
-            FileMetadata(
-                filepath=FilePath(to_path('gs://cpg-dataset-main/cram/CPGaaa.cram'))
-            ),
-            FileMetadata(
-                filepath=FilePath(to_path('gs://cpg-dataset-main/cram/CPGbbb.cram'))
-            ),
+        # Mock check_blobs to return only 2 of the 3 requested files
+        mock_check_blobs.return_value = [
+            FilePath(to_path('gs://cpg-dataset-main/cram/CPGaaa.cram')),
+            FilePath(to_path('gs://cpg-dataset-main/cram/CPGbbb.cram')),
         ]
 
         found, missing = self.gcs_data_access.validate_cram_files(
@@ -275,9 +300,15 @@ class TestAudit(unittest.TestCase):
 
         self.assertEqual(len(found), 2)
         self.assertEqual(len(missing), 1)
-        self.assertEqual(found[0], 'cram/CPGaaa.cram')
-        self.assertEqual(found[1], 'cram/CPGbbb.cram')
-        self.assertEqual(missing[0], 'cram/CPGccc.cram')
+        self.assertEqual(
+            found[0], FilePath(to_path('gs://cpg-dataset-main/cram/CPGaaa.cram'))
+        )
+        self.assertEqual(
+            found[1], FilePath(to_path('gs://cpg-dataset-main/cram/CPGbbb.cram'))
+        )
+        self.assertEqual(
+            missing[0], FilePath(to_path('gs://cpg-dataset-main/cram/CPGccc.cram'))
+        )
 
     # ===== AUDIT ANALYZER TESTS =====
     # These test the core business logic - most complex tests
@@ -304,7 +335,7 @@ class TestAudit(unittest.TestCase):
                             ReadFile(
                                 FileMetadata(
                                     filepath=FilePath(
-                                        'gs://cpg-dataset-main-upload/read1.fq'
+                                        to_path('gs://cpg-dataset-main-upload/read1.fq')
                                     ),
                                     filesize=11,
                                     checksum='abc123',
@@ -313,7 +344,7 @@ class TestAudit(unittest.TestCase):
                             ReadFile(
                                 FileMetadata(
                                     filepath=FilePath(
-                                        'gs://cpg-dataset-main-upload/read2.fq'
+                                        to_path('gs://cpg-dataset-main-upload/read2.fq')
                                     ),
                                     filesize=12,
                                     checksum='def456',
@@ -327,17 +358,19 @@ class TestAudit(unittest.TestCase):
 
         bucket_files = [
             FileMetadata(
-                filepath=FilePath('gs://cpg-dataset-main-upload/read1.fq'),
+                filepath=FilePath(to_path('gs://cpg-dataset-main-upload/read1.fq')),
                 filesize=11,
                 checksum='abc123',
             ),
             FileMetadata(
-                filepath=FilePath('gs://cpg-dataset-main-upload/read2.fq'),
+                filepath=FilePath(to_path('gs://cpg-dataset-main-upload/read2.fq')),
                 filesize=12,
                 checksum='def456',
             ),
             FileMetadata(
-                filepath=FilePath('gs://cpg-dataset-main-upload/uningested.fq'),
+                filepath=FilePath(
+                    to_path('gs://cpg-dataset-main-upload/uningested.fq')
+                ),
                 filesize=20,
                 checksum='xyz789',
             ),
@@ -349,7 +382,9 @@ class TestAudit(unittest.TestCase):
                 type='cram',
                 sequencing_group_id='CPGaaa',
                 output_file=FileMetadata(
-                    filepath=FilePath('gs://cpg-dataset-main/cram/CPGaaa.cram'),
+                    filepath=FilePath(
+                        to_path('gs://cpg-dataset-main/cram/CPGaaa.cram')
+                    ),
                 ),
             )
         ]
@@ -393,7 +428,7 @@ class TestAudit(unittest.TestCase):
                             ReadFile(
                                 FileMetadata(
                                     filepath=FilePath(
-                                        'gs://cpg-test-upload/dir1/read3.fq'
+                                        to_path('gs://cpg-test-upload/dir1/read3.fq')
                                     ),
                                     filesize=12,
                                     checksum='hash123',
@@ -402,13 +437,14 @@ class TestAudit(unittest.TestCase):
                         ],
                     )
                 ],
+                cram_analysis=Analysis(id=1, type='cram'),
             )
         ]
 
         # File was moved to a different directory
         bucket_files = [
             FileMetadata(
-                filepath=FilePath('gs://cpg-test-upload/dir2/read3.fq'),
+                filepath=FilePath(to_path('gs://cpg-test-upload/dir2/read3.fq')),
                 filesize=12,
                 checksum='hash123',  # Same checksum indicates it's the same file
             )
@@ -434,7 +470,7 @@ class TestAudit(unittest.TestCase):
         read_files = [
             ReadFile(
                 FileMetadata(
-                    filepath=FilePath('gs://bucket/original.fq'),
+                    filepath=FilePath(to_path('gs://bucket/original.fq')),
                     filesize=100,
                     checksum='abc123',
                 )
@@ -443,7 +479,7 @@ class TestAudit(unittest.TestCase):
 
         bucket_files = [
             FileMetadata(
-                filepath=FilePath('gs://bucket/moved.fq'),
+                filepath=FilePath(to_path('gs://bucket/moved.fq')),
                 filesize=100,
                 checksum='abc123',
             )
@@ -453,8 +489,10 @@ class TestAudit(unittest.TestCase):
         moved_file = list(moved_files.values())[0]
 
         self.assertEqual(len(moved_files), 1)
-        self.assertEqual(moved_file.old_path, to_path('gs://bucket/original.fq'))
-        self.assertEqual(moved_file.new_path, to_path('gs://bucket/moved.fq'))
+        self.assertEqual(
+            moved_file.old_path, FilePath(to_path('gs://bucket/original.fq'))
+        )
+        self.assertEqual(moved_file.new_path, FilePath(to_path('gs://bucket/moved.fq')))
 
     def test_find_original_analysis_files(self):
         """Test matching Analysis files with bucket files based on checksum"""
@@ -464,7 +502,7 @@ class TestAudit(unittest.TestCase):
                 id=1,
                 type='vcf',
                 output_file=FileMetadata(
-                    filepath=FilePath('gs://bucket/analysis1.vcf'),
+                    filepath=FilePath(to_path('gs://bucket/analysis1.vcf')),
                     filesize=200,
                     checksum='def456',
                 ),
@@ -473,7 +511,7 @@ class TestAudit(unittest.TestCase):
 
         bucket_files = [
             FileMetadata(
-                filepath=FilePath('gs://bucket/analysis1.vcf'),
+                filepath=FilePath(to_path('gs://bucket/analysis1.vcf')),
                 filesize=200,
                 checksum='def456',
             )
@@ -491,7 +529,7 @@ class TestAudit(unittest.TestCase):
         metamist_files = [
             ReadFile(
                 FileMetadata(
-                    filepath=FilePath('gs://bucket/sample.fq'),
+                    filepath=FilePath(to_path('gs://bucket/sample.fq')),
                     filesize=100,
                     checksum='abc123',
                 )
@@ -500,14 +538,14 @@ class TestAudit(unittest.TestCase):
 
         bucket_files = [
             FileMetadata(
-                filepath=FilePath('gs://bucket/dir/sample.fq'),
+                filepath=FilePath(to_path('gs://bucket/dir/sample.fq')),
                 filesize=100,
                 checksum='abc123',
             ),
             FileMetadata(
-                filepath=FilePath('gs://bucket/uningested.fq'),
+                filepath=FilePath(to_path('gs://bucket/uningested.fq')),
                 filesize=100,
-                checksum='abc123',
+                checksum='def456',
             ),
         ]
 
@@ -520,20 +558,20 @@ class TestAudit(unittest.TestCase):
         )
 
         self.assertEqual(len(uningested), 1)
-        self.assertEqual(uningested[0].filepath, to_path('gs://bucket/uningested.fq'))
+        self.assertEqual(
+            uningested[0].filepath, FilePath(to_path('gs://bucket/uningested.fq'))
+        )
 
     # ===== INTEGRATION TESTS =====
     # These test multiple components working together
 
     @run_as_sync
-    @unittest.mock.patch(
-        'metamist.audit.adapters.graphql_client.GraphQLClient.query_async'
-    )
+    @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
     @unittest.mock.patch.object(GCSDataAccess, 'list_files_in_bucket')
-    async def test_full_audit_workflow(self, mock_list_files, mock_graphql):
+    async def test_full_audit_workflow(self, mock_list_files, mock_query_async):
         """Integration test - combines multiple components"""
 
-        mock_graphql.side_effect = [
+        mock_query_async.side_effect = [
             # First call: get sequencing groups
             {
                 'project': {

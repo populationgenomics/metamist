@@ -227,7 +227,7 @@ class AuditAnalyzer:
         for sg in sequencing_groups:
             for assay in sg.assays:
                 for read_file in assay.read_files:
-                    path = str(read_file.filepath)
+                    path = read_file.filepath.uri
                     path_to_sg_assay[path] = (sg, assay.id)
 
         # Create entries for moved files
