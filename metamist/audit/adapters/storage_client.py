@@ -5,7 +5,7 @@ from typing import cast
 from google.cloud import storage
 from cpg_utils import to_path
 
-from ..models import FileMetadata, FilePath
+from metamist.audit.models import FileMetadata, FilePath
 
 
 class StorageClient:

@@ -6,10 +6,9 @@ from io import StringIO
 
 from cpg_utils import Path, to_path
 
-from ..data_access import GCSDataAccess
 from .audit_logging import AuditLogs
-
-from ..models import (
+from metamist.audit.data_access import GCSDataAccess
+from metamist.audit.models import (
     AuditResult,
     ReviewResult,
     DeletionResult,

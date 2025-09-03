@@ -2,9 +2,9 @@
 
 import click
 
-from ..data_access.gcs_data_access import GCSDataAccess
-from ..models import AuditReportEntry, ReviewResult
-from ..services import AuditLogs, ReportGenerator
+from metamist.audit.data_access.gcs_data_access import GCSDataAccess
+from metamist.audit.models import AuditReportEntry, ReviewResult
+from metamist.audit.services import AuditLogs, ReportGenerator
 
 from cpg_utils import to_path
 

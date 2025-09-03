@@ -2,16 +2,9 @@
 
 import click
 
-from ..data_access import GCSDataAccess, MetamistDataAccess
-from ..models import AuditReportEntry, DeletionResult
-from ..services import AuditLogs, ReportGenerator
-
-from metamist.apis import AnalysisApi
-from metamist.models import (
-    Analysis,
-    AnalysisStatus,
-    AnalysisUpdateModel,
-)
+from metamist.audit.data_access import GCSDataAccess, MetamistDataAccess
+from metamist.audit.models import AuditReportEntry, DeletionResult
+from metamist.audit.services import AuditLogs, ReportGenerator
 
 from cpg_utils import to_path
 
@@ -40,8 +33,10 @@ def delete_from_audit_results(
 
     if not dry_run:
         upsert_deleted_files_analysis(
-            dataset, report_name, str(deletion_report), stats, audit_logs
+            dataset, report_name, deletion_report.as_uri(), stats, audit_logs
         )
+
+    audit_logs.info_nl(f'Finished processing deletes from report: {report_name}')
 
 
 def delete_files_from_report(
@@ -112,28 +107,19 @@ async def upsert_deleted_files_analysis(
         dataset, deletion_report_path
     ):
         audit_logs.info_nl(
-            f'Found existing analysis record for {deletion_report_path}, ID: {existing_analysis["id"]}. Updating...'
+            f'Found existing analysis record (ID: {existing_analysis["id"]}) for {deletion_report_path}. Updating...'
         )
-        analysis_update = AnalysisUpdateModel(
-            status=AnalysisStatus('completed'),
-            output=existing_analysis['output'],
-            meta=existing_analysis['meta'] | {audited_report_name: stats},
+        await MetamistDataAccess().update_audit_deletion_analysis(
+            existing_analysis, audited_report_name, stats
         )
-        AnalysisApi().update_analysis(existing_analysis['id'], analysis_update)
+        audit_logs.info_nl(f'Updated analysis {existing_analysis["id"]}.')
 
     else:
-        audit_logs.info_nl(
-            f'No existing analysis record for {deletion_report_path}. Creating new record...'
+        audit_logs.info_nl(f'Creating new record for {deletion_report_path}')
+        aid = await MetamistDataAccess().create_audit_deletion_analysis(
+            dataset, audited_report_name, deletion_report_path, stats
         )
-        analysis = Analysis(
-            type='audit_deletion',
-            output=str(deletion_report_path),
-            status=AnalysisStatus('completed'),
-            meta={audited_report_name: stats},
-        )
-        AnalysisApi().create_analysis(dataset, analysis)
-
-    audit_logs.info_nl(f'Upserted analysis record for {deletion_report_path}')
+        audit_logs.info_nl(f'Created analysis {aid}.')
 
 
 @click.command()

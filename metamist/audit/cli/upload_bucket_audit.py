@@ -5,9 +5,9 @@ import click
 from collections import defaultdict
 from types import SimpleNamespace
 
-from ..models import AuditConfig, SequencingGroup
-from ..data_access import MetamistDataAccess, GCSDataAccess
-from ..services import AuditAnalyzer, AuditLogs, ReportGenerator
+from metamist.audit.data_access import MetamistDataAccess, GCSDataAccess
+from metamist.audit.models import AuditConfig, SequencingGroup
+from metamist.audit.services import AuditAnalyzer, AuditLogs, ReportGenerator
 
 
 class AuditOrchestrator:

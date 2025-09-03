@@ -2,8 +2,8 @@
 
 from cpg_utils.config import config_retrieve, dataset_path
 
-from ..models import FileMetadata, FileType, FilePath
-from ..adapters import StorageClient
+from metamist.audit.models import FileMetadata, FileType, FilePath
+from metamist.audit.adapters import StorageClient
 
 
 class GCSDataAccess:

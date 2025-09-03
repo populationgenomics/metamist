@@ -3,9 +3,9 @@
 from datetime import datetime
 from cpg_utils import to_path
 
-from ..models import (
+from metamist.audit.models import (
     SequencingGroup,
-    Analysis,
+    Analysis as AuditAnalysis,
     Assay,
     Sample,
     Participant,
@@ -15,7 +15,14 @@ from ..models import (
     ExternalIds,
     AuditConfig,
 )
-from ..adapters import GraphQLClient
+from metamist.audit.adapters import GraphQLClient
+
+from metamist.apis import AnalysisApi
+from metamist.models import (
+    Analysis,
+    AnalysisStatus,
+    AnalysisUpdateModel,
+)
 
 
 class MetamistDataAccess:
@@ -57,7 +64,7 @@ class MetamistDataAccess:
 
     async def get_analyses_for_sequencing_groups(
         self, dataset: str, sg_ids: list[str], analysis_types: list[str]
-    ) -> list[Analysis]:
+    ) -> list[AuditAnalysis]:
         """
         Fetch analyses for sequencing groups.
 
@@ -85,7 +92,7 @@ class MetamistDataAccess:
 
     async def get_latest_cram_analyses(
         self, dataset: str, sg_ids: list[str]
-    ) -> dict[str, Analysis]:
+    ) -> dict[str, AuditAnalysis]:
         """
         Get the latest CRAM analysis for each sequencing group.
 
@@ -101,7 +108,7 @@ class MetamistDataAccess:
         )
 
         # Group by SG and find latest
-        analyses_by_sg: dict[str, list[Analysis]] = {}
+        analyses_by_sg: dict[str, list[AuditAnalysis]] = {}
         for analysis in analyses:
             if analysis.sequencing_group_id:
                 if analysis.sequencing_group_id not in analyses_by_sg:
@@ -153,6 +160,54 @@ class MetamistDataAccess:
         """
         return await self.graphql_client.get_audit_deletion_analyses(dataset)
 
+    async def create_audit_deletion_analysis(
+        self,
+        dataset: str,
+        audited_report_name: str,
+        deletion_report_path: str,
+        stats: dict,
+    ) -> int:
+        """
+        Create a new audit deletion analysis.
+
+        Args:
+            dataset: Dataset name
+            audited_report_name: Name of the audited report
+            deletion_report_path: Path to the deletion report
+            stats: Statistics for the analysis
+        """
+        analysis = Analysis(
+            type='audit_deletion',
+            output=deletion_report_path,
+            status=AnalysisStatus('completed'),
+            meta={audited_report_name: stats},
+        )
+        return await AnalysisApi().create_analysis_async(dataset, analysis)
+
+    async def update_audit_deletion_analysis(
+        self,
+        existing_analysis: dict,
+        audited_report_name: str,
+        stats: dict,
+    ) -> None:
+        """
+        Upsert a specific audit deletion analysis.
+
+        Args:
+            dataset: Dataset name
+            existing_analysis: Existing analysis dict
+            audited_report_name: Name of the audited report
+            stats: Statistics for the analysis
+        """
+        analysis_update = AnalysisUpdateModel(
+            status=AnalysisStatus('completed'),
+            output=existing_analysis['output'],
+            meta=existing_analysis['meta'] | {audited_report_name: stats},
+        )
+        await AnalysisApi().update_analysis_async(
+            existing_analysis['id'], analysis_update
+        )
+
     async def get_enum_values(self, enum_type: str) -> list[str]:
         """
         Get valid values for an enum type.
@@ -164,6 +219,54 @@ class MetamistDataAccess:
             List of valid enum values
         """
         return await self.graphql_client.get_enum_values(enum_type)
+
+    async def validate_metamist_enums(
+        self,
+        config: 'AuditConfig',
+    ) -> 'AuditConfig':
+        """
+        Validate enum values against Metamist API.
+
+        Args:
+            metamist: Metamist data access object
+
+        Returns:
+            Validated configuration
+        """
+
+        async def validate_enum_value(enum_type: str, config_values: tuple[str]) -> str:
+            valid_values = await self.graphql_client.get_enum_values(enum_type)
+            if 'all' in config_values:
+                return valid_values
+            if any(value.lower() not in valid_values for value in config_values):
+                raise ValueError(
+                    f"Invalid {enum_type} values: {', '.join(config_values)}. "
+                    f"Valid values are: {', '.join(valid_values)}."
+                )
+            return tuple(config_values)
+
+        sequencing_types = await validate_enum_value(
+            'sequencing_type', config.sequencing_types
+        )
+        sequencing_techs = await validate_enum_value(
+            'sequencing_technology', config.sequencing_technologies
+        )
+        sequencing_platforms = await validate_enum_value(
+            'sequencing_platform', config.sequencing_platforms
+        )
+        analysis_types = await validate_enum_value(
+            'analysis_type', config.analysis_types
+        )
+
+        return AuditConfig(
+            dataset=config.dataset,
+            sequencing_types=sequencing_types,
+            sequencing_technologies=sequencing_techs,
+            sequencing_platforms=sequencing_platforms,
+            analysis_types=analysis_types,
+            file_types=config.file_types,
+            excluded_prefixes=config.excluded_prefixes,
+        )
 
     def _parse_sequencing_group(self, data: dict) -> SequencingGroup:
         """Parse raw sequencing group data into entity."""
@@ -239,7 +342,7 @@ class MetamistDataAccess:
         except (ValueError, AttributeError):
             return None
 
-    def _parse_analysis(self, data: dict, sg_id: str) -> Analysis | None:
+    def _parse_analysis(self, data: dict, sg_id: str) -> AuditAnalysis | None:
         """Parse raw analysis data into entity."""
         # Handle different output formats
         output_path = None
@@ -262,7 +365,7 @@ class MetamistDataAccess:
                 filepath=file_path, filesize=output_size, checksum=output_checksum
             )
 
-            return Analysis(
+            return AuditAnalysis(
                 id=data['id'],
                 type=data['type'],
                 output_file=output_file,
@@ -281,51 +384,3 @@ class MetamistDataAccess:
             return datetime.strptime(timestamp_str, '%Y-%m-%dT%H:%M:%S')
         except ValueError:
             return datetime.min
-
-    async def validate_metamist_enums(
-        self,
-        config: 'AuditConfig',
-    ) -> 'AuditConfig':
-        """
-        Validate enum values against Metamist API.
-
-        Args:
-            metamist: Metamist data access object
-
-        Returns:
-            Validated configuration
-        """
-
-        async def validate_enum_value(enum_type: str, config_values: tuple[str]) -> str:
-            valid_values = await self.graphql_client.get_enum_values(enum_type)
-            if 'all' in config_values:
-                return valid_values
-            if any(value.lower() not in valid_values for value in config_values):
-                raise ValueError(
-                    f"Invalid {enum_type} values: {', '.join(config_values)}. "
-                    f"Valid values are: {', '.join(valid_values)}."
-                )
-            return tuple(config_values)
-
-        sequencing_types = await validate_enum_value(
-            'sequencing_type', config.sequencing_types
-        )
-        sequencing_techs = await validate_enum_value(
-            'sequencing_technology', config.sequencing_technologies
-        )
-        sequencing_platforms = await validate_enum_value(
-            'sequencing_platform', config.sequencing_platforms
-        )
-        analysis_types = await validate_enum_value(
-            'analysis_type', config.analysis_types
-        )
-
-        return AuditConfig(
-            dataset=config.dataset,
-            sequencing_types=sequencing_types,
-            sequencing_technologies=sequencing_techs,
-            sequencing_platforms=sequencing_platforms,
-            analysis_types=analysis_types,
-            file_types=config.file_types,
-            excluded_prefixes=config.excluded_prefixes,
-        )

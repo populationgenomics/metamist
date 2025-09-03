@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from ..models import Analysis, FileMetadata, ReadFile, MovedFile
+from metamist.audit.models import Analysis, FileMetadata, ReadFile, MovedFile
 
 
 class FileMatcher(ABC):
