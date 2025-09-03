@@ -8,6 +8,7 @@ import { BarChart, IData } from '../../shared/components/Graphs/BarChart'
 import { DonutChart } from '../../shared/components/Graphs/DonutChart'
 import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
+import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { exportTable } from '../../shared/utilities/exportTable'
 import { convertFieldName } from '../../shared/utilities/fieldName'
 import generateUrl from '../../shared/utilities/generateUrl'
@@ -569,8 +570,9 @@ const BillingCostByTime: React.FunctionComponent = () => {
         if (isLoading) {
             return (
                 <div>
-                    <p style={{ textAlign: 'center', marginTop: '20px' }}>
-                        <em>Loading data...</em>
+                    <LoadingDucks />
+                    <p style={{ textAlign: 'center', marginTop: '5px' }}>
+                        <em>This query takes a while...</em>
                     </p>
                 </div>
             )
@@ -681,12 +683,12 @@ const BillingCostByTime: React.FunctionComponent = () => {
             // For GCP Project grouping, use project selector logic
             if (groupBy === BillingColumn.GcpProject) {
                 const queryModel = buildFilteredQueryModel(selectedProjects, [])
-                getData(queryModel)
+                debouncedGetData(queryModel)
             }
             // For Topic grouping, use topic selector logic
             else if (groupBy === BillingColumn.Topic) {
                 const queryModel = buildFilteredQueryModel([], selectedTopics)
-                getData(queryModel)
+                debouncedGetData(queryModel)
             }
             // For other groupings, use the existing selectedData logic
             else if (selectedData !== undefined && selectedData !== '' && selectedData !== null) {
@@ -733,7 +735,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [start, end, groupBy, selectedData])
+    }, [start, end, groupBy, selectedData, selectedProjects, selectedTopics, debouncedGetData])
 
     const exportToFile = (
         format: 'csv' | 'tsv',

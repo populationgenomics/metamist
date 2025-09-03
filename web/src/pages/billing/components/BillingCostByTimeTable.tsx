@@ -574,7 +574,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                     style={{
                         height: Math.min(
                             600,
-                            Math.max(200, virtuosoBreakdownData.length * 45 + 100)
+                            Math.max(200, virtuosoBreakdownData.length * 50 + 100)
                         ),
                         backgroundColor: 'white',
                     }}
@@ -707,7 +707,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
             ) : (
                 <TableVirtuoso
                     style={{
-                        height: Math.min(600, Math.max(200, virtuosoSummaryData.length * 45 + 100)),
+                        height: Math.min(600, Math.max(200, virtuosoSummaryData.length * 50 + 100)),
                         backgroundColor: 'white',
                     }}
                     data={virtuosoSummaryData}

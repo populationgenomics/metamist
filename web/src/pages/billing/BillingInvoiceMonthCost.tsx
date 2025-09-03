@@ -21,6 +21,7 @@ import {
 } from '../../shared/components/ColumnVisibilityDropdown'
 import { HorizontalStackedBarChart } from '../../shared/components/Graphs/HorizontalStackedBarChart'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
+import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import Table from '../../shared/components/Table'
 import { exportTable } from '../../shared/utilities/exportTable'
 import { convertFieldName } from '../../shared/utilities/fieldName'
@@ -718,7 +719,9 @@ const BillingCurrentCost = () => {
                 )
             })()}
 
-            {!showAsChart ? (
+            {!showAsChart && isLoading ? <LoadingDucks /> : null}
+
+            {!showAsChart && !isLoading ? (
                 <Table celled compact sortable>
                     <SUITable.Header>
                         <SUITable.Row>
