@@ -7,7 +7,7 @@ from io import StringIO
 from cpg_utils import Path, to_path
 
 from ..data_access import GCSDataAccess
-from ..services import AuditLogs
+from .audit_logging import AuditLogs
 
 from ..models import (
     AuditResult,
@@ -55,6 +55,9 @@ class ReportGenerator:
             config: Audit configuration
             output_prefix: Optional prefix for output paths
         """
+        self.audit_logs.info_nl(
+            f'Target: gs://{self.gcs_data.analysis_bucket}/{self.output_dir}/'
+        )
 
         self._write_audit_config(f'{self.output_dir}/audit_config.txt', config)
 
@@ -86,10 +89,6 @@ class ReportGenerator:
                 f'{self.output_dir}/unaligned_sgs.tsv',
                 audit_result.unaligned_sequencing_groups,
             )
-
-        self.audit_logs.info_nl(
-            f'Reports written to gs://{self.gcs_data.analysis_bucket}/{self.output_dir}'
-        )
 
     def write_reviewed_files_report(
         self,
@@ -132,6 +131,7 @@ class ReportGenerator:
         buffer = StringIO()
 
         lines = [
+            f'Dataset: {config.dataset}',
             f"Sequencing Types: {', '.join(sorted(config.sequencing_types))}",
             f"Sequencing Technologies: {', '.join(sorted(config.sequencing_technologies))}",
             f"Sequencing Platforms: {', '.join(sorted(config.sequencing_platforms))}",
@@ -142,6 +142,7 @@ class ReportGenerator:
             lines.append(
                 f"Excluded Prefixes: {', '.join(sorted(config.excluded_prefixes))}"
             )
+        lines.append('')
 
         buffer.write('\n'.join(lines))
 
@@ -149,7 +150,7 @@ class ReportGenerator:
         self.gcs_data.storage.upload_from_buffer(blob, buffer)
 
         self.audit_logs.info_nl(
-            f'Metadata report written to gs://{self.gcs_data.analysis_bucket}/{blob_path}'
+            f'{"AUDIT CONFIG":<20}: gs://{self.gcs_data.analysis_bucket}/{blob_path}'
         )
 
     def _write_csv_report(
@@ -159,8 +160,6 @@ class ReportGenerator:
         report_name: str,
     ) -> Path:
         """Create or update a CSV report for audit entries."""
-        self.audit_logs.info(f'Writing {report_name} report.')
-
         fieldnames = entries[0].fieldnames()
         rows = [entry.to_report_dict() for entry in entries]
         if report_name == 'FILES TO DELETE':
@@ -168,8 +167,8 @@ class ReportGenerator:
 
         blob = self.gcs_data.storage.get_blob(self.gcs_data.analysis_bucket, blob_path)
         output_path = f'gs://{self.gcs_data.analysis_bucket}/{blob_path}'
-        if blob and blob.size > 0:
-            self.audit_logs.info_nl(
+        if blob.exists() and blob.size > 0:
+            self.audit_logs.info(
                 f'Existing report found, appending new rows to: {output_path}'
             )
             existing_data = blob.download_as_text(encoding='utf-8-sig')
@@ -177,8 +176,6 @@ class ReportGenerator:
             reader = csv.DictReader(buffer)
             rows = list(reader) + rows
             buffer.close()
-        else:
-            self.audit_logs.info_nl(f'Creating new report at: {output_path}')
 
         buffer = StringIO()
         writer = csv.DictWriter(buffer, fieldnames=fieldnames)
@@ -189,7 +186,7 @@ class ReportGenerator:
         self.gcs_data.storage.upload_from_buffer(blob, buffer, 'text/csv')
 
         self.audit_logs.info_nl(
-            f'{report_name}: {len(entries)} entries written to {output_path}'
+            f'{report_name:<20}: {output_path} ({len(entries)} entries)'
         )
 
         return to_path(output_path)
@@ -252,9 +249,8 @@ class ReportGenerator:
         self.gcs_data.storage.upload_from_buffer(
             blob, buffer, 'text/tab-separated-values'
         )
-        self.audit_logs.info(
-            f'UNALIGNED SEQUENCING GROUPS: {len(unaligned_sgs)} entries written to '
-            f'gs://{self.gcs_data.analysis_bucket}/{blob_path}'
+        self.audit_logs.info_nl(
+            f'{"UNALIGNED SGS":<20}: gs://{self.gcs_data.analysis_bucket}/{blob_path} ({len(unaligned_sgs)} entries)'
         )
 
     def write_log_file(self, log_file: str, save_path: str):
@@ -262,6 +258,7 @@ class ReportGenerator:
         # Upload the log file to GCS
         blob = self.gcs_data.storage.get_blob(self.gcs_data.analysis_bucket, save_path)
         blob.upload_from_filename(log_file)
+        return to_path(f'gs://{self.gcs_data.analysis_bucket}/{save_path}')
 
     def get_report_rows(self, report_path: Path) -> list[AuditReportEntry]:
         """Retrieve rows from the audit report CSV."""
@@ -298,8 +295,7 @@ class ReportGenerator:
             Dictionary of statistics
         """
         total_size_to_delete = sum(
-            entry.filesize or 0
-            for entry in audit_result.files_to_delete + audit_result.moved_files
+            entry.filesize or 0 for entry in audit_result.files_to_delete
         )
 
         total_size_to_review = sum(
@@ -309,7 +305,6 @@ class ReportGenerator:
         return {
             'files_to_delete': len(audit_result.files_to_delete),
             'files_to_delete_size_gb': total_size_to_delete / (1024**3),
-            'moved_files': len(audit_result.moved_files),
             'files_to_review': len(audit_result.files_to_review),
             'files_to_review_size_gb': total_size_to_review / (1024**3),
             'unaligned_sgs': len(audit_result.unaligned_sequencing_groups),

@@ -64,7 +64,7 @@ class StorageClient:
         """
         prefixes = set()
         for p in paths:
-            prefixes.add(p.blob.rsplit('/', 1)[0])
+            prefixes.add(p.blob.rsplit('/', 1)[0] + '/')
         bucket_blobs = self.find_blobs(bucket_name, prefixes)
         return [p for p in paths if p in [b.filepath for b in bucket_blobs]]
 
@@ -90,10 +90,10 @@ class StorageClient:
         bucket = self.get_bucket(bucket_name)
 
         files = []
+        if not prefixes:
+            prefixes = {None}
         for prefix in prefixes:
-            for item in self.client.list_blobs(
-                bucket, prefix=prefix + ('/' if not prefix.endswith('/') else '')
-            ):
+            for item in self.client.list_blobs(bucket, prefix=prefix):
                 blob = cast(storage.Blob, item)
                 # Skip if file doesn't match extensions
                 if file_extensions and not blob.name.endswith(file_extensions):

@@ -29,6 +29,7 @@ __all__ = [
     'delete_from_audit_results',
     'delete_files_from_report',
     'upsert_deleted_files_analysis',
+    'review_main',
     'review_audit_report',
     'review_filtered_files',
     'parse_filter_expressions',

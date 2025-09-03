@@ -4,7 +4,7 @@ Metamist Audit Module
 This module provides tools for auditing Metamist datasets and their associated
 cloud storage buckets. The primary use case is identifying:
 - Files that can be safely deleted (e.g., original reads where CRAMs exist)
-- Files that need ingestion into Metamist
+- Files that need review (could require ingestion into Metamist, could require deletion)
 - Sequencing groups requiring processing
 
 Architecture:
@@ -39,6 +39,8 @@ from .models import (
     ReadFile,
     AuditReportEntry,
     AuditResult,
+    ReviewResult,
+    DeletionResult,
     # Value objects
     AuditConfig,
     FileType,
@@ -82,8 +84,11 @@ __all__ = [
     # Results
     'AuditResult',
     'AuditReportEntry',
+    'ReviewResult',
+    'DeletionResult',
     # Services
     'AuditAnalyzer',
+    'AuditLogs',
     'ReportGenerator',
     'FileMatchingService',
     # Value objects

@@ -13,6 +13,7 @@ from ..models import (
     FileMetadata,
     FilePath,
     ExternalIds,
+    AuditConfig,
 )
 from ..adapters import GraphQLClient
 
@@ -280,3 +281,51 @@ class MetamistDataAccess:
             return datetime.strptime(timestamp_str, '%Y-%m-%dT%H:%M:%S')
         except ValueError:
             return datetime.min
+
+    async def validate_metamist_enums(
+        self,
+        config: 'AuditConfig',
+    ) -> 'AuditConfig':
+        """
+        Validate enum values against Metamist API.
+
+        Args:
+            metamist: Metamist data access object
+
+        Returns:
+            Validated configuration
+        """
+
+        async def validate_enum_value(enum_type: str, config_values: tuple[str]) -> str:
+            valid_values = await self.graphql_client.get_enum_values(enum_type)
+            if 'all' in config_values:
+                return valid_values
+            if any(value.lower() not in valid_values for value in config_values):
+                raise ValueError(
+                    f"Invalid {enum_type} values: {', '.join(config_values)}. "
+                    f"Valid values are: {', '.join(valid_values)}."
+                )
+            return tuple(config_values)
+
+        sequencing_types = await validate_enum_value(
+            'sequencing_type', config.sequencing_types
+        )
+        sequencing_techs = await validate_enum_value(
+            'sequencing_technology', config.sequencing_technologies
+        )
+        sequencing_platforms = await validate_enum_value(
+            'sequencing_platform', config.sequencing_platforms
+        )
+        analysis_types = await validate_enum_value(
+            'analysis_type', config.analysis_types
+        )
+
+        return AuditConfig(
+            dataset=config.dataset,
+            sequencing_types=sequencing_types,
+            sequencing_technologies=sequencing_techs,
+            sequencing_platforms=sequencing_platforms,
+            analysis_types=analysis_types,
+            file_types=config.file_types,
+            excluded_prefixes=config.excluded_prefixes,
+        )

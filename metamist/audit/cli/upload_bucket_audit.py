@@ -59,22 +59,14 @@ class AuditOrchestrator:
 
         # 2. Fetch analyses for sequencing groups
         self.audit_logs.info_nl('Getting analyses'.center(50, '~'))
+        self.audit_logs.info_nl(f'Target: gs://{self.gcs.main_bucket}/')
         sg_ids = [sg.id for sg in sgs]
         analyses = await self.metamist.get_analyses_for_sequencing_groups(
             config.dataset, sg_ids, list(config.analysis_types)
         )
         self.audit_logs.info_nl(f'Found {len(analyses)} analyses')
 
-        # 3. Get bucket name and list files
-        self.audit_logs.info_nl('Scanning upload bucket'.center(50, '~'))
-        self.audit_logs.info_nl(f'Target: gs://{self.gcs.upload_bucket}')
-
-        bucket_files = self.gcs.list_files_in_bucket(
-            self.gcs.upload_bucket, list(config.file_types), config.excluded_prefixes
-        )
-        self.audit_logs.info_nl(f'Found {len(bucket_files)} files in bucket')
-
-        # 4. Validate CRAM files exist
+        # 3. Validate CRAM files exist
         if analyses:
             self.audit_logs.info_nl('Validating analysis existence'.center(50, '~'))
             cram_paths = [
@@ -86,6 +78,15 @@ class AuditOrchestrator:
 
             self.audit_logs.info_nl(f'Validated {len(found)} CRAM files')
 
+        # 4. Get upload bucket files
+        self.audit_logs.info_nl('Scanning upload bucket'.center(50, '~'))
+        self.audit_logs.info_nl(f'Target: gs://{self.gcs.upload_bucket}/')
+
+        bucket_files = self.gcs.list_files_in_bucket(
+            self.gcs.upload_bucket, list(config.file_types), config.excluded_prefixes
+        )
+        self.audit_logs.info_nl(f'Found {len(bucket_files)} files in bucket')
+
         # 5. Run analysis
         self.audit_logs.info_nl('Analyzing audit data'.center(50, '~'))
         result = self.analyzer.analyze_sequencing_groups(
@@ -93,19 +94,20 @@ class AuditOrchestrator:
             bucket_files,
             analyses,
         )
-        self.audit_logs.info_nl('Analysis complete!')
+        self.audit_logs.info_nl('Analysis complete.')
 
         # 6. Log summary
         self._log_summary(result)
 
         # 7. Write reports and log to the analysis bucket
-        self.audit_logs.info('Writing reports'.center(50, '~'))
-        self.reporter.write_audit_reports(result, self.gcs.analysis_bucket, config)
-        self.reporter.write_log_file(
+        self.audit_logs.info_nl('Writing reports'.center(50, '~'))
+        self.reporter.write_audit_reports(result, config)
+
+        self.audit_logs.info_nl('Upload bucket audit complete!')
+        log_file_path = self.reporter.write_log_file(
             self.audit_logs.log_file, f'{self.reporter.output_dir}/log.txt'
         )
-
-        self.audit_logs.info('Upload bucket audit complete!')
+        self.audit_logs.info_nl(f'Wrote log to {log_file_path}')
 
     def _log_initialization(self, config: AuditConfig):
         """Log audit initialization details."""
@@ -149,31 +151,33 @@ class AuditOrchestrator:
         """Log audit result summary."""
         stats = self.reporter.generate_summary_statistics(result)
 
-        self.audit_logs.info('Audit Summary'.center(50, '~'))
+        # self.audit_logs.info_nl('Audit Summary'.center(50, '~'))
         self.audit_logs.info(
-            f'Files to delete: {stats["files_to_delete"]} '
+            f'Files to delete:           {stats["files_to_delete"]} '
             f'({stats["files_to_delete_size_gb"]:.2f} GB)'
         )
-        self.audit_logs.info(f'Moved files: {stats["moved_files"]}')
         self.audit_logs.info(
-            f'Files to ingest: {stats["files_to_ingest"]} '
-            f'({stats["files_to_ingest_size_gb"]:.2f} GB)'
+            f'Files to review:           {stats["files_to_review"]} '
+            f'({stats["files_to_review_size_gb"]:.2f} GB)'
         )
-        self.audit_logs.info(f'Unaligned SGs: {stats["unaligned_sgs"]}')
-        self.audit_logs.info('')
+        self.audit_logs.info_nl(f'Unaligned SGs:             {stats["unaligned_sgs"]}')
 
 
-async def audit_upload_bucket_async(audit: AuditConfig):
+async def audit_upload_bucket_async(config_args: SimpleNamespace):
     """
     Async entry point for upload bucket audit.
 
     Args:
         audit: Audit configuration
     """
-    audit_logs = AuditLogs(audit.dataset, 'upload_bucket_audit')
     metamist = MetamistDataAccess()
+    audit = await metamist.validate_metamist_enums(
+        AuditConfig.from_cli_args(config_args)
+    )
+
+    audit_logs = AuditLogs(audit.dataset, 'upload_bucket_audit')
     gcs = GCSDataAccess(audit.dataset)
-    reporter = ReportGenerator(gcs, audit.results_folder, audit_logs)
+    reporter = ReportGenerator(gcs, audit_logs, audit.results_folder)
     orchestrator = AuditOrchestrator(
         metamist_data_access=metamist,
         gcs_data_access=gcs,
@@ -258,7 +262,7 @@ def main(
     results_folder: str | None = None,
 ):
     """Run upload bucket audit for a Metamist dataset."""
-    args = SimpleNamespace(
+    config_args = SimpleNamespace(
         dataset=dataset,
         sequencing_types=sequencing_types,
         sequencing_technologies=sequencing_technologies,
@@ -268,10 +272,9 @@ def main(
         excluded_prefixes=excluded_prefixes,
         results_folder=results_folder,
     )
-    config = AuditConfig.from_cli_args(args)
 
     # Run audit
-    audit_upload_bucket(config)
+    audit_upload_bucket(config_args)
 
 
 if __name__ == '__main__':
