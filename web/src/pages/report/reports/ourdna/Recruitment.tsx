@@ -103,6 +103,7 @@ export default function Recruitment() {
                                     fill: 'collection_type',
                                     inset: 0.5,
                                     tip: true,
+                                    order: '-sum',
                                 })
                             ),
                         ],
