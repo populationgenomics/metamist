@@ -40,6 +40,83 @@ const PROCESS_DURATION_QUERY = `
     from times
 `
 
+function ProcessingTimesByCollectionDay(props: { eventType: string; eventTypeTitle: string }) {
+    return (
+        <ReportItemPlot
+            height={ROW_HEIGHT}
+            flexBasis={480}
+            flexGrow={1}
+            title={`${props.eventTypeTitle} processing times by collection day`}
+            description="Processing time by the day the sample was collected"
+            project={PROJECT}
+            query={[
+                {
+                    name: 'durations',
+                    query: PROCESS_DURATION_QUERY,
+                },
+                {
+                    name: 'result',
+                    query: `
+                        select
+                            count(distinct participant_id) as count,
+                            day,
+                            CASE
+                                WHEN duration < 24 THEN '0-24 hours'
+                                WHEN duration >= 24 AND duration < 36 THEN '24-36 hours'
+                                WHEN duration >= 36 AND duration < 48 THEN '36-48 hours'
+                                WHEN duration >= 48 AND duration < 72 THEN '48-72 hours'
+                                ELSE '72+ hours'
+                            END AS duration,
+                            event_type
+                        from durations
+                        where event_type = '${props.eventType}'
+                        and duration is not null
+                        group by 2, 3, 4 order by 3, 2, 4
+                    `,
+                },
+            ]}
+            plot={(data) => ({
+                marginTop: 20,
+                marginRight: 0,
+                marginBottom: 40,
+                marginLeft: 0,
+                color: {
+                    scheme: 'RdYlGn',
+                    legend: true,
+                    reverse: true,
+                },
+                x: {
+                    axis: null,
+                },
+                y: {
+                    axis: null,
+                },
+                fx: {
+                    domain: [
+                        'Monday',
+                        'Tuesday',
+                        'Wednesday',
+                        'Thursday',
+                        'Friday',
+                        'Saturday',
+                        'Sunday',
+                    ],
+                },
+                marks: [
+                    Plot.frame({ stroke: '#ccc' }),
+                    Plot.barY(data, {
+                        x: 'duration',
+                        y: 'count',
+                        fill: 'duration',
+                        tip: true,
+                        fx: 'day',
+                    }),
+                ],
+            })}
+        />
+    )
+}
+
 export default function ProcessingTimes() {
     return (
         <Report>
@@ -141,76 +218,12 @@ export default function ProcessingTimes() {
                     })}
                 />
             </ReportRow>
+
             <ReportRow>
-                <ReportItemPlot
-                    height={ROW_HEIGHT * 2}
-                    flexGrow={1}
-                    title="Processing times by collection day"
-                    description="Processing time by the day the sample was collected and the type of event"
-                    project={PROJECT}
-                    query={[
-                        {
-                            name: 'durations',
-                            query: PROCESS_DURATION_QUERY,
-                        },
-                        {
-                            name: 'result',
-                            query: `
-                                select
-                                    count(distinct participant_id) as count,
-                                    day,
-                                    CASE
-                                        WHEN duration < 24 THEN '0-24 hours'
-                                        WHEN duration >= 24 AND duration < 36 THEN '24-36 hours'
-                                        WHEN duration >= 36 AND duration < 48 THEN '36-48 hours'
-                                        WHEN duration >= 48 AND duration < 72 THEN '48-72 hours'
-                                        WHEN duration is null THEN 'unknown'
-                                        ELSE '72+ hours'
-                                    END AS duration,
-                                    event_type
-                                from durations group by 2, 3, 4 order by 3, 2, 4
-                            `,
-                        },
-                    ]}
-                    plot={(data) => ({
-                        marginTop: 20,
-                        marginRight: 0,
-                        marginBottom: 40,
-                        marginLeft: 80,
-                        color: {
-                            scheme: 'RdYlGn',
-                            legend: true,
-                            reverse: true,
-                        },
-                        x: {
-                            axis: null,
-                        },
-                        y: {
-                            axis: null,
-                        },
-                        fy: {
-                            domain: [
-                                'Monday',
-                                'Tuesday',
-                                'Wednesday',
-                                'Thursday',
-                                'Friday',
-                                'Saturday',
-                                'Sunday',
-                            ],
-                        },
-                        marks: [
-                            Plot.frame({ stroke: '#ccc' }),
-                            Plot.barY(data, {
-                                x: 'duration',
-                                y: 'count',
-                                fill: 'duration',
-                                tip: true,
-                                fy: 'day',
-                                fx: 'event_type',
-                            }),
-                        ],
-                    })}
+                <ProcessingTimesByCollectionDay eventType="walk-in" eventTypeTitle="Walk in" />
+                <ProcessingTimesByCollectionDay
+                    eventType="one-stop-shop"
+                    eventTypeTitle="One stop shop"
                 />
             </ReportRow>
             <ReportRow>
