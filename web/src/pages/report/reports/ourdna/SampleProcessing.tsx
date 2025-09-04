@@ -15,6 +15,7 @@ const PROCESS_DURATION_QUERY = `
             coalesce(s.meta_processing_site, 'unknown') as processing_site,
             coalesce(s.meta_collection_event_type, 'unknown') as event_type,
             try_strptime(meta_collection_datetime, '%Y-%m-%dT%H:%M:%S') as collection_time,
+            dayname(try_strptime(meta_collection_datetime, '%Y-%m-%dT%H:%M:%S')) as day,
             s.external_id as sample_agd_id,
             -- The most important sample derivative to track the processing time of is PBMC
             try_strptime((
@@ -142,6 +143,78 @@ export default function ProcessingTimes() {
             </ReportRow>
             <ReportRow>
                 <ReportItemPlot
+                    height={ROW_HEIGHT * 2}
+                    flexGrow={1}
+                    title="Processing times by collection day"
+                    description="Processing time by the day the sample was collected and the type of event"
+                    project={PROJECT}
+                    query={[
+                        {
+                            name: 'durations',
+                            query: PROCESS_DURATION_QUERY,
+                        },
+                        {
+                            name: 'result',
+                            query: `
+                                select
+                                    count(distinct participant_id) as count,
+                                    day,
+                                    CASE
+                                        WHEN duration < 24 THEN '0-24 hours'
+                                        WHEN duration >= 24 AND duration < 36 THEN '24-36 hours'
+                                        WHEN duration >= 36 AND duration < 48 THEN '36-48 hours'
+                                        WHEN duration >= 48 AND duration < 72 THEN '48-72 hours'
+                                        WHEN duration is null THEN 'unknown'
+                                        ELSE '72+ hours'
+                                    END AS duration,
+                                    event_type
+                                from durations group by 2, 3, 4 order by 3, 2, 4
+                            `,
+                        },
+                    ]}
+                    plot={(data) => ({
+                        marginTop: 20,
+                        marginRight: 0,
+                        marginBottom: 40,
+                        marginLeft: 80,
+                        color: {
+                            scheme: 'RdYlGn',
+                            legend: true,
+                            reverse: true,
+                        },
+                        x: {
+                            axis: null,
+                        },
+                        y: {
+                            axis: null,
+                        },
+                        fy: {
+                            domain: [
+                                'Monday',
+                                'Tuesday',
+                                'Wednesday',
+                                'Thursday',
+                                'Friday',
+                                'Saturday',
+                                'Sunday',
+                            ],
+                        },
+                        marks: [
+                            Plot.frame({ stroke: '#ccc' }),
+                            Plot.barY(data, {
+                                x: 'duration',
+                                y: 'count',
+                                fill: 'duration',
+                                tip: true,
+                                fy: 'day',
+                                fx: 'event_type',
+                            }),
+                        ],
+                    })}
+                />
+            </ReportRow>
+            <ReportRow>
+                <ReportItemPlot
                     height={ROW_HEIGHT}
                     flexGrow={1}
                     title="Processing time buckets"
@@ -231,7 +304,7 @@ export default function ProcessingTimes() {
             </ReportRow>
             <ReportRow>
                 <ReportItemTable
-                    height={ROW_HEIGHT}
+                    height={ROW_HEIGHT + 200}
                     flexGrow={1}
                     flexBasis={300}
                     title="All sample processing times"
@@ -249,6 +322,7 @@ export default function ProcessingTimes() {
                                     participant_portal_id,
                                     processing_site,
                                     event_type,
+                                    day as collection_day,
                                     strftime(collection_time, '%Y-%m-%d %H:%M:%S') as collection_time,
                                     strftime(process_end_time, '%Y-%m-%d %H:%M:%S') as process_end_time,
                                     duration
