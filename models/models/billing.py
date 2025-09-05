@@ -104,6 +104,7 @@ class BillingColumn(str, Enum):
             BillingColumn.USAGE,
             BillingColumn.CREDITS,
             BillingColumn.INVOICE,
+            BillingColumn.ADJUSTMENT_INFO,
             BillingColumn.SAMPLE,
         )
 
