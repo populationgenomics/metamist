@@ -1,6 +1,3 @@
-from api.utils.db import (
-    Connection,
-)
 from db.python.layers.bq_base import BqBaseLayer
 from db.python.tables.bq.billing_ar_batch import BillingArBatchTable
 from db.python.tables.bq.billing_daily import BillingDailyTable
@@ -12,7 +9,6 @@ from models.models import (
     AnalysisCostRecord,
     BillingColumn,
     BillingCostBudgetRecord,
-    BillingSampleQueryModel,
     BillingTotalCostQueryModel,
 )
 
@@ -270,21 +266,3 @@ class BillingLayer(BqBaseLayer):
             start_day, end_day, batches, ar_guid
         )
         return results
-
-    async def get_cost_by_sample(
-        self,
-        connection: Connection,
-        query: BillingSampleQueryModel,
-    ) -> list[dict] | None:
-        """
-        Get Sample cost with selected fields for requested time interval
-        """
-        if not query.start_date or not query.end_date:
-            raise ValueError('Dates are required')
-
-        if not query.search_ids:
-            raise ValueError('Search IDs are required')
-
-        ar_batch_able = BillingArBatchTable(self.connection)
-
-        return await ar_batch_able.get_cost_by_sample(connection, query)
