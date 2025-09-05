@@ -1,7 +1,7 @@
 import re
 from abc import ABCMeta, abstractmethod
 from collections import Counter, defaultdict, namedtuple
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from google.cloud import bigquery
@@ -14,9 +14,6 @@ from api.settings import (
     BQ_DAYS_BACK_OPTIMAL,
 )
 from api.utils.dates import get_invoice_month_range, reformat_datetime
-from api.utils.db import (
-    Connection,
-)
 from db.python.gcp_connect import BqDbBase
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.function_bq_filter import FunctionBQFilter
@@ -735,18 +732,22 @@ class BillingBaseTable(BqDbBase):
         return results
 
     def get_compute_costs_by_seq_groups(
-        self, ar_guids, sequencing_groups: list[str], fields_selected: str
+        self,
+        batch_ids: dict[str, tuple[datetime, datetime]],
+        sequencing_groups: list[str],
+        fields_selected: str,
     ) -> list[dict]:
         """
         Get compute costs by sequencing groups
         """
-        if not ar_guids:
+        if not batch_ids:
             return []
 
         where_filter = []
-        for k, v in ar_guids.items():
+        # append all batch time filters to optimise the cost of BQ retrieval
+        for k, v in batch_ids.items():
             where_filter.append(
-                f"(ar_guid = '{k}' AND day >= TIMESTAMP('{v[0]}') AND day <= TIMESTAMP('{v[1]}'))"
+                f"(batch_id = '{k}' AND day >= TIMESTAMP('{v[0]}') AND day <= TIMESTAMP('{v[1]}'))"
             )
 
         query_parameters = [
@@ -755,6 +756,8 @@ class BillingBaseTable(BqDbBase):
             )
         ]
 
+        # we do not want to include seqr cost as those are redistributed to other topics
+        # if we included them we would be double counting the costs.
         _query = f"""
         WITH ag as (
             SELECT
@@ -762,17 +765,17 @@ class BillingBaseTable(BqDbBase):
             ar_guid,
             topic,
             stage,
-            cost_category,
             sequencing_group,
             SUM(cost) as cost,
             SUM(cost)/ARRAY_LENGTH(SPLIT(sequencing_group, ',')) as cost_adj
             FROM `{BQ_AGGREG_EXT_VIEW}`
             WHERE ({' OR '.join(where_filter) if where_filter else '1=1'})
             AND sequencing_group IS NOT NULL
-            GROUP BY invoice_month,sequencing_group, ar_guid, topic, stage, cost_category
+            AND topic <> 'seqr'
+            GROUP BY invoice_month,sequencing_group, ar_guid, topic, stage
         ),
         t as (
-        SELECT invoice_month, ar_guid, topic, stage, cost_category, sg as sequencing_group, cost_adj
+        SELECT invoice_month, ar_guid, topic, stage, 'Compute' as cost_category, sg as sequencing_group, cost_adj
         FROM ag, UNNEST(SPLIT(UPPER(sequencing_group), ',')) as sg
         WHERE sg IN UNNEST(@sequencing_groups)
         )
@@ -832,161 +835,3 @@ class BillingBaseTable(BqDbBase):
                 storage_cost[row.invoice_month] = row.cost
 
         return storage_cost
-
-    async def get_min_max_dates(
-        self,
-        connection: Connection,
-        query_start_date: datetime,
-        query_end_date: datetime,
-        min_compute_date: datetime,
-        sequencing_groups_as_ids: list[int],
-    ) -> tuple[datetime, datetime]:
-        """
-        Get min and max dates for the given sequencing groups
-        """
-        # Find the minimum day when samples has been added
-        # using FOR SYSTEM_TIME ALL gives us full history
-        _query = """
-        SELECT MIN(l.timestamp) as start_date
-        FROM sequencing_group FOR SYSTEM_TIME ALL sg
-        INNER JOIN audit_log l on l.id = sg.audit_log_id
-        WHERE sg.id IN :seq_groups
-        """
-        info_record = await connection.connection.fetch_one(
-            _query,
-            {
-                'seq_groups': list(sequencing_groups_as_ids),
-            },
-        )
-        first_seq_record_date = min(
-            [
-                dict(info_record).get('start_date', datetime.now()),
-                min_compute_date,
-            ]
-        )
-
-        # Adjust start date
-        start_date = max(query_start_date, first_seq_record_date)
-
-        # if start_date passes the end date, be sure we shift it so we have some data
-        if start_date > query_end_date:
-            end_date = start_date + timedelta(days=31)
-        else:
-            end_date = query_end_date
-
-        return (start_date, end_date)
-
-    async def get_number_of_sequencing_groups(
-        self, connection: Connection, project_id: int
-    ) -> int:
-        """
-        Get number of sequencing groups for the given projects
-        """
-        _query = """
-            SELECT COUNT(distinct sg.id) as cnt
-            FROM sample s
-            INNER JOIN sequencing_group sg ON sg.sample_id = s.id
-            WHERE s.project IN :projects
-        """
-        info_record = await connection.connection.fetch_one(
-            _query,
-            {
-                'projects': [project_id],
-            },
-        )
-        return dict(info_record).get('cnt', 0)
-
-    async def get_total_crams_info(
-        self, connection: Connection, project_id: int
-    ) -> tuple[float, int]:
-        """
-        Get the cram size per project, total size and count cram files
-        """
-        _query = """
-            SELECT sum(f.size) as total_crams_size, count(*) as cram_files_cnt
-            FROM output_file f
-            INNER JOIN analysis_outputs o ON o.file_id = f.id
-            INNER JOIN analysis a ON a.id = o.analysis_id
-            where a.type = 'CRAM'
-            AND a.status = 'COMPLETED'
-            and a.project IN :projects
-        """
-        info_record = await connection.connection.fetch_one(
-            _query,
-            {
-                'projects': [project_id],
-            },
-        )
-
-        total_cram_info = dict(info_record)
-        total_crams_size = float(total_cram_info.get('total_crams_size', 0))
-        cram_files_cnt = total_cram_info.get('cram_files_cnt', 0)
-        return (total_crams_size, cram_files_cnt)
-
-    async def get_cram_files_info(
-        self,
-        connection: Connection,
-        project_id: int,
-        sequencing_groups_as_ids: list[int],
-        number_of_seq_groups: int,
-        storage_cost: dict[str, float],
-        total_crams_size: float,
-        seq_id_map: dict[int, str],
-        individual_sq: bool,
-    ) -> list[dict] | None:
-        """
-        Get CRAM files information for the given sequencing groups
-        """
-        _query = """
-            SELECT sg.id, sum(f.size) as crams_size
-            FROM sequencing_group sg
-            LEFT JOIN analysis_sequencing_group asg ON asg.sequencing_group_id = sg.id
-            LEFT JOIN analysis a ON asg.analysis_id = a.id AND a.type = 'CRAM' AND a.status = 'COMPLETED' AND a.project IN :projects
-            LEFT JOIN analysis_outputs o ON a.id = o.analysis_id
-            LEFT JOIN output_file f ON o.file_id = f.id
-            WHERE sg.id IN :seq_groups
-            GROUP BY sg.id
-        """
-        records = await connection.connection.fetch_all(
-            _query,
-            {
-                'projects': [project_id],
-                'seq_groups': list(sequencing_groups_as_ids),
-            },
-        )
-        sg_storage_cost = []
-        cram_sizes = dict(
-            (row['id'], float(row['crams_size'] if row['crams_size'] else 0))
-            for row in records
-        )
-        if individual_sq:
-            for k, v in cram_sizes.items():
-                for sk, sv in storage_cost.items():
-                    sg_storage_cost.append(
-                        {
-                            'invoice_month': sk,
-                            'cost_category': 'Cloud Storage',
-                            'sequencing_group': seq_id_map[k],
-                            'cost': (
-                                sv * float(v) / total_crams_size
-                                if total_crams_size
-                                else sv / number_of_seq_groups
-                            ),
-                        }
-                    )
-        else:
-            for sk, sv in storage_cost.items():
-                sg_storage_cost.append(
-                    {
-                        'invoice_month': sk,
-                        'cost_category': 'Cloud Storage',
-                        'cost': (
-                            sv * sum(cram_sizes.values()) / total_crams_size
-                            if total_crams_size
-                            else sv
-                            * len(list(sequencing_groups_as_ids))
-                            / number_of_seq_groups
-                        ),
-                    }
-                )
-        return sg_storage_cost
