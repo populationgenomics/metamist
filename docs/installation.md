@@ -70,7 +70,7 @@ docker run --name mariadb-p3307 -e MYSQL_ALLOW_EMPTY_PASSWORD=1 -p 3307:3306 -d 
 docker exec -it mariadb-p3306 bash
 ```
 
-Then in the container shell run:
+2. In the container shell, run the MariaDB CLI to create the database, user, and roles:
 
 ```bash
 mariadb -u root --execute "
