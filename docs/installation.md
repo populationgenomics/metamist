@@ -184,7 +184,7 @@ Switch your database to sm_dev
 USE sm_dev;
 ```
 
-Add yourself to the `project-creators` and `members-admin` group.
+Add your local username to the `project-creators` and `members-admin` groups:
 
 ```sql
 INSERT INTO group_member(group_id, member)
