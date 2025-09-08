@@ -55,7 +55,7 @@ To start the database, run:
 docker run --name mariadb-p3306 -e MYSQL_ALLOW_EMPTY_PASSWORD=1 -p 3306:3306 -d docker.io/library/mariadb:11.7.2
 ```
 
-If you need to run on a different port as `3306` is already taken you can specify that in the port mapping.
+If port 3306 is already in use, you can specify a different port in the mapping. For example:
 
 ```bash
 docker run --name mariadb-p3307 -e MYSQL_ALLOW_EMPTY_PASSWORD=1 -p 3307:3306 -d docker.io/library/mariadb:11.7.2
