@@ -19,7 +19,7 @@ cd metamist
 
 ### Install python requirements
 
-It is recommended to use [pyenv](https://github.com/pyenv/pyenv) and [virtualenv](https://virtualenv.pypa.io/en/latest/installation.html) to manage the python version and virtual environment for metamist. Metamist currently is deployed with python 3.11 so it is best to use that locally to ensure your changes are compatible.
+It is recommended to use [pyenv](https://github.com/pyenv/pyenv) and [virtualenv](https://virtualenv.pypa.io/en/latest/installation.html) to manage the Python version and virtual environment for Metamist. Since Metamist currently is deployed with python 3.11, you should also use that locally to ensure compatibility. 
 
 
 ```bash
