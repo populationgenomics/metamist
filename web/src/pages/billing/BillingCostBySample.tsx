@@ -1,8 +1,7 @@
-import { ApolloError, useQuery } from '@apollo/client'
+import { ApolloError } from '@apollo/client'
 import {
     Alert,
     Box,
-    CircularProgress,
     ToggleButton,
     ToggleButtonGroup,
     Typography,
@@ -10,15 +9,12 @@ import {
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { DateTime } from 'luxon'
 import { useContext, useEffect, useMemo, useState } from 'react'
-import { gql } from '../../__generated__/gql'
 
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import {
     BillingApi,
     BillingColumn,
-    BillingSource,
-    BillingTimePeriods,
-    BillingTotalCostQueryModel,
+    BillingSampleQueryModel,
     BillingTotalCostRecord,
 } from '../../sm-api'
 
@@ -38,83 +34,13 @@ const billingApi = new BillingApi()
 
 // A map of billing column enums to titles, these are the supported fields to break down by
 const BILLING_COLUMN_MAP: Map<BillingColumn, string> = new Map([
-    [BillingColumn.SequencingGroup, 'Sequencing Group'],
+    [BillingColumn.SequencingGroup, 'Sequencing Group / Sample'],
     [BillingColumn.Topic, 'Topic'],
     [BillingColumn.ArGuid, 'AR guid'],
     [BillingColumn.CostCategory, 'Cost Category'],
     [BillingColumn.Stage, 'Stage'],
 ])
 
-type EntityType = 'sequencing_group' | 'sample'
-
-const SAMPLE_SG_QUERY = gql(`
-    query SampleSgMap($sampleIds: [String!]!) {
-        myProjects {
-            samples(id: {in_: $sampleIds}) {
-                id
-                sequencingGroups {
-                    id
-                }
-            }
-        }
-    }
-`)
-
-type BillingSampleSgMapResult = {
-    loading: boolean
-    data?: {
-        sampleToSgs: Record<string, string[]>
-        sgToSample: Record<string, string>
-    }
-    error?: ApolloError
-}
-
-// Get maps describing the relationships between samples and sequencing groups.
-// This is needed for when you fetch billing data for samples as we only have billing data in
-// the backend organized by sequencing group, so it is necessary to map from the SG data back
-// to sample data and vice versa
-function useBillingSampleSgMap(entityType: EntityType, ids: string[]): BillingSampleSgMapResult {
-    // This map is only needed when requesting sample billing data
-    const mapNeeded = entityType === 'sample' && ids.length > 0
-
-    const { loading, data, error } = useQuery(SAMPLE_SG_QUERY, {
-        variables: { sampleIds: ids },
-        skip: !mapNeeded, // Only need to run this when working with sample ids
-    })
-
-    const result = useMemo(() => {
-        if (!mapNeeded)
-            return {
-                loading: false,
-                data: undefined,
-                error: undefined,
-            }
-        if (loading || !data || error) return { loading, data: undefined, error }
-
-        const idPairs = data.myProjects
-            .flatMap((pp) => pp.samples)
-            .flatMap((ss) => ss.sequencingGroups.map((sg) => ({ sgId: sg.id, sampleId: ss.id })))
-
-        const sampleToSgs = idPairs.reduce((rr: Record<string, string[]>, ids) => {
-            rr[ids.sampleId] = rr[ids.sampleId] ?? []
-            rr[ids.sampleId].push(ids.sgId)
-            return rr
-        }, {})
-
-        const sgToSample = idPairs.reduce((rr: Record<string, string>, ids) => {
-            rr[ids.sgId] = ids.sampleId
-            return rr
-        }, {})
-
-        return {
-            loading,
-            error,
-            data: { sampleToSgs, sgToSample },
-        }
-    }, [loading, data, error, mapNeeded])
-
-    return result
-}
 
 // Remove all the columns that weren't selected from the result, so that the remaining ones
 // can be shown in the table
@@ -122,6 +48,7 @@ function transformBillingResultRow(result: BillingTotalCostRecord, breakDownBy: 
     const cost = result.cost
     const month = result.invoice_month
     const sequencingGroup = result.sequencing_group
+    const sample = result.sample
 
     const breakDownCols = breakDownBy.reduce(
         (rr: Partial<{ [key in BillingColumn]: number | string | object | null }>, col) => {
@@ -139,54 +66,12 @@ function transformBillingResultRow(result: BillingTotalCostRecord, breakDownBy: 
         ...breakDownCols,
         cost,
         month,
-        sample: null as string | null,
+        sample,
         sequencingGroup: sequencingGroup ? [sequencingGroup] : [],
     }
 }
 
 type BillingResultRow = ReturnType<typeof transformBillingResultRow>
-
-// Take the result rows and aggregate them up to the sample level
-function aggregateToSampleLevel(
-    data: BillingResultRow[],
-    sgToSample: Record<string, string>
-): BillingResultRow[] {
-    if (data.length === 0) return []
-
-    // Get the order of keys to use to compute composite key, just do this from the first
-    // row to ensure that key is constructed in same order for all rows
-    const firstRow = data[0]
-    const { cost: cost, sequencingGroup: _sequencingGroup, ...breakDownCols } = firstRow
-    const keyOrder = Object.keys(breakDownCols) as (keyof typeof breakDownCols)[]
-
-    // Group the rows by a composite key composed of the field that we want to group by
-    // This allows us to sum up the cost for all the sgs in a sample
-    const groupedData = data.reduce((rr: Map<string, BillingResultRow>, row) => {
-        const { cost, sequencingGroup, ...breakDownCols } = row
-        if (!sequencingGroup || sequencingGroup.length === 0) return rr
-        const sample = sgToSample[sequencingGroup[0]]
-        if (!sample) return rr
-
-        const compositeKey = keyOrder.map((key) => row[key]).join('||||')
-
-        const val = rr.get(compositeKey)
-        if (val) {
-            val.cost += cost
-            val.sequencingGroup = val.sequencingGroup.concat(sequencingGroup)
-        } else {
-            rr.set(compositeKey, {
-                ...breakDownCols,
-                sample,
-                sequencingGroup: sequencingGroup,
-                cost,
-            })
-        }
-
-        return rr
-    }, new Map())
-
-    return [...groupedData.entries()].map(([_, val]) => val)
-}
 
 type BillingDataResult = {
     loading: boolean
@@ -197,19 +82,17 @@ type BillingDataResult = {
 
 // This is the main hook for fetching data from the billing API
 function useBillingCostBySampleData(
-    entityType: EntityType,
     ids: string[],
     dateRange: [DateTime, DateTime],
     breakDownBy: BillingColumn[]
 ): BillingDataResult {
+
     const [billingResult, setBillingResult] = useState<BillingDataResult>({ loading: false })
 
     const start = dateRange[0].toISODate()
     const end = dateRange[1].endOf('month').toISODate()
 
     if (!start || !end) throw new Error('Missing start or end')
-
-    const billingSampleSgMap = useBillingSampleSgMap(entityType, ids)
 
     useEffect(() => {
         // Will get set to true if effect becomes stale, in which case we don't want to return data
@@ -227,58 +110,22 @@ function useBillingCostBySampleData(
             return
         }
 
-        // Handle errors that come back from getting the sample map,
-        // but only if working with sample ids
-        if (entityType === 'sample' && billingSampleSgMap.error) {
-            setBillingResult({
-                loading: false,
-                error: billingSampleSgMap.error,
-            })
-            return
-        }
-
-        // Handle loading state of sample map
-        if (entityType === 'sample' && (!billingSampleSgMap.data || billingSampleSgMap.loading)) {
-            setBillingResult({ loading: true })
-            return
-        }
-
-        const sampleToSgs = billingSampleSgMap?.data?.sampleToSgs ?? {}
-        const sgToSample = billingSampleSgMap?.data?.sgToSample ?? {}
-        const missingSamples =
-            entityType === 'sample' ? ids.filter((id) => !(id in sampleToSgs)) : []
-
-        if (missingSamples.length > 0) {
-            warnings.push(
-                `Some samples were not included in results as it wasn't possible to find the sequencing groups those samples belong to. This may be because you don't have access to the projects that these samples belong to. Affected ids: ${missingSamples.join(', ')}`
-            )
-        }
-
-        const sequencingGroupIds =
-            entityType === 'sample' ? ids.flatMap((id) => sampleToSgs[id]).filter(Boolean) : ids
-
         // Don't run query if there's no ids to filter to
-        if (sequencingGroupIds.length === 0) {
+        if (ids.length === 0) {
             setBillingResult({ loading: false, data: [] })
             return
         }
 
-        const query: BillingTotalCostQueryModel = {
-            fields: [...breakDownBy],
+        const query: BillingSampleQueryModel = {
             start_date: start,
             end_date: end,
-            order_by: { day: false },
-            source: BillingSource.Aggregate,
-            time_periods: BillingTimePeriods.Month,
-            filters: {
-                sequencing_group: sequencingGroupIds,
-            },
+            search_ids: ids,
+            fields: [...breakDownBy],
         }
 
         setBillingResult({
             loading: true,
         })
-
         billingApi
             .costBySample(query)
             .then((result) => {
@@ -286,14 +133,10 @@ function useBillingCostBySampleData(
                 if (ignore) return
 
                 const data = result.data?.map((row) => transformBillingResultRow(row, breakDownBy))
-
-                const groupedData =
-                    entityType === 'sample' ? aggregateToSampleLevel(data, sgToSample) : data
-
                 setBillingResult({
                     warnings,
                     loading: false,
-                    data: groupedData,
+                    data: data,
                 })
             })
             .catch((err) => {
@@ -307,7 +150,7 @@ function useBillingCostBySampleData(
         return () => {
             ignore = true
         }
-    }, [entityType, ids, start, end, breakDownBy, billingSampleSgMap])
+    }, [ids, start, end, breakDownBy])
 
     return billingResult
 }
@@ -333,35 +176,30 @@ function CustomTableToolbar() {
     )
 }
 
-const sampleCols: GridColDef<BillingResultRow>[] = [
+const sampleCol: GridColDef<BillingResultRow>[] = [
     {
         field: 'sample',
         width: 120,
         headerName: 'Sample',
     },
-    {
-        field: 'sequencingGroup',
-        headerName: 'Sequencing Groups',
-        width: 140,
-        renderCell: (params) => params.row.sequencingGroup.join(', '),
-    },
 ]
 
-const sgCols: GridColDef<BillingResultRow>[] = []
-
-function BillingCostBySampleTable(props: { entityType: EntityType; data: BillingResultRow[] }) {
-    const { data, entityType } = props
+function BillingCostBySampleTable(props: { data: BillingResultRow[] }) {
+    const { data } = props
 
     const columns: GridColDef<BillingResultRow>[] = useMemo(() => {
         const firstRow = data[0]
         if (!firstRow) return []
-        const {
+        const {            
             cost: _cost,
             month: _month,
             sequencingGroup: _sequencingGroup,
             sample: _sample,
             ...breakDownCols
         } = firstRow
+        
+        // check if any of data record contains a non-empty sample string
+        const hasSample = data.some((row) => typeof row.sample === 'string')
 
         const breakDownColDefs = Object.keys(breakDownCols).map(
             (col): GridColDef<BillingResultRow> => ({
@@ -377,8 +215,7 @@ function BillingCostBySampleTable(props: { entityType: EntityType; data: Billing
                 headerName: 'Month',
                 valueGetter: (_value, row) => row.month?.slice(0, 7),
             },
-            ...(entityType === 'sequencing_group' ? sgCols : []),
-            ...(entityType === 'sample' ? sampleCols : []),
+            ... (hasSample ? sampleCol : []),
             ...breakDownColDefs,
             {
                 field: 'cost',
@@ -386,7 +223,7 @@ function BillingCostBySampleTable(props: { entityType: EntityType; data: Billing
                 renderCell: (params) => formatMoney(params.row.cost),
             },
         ]
-    }, [data, entityType])
+    }, [data])
 
     return (
         <Box
@@ -421,7 +258,7 @@ function BillingCostBySample() {
     const [breakDownBy, setBreakDownBy] = useState<BillingColumn[]>([BillingColumn.SequencingGroup])
     const viewer = useContext(ViewerContext)
 
-    const idPrefixes: Record<EntityType, string> | undefined = viewer?.metamistSettings
+    const idPrefixes: Record<string> | undefined = viewer?.metamistSettings
         ? {
               sample: viewer.metamistSettings.samplePrefix,
               sequencing_group: viewer.metamistSettings.sequencingGroupPrefix,
@@ -432,17 +269,13 @@ function BillingCostBySample() {
 
     const typeFrequency = idPrefixes
         ? Object.entries(idPrefixes)
-              .map(([type, prefix]) => {
-                  const entityType = type as EntityType // ts doesn't know how to pull types through Object.entries
-                  const count = idList.filter((id) => id.startsWith(prefix)).length
-                  return { entityType, prefix, count }
+              .map(([prefix]) => {
+                 const count = idList.filter((id) => id.startsWith(prefix)).length
+                  return { prefix, count }
               }, {})
               .filter(({ count }) => count > 0)
               .sort((a, b) => b.count - a.count)
         : undefined
-
-    const mostFrequentPrefix = typeFrequency?.[0]?.prefix
-    const mostFrequentType = typeFrequency?.[0]?.entityType
 
     // get search params from url on first load. The URL isn't the source of the state so
     // it is only read from once, and then written back to when filters change.
@@ -502,19 +335,8 @@ function BillingCostBySample() {
         }
     }, [breakDownBy, dateRange, idList])
 
-    // Filter ids down to the type of the most frequent used id type, memoize this otherwise
-    // the hook to get data will update constantly
-    const validIdList = useMemo(() => {
-        return mostFrequentPrefix && idList
-            ? idList.filter((id) => id.startsWith(mostFrequentPrefix))
-            : []
-    }, [mostFrequentPrefix, idList])
-
-    const entityType = mostFrequentType ?? 'sequencing_group'
-
     const { loading, data, error, warnings } = useBillingCostBySampleData(
-        entityType,
-        validIdList,
+        idList,
         dateRange,
         breakDownBy
     )
@@ -526,15 +348,11 @@ function BillingCostBySample() {
             </Typography>
 
             <Box mt={2}>
-                {idPrefixes ? (
-                    <IdSelector
-                        idPrefixes={Object.values(idPrefixes)}
-                        idList={idList}
-                        onChange={(value) => setIdList(value)}
-                    />
-                ) : (
-                    <CircularProgress />
-                )}
+                <IdSelector
+                    idPrefixes={idPrefixes ? Object.values(idPrefixes) : []}
+                    idList={idList}
+                    onChange={(value) => setIdList(value)}
+                />
             </Box>
 
             <Box mt={2} display={'flex'} gap={4}>
@@ -590,8 +408,7 @@ function BillingCostBySample() {
                 <Box mt={2}>
                     <Alert severity="warning">
                         More than one type of ID has been entered, but billing data can only be
-                        loaded for one type of id at a time. Only {mostFrequentType} ids will be
-                        used.
+                        loaded for one type of id at a time.
                     </Alert>
                 </Box>
             ) : null}
@@ -613,7 +430,7 @@ function BillingCostBySample() {
 
             {!loading && (
                 <Box mt={4}>
-                    <BillingCostBySampleTable entityType={entityType} data={data ?? []} />
+                    <BillingCostBySampleTable data={data ?? []} />
                 </Box>
             )}
         </PaddedPage>
