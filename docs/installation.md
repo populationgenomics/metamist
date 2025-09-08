@@ -2,7 +2,7 @@
 
 This document will walk you through the steps required for setting up a local installation of metamist.
 
-**Note** this is a Metamist Developer guide, not a Metamist user guide. These steps are only required if you need to test a script on a local version of metamist or work on contributions to the metamist code base. If you just need to access and work with metamist data see [the instructions here](/README.md)
+**Note** this is a Metamist Developer guide, not a Metamist user guide. These steps are only required if you need to test a script on a local version of metamist or work on contributions to the metamist code base. If you just need to access and work with metamist data see [the instructions here](/README.md#usage)
 
 
 ## Clone the codebase
