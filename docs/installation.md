@@ -1,8 +1,8 @@
 # Installation
 
-This document will walk you through the steps required for setting up a local installation of metamist.
+This document will walk you through the steps required for setting up a local installation of Metamist.
 
-**Note** this is a Metamist Developer guide, not a Metamist user guide. These steps are only required if you need to test a script on a local version of metamist or work on contributions to the metamist code base. If you just need to access and work with metamist data see [the instructions here](/README.md#usage)
+**Note** this is a Metamist Developer guide, not a Metamist user guide. These steps are only required if you need to test a script on a local version of Metamist or work on contributions to the Metamist code base. If you just need to access and work with Metamist data see [the instructions here](/README.md#usage)
 
 
 ## Clone the codebase
@@ -91,7 +91,7 @@ Once that is done you can disconnect from the container.
 
 #### Running database migrations
 
-Metamist uses liquibase to manage database migrations. To create the metamist database tables you will need to run the migrations.
+Metamist uses liquibase to manage database migrations. To create the Metamist database tables you will need to run the migrations.
 
 Start by installing liquibase:
 
@@ -132,7 +132,7 @@ export SM_DEV_DB_PORT="3306"
 ```
 
 
-If you do go down the route of setting the variables in your project's vscode `launch.json`, it is still a good idea to set the first 3 environment variables above in your bash/zsh profile. These variables are used by some of the scripts below, for example to generate the metamist API. If they aren't set then your generated API will point to the production metamist.
+If you do go down the route of setting the variables in your project's vscode `launch.json`, it is still a good idea to set the first 3 environment variables above in your bash/zsh profile. These variables are used by some of the scripts below, for example to generate the Metamist API. If they aren't set then your generated API will point to the production Metamist.
 
 in `.vscode/launch.json`
 
@@ -202,7 +202,7 @@ Next up, we need to run the API generator to create the python client, which wil
 
 This is handled by the `regenerate_api.py` script.
 
-This script requires [openapi-generator](https://openapi-generator.tech/docs/installation/) to be installed, this is included as part of metamist's python dev requirements, so make sure that you have your virtual env activated before running:
+This script requires [openapi-generator](https://openapi-generator.tech/docs/installation/) to be installed, this is included as part of Metamist's python dev requirements, so make sure that you have your virtual env activated before running:
 
 ```bash
 python regenerate_api.py
@@ -233,7 +233,7 @@ uvicorn --port 8000 --host 0.0.0.0 api.server:app
 
 ### Generating some data
 
-To add some data to your database, you can run the `test/data/generate_data.py` script. Make sure you have your virtualenv activated and the `SM_ENVIRONMENT` and `SM_LOCALONLY_DEFAULTUSER` environment variables set before running this, otherwise the metamist python client will try to add the data to production metamist.
+To add some data to your database, you can run the `test/data/generate_data.py` script. Make sure you have your virtualenv activated and the `SM_ENVIRONMENT` and `SM_LOCALONLY_DEFAULTUSER` environment variables set before running this, otherwise the Metamist python client will try to add the data to production Metamist.
 
 
 ```bash
@@ -243,24 +243,24 @@ python3 test/data/generate_data.py
 
 ### Conclusion
 
-At this point, your API should be fully functional. You can test scripts by setting the `SM_ENVIRONMENT` variable to `local` so that the metamist python client points to your local installation. You can also work on developing backend features.
+At this point, your API should be fully functional. You can test scripts by setting the `SM_ENVIRONMENT` variable to `local` so that the Metamist python client points to your local installation. You can also work on developing backend features.
 
 - The GraphiQL explorer is accessible at: [http://localhost:8000/graphql](http://localhost:8000/graphql)
 - The swagger http api documentation is accessible at: [http://localhost:8000/docs](http://localhost:8000/docs)
 
-To set up the metamist web client, read on.
+To set up the Metamist web client, read on.
 
 
 
 ## Web Client Setup
 
-The metamist web client is a React single page application that calls the metamist apis and displays metadata in a user interface.
+The Metamist web client is a React single page application that calls the Metamist apis and displays metadata in a user interface.
 
 To get up and running you will need [nodejs](https://nodejs.org/en) installed, there are a few options for managing node versions but we recommend [fnm](https://github.com/Schniz/fnm) as it is lightweight, simple and provides a similar api to `nvm` while being much much faster.
 
 Other installation options are outlined on the [nodejs download page](https://nodejs.org/en/download).
 
-The metamist client should work with a variety of node versions but for the purposes of this setup we'll install 22 which is the LTS version at the time of writing.
+The Metamist client should work with a variety of node versions but for the purposes of this setup we'll install 22 which is the LTS version at the time of writing.
 
 
 ```bash
@@ -287,7 +287,7 @@ The web client should now be running at [http://localhost:5173](http://localhost
 The CPG deploy is managed through Cloud Run on the Google Cloud Platform.
 The deploy github action builds the container, and is deployed.
 
-Additionally you can access metamist through the identity-aware proxy (IAP),
+Additionally you can access Metamist through the identity-aware proxy (IAP),
 which handles the authentication through OAuth, allowing you to access the
 front-end.
 
