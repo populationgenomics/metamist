@@ -1,11 +1,5 @@
 import { ApolloError } from '@apollo/client'
-import {
-    Alert,
-    Box,
-    ToggleButton,
-    ToggleButtonGroup,
-    Typography,
-} from '@mui/material'
+import { Alert, Box, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { DateTime } from 'luxon'
 import { useContext, useEffect, useMemo, useState } from 'react'
@@ -40,7 +34,6 @@ const BILLING_COLUMN_MAP: Map<BillingColumn, string> = new Map([
     [BillingColumn.CostCategory, 'Cost Category'],
     [BillingColumn.Stage, 'Stage'],
 ])
-
 
 // Remove all the columns that weren't selected from the result, so that the remaining ones
 // can be shown in the table
@@ -86,7 +79,6 @@ function useBillingCostBySampleData(
     dateRange: [DateTime, DateTime],
     breakDownBy: BillingColumn[]
 ): BillingDataResult {
-
     const [billingResult, setBillingResult] = useState<BillingDataResult>({ loading: false })
 
     const start = dateRange[0].toISODate()
@@ -215,7 +207,7 @@ function BillingCostBySampleTable(props: { data: BillingResultRow[] }) {
                 headerName: 'Month',
                 valueGetter: (_value, row) => row.month?.slice(0, 7),
             },
-            ... (hasSample ? sampleCol : []),
+            ...(hasSample ? sampleCol : []),
             ...breakDownColDefs,
             {
                 field: 'cost',
@@ -270,7 +262,7 @@ function BillingCostBySample() {
     const typeFrequency = idPrefixes
         ? Object.entries(idPrefixes)
               .map(([prefix]) => {
-                 const count = idList.filter((id) => id.startsWith(prefix)).length
+                  const count = idList.filter((id) => id.startsWith(prefix)).length
                   return { prefix, count }
               }, {})
               .filter(({ count }) => count > 0)
