@@ -47,7 +47,7 @@ Metamist uses a MariaDB 11 database. Docker is the easiest way to run the Metami
 
 We have found that [OrbStack](https://orbstack.dev/) is faster and easier to use than [Docker Desktop](https://docs.docker.com/desktop/) but either should work fine.
 
-It is also possible to install MariaDB stanalone using [homebrew](brew.sh) or another package manager.
+You can also install MariaDB standalone using [homebrew](brew.sh) or another package manager.
 
 To start the database, run:
 
