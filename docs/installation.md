@@ -19,7 +19,7 @@ cd metamist
 
 ### Install python requirements
 
-It is recommended to use [pyenv](https://github.com/pyenv/pyenv) and [virtualenv](https://virtualenv.pypa.io/en/latest/installation.html) to manage the Python version and virtual environment for Metamist. Since Metamist currently is deployed with python 3.11, you should also use that locally to ensure compatibility. 
+It is recommended to use [pyenv](https://github.com/pyenv/pyenv) and [virtualenv](https://virtualenv.pypa.io/en/latest/installation.html) to manage the Python version and virtual environment for Metamist. Since Metamist currently is deployed with python 3.11, you should also use 3.11 locally to ensure that any changes you make are compatible with the deployed version of Metamist. 
 
 
 ```bash
@@ -47,7 +47,7 @@ Metamist uses a MariaDB 11 database. Docker is the easiest way to run the Metami
 
 We have found that [OrbStack](https://orbstack.dev/) is faster and easier to use than [Docker Desktop](https://docs.docker.com/desktop/) but either should work fine.
 
-You can also install MariaDB standalone using [homebrew](brew.sh) or another package manager.
+If you would prefer to not use Docker, you could also install MariaDB standalone using [homebrew](brew.sh) or another package manager.
 
 To start the database, run:
 
