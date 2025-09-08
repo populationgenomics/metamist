@@ -64,7 +64,7 @@ docker run --name mariadb-p3307 -e MYSQL_ALLOW_EMPTY_PASSWORD=1 -p 3307:3306 -d 
 
 #### Setting up the database and permissions
 
-Connect to the running container and use the MariaDB cli to set up users. If you installed MariaDB without docker you may need sudo for the MariaDB command.
+1. Connect to the running container:
 
 ```bash
 docker exec -it mariadb-p3306 bash
