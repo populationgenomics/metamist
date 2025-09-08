@@ -43,7 +43,7 @@ pip install --no-deps -r requirements-dev.txt
 
 #### Running MariaDB
 
-Metamist uses a MariaDB 11 database. Docker is probably the easiest way to run the metamist MariaDB database locally.
+Metamist uses a MariaDB 11 database. Docker is the easiest way to run the Metamist MariaDB database locally.
 
 We have found that [OrbStack](https://orbstack.dev/) is faster and easier to use than [Docker Desktop](https://docs.docker.com/desktop/) but either should work fine.
 
