@@ -35,10 +35,14 @@ type SummaryRowData = {
     headerFields: Array<{ category: string; title: string }>
     getColumnDisplayStyle: (category: string) => React.CSSProperties
 }
-
 const BreakdownTableRow: React.FC<{ item: BreakdownRowData }> = ({ item: row, ...props }) => {
     const theme = React.useContext(ThemeContext)
     const isDarkMode = theme.theme === 'dark-mode'
+
+    if (!row) {
+        return null
+    }
+
     return (
         <TableRow
             {...props}
@@ -295,10 +299,15 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         return groups
     }, [expandCompute, columnConfigs])
 
-    // Create CSS classes for column visibility based on expand state
+    // Create CSS classes for column visibility based on expand state and column visibility
     const getColumnDisplayStyle = React.useCallback(
         (group: string) => {
-            // Always show core columns
+            // First check if column is visible based on user selection
+            if (!visibleColumns.has(group)) {
+                return { display: 'none' }
+            }
+
+            // Always show core columns if they're visible
             if (['Daily Total', 'Cloud Storage'].includes(group)) {
                 return { display: 'table-cell' }
             }
@@ -320,7 +329,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                 return { display: isComputeCategory ? 'none' : 'table-cell' }
             }
         },
-        [expandCompute]
+        [expandCompute, visibleColumns]
     )
 
     // Properly ordered header fields to match table header structure
@@ -417,9 +426,10 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
 
     // Prepare data for react-virtuoso breakdown table
     const virtuosoBreakdownData = React.useMemo(() => {
-        if (viewMode !== 'breakdown') return []
+        if (viewMode !== 'breakdown') {
+            return []
+        }
 
-        // Add regular breakdown rows only
         return allBreakdownRows.map((row) => ({
             ...row,
             headerFields,
@@ -597,7 +607,10 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                     fixedHeaderContent={() => (
                         <>
                             <TableRow className={`ui table row${isDarkMode ? ' inverted' : ''}`}>
-                                <SUITable.HeaderCell colSpan={3} textAlign="center">
+                                <SUITable.HeaderCell
+                                    colSpan={2 + (visibleColumns.has('Daily Total') ? 1 : 0)}
+                                    textAlign="center"
+                                >
                                     <span
                                         style={{
                                             display: 'flex',
@@ -608,7 +621,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                                         <Switch
                                             checked={expandCompute}
                                             onChange={(e) => {
-                                                setExpandCompute(e.target.checked)
+                                                setExpandCompute?.(e.target.checked)
                                             }}
                                             size="small"
                                             color="primary"
@@ -617,18 +630,26 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                                     </span>
                                 </SUITable.HeaderCell>
                                 <SUITable.HeaderCell
-                                    colSpan={1}
+                                    colSpan={visibleColumns.has('Cloud Storage') ? 1 : 0}
                                     style={getColumnDisplayStyle('Cloud Storage')}
                                 >
                                     Storage Cost
                                 </SUITable.HeaderCell>
                                 <SUITable.HeaderCell
-                                    colSpan={headerFields.length - 2}
+                                    colSpan={
+                                        headerFields.filter(
+                                            (f) =>
+                                                f.category !== 'Daily Total' &&
+                                                f.category !== 'Cloud Storage' &&
+                                                visibleColumns.has(f.category)
+                                        ).length
+                                    }
                                     style={{
                                         display: headerFields.some(
                                             (f) =>
                                                 f.category !== 'Daily Total' &&
-                                                f.category !== 'Cloud Storage'
+                                                f.category !== 'Cloud Storage' &&
+                                                visibleColumns.has(f.category)
                                         )
                                             ? 'table-cell'
                                             : 'none',
@@ -724,7 +745,10 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                     fixedHeaderContent={() => (
                         <>
                             <TableRow className={`ui table row${isDarkMode ? ' inverted' : ''}`}>
-                                <SUITable.HeaderCell colSpan={2} textAlign="center">
+                                <SUITable.HeaderCell
+                                    colSpan={1 + (visibleColumns.has('Daily Total') ? 1 : 0)}
+                                    textAlign="center"
+                                >
                                     <span
                                         style={{
                                             display: 'flex',
@@ -735,7 +759,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                                         <Switch
                                             checked={expandCompute}
                                             onChange={(e) => {
-                                                setExpandCompute(e.target.checked)
+                                                setExpandCompute?.(e.target.checked)
                                             }}
                                             size="small"
                                             color="primary"
@@ -744,18 +768,26 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                                     </span>
                                 </SUITable.HeaderCell>
                                 <SUITable.HeaderCell
-                                    colSpan={1}
+                                    colSpan={visibleColumns.has('Cloud Storage') ? 1 : 0}
                                     style={getColumnDisplayStyle('Cloud Storage')}
                                 >
                                     Storage Cost
                                 </SUITable.HeaderCell>
                                 <SUITable.HeaderCell
-                                    colSpan={headerFields.length - 2}
+                                    colSpan={
+                                        headerFields.filter(
+                                            (f) =>
+                                                f.category !== 'Daily Total' &&
+                                                f.category !== 'Cloud Storage' &&
+                                                visibleColumns.has(f.category)
+                                        ).length
+                                    }
                                     style={{
                                         display: headerFields.some(
                                             (f) =>
                                                 f.category !== 'Daily Total' &&
-                                                f.category !== 'Cloud Storage'
+                                                f.category !== 'Cloud Storage' &&
+                                                visibleColumns.has(f.category)
                                         )
                                             ? 'table-cell'
                                             : 'none',
