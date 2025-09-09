@@ -26,13 +26,20 @@ import IdSelector from './components/IdSelector'
 
 const billingApi = new BillingApi()
 
-// A map of billing column enums to titles, these are the supported fields to break down by
-const BILLING_COLUMN_MAP: Map<BillingColumn, string> = new Map([
+// A map of billing column enums to names for the breakdown selector
+const BREAK_DOWN_MAP: Map<BillingColumn, string> = new Map([
     [BillingColumn.SequencingGroup, 'Sequencing Group / Sample'],
     [BillingColumn.Topic, 'Topic'],
     [BillingColumn.ArGuid, 'AR guid'],
     [BillingColumn.CostCategory, 'Cost Category'],
     [BillingColumn.Stage, 'Stage'],
+])
+
+// A map of billing column enums to column titles
+const COLUMN_NAME_MAP: Map<BillingColumn, string> = new Map([
+    ...BREAK_DOWN_MAP.entries(),
+    // Override the title name for sequencing group column as it won't show samples
+    [BillingColumn.SequencingGroup, 'Sequencing Group'],
 ])
 
 // Remove all the columns that weren't selected from the result, so that the remaining ones
@@ -197,7 +204,14 @@ function BillingCostBySampleTable(props: { data: BillingResultRow[] }) {
             (col): GridColDef<BillingResultRow> => ({
                 field: col,
                 width: 120,
-                headerName: BILLING_COLUMN_MAP.get(col as BillingColumn) || col,
+                headerName: COLUMN_NAME_MAP.get(col as BillingColumn) || col,
+                renderCell: (params) => {
+                    const value = params.value
+                    if (typeof value === 'string') {
+                        return value.split(',').join(', ')
+                    }
+                    return value
+                },
             })
         )
 
@@ -205,7 +219,11 @@ function BillingCostBySampleTable(props: { data: BillingResultRow[] }) {
             {
                 field: 'month',
                 headerName: 'Month',
-                valueGetter: (_value, row) => row.month?.slice(0, 7),
+                width: 120,
+                renderCell: (params) => {
+                    if (!params.row.month) return ''
+                    return DateTime.fromFormat(params.row.month, 'yyyyMM').toFormat('LLL yyyy')
+                },
             },
             ...(hasSample ? sampleCol : []),
             ...breakDownColDefs,
@@ -250,23 +268,11 @@ function BillingCostBySample() {
     const [breakDownBy, setBreakDownBy] = useState<BillingColumn[]>([BillingColumn.SequencingGroup])
     const viewer = useContext(ViewerContext)
 
-    const idPrefixes: Record<string> | undefined = viewer?.metamistSettings
+    const idPrefixes: Record<string, string> | undefined = viewer?.metamistSettings
         ? {
               sample: viewer.metamistSettings.samplePrefix,
               sequencing_group: viewer.metamistSettings.sequencingGroupPrefix,
           }
-        : undefined
-
-    // Calculate which id type has the most values
-
-    const typeFrequency = idPrefixes
-        ? Object.entries(idPrefixes)
-              .map(([prefix]) => {
-                  const count = idList.filter((id) => id.startsWith(prefix)).length
-                  return { prefix, count }
-              }, {})
-              .filter(({ count }) => count > 0)
-              .sort((a, b) => b.count - a.count)
         : undefined
 
     // get search params from url on first load. The URL isn't the source of the state so
@@ -387,7 +393,7 @@ function BillingCostBySample() {
                             setBreakDownBy(value)
                         }}
                     >
-                        {[...BILLING_COLUMN_MAP.entries()].map(([id, col]) => (
+                        {[...BREAK_DOWN_MAP.entries()].map(([id, col]) => (
                             <ToggleButton value={id} key={id}>
                                 {col}
                             </ToggleButton>
@@ -395,15 +401,6 @@ function BillingCostBySample() {
                     </ToggleButtonGroup>
                 </Box>
             </Box>
-
-            {typeFrequency && typeFrequency.length > 1 ? (
-                <Box mt={2}>
-                    <Alert severity="warning">
-                        More than one type of ID has been entered, but billing data can only be
-                        loaded for one type of id at a time.
-                    </Alert>
-                </Box>
-            ) : null}
 
             {error && (
                 <Box mt={2}>
