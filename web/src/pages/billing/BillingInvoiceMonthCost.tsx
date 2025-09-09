@@ -262,6 +262,7 @@ const BillingCurrentCost = () => {
             if (value !== BillingColumn.Topic) {
                 setSelectedTopics([])
             }
+            // Immediate data fetch for Group By selector (no debouncing)
             getData(value as BillingColumn, invoiceMonth, [], [])
         }
     }
@@ -270,7 +271,7 @@ const BillingCurrentCost = () => {
         const value = data.value
         if (typeof value == 'string') {
             setInvoiceMonth(value)
-            // Pass current filters based on groupBy
+            // Immediate data fetch for Invoice Month selector (no debouncing)
             if (groupBy === BillingColumn.GcpProject) {
                 getData(groupBy, value, selectedGcpProjects, [])
             } else if (groupBy === BillingColumn.Topic) {
@@ -297,16 +298,19 @@ const BillingCurrentCost = () => {
         setSelectedTopics(value)
     }
 
+    // Separate useEffect for GCP Project filter changes only
     React.useEffect(() => {
-        // Pass current filters based on groupBy
         if (groupBy === BillingColumn.GcpProject) {
             debouncedGetData(groupBy, invoiceMonth, selectedGcpProjects, [])
-        } else if (groupBy === BillingColumn.Topic) {
-            debouncedGetData(groupBy, invoiceMonth, [], selectedTopics)
-        } else {
-            debouncedGetData(groupBy, invoiceMonth, [], [])
         }
-    }, [groupBy, invoiceMonth, selectedGcpProjects, selectedTopics, debouncedGetData])
+    }, [selectedGcpProjects, debouncedGetData])
+
+    // Separate useEffect for Topic filter changes only
+    React.useEffect(() => {
+        if (groupBy === BillingColumn.Topic) {
+            debouncedGetData(groupBy, invoiceMonth, [], selectedTopics)
+        }
+    }, [selectedTopics, debouncedGetData])
 
     // Define column groups for easier management
     const DAILY_COLUMNS = ['compute_daily', 'storage_daily', 'total_daily']
