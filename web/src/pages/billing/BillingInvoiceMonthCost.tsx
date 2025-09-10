@@ -303,14 +303,14 @@ const BillingCurrentCost = () => {
         if (groupBy === BillingColumn.GcpProject) {
             debouncedGetData(groupBy, invoiceMonth, selectedGcpProjects, [])
         }
-    }, [selectedGcpProjects, debouncedGetData])
+    }, [selectedGcpProjects, debouncedGetData, groupBy, invoiceMonth])
 
     // Separate useEffect for Topic filter changes only
     React.useEffect(() => {
         if (groupBy === BillingColumn.Topic) {
             debouncedGetData(groupBy, invoiceMonth, [], selectedTopics)
         }
-    }, [selectedTopics, debouncedGetData])
+    }, [selectedTopics, debouncedGetData, groupBy, invoiceMonth])
 
     // Define column groups for easier management
     const DAILY_COLUMNS = ['compute_daily', 'storage_daily', 'total_daily']
@@ -872,92 +872,54 @@ const BillingCurrentCost = () => {
                                             <SUITable.Cell style={{ border: 'none' }} />
                                             <SUITable.Cell>{dk.cost_category}</SUITable.Cell>
 
-                                            {dk.cost_group === 'C' ? (
-                                                <React.Fragment>
-                                                    {invoiceMonth === thisMonth &&
-                                                    isColumnVisible('compute_daily') ? (
-                                                        <SUITable.Cell>
-                                                            {formatMoney(dk.daily_cost)}
-                                                        </SUITable.Cell>
-                                                    ) : null}
+                                            {/* Render cells for each visible column in the exact same order as HEADER_FIELDS */}
+                                            {HEADER_FIELDS.map((field) => {
+                                                // Skip the 'field' column since it's already rendered
+                                                if (
+                                                    field.category === 'field' ||
+                                                    !isColumnVisible(field.category)
+                                                ) {
+                                                    return null
+                                                }
 
-                                                    {/* Calculate colspan dynamically based on visible columns */}
-                                                    {(() => {
-                                                        // For the daily section, we need to check visibility of storage_daily and total_daily
-                                                        if (invoiceMonth === thisMonth) {
-                                                            const visibleCount =
-                                                                (isColumnVisible('storage_daily')
-                                                                    ? 1
-                                                                    : 0) +
-                                                                (isColumnVisible('total_daily')
-                                                                    ? 1
-                                                                    : 0)
+                                                // Determine if this detail row should show data in this column
+                                                let shouldShowData = false
+                                                let dataValue = 0
 
-                                                            return visibleCount > 0 ? (
-                                                                <SUITable.Cell
-                                                                    colSpan={visibleCount}
-                                                                />
-                                                            ) : null
-                                                        }
-                                                        return null
-                                                    })()}
+                                                if (dk.cost_group === 'C') {
+                                                    // Compute costs: show in compute columns
+                                                    if (
+                                                        field.category === 'compute_daily' ||
+                                                        field.category === 'compute_monthly'
+                                                    ) {
+                                                        shouldShowData = true
+                                                        dataValue =
+                                                            field.category === 'compute_daily'
+                                                                ? dk.daily_cost
+                                                                : dk.monthly_cost
+                                                    }
+                                                } else {
+                                                    // Storage costs: show in storage columns
+                                                    if (
+                                                        field.category === 'storage_daily' ||
+                                                        field.category === 'storage_monthly'
+                                                    ) {
+                                                        shouldShowData = true
+                                                        dataValue =
+                                                            field.category === 'storage_daily'
+                                                                ? dk.daily_cost
+                                                                : dk.monthly_cost
+                                                    }
+                                                }
 
-                                                    {isColumnVisible('compute_monthly') ? (
-                                                        <SUITable.Cell>
-                                                            {formatMoney(dk.monthly_cost)}
-                                                        </SUITable.Cell>
-                                                    ) : null}
-
-                                                    {/* Calculate colspan dynamically based on visible columns */}
-                                                    {(() => {
-                                                        // For monthly section, check visibility of storage_monthly and total_monthly
-                                                        const visibleCount =
-                                                            (isColumnVisible('storage_monthly')
-                                                                ? 1
-                                                                : 0) +
-                                                            (isColumnVisible('total_monthly')
-                                                                ? 1
-                                                                : 0)
-
-                                                        return visibleCount > 0 ? (
-                                                            <SUITable.Cell colSpan={visibleCount} />
-                                                        ) : null
-                                                    })()}
-                                                </React.Fragment>
-                                            ) : (
-                                                <React.Fragment>
-                                                    {isColumnVisible('compute_daily') ? (
-                                                        <SUITable.Cell />
-                                                    ) : null}
-
-                                                    {invoiceMonth === thisMonth &&
-                                                    isColumnVisible('storage_daily') ? (
-                                                        <SUITable.Cell>
-                                                            {formatMoney(dk.daily_cost)}
-                                                        </SUITable.Cell>
-                                                    ) : null}
-
-                                                    {/* Calculate colspan for total_daily */}
-                                                    {invoiceMonth === thisMonth &&
-                                                    isColumnVisible('total_daily') ? (
-                                                        <SUITable.Cell />
-                                                    ) : null}
-
-                                                    {isColumnVisible('compute_monthly') ? (
-                                                        <SUITable.Cell />
-                                                    ) : null}
-
-                                                    {isColumnVisible('storage_monthly') ? (
-                                                        <SUITable.Cell>
-                                                            {formatMoney(dk.monthly_cost)}
-                                                        </SUITable.Cell>
-                                                    ) : null}
-
-                                                    {isColumnVisible('total_monthly') ? (
-                                                        <SUITable.Cell />
-                                                    ) : null}
-                                                </React.Fragment>
-                                            )}
+                                                return (
+                                                    <SUITable.Cell key={field.category}>
+                                                        {shouldShowData
+                                                            ? formatMoney(dataValue)
+                                                            : ''}
+                                                    </SUITable.Cell>
+                                                )
+                                            })}
 
                                             {groupBy === BillingColumn.GcpProject &&
                                             invoiceMonth === thisMonth &&
