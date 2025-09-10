@@ -12,6 +12,7 @@ from models.models import (
     BillingCostBudgetRecord,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
+    BillingRunningCostQueryModel,
 )
 
 TEST_API_BILLING_USER = 'test_user'
@@ -154,13 +155,19 @@ class TestApiBilling(BqTest):
 
     @run_as_sync
     @patch('api.routes.billing._get_billing_layer_from')
-    @patch('db.python.layers.billing.BillingLayer.get_running_cost')
+    @patch('db.python.layers.billing.BillingLayer.get_running_cost_with_filters')
     async def test_get_running_cost(
-        self, mock_get_running_cost, mock_get_billing_layer
+        self, mock_get_running_cost_with_filters, mock_get_billing_layer
     ):
         """
-        Test get_running_cost function
+        Test get_running_cost function with new POST API and filtering support
         """
+        query = BillingRunningCostQueryModel(
+            field=BillingColumn.TOPIC,
+            invoice_month=None,
+            source=None,
+            filters={BillingColumn.GCP_PROJECT: ['project1', 'project2']},
+        )
         mockup_record = [
             BillingCostBudgetRecord.from_json(
                 {'field': 'TOPIC1', 'total_monthly': 999.99, 'details': []}
@@ -170,14 +177,49 @@ class TestApiBilling(BqTest):
             ),
         ]
         mock_get_billing_layer.return_value = self.layer
-        mock_get_running_cost.return_value = mockup_record
+        mock_get_running_cost_with_filters.return_value = mockup_record
         records = await billing.get_running_costs(
-            field=BillingColumn.TOPIC,
-            invoice_month=None,
-            source=None,
+            query=query,
             author=TEST_API_BILLING_USER,
         )
         self.assertEqual(mockup_record, records)
+
+        # Verify the layer method was called with the query object
+        mock_get_running_cost_with_filters.assert_called_once_with(query)
+
+    @run_as_sync
+    @patch('api.routes.billing._get_billing_layer_from')
+    @patch('db.python.layers.billing.BillingLayer.get_running_cost_with_filters')
+    async def test_get_running_cost_without_filters(
+        self, mock_get_running_cost_with_filters, mock_get_billing_layer
+    ):
+        """
+        Test get_running_cost function without filters (backwards compatibility)
+        """
+        query = BillingRunningCostQueryModel(
+            field=BillingColumn.GCP_PROJECT,
+            invoice_month='202412',
+            source=None,
+            filters=None,
+        )
+        mockup_record = [
+            BillingCostBudgetRecord.from_json(
+                {'field': 'project1', 'total_monthly': 500.00, 'details': []}
+            ),
+            BillingCostBudgetRecord.from_json(
+                {'field': 'project2', 'total_monthly': 750.50, 'details': []}
+            ),
+        ]
+        mock_get_billing_layer.return_value = self.layer
+        mock_get_running_cost_with_filters.return_value = mockup_record
+        records = await billing.get_running_costs(
+            query=query,
+            author=TEST_API_BILLING_USER,
+        )
+        self.assertEqual(mockup_record, records)
+
+        # Verify the layer method was called with the query object
+        mock_get_running_cost_with_filters.assert_called_once_with(query)
 
     @patch('api.routes.billing._get_billing_layer_from')
     async def call_api_function(

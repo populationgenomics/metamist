@@ -35,16 +35,16 @@ interface IBillingCostByMonthTableProps {
     isLoading: boolean
     data: DataDict
     months: string[]
-    visibleColumns: Set<string>
+    orderedTopics: string[]
 }
 
-const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
+const BillingCostByMonthTable: React.FunctionComponent<IBillingCostByMonthTableProps> = ({
     start,
     end,
     isLoading,
     data,
     months,
-    visibleColumns,
+    orderedTopics,
 }) => {
     if (isLoading) {
         return (
@@ -55,25 +55,15 @@ const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
     }
     const compTypes = ['Compute Cost', 'Storage Cost']
 
-    // Helper function to check if a column is visible
-    const isColumnVisible = (category: string): boolean => {
-        if (category === 'compute_type') {
-            return true // Always show required columns
-        }
-        return visibleColumns.has(category)
-    }
-
-    // Get only visible topics
-    const getVisibleTopics = () => {
-        return Object.keys(data)
-            .filter((topic) => isColumnVisible(topic))
-            .sort((a, b) => a.localeCompare(b))
+    // Get all topics in the order they were provided
+    const getAllTopics = () => {
+        return orderedTopics
     }
 
     const dataToBody = (data: DataDict) => {
-        const visibleTopics = getVisibleTopics()
+        const allTopics = getAllTopics()
 
-        return visibleTopics.map((key) => (
+        return allTopics.map((key) => (
             <>
                 {compTypes.map((compType, index) => (
                     <SUITable.Row key={`${key}-${index}-row`}>
