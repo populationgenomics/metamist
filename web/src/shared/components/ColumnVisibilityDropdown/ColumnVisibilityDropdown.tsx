@@ -40,6 +40,8 @@ export interface ColumnVisibilityDropdownProps {
     enableUrlPersistence?: boolean
     /** URL parameter name for column selection (default: 'columns') */
     urlParamName?: string
+    /** Custom button text (default: 'Fields') */
+    buttonText?: string
 }
 
 /**
@@ -142,6 +144,7 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
     searchPlaceholder = 'Search columns...',
     enableUrlPersistence = false,
     urlParamName = 'columns',
+    buttonText = 'Fields',
 }) => {
     const [isOpen, setIsOpen] = React.useState(false)
     const [searchTerm, setSearchTerm] = React.useState('')
@@ -417,7 +420,7 @@ const ColumnVisibilityDropdown: React.FC<ColumnVisibilityDropdownProps> = ({
                 floating
                 labeled
                 icon="columns"
-                text="Fields"
+                text={buttonText}
                 style={{ marginRight: '10px', ...buttonStyle }}
                 open={isOpen}
                 onClick={(e) => {

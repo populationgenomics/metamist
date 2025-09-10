@@ -3,6 +3,8 @@ import React from 'react'
 import formatMoney from '../../utilities/formatMoney'
 import LoadingDucks from '../LoadingDucks/LoadingDucks'
 
+const margin = { top: 50, right: 0, bottom: 150, left: 100 }
+
 export interface IData {
     label: string
     value: number
@@ -17,20 +19,11 @@ interface BarChartProps {
 
 export const BarChart: React.FC<BarChartProps> = ({ data, maxSlices, colors, isLoading }) => {
     const colorFunc: (t: number) => string | undefined = colors ?? interpolateRainbow
-    const margin = { top: 50, right: 0, bottom: 150, left: 100 }
     //   const width = 1000 - margin.left - margin.right;
     const height = 400 - margin.top - margin.bottom
 
     const containerDivRef = React.useRef<HTMLDivElement | null>(null)
     const [width, setWidth] = React.useState(768)
-
-    const scaleX = scaleBand()
-        .domain(data.map(({ label }) => label))
-        .range([0, width - margin.left - margin.right])
-        .padding(0.5)
-    const scaleY = scaleLinear()
-        .domain([0, Math.max(...data.map(({ value }) => value))])
-        .range([height, 0])
 
     React.useEffect(() => {
         function updateWindowWidth() {
@@ -46,22 +39,26 @@ export const BarChart: React.FC<BarChartProps> = ({ data, maxSlices, colors, isL
         }
     }, [])
 
-    if (isLoading) {
-        return (
-            <div>
-                <LoadingDucks />
-            </div>
-        )
-    }
+    React.useEffect(() => {
+        if (isLoading || !data || data.length === 0 || width === 0) {
+            return
+        }
 
-    if (!data || data.length === 0) {
-        return <>No Data</>
-    }
+        const contDiv = containerDivRef.current
+        if (!contDiv) {
+            return
+        }
 
-    const contDiv = containerDivRef.current
-    if (contDiv) {
         // reset svg
         contDiv.innerHTML = ''
+
+        const scaleX = scaleBand()
+            .domain(data.map(({ label }) => label))
+            .range([0, width - margin.left - margin.right])
+            .padding(0.5)
+        const scaleY = scaleLinear()
+            .domain([0, Math.max(...data.map(({ value }) => value))])
+            .range([height, 0])
 
         // construct svg
         const svg = select(contDiv)
@@ -118,6 +115,19 @@ export const BarChart: React.FC<BarChartProps> = ({ data, maxSlices, colors, isL
             .join('tspan')
             .attr('font-weight', (_, i) => (i ? null : 'normal'))
             .text((d) => d)
+    }, [data, width, isLoading, maxSlices, colorFunc, height])
+
+    if (isLoading) {
+        return (
+            <div>
+                <LoadingDucks />
+            </div>
+        )
     }
+
+    if (!data || data.length === 0) {
+        return <>No Data</>
+    }
+
     return <div ref={containerDivRef}></div>
 }

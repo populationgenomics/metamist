@@ -14,6 +14,7 @@ from models.models import (
     BillingCostBudgetRecord,
     BillingSampleQueryModel,
     BillingTotalCostQueryModel,
+    BillingRunningCostQueryModel,
 )
 
 
@@ -203,7 +204,19 @@ class BillingLayer(BqBaseLayer):
         Get Running costs including monthly budget
         """
         billing_table = self.table_factory(source, [field])
-        return await billing_table.get_running_cost(field, invoice_month)
+        return await billing_table.get_running_cost_with_filters(
+            BillingRunningCostQueryModel(field=field, invoice_month=invoice_month)
+        )
+
+    async def get_running_cost_with_filters(
+        self,
+        query: BillingRunningCostQueryModel,
+    ) -> list[BillingCostBudgetRecord]:
+        """
+        Get Running costs including monthly budget with filtering support
+        """
+        billing_table = self.table_factory(query.source, [query.field], query.filters)
+        return await billing_table.get_running_cost_with_filters(query)
 
     async def get_cost_by_ar_guid(
         self,

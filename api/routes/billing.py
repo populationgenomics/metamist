@@ -15,14 +15,13 @@ from api.utils.db import (
     get_projectless_db_connection,
 )
 from db.python.layers.billing import BillingLayer
-from models.enums import BillingSource
 from models.models import (
     AnalysisCostRecord,
-    BillingColumn,
     BillingCostBudgetRecord,
     BillingSampleQueryModel,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
+    BillingRunningCostQueryModel,
 )
 
 router = APIRouter(prefix='/billing', tags=['billing'])
@@ -525,21 +524,29 @@ async def get_total_cost(
     return [BillingTotalCostRecord.from_json(record) for record in records]
 
 
-@router.get(
-    '/running-cost/{field}',
+@router.post(
+    '/running-cost',
     response_model=list[BillingCostBudgetRecord],
     operation_id='getRunningCost',
 )
 @alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_running_costs(
-    field: BillingColumn,
-    invoice_month: str | None = None,
-    source: BillingSource | None = None,
+    query: BillingRunningCostQueryModel,
     author: str = get_author,
 ) -> list[BillingCostBudgetRecord]:
     """
-    Get running cost for specified fields in database
+    Get running cost for specified fields in database with filtering support
     e.g. fields = ['gcp_project', 'topic', 'wdl_task_names', 'cromwell_sub_workflow_name', 'compute_category']
+
+    Example request with filtering:
+    {
+        "field": "gcp_project",
+        "invoice_month": "202412",
+        "source": "gcp_billing",
+        "filters": {
+            "gcp_project": ["project1", "project2"]
+        }
+    }
     """
     # TODO replace alru_cache with async-cache?
     # so we can skip author for caching?
@@ -547,7 +554,7 @@ async def get_running_costs(
     # @AsyncTTL(time_to_live=BILLING_CACHE_RESPONSE_TTL, maxsize=1024, skip_args=2)
 
     billing_layer = _get_billing_layer_from(author)
-    records = await billing_layer.get_running_cost(field, invoice_month, source)
+    records = await billing_layer.get_running_cost_with_filters(query)
     return records
 
 
