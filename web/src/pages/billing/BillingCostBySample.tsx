@@ -1,5 +1,14 @@
 import { ApolloError } from '@apollo/client'
-import { Alert, Box, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material'
+import {
+    Alert,
+    Box,
+    Button,
+    Modal,
+    Link as MuiLink,
+    ToggleButton,
+    ToggleButtonGroup,
+    Typography,
+} from '@mui/material'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { DateTime } from 'luxon'
 import { useContext, useEffect, useMemo, useState } from 'react'
@@ -80,12 +89,14 @@ type BillingDataResult = {
     warnings?: string[]
 }
 
-// This is the main hook for fetching data from the billing API
-function useBillingCostBySampleData(
-    ids: string[],
-    dateRange: [DateTime, DateTime],
+type DataQuery = {
+    ids: string[]
+    dateRange: [DateTime, DateTime]
     breakDownBy: BillingColumn[]
-): BillingDataResult {
+}
+
+// This is the main hook for fetching data from the billing API
+function useBillingCostBySampleData({ ids, dateRange, breakDownBy }: DataQuery): BillingDataResult {
     const [billingResult, setBillingResult] = useState<BillingDataResult>({ loading: false })
 
     const start = dateRange[0].toISODate()
@@ -266,6 +277,12 @@ function BillingCostBySample() {
         DateTime.now().startOf('month'),
     ])
     const [breakDownBy, setBreakDownBy] = useState<BillingColumn[]>([BillingColumn.SequencingGroup])
+
+    // Store data query separately from individual filters so that we only run the data request
+    // when the search button is clicked. This avoids over-requesting when users are changing filters
+    const [dataQuery, setDataQuery] = useState<DataQuery>({ ids: [], dateRange, breakDownBy })
+
+    const [showingInfo, setShowingInfo] = useState(false)
     const viewer = useContext(ViewerContext)
 
     const idPrefixes: Record<string, string> | undefined = viewer?.metamistSettings
@@ -279,38 +296,52 @@ function BillingCostBySample() {
     // it is only read from once, and then written back to when filters change.
     useEffect(() => {
         const search = new URLSearchParams(window.location.search)
-        const start = search.get('start')
-        const end = search.get('end')
-        const breakDownBy = search.get('breakDownBy')
-        const ids = search.get('idList')
+        const startQs = search.get('start')
+        const endQs = search.get('end')
+        const breakDownByQs = search.get('breakDownBy')
+        const idsQs = search.get('idList')
 
-        if (start && end) {
-            const parsedStart = DateTime.fromISO(start)
-            const parsedEnd = DateTime.fromISO(end)
+        let dateRange: [DateTime, DateTime] | null = null
+        let ids: string[] | null = null
+        let breakDownBy: BillingColumn[] | null = null
+
+        if (startQs && endQs) {
+            const parsedStart = DateTime.fromISO(startQs)
+            const parsedEnd = DateTime.fromISO(endQs)
             if (parsedStart.isValid && parsedEnd.isValid && parsedEnd > parsedStart) {
                 setDateRange([parsedStart, parsedEnd])
+                dateRange = [parsedStart, parsedEnd]
             }
         }
 
-        if (breakDownBy) {
+        if (breakDownByQs) {
             const validBillingColumns = new Set(
                 Object.entries(BillingColumn).map(([_, value]) => value)
             )
-            const trimmedBreakDownBy = breakDownBy
+            const trimmedBreakDownBy = breakDownByQs
                 .split(',')
                 .map((ii) => ii.trim()) as BillingColumn[]
             const validBreakDownBy = trimmedBreakDownBy.filter((ii) => validBillingColumns.has(ii))
             setBreakDownBy(validBreakDownBy)
+            breakDownBy = validBreakDownBy
         }
 
-        if (ids) {
-            setIdList(ids.split(',').map((id) => id.trim().toUpperCase()))
+        if (idsQs) {
+            ids = idsQs.split(',').map((id) => id.trim().toUpperCase())
+            setIdList(ids)
         }
+
+        setDataQuery((prev) => ({
+            dateRange: dateRange ?? prev.dateRange,
+            ids: ids ?? prev.ids,
+            breakDownBy: breakDownBy ?? prev.breakDownBy,
+        }))
     }, [])
 
     // Update url with filters when they change
     useEffect(() => {
-        const idListVal = idList.join(',')
+        const { ids, dateRange, breakDownBy } = dataQuery
+        const idListVal = ids.join(',')
         const breakDownByVal = breakDownBy.join(',')
         const startVal = dateRange[0].toISODate()
         const endVal = dateRange[1].toISODate()
@@ -331,19 +362,43 @@ function BillingCostBySample() {
         return () => {
             clearTimeout(update)
         }
-    }, [breakDownBy, dateRange, idList])
+    }, [dataQuery])
 
-    const { loading, data, error, warnings } = useBillingCostBySampleData(
-        idList,
-        dateRange,
-        breakDownBy
-    )
+    const { loading, data, error, warnings } = useBillingCostBySampleData(dataQuery)
+
+    // Calculate whether to enable the search button. Dirty state refers to whether the current
+    // filters match the query for which results are displayed.
+    const isDirty = useMemo(() => {
+        let dirty = false
+        if (dataQuery.ids.join(',') !== idList.join(',')) dirty = true
+        if (dataQuery.breakDownBy.join(',') !== breakDownBy.join(',')) dirty = true
+        if (dataQuery.dateRange.join(',') !== dateRange.join(',')) dirty = true
+
+        return dirty
+    }, [dataQuery, idList, breakDownBy, dateRange])
 
     return (
         <PaddedPage>
-            <Typography variant="h1" fontSize={28} fontWeight={'bold'}>
-                Billing cost by sample
-            </Typography>
+            <Box display="flex">
+                <Box mr={2}>
+                    <Typography variant="h1" fontSize={28} fontWeight={'bold'}>
+                        Billing cost by sample
+                    </Typography>
+                </Box>
+                <Box alignSelf={'end'}>
+                    <MuiLink
+                        href="#"
+                        sx={{ fontSize: 12, mr: 2 }}
+                        color="info"
+                        onClick={(e) => {
+                            e.preventDefault()
+                            setShowingInfo(true)
+                        }}
+                    >
+                        How is this calculated?
+                    </MuiLink>
+                </Box>
+            </Box>
 
             <Box mt={2}>
                 <IdSelector
@@ -368,6 +423,7 @@ function BillingCostBySample() {
                                 if (value) setDateRange([value, dateRange[1]])
                             }}
                             slotProps={{ textField: { size: 'small' } }}
+                            sx={{ maxWidth: 180 }}
                         />
                         <DatePicker
                             label={'End'}
@@ -378,6 +434,7 @@ function BillingCostBySample() {
                             }}
                             value={dateRange[1]}
                             slotProps={{ textField: { size: 'small' } }}
+                            sx={{ maxWidth: 180 }}
                         />
                     </Box>
                 </Box>
@@ -399,6 +456,18 @@ function BillingCostBySample() {
                             </ToggleButton>
                         ))}
                     </ToggleButtonGroup>
+                </Box>
+                {/* Align to end of row */}
+                <Box justifyContent={'end'} alignSelf={'end'} flexGrow={1} display={'flex'}>
+                    <Button
+                        disabled={!isDirty}
+                        variant="contained"
+                        onClick={() => {
+                            setDataQuery({ ids: idList, dateRange, breakDownBy })
+                        }}
+                    >
+                        Search
+                    </Button>
                 </Box>
             </Box>
 
@@ -422,6 +491,72 @@ function BillingCostBySample() {
                     <BillingCostBySampleTable data={data ?? []} />
                 </Box>
             )}
+
+            <Modal open={showingInfo} onClose={() => setShowingInfo(false)}>
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        width: '100%',
+                        maxWidth: 640,
+                        bgcolor: 'background.paper',
+                        boxShadow: 24,
+                        p: 4,
+                    }}
+                >
+                    <Typography variant="h5" component="h2" mb={2}>
+                        How are Sample and Sequencing Group costs calculated?
+                    </Typography>
+                    <Alert severity="info">
+                        Due to constraints in the cost reporting available in GCP some costs
+                        displayed on this page are estimated.
+                    </Alert>
+
+                    <Typography variant="h6" component="h2" mt={2}>
+                        Storage cost calculations
+                    </Typography>
+                    <Typography mb={2}>
+                        GCP cost reporting only provides storage costs at a bucket level. The cost
+                        figures displayed on this page are estimated using sample CRAM file sizes to
+                        apportion costs to a sequencing group level. The calculation is:
+                    </Typography>
+                    <Typography mb={2}>
+                        <code>
+                            sg storage cost = (sg cram file size / total of cram file sizes in
+                            project) * total project storage cost
+                        </code>
+                    </Typography>
+                    <Typography mb={2}>
+                        If a sequencing group does not have a active CRAM file then no storage cost
+                        will be allocated.
+                    </Typography>
+                    <Typography mb={2}>
+                        The <em>current</em> CRAM file size is used, so recent changes to CRAM files
+                        can impact historical cost reporting.
+                    </Typography>
+                    <Typography mb={2}>
+                        A sequencing group will be allocated storage costs for any month that it was
+                        "active". Active months are defined as the time period from when the sample
+                        was first seen either in metamist audit logs, or in billing compute records.
+                    </Typography>
+
+                    <Typography mb={2} fontWeight={'bold'}>
+                        Storage costs are intended to be used as an indicative estimate and should
+                        not be used as precise measurements.
+                    </Typography>
+
+                    <Typography variant="h6" component="h2" mt={2}>
+                        Compute cost calculations
+                    </Typography>
+
+                    <Typography mb={2}>
+                        If a compute billing record contains multiple sequencing groups, the cost is
+                        allocated evenly across all sequencing groups for that record.
+                    </Typography>
+                </Box>
+            </Modal>
         </PaddedPage>
     )
 }
