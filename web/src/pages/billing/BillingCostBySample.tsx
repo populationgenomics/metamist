@@ -529,7 +529,7 @@ function BillingCostBySample() {
                         </code>
                     </Typography>
                     <Typography mb={2}>
-                        If a sequencing group does not have a active CRAM file then no storage cost
+                        If a sequencing group does not have an active CRAM file then no storage cost
                         will be allocated.
                     </Typography>
                     <Typography mb={2}>
