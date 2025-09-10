@@ -538,8 +538,9 @@ function BillingCostBySample() {
                     </Typography>
                     <Typography mb={2}>
                         A sequencing group will be allocated storage costs for any month that it was
-                        "active". Active months are defined as the time period from when the sample
-                        was first seen either in metamist audit logs, or in billing compute records.
+                        &quot;active&quot;. Active months are defined as the time period from when
+                        the sample was first seen either in metamist audit logs, or in billing
+                        compute records.
                     </Typography>
 
                     <Typography mb={2} fontWeight={'bold'}>
