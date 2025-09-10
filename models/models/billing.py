@@ -556,7 +556,7 @@ class BillingSampleQueryModel(SMBase):
     end_date: str
     # sample ids or seq group ids
     search_ids: list[str] | None = None
-      
+
     def __hash__(self):
         """Create hash for this object to use in caching"""
         return hash(self.model_dump_json())
