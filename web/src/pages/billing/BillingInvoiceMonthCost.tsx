@@ -895,8 +895,8 @@ const BillingCurrentCost = () => {
                                                         shouldShowData = true
                                                         dataValue =
                                                             field.category === 'compute_daily'
-                                                                ? dk.daily_cost
-                                                                : dk.monthly_cost
+                                                                ? dk.daily_cost ?? 0
+                                                                : dk.monthly_cost ?? 0
                                                     }
                                                 } else {
                                                     // Storage costs: show in storage columns
@@ -907,8 +907,8 @@ const BillingCurrentCost = () => {
                                                         shouldShowData = true
                                                         dataValue =
                                                             field.category === 'storage_daily'
-                                                                ? dk.daily_cost
-                                                                : dk.monthly_cost
+                                                                ? dk.daily_cost ?? 0
+                                                                : dk.monthly_cost ?? 0
                                                     }
                                                 }
 
