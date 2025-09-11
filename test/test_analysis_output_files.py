@@ -225,10 +225,10 @@ class TestOutputFiles(DbIsolatedTest):
 
         outputs = {
             'cram': {
-                'basename': 'gs://fakegcs/file2.cram',
+                'path': 'gs://fakegcs/file2.cram',
                 'secondary_files': {
-                    'meta': {'basename': 'gs://fakegcs/file2.cram.meta'},
-                    'ext': {'basename': 'gs://fakegcs/file2.cram.ext'},
+                    'meta': {'path': 'gs://fakegcs/file2.cram.meta'},
+                    'ext': {'path': 'gs://fakegcs/file2.cram.ext'},
                 },
             },
         }
