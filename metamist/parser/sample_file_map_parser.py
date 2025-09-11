@@ -114,7 +114,7 @@ logger.setLevel(logging.INFO)
 class SampleFileMapParser(GenericMetadataParser):
     """Parser for SampleFileMap"""
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         search_locations: list[str],
         project: str,

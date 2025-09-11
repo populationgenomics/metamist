@@ -102,7 +102,6 @@ class GenericMetadataParser(GenericParser):
         read_length_column: str | None = None,
         reference_assembly_location_column: str | None = None,
         ora_reference_assembly_location_column: str | None = None,
-
         # GVCF columns
         gvcf_column: str | None = None,
         # Meta field key maps
@@ -247,7 +246,9 @@ class GenericMetadataParser(GenericParser):
         self.read_end_type_column = read_end_type_column
         self.read_length_column = read_length_column
         self.reference_assembly_location_column = reference_assembly_location_column
-        self.ora_reference_assembly_location_column = ora_reference_assembly_location_column
+        self.ora_reference_assembly_location_column = (
+            ora_reference_assembly_location_column
+        )
 
         # Meta field key maps
         self.participant_meta_map = participant_meta_map or {}
@@ -456,7 +457,16 @@ class GenericMetadataParser(GenericParser):
 
         files_from_rows: list[str] = sum(await asyncio.gather(*filename_promises), [])
         filenames_from_rows = set(f.strip() for f in files_from_rows if f and f.strip())
-        relevant_extensions = ('.cram', '.fastq.gz', '.fastq', 'fq.gz', '.fq', '.bam', '.fastq.ora', '.fq.ora')
+        relevant_extensions = (
+            '.cram',
+            '.fastq.gz',
+            '.fastq',
+            'fq.gz',
+            '.fq',
+            '.bam',
+            '.fastq.ora',
+            '.fq.ora',
+        )
 
         # we need to explicitly filter filenames from rows not to include absolute
         # paths, otherwise the below check will flag it as missing
@@ -839,16 +849,14 @@ class GenericMetadataParser(GenericParser):
                 )
 
         ora_ref_fp = self.file_path(ora_ref)
-        secondary_files = (
-            await self.create_secondary_file_objects_by_potential_pattern(
-                ora_ref_fp, ['.tar']
-            )
+        secondary_files = await self.create_secondary_file_objects_by_potential_pattern(
+            ora_ref_fp, ['.tar']
         )
         ora_reference = await self.create_file_object(
             ora_ref_fp, secondary_files=secondary_files
         )
         return {'reads_type': 'fastq_ora', 'ora_reference': ora_reference}
-    
+
     async def get_assays_from_group(
         self, sequencing_group: ParsedSequencingGroup
     ) -> list[ParsedAssay]:
@@ -860,9 +868,12 @@ class GenericMetadataParser(GenericParser):
 
         assays = []
 
-        read_filenames, read_checksums, reference_assemblies, ora_references = await self.get_read_and_ref_files_and_checksums(
-            sample.external_sid, rows
-        )
+        (
+            read_filenames,
+            read_checksums,
+            reference_assemblies,
+            ora_references,
+        ) = await self.get_read_and_ref_files_and_checksums(sample.external_sid, rows)
 
         # strip in case collaborator put "file1, file2"
         full_read_filenames: list[str] = []
@@ -888,7 +899,7 @@ class GenericMetadataParser(GenericParser):
         reads_type = keys[0]
         collapsed_assay_meta['reads_type'] = reads_type
         # collapsed_assay_meta['reads'] = reads[reads_type]
-        
+
         if reads_type == 'fastq_ora':
             collapsed_assay_meta.update(
                 await self.parse_fastq_ora_assays(sample, ora_references)
