@@ -1402,8 +1402,6 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
             if any(r.lower().endswith(ext) for ext in FASTQ_ORA_EXTENSIONS)
         ]
         if fastq_oras:
-            # TODO if not ora ref, fail
-
             structured_fastq_oras = self.parse_fastqs_structure(fastq_oras)
             fastq_ora_files: list[Sequence[Coroutine | BaseException]] = []  # type: ignore
             for fastq_ora_group in structured_fastq_oras:

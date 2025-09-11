@@ -836,7 +836,7 @@ class GenericMetadataParser(GenericParser):
             # sorted for consistent testing
             str_ora_references = ', '.join(sorted(ora_references))
             raise ValueError(
-                f'Multiple ORA references were defined for {sample.external_sid}: {str_ora_references}'
+                f'Multiple ORA references were defined for {sample.primary_external_id}: {str_ora_references}'
             )
         if len(ora_references) == 1:
             ora_ref = next(iter(ora_references))
@@ -844,7 +844,7 @@ class GenericMetadataParser(GenericParser):
             ora_ref = self.ora_reference_assembly_location
             if not ora_ref:
                 raise ValueError(
-                    f'Reads type for {sample.external_sid!r} is FASTQ ORA, but a decompression '
+                    f'Reads type for {sample.primary_external_id!r} is FASTQ ORA, but a decompression '
                     f'reference is not defined, please set the ORA decompression reference path'
                 )
 
@@ -901,6 +901,8 @@ class GenericMetadataParser(GenericParser):
         # collapsed_assay_meta['reads'] = reads[reads_type]
 
         if reads_type == 'fastq_ora':
+            if not ora_references:
+                raise ValueError('Missing ORA reference for fastq_ora')
             collapsed_assay_meta.update(
                 await self.parse_fastq_ora_assays(sample, ora_references)
             )
