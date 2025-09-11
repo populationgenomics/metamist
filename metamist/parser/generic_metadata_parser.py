@@ -816,7 +816,7 @@ class GenericMetadataParser(GenericParser):
         cram_reference = await self.create_file_object(
             ref_fp, secondary_files=secondary_files
         )
-        return {'reference_assembly' : cram_reference}
+        return {'reference_assembly': cram_reference}
 
     async def parse_fastq_ora_assays(
         self, sample: ParsedSample, ora_references: set[str]
