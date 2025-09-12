@@ -873,7 +873,7 @@ class GenericMetadataParser(GenericParser):
             read_checksums,
             reference_assemblies,
             ora_references,
-        ) = await self.get_read_and_ref_files_and_checksums(sample.external_sid, rows)
+        ) = await self.get_read_and_ref_files_and_checksums(sample.primary_external_id, rows)
 
         # strip in case collaborator put "file1, file2"
         full_read_filenames: list[str] = []
