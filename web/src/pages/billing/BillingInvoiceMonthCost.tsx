@@ -872,9 +872,7 @@ const BillingCurrentCost = () => {
                                             <SUITable.Cell style={{ border: 'none' }} />
                                             <SUITable.Cell>{dk.cost_category}</SUITable.Cell>
 
-                                            {/* Render cells for each visible column in the exact same order as HEADER_FIELDS */}
                                             {HEADER_FIELDS.map((field) => {
-                                                // Skip the 'field' column since it's already rendered
                                                 if (
                                                     field.category === 'field' ||
                                                     !isColumnVisible(field.category)
@@ -882,7 +880,6 @@ const BillingCurrentCost = () => {
                                                     return null
                                                 }
 
-                                                // Determine if this detail row should show data in this column
                                                 let shouldShowData = false
                                                 let dataValue = 0
 
