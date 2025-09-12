@@ -391,7 +391,6 @@ class BillingBaseTable(BqDbBase):
         total_monthly_category: dict,
         total_daily_category: dict,
         results: list[BillingCostBudgetRecord],
-        filters: dict | None = None,
     ) -> list[BillingCostBudgetRecord]:
         """
         Add total row: compute + storage to the results
@@ -409,14 +408,8 @@ class BillingBaseTable(BqDbBase):
             )
 
         # Generate appropriate title based on whether filters are applied
-        if filters and 'gcp_project' in filters:
-            gcp_projects = filters['gcp_project']
-            if isinstance(gcp_projects, list) and len(gcp_projects) > 0:
-                field_title = f'Total ({len(gcp_projects)} projects)'
-            else:
-                field_title = f'{BillingColumn.generate_all_title(field)}'
-        else:
-            field_title = f'{BillingColumn.generate_all_title(field)}'
+        # Always use consistent "All X" naming for aggregate rows
+        field_title = f'{BillingColumn.generate_all_title(field)}'
 
         # add total row: compute + storage
         results.append(
@@ -749,7 +742,6 @@ class BillingBaseTable(BqDbBase):
             total_monthly_category,
             total_daily_category,
             results,
-            query.filters,
         )
 
         # add rest of the records: compute + storage

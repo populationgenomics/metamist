@@ -409,6 +409,13 @@ const BillingCurrentCost = () => {
         return `${num.toFixed(0).toString()} % `
     }
 
+    // Helper function to calculate consistent totals from rounded components
+    const getConsistentTotal = (compute: number | null, storage: number | null): number => {
+        const computeRounded = compute ? Math.round(compute * 100) / 100 : 0
+        const storageRounded = storage ? Math.round(storage * 100) / 100 : 0
+        return computeRounded + storageRounded
+    }
+
     if (error)
         return (
             <Message negative>
@@ -831,16 +838,32 @@ const BillingCurrentCost = () => {
                                                         </b>
                                                     </SUITable.Cell>
                                                 )
-                                            default:
+                                            default: {
                                                 // We already checked visibility above, so just render
+                                                const record = p as BillingCostBudgetRecord
+                                                let value = record[
+                                                    k.category as keyof BillingCostBudgetRecord
+                                                ] as number
+
+                                                // Recalculate totals from rounded components for consistency
+                                                if (k.category === 'total_monthly') {
+                                                    value = getConsistentTotal(
+                                                        record.compute_monthly,
+                                                        record.storage_monthly
+                                                    )
+                                                } else if (k.category === 'total_daily') {
+                                                    value = getConsistentTotal(
+                                                        record.compute_daily,
+                                                        record.storage_daily
+                                                    )
+                                                }
+
                                                 return (
                                                     <SUITable.Cell key={k.category}>
-                                                        {
-                                                            // @ts-ignore
-                                                            formatMoney(p[k.category])
-                                                        }
+                                                        {formatMoney(value)}
                                                     </SUITable.Cell>
                                                 )
+                                            }
                                         }
                                     })}
 
