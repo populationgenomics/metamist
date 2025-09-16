@@ -143,7 +143,6 @@ export const ProjectGridFilterGuide: React.FC<IProjectGridFilterGuideProps> = ({
                     input={exampleDictionary}
                     height="330px"
                     readonly
-                    onChange={() => console.log}
                 />
                 <h3>Query definition</h3>
                 <p>
@@ -198,9 +197,6 @@ export const ProjectGridFilterGuide: React.FC<IProjectGridFilterGuideProps> = ({
                     input={yamlString}
                     height="400px"
                     readonly
-                    onChange={(v) => {
-                        console.log(v)
-                    }}
                 />
             </div>
         </>
