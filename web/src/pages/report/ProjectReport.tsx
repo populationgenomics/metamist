@@ -1,15 +1,29 @@
-import { Box, Tab, Tabs, Typography } from '@mui/material'
+import { useContext } from 'react'
+import { Alert, Box, Tab, Tabs, Typography } from '@mui/material'
 import { Link, useParams } from 'react-router-dom'
 import MuckError from '../../shared/components/MuckError'
 import { reports } from './reportIndex'
+import { ViewerContext } from '../../viewer'
+import { ProjectMemberRole } from '../../__generated__/graphql'
 
 const NotFound = () => <MuckError message="Report not found" />
 
 export default function ProjectReport() {
     const { projectName, reportName, tabName } = useParams()
-
+    
     if (!projectName || !reportName || !reports[projectName] || !reports[projectName][reportName]) {
         return <NotFound />
+    }
+    
+    const viewer = useContext(ViewerContext);
+    const canAccess = viewer?.checkProjectAccessByName(projectName, 
+        [
+            ProjectMemberRole.Contributor, 
+            ProjectMemberRole.Reader, 
+            ProjectMemberRole.Writer
+        ]);
+    if (!canAccess) {
+        return <Alert severity='error'>You do not have appropriate permissions to view the project "{projectName}".</Alert>;
     }
 
     const reportTabs = reports[projectName][reportName].tabs
