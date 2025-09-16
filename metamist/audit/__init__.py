@@ -51,7 +51,7 @@ from .models import (
 from .services import (
     AuditLogs,
     AuditAnalyzer,
-    ReportGenerator,
+    Reporter,
     FileMatchingService,
 )
 
@@ -60,7 +60,7 @@ from .cli.upload_bucket_audit import (
     audit_upload_bucket_async,
     AuditOrchestrator,
 )
-from .cli.review_audit_results import review_audit_report, review_filtered_files
+from .cli.review_audit_results import review_audit_report, review_rows
 from .cli.delete_from_audit_results import (
     delete_from_audit_results,
     delete_files_from_report,
@@ -75,7 +75,7 @@ __all__ = [
     'audit_upload_bucket_async',
     'AuditOrchestrator',
     'review_audit_report',
-    'review_filtered_files',
+    'review_rows',
     'delete_from_audit_results',
     'delete_files_from_report',
     'upsert_deleted_files_analysis',
@@ -97,7 +97,7 @@ __all__ = [
     # Services
     'AuditAnalyzer',
     'AuditLogs',
-    'ReportGenerator',
+    'Reporter',
     'FileMatchingService',
     # Value objects
     'FileMetadata',

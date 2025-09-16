@@ -4,7 +4,7 @@ import click
 
 from metamist.audit.data_access.gcs_data_access import GCSDataAccess
 from metamist.audit.models import AuditReportEntry, ReviewResult
-from metamist.audit.services import AuditLogs, ReportGenerator
+from metamist.audit.services import AuditLogs, Reporter
 
 from cpg_utils import to_path
 
@@ -17,20 +17,19 @@ def review_audit_report(
     report: str = 'files_to_review',
     action: str = 'DELETE',
     comment: str = '',
-    filter_func: callable = None,
+    filter_expressions: list[str] | None = None,
 ):
     """Review files listed in the audit results."""
     audit_logs = AuditLogs(dataset, 'audit_review')
 
     gcs_data = GCSDataAccess(dataset)
-    reporter = ReportGenerator(gcs_data, audit_logs, results_folder)
+    reporter = Reporter(gcs_data, audit_logs, results_folder)
 
     audit_logs.info_nl(f"Reading report '{report}'".center(50, '~'))
     rows = reporter.get_report_rows_from_name(report)
 
-    review_result = review_filtered_files(
-        rows, filter_func, action, comment, audit_logs
-    )
+    rows = reporter.filter_rows(filter_expressions, rows)
+    review_result = review_rows(rows, action, comment, audit_logs)
     audit_logs.info_nl(
         f'Added comments to {len(review_result.reviewed_files)} / {len(rows)} files.'
     )
@@ -40,21 +39,19 @@ def review_audit_report(
     audit_logs.info_nl('Review complete!')
 
 
-def review_filtered_files(
+def review_rows(
     rows: list[AuditReportEntry],
-    filter_func: callable,
     action: str,
     comment: str,
     audit_logs: AuditLogs,
 ) -> ReviewResult:
     """Review files from audit results based on filters and comments."""
+    action = action.upper()
+    if action not in ACTIONS:
+        raise ValueError(f'Invalid action: {action}. Must be one of {ACTIONS}.')
     audit_logs.info_nl(f"Annotating rows with comment: '{comment}'")
     reviewed_rows: list[AuditReportEntry] = []
     for row in rows:
-        if filter_func and not filter_func(row.to_report_dict()):
-            # Skip row due to filter(s)
-            continue
-
         file_path = to_path(row.filepath)
         if not file_path.exists():
             audit_logs.warning(f'File {file_path} does not exist, skipping review.')
@@ -65,53 +62,6 @@ def review_filtered_files(
         reviewed_rows.append(row)
 
     return ReviewResult(reviewed_files=reviewed_rows)
-
-
-def parse_filter_expressions(filter_expressions: list[str]) -> callable:
-    """Parse filter expressions into a callable filter function."""
-
-    def matches_filters(row: dict) -> bool:
-        for expr in filter_expressions:
-            if not evaluate_filter_expression(expr, row):
-                return False
-        return True
-
-    return matches_filters
-
-
-def evaluate_filter_expression(expr: str, row: dict) -> bool:
-    """Evaluate a single filter expression against a row."""
-    # Recursive cases first
-    if ' or ' in expr:
-        # Evaluate either side of the 'or'
-        left, right = expr.split(' or ', 1)
-        return evaluate_filter_expression(
-            left.strip(), row
-        ) or evaluate_filter_expression(right.strip(), row)
-
-    if ' and ' in expr:
-        # Evaluate either side of the 'and'
-        left, right = expr.split(' and ', 1)
-        return evaluate_filter_expression(
-            left.strip(), row
-        ) and evaluate_filter_expression(right.strip(), row)
-
-    # Handle contains operator
-    if ' contains ' in expr:
-        field, value = expr.split(' contains ', 1)
-        return value.strip('"\'') in str(row.get(field.strip(), ''))
-
-    # Handle equality
-    if '==' in expr:
-        field, value = expr.split('==', 1)
-        return str(row.get(field.strip(), '')).strip() == value.strip().strip('"\'')
-
-    # Handle inequality
-    if '!=' in expr:
-        field, value = expr.split('!=', 1)
-        return str(row.get(field.strip(), '')).strip() != value.strip().strip('"\'')
-
-    return True
 
 
 @click.command()
@@ -140,20 +90,12 @@ def main(
     filter_expressions: tuple = (),
 ):
     """Main function to review objects."""
-    action = action.upper()
-    if action not in ACTIONS:
-        raise ValueError(f'Invalid action: {action}. Must be one of {ACTIONS}.')
-    filter_func = (
-        parse_filter_expressions(list(filter_expressions))
-        if filter_expressions
-        else None
-    )
     review_audit_report(
         dataset=dataset,
         results_folder=results_folder,
         action=action,
         comment=comment,
-        filter_func=filter_func,
+        filter_expressions=list(filter_expressions),
     )
 
 

@@ -4,7 +4,7 @@ import click
 
 from metamist.audit.data_access import GCSDataAccess, MetamistDataAccess
 from metamist.audit.models import AuditReportEntry, DeletionResult
-from metamist.audit.services import AuditLogs, ReportGenerator
+from metamist.audit.services import AuditLogs, Reporter
 
 from cpg_utils import Path, to_path
 
@@ -19,7 +19,7 @@ def delete_from_audit_results(
     audit_logs = AuditLogs(dataset, 'audit_deletions')
 
     gcs = GCSDataAccess(dataset)
-    reporter = ReportGenerator(gcs, audit_logs, results_folder)
+    reporter = Reporter(gcs, audit_logs, results_folder)
 
     audit_logs.info_nl(f"Reading report '{report}'".center(50, '~'))
 

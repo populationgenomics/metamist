@@ -6,11 +6,12 @@ import unittest.mock
 
 from metamist.audit.adapters import StorageClient
 from metamist.audit.cli.upload_bucket_audit import AuditOrchestrator
+from metamist.audit.cli.review_audit_results import review_rows
 from metamist.audit.data_access import MetamistDataAccess, GCSDataAccess
 from metamist.audit.services import (
     AuditAnalyzer,
     FileMatchingService,
-    ReportGenerator,
+    Reporter,
     AuditLogs,
 )
 from metamist.audit.models import (
@@ -68,7 +69,7 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
         self.file_matcher = FileMatchingService()
         self.audit_analyzer = AuditAnalyzer()
         self.audit_logs = AuditLogs('dataset', 'test')
-        self.report_generator = ReportGenerator(self.gcs_data_access, self.audit_logs)
+        self.reporter = Reporter(self.gcs_data_access, self.audit_logs)
 
     def tearDown(self):
         """Clean up test fixtures."""
@@ -552,7 +553,7 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
             self.metamist_data_access,
             self.gcs_data_access,
             self.audit_analyzer,
-            ReportGenerator(self.gcs_data_access, AuditLogs('dataset', 'test')),
+            Reporter(self.gcs_data_access, AuditLogs('dataset', 'test')),
             AuditLogs('dataset', 'test'),
         )
 
@@ -568,15 +569,15 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
 
         # This would normally write files, so mock that too
         with unittest.mock.patch.object(
-            ReportGenerator, 'write_audit_reports'
+            Reporter, 'write_audit_reports'
         ) as mock_write_reports:
             await orchestrator.run_audit(config)
             self.assertTrue(mock_write_reports.called)
 
-    # ===== REPORT GENERATOR SERVICE TESTS =====
-    # These test the file matching logic
+    # ===== REPORTER SERVICE TESTS =====
+    # These test the report writing and reading logic
     def test_write_audit_reports(self):
-        """Test the ReportGenerator.write_audit_reports method."""
+        """Test the Reporter.write_audit_reports method."""
         audit_result = AuditResult(
             files_to_delete=[
                 AuditReportEntry(filepath='gs://cpg-dataset-main-upload/file1.bam')
@@ -599,9 +600,9 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
             excluded_prefixes=('<EXCLUDED_PREFIX>',),
         )
         with unittest.mock.patch.object(
-            ReportGenerator, '_write_csv_report'
+            Reporter, '_write_csv_report'
         ) as mock_write_csv_report:
-            self.report_generator.write_audit_reports(audit_result, config)
+            self.reporter.write_audit_reports(audit_result, config)
             self.assertTrue(mock_write_csv_report.called)
 
     # write_log_file
@@ -610,19 +611,212 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
     # get_report_stats
     # get_report_entries_stats
     # generate_summary_statistics
-    # AuditReportEntry from_report_dict
-    # AuditReportEntry to_report_dict
-    # AuditReportEntry fieldsname
-    # AuditReportEntry update_action
-    # AuditReportEntry update_review_comment
 
-    # TODO
-    # Review audit results tests
-    # parse_filter_expressions
-    # evalutate_filter_expression
-    # review_audit_report
-    # review_filtered_files
-    # main
+    # ===== REVIEW AUDIT RESULTS TESTS =====
+    # Test the report reviewing entrypoint and related functions
+    def filter_rows(self):
+        """Test filtering rows based on expressions."""
+        expressions = [
+            'sg_type == "exome" and sg_platform == "illumina"',
+            'sample_id == "S01" or sample_id == "S02"',
+            'participant_external_ids contains "P001"',
+            'filesize > 1000 and sg_tech == "short-read"',
+            'filepath contains ".bam"',
+        ]
+        parsed = self.reporter.filter_rows(
+            [expressions[0]],
+            rows=[
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file1.bam',
+                    sg_type='exome',
+                    sg_platform='illumina',
+                ),
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file2.bam',
+                    sg_type='genome',
+                    sg_platform='illumina',
+                ),
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file3.bam',
+                    sg_type='exome',
+                    sg_platform='pacbio',
+                ),
+            ],
+        )
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
+        parsed = self.reporter.filter_rows(
+            [expressions[1]],
+            rows=[
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file1.bam',
+                    sample_id='S01',
+                ),
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file2.bam',
+                    sample_id='S03',
+                ),
+            ],
+        )
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
+        parsed = self.reporter.filter_rows(
+            [expressions[2]],
+            rows=[
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file1.bam',
+                    participant_external_ids=['P001', 'P002'],
+                ),
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file2.bam',
+                    participant_external_ids=['P002', 'P003'],
+                ),
+            ],
+        )
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
+        parsed = self.reporter.filter_rows(
+            [expressions[3]],
+            rows=[
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file1.bam',
+                    filesize=2000,
+                    sg_tech='short-read',
+                ),
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file2.bam',
+                    filesize=500,
+                    sg_tech='short-read',
+                ),
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file3.bam',
+                    filesize=2000,
+                    sg_tech='long-read',
+                ),
+            ],
+        )
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
+
+        # Now a compound expression
+        parsed = self.reporter.filter_rows(
+            [expressions[4], 'filesize >= 1500'],
+            rows=[
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file1.bam',
+                    filesize=2000,
+                ),
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file2.cram',
+                    filesize=1499,
+                ),
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file3.bam',
+                    filesize=500,
+                ),
+            ],
+        )
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
+
+        # Compound with 'or'
+        parsed = self.reporter.filter_rows(
+            [
+                'filesize >= 1500 or filepath contains ".cram" or sample_id == "S03" or sg_type == "genome"'
+            ],
+            rows=[
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file1.bam',
+                    filesize=2000,
+                ),
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file2.cram',
+                    filesize=1500,
+                ),
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file3.bam',
+                    filesize=500,
+                    sg_type='genome',
+                ),
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file4.bam',
+                    sample_id='S03',
+                ),
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file5.bam',
+                    filesize=1000,
+                ),
+            ],
+        )
+        self.assertEqual(len(parsed), 4)
+        self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
+        self.assertEqual(parsed[1].filepath, 'gs://cpg-dataset-main-upload/file2.cram')
+        self.assertEqual(parsed[2].filepath, 'gs://cpg-dataset-main-upload/file3.bam')
+        self.assertEqual(parsed[3].filepath, 'gs://cpg-dataset-main-upload/file4.bam')
+
+    def test_review_rows(self):
+        """Test reviewing rows - updating action and comments"""
+        rows = [
+            AuditReportEntry(
+                filepath='gs://cpg-dataset-main-upload/file1.bam',
+                review_action='REVIEW',
+                review_comment='',
+            ),
+            AuditReportEntry(
+                filepath='gs://cpg-dataset-main-upload/file2.bam',
+                review_action='REVIEW',
+                review_comment='',
+            ),
+        ]
+        # Mock to_path to return a mock object with exists() method
+        mock_path = unittest.mock.MagicMock()
+        mock_path.exists.return_value = True
+        with unittest.mock.patch(
+            'metamist.audit.cli.review_audit_results.to_path', return_value=mock_path
+        ):
+            review_result = review_rows(
+                rows,
+                action='INGEST',
+                comment='Reviewed and marked for ingestion',
+                audit_logs=self.audit_logs,
+            )
+            self.assertEqual(len(review_result.reviewed_files), 2)
+            for row in review_result.reviewed_files:
+                self.assertEqual(row.action, 'INGEST')
+                self.assertEqual(
+                    row.review_comment, 'Reviewed and marked for ingestion'
+                )
+
+            rows = [
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file1.bam',
+                    review_action='REVIEW',
+                    review_comment='',
+                ),
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file2.bam',
+                    review_action='REVIEW',
+                    review_comment='',
+                ),
+            ]
+            review_result = review_rows(
+                rows,
+                action='REVIEW',
+                comment='No changes made',
+                audit_logs=self.audit_logs,
+            )
+            self.assertEqual(len(review_result.reviewed_files), 2)
+            for row in review_result.reviewed_files:
+                self.assertEqual(row.action, 'REVIEW')
+                self.assertEqual(row.review_comment, 'No changes made')
+
+            with self.assertRaises(ValueError):
+                review_rows(
+                    rows,
+                    action='INVALID_ACTION',
+                    comment='This should fail',
+                    audit_logs=self.audit_logs,
+                )
 
     # TODO
     # Delete from audit results tests

@@ -8,7 +8,7 @@ from .file_matcher import (
     FileMatchingService,
 )
 from .audit_analyzer import AuditAnalyzer
-from .report_generator import ReportGenerator
+from .reporter import Reporter
 from .audit_logging import AuditLogs
 
 __all__ = [
@@ -20,6 +20,6 @@ __all__ = [
     'FileMatchingService',
     # Core services
     'AuditAnalyzer',
-    'ReportGenerator',
+    'Reporter',
     'AuditLogs',
 ]
