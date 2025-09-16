@@ -49,6 +49,7 @@ module.exports = {
         '@typescript-eslint/ban-ts-comment': 0,
         // This isn't needed as ts validates prop types
         'react/prop-types': [0],
+        "no-console": "error",
     },
     settings: {
         react: {
