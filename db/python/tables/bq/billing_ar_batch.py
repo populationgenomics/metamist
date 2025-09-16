@@ -182,7 +182,7 @@ class BillingArBatchTable(BillingBaseTable):
         )
 
         total_cram_info = dict(info_record)
-        total_crams_size = float(total_cram_info.get('total_crams_size', 0))
+        total_crams_size = float(total_cram_info.get('total_crams_size') or 0)
         return total_crams_size
 
     async def calculate_storage_cost_using_cram_files_info(
@@ -490,9 +490,9 @@ class BillingArBatchTable(BillingBaseTable):
             )
 
             # get number of seq groups
-            number_of_seq_groups[
-                project_id
-            ] = await self.get_number_of_sequencing_groups(connection, project_id)
+            number_of_seq_groups[project_id] = (
+                await self.get_number_of_sequencing_groups(connection, project_id)
+            )
 
             # Get the cram size per project, total size and count cram files
             total_crams_size[project_id] = await self.get_total_crams_info(
