@@ -1,8 +1,9 @@
 """Repository for Google Cloud Storage data access."""
 
+from cpg_utils import Path
 from cpg_utils.config import config_retrieve, dataset_path
 
-from metamist.audit.models import FileMetadata, FileType, FilePath
+from metamist.audit.models import FileMetadata, FileType
 from metamist.audit.adapters import StorageClient
 
 
@@ -75,8 +76,8 @@ class GCSDataAccess:
         )
 
     def validate_cram_files(
-        self, cram_paths: list[FilePath]
-    ) -> tuple[list[FilePath], list[FilePath]]:
+        self, cram_paths: list[Path]
+    ) -> tuple[list[Path], list[Path]]:
         """
         Validate the existence of CRAM files in the bucket.
 
@@ -88,7 +89,7 @@ class GCSDataAccess:
             Lists of found CRAM paths and missing CRAM paths
         """
         assert all(
-            p.path.bucket == self.main_bucket for p in cram_paths
+            p.bucket == self.main_bucket for p in cram_paths
         ), 'All CRAM paths must be in the main(|test) bucket'
         crams_in_bucket = self.storage.check_blobs(self.main_bucket, cram_paths)
         # Check that all cram_paths were found

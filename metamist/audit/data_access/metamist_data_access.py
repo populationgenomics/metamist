@@ -9,20 +9,11 @@ from metamist.audit.models import (
     Assay,
     Sample,
     Participant,
-    ReadFile,
     FileMetadata,
-    FilePath,
     ExternalIds,
     AuditConfig,
 )
 from metamist.audit.adapters import GraphQLClient
-
-from metamist.apis import AnalysisApi
-from metamist.models import (
-    Analysis,
-    AnalysisStatus,
-    AnalysisUpdateModel,
-)
 
 
 class MetamistDataAccess:
@@ -140,14 +131,12 @@ class MetamistDataAccess:
             stats: Statistics for the analysis
         """
         cohort_id = self.graphql_client.get_dataset_cohort(dataset, cohort_name)
-        analysis = Analysis(
-            cohort_ids=[cohort_id],
-            type='audit_deletion',
-            output=deletion_report_path,
-            status=AnalysisStatus('completed'),
+        return self.graphql_client.create_audit_deletion_analysis(
+            dataset,
+            cohort_id,
+            deletion_report_path,
             meta={audited_report_name: stats},
         )
-        return AnalysisApi().create_analysis(dataset, analysis)
 
     def update_audit_deletion_analysis(
         self,
@@ -171,12 +160,10 @@ class MetamistDataAccess:
             'file_count': stats.get('file_count', 0)
             + current_stats.get('file_count', 0),
         }
-        analysis_update = AnalysisUpdateModel(
-            status=AnalysisStatus('completed'),
-            output=existing_analysis['output'],
-            meta=existing_analysis['meta'] | {audited_report_name: new_stats},
+        self.graphql_client.update_audit_deletion_analysis(
+            existing_analysis['id'],
+            existing_analysis['meta'] | {audited_report_name: new_stats},
         )
-        AnalysisApi().update_analysis(existing_analysis['id'], analysis_update)
 
     async def get_enum_values(self, enum_type: str) -> list[str]:
         """
@@ -295,20 +282,18 @@ class MetamistDataAccess:
 
         return assay if assay.read_files else None
 
-    def _parse_read_file(self, data: dict) -> ReadFile | None:
+    def _parse_read_file(self, data: dict) -> FileMetadata | None:
         """Parse raw read file data into entity."""
         location = data.get('location')
         if not location:
             return None
 
         try:
-            file_path = FilePath(to_path(location))
-            metadata = FileMetadata(
-                filepath=file_path,
+            return FileMetadata(
+                filepath=to_path(location),
                 filesize=data.get('size'),
                 checksum=data.get('checksum'),
             )
-            return ReadFile(metadata=metadata)
         except (ValueError, AttributeError):
             return None
 
@@ -330,11 +315,11 @@ class MetamistDataAccess:
             return None
 
         try:
-            file_path = FilePath(to_path(output_path))
             output_file = FileMetadata(
-                filepath=file_path, filesize=output_size, checksum=output_checksum
+                filepath=to_path(output_path),
+                filesize=output_size,
+                checksum=output_checksum,
             )
-
             return AuditAnalysis(
                 id=data['id'],
                 type=data['type'],

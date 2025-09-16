@@ -3,9 +3,9 @@
 from io import StringIO
 from typing import cast
 from google.cloud import storage
-from cpg_utils import to_path
+from cpg_utils import Path, to_path
 
-from metamist.audit.models import FileMetadata, FilePath
+from metamist.audit.models import FileMetadata
 
 
 class StorageClient:
@@ -50,21 +50,24 @@ class StorageClient:
     def check_blobs(
         self,
         bucket_name: str,
-        paths: list[FilePath],
-    ) -> list[FilePath]:
+        paths: list[Path],
+    ) -> list[Path]:
         """
         Check the existence of blobs in a bucket.
+        Does so by getting the unique prefixes from all input paths,
+        doing list_blobs() on each prefix, and intersecting the
+        results with the input paths.
 
         Args:
             bucket: Name of the bucket
             blobs: List of blob names to check
 
         Returns:
-            List of found blob names
+            List of paths validated against the bucket files
         """
         prefixes = set()
         for p in paths:
-            prefixes.add(p.blob.rsplit('/', 1)[0] + '/')
+            prefixes.add('/'.join(p.parts[2:-1]) + '/')
         bucket_blobs = self.find_blobs(bucket_name, prefixes)
         return [p for p in paths if p in [b.filepath for b in bucket_blobs]]
 
@@ -107,7 +110,7 @@ class StorageClient:
 
                 files.append(
                     FileMetadata(
-                        filepath=FilePath(to_path(f'gs://{bucket_name}/{blob.name}')),
+                        filepath=to_path(f'gs://{bucket_name}/{blob.name}'),
                         filesize=blob.size,
                         checksum=blob.crc32c,
                     )

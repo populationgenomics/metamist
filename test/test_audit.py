@@ -16,22 +16,28 @@ from metamist.audit.services import (
 from metamist.audit.models import (
     SequencingGroup,
     Analysis,
-    Assay,
-    Sample,
-    Participant,
-    ExternalIds,
-    ReadFile,
-    FileMetadata,
-    FilePath,
     AuditConfig,
     FileType,
     AuditResult,
+    FileMetadata,
+)
+from data.audit_fixtures.audit_test import (
+    ENUMS_QUERY_RESULT,
+    SEQUENCING_GROUPS,
+    SR_ILLUMINA_EXOME_SGS,
+    UPLOAD_BUCKET_FILES,
+    MAIN_BUCKET_FILES,
+    ANALYSES,
+    ALL_SEQUENCING_GROUP_ASSAYS_RESPONSE,
+    SR_ILLUMINA_EXOME_SGS_ASSAYS_RESPONSE,
+    ALL_SEQUENCING_GROUP_ANALYSES_RESPONSE,
+    SR_ILLUMINA_EXOME_SGS_CRAM_RESPONSE,
 )
 
 from cpg_utils import to_path
 
 
-class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attributes
+class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attributes, too-many-public-methods
     """Test the audit module"""
 
     def setUp(self):
@@ -63,11 +69,11 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
         self.storage_client_patcher.stop()
         self.bucket_patcher.stop()
 
-    # ===== METAMIST DATA ACCESS TESTS =====
-    # These test the data access layer - mapping GraphQL responses to domain models
-
     def test_gcs_data_access_setup(self):
-        """Test that GCSDataAccess initializes correctly with mocked buckets"""
+        """
+        First test that GCSDataAccess initializes correctly with mocked buckets
+        since these are used frequently in the tests.
+        """
         # Verify that the bucket names are set correctly from our mocks
         self.assertEqual(self.gcs_data_access.main_bucket, 'cpg-dataset-main')
         self.assertEqual(self.gcs_data_access.upload_bucket, 'cpg-dataset-main-upload')
@@ -77,114 +83,200 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
         self.assertEqual(self.gcs_data_access.dataset, 'dataset')
         self.assertEqual(self.gcs_data_access.gcp_project, 'test')
 
+    # ===== METAMIST DATA ACCESS TESTS =====
+    # These test the data access layer - mapping GraphQL responses to domain models
     @run_as_sync
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
-    async def test_get_sequencing_groups(self, mock_query_async):
-        """Test MetamistDataAccess.get_sequencing_groups"""
-        mock_query_async.return_value = {
-            'project': {
-                'sequencingGroups': [
-                    {
-                        'id': 'CPGaaa',
-                        'type': 'genome',
-                        'technology': 'short-read',
-                        'platform': 'illumina',
-                        'sample': {
-                            'id': 'XPG123',
-                            'externalIds': {'': 'EXT123'},
-                            'participant': {'id': 1, 'externalIds': {'': 'P01'}},
-                        },
-                        'assays': [
-                            {
-                                'id': 1,
-                                'meta': {
-                                    'reads': [
-                                        {
-                                            'location': 'gs://cpg-dataset-main-upload/R1.fq',
-                                            'size': 11,
-                                            'checksum': 'abc123',
-                                        },
-                                        {
-                                            'location': 'gs://cpg-dataset-main-upload/R2.fq',
-                                            'size': 12,
-                                            'checksum': 'def456',
-                                        },
-                                    ]
-                                },
-                            }
-                        ],
-                    }
-                ],
-            }
-        }
+    async def test_validate_enums(self, mock_query_async):
+        """Test MetamistDataAccess.validate_enums"""
+        mock_query_async.return_value = ENUMS_QUERY_RESULT
+        config = AuditConfig(
+            dataset='dataset',
+            sequencing_types=('genome', 'exome'),
+            sequencing_technologies=('short-read', 'long-read'),
+            sequencing_platforms=('illumina', 'pacbio', 'ont'),
+            analysis_types=('cram', 'vcf'),
+            file_types=tuple(list(FileType)),
+        )
+        result = await self.metamist_data_access.validate_metamist_enums(config=config)
+        self.assertEqual(config, result)
 
-        # Test the new method
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
+    async def test_validate_enums_failure(self, mock_query_async):
+        """Test MetamistDataAccess.validate_enums invalid input"""
+        mock_query_async.return_value = ENUMS_QUERY_RESULT
+        with self.assertRaises(ValueError):
+            await self.metamist_data_access.validate_metamist_enums(
+                config=AuditConfig(
+                    dataset='dataset',
+                    sequencing_types=('genome', 'exome'),
+                    sequencing_technologies=(
+                        'short-read',
+                        'long-read',
+                        'future-technology',
+                    ),
+                    sequencing_platforms=('illumina', 'pacbio', 'ont'),
+                    analysis_types=('cram', 'vcf'),
+                    file_types=tuple(list(FileType)),
+                )
+            )
+
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
+    async def test_get_all_sequencing_groups(self, mock_query_async):
+        """Test MetamistDataAccess.get_sequencing_groups"""
+        mock_query_async.return_value = ALL_SEQUENCING_GROUP_ASSAYS_RESPONSE
+
         result = await self.metamist_data_access.get_sequencing_groups(
-            dataset='test',
-            sequencing_types=['genome'],
+            dataset='dataset',
+            sequencing_types=['genome', 'exome'],
+            sequencing_technologies=['short-read', 'long_read'],
+            sequencing_platforms=['illumina', 'pacbio', 'ont'],
+        )
+
+        self.assertEqual(len(result), 7)
+        for sg in result:
+            self.assertIsInstance(sg, SequencingGroup)
+
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
+    async def test_get_filtered_sequencing_groups(self, mock_query_async):
+        """Test MetamistDataAccess.get_sequencing_groups filtered"""
+        mock_query_async.return_value = SR_ILLUMINA_EXOME_SGS_ASSAYS_RESPONSE
+
+        result = await self.metamist_data_access.get_sequencing_groups(
+            dataset='dataset',
+            sequencing_types=['exome'],
             sequencing_technologies=['short-read'],
             sequencing_platforms=['illumina'],
         )
 
-        # Assertions using new domain models
         self.assertEqual(len(result), 1)
         sg = result[0]
         self.assertIsInstance(sg, SequencingGroup)
-        self.assertEqual(sg.id, 'CPGaaa')
-        self.assertEqual(sg.type, 'genome')
-        self.assertEqual(len(sg.assays), 1)
+        self.assertEqual(sg.id, 'SG01_2')
+        self.assertEqual(sg.technology, 'short-read')
+        self.assertEqual(sg.platform, 'illumina')
+        self.assertEqual(sg.sample.external_id, 'EXT001')
+        self.assertEqual(sg.sample.participant.external_id, 'P001')
 
-        assay = sg.assays[0]
-        self.assertEqual(assay.id, 1)
-        self.assertEqual(len(assay.read_files), 2)
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.adapters.graphql_client.query')
+    async def test_get_dataset_cohort(self, mock_query):
+        """Test MetamistDataAccess.get_dataset_cohort"""
+        mock_query.return_value = {
+            'project': {'cohorts': [{'id': 'C01', 'name': 'Cohort 1'}]}
+        }
+        cohort_id = self.metamist_data_access.graphql_client.get_dataset_cohort(
+            'dataset', 'Cohort 1'
+        )
+        self.assertEqual(cohort_id, 'C01')
 
-        read_file_1 = assay.read_files[0]
-        self.assertEqual(read_file_1.filepath.uri, 'gs://cpg-dataset-main-upload/R1.fq')
-        self.assertEqual(read_file_1.filesize, 11)
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.adapters.graphql_client.query')
+    async def test_get_dataset_cohort_create_new(self, mock_query):
+        """Test MetamistDataAccess.get_dataset_cohort where none are found so we create new"""
+        mock_query.side_effect = [
+            {  # Query 1 - for the existing cohorts
+                'project': {'cohorts': []}
+            },
+            {  # Query 2 - a mutation query to create a new cohort
+                'cohort': {
+                    'createCohortFromCriteria': {'id': 'C01', 'name': 'Cohort 1'}
+                }
+            },
+        ]
+        cohort_id = self.metamist_data_access.graphql_client.get_dataset_cohort(
+            'dataset', 'Cohort 1'
+        )
+        self.assertEqual(cohort_id, 'C01')
 
-        read_file_2 = assay.read_files[1]
-        self.assertEqual(read_file_2.filepath.uri, 'gs://cpg-dataset-main-upload/R2.fq')
-        self.assertEqual(read_file_2.filesize, 12)
+    @unittest.mock.patch('metamist.audit.adapters.graphql_client.query')
+    def test_create_audit_deletion_analysis(self, mock_query):
+        """Test MetamistDataAccess.create_audit_deletion_analysis"""
+        mock_query.side_effect = [
+            {'project': {'cohorts': [{'id': 'C01', 'name': 'Cohort 1'}]}},
+            {'analysis': {'createAnalysis': {'id': 1}}},
+        ]
+        result = self.metamist_data_access.create_audit_deletion_analysis(
+            dataset='dataset',
+            cohort_name='Cohort 1',
+            audited_report_name='files_to_delete',
+            deletion_report_path='gs://cpg-dataset-main-analysis/audit_results/20250901_1633/files_to_delete.csv',
+            stats={},
+        )
+
+        self.assertEqual(result, 1)
+
+    # TODO
+    # Test entities
+    # test participant.external_id
+    # test sample.external_id
+    # test assay.get_total_size
+    # test sequencing_group.get_total_read_size
+
+    # TODO
+    # test value_objects
+    # FileType.extensions
+    # FileType.all_read_extensions
+    # FileType.all_extensions
+    # ExternalIds.get_primary
+    # ExternalIds.__getitem__
+    # ExternalIds.values
+    # AuditConfig.from_cli_args
+
+    # TODO
+
+    # test_get_sequencing_groups_more
+    # - Should handle reads as a dict, not nested list in _parse_assay
+    # - Should handle secondary files in assay reads in _parse_assay
+    # - Should handle empty read files (i.e. where read.location == None) in _parse_read_file
+    # - Should handle cases which lead to ValueError / AttributeError in _parse_read_file
+    # - Should handle outputs dict in _parse_analysis
+    # - Should handle outputs dict where output_path = None in _parse_analysis
+    # - Should handle cases which lead to ValueError / AttributeError in _parse_analysis
+    # - Should handle different timestamp parsing in _parse_timestamp
 
     @run_as_sync
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
     async def test_get_analyses_for_sequencing_groups(self, mock_query_async):
         """Test MetamistDataAccess.get_analyses_for_sequencing_groups"""
-        mock_query_async.return_value = {
-            'project': {
-                'sequencingGroups': [
-                    {
-                        'id': 'CPGaaa',
-                        'analyses': [
-                            {
-                                'id': 1,
-                                'type': 'cram',
-                                'status': 'completed',
-                                'meta': {
-                                    'sequencing_type': 'genome',
-                                },
-                                'output': 'gs://cpg-dataset-main/cram/CPGaaa.cram',
-                                'timestampCompleted': '2023-05-11T16:33:00',
-                            },
-                        ],
-                    },
-                ]
-            }
-        }
+        mock_query_async.return_value = ALL_SEQUENCING_GROUP_ANALYSES_RESPONSE
 
         result = await self.metamist_data_access.get_analyses_for_sequencing_groups(
-            dataset='test', sg_ids=['CPGaaa'], analysis_types=['cram']
+            dataset='dataset',
+            sg_ids=[sg.id for sg in SEQUENCING_GROUPS.values()],
+            analysis_types=['cram', 'vcf'],
+        )
+
+        self.assertEqual(len(result), 7)
+        for analysis in result:
+            self.assertIsInstance(analysis, Analysis)
+            self.assertIn(analysis.id, [1, 2, 3, 4, 5, 6, 7])
+            self.assertIn(analysis.type, ['cram', 'vcf'])
+
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
+    async def test_get_filtered_analyses_for_sequencing_groups(self, mock_query_async):
+        """Test MetamistDataAccess.get_analyses_for_sequencing_groups filtered"""
+        mock_query_async.return_value = SR_ILLUMINA_EXOME_SGS_CRAM_RESPONSE
+
+        result = await self.metamist_data_access.get_analyses_for_sequencing_groups(
+            dataset='dataset',
+            sg_ids=[sg.id for sg in SR_ILLUMINA_EXOME_SGS],
+            analysis_types=['cram'],
         )
 
         self.assertEqual(len(result), 1)
         analysis = result[0]
         self.assertIsInstance(analysis, Analysis)
-        self.assertEqual(analysis.id, 1)
+        self.assertEqual(analysis.id, 2)
+        self.assertEqual(analysis.sequencing_group_id, 'SG01_2')
         self.assertEqual(analysis.type, 'cram')
-        self.assertEqual(analysis.sequencing_group_id, 'CPGaaa')
         self.assertTrue(analysis.is_cram)
         self.assertEqual(
-            analysis.output_file.filepath.uri, 'gs://cpg-dataset-main/cram/CPGaaa.cram'
+            analysis.output_path, 'gs://cpg-dataset-main/exome/cram/SG01_2.cram'
         )
 
     @run_as_sync
@@ -211,12 +303,32 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
         }
 
         result = self.metamist_data_access.get_audit_deletion_analysis(
-            dataset='test',
+            dataset='dataset',
             output_path='gs://cpg-dataset-main-analysis/audit_results/20250901_1633/deleted_file.csv',
         )
 
         self.assertIsInstance(result, dict)
         self.assertEqual(result['id'], 1)
+
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.adapters.graphql_client.query')
+    async def test_get_audit_deletion_analysis_none(self, mock_query):
+        """Test MetamistDataAccess.get_audit_deletion_analyses"""
+        mock_query.return_value = {
+            'project': {
+                'analyses': [],
+            },
+        }
+
+        result = self.metamist_data_access.get_audit_deletion_analysis(
+            dataset='dataset',
+            output_path='gs://cpg-dataset-main-analysis/audit_results/20250901_1633/deleted_file.csv',
+        )
+
+        self.assertIsNone(result)
+
+    # TODO
+    # update_audit_deletion_analysis
 
     # ===== GCS DATA ACCESS TESTS =====
     # These test the data access layer - mapping GCS responses to domain models
@@ -225,15 +337,9 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
     def test_list_files_in_bucket(self, mock_list_files):
         """Test listing the files in a bucket"""
         mock_list_files.return_value = [
-            FileMetadata(
-                filepath=FilePath(to_path('gs://cpg-dataset-main-upload/read1.fq'))
-            ),
-            FileMetadata(
-                filepath=FilePath(to_path('gs://cpg-dataset-main-upload/read2.fq'))
-            ),
-            FileMetadata(
-                filepath=FilePath(to_path('gs://cpg-dataset-main-upload/uningested.fq'))
-            ),
+            f
+            for f in UPLOAD_BUCKET_FILES
+            if str(f.filepath).endswith(FileType.FASTQ.extensions)
         ]
 
         blobs = self.gcs_data_access.list_files_in_bucket(
@@ -243,315 +349,108 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
             ],
         )
 
-        self.assertEqual(len(blobs), 3)
-        self.assertEqual(
-            blobs[0].filepath,
-            FilePath(to_path('gs://cpg-dataset-main-upload/read1.fq')),
-        )
-        self.assertEqual(
-            blobs[1].filepath,
-            FilePath(to_path('gs://cpg-dataset-main-upload/read2.fq')),
-        )
-        self.assertEqual(
-            blobs[2].filepath,
-            FilePath(to_path('gs://cpg-dataset-main-upload/uningested.fq')),
-        )
+        self.assertEqual(len(blobs), 8)
 
     @unittest.mock.patch.object(StorageClient, 'check_blobs')
     def test_validate_cram_files(self, mock_check_blobs):
         """Test validating CRAM files"""
-        mock_check_blobs.return_value = [
-            FilePath(to_path('gs://cpg-dataset-main/cram/CPGaaa.cram')),
-            FilePath(to_path('gs://cpg-dataset-main/cram/CPGbbb.cram')),
-        ]
+        mock_check_blobs.return_value = [f.filepath for f in MAIN_BUCKET_FILES[:2]]
 
         found, missing = self.gcs_data_access.validate_cram_files(
-            cram_paths=[
-                FilePath(to_path('gs://cpg-dataset-main/cram/CPGaaa.cram')),
-                FilePath(to_path('gs://cpg-dataset-main/cram/CPGbbb.cram')),
-            ]
+            cram_paths=[f.filepath for f in MAIN_BUCKET_FILES[:2]]
         )
 
         self.assertEqual(len(found), 2)
         self.assertEqual(len(missing), 0)
+        self.assertEqual(found[0], to_path('gs://cpg-dataset-main/cram/SG01_1.cram'))
         self.assertEqual(
-            found[0], FilePath(to_path('gs://cpg-dataset-main/cram/CPGaaa.cram'))
-        )
-        self.assertEqual(
-            found[1], FilePath(to_path('gs://cpg-dataset-main/cram/CPGbbb.cram'))
+            found[1], to_path('gs://cpg-dataset-main/exome/cram/SG01_2.cram')
         )
 
     @unittest.mock.patch.object(StorageClient, 'check_blobs')
     def test_validate_cram_files_with_missing(self, mock_check_blobs):
         """Test validating CRAM files where one is missing"""
         # Mock check_blobs to return only 2 of the 3 requested files
-        mock_check_blobs.return_value = [
-            FilePath(to_path('gs://cpg-dataset-main/cram/CPGaaa.cram')),
-            FilePath(to_path('gs://cpg-dataset-main/cram/CPGbbb.cram')),
-        ]
+        mock_check_blobs.return_value = [f.filepath for f in MAIN_BUCKET_FILES[:2]]
 
         found, missing = self.gcs_data_access.validate_cram_files(
-            cram_paths=[
-                FilePath(to_path('gs://cpg-dataset-main/cram/CPGaaa.cram')),
-                FilePath(to_path('gs://cpg-dataset-main/cram/CPGbbb.cram')),
-                FilePath(to_path('gs://cpg-dataset-main/cram/CPGccc.cram')),
-            ]
+            cram_paths=[f.filepath for f in MAIN_BUCKET_FILES[:3]]
         )
 
         self.assertEqual(len(found), 2)
         self.assertEqual(len(missing), 1)
+        self.assertEqual(found[0], to_path('gs://cpg-dataset-main/cram/SG01_1.cram'))
         self.assertEqual(
-            found[0], FilePath(to_path('gs://cpg-dataset-main/cram/CPGaaa.cram'))
+            found[1], to_path('gs://cpg-dataset-main/exome/cram/SG01_2.cram')
         )
-        self.assertEqual(
-            found[1], FilePath(to_path('gs://cpg-dataset-main/cram/CPGbbb.cram'))
-        )
-        self.assertEqual(
-            missing[0], FilePath(to_path('gs://cpg-dataset-main/cram/CPGccc.cram'))
-        )
+        self.assertEqual(missing[0], to_path('gs://cpg-dataset-main/cram/SG02.cram'))
 
     # ===== AUDIT ANALYZER TESTS =====
     # These test the core business logic - most complex tests
 
     def test_analyze_sequencing_groups_basic(self):
         """Test basic audit analysis"""
-        sequencing_groups = [
-            SequencingGroup(
-                id='CPGaaa',
-                type='genome',
-                technology='short-read',
-                platform='illumina',
-                sample=Sample(
-                    id='XPG123',
-                    external_ids=ExternalIds({'': 'EXT123'}),
-                    participant=Participant(
-                        id=1, external_ids=ExternalIds({'': 'P01'})
-                    ),
-                ),
-                assays=[
-                    Assay(
-                        id=1,
-                        read_files=[
-                            ReadFile(
-                                FileMetadata(
-                                    filepath=FilePath(
-                                        to_path('gs://cpg-dataset-main-upload/read1.fq')
-                                    ),
-                                    filesize=11,
-                                    checksum='abc123',
-                                )
-                            ),
-                            ReadFile(
-                                FileMetadata(
-                                    filepath=FilePath(
-                                        to_path('gs://cpg-dataset-main-upload/read2.fq')
-                                    ),
-                                    filesize=12,
-                                    checksum='def456',
-                                )
-                            ),
-                        ],
-                    )
-                ],
-            )
-        ]
-
-        bucket_files = [
-            FileMetadata(
-                filepath=FilePath(to_path('gs://cpg-dataset-main-upload/read1.fq')),
-                filesize=11,
-                checksum='abc123',
-            ),
-            FileMetadata(
-                filepath=FilePath(to_path('gs://cpg-dataset-main-upload/read2.fq')),
-                filesize=12,
-                checksum='def456',
-            ),
-            FileMetadata(
-                filepath=FilePath(
-                    to_path('gs://cpg-dataset-main-upload/uningested.fq')
-                ),
-                filesize=20,
-                checksum='xyz789',
-            ),
-        ]
-
-        analyses = [
-            Analysis(
-                id=1,
-                type='cram',
-                sequencing_group_id='CPGaaa',
-                output_file=FileMetadata(
-                    filepath=FilePath(
-                        to_path('gs://cpg-dataset-main/cram/CPGaaa.cram')
-                    ),
-                ),
-            )
-        ]
-
         # Test the core analysis
         result = self.audit_analyzer.analyze_sequencing_groups(
-            sequencing_groups, bucket_files, analyses
+            SEQUENCING_GROUPS.values(), UPLOAD_BUCKET_FILES, ANALYSES.values()
         )
-
-        # Verify results
         self.assertIsInstance(result, AuditResult)
 
-        # Should have files to delete (original reads, since CRAM exists)
+        # Should have files to delete
         self.assertGreater(len(result.files_to_delete), 0)
-
         # Should have files to review (uningested file)
         self.assertGreater(len(result.files_to_review), 0)
-
         # Should mark SG as complete
-        self.assertEqual(len(result.unaligned_sequencing_groups), 0)
+        self.assertEqual(len(result.unaligned_sequencing_groups), 1)
+        self.assertEqual(result.unaligned_sequencing_groups[0].id, 'SG04')
 
     def test_analyze_with_moved_files(self):
         """Test moved file detection"""
-        sequencing_groups = [
-            SequencingGroup(
-                id='CPGaaa',
-                type='genome',
-                technology='short-read',
-                platform='illumina',
-                sample=Sample(
-                    id='XPG123',
-                    external_ids=ExternalIds({'': 'EXT123'}),
-                    participant=Participant(
-                        id=1, external_ids=ExternalIds({'': 'P01'})
-                    ),
-                ),
-                assays=[
-                    Assay(
-                        id=1,
-                        read_files=[
-                            ReadFile(
-                                FileMetadata(
-                                    filepath=FilePath(
-                                        to_path('gs://cpg-test-upload/dir1/read3.fq')
-                                    ),
-                                    filesize=12,
-                                    checksum='hash123',
-                                )
-                            )
-                        ],
-                    )
-                ],
-                cram_analysis=Analysis(id=1, type='cram'),
-            )
-        ]
-
-        # File was moved to a different directory
-        bucket_files = [
-            FileMetadata(
-                filepath=FilePath(to_path('gs://cpg-test-upload/dir2/read3.fq')),
-                filesize=12,
-                checksum='hash123',  # Same checksum indicates it's the same file
-            )
-        ]
-
         analyses: list[Analysis] = []
-
         result = self.audit_analyzer.analyze_sequencing_groups(
-            sequencing_groups, bucket_files, analyses
+            SEQUENCING_GROUPS.values(), UPLOAD_BUCKET_FILES, analyses
         )
 
-        # Should detect the moved file
+        # Should detect the moved files
         self.assertGreater(len(result.moved_files), 0)
-        moved_file = result.moved_files[0]
-        self.assertEqual(moved_file.filepath, 'gs://cpg-test-upload/dir2/read3.fq')
+        self.assertEqual(
+            result.moved_files[0].filepath,
+            'gs://cpg-dataset-main-upload/unknown_files/unknown_R1.fq',
+        )
+        self.assertEqual(
+            result.moved_files[1].filepath,
+            'gs://cpg-dataset-main-upload/unknown_files/unknown_R2.fq',
+        )
+
+    def test_analyze_with_uningested_files(self):
+        """Test uningested file detection"""
+        analyses: list[Analysis] = []
+        result = self.audit_analyzer.analyze_sequencing_groups(
+            SEQUENCING_GROUPS.values(), UPLOAD_BUCKET_FILES, analyses
+        )
+
+        self.assertGreater(len(result.files_to_review), 0)
+        for entry in result.files_to_review:
+            self.assertIsNotNone(entry.filepath)
 
     # ===== FILE MATCHING SERVICE TESTS =====
     # These test the file matching logic
-
-    def test_find_moved_files(self):
-        """Test find moved files"""
-
-        read_files = [
-            ReadFile(
-                FileMetadata(
-                    filepath=FilePath(to_path('gs://bucket/original.fq')),
-                    filesize=100,
-                    checksum='abc123',
-                )
-            )
-        ]
-
-        bucket_files = [
-            FileMetadata(
-                filepath=FilePath(to_path('gs://bucket/moved.fq')),
-                filesize=100,
-                checksum='abc123',
-            )
-        ]
-
-        moved_files = self.file_matcher.find_moved_files(read_files, bucket_files)
-        moved_file = list(moved_files.values())[0]
-
-        self.assertEqual(len(moved_files), 1)
-        self.assertEqual(
-            moved_file.old_path, FilePath(to_path('gs://bucket/original.fq'))
-        )
-        self.assertEqual(moved_file.new_path, FilePath(to_path('gs://bucket/moved.fq')))
-
     def test_find_original_analysis_files(self):
         """Test matching Analysis files with bucket files based on checksum"""
+        analyses = ANALYSES.values()
+        self.file_matcher.find_original_analysis_files(analyses, MAIN_BUCKET_FILES)
 
-        analyses = [
-            Analysis(
-                id=1,
-                type='vcf',
-                output_file=FileMetadata(
-                    filepath=FilePath(to_path('gs://bucket/analysis1.vcf')),
-                    filesize=200,
-                    checksum='def456',
-                ),
-            )
-        ]
-
-        bucket_files = [
-            FileMetadata(
-                filepath=FilePath(to_path('gs://bucket/analysis1.vcf')),
-                filesize=200,
-                checksum='def456',
-            )
-        ]
-
-        assert analyses[0].original_file is None
-
-        self.file_matcher.find_original_analysis_files(analyses, bucket_files)
-
-        assert analyses[0].original_file is not None
+        for analysis in analyses:
+            if analysis.id == 7:
+                self.assertIsNotNone(analysis.original_file)
 
     def test_find_uningested_files(self):
         """Test finding uningested files"""
-
-        metamist_files = [
-            ReadFile(
-                FileMetadata(
-                    filepath=FilePath(to_path('gs://bucket/sample.fq')),
-                    filesize=100,
-                    checksum='abc123',
-                )
-            )
-        ]
-
-        bucket_files = [
-            FileMetadata(
-                filepath=FilePath(to_path('gs://bucket/dir/sample.fq')),
-                filesize=100,
-                checksum='abc123',
-            ),
-            FileMetadata(
-                filepath=FilePath(to_path('gs://bucket/uningested.fq')),
-                filesize=100,
-                checksum='def456',
-            ),
-        ]
+        metamist_files: list[FileMetadata] = []
+        bucket_files = UPLOAD_BUCKET_FILES[:1]
 
         moved_files = self.file_matcher.find_moved_files(metamist_files, bucket_files)
-
-        self.assertEqual(len(moved_files), 1)
+        self.assertEqual(len(moved_files), 0)
 
         uningested = self.file_matcher.find_uningested_files(
             metamist_files, bucket_files, moved_files
@@ -559,7 +458,8 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
 
         self.assertEqual(len(uningested), 1)
         self.assertEqual(
-            uningested[0].filepath, FilePath(to_path('gs://bucket/uningested.fq'))
+            uningested[0].filepath,
+            to_path('gs://cpg-dataset-main-upload/2025-01-01/bams/EXT001.bam'),
         )
 
     # ===== INTEGRATION TESTS =====
@@ -568,95 +468,33 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
     @run_as_sync
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
     @unittest.mock.patch.object(GCSDataAccess, 'list_files_in_bucket')
-    async def test_full_audit_workflow(self, mock_list_files, mock_query_async):
+    async def test_full_audit_workflow_write_reports(
+        self, mock_list_files, mock_query_async
+    ):
         """Integration test - combines multiple components"""
-
         mock_query_async.side_effect = [
             # First call: get sequencing groups
-            {
-                'project': {
-                    'sequencingGroups': [
-                        {
-                            'id': 'CPGaaa',
-                            'type': 'genome',
-                            'technology': 'short-read',
-                            'platform': 'illumina',
-                            'sample': {
-                                'id': 'XPG123',
-                                'externalIds': {'': 'EXT123'},
-                                'participant': {'id': 1, 'externalIds': {'': 'P01'}},
-                            },
-                            'assays': [
-                                {
-                                    'id': 1,
-                                    'meta': {
-                                        'reads': [
-                                            {
-                                                'location': 'gs://cpg-dataset-main-upload/R1.fq',
-                                                'size': 11,
-                                                'checksum': 'abc123',
-                                            },
-                                            {
-                                                'location': 'gs://cpg-dataset-main-upload/R2.fq',
-                                                'size': 12,
-                                                'checksum': 'def456',
-                                            },
-                                        ]
-                                    },
-                                }
-                            ],
-                        }
-                    ],
-                }
-            },
+            ALL_SEQUENCING_GROUP_ASSAYS_RESPONSE,
             # Second call: get analyses for sequencing groups
-            {
-                'project': {
-                    'sequencingGroups': [
-                        {
-                            'id': 'CPGaaa',
-                            'analyses': [
-                                {
-                                    'id': 1,
-                                    'type': 'cram',
-                                    'status': 'completed',
-                                    'meta': {
-                                        'sequencing_type': 'genome',
-                                    },
-                                    'output': 'gs://cpg-dataset-main/cram/CPGaaa.cram',
-                                    'timestampCompleted': '2023-05-11T16:33:00',
-                                },
-                            ],
-                        },
-                    ]
-                }
-            },
+            ALL_SEQUENCING_GROUP_ANALYSES_RESPONSE,
         ]
-
-        mock_list_files.return_value = [
-            FileMetadata(
-                filepath=FilePath(to_path('gs://cpg-dataset-main/cram/CPGaaa.cram'))
-            ),
-            FileMetadata(
-                filepath=FilePath(to_path('gs://cpg-dataset-main/cram/CPGbbb.cram'))
-            ),
-        ]
+        mock_list_files.return_value = UPLOAD_BUCKET_FILES
 
         orchestrator = AuditOrchestrator(
             self.metamist_data_access,
             self.gcs_data_access,
             self.audit_analyzer,
-            ReportGenerator(self.gcs_data_access, AuditLogs('test', 'test')),
-            AuditLogs('test', 'test'),
+            ReportGenerator(self.gcs_data_access, AuditLogs('dataset', 'test')),
+            AuditLogs('dataset', 'test'),
         )
 
         config = AuditConfig(
-            dataset='test',
-            sequencing_types=('genome',),
-            sequencing_technologies=('short-read',),
-            sequencing_platforms=('illumina',),
-            analysis_types=('cram',),
-            file_types=(FileType.FASTQ,),
+            dataset='dataset',
+            sequencing_types=('genome', 'exome'),
+            sequencing_technologies=('short-read', 'long-read'),
+            sequencing_platforms=('illumina', 'pacbio', 'ont'),
+            analysis_types=('cram', 'vcf'),
+            file_types=tuple(list(FileType)),
         )
 
         # This would normally write files, so mock that too
@@ -665,3 +503,38 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
         ) as mock_write_reports:
             await orchestrator.run_audit(config)
             self.assertTrue(mock_write_reports.called)
+
+    # TODO
+    # Report generator tests
+    # write_audit_reports
+    # write_reviewed_files_report
+    # write_deleted_files_report
+    # _write_audit_config
+    # _write_csv_report
+    # _write_unaligned_sgs_report
+    # write_log_file
+    # get_report_rows
+    # get_report_rows_from_name
+    # get_report_stats
+    # get_report_entries_stats
+    # generate_summary_statistics
+    # AuditReportEntry from_report_dict
+    # AuditReportEntry to_report_dict
+    # AuditReportEntry fieldsname
+    # AuditReportEntry update_action
+    # AuditReportEntry update_review_comment
+
+    # TODO
+    # Review audit results tests
+    # parse_filter_expressions
+    # evalutate_filter_expression
+    # review_audit_report
+    # review_filtered_files
+    # main
+
+    # TODO
+    # Delete from audit results tests
+    # delete_from_audit_results
+    # delete_files_from_report
+    # upsert_deleted_files_analysis
+    # main

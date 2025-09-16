@@ -36,7 +36,6 @@ from .models import (
     Assay,
     Sample,
     Participant,
-    ReadFile,
     AuditReportEntry,
     AuditResult,
     ReviewResult,
@@ -45,7 +44,6 @@ from .models import (
     AuditConfig,
     FileType,
     FileMetadata,
-    FilePath,
     ExternalIds,
     MovedFile,
 )
@@ -91,7 +89,6 @@ __all__ = [
     'Assay',
     'Sample',
     'Participant',
-    'ReadFile',
     # Results
     'AuditResult',
     'AuditReportEntry',
@@ -104,7 +101,6 @@ __all__ = [
     'FileMatchingService',
     # Value objects
     'FileMetadata',
-    'FilePath',
     'ExternalIds',
     'MovedFile',
 ]

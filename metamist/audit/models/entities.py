@@ -12,6 +12,13 @@ class Participant:
     id: int
     external_ids: ExternalIds
 
+    def to_gql_dict(self) -> dict:
+        """Convert the participant to a GQL dictionary representation."""
+        return {
+            'id': self.id,
+            'externalIds': self.external_ids.ids,
+        }
+
     @property
     def external_id(self) -> str | None:
         """Get the primary external ID."""
@@ -26,6 +33,14 @@ class Sample:
     external_ids: ExternalIds
     participant: Participant
 
+    def to_gql_dict(self) -> dict:
+        """Convert the sample to a GQL dictionary representation."""
+        return {
+            'id': self.id,
+            'externalIds': self.external_ids.ids,
+            'participant': self.participant.to_gql_dict(),
+        }
+
     @property
     def external_id(self) -> str | None:
         """Get the primary external ID."""
@@ -33,39 +48,22 @@ class Sample:
 
 
 @dataclass
-class ReadFile:
-    """Read file entity."""
-
-    metadata: FileMetadata
-
-    @property
-    def filepath(self):
-        """Get the file path."""
-        return self.metadata.filepath
-
-    @property
-    def filesize(self):
-        """Get the file size."""
-        return self.metadata.filesize
-
-    @property
-    def checksum(self):
-        """Get the file checksum."""
-        return self.metadata.checksum
-
-    def update_metadata(self, metadata: FileMetadata):
-        """Update the file metadata."""
-        self.metadata = metadata
-
-
-@dataclass
 class Assay:
     """Assay entity."""
 
     id: int
-    read_files: list[ReadFile] = field(default_factory=list)
+    read_files: list[FileMetadata] = field(default_factory=list)
 
-    def add_read_file(self, read_file: ReadFile):
+    def to_gql_dict(self) -> dict:
+        """Convert the assay to a GQL dictionary representation."""
+        return {
+            'id': self.id,
+            'meta': {
+                'reads': [read_file.to_gql_dict() for read_file in self.read_files],
+            },
+        }
+
+    def add_read_file(self, read_file: FileMetadata):
         """Add a read file to the assay."""
         self.read_files.append(read_file)
 
@@ -84,6 +82,17 @@ class Analysis:
     original_file: FileMetadata | None = None
     sequencing_group_id: str | None = None
     timestamp_completed: str | None = None
+
+    def to_gql_dict(self) -> dict:
+        """Convert the analysis to a GQL dictionary representation."""
+        return {
+            'id': self.id,
+            'type': self.type.lower(),
+            'status': 'completed',
+            'meta': {},
+            'output': str(self.output_file.filepath) if self.output_file else None,
+            'timestampCompleted': self.timestamp_completed,
+        }
 
     @property
     def is_cram(self) -> bool:
@@ -108,6 +117,17 @@ class SequencingGroup:
     assays: list[Assay] = field(default_factory=list)
     cram_analysis: Analysis | None = None
 
+    def to_gql_dict(self) -> dict:
+        """Convert the sequencing group to the dict representation for GraphQL."""
+        return {
+            'id': self.id,
+            'type': self.type,
+            'technology': self.technology,
+            'platform': self.platform,
+            'sample': self.sample.to_gql_dict(),
+            'assays': [assay.to_gql_dict() for assay in self.assays],
+        }
+
     @property
     def is_complete(self) -> bool:
         """Check if the sequencing group has a completed CRAM."""
@@ -123,7 +143,7 @@ class SequencingGroup:
         if analysis.is_cram:
             self.cram_analysis = analysis
 
-    def get_all_read_files(self) -> list[ReadFile]:
+    def get_all_read_files(self) -> list[FileMetadata]:
         """Get all read files from all assays."""
         return [read_file for assay in self.assays for read_file in assay.read_files]
 

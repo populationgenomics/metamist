@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from metamist.audit.models import Analysis, FileMetadata, ReadFile, MovedFile
+from metamist.audit.models import Analysis, FileMetadata, MovedFile
 
 
 class FileMatcher(ABC):
@@ -102,7 +102,7 @@ class FileMatchingService:
         self.matcher = CompositeFileMatcher([ChecksumMatcher(), FilenameSizeMatcher()])
 
     def find_moved_files(
-        self, metamist_files: list[ReadFile], bucket_files: list[FileMetadata]
+        self, metamist_files: list[FileMetadata], bucket_files: list[FileMetadata]
     ) -> dict[str, MovedFile]:
         """
         Find files that have been moved within the bucket.
@@ -119,23 +119,20 @@ class FileMatchingService:
         """
         moved_files = {}
 
-        # Convert ReadFiles to FileMetadata for comparison
-        metamist_files_metadata = [f.metadata for f in metamist_files]
-
         # Create lookup structures
-        metamist_files_by_path = {f.filepath.uri: f for f in metamist_files_metadata}
+        metamist_files_by_path = {str(f.filepath): f for f in metamist_files}
 
         for bucket_file in bucket_files:
             # Skip if file is at the expected location
-            if bucket_file.filepath.uri in metamist_files_by_path:
+            if str(bucket_file.filepath) in metamist_files_by_path:
                 continue
 
             # Try to find a match in Metamist files
-            match = self.matcher.match(bucket_file, metamist_files_metadata)
+            match = self.matcher.match(bucket_file, metamist_files)
 
-            if match and match.filepath.uri != bucket_file.filepath.uri:
+            if match and match.filepath != bucket_file.filepath:
                 # File has been moved
-                moved_files[match.filepath.uri] = MovedFile(
+                moved_files[str(match.filepath)] = MovedFile(
                     old_path=match.filepath,
                     new_path=bucket_file.filepath,
                     metadata=bucket_file,
@@ -158,7 +155,7 @@ class FileMatchingService:
 
     def find_uningested_files(
         self,
-        metamist_files: list[ReadFile],
+        metamist_files: list[FileMetadata],
         bucket_files: list[FileMetadata],
         moved_files: dict[str, MovedFile],
         analysis_files: list[FileMetadata] | None = None,
@@ -180,16 +177,16 @@ class FileMatchingService:
 
         # Add Metamist file paths
         for f in metamist_files:
-            known_paths.add(f.filepath.uri)
+            known_paths.add(str(f.filepath))
 
         # Add moved file new paths
         for moved in moved_files.values():
-            known_paths.add(moved.new_path.uri)
+            known_paths.add(str(moved.new_path))
 
         # Find files not in known paths
         uningested = []
         for bucket_file in bucket_files:
-            if bucket_file.filepath.uri not in known_paths:
+            if str(bucket_file.filepath) not in known_paths:
                 # Check if it matches an analysis file
                 is_analysis_file = False
                 if analysis_files and bucket_file.checksum:

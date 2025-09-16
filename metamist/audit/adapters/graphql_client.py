@@ -112,6 +112,30 @@ class GraphQLClient:
         """
     )
 
+    CREATE_ANALYSIS_MUTATION = gql(
+        """
+        mutation createAnalysisMutation($dataset: String!, $type: String!, $cohortIds: String!, $output: String!, $meta: JSON!) {
+          analysis {
+            createAnalysis(analysis: {type: $type, status: COMPLETED, cohortIds: $cohortIds, output: $output, meta: $meta}, project: $dataset) {
+                id
+            }
+          }
+        }
+        """
+    )
+
+    UPDATE_ANALYSIS_MUTATION = gql(
+        """
+        mutation updateAnalysisMutation($analysisId: Int!, $meta: JSON!) {
+          analysis {
+            updateAnalysis(analysis: {status: COMPLETED, meta: $meta}, analysisId: $analysisId) {
+                id
+            }
+          }
+        }
+        """
+    )
+
     def __init__(self):
         """Initialize GraphQL client."""
         self._enums_cache: dict[str, list[str]] | None = None
@@ -257,3 +281,51 @@ class GraphQLClient:
             },
         )
         return result['cohort']['createCohortFromCriteria']['id']
+
+    def create_audit_deletion_analysis(
+        self, dataset: str, cohort_ids: str, output: str, meta: dict
+    ) -> int:
+        """
+        Create a new audit deletion analysis.
+
+        Args:
+            dataset: Dataset name
+            analysis_type: Type of analysis
+            cohort_ids: String of cohort ID
+            output: Output location
+            meta: Metadata for the analysis
+
+        Returns:
+            Analysis ID
+        """
+        result = query(
+            self.CREATE_ANALYSIS_MUTATION,
+            {
+                'dataset': dataset,
+                'type': 'audit_deletion',
+                'cohortIds': cohort_ids,
+                'output': output,
+                'meta': meta,
+            },
+        )
+        return result['analysis']['createAnalysis']['id']
+
+    def update_audit_deletion_analysis(self, analysis_id: int, meta: dict) -> int:
+        """
+        Update an existing audit deletion analysis.
+
+        Args:
+            analysis_id: Analysis ID
+            meta: Updated metadata for the analysis
+
+        Returns:
+            Updated Analysis ID
+        """
+        result = query(
+            self.UPDATE_ANALYSIS_MUTATION,
+            {
+                'analysisId': analysis_id,
+                'meta': meta,
+            },
+        )
+        return result['analysis']['updateAnalysis']['id']

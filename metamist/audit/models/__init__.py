@@ -3,7 +3,6 @@
 from .entities import (
     Participant,
     Sample,
-    ReadFile,
     Assay,
     Analysis,
     SequencingGroup,
@@ -14,7 +13,6 @@ from .entities import (
 )
 from .value_objects import (
     FileType,
-    FilePath,
     FileMetadata,
     ExternalIds,
     AuditConfig,
@@ -25,7 +23,6 @@ __all__ = [
     # Entities
     'Participant',
     'Sample',
-    'ReadFile',
     'Assay',
     'Analysis',
     'SequencingGroup',
@@ -35,7 +32,6 @@ __all__ = [
     'DeletionResult',
     # Value Objects
     'FileType',
-    'FilePath',
     'FileMetadata',
     'ExternalIds',
     'AuditConfig',

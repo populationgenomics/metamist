@@ -7,7 +7,6 @@ from metamist.audit.models import (
     AuditReportEntry,
     AuditResult,
     FileMetadata,
-    ReadFile,
     MovedFile,
 )
 
@@ -108,7 +107,7 @@ class AuditAnalyzer:
 
     def _get_all_read_files(
         self, sequencing_groups: list[SequencingGroup]
-    ) -> list[ReadFile]:
+    ) -> list[FileMetadata]:
         """Get all read files from all sequencing groups."""
         read_files = []
         for sg in sequencing_groups:
@@ -141,7 +140,7 @@ class AuditAnalyzer:
                     if str(read_file.filepath) not in bucket_paths:
                         continue
                     entry = self._create_report_entry(
-                        sg=sg, assay_id=assay.id, file_metadata=read_file.metadata
+                        sg=sg, assay_id=assay.id, file_metadata=read_file
                     )
                     entries.append(entry)
 
@@ -227,15 +226,15 @@ class AuditAnalyzer:
         for sg in sequencing_groups:
             for assay in sg.assays:
                 for read_file in assay.read_files:
-                    path = read_file.filepath.uri
+                    path = str(read_file.filepath)
                     path_to_sg_assay[path] = (sg, assay.id)
 
         # Create entries for moved files
-        for old_path, moved_file in moved_files.items():
-            if old_path not in path_to_sg_assay:
+        for original_path, moved_file in moved_files.items():
+            if original_path not in path_to_sg_assay:
                 continue
 
-            sg, assay_id = path_to_sg_assay[old_path]
+            sg, assay_id = path_to_sg_assay[original_path]
 
             if sg.id in excluded_sg_ids or not sg.is_complete:
                 continue
@@ -255,7 +254,7 @@ class AuditAnalyzer:
     ) -> AuditReportEntry:
         """Create a report entry from sequencing group and file data."""
         return AuditReportEntry(
-            filepath=file_metadata.filepath.uri,
+            filepath=str(file_metadata.filepath),
             filesize=file_metadata.filesize,
             sg_id=sg.id,
             sg_type=sg.type,

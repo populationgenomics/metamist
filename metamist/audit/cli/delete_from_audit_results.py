@@ -6,7 +6,7 @@ from metamist.audit.data_access import GCSDataAccess, MetamistDataAccess
 from metamist.audit.models import AuditReportEntry, DeletionResult
 from metamist.audit.services import AuditLogs, ReportGenerator
 
-from cpg_utils import to_path
+from cpg_utils import Path, to_path
 
 
 def delete_from_audit_results(
@@ -34,7 +34,7 @@ def delete_from_audit_results(
 
     if not dry_run:
         upsert_deleted_files_analysis(
-            dataset, report, results_folder, deletion_report.as_uri(), stats, audit_logs
+            dataset, report, results_folder, deletion_report, stats, audit_logs
         )
 
     all_stats = reporter.get_report_stats(deletion_report)
@@ -104,7 +104,7 @@ def upsert_deleted_files_analysis(
     dataset: str,
     audited_report_name: str,
     results_folder: str,
-    deletion_report_path: str,
+    deletion_report: Path,
     stats: dict,
     audit_logs: AuditLogs,
 ):
@@ -114,10 +114,10 @@ def upsert_deleted_files_analysis(
     """
     audit_logs.info_nl('Upserting analysis record for deleted files report.')
     if existing_analysis := MetamistDataAccess().get_audit_deletion_analysis(
-        dataset, deletion_report_path
+        dataset, str(deletion_report)
     ):
         audit_logs.info_nl(
-            f'Found existing analysis record (ID: {existing_analysis["id"]}) for {deletion_report_path}. Updating...'
+            f'Found existing analysis record (ID: {existing_analysis["id"]}) for {deletion_report}. Updating...'
         )
         MetamistDataAccess().update_audit_deletion_analysis(
             existing_analysis, audited_report_name, stats
@@ -125,10 +125,10 @@ def upsert_deleted_files_analysis(
         audit_logs.info_nl(f'Updated analysis {existing_analysis["id"]}.')
 
     else:
-        audit_logs.info_nl(f'Creating new record for {deletion_report_path}')
+        audit_logs.info_nl(f'Creating new record for {deletion_report}')
         cohort_name = f'{dataset}_{results_folder}'
         aid = MetamistDataAccess().create_audit_deletion_analysis(
-            dataset, cohort_name, audited_report_name, deletion_report_path, stats
+            dataset, cohort_name, audited_report_name, str(deletion_report), stats
         )
         audit_logs.info_nl(f'Created analysis {aid}.')
 

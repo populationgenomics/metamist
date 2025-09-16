@@ -33,50 +33,20 @@ class FileType(Enum):
 
 
 @dataclass(frozen=True)
-class FilePath:
-    """Immutable file path value object."""
-
-    path: Path
-
-    @property
-    def name(self) -> str:
-        """Get the file name."""
-        return self.path.name
-
-    @property
-    def bucket(self) -> str:
-        """Get the bucket name."""
-        return self.path.bucket
-
-    @property
-    def blob(self) -> str:
-        """Get the blob name."""
-        return self.path.blob
-
-    @property
-    def uri(self) -> str:
-        """Get the URI."""
-        return self.path.as_uri()
-
-    def __str__(self) -> str:
-        return self.uri
-
-
-@dataclass(frozen=True)
 class FileMetadata:
     """Immutable file metadata."""
 
-    filepath: FilePath
+    filepath: Path
     filesize: int | None = None
     checksum: str | None = None
 
-    def with_size(self, size: int) -> 'FileMetadata':
-        """Create a new instance with updated size."""
-        return FileMetadata(self.filepath, size, self.checksum)
-
-    def with_checksum(self, checksum: str) -> 'FileMetadata':
-        """Create a new instance with updated checksum."""
-        return FileMetadata(self.filepath, self.filesize, checksum)
+    def to_gql_dict(self) -> dict:
+        """Convert the file metadata to a GQL dictionary representation."""
+        return {
+            'location': str(self.filepath),
+            'size': self.filesize,
+            'checksum': self.checksum,
+        }
 
 
 @dataclass(frozen=True)
@@ -149,6 +119,6 @@ class AuditConfig:  # pylint: disable=too-many-instance-attributes
 class MovedFile:
     """Represents a file that has been moved."""
 
-    old_path: FilePath
-    new_path: FilePath
+    old_path: Path
+    new_path: Path
     metadata: FileMetadata

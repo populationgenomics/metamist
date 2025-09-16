@@ -233,8 +233,8 @@ The architecture makes testing straightforward:
 # Test file matching logic
 def test_checksum_matcher():
     matcher = ChecksumMatcher()
-    file1 = FileMetadata(filepath=FilePath(...), checksum='abc123')
-    file2 = FileMetadata(filepath=FilePath(...), checksum='abc123')
+    file1 = FileMetadata(filepath=(...), checksum='abc123')
+    file2 = FileMetadata(filepath=(...), checksum='abc123')
 
     result = matcher.match(file1, [file2])
     assert result == file2
