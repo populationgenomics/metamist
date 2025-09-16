@@ -238,23 +238,6 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
 
         self.assertEqual(result, 1)
 
-    # TODO
-    # Test entities
-    # test participant.external_id
-    # test sample.external_id
-    # test assay.get_total_size
-    # test sequencing_group.get_total_read_size
-
-    # TODO
-    # test value_objects
-    # FileType.extensions
-    # FileType.all_read_extensions
-    # FileType.all_extensions
-    # ExternalIds.get_primary
-    # ExternalIds.__getitem__
-    # ExternalIds.values
-    # AuditConfig.from_cli_args
-
     @run_as_sync
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
     async def test_get_analyses_for_sequencing_groups(self, mock_query_async):
@@ -580,13 +563,30 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
         """Test the Reporter.write_audit_reports method."""
         audit_result = AuditResult(
             files_to_delete=[
-                AuditReportEntry(filepath='gs://cpg-dataset-main-upload/file1.bam')
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file1.bam',
+                    filesize=2048000000,
+                ),
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file4.bam',
+                    filesize=1024000000,
+                ),
             ],
             files_to_review=[
-                AuditReportEntry(filepath='gs://cpg-dataset-main-upload/file2.bam')
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file2.bam',
+                    filesize=512000000,
+                ),
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file5.bam',
+                    filesize=256000000,
+                ),
             ],
             moved_files=[
-                AuditReportEntry(filepath='gs://cpg-dataset-main-upload/file3.bam')
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file3.bam',
+                    filesize=1024000000,
+                )
             ],
             unaligned_sequencing_groups=[SEQUENCING_GROUPS['SG05']],
         )
@@ -603,6 +603,13 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
             Reporter, '_write_csv_report'
         ) as mock_write_csv_report:
             self.reporter.write_audit_reports(audit_result, config)
+            stats = self.reporter.generate_summary_statistics(audit_result)
+            self.assertIsInstance(stats, dict)
+            self.assertEqual(stats['files_to_delete'], 2)
+            self.assertEqual(stats['files_to_delete_size_gb'], 3072000000 / (1024**3))
+            self.assertEqual(stats['files_to_review'], 2)
+            self.assertEqual(stats['files_to_review_size_gb'], 768000000 / (1024**3))
+            self.assertEqual(stats['unaligned_sgs'], 1)
             self.assertTrue(mock_write_csv_report.called)
 
     # write_log_file
