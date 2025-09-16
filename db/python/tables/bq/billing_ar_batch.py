@@ -490,9 +490,9 @@ class BillingArBatchTable(BillingBaseTable):
             )
 
             # get number of seq groups
-            number_of_seq_groups[
-                project_id
-            ] = await self.get_number_of_sequencing_groups(connection, project_id)
+            number_of_seq_groups[project_id] = (
+                await self.get_number_of_sequencing_groups(connection, project_id)
+            )
 
             # Get the cram size per project, total size and count cram files
             total_crams_size[project_id] = await self.get_total_crams_info(
@@ -527,9 +527,14 @@ class BillingArBatchTable(BillingBaseTable):
             combined_seq_record_date[sid] = min(
                 first_date,
                 min(
-                    datetime.strptime(result['invoice_month'], '%Y%m')
-                    for result in compute_results
-                    if result['sequencing_group'] == sid
+                    # get the min invoice month from compute results for this seq group
+                    (
+                        datetime.strptime(result['invoice_month'], '%Y%m')
+                        for result in compute_results
+                        if result['sequencing_group'] == sid
+                    ),
+                    # if no compute results, use the first record date
+                    default=first_date,
                 ),
             )
 
