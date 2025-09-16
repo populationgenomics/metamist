@@ -182,7 +182,7 @@ class BillingArBatchTable(BillingBaseTable):
         )
 
         total_cram_info = dict(info_record)
-        total_crams_size = float(total_cram_info.get('total_crams_size', 0))
+        total_crams_size = float(total_cram_info.get('total_crams_size') or 0)
         return total_crams_size
 
     async def calculate_storage_cost_using_cram_files_info(
@@ -527,9 +527,14 @@ class BillingArBatchTable(BillingBaseTable):
             combined_seq_record_date[sid] = min(
                 first_date,
                 min(
-                    datetime.strptime(result['invoice_month'], '%Y%m')
-                    for result in compute_results
-                    if result['sequencing_group'] == sid
+                    # get the min invoice month from compute results for this seq group
+                    (
+                        datetime.strptime(result['invoice_month'], '%Y%m')
+                        for result in compute_results
+                        if result['sequencing_group'] == sid
+                    ),
+                    # if no compute results, use the first record date
+                    default=first_date,
                 ),
             )
 
