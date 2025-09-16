@@ -139,11 +139,7 @@ export const ProjectGridFilterGuide: React.FC<IProjectGridFilterGuideProps> = ({
                         </li>
                     </ul>
                 </p>
-                <DictEditor
-                    input={exampleDictionary}
-                    height="330px"
-                    readonly
-                />
+                <DictEditor input={exampleDictionary} height="330px" readonly />
                 <h3>Query definition</h3>
                 <p>
                     <em>Most</em> fields can be queried using the following operators:
@@ -193,11 +189,7 @@ export const ProjectGridFilterGuide: React.FC<IProjectGridFilterGuideProps> = ({
                     operator.
                 </p>
 
-                <DictEditor
-                    input={yamlString}
-                    height="400px"
-                    readonly
-                />
+                <DictEditor input={yamlString} height="400px" readonly />
             </div>
         </>
     )
