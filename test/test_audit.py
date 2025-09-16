@@ -21,7 +21,7 @@ from metamist.audit.models import (
     AuditResult,
     FileMetadata,
 )
-from data.audit_fixtures.audit_test import (
+from test.data.audit_fixtures.audit_test import (
     ENUMS_QUERY_RESULT,
     SEQUENCING_GROUPS,
     SR_ILLUMINA_EXOME_SGS,
@@ -392,7 +392,9 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
         """Test basic audit analysis"""
         # Test the core analysis
         result = self.audit_analyzer.analyze_sequencing_groups(
-            SEQUENCING_GROUPS.values(), UPLOAD_BUCKET_FILES, ANALYSES.values()
+            list(SEQUENCING_GROUPS.values()),
+            UPLOAD_BUCKET_FILES,
+            list(ANALYSES.values()),
         )
         self.assertIsInstance(result, AuditResult)
 
@@ -408,7 +410,7 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
         """Test moved file detection"""
         analyses: list[Analysis] = []
         result = self.audit_analyzer.analyze_sequencing_groups(
-            SEQUENCING_GROUPS.values(), UPLOAD_BUCKET_FILES, analyses
+            list(SEQUENCING_GROUPS.values()), UPLOAD_BUCKET_FILES, analyses
         )
 
         # Should detect the moved files
@@ -426,7 +428,7 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
         """Test uningested file detection"""
         analyses: list[Analysis] = []
         result = self.audit_analyzer.analyze_sequencing_groups(
-            SEQUENCING_GROUPS.values(), UPLOAD_BUCKET_FILES, analyses
+            list(SEQUENCING_GROUPS.values()), UPLOAD_BUCKET_FILES, analyses
         )
 
         self.assertGreater(len(result.files_to_review), 0)
@@ -437,7 +439,7 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
     # These test the file matching logic
     def test_find_original_analysis_files(self):
         """Test matching Analysis files with bucket files based on checksum"""
-        analyses = ANALYSES.values()
+        analyses = list(ANALYSES.values())
         self.file_matcher.find_original_analysis_files(analyses, MAIN_BUCKET_FILES)
 
         for analysis in analyses:
