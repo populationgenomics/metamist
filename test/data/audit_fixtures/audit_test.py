@@ -5,11 +5,15 @@ Contains fixtured data for the audit unit tests
 from metamist.audit.models import (
     SequencingGroup,
     Analysis,
-    Assay,
     Sample,
     Participant,
     ExternalIds,
     FileMetadata,
+)
+
+from test.data.audit_fixtures.read_files import (
+    ASSAYS,
+    ASSAY_WITH_SECONDARY_FILE_GQL_DICT,
 )
 
 from cpg_utils import to_path
@@ -22,29 +26,6 @@ ENUMS_QUERY_RESULT = {
         'sequencingPlatform': ['illumina', 'pacbio', 'ont'],
         'sequencingTechnology': ['short-read', 'long-read'],
     }
-}
-
-PARTICIPANTS = {
-    1: Participant(
-        id=1,
-        external_ids=ExternalIds(ids={'': 'P001'}),
-    ),
-    2: Participant(
-        id=2,
-        external_ids=ExternalIds(ids={'': 'P002'}),
-    ),
-    3: Participant(
-        id=3,
-        external_ids=ExternalIds(ids={'': 'P003'}),
-    ),
-    4: Participant(
-        id=4,
-        external_ids=ExternalIds(ids={'': 'P004'}),
-    ),
-    5: Participant(
-        id=5,
-        external_ids=ExternalIds(ids={'': 'P005'}),
-    ),
 }
 
 SAMPLES = {
@@ -84,291 +65,6 @@ SAMPLES = {
         participant=Participant(id=5, external_ids=ExternalIds(ids={'': 'P005'})),
     ),
 }
-
-ASSAYS = {
-    # One read file (BAM) (in bucket)
-    1: Assay(
-        id=1,
-        read_files=[
-            FileMetadata(
-                filepath=to_path(
-                    'gs://cpg-dataset-main-upload/2025-01-01/bams/EXT001.bam'
-                ),
-                filesize=1234,
-                checksum='abc123',
-            )
-        ],
-    ),
-    # One read file (BAM) (exome)
-    2: Assay(
-        id=2,
-        read_files=[
-            FileMetadata(
-                filepath=to_path(
-                    'gs://cpg-dataset-main-upload/2025-01-01/bams/exome/EXT001.bam'
-                ),
-                filesize=321,
-                checksum='cba321',
-            )
-        ],
-    ),
-    # One read file (CRAM) (in bucket)
-    3: Assay(
-        id=3,
-        read_files=[
-            FileMetadata(
-                filepath=to_path(
-                    'gs://cpg-dataset-main-upload/2025-01-01/crams/EXT002.cram'
-                ),
-                filesize=1953,
-                checksum='asd456',
-            )
-        ],
-    ),
-    # Two read files (fastq) (exome) (in bucket)
-    4: Assay(
-        id=4,
-        read_files=[
-            FileMetadata(
-                filepath=to_path(
-                    'gs://cpg-dataset-main-upload/2025-02-01/exome/fastqs/EXT003_R1.fq'
-                ),
-                filesize=3456,
-                checksum='cde345',
-            ),
-            FileMetadata(
-                filepath=to_path(
-                    'gs://cpg-dataset-main-upload/2025-02-01/exome/fastqs/EXT003_R2.fq'
-                ),
-                filesize=4567,
-                checksum='def456',
-            ),
-        ],
-    ),
-    # Two read files (fastq)
-    5: Assay(
-        id=5,
-        read_files=[
-            FileMetadata(
-                filepath=to_path(
-                    'gs://cpg-dataset-main-upload/2025-02-01/fastqs/EXT004_L001_R1.fq'
-                ),
-                filesize=5678,
-                checksum='efg567',
-            ),
-            FileMetadata(
-                filepath=to_path(
-                    'gs://cpg-dataset-main-upload/2025-02-01/fastqs/EXT004_L001_R2.fq'
-                ),
-                filesize=6789,
-                checksum='fgh678',
-            ),
-        ],
-    ),
-    # Two read files (fastq)
-    6: Assay(
-        id=6,
-        read_files=[
-            FileMetadata(
-                filepath=to_path(
-                    'gs://cpg-dataset-main-upload/2025-03-01/fastqs/EXT004_L002_R1.fq'
-                ),
-                filesize=7890,
-                checksum='ghi789',
-            ),
-            FileMetadata(
-                filepath=to_path(
-                    'gs://cpg-dataset-main-upload/2025-03-01/fastqs/EXT004_L002_R2.fq'
-                ),
-                filesize=8901,
-                checksum='hij890',
-            ),
-        ],
-    ),
-    # Two read files (fastq)
-    7: Assay(
-        id=7,
-        read_files=[
-            FileMetadata(
-                filepath=to_path(
-                    'gs://cpg-dataset-main-upload/2025-03-01/fastqs/EXT004_L003_R1.fq'
-                ),
-                filesize=9012,
-                checksum='ijk123',
-            ),
-            FileMetadata(
-                filepath=to_path(
-                    'gs://cpg-dataset-main-upload/2025-03-01/fastqs/EXT004_L003_R2.fq'
-                ),
-                filesize=123,
-                checksum='jkl234',
-            ),
-        ],
-    ),
-    # Two read files (fastq)
-    8: Assay(
-        id=8,
-        read_files=[
-            FileMetadata(
-                filepath=to_path(
-                    'gs://cpg-dataset-main-upload/2025-04-01/fastqs/EXT005_L001_R1.fq'
-                ),
-                filesize=2345,
-                checksum='mno345',
-            ),
-            FileMetadata(
-                filepath=to_path(
-                    'gs://cpg-dataset-main-upload/2025-04-01/fastqs/EXT005_L001_R2.fq'
-                ),
-                filesize=3456,
-                checksum='pqr456',
-            ),
-        ],
-    ),
-    # Two read files (fastq)
-    9: Assay(
-        id=9,
-        read_files=[
-            FileMetadata(
-                filepath=to_path(
-                    'gs://cpg-dataset-main-upload/2025-04-01/fastqs/EXT005_L002_R1.fq'
-                ),
-                filesize=4567,
-                checksum='stu567',
-            ),
-            FileMetadata(
-                filepath=to_path(
-                    'gs://cpg-dataset-main-upload/2025-04-01/fastqs/EXT005_L002_R2.fq'
-                ),
-                filesize=5678,
-                checksum='vwx678',
-            ),
-        ],
-    ),
-    # Two read files (fastq)
-    10: Assay(
-        id=10,
-        read_files=[
-            FileMetadata(
-                filepath=to_path(
-                    'gs://cpg-dataset-main-upload/2025-04-01/fastqs/EXT005_L003_R1.fq'
-                ),
-                filesize=6789,
-                checksum='yza890',
-            ),
-            FileMetadata(
-                filepath=to_path(
-                    'gs://cpg-dataset-main-upload/2025-04-01/fastqs/EXT005_L003_R2.fq'
-                ),
-                filesize=7890,
-                checksum='bcd901',
-            ),
-        ],
-    ),
-    # One read file (bam) (long-read)
-    11: Assay(
-        id=11,
-        read_files=[
-            FileMetadata(
-                filepath=to_path(
-                    'gs://cpg-dataset-main-upload/2025-05-01/long_read/bams/EXT006.bam'
-                ),
-                filesize=12345,
-                checksum='abcde12345',
-            )
-        ],
-    ),
-}
-
-UPLOAD_BUCKET_FILES = [
-    # Matches assay 1
-    FileMetadata(
-        filepath=to_path('gs://cpg-dataset-main-upload/2025-01-01/bams/EXT001.bam'),
-        filesize=1234,
-        checksum='abc123',
-    ),
-    # Matches assay 3
-    FileMetadata(
-        filepath=to_path('gs://cpg-dataset-main-upload/2025-01-01/crams/EXT002.cram'),
-        filesize=2345,
-        checksum='bcd234',
-    ),
-    # Matches assay 4
-    FileMetadata(
-        filepath=to_path(
-            'gs://cpg-dataset-main-upload/2025-02-01/exome/fastqs/EXT003_R1.fq'
-        ),
-        filesize=3456,
-        checksum='cde345',
-    ),
-    FileMetadata(
-        filepath=to_path(
-            'gs://cpg-dataset-main-upload/2025-02-01/exome/fastqs/EXT003_R2.fq'
-        ),
-        filesize=4567,
-        checksum='def456',
-    ),
-    # Matches a registered vcf analysis
-    FileMetadata(
-        filepath=to_path('gs://cpg-dataset-main-upload/vcf/EXT006.vcf'),
-        filesize=123456,
-        checksum='abcd1234',
-    ),
-    # Does not match any assay, but contains an external ID in filename
-    FileMetadata(
-        filepath=to_path(
-            'gs://cpg-dataset-main-upload/2025-02-01/exome/fastqs/EXT003_topup_R1.fq.gz'
-        ),
-        filesize=5679,
-        checksum='efg5679',
-    ),
-    FileMetadata(
-        filepath=to_path(
-            'gs://cpg-dataset-main-upload/2025-02-01/exome/fastqs/EXT003_topup_R2.fq.gz'
-        ),
-        filesize=5670,
-        checksum='efg5670',
-    ),
-    # Does not match any assay, and does not contain any external IDs in filename
-    # But matches an ingested file based on checksum and size
-    FileMetadata(
-        filepath=to_path('gs://cpg-dataset-main-upload/unknown_files/unknown_R1.fq'),
-        filesize=6789,
-        checksum='yza890',
-    ),
-    FileMetadata(
-        filepath=to_path('gs://cpg-dataset-main-upload/unknown_files/unknown_R2.fq'),
-        filesize=7890,
-        checksum='bcd901',
-    ),
-    # Does not match any assay, contains no external IDs in filename, does not match
-    # any known files
-    FileMetadata(
-        filepath=to_path('gs://cpg-dataset-main-upload/unknown_files/unknown_2_R1.fq'),
-        filesize=8543,
-        checksum='sdf123',
-    ),
-    FileMetadata(
-        filepath=to_path('gs://cpg-dataset-main-upload/unknown_files/unknown_2_R2.fq'),
-        filesize=7415,
-        checksum='szx758',
-    ),
-]
-
-
-MAIN_BUCKET_FILES = [
-    FileMetadata(to_path('gs://cpg-dataset-main/cram/SG01_1.cram')),
-    FileMetadata(to_path('gs://cpg-dataset-main/exome/cram/SG01_2.cram')),
-    FileMetadata(to_path('gs://cpg-dataset-main/cram/SG02.cram')),
-    FileMetadata(to_path('gs://cpg-dataset-main/exome/cram/SG03.cram')),
-    FileMetadata(to_path('gs://cpg-dataset-main/cram/SG04.cram')),
-    FileMetadata(to_path('gs://cpg-dataset-main/cram/SG06.cram')),
-    FileMetadata(
-        to_path('gs://cpg-dataset-main/vcf/SG06.vcf'),
-        filesize=123456,
-        checksum='abcd1234',
-    ),
-]
 
 ANALYSES = {
     1: Analysis(
@@ -503,9 +199,24 @@ SR_ILLUMINA_EXOME_SGS = [
     sg for sg in ILLUMINA_SGS if sg in EXOME_SGS and sg in SHORT_READ_SGS
 ]
 
-ALL_SEQUENCING_GROUP_ASSAYS_RESPONSE = {
+ALL_SG_ASSAYS_RESPONSE = {
     'project': {
         'sequencingGroups': [sg.to_gql_dict() for sg in SEQUENCING_GROUPS.values()],
+    }
+}
+
+SG_ASSAYS_RESPONSE_WITH_SECONDARY_FILES = {
+    'project': {
+        'sequencingGroups': [
+            {
+                'id': 'SG101',
+                'type': 'exome',
+                'technology': 'short-read',
+                'platform': 'illumina',
+                'sample': SAMPLES['S01'].to_gql_dict(),
+                'assays': [ASSAY_WITH_SECONDARY_FILE_GQL_DICT],
+            }
+        ]
     }
 }
 
@@ -513,7 +224,7 @@ SR_ILLUMINA_EXOME_SGS_ASSAYS_RESPONSE = {
     'project': {'sequencingGroups': [sg.to_gql_dict() for sg in SR_ILLUMINA_EXOME_SGS]}
 }
 
-ALL_SEQUENCING_GROUP_ANALYSES_RESPONSE = {
+ALL_SG_ANALYSES_RESPONSE = {
     'project': {
         'sequencingGroups': [
             {
@@ -541,6 +252,66 @@ SR_ILLUMINA_EXOME_SGS_CRAM_RESPONSE = {
                 ],
             }
             for sg in SR_ILLUMINA_EXOME_SGS
+        ],
+    }
+}
+
+ANALYSIS_WITH_OUTPUTS_GQL_RESPONSE = {
+    'project': {
+        'sequencingGroups': [
+            {
+                'id': 'SG101',
+                'analyses': [
+                    {
+                        'id': 101,
+                        'type': 'cram',
+                        'status': 'completed',
+                        'meta': {},
+                        'output': 'gs://cpg-dataset-main-upload/2023-05-01/EXT101.cram',
+                        'outputs': {
+                            'id': 123,
+                            'path': 'gs://cpg-dataset-main-upload/2023-05-01/EXT101.cram',
+                            'basename': 'EXT101.cram',
+                            'dirname': 'gs://cpg-dataset-main-upload/2023-05-01',
+                            'nameroot': 'EXT101',
+                            'nameext': '.cram',
+                            'file_checksum': 'pyVQxQ==',
+                            'size': 29330411025,
+                        },
+                        'timestampCompleted': '2023-05-01T00:00:00Z',
+                    }
+                ],
+            }
+        ],
+    }
+}
+
+
+ANALYSES_WITH_MALFORMED_TIMESTAMPS_GQL_RESPONSE = {
+    'project': {
+        'sequencingGroups': [
+            {
+                'id': 'SG101',
+                'analyses': [
+                    {
+                        'id': 101,
+                        'type': 'cram',
+                        'status': 'completed',
+                        'meta': {},
+                        'output': 'gs://cpg-dataset-main-upload/2023-05-01/EXT101.cram',
+                        'timestampCompleted': 'abcde',
+                    },
+                    {
+                        'id': 102,
+                        'type': 'cram',
+                        'status': 'completed',
+                        'meta': {},
+                        'output': 'gs://cpg-dataset-main-upload/2023-05-01/EXT102.cram',
+                        # Removed for testing
+                        # 'timestampCompleted': '',
+                    },
+                ],
+            }
         ],
     }
 }

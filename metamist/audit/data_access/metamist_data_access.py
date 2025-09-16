@@ -5,7 +5,7 @@ from cpg_utils import to_path
 
 from metamist.audit.models import (
     SequencingGroup,
-    Analysis as AuditAnalysis,
+    Analysis,
     Assay,
     Sample,
     Participant,
@@ -55,7 +55,7 @@ class MetamistDataAccess:
 
     async def get_analyses_for_sequencing_groups(
         self, dataset: str, sg_ids: list[str], analysis_types: list[str]
-    ) -> list[AuditAnalysis]:
+    ) -> list[Analysis]:
         """
         Fetch analyses for sequencing groups.
 
@@ -67,17 +67,15 @@ class MetamistDataAccess:
         Returns:
             List of Analysis entities
         """
-        raw_data = await self.graphql_client.get_analyses_for_sequencing_groups(
+        response = await self.graphql_client.get_analyses_for_sequencing_groups(
             dataset, sg_ids, analysis_types
         )
 
         analyses = []
-        for sg_data in raw_data:
-            sg_id = sg_data['id']
-            for analysis_data in sg_data.get('analyses', []):
-                analysis = self._parse_analysis(analysis_data, sg_id)
-                if analysis:
-                    analyses.append(analysis)
+        for sg_data in response:
+            for analysis in sg_data.get('analyses', []):
+                if parsed_analysis := self._parse_analysis(analysis, sg_data['id']):
+                    analyses.append(parsed_analysis)
 
         return analyses
 
@@ -182,36 +180,36 @@ class MetamistDataAccess:
         config: 'AuditConfig',
     ) -> 'AuditConfig':
         """
-        Validate enum values against Metamist API.
+        Validate config args against allowed values from the Metamist enums table.
 
         Args:
-            metamist: Metamist data access object
+            config: The configuration to validate
 
         Returns:
             Validated configuration
         """
 
-        async def validate_enum_value(enum_type: str, config_values: tuple[str]) -> str:
-            valid_values = await self.graphql_client.get_enum_values(enum_type)
-            if 'all' in config_values:
+        async def validate_enum_input(enum_type: str, input_values: tuple[str]) -> str:
+            valid_values = await self.get_enum_values(enum_type)
+            if 'all' in input_values:
                 return valid_values
-            if any(value.lower() not in valid_values for value in config_values):
+            if any(value.lower() not in valid_values for value in input_values):
                 raise ValueError(
-                    f"Invalid {enum_type} values: {', '.join(config_values)}. "
+                    f"Invalid {enum_type} values: {', '.join(input_values)}. "
                     f"Valid values are: {', '.join(valid_values)}."
                 )
-            return tuple(config_values)
+            return tuple(input_values)
 
-        sequencing_types = await validate_enum_value(
+        sequencing_types = await validate_enum_input(
             'sequencing_type', config.sequencing_types
         )
-        sequencing_techs = await validate_enum_value(
+        sequencing_techs = await validate_enum_input(
             'sequencing_technology', config.sequencing_technologies
         )
-        sequencing_platforms = await validate_enum_value(
+        sequencing_platforms = await validate_enum_input(
             'sequencing_platform', config.sequencing_platforms
         )
-        analysis_types = await validate_enum_value(
+        analysis_types = await validate_enum_input(
             'analysis_type', config.analysis_types
         )
 
@@ -276,28 +274,24 @@ class MetamistDataAccess:
 
             # Handle secondary files
             for secondary in read.get('secondaryFiles', []):
-                secondary_file = self._parse_read_file(secondary)
-                if secondary_file:
+                if secondary_file := self._parse_read_file(secondary):
                     assay.add_read_file(secondary_file)
 
         return assay if assay.read_files else None
 
     def _parse_read_file(self, data: dict) -> FileMetadata | None:
         """Parse raw read file data into entity."""
-        location = data.get('location')
-        if not location:
-            return None
-
         try:
+            location = data['location']
             return FileMetadata(
                 filepath=to_path(location),
                 filesize=data.get('size'),
                 checksum=data.get('checksum'),
             )
-        except (ValueError, AttributeError):
+        except (ValueError, KeyError):
             return None
 
-    def _parse_analysis(self, data: dict, sg_id: str) -> AuditAnalysis | None:
+    def _parse_analysis(self, data: dict, sg_id: str) -> Analysis | None:
         """Parse raw analysis data into entity."""
         # Handle different output formats
         output_path = None
@@ -314,21 +308,18 @@ class MetamistDataAccess:
         if not output_path:
             return None
 
-        try:
-            output_file = FileMetadata(
-                filepath=to_path(output_path),
-                filesize=output_size,
-                checksum=output_checksum,
-            )
-            return AuditAnalysis(
-                id=data['id'],
-                type=data['type'],
-                output_file=output_file,
-                sequencing_group_id=sg_id,
-                timestamp_completed=data.get('timestampCompleted'),
-            )
-        except (ValueError, AttributeError):
-            return None
+        output_file = FileMetadata(
+            filepath=to_path(output_path),
+            filesize=output_size,
+            checksum=output_checksum,
+        )
+        return Analysis(
+            id=data['id'],
+            type=data['type'],
+            output_file=output_file,
+            sequencing_group_id=sg_id,
+            timestamp_completed=self._parse_timestamp(data.get('timestampCompleted')),
+        )
 
     def _parse_timestamp(self, timestamp_str: str) -> datetime:
         """Parse timestamp string to datetime."""

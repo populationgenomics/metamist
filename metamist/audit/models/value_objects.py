@@ -59,9 +59,6 @@ class ExternalIds:
         """Get the primary external ID if only one exists."""
         return self.ids.get('')
 
-    def __getitem__(self, key: str) -> str | None:
-        return self.ids.get(key)
-
     def values(self) -> list[str]:
         """Get all external ID values."""
         return list(self.ids.values())
@@ -86,10 +83,10 @@ class AuditConfig:  # pylint: disable=too-many-instance-attributes
         file_types = []
         for ft in args.file_types:
             if ft == 'all':
-                file_types = list(FileType)
+                file_types = list(FileType.all_extensions())
                 break
             if ft == 'all_reads':
-                file_types = [FileType.FASTQ, FileType.BAM, FileType.CRAM]
+                file_types = list(FileType.all_read_extensions())
                 break
             # Map string to FileType
             ft_map = {

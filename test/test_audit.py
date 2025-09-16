@@ -1,8 +1,8 @@
 # noqa: B006
 
+from datetime import datetime
 import unittest
 import unittest.mock
-from test.testbase import run_as_sync
 
 from metamist.audit.adapters import StorageClient
 from metamist.audit.cli.upload_bucket_audit import AuditOrchestrator
@@ -15,25 +15,29 @@ from metamist.audit.services import (
 )
 from metamist.audit.models import (
     SequencingGroup,
+    Assay,
     Analysis,
     AuditConfig,
     FileType,
     AuditResult,
+    AuditReportEntry,
     FileMetadata,
 )
 from test.data.audit_fixtures.audit_test import (
+    ANALYSES_WITH_MALFORMED_TIMESTAMPS_GQL_RESPONSE,
+    SG_ASSAYS_RESPONSE_WITH_SECONDARY_FILES,
     ENUMS_QUERY_RESULT,
     SEQUENCING_GROUPS,
     SR_ILLUMINA_EXOME_SGS,
-    UPLOAD_BUCKET_FILES,
-    MAIN_BUCKET_FILES,
     ANALYSES,
-    ALL_SEQUENCING_GROUP_ASSAYS_RESPONSE,
+    ALL_SG_ASSAYS_RESPONSE,
     SR_ILLUMINA_EXOME_SGS_ASSAYS_RESPONSE,
-    ALL_SEQUENCING_GROUP_ANALYSES_RESPONSE,
+    ALL_SG_ANALYSES_RESPONSE,
     SR_ILLUMINA_EXOME_SGS_CRAM_RESPONSE,
 )
-
+from test.data.audit_fixtures.bucket_files import UPLOAD_BUCKET_FILES, MAIN_BUCKET_FILES
+from test.testbase import run_as_sync
+from types import SimpleNamespace
 from cpg_utils import to_path
 
 
@@ -61,13 +65,20 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
 
         self.metamist_data_access = MetamistDataAccess()
         self.gcs_data_access = GCSDataAccess('dataset', 'test')
-        self.audit_analyzer = AuditAnalyzer()
         self.file_matcher = FileMatchingService()
+        self.audit_analyzer = AuditAnalyzer()
+        self.audit_logs = AuditLogs('dataset', 'test')
+        self.report_generator = ReportGenerator(self.gcs_data_access, self.audit_logs)
 
     def tearDown(self):
         """Clean up test fixtures."""
         self.storage_client_patcher.stop()
         self.bucket_patcher.stop()
+
+    def test_file_matching_service(self):
+        """Test FileMatchingService"""
+        self.assertIsInstance(self.file_matcher, FileMatchingService)
+        self.assertIsInstance(self.audit_analyzer.file_matcher, FileMatchingService)
 
     def test_gcs_data_access_setup(self):
         """
@@ -126,7 +137,7 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
     async def test_get_all_sequencing_groups(self, mock_query_async):
         """Test MetamistDataAccess.get_sequencing_groups"""
-        mock_query_async.return_value = ALL_SEQUENCING_GROUP_ASSAYS_RESPONSE
+        mock_query_async.return_value = ALL_SG_ASSAYS_RESPONSE
 
         result = await self.metamist_data_access.get_sequencing_groups(
             dataset='dataset',
@@ -134,10 +145,27 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
             sequencing_technologies=['short-read', 'long_read'],
             sequencing_platforms=['illumina', 'pacbio', 'ont'],
         )
-
         self.assertEqual(len(result), 7)
         for sg in result:
             self.assertIsInstance(sg, SequencingGroup)
+            for assay in sg.assays:
+                self.assertIsInstance(assay, Assay)
+                for rf in assay.read_files:
+                    self.assertIsInstance(rf, FileMetadata)
+
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
+    async def test_get_sequencing_groups_with_secondary_files(self, mock_query_async):
+        """Test MetamistDataAccess.get_sequencing_groups"""
+        mock_query_async.return_value = SG_ASSAYS_RESPONSE_WITH_SECONDARY_FILES
+
+        result = await self.metamist_data_access.get_sequencing_groups(
+            dataset='dataset',
+            sequencing_types=['genome', 'exome'],
+            sequencing_technologies=['short-read', 'long_read'],
+            sequencing_platforms=['illumina', 'pacbio', 'ont'],
+        )
+        self.assertEqual(len(result[0].assays[0].read_files), 2)
 
     @run_as_sync
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
@@ -226,23 +254,11 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
     # ExternalIds.values
     # AuditConfig.from_cli_args
 
-    # TODO
-
-    # test_get_sequencing_groups_more
-    # - Should handle reads as a dict, not nested list in _parse_assay
-    # - Should handle secondary files in assay reads in _parse_assay
-    # - Should handle empty read files (i.e. where read.location == None) in _parse_read_file
-    # - Should handle cases which lead to ValueError / AttributeError in _parse_read_file
-    # - Should handle outputs dict in _parse_analysis
-    # - Should handle outputs dict where output_path = None in _parse_analysis
-    # - Should handle cases which lead to ValueError / AttributeError in _parse_analysis
-    # - Should handle different timestamp parsing in _parse_timestamp
-
     @run_as_sync
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
     async def test_get_analyses_for_sequencing_groups(self, mock_query_async):
         """Test MetamistDataAccess.get_analyses_for_sequencing_groups"""
-        mock_query_async.return_value = ALL_SEQUENCING_GROUP_ANALYSES_RESPONSE
+        mock_query_async.return_value = ALL_SG_ANALYSES_RESPONSE
 
         result = await self.metamist_data_access.get_analyses_for_sequencing_groups(
             dataset='dataset',
@@ -255,6 +271,26 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
             self.assertIsInstance(analysis, Analysis)
             self.assertIn(analysis.id, [1, 2, 3, 4, 5, 6, 7])
             self.assertIn(analysis.type, ['cram', 'vcf'])
+
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
+    async def test_get_analyses_alternate(self, mock_query_async):
+        """Test MetamistDataAccess.get_analyses_for_sequencing_groups"""
+        mock_query_async.return_value = ANALYSES_WITH_MALFORMED_TIMESTAMPS_GQL_RESPONSE
+
+        result = await self.metamist_data_access.get_analyses_for_sequencing_groups(
+            dataset='dataset',
+            sg_ids=['SG101'],
+            analysis_types=['cram'],
+        )
+
+        self.assertEqual(len(result), 2)
+        self.assertIsInstance(result[0], Analysis)
+        self.assertEqual(result[0].id, 101)
+        self.assertEqual(result[0].timestamp_completed, datetime.min)
+        self.assertEqual(
+            result[0].output_path, 'gs://cpg-dataset-main-upload/2023-05-01/EXT101.cram'
+        )
 
     @run_as_sync
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
@@ -327,29 +363,40 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
 
         self.assertIsNone(result)
 
-    # TODO
-    # update_audit_deletion_analysis
-
     # ===== GCS DATA ACCESS TESTS =====
     # These test the data access layer - mapping GCS responses to domain models
 
     @unittest.mock.patch.object(GCSDataAccess, 'list_files_in_bucket')
-    def test_list_files_in_bucket(self, mock_list_files):
+    def test_list_read_files_in_bucket(self, mock_list_files):
         """Test listing the files in a bucket"""
         mock_list_files.return_value = [
             f
             for f in UPLOAD_BUCKET_FILES
-            if str(f.filepath).endswith(FileType.FASTQ.extensions)
+            if str(f.filepath).endswith(FileType.all_read_extensions())
         ]
 
         blobs = self.gcs_data_access.list_files_in_bucket(
             bucket_name='cpg-dataset-main-upload',
-            file_types=[
-                FileType.FASTQ,
-            ],
+            file_types=[FileType.FASTQ, FileType.BAM, FileType.CRAM],
         )
 
-        self.assertEqual(len(blobs), 8)
+        self.assertEqual(len(blobs), 10)
+
+    @unittest.mock.patch.object(GCSDataAccess, 'list_files_in_bucket')
+    def test_list_all_files_in_bucket(self, mock_list_files):
+        """Test listing the files in a bucket"""
+        mock_list_files.return_value = [
+            f
+            for f in UPLOAD_BUCKET_FILES
+            if str(f.filepath).endswith(FileType.all_extensions())
+        ]
+
+        blobs = self.gcs_data_access.list_files_in_bucket(
+            bucket_name='cpg-dataset-main-upload',
+            file_types=list(FileType),
+        )
+
+        self.assertEqual(len(blobs), 11)
 
     @unittest.mock.patch.object(StorageClient, 'check_blobs')
     def test_validate_cram_files(self, mock_check_blobs):
@@ -469,6 +516,25 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
 
     @run_as_sync
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
+    async def test_audit_config_instantiation_from_inputs(self, mock_query_async):
+        """Test configuration creation from inputs"""
+        config_args = SimpleNamespace(
+            dataset='dataset',
+            sequencing_types=('genome', 'exome'),
+            sequencing_technologies=('short-read', 'long-read'),
+            sequencing_platforms=('illumina', 'pacbio', 'ont'),
+            analysis_types=('cram', 'vcf'),
+            file_types=tuple(list(FileType)),
+            excluded_prefixes=('<EXCLUDED_PREFIX>',),
+            results_folder='results_folder',
+        )
+        mock_query_async.return_value = ENUMS_QUERY_RESULT
+
+        config = AuditConfig.from_cli_args(config_args)
+        self.assertIsInstance(config, AuditConfig)
+
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
     @unittest.mock.patch.object(GCSDataAccess, 'list_files_in_bucket')
     async def test_full_audit_workflow_write_reports(
         self, mock_list_files, mock_query_async
@@ -476,9 +542,9 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
         """Integration test - combines multiple components"""
         mock_query_async.side_effect = [
             # First call: get sequencing groups
-            ALL_SEQUENCING_GROUP_ASSAYS_RESPONSE,
+            ALL_SG_ASSAYS_RESPONSE,
             # Second call: get analyses for sequencing groups
-            ALL_SEQUENCING_GROUP_ANALYSES_RESPONSE,
+            ALL_SG_ANALYSES_RESPONSE,
         ]
         mock_list_files.return_value = UPLOAD_BUCKET_FILES
 
@@ -497,6 +563,7 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
             sequencing_platforms=('illumina', 'pacbio', 'ont'),
             analysis_types=('cram', 'vcf'),
             file_types=tuple(list(FileType)),
+            excluded_prefixes=('<EXCLUDED_PREFIX>',),
         )
 
         # This would normally write files, so mock that too
@@ -506,14 +573,37 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
             await orchestrator.run_audit(config)
             self.assertTrue(mock_write_reports.called)
 
-    # TODO
-    # Report generator tests
-    # write_audit_reports
-    # write_reviewed_files_report
-    # write_deleted_files_report
-    # _write_audit_config
-    # _write_csv_report
-    # _write_unaligned_sgs_report
+    # ===== REPORT GENERATOR SERVICE TESTS =====
+    # These test the file matching logic
+    def test_write_audit_reports(self):
+        """Test the ReportGenerator.write_audit_reports method."""
+        audit_result = AuditResult(
+            files_to_delete=[
+                AuditReportEntry(filepath='gs://cpg-dataset-main-upload/file1.bam')
+            ],
+            files_to_review=[
+                AuditReportEntry(filepath='gs://cpg-dataset-main-upload/file2.bam')
+            ],
+            moved_files=[
+                AuditReportEntry(filepath='gs://cpg-dataset-main-upload/file3.bam')
+            ],
+            unaligned_sequencing_groups=[SEQUENCING_GROUPS['SG05']],
+        )
+        config = AuditConfig(
+            dataset='dataset',
+            sequencing_types=('genome', 'exome'),
+            sequencing_technologies=('short-read', 'long-read'),
+            sequencing_platforms=('illumina', 'pacbio', 'ont'),
+            analysis_types=('cram', 'vcf'),
+            file_types=tuple(list(FileType)),
+            excluded_prefixes=('<EXCLUDED_PREFIX>',),
+        )
+        with unittest.mock.patch.object(
+            ReportGenerator, '_write_csv_report'
+        ) as mock_write_csv_report:
+            self.report_generator.write_audit_reports(audit_result, config)
+            self.assertTrue(mock_write_csv_report.called)
+
     # write_log_file
     # get_report_rows
     # get_report_rows_from_name
