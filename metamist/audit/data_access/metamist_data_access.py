@@ -91,22 +91,20 @@ class MetamistDataAccess:
         """
         return self.graphql_client.get_audit_deletion_analyses(dataset)
 
-    def get_audit_deletion_analysis(
-        self, dataset: str, output_path: str
-    ) -> dict | None:
+    def get_audit_deletion_analysis(self, dataset: str, output: str) -> dict | None:
         """
         Fetch a specific audit deletion analysis by output path.
 
         Args:
             dataset: Dataset name
-            output_path: Output path of the analysis
+            output: Output path of the analysis
 
         Returns:
-            analysis dict or None if not found
+            analysis GQL dict or None if not found
         """
         analyses = self.get_audit_deletion_analyses(dataset)
         for analysis in analyses:
-            if analysis['output'] == output_path:
+            if analysis['output'] == output:
                 return analysis
         return None
 
@@ -141,7 +139,7 @@ class MetamistDataAccess:
         existing_analysis: dict,
         audited_report_name: str,
         stats: dict,
-    ) -> None:
+    ) -> int:
         """
         Upsert a specific audit deletion analysis.
 
@@ -158,7 +156,7 @@ class MetamistDataAccess:
             'file_count': stats.get('file_count', 0)
             + current_stats.get('file_count', 0),
         }
-        self.graphql_client.update_audit_deletion_analysis(
+        return self.graphql_client.update_audit_deletion_analysis(
             existing_analysis['id'],
             existing_analysis['meta'] | {audited_report_name: new_stats},
         )

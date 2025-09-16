@@ -238,6 +238,27 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
 
         self.assertEqual(result, 1)
 
+    @unittest.mock.patch('metamist.audit.adapters.graphql_client.query')
+    def test_update_audit_deletion_analysis(self, mock_query):
+        """Test MetamistDataAccess.update_audit_deletion_analysis"""
+        report_path = 'gs://cpg-dataset-main-analysis/audit_results/20250901_1633/files_to_delete.csv'
+        mock_query.side_effect = [
+            {'project': {'analyses': [{'id': 1, 'output': report_path, 'meta': {}}]}},
+            {'analysis': {'updateAnalysis': {'id': 1}}},
+        ]
+        existing_audit_deletion = self.metamist_data_access.get_audit_deletion_analysis(
+            dataset='dataset',
+            output=report_path,
+        )
+        self.assertEqual(existing_audit_deletion['output'], report_path)
+        result = self.metamist_data_access.update_audit_deletion_analysis(
+            existing_analysis=existing_audit_deletion,
+            audited_report_name='files_to_delete',
+            stats={},
+        )
+
+        self.assertEqual(result, 1)
+
     @run_as_sync
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
     async def test_get_analyses_for_sequencing_groups(self, mock_query_async):
@@ -324,7 +345,7 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
 
         result = self.metamist_data_access.get_audit_deletion_analysis(
             dataset='dataset',
-            output_path='gs://cpg-dataset-main-analysis/audit_results/20250901_1633/deleted_file.csv',
+            output='gs://cpg-dataset-main-analysis/audit_results/20250901_1633/deleted_file.csv',
         )
 
         self.assertIsInstance(result, dict)
@@ -342,7 +363,7 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
 
         result = self.metamist_data_access.get_audit_deletion_analysis(
             dataset='dataset',
-            output_path='gs://cpg-dataset-main-analysis/audit_results/20250901_1633/deleted_file.csv',
+            output='gs://cpg-dataset-main-analysis/audit_results/20250901_1633/deleted_file.csv',
         )
 
         self.assertIsNone(result)
