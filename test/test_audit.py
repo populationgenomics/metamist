@@ -559,6 +559,51 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
 
     # ===== REPORTER SERVICE TESTS =====
     # These test the report writing and reading logic
+    def test_audit_report_entry_to_and_from_dict(self):
+        """Test AuditReportEntry.from_dict"""
+        data = {
+            'filepath': 'gs://cpg-dataset-main-upload/file1.bam',
+            'filesize': 2048000000,
+            'assay_id': 1,
+            'sg_id': 'SG01',
+            'sg_type': 'exome',
+            'sg_tech': 'short-read',
+            'sg_platform': 'illumina',
+            'sample_id': 'S01',
+            'sample_external_ids': 'EXT001',
+            'participant_id': 1,
+            'participant_external_ids': ['P001'],
+            'cram_analysis_id': 1,
+            'cram_file_path': 'cram',
+            'action': 'delete',
+            'review_comment': 'File is old and replaced by newer upload',
+        }
+        entry = AuditReportEntry.from_report_dict(data)
+        self.assertIsInstance(entry, AuditReportEntry)
+        self.assertEqual(entry.filepath, data['filepath'])
+        self.assertEqual(entry.filesize, data['filesize'])
+        self.assertEqual(entry.sg_id, data['sg_id'])
+        self.assertEqual(entry.sg_type, data['sg_type'])
+        self.assertEqual(entry.sg_tech, data['sg_tech'])
+        self.assertEqual(entry.sg_platform, data['sg_platform'])
+        self.assertEqual(entry.sample_id, data['sample_id'])
+        self.assertEqual(
+            entry.participant_external_ids, data['participant_external_ids']
+        )
+        self.assertEqual(entry.cram_analysis_id, data['cram_analysis_id'])
+        self.assertEqual(entry.cram_file_path, data['cram_file_path'])
+        self.assertEqual(entry.action, data['action'])
+        self.assertEqual(entry.review_comment, data['review_comment'])
+
+        entry_dict = entry.to_report_dict()
+        fields_to_headers = {
+            v: k for k, v in AuditReportEntry.HEADER_TO_FIELD_MAP.items()
+        }
+        self.assertEqual(
+            entry_dict,
+            {fields_to_headers[header]: value for header, value in data.items()},
+        )
+
     def test_write_audit_reports(self):
         """Test the Reporter.write_audit_reports method."""
         audit_result = AuditResult(
