@@ -688,7 +688,7 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
 
     # ===== REVIEW AUDIT RESULTS TESTS =====
     # Test the report reviewing entrypoint and related functions
-    def filter_rows(self):
+    def test_filter_rows(self):
         """Test filtering rows based on expressions."""
         expressions = [
             'sg_type == "exome" and sg_platform == "illumina"',
