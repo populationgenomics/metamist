@@ -1,6 +1,7 @@
 export { default as BillingCostByAnalysis } from './BillingCostByAnalysis'
 export { default as BillingCostByCategory } from './BillingCostByCategory'
 export { default as BillingCostByMonth } from './BillingCostByMonth'
+export { default as BillingCostBySample } from './BillingCostBySample'
 export { default as BillingCostByTime } from './BillingCostByTime'
 export { default as BillingHome } from './BillingHome'
 export { default as BillingInvoiceMonthCost } from './BillingInvoiceMonthCost'
