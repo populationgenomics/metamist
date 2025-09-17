@@ -363,8 +363,8 @@ def main(project='ourdna', num_participants=10):
     ]
     enums_api = EnumsApi()
     # add sample type enums
-    for type in sample_types:
-        enums_api.post_sample_types(new_type=type)
+    for typ in sample_types:
+        enums_api.post_sample_types(new_type=typ)
 
     participants = [create_participant() for _ in range(num_participants)]
     participants_rec = participant_api.upsert_participants(project, participants)
