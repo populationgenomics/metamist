@@ -1,9 +1,9 @@
-# noqa: B006
+# noqa: B006 pylint: disable=C0302, E1101
 
 from datetime import datetime
 import unittest
 import unittest.mock
-
+from io import StringIO
 from metamist.audit.adapters import StorageClient
 from metamist.audit.cli.upload_bucket_audit import AuditOrchestrator
 from metamist.audit.cli.review_audit_results import review_rows
@@ -71,6 +71,10 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
         self.audit_analyzer = AuditAnalyzer()
         self.audit_logs = AuditLogs('dataset', 'test')
         self.reporter = Reporter(self.gcs_data_access, self.audit_logs)
+
+        self.sample_csv_content = """File Path,File Size,SG ID,SG Type,SG Technology,SG Platform,Assay ID,Sample ID,Sample External ID,Participant ID,Participant External ID,CRAM Analysis ID,CRAM Path,Action,Review Comment
+gs://cpg-dataset-main-upload/file1.bam,2048000000,SG01,exome,short-read,illumina,1,S01,EXT001,1,"P001",1,cram,delete,File is old and replaced by newer upload
+gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina,2,S02,EXT002,2,"P002",2,cram,review,File not found in main bucket"""
 
     def tearDown(self):
         """Clean up test fixtures."""
@@ -626,6 +630,139 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
             {fields_to_headers[header]: value for header, value in data.items()},
         )
 
+    def test_get_report_rows_from_name_file_exists(self):
+        """Test the Reporter.get_report_rows_from_name method."""
+        mock_path = unittest.mock.MagicMock()
+        mock_path.exists.return_value = True
+
+        # Mock the file opening to return StringIO with our CSV content
+        mock_file = StringIO(self.sample_csv_content)
+        mock_path.open.return_value.__enter__.return_value = mock_file
+
+        rows = self.reporter.get_report_rows(mock_path)
+        self.assertEqual(len(rows), 2)
+        self.assertIsInstance(rows[0], AuditReportEntry)
+        self.assertEqual(rows[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
+        self.assertEqual(
+            rows[0].filesize, '2048000000'
+        )  # Note: will be string from CSV
+        self.assertEqual(rows[0].sg_id, 'SG01')
+        self.assertEqual(rows[0].action.upper(), 'DELETE')
+        self.assertEqual(rows[1].filepath, 'gs://cpg-dataset-main-upload/file2.bam')
+        self.assertEqual(rows[1].action.upper(), 'REVIEW')
+
+    def test_get_report_rows_file_not_exists(self):
+        """Test reading CSV when file doesn't exist."""
+        mock_path = unittest.mock.MagicMock()
+        mock_path.exists.return_value = False
+
+        with unittest.mock.patch.object(self.audit_logs, 'error') as mock_error:
+            mock_error.return_value = None  # No-op for logging
+            rows = self.reporter.get_report_rows(mock_path)
+
+            self.assertEqual(rows, [])
+            self.assertTrue(mock_error.called)
+
+    def test_get_report_stats_from_file(self):
+        """Test the Reporter.get_report_stats method."""
+        mock_path = unittest.mock.MagicMock()
+        mock_path.exists.return_value = True
+        mock_file = StringIO(self.sample_csv_content)
+        mock_path.open.return_value.__enter__.return_value = mock_file
+
+        stats = self.reporter.get_report_stats(mock_path)
+
+        expected_total_size = 2048000000 + 512000000  # Sum of file sizes
+        self.assertEqual(stats['total_size'], expected_total_size)
+        self.assertEqual(stats['file_count'], 2)
+
+    def test_get_report_entries_stats(self):
+        """Test the Reporter.get_report_entries_stats method."""
+        entries = [
+            AuditReportEntry(filepath='file1.bam', filesize=1000),
+            AuditReportEntry(filepath='file2.bam', filesize=2000),
+            AuditReportEntry(filepath='file3.bam', filesize=None),  # Test None handling
+        ]
+
+        with self.assertRaises(TypeError):
+            self.reporter.get_report_entries_stats(None)  # type: ignore
+
+        stats = self.reporter.get_report_entries_stats(
+            entries[:2]
+        )  # Only first two have valid filesize
+
+        self.assertEqual(stats['total_size'], 3000)
+        self.assertEqual(stats['file_count'], 2)
+
+    def test_write_csv_report_new_file(self):
+        """Test writing CSV report to new file."""
+        entries = [
+            AuditReportEntry(
+                filepath='gs://bucket/file1.bam',
+                filesize=1000,
+                sg_id='SG01',
+                action='DELETE',
+            ),
+            AuditReportEntry(
+                filepath='gs://bucket/file2.bam',
+                filesize=2000,
+                sg_id='SG02',
+                action='REVIEW',
+            ),
+        ]
+
+        # Mock blob doesn't exist
+        mock_blob = unittest.mock.MagicMock()
+        mock_blob.exists.return_value = False
+        mock_blob.size = 0
+        with unittest.mock.patch.object(
+            StorageClient, 'get_blob', return_value=mock_blob
+        ), unittest.mock.patch.object(StorageClient, 'upload_from_buffer'):
+            self.reporter.write_csv_report('test/path.csv', entries, 'TEST REPORT')
+
+            # Verify blob operations
+            self.gcs_data_access.storage.get_blob.assert_called_with(  # type: ignore
+                'cpg-dataset-main-analysis', 'test/path.csv'
+            )
+            self.gcs_data_access.storage.upload_from_buffer.assert_called()  # type: ignore
+
+            # Verify the uploaded content format
+            call_args = self.gcs_data_access.storage.upload_from_buffer.call_args  # type: ignore
+            uploaded_buffer = call_args[0][1]  # Second argument is the buffer
+            uploaded_content = uploaded_buffer.getvalue()
+
+            # Should contain headers and data
+            self.assertIn('File Path', uploaded_content)
+            self.assertIn('gs://bucket/file1.bam', uploaded_content)
+            self.assertIn('SG01', uploaded_content)
+
+    def test_write_csv_report_append_to_existing(self):
+        """Test appending to existing CSV file."""
+        # Mock existing file content
+        existing_content = """File Path,File Size,SG ID,Action
+gs://bucket/existing.bam,500,SG00,DELETE"""
+
+        mock_blob = unittest.mock.MagicMock()
+        mock_blob.exists.return_value = True
+        mock_blob.size = 100  # Non-zero size
+        mock_blob.download_as_text.return_value = existing_content
+        with unittest.mock.patch.object(
+            StorageClient, 'get_blob', return_value=mock_blob
+        ), unittest.mock.patch.object(StorageClient, 'upload_from_buffer'):
+            new_entries = [
+                AuditReportEntry(
+                    filepath='gs://bucket/new.bam',
+                    filesize=1000,
+                    sg_id='SG01',
+                    action='REVIEW',
+                )
+            ]
+            self.reporter.write_csv_report('test/path.csv', new_entries, 'TEST REPORT')
+
+            # Verify it tried to download existing content
+            mock_blob.download_as_text.assert_called_once_with(encoding='utf-8-sig')
+            self.gcs_data_access.storage.upload_from_buffer.assert_called()  # type: ignore
+
     def test_write_audit_reports(self):
         """Test the Reporter.write_audit_reports method."""
         audit_result = AuditResult(
@@ -633,10 +770,12 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
                 AuditReportEntry(
                     filepath='gs://cpg-dataset-main-upload/file1.bam',
                     filesize=2048000000,
+                    sg_id='SG01',
                 ),
                 AuditReportEntry(
                     filepath='gs://cpg-dataset-main-upload/file4.bam',
                     filesize=1024000000,
+                    sg_id='SG02',
                 ),
             ],
             files_to_review=[
@@ -678,13 +817,6 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
             self.assertEqual(stats['files_to_review_size_gb'], 768000000 / (1024**3))
             self.assertEqual(stats['unaligned_sgs'], 1)
             self.assertTrue(mock_write_csv_report.called)
-
-    # write_log_file
-    # get_report_rows
-    # get_report_rows_from_name
-    # get_report_stats
-    # get_report_entries_stats
-    # generate_summary_statistics
 
     # ===== REVIEW AUDIT RESULTS TESTS =====
     # Test the report reviewing entrypoint and related functions
@@ -828,6 +960,22 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
         self.assertEqual(parsed[2].filepath, 'gs://cpg-dataset-main-upload/file3.bam')
         self.assertEqual(parsed[3].filepath, 'gs://cpg-dataset-main-upload/file4.bam')
 
+        parsed = self.reporter.filter_rows(
+            ['sample_id != "S03"'],
+            rows=[
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file1.bam',
+                    sample_id='S01',
+                ),
+                AuditReportEntry(
+                    filepath='gs://cpg-dataset-main-upload/file2.bam',
+                    sample_id='S03',
+                ),
+            ],
+        )
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
+
     def test_review_rows(self):
         """Test reviewing rows - updating action and comments"""
         rows = [
@@ -892,13 +1040,6 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
                     audit_logs=self.audit_logs,
                 )
 
-    # TODO
-    # Delete from audit results tests
-    # delete_from_audit_results
-    # delete_files_from_report
-    # upsert_deleted_files_analysis
-    # main
-
     def test_delete_files_from_report(self):
         """Test the delete_files_from_report function end-to-end"""
         rows = [
@@ -956,8 +1097,3 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
                 self.assertIsInstance(stats, dict)
                 self.assertEqual(stats['total_size'], 2048000000 + 1024000000)
                 self.assertEqual(stats['file_count'], 2)
-
-                # self.assertTrue(mock_create_analysis.called)
-                # self.assertFalse(mock_update_analysis.called)
-
-                # Now test with one file that doesn't exist

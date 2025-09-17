@@ -153,7 +153,6 @@ class Reporter:
         report_name: str,
     ) -> Path:
         """Create or update a CSV report for audit entries."""
-        fieldnames = entries[0].fieldnames()
         rows = [entry.to_report_dict() for entry in entries]
         if report_name == 'FILES TO DELETE':
             rows = sorted(rows, key=lambda x: x.get('SG ID', ''))
@@ -173,7 +172,7 @@ class Reporter:
             buffer.close()
 
         buffer = StringIO()
-        writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+        writer = csv.DictWriter(buffer, fieldnames=AuditReportEntry().fieldnames())
         writer.writeheader()
         writer.writerows(rows)
 
@@ -185,6 +184,19 @@ class Reporter:
         )
 
         return to_path(output_path)
+
+    def write_csv_report(
+        self,
+        blob_path: str,
+        entries: list[AuditReportEntry],
+        report_name: str,
+    ) -> Path:
+        """Write a CSV report to GCS."""
+        return self._write_csv_report(
+            blob_path=blob_path,
+            entries=entries,
+            report_name=report_name,
+        )
 
     def _write_log_file(self, log_file: str, save_path: str):
         """Write audit logs to a file."""
@@ -334,7 +346,12 @@ class Reporter:
             return rows
 
         filter_func = self.parse_filter_expressions(filter_expressions)
-        filtered_rows = [row for row in rows if filter_func(row.to_report_dict())]
+
+        filtered_rows = [
+            row
+            for row in rows
+            if filter_func(row.to_report_dict(use_external_headers=False))
+        ]
         self.audit_logs.info_nl(f'Filtered rows: {len(filtered_rows)} / {len(rows)}.')
         return filtered_rows
 

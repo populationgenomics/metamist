@@ -198,6 +198,11 @@ class AuditReportEntry:  # pylint: disable=too-many-instance-attributes
             setattr(self, key_name, value)
 
     @classmethod
+    def get_field_to_header_map(cls) -> dict[str, str]:
+        """Get the reverse mapping from field names to human-readable headers."""
+        return {field: header for header, field in cls.HEADER_TO_FIELD_MAP.items()}
+
+    @classmethod
     def from_report_dict(cls, report_dict: dict) -> 'AuditReportEntry':
         """Create an AuditReportEntry from a report dictionary with human-readable headers."""
         kwargs = {}
@@ -208,12 +213,7 @@ class AuditReportEntry:  # pylint: disable=too-many-instance-attributes
             kwargs[field_name] = value
         return cls(**kwargs)
 
-    @classmethod
-    def get_field_to_header_map(cls) -> dict[str, str]:
-        """Get the reverse mapping from field names to human-readable headers."""
-        return {field: header for header, field in cls.HEADER_TO_FIELD_MAP.items()}
-
-    def to_report_dict(self) -> dict:
+    def to_report_dict(self, use_external_headers: bool = True) -> dict:
         """Convert to dictionary for report generation."""
         # Simplify external IDs if only one exists
         sample_ext = self.sample_external_ids
@@ -252,7 +252,13 @@ class AuditReportEntry:  # pylint: disable=too-many-instance-attributes
             header = field_to_header.get(
                 field_name, field_name.replace('_', ' ').title()
             )
-            result[header] = value
+            if use_external_headers:
+                result[header] = value
+            else:
+                # Or use field names directly
+                if not value:
+                    continue  # Skip fields with no values if not using headers
+                result[field_name] = value
 
         return result
 
