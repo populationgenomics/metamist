@@ -123,6 +123,13 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
             return
         }
 
+        // Filter out negative or zero values for pie chart display
+        const filteredData = data.filter((d) => d.value > 0)
+
+        if (filteredData.length === 0) {
+            return
+        }
+
         const contDiv = containerDivRef.current
         if (!contDiv) {
             return
@@ -143,12 +150,15 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
                 }
                 return 0 // works both on Safari and Firefox, any other value will break one of them
             })
-        const data_ready = pieFnc(data)
+        const data_ready = pieFnc(filteredData)
         const innerRadius = radius / 1.75 // inner radius of pie, in pixels (non-zero for donut)
         const outerRadius = radius // outer radius of pie, in pixels
         const labelRadius = outerRadius * 0.8 // center radius of labels
         const arcData = arc().innerRadius(innerRadius).outerRadius(outerRadius)
         const arcLabel = arc().innerRadius(labelRadius).outerRadius(labelRadius)
+
+        // Calculate total for percentage calculations using filtered data
+        const total = filteredData.reduce((sum, d) => sum + d.value, 0)
 
         // reset svg
         contDiv.innerHTML = ''
@@ -184,7 +194,10 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
                 onHoverOut(event.currentTarget, v)
             })
             .append('title')
-            .text((d) => `${d.data.label} ${d.data.value}`)
+            .text((d) => {
+                const percentage = total > 0 ? ((d.data.value / total) * 100).toFixed(1) : '0.0'
+                return `${d.data.label}: ${formatMoney(d.data.value)} (${percentage}%)`
+            })
             .style('text-anchor', 'middle')
             .style('font-size', 17)
 
@@ -203,13 +216,15 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
             .attr('id', (d) => `${chartId}-lbl${d.index}`)
             .selectAll('tspan')
             .data((d) => {
-                const lines = `${formatMoney(d.data.value)}`.split(/\n/)
+                const percentage = total > 0 ? ((d.data.value / total) * 100).toFixed(1) : '0.0'
+                const lines = `${formatMoney(d.data.value)}\n${percentage}%`.split(/\n/)
                 return d.endAngle - d.startAngle > 0.25 ? lines : lines.slice(0, 1)
             })
             .join('tspan')
             .attr('x', 0)
-            .attr('y', (_, i) => `${i * 2.1}em`)
+            .attr('y', (_, i) => `${i * 1.2}em`)
             .attr('font-weight', (_, i) => (i ? null : 'normal'))
+            .attr('font-size', (_, i) => (i ? '0.8em' : '1em'))
             .text((d) => d)
 
         // add legend
@@ -231,6 +246,7 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
                         .append('circle')
                         .attr('r', 8)
                         .attr('fill', colorFunc(d.index / maxSlices) ?? 'black')
+                    const percentage = total > 0 ? ((d.data.value / total) * 100).toFixed(1) : '0.0'
                     select(this)
                         .append('text')
                         .attr('text-anchor', 'start')
@@ -238,7 +254,7 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
                         .attr('y', 0)
                         .attr('dy', '0.35em')
                         .attr('id', `${chartId}-legend${d.index}`)
-                        .text(d.data.label)
+                        .text(`${d.data.label} (${percentage}%)`)
                         .attr('font-size', '0.9em')
                     select(this)
                         .on('mouseover', () => {
