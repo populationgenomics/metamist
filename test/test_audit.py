@@ -7,6 +7,7 @@ import unittest.mock
 from metamist.audit.adapters import StorageClient
 from metamist.audit.cli.upload_bucket_audit import AuditOrchestrator
 from metamist.audit.cli.review_audit_results import review_rows
+from metamist.audit.cli.delete_from_audit_results import delete_files_from_report
 from metamist.audit.data_access import MetamistDataAccess, GCSDataAccess
 from metamist.audit.services import (
     AuditAnalyzer,
@@ -221,6 +222,54 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
         )
         self.assertEqual(cohort_id, 'C01')
 
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.adapters.graphql_client.query')
+    async def test_get_audit_deletion_analysis(self, mock_query):
+        """Test MetamistDataAccess.get_audit_deletion_analyses"""
+        mock_query.return_value = {
+            'project': {
+                'analyses': [
+                    {
+                        'id': 1,
+                        'timestampCompleted': '2025-09-01T16:33:00',
+                        'output': 'gs://cpg-dataset-main-analysis/audit_results/20250901_1633/deleted_file.csv',
+                        'meta': {},
+                    },
+                    {
+                        'id': 2,
+                        'timestampCompleted': '2025-09-01T16:43:00',
+                        'output': 'gs://cpg-dataset-main-analysis/audit_results/20250901_1643/deleted_file.csv',
+                        'meta': {},
+                    },
+                ],
+            },
+        }
+
+        result = self.metamist_data_access.get_audit_deletion_analysis(
+            dataset='dataset',
+            output='gs://cpg-dataset-main-analysis/audit_results/20250901_1633/deleted_file.csv',
+        )
+
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result['id'], 1)
+
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.adapters.graphql_client.query')
+    async def test_get_audit_deletion_analysis_none(self, mock_query):
+        """Test MetamistDataAccess.get_audit_deletion_analyses"""
+        mock_query.return_value = {
+            'project': {
+                'analyses': [],
+            },
+        }
+
+        result = self.metamist_data_access.get_audit_deletion_analysis(
+            dataset='dataset',
+            output='gs://cpg-dataset-main-analysis/audit_results/20250901_1633/deleted_file.csv',
+        )
+
+        self.assertIsNone(result)
+
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query')
     def test_create_audit_deletion_analysis(self, mock_query):
         """Test MetamistDataAccess.create_audit_deletion_analysis"""
@@ -319,54 +368,6 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
         self.assertEqual(
             analysis.output_path, 'gs://cpg-dataset-main/exome/cram/SG01_2.cram'
         )
-
-    @run_as_sync
-    @unittest.mock.patch('metamist.audit.adapters.graphql_client.query')
-    async def test_get_audit_deletion_analysis(self, mock_query):
-        """Test MetamistDataAccess.get_audit_deletion_analyses"""
-        mock_query.return_value = {
-            'project': {
-                'analyses': [
-                    {
-                        'id': 1,
-                        'timestampCompleted': '2025-09-01T16:33:00',
-                        'output': 'gs://cpg-dataset-main-analysis/audit_results/20250901_1633/deleted_file.csv',
-                        'meta': {},
-                    },
-                    {
-                        'id': 2,
-                        'timestampCompleted': '2025-09-01T16:43:00',
-                        'output': 'gs://cpg-dataset-main-analysis/audit_results/20250901_1643/deleted_file.csv',
-                        'meta': {},
-                    },
-                ],
-            },
-        }
-
-        result = self.metamist_data_access.get_audit_deletion_analysis(
-            dataset='dataset',
-            output='gs://cpg-dataset-main-analysis/audit_results/20250901_1633/deleted_file.csv',
-        )
-
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result['id'], 1)
-
-    @run_as_sync
-    @unittest.mock.patch('metamist.audit.adapters.graphql_client.query')
-    async def test_get_audit_deletion_analysis_none(self, mock_query):
-        """Test MetamistDataAccess.get_audit_deletion_analyses"""
-        mock_query.return_value = {
-            'project': {
-                'analyses': [],
-            },
-        }
-
-        result = self.metamist_data_access.get_audit_deletion_analysis(
-            dataset='dataset',
-            output='gs://cpg-dataset-main-analysis/audit_results/20250901_1633/deleted_file.csv',
-        )
-
-        self.assertIsNone(result)
 
     # ===== GCS DATA ACCESS TESTS =====
     # These test the data access layer - mapping GCS responses to domain models
@@ -897,3 +898,66 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
     # delete_files_from_report
     # upsert_deleted_files_analysis
     # main
+
+    def test_delete_files_from_report(self):
+        """Test the delete_files_from_report function end-to-end"""
+        rows = [
+            AuditReportEntry(
+                filepath='gs://cpg-dataset-main-upload/file1.bam',
+                filesize=2048000000,
+                action='DELETE',
+                review_comment='Marked for deletion',
+            ),
+            AuditReportEntry(
+                filepath='gs://cpg-dataset-main-upload/file2.bam',
+                filesize=512000000,
+                action='REVIEW',
+                review_comment='No changes made',
+            ),
+            AuditReportEntry(
+                filepath='gs://cpg-dataset-main-upload/file3.bam',
+                filesize=1024000000,
+                action='DELETE',
+                review_comment='Marked for deletion',
+            ),
+        ]
+        # Mock to_path to return a mock object with exists() method
+        mock_path = unittest.mock.MagicMock()
+        mock_path.exists.return_value = True
+        with unittest.mock.patch(
+            'metamist.audit.cli.delete_from_audit_results.to_path',
+            return_value=mock_path,
+        ):
+            # Mock MetamistDataAccess methods
+            with unittest.mock.patch.object(
+                MetamistDataAccess, 'get_audit_deletion_analysis'
+            ) as mock_get_analysis, unittest.mock.patch.object(
+                MetamistDataAccess, 'create_audit_deletion_analysis'
+            ) as mock_create_analysis, unittest.mock.patch.object(
+                MetamistDataAccess, 'update_audit_deletion_analysis'
+            ) as mock_update_analysis:
+                mock_get_analysis.return_value = None
+                mock_create_analysis.return_value = 1
+                mock_update_analysis.return_value = 1
+
+                deletion_result = delete_files_from_report(
+                    self.gcs_data_access,
+                    report_name='files_to_review',
+                    rows=rows,
+                    audit_logs=self.audit_logs,
+                    dry_run=False,
+                )
+
+                self.assertEqual(len(deletion_result.deleted_files), 2)
+
+                stats = self.reporter.get_report_entries_stats(
+                    deletion_result.deleted_files
+                )
+                self.assertIsInstance(stats, dict)
+                self.assertEqual(stats['total_size'], 2048000000 + 1024000000)
+                self.assertEqual(stats['file_count'], 2)
+
+                # self.assertTrue(mock_create_analysis.called)
+                # self.assertFalse(mock_update_analysis.called)
+
+                # Now test with one file that doesn't exist
