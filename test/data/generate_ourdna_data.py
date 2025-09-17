@@ -6,13 +6,12 @@ Local Backend API needs to run prior executing this script
 """
 
 import argparse
-import asyncio
 import datetime
 import random
 import uuid
 from typing import Sequence, Union
 
-from metamist.apis import ParticipantApi
+from metamist.apis import EnumsApi, ParticipantApi
 from metamist.models import ParticipantUpsert, SampleUpsert
 
 PRIMARY_EXTERNAL_ORG = ''
@@ -350,9 +349,22 @@ def create_participant():
     return participant
 
 
-async def main(project='ourdna', num_participants=10):
+def main(project='ourdna', num_participants=10):
     """Doing the generation for you"""
     participant_api = ParticipantApi()
+
+    sample_types = [
+        'blood',
+        'whole-blood',
+        'guthrie-card',
+        'plasma',
+        'pbmc',
+        'buffy-coat',
+    ]
+    enums_api = EnumsApi()
+    # add sample type enums
+    for type in sample_types:
+        enums_api.post_sample_types(new_type=type)
 
     participants = [create_participant() for _ in range(num_participants)]
     participants_rec = participant_api.upsert_participants(project, participants)
@@ -366,4 +378,4 @@ if __name__ == '__main__':
     parser.add_argument('--project', type=str, default='ourdna')
     parser.add_argument('--num-participants', type=int, default=10)
     args = vars(parser.parse_args())
-    asyncio.new_event_loop().run_until_complete(main(**args))
+    main(**args)
