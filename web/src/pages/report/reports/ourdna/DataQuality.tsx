@@ -23,7 +23,7 @@ const AGE_QUERY = `
     and s.type = 'blood'
 `
 
-export default function DataQuality({project}: {project: string}) {
+export default function DataQuality({ project }: { project: string }) {
     return (
         <Report>
             <ReportRow>

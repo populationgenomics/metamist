@@ -5,7 +5,7 @@ import ReportRow from '../../components/ReportRow'
 
 const ROW_HEIGHT = 450
 
-export default function Demographics({project}: {project: string}) {
+export default function Demographics({ project }: { project: string }) {
     return (
         <Report>
             <ReportRow>

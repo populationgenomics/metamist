@@ -117,7 +117,7 @@ function ProcessingTimesByCollectionDay(props: { eventType: string; eventTypeTit
     )
 }
 
-export default function ProcessingTimes({project}: {project: string}) {
+export default function ProcessingTimes({ project }: { project: string }) {
     return (
         <Report>
             <ReportRow>

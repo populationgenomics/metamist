@@ -5,7 +5,7 @@ import Report from '../../components/Report'
 import { ReportItemPlot } from '../../components/ReportItem'
 import ReportRow from '../../components/ReportRow'
 
-export default function ConsentAndChoices({project}: {project: string}) {
+export default function ConsentAndChoices({ project }: { project: string }) {
     const [normalize, setNormalize] = useState(true)
     const [onlySamples, setOnlySamples] = useState(false)
 

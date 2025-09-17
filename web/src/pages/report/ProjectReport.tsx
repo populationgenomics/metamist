@@ -1,35 +1,34 @@
-import { useContext } from 'react'
 import { Alert, Box, Tab, Tabs, Typography } from '@mui/material'
+import { useContext } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import MuckError from '../../shared/components/MuckError'
-import { reports } from './reportIndex'
-import { ViewerContext } from '../../viewer'
 import { ProjectMemberRole } from '../../__generated__/graphql'
+import MuckError from '../../shared/components/MuckError'
+import { ViewerContext } from '../../viewer'
+import { reports } from './reportIndex'
 
 const NotFound = () => <MuckError message="Report not found" />
 
 export default function ProjectReport() {
     const { projectName, reportName, tabName } = useParams()
-    
+
     if (!projectName || !reportName || !reports[projectName] || !reports[projectName][reportName]) {
         return <NotFound />
     }
-    
-    const viewer = useContext(ViewerContext);
-    const canAccess = viewer?.checkProjectAccessByName(projectName, 
-        [
-            ProjectMemberRole.Contributor, 
-            ProjectMemberRole.Reader, 
-            ProjectMemberRole.Writer
-        ]);
+
+    const viewer = useContext(ViewerContext)
+    const canAccess = viewer?.checkProjectAccessByName(projectName, [
+        ProjectMemberRole.Contributor,
+        ProjectMemberRole.Reader,
+        ProjectMemberRole.Writer,
+    ])
     if (!canAccess) {
         return (
             <Box p={5}>
-                <Alert severity='error'>
+                <Alert severity="error">
                     You do not have appropriate permissions to view the project "{projectName}".
                 </Alert>
             </Box>
-        );
+        )
     }
 
     const reportTabs = reports[projectName][reportName].tabs
@@ -58,9 +57,7 @@ export default function ProjectReport() {
                     {activeTab.title}
                 </Typography>
                 <Box>
-                    <Report
-                        project={projectName}
-                    />
+                    <Report project={projectName} />
                 </Box>
             </Box>
         </Box>
