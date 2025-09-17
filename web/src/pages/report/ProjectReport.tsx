@@ -10,12 +10,12 @@ const NotFound = () => <MuckError message="Report not found" />
 
 export default function ProjectReport() {
     const { projectName, reportName, tabName } = useParams()
-
+    const viewer = useContext(ViewerContext)
+    
     if (!projectName || !reportName || !reports[projectName] || !reports[projectName][reportName]) {
         return <NotFound />
     }
 
-    const viewer = useContext(ViewerContext)
     const canAccess = viewer?.checkProjectAccessByName(projectName, [
         ProjectMemberRole.Contributor,
         ProjectMemberRole.Reader,
