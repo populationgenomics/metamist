@@ -7,7 +7,7 @@ import OurDnaProcessingTimes from './reports/ourdna/SampleProcessing'
 type ReportTab = {
     title: string
     id: string
-    content: React.ComponentType
+    content: React.ComponentType<{project: string}>
 }
 
 type ReportDefinition = {

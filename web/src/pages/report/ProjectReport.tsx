@@ -52,7 +52,9 @@ export default function ProjectReport() {
                     {activeTab.title}
                 </Typography>
                 <Box>
-                    <Report />
+                    <Report
+                        project={projectName}
+                    />
                 </Box>
             </Box>
         </Box>

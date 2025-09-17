@@ -3,7 +3,6 @@ import { ReportItemMetric, ReportItemTable } from '../../components/ReportItem'
 import ReportRow from '../../components/ReportRow'
 
 const ROW_HEIGHT = 220
-const PROJECT = 'ourdna'
 
 const AGE_QUERY = `
     select distinct
@@ -24,12 +23,12 @@ const AGE_QUERY = `
     and s.type = 'blood'
 `
 
-export default function DataQuality() {
+export default function DataQuality({project}: {project: string}) {
     return (
         <Report>
             <ReportRow>
                 <ReportItemMetric
-                    project={PROJECT}
+                    project={project}
                     height={ROW_HEIGHT}
                     flexBasis={300}
                     flexGrow={1}
@@ -47,7 +46,7 @@ export default function DataQuality() {
                     `}
                 />
                 <ReportItemMetric
-                    project={PROJECT}
+                    project={project}
                     height={ROW_HEIGHT}
                     flexBasis={300}
                     flexGrow={1}
@@ -65,7 +64,7 @@ export default function DataQuality() {
                     `}
                 />
                 <ReportItemMetric
-                    project={PROJECT}
+                    project={project}
                     height={ROW_HEIGHT}
                     flexBasis={300}
                     flexGrow={1}
@@ -80,7 +79,7 @@ export default function DataQuality() {
                     `}
                 />
                 <ReportItemMetric
-                    project={PROJECT}
+                    project={project}
                     height={ROW_HEIGHT}
                     flexBasis={300}
                     flexGrow={1}
@@ -98,7 +97,7 @@ export default function DataQuality() {
             </ReportRow>
             <ReportRow>
                 <ReportItemMetric
-                    project={PROJECT}
+                    project={project}
                     height={ROW_HEIGHT}
                     flexBasis={300}
                     flexGrow={1}
@@ -113,7 +112,7 @@ export default function DataQuality() {
                     `}
                 />
                 <ReportItemMetric
-                    project={PROJECT}
+                    project={project}
                     height={ROW_HEIGHT}
                     flexBasis={300}
                     flexGrow={1}
@@ -129,7 +128,7 @@ export default function DataQuality() {
                     `}
                 />
                 <ReportItemMetric
-                    project={PROJECT}
+                    project={project}
                     height={ROW_HEIGHT}
                     flexBasis={300}
                     flexGrow={1}
@@ -156,7 +155,7 @@ export default function DataQuality() {
                     flexGrow={1}
                     flexBasis={300}
                     title="Participants with unreasonable ages"
-                    project={PROJECT}
+                    project={project}
                     showToolbar={true}
                     query={[
                         {
@@ -180,7 +179,7 @@ export default function DataQuality() {
                     flexBasis={300}
                     title="Mismatched or invalid Sonic Ids"
                     description={`Sonic ids that are either not numeric, or don't match the sonic id recorded in the event portal`}
-                    project={PROJECT}
+                    project={project}
                     showToolbar={true}
                     query={`
                         select
