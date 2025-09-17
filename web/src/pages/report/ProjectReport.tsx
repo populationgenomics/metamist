@@ -23,7 +23,13 @@ export default function ProjectReport() {
             ProjectMemberRole.Writer
         ]);
     if (!canAccess) {
-        return <Alert severity='error'>You do not have appropriate permissions to view the project "{projectName}".</Alert>;
+        return (
+            <Box p={5}>
+                <Alert severity='error'>
+                    You do not have appropriate permissions to view the project "{projectName}".
+                </Alert>
+            </Box>
+        );
     }
 
     const reportTabs = reports[projectName][reportName].tabs
