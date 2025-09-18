@@ -11,7 +11,7 @@ const App: React.FunctionComponent = () => {
 
     return (
         <Router>
-            <ViewerContext.Provider value={{viewer, loading, error}}>
+            <ViewerContext.Provider value={{ viewer, loading, error }}>
                 <NavBar />
                 <Routes />
                 {error && (
