@@ -16,6 +16,7 @@ const PROCESS_DURATION_QUERY = `
             coalesce(s.meta_collection_event_type, 'unknown') as event_type,
             try_strptime(meta_collection_datetime, '%Y-%m-%dT%H:%M:%S') as collection_time,
             dayname(try_strptime(meta_collection_datetime, '%Y-%m-%dT%H:%M:%S')) as day,
+            meta_ancestry_participant_ancestry as ancestry,
             s.external_id as sample_agd_id,
             -- The most important sample derivative to track the processing time of is PBMC
             try_strptime((
@@ -338,7 +339,8 @@ export default function ProcessingTimes() {
                                     day as collection_day,
                                     strftime(collection_time, '%Y-%m-%d %H:%M:%S') as collection_time,
                                     strftime(process_end_time, '%Y-%m-%d %H:%M:%S') as process_end_time,
-                                    duration
+                                    duration,
+                                    ancestry
                                 from durations
                                 order by duration desc nulls last
                             `,
