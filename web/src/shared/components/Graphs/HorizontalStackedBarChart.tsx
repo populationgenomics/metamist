@@ -161,10 +161,6 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
             .style('font-size', '18px') // make the axis labels bigger
             .call(d3.axisLeft(yScale).tickSize(0).tickPadding(5))
 
-        // color palette
-        // @ts-ignore
-        const color = d3.scaleOrdinal().domain(typeKeys).range(['url(#pattern0)', 'url(#pattern1)'])
-
         // @ts-ignore
         const color_fnc = (d) => {
             if (threshold_series === undefined) {
@@ -233,8 +229,7 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
             .selectAll('g')
             .data(indexedData)
             .join('g')
-            // @ts-ignore
-            .attr('fill', (d) => color(d))
+            .attr('fill', (_d, i) => `url(#pattern${i})`)
             .selectAll('rect')
             .data((d) => d)
             .join('rect')
