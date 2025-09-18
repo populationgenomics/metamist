@@ -5,15 +5,20 @@ import { ProjectMemberRole } from '../../__generated__/graphql'
 import MuckError from '../../shared/components/MuckError'
 import { ViewerContext } from '../../viewer'
 import { reports } from './reportIndex'
+import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 
 const NotFound = () => <MuckError message="Report not found" />
 
 export default function ProjectReport() {
     const { projectName, reportName, tabName } = useParams()
-    const viewer = useContext(ViewerContext)
+    const {viewer, loading} = useContext(ViewerContext)
 
     if (!projectName || !reportName || !reports[projectName] || !reports[projectName][reportName]) {
         return <NotFound />
+    }
+
+    if (loading) {
+        return <LoadingDucks />
     }
 
     const canAccess = viewer?.checkProjectAccessByName(projectName, [
@@ -21,11 +26,12 @@ export default function ProjectReport() {
         ProjectMemberRole.Reader,
         ProjectMemberRole.Writer,
     ])
+    console.log(canAccess);
     if (!canAccess) {
         return (
             <Box p={5}>
                 <Alert severity="error">
-                    You do not have appropriate permissions to view the project "{projectName}".
+                    You do not have appropriate permissions to view the project &ldquo;{projectName}&rdquo;.
                 </Alert>
             </Box>
         )

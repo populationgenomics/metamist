@@ -128,7 +128,7 @@ export function DiscussionView(props: {
         sectionType: 'direct',
     }
 
-    const viewer = useContext(ViewerContext)
+    const {viewer} = useContext(ViewerContext)
 
     // toggle the side panel open if the specified param is in the url
     useEffect(() => {

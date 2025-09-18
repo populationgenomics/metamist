@@ -6,12 +6,12 @@ import NavBar from './shared/components/Header/NavBar'
 import { useViewer, ViewerContext } from './viewer'
 
 const App: React.FunctionComponent = () => {
-    const { viewer, error } = useViewer()
+    const { viewer, error, loading } = useViewer()
     const [showAlert, setShowAlert] = React.useState(true)
 
     return (
         <Router>
-            <ViewerContext.Provider value={viewer}>
+            <ViewerContext.Provider value={{viewer, loading, error}}>
                 <NavBar />
                 <Routes />
                 {error && (
