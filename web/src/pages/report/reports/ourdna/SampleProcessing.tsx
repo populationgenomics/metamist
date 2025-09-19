@@ -172,12 +172,7 @@ function ProcessingTimesByAncestry() {
                     axis: null,
                 },
                 fx: {
-                    domain: [
-                        'Vietnamese',
-                        'Filipino',
-                        'Lebanese',
-                        'Other',
-                    ],
+                    domain: ['Vietnamese', 'Filipino', 'Lebanese', 'Other'],
                 },
                 marks: [
                     Plot.frame({ stroke: '#ccc' }),
