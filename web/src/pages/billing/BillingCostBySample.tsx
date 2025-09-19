@@ -283,7 +283,7 @@ function BillingCostBySample() {
     const [dataQuery, setDataQuery] = useState<DataQuery>({ ids: [], dateRange, breakDownBy })
 
     const [showingInfo, setShowingInfo] = useState(false)
-    const viewer = useContext(ViewerContext)
+    const { viewer } = useContext(ViewerContext)
 
     const idPrefixes: Record<string, string> | undefined = viewer?.metamistSettings
         ? {
