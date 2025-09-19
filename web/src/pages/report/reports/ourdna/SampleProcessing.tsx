@@ -295,10 +295,15 @@ export default function ProcessingTimes({ project }: { project: string }) {
             </ReportRow>
 
             <ReportRow>
-                <ProcessingTimesByCollectionDay eventType="walk-in" eventTypeTitle="Walk in" />
+                <ProcessingTimesByCollectionDay
+                    eventType="walk-in"
+                    eventTypeTitle="Walk in"
+                    project={project}
+                />
                 <ProcessingTimesByCollectionDay
                     eventType="one-stop-shop"
                     eventTypeTitle="One stop shop"
+                    project={project}
                 />
             </ReportRow>
             <ReportRow>
@@ -391,7 +396,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                 />
             </ReportRow>
             <ReportRow>
-                <ProcessingTimesByAncestry />
+                <ProcessingTimesByAncestry project={project} />
             </ReportRow>
             <ReportRow>
                 <ReportItemTable
