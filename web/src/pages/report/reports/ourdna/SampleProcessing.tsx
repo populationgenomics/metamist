@@ -154,6 +154,7 @@ function ProcessingTimesByAncestry(props: { project: string }) {
                                 ELSE '72+ hours'
                             END AS duration,
                         from durations
+                        where duration is not null
                         group by 2, 3 order by 2, 3
                     `,
                 },
@@ -422,7 +423,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                     strftime(collection_time, '%Y-%m-%d %H:%M:%S') as collection_time,
                                     strftime(process_end_time, '%Y-%m-%d %H:%M:%S') as process_end_time,
                                     duration,
-                                    ancestry
+                                    array_to_string(ancestry, ', ')
                                 from durations
                                 order by duration desc nulls last
                             `,
