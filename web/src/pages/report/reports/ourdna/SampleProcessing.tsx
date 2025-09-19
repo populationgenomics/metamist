@@ -118,6 +118,82 @@ function ProcessingTimesByCollectionDay(props: { eventType: string; eventTypeTit
     )
 }
 
+function ProcessingTimesByAncestry() {
+    return (
+        <ReportItemPlot
+            height={ROW_HEIGHT}
+            flexBasis={480}
+            flexGrow={1}
+            title={`Processing times by ancestry`}
+            description="Processing time by the ancestry of the participant"
+            project={PROJECT}
+            query={[
+                {
+                    name: 'durations',
+                    query: PROCESS_DURATION_QUERY,
+                },
+                {
+                    name: 'result',
+                    query: `
+                        select
+                            count(distinct participant_id) as count,
+                            CASE
+                                WHEN 'Vietnamese' IN durations.ancestry THEN 'Vietnamese'
+                                WHEN 'Filipino' IN durations.ancestry THEN 'Filipino'
+                                WHEN 'Lebanese' IN durations.ancestry THEN 'Lebanese'
+                                ELSE 'Other'
+                            END AS ancestry,
+                            CASE
+                                WHEN duration < 24 THEN '0-24 hours'
+                                WHEN duration >= 24 AND duration < 36 THEN '24-36 hours'
+                                WHEN duration >= 36 AND duration < 48 THEN '36-48 hours'
+                                WHEN duration >= 48 AND duration < 72 THEN '48-72 hours'
+                                ELSE '72+ hours'
+                            END AS duration,
+                        from durations
+                        group by 2, 3 order by 2, 3
+                    `,
+                },
+            ]}
+            plot={(data) => ({
+                marginTop: 20,
+                marginRight: 100,
+                marginBottom: 40,
+                marginLeft: 100,
+                color: {
+                    scheme: 'RdYlGn',
+                    legend: true,
+                    reverse: true,
+                },
+                x: {
+                    axis: null,
+                },
+                y: {
+                    axis: null,
+                },
+                fx: {
+                    domain: [
+                        'Vietnamese',
+                        'Filipino',
+                        'Lebanese',
+                        'Other',
+                    ],
+                },
+                marks: [
+                    Plot.frame({ stroke: '#ccc' }),
+                    Plot.barY(data, {
+                        x: 'duration',
+                        y: 'count',
+                        fill: 'duration',
+                        tip: true,
+                        fx: 'ancestry',
+                    }),
+                ],
+            })}
+        />
+    )
+}
+
 export default function ProcessingTimes() {
     return (
         <Report>
@@ -315,6 +391,9 @@ export default function ProcessingTimes() {
                         ],
                     })}
                 />
+            </ReportRow>
+            <ReportRow>
+                <ProcessingTimesByAncestry />
             </ReportRow>
             <ReportRow>
                 <ReportItemTable
