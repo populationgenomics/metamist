@@ -423,7 +423,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                     strftime(collection_time, '%Y-%m-%d %H:%M:%S') as collection_time,
                                     strftime(process_end_time, '%Y-%m-%d %H:%M:%S') as process_end_time,
                                     duration,
-                                    array_to_string(ancestry, ', ')
+                                    array_to_string(ancestry, ', ') as ancestry
                                 from durations
                                 order by duration desc nulls last
                             `,
