@@ -4,7 +4,6 @@ import { ReportItemPlot, ReportItemTable } from '../../components/ReportItem'
 import ReportRow from '../../components/ReportRow'
 
 const ROW_HEIGHT = 450
-const PROJECT = 'ourdna'
 
 const PROCESS_DURATION_QUERY = `
     with times as (
@@ -41,7 +40,11 @@ const PROCESS_DURATION_QUERY = `
     from times
 `
 
-function ProcessingTimesByCollectionDay(props: { eventType: string; eventTypeTitle: string }) {
+function ProcessingTimesByCollectionDay(props: {
+    eventType: string
+    eventTypeTitle: string
+    project: string
+}) {
     return (
         <ReportItemPlot
             height={ROW_HEIGHT}
@@ -49,7 +52,7 @@ function ProcessingTimesByCollectionDay(props: { eventType: string; eventTypeTit
             flexGrow={1}
             title={`${props.eventTypeTitle} processing times by collection day`}
             description="Processing time by the day the sample was collected"
-            project={PROJECT}
+            project={props.project}
             query={[
                 {
                     name: 'durations',
@@ -118,7 +121,7 @@ function ProcessingTimesByCollectionDay(props: { eventType: string; eventTypeTit
     )
 }
 
-function ProcessingTimesByAncestry() {
+function ProcessingTimesByAncestry(props: { project: string }) {
     return (
         <ReportItemPlot
             height={ROW_HEIGHT}
@@ -126,7 +129,7 @@ function ProcessingTimesByAncestry() {
             flexGrow={1}
             title={`Processing times by ancestry`}
             description="Processing time by the ancestry of the participant"
-            project={PROJECT}
+            project={props.project}
             query={[
                 {
                     name: 'durations',
@@ -188,7 +191,7 @@ function ProcessingTimesByAncestry() {
         />
     )
 }
- 
+
 export default function ProcessingTimes({ project }: { project: string }) {
     return (
         <Report>
