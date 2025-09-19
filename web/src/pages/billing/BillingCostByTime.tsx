@@ -90,8 +90,8 @@ const BillingCostByTime: React.FunctionComponent = () => {
     // Create a debounced version of getData for project selections
     const debouncedGetData = React.useMemo(
         () =>
-            debounce((query: BillingTotalCostQueryModel) => {
-                getData(query)
+            debounce((query: BillingTotalCostQueryModel, currentGroupBy?: BillingColumn) => {
+                getData(query, currentGroupBy)
             }, 1000), // 1000ms delay
         // eslint-disable-next-line react-hooks/exhaustive-deps
         []
@@ -151,9 +151,13 @@ const BillingCostByTime: React.FunctionComponent = () => {
             }
 
             // Handle columns parameter
-            if (columns !== undefined && columns.size > 0) {
-                const columnsArray = Array.from(columns).sort()
-                searchParams.set('columns', columnsArray.join(','))
+            if (columns !== undefined) {
+                if (columns.size > 0) {
+                    const columnsArray = Array.from(columns).sort()
+                    searchParams.set('columns', columnsArray.join(','))
+                } else {
+                    searchParams.delete('columns')
+                }
             }
 
             // Handle projects parameter
@@ -191,7 +195,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
 
     const onGroupBySelect = (event: unknown, data: DropdownProps) => {
         const value = data.value
-        if (typeof value == 'string') {
+        if (typeof value === 'string') {
             setGroupBy(value as BillingColumn)
             setSelectedData(undefined)
             // Clear filters when switching groupBy
@@ -202,6 +206,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 setSelectedTopics([])
             }
             updateNav(value, undefined, start, end, expandCompute, visibleColumns, [], [])
+            // getData will be called by useEffect with the new groupBy value
         }
     }
 
@@ -319,8 +324,32 @@ const BillingCostByTime: React.FunctionComponent = () => {
     // Custom handlers that update URL
     const handleExpandChange = React.useCallback(
         (expand: boolean) => {
-            // Only update expand state - let table handle column visibility internally
             setExpandCompute(expand)
+
+            // Update visible columns based on new expand state
+            const updatedVisibleColumns = new Set(visibleColumns)
+
+            if (expand) {
+                // Expanded: Remove "Compute Cost", add individual compute columns that were visible
+                updatedVisibleColumns.delete('Compute Cost')
+
+                // Add individual compute columns (excluding Cloud Storage which isn't compute)
+                groups.forEach((group) => {
+                    if (group !== 'Cloud Storage') {
+                        updatedVisibleColumns.add(group)
+                    }
+                })
+            } else {
+                // Collapsed: Remove individual compute columns, add "Compute Cost"
+                groups.forEach((group) => {
+                    if (group !== 'Cloud Storage') {
+                        updatedVisibleColumns.delete(group)
+                    }
+                })
+                updatedVisibleColumns.add('Compute Cost')
+            }
+
+            setVisibleColumns(updatedVisibleColumns)
 
             updateNav(
                 groupBy,
@@ -328,7 +357,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 start,
                 end,
                 expand,
-                visibleColumns, // Keep current visible columns for URL
+                updatedVisibleColumns, // Use updated visible columns for URL
                 selectedProjects,
                 selectedTopics
             )
@@ -339,6 +368,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
             start,
             end,
             visibleColumns,
+            groups,
             selectedProjects,
             selectedTopics,
             updateNav,
@@ -370,10 +400,14 @@ const BillingCostByTime: React.FunctionComponent = () => {
     )
 
     const getData = React.useCallback(
-        (query: BillingTotalCostQueryModel) => {
+        (query: BillingTotalCostQueryModel, currentGroupBy?: BillingColumn) => {
+            const effectiveGroupBy = currentGroupBy || groupBy
             setIsLoading(true)
             setError(undefined)
             setMessage(undefined)
+            // Clear previous breakdown data to prevent stale data when switching groupBy
+            setBreakdownData({})
+
             new BillingApi()
                 .getTotalCost(query)
                 .then((response) => {
@@ -389,58 +423,71 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     const allProjects = new Set<string>()
                     const allCategories = new Set<string>()
 
-                    response.data.forEach((item: BillingTotalCostRecord) => {
+                    // Filter and process data based on current groupBy to ensure we only get valid records
+                    const validRecords = response.data.filter((item: BillingTotalCostRecord) => {
+                        const fieldValue =
+                            effectiveGroupBy === BillingColumn.GcpProject
+                                ? item.gcp_project
+                                : item.topic
+                        return (
+                            item.day && item.cost_category && fieldValue && fieldValue.trim() !== ''
+                        )
+                    })
+
+                    validRecords.forEach((item: BillingTotalCostRecord) => {
                         const { day, cost_category, cost, gcp_project, topic } = item
+                        const fieldValue =
+                            effectiveGroupBy === BillingColumn.GcpProject ? gcp_project : topic
 
-                        if (day && cost_category) {
-                            const fieldValue =
-                                groupBy === BillingColumn.GcpProject ? gcp_project : topic
+                        allProjects.add(fieldValue!)
+                        allCategories.add(cost_category!)
 
-                            if (fieldValue) {
-                                allProjects.add(fieldValue)
-                                allCategories.add(cost_category)
-
-                                if (!breakdown[day]) {
-                                    breakdown[day] = {}
-                                }
-                                if (!breakdown[day][fieldValue]) {
-                                    breakdown[day][fieldValue] = {}
-                                }
-                                if (!breakdown[day][fieldValue][cost_category]) {
-                                    breakdown[day][fieldValue][cost_category] = 0
-                                }
-                                breakdown[day][fieldValue][cost_category] += cost
-                            }
+                        if (!breakdown[day!]) {
+                            breakdown[day!] = {}
                         }
+                        if (!breakdown[day!][fieldValue!]) {
+                            breakdown[day!][fieldValue!] = {}
+                        }
+                        if (!breakdown[day!][fieldValue!][cost_category!]) {
+                            breakdown[day!][fieldValue!][cost_category!] = 0
+                        }
+                        breakdown[day!][fieldValue!][cost_category!] += cost
                     })
 
-                    // Fill in zeros for missing combinations and add calculated fields
-                    Object.keys(breakdown).forEach((day) => {
-                        allProjects.forEach((project) => {
-                            if (!breakdown[day][project]) {
-                                breakdown[day][project] = {}
-                            }
-                            allCategories.forEach((category) => {
-                                if (!breakdown[day][project][category]) {
-                                    breakdown[day][project][category] = 0
+                    // Early return if no valid breakdown data
+                    if (allProjects.size === 0) {
+                        setBreakdownData({})
+                        // Continue with the rest of the processing for charts
+                    } else {
+                        // Fill in zeros for missing combinations and add calculated fields
+                        Object.keys(breakdown).forEach((day) => {
+                            allProjects.forEach((project) => {
+                                if (!breakdown[day][project]) {
+                                    breakdown[day][project] = {}
                                 }
+                                allCategories.forEach((category) => {
+                                    if (!breakdown[day][project][category]) {
+                                        breakdown[day][project][category] = 0
+                                    }
+                                })
+
+                                // Calculate Daily Total for this project
+                                const dailyTotal = Object.values(breakdown[day][project]).reduce(
+                                    (sum, cost) => sum + cost,
+                                    0
+                                )
+                                breakdown[day][project]['Daily Total'] = dailyTotal
+
+                                // Calculate Compute Cost for this project (total - Cloud Storage)
+                                const cloudStorageCost =
+                                    breakdown[day][project]['Cloud Storage'] || 0
+                                const computeCost = dailyTotal - cloudStorageCost
+                                breakdown[day][project]['Compute Cost'] = computeCost
                             })
-
-                            // Calculate Daily Total for this project
-                            const dailyTotal = Object.values(breakdown[day][project]).reduce(
-                                (sum, cost) => sum + cost,
-                                0
-                            )
-                            breakdown[day][project]['Daily Total'] = dailyTotal
-
-                            // Calculate Compute Cost for this project (total - Cloud Storage)
-                            const cloudStorageCost = breakdown[day][project]['Cloud Storage'] || 0
-                            const computeCost = dailyTotal - cloudStorageCost
-                            breakdown[day][project]['Compute Cost'] = computeCost
                         })
-                    })
 
-                    setBreakdownData(breakdown)
+                        setBreakdownData(breakdown)
+                    }
 
                     // calc totals per cost_category
                     const recTotals: { [key: string]: number } = {}
@@ -683,33 +730,39 @@ const BillingCostByTime: React.FunctionComponent = () => {
             // For GCP Project grouping, use project selector logic
             if (groupBy === BillingColumn.GcpProject) {
                 const queryModel = buildFilteredQueryModel(selectedProjects, [])
-                debouncedGetData(queryModel)
+                debouncedGetData(queryModel, groupBy)
             }
             // For Topic grouping, use topic selector logic
             else if (groupBy === BillingColumn.Topic) {
                 const queryModel = buildFilteredQueryModel([], selectedTopics)
-                debouncedGetData(queryModel)
+                debouncedGetData(queryModel, groupBy)
             }
             // For other groupings, use the existing selectedData logic
             else if (selectedData !== undefined && selectedData !== '' && selectedData !== null) {
                 const source = BillingSource.Aggregate
                 if (selectedData.startsWith('All ')) {
-                    getData({
-                        fields: [BillingColumn.Day, BillingColumn.CostCategory],
-                        start_date: start,
-                        end_date: end,
-                        order_by: { day: false },
-                        source: source,
-                    })
+                    getData(
+                        {
+                            fields: [BillingColumn.Day, BillingColumn.CostCategory],
+                            start_date: start,
+                            end_date: end,
+                            order_by: { day: false },
+                            source: source,
+                        },
+                        groupBy
+                    )
                 } else {
-                    getData({
-                        fields: [BillingColumn.Day, BillingColumn.CostCategory],
-                        start_date: start,
-                        end_date: end,
-                        filters: { [groupBy.replace('-', '_').toLowerCase()]: selectedData },
-                        order_by: { day: false },
-                        source: source,
-                    })
+                    getData(
+                        {
+                            fields: [BillingColumn.Day, BillingColumn.CostCategory],
+                            start_date: start,
+                            end_date: end,
+                            filters: { [groupBy.replace('-', '_').toLowerCase()]: selectedData },
+                            order_by: { day: false },
+                            source: source,
+                        },
+                        groupBy
+                    )
                 }
             } else {
                 // For non-GCP and non-Topic groupings, require selectedData

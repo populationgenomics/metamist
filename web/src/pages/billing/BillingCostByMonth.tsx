@@ -334,6 +334,15 @@ const BillingCostByTime: React.FunctionComponent = () => {
     /* eslint-disable react-hooks/exhaustive-deps */
     React.useEffect(() => {
         if (Boolean(start) && Boolean(end)) {
+            // Check if start date is after end date
+            if (start > end) {
+                setIsLoading(false)
+                setError(undefined)
+                setMessage(
+                    'Start date cannot be later than end date. Please adjust your selection.'
+                )
+                return
+            }
             // Use debounced function for topic filtering
             debouncedGetData(start, end, selectedTopics)
         } else {
@@ -358,17 +367,6 @@ const BillingCostByTime: React.FunctionComponent = () => {
         const matrix: string[][] = []
 
         allTopics.forEach((topic: string) => {
-            // Storage cost row
-            const storageRow: [string, string, ...string[]] = [
-                topic,
-                CloudSpendCategory.STORAGE_COST.toString(),
-                ...months.map((m) => {
-                    const val = data[topic]?.[m]?.[CloudSpendCategory.STORAGE_COST]
-                    return val === undefined ? '' : val.toFixed(2)
-                }),
-            ]
-            matrix.push(storageRow)
-
             const computeRow: [string, string, ...string[]] = [
                 topic,
                 CloudSpendCategory.COMPUTE_COST.toString(),
@@ -378,6 +376,16 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 }),
             ]
             matrix.push(computeRow)
+
+            const storageRow: [string, string, ...string[]] = [
+                topic,
+                CloudSpendCategory.STORAGE_COST.toString(),
+                ...months.map((m) => {
+                    const val = data[topic]?.[m]?.[CloudSpendCategory.STORAGE_COST]
+                    return val === undefined ? '' : val.toFixed(2)
+                }),
+            ]
+            matrix.push(storageRow)
         })
 
         exportTable(

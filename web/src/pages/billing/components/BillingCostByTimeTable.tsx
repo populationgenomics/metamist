@@ -15,6 +15,7 @@ import {
 import { IStackedAreaByDateChartData } from '../../../shared/components/Graphs/StackedAreaByDateChart'
 
 import Table from '../../../shared/components/Table'
+import { ThemeContext } from '../../../shared/components/ThemeProvider'
 import { convertFieldName } from '../../../shared/utilities/fieldName'
 import formatMoney from '../../../shared/utilities/formatMoney'
 import { BillingColumn } from '../../../sm-api'
@@ -34,13 +35,26 @@ type SummaryRowData = {
     headerFields: Array<{ category: string; title: string }>
     getColumnDisplayStyle: (category: string) => React.CSSProperties
 }
-
 const BreakdownTableRow: React.FC<{ item: BreakdownRowData }> = ({ item: row, ...props }) => {
+    const theme = React.useContext(ThemeContext)
+    const isDarkMode = theme.theme === 'dark-mode'
+
+    if (!row) {
+        return null
+    }
+
     return (
         <TableRow
             {...props}
-            className="ui table row"
-            style={row.isTotal ? { backgroundColor: '#f5f5f5', fontWeight: 'bold' } : {}}
+            className={`ui table row${isDarkMode ? ' inverted' : ''}`}
+            style={
+                row.isTotal
+                    ? {
+                          backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#f5f5f5',
+                          fontWeight: 'bold',
+                      }
+                    : {}
+            }
         >
             <SUITable.Cell collapsing>
                 <b>{row.date ? row.date.toLocaleDateString() : 'All Time Total'}</b>
@@ -63,8 +77,10 @@ const BreakdownTableRow: React.FC<{ item: BreakdownRowData }> = ({ item: row, ..
 }
 
 const SummaryTableRow: React.FC<{ item: SummaryRowData }> = ({ item: row, ...props }) => {
+    const theme = React.useContext(ThemeContext)
+    const isDarkMode = theme.theme === 'dark-mode'
     return (
-        <TableRow {...props} className="ui table row">
+        <TableRow {...props} className={`ui table row${isDarkMode ? ' inverted' : ''}`}>
             <SUITable.Cell collapsing>
                 <b>{row.date.toLocaleDateString()}</b>
             </SUITable.Cell>
@@ -196,6 +212,8 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     onExportRequest,
     currentViewMode: externalCurrentViewMode,
 }) => {
+    const theme = React.useContext(ThemeContext)
+    const isDarkMode = theme.theme === 'dark-mode'
     const [internalData, setInternalData] = React.useState<IStackedAreaByDateChartData[]>([])
     const [internalGroups, setInternalGroups] = React.useState<string[]>([])
     const [viewMode, setViewMode] = React.useState<ViewMode>(externalCurrentViewMode || 'summary')
@@ -281,10 +299,15 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         return groups
     }, [expandCompute, columnConfigs])
 
-    // Create CSS classes for column visibility based on expand state
+    // Create CSS classes for column visibility based on expand state and column visibility
     const getColumnDisplayStyle = React.useCallback(
         (group: string) => {
-            // Always show core columns
+            // First check if column is visible based on user selection
+            if (!visibleColumns.has(group)) {
+                return { display: 'none' }
+            }
+
+            // Always show core columns if they're visible
             if (['Daily Total', 'Cloud Storage'].includes(group)) {
                 return { display: 'table-cell' }
             }
@@ -306,7 +329,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                 return { display: isComputeCategory ? 'none' : 'table-cell' }
             }
         },
-        [expandCompute]
+        [expandCompute, visibleColumns]
     )
 
     // Properly ordered header fields to match table header structure
@@ -403,9 +426,10 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
 
     // Prepare data for react-virtuoso breakdown table
     const virtuosoBreakdownData = React.useMemo(() => {
-        if (viewMode !== 'breakdown') return []
+        if (viewMode !== 'breakdown') {
+            return []
+        }
 
-        // Add regular breakdown rows only
         return allBreakdownRows.map((row) => ({
             ...row,
             headerFields,
@@ -576,14 +600,17 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                             600,
                             Math.max(200, virtuosoBreakdownData.length * 50 + 100)
                         ),
-                        backgroundColor: 'white',
+                        backgroundColor: 'transparent',
                     }}
                     data={virtuosoBreakdownData}
                     components={VirtuosoBreakdownTableComponents}
                     fixedHeaderContent={() => (
                         <>
-                            <TableRow className="ui table row">
-                                <SUITable.HeaderCell colSpan={3} textAlign="center">
+                            <TableRow className={`ui table row${isDarkMode ? ' inverted' : ''}`}>
+                                <SUITable.HeaderCell
+                                    colSpan={2 + (visibleColumns.has('Daily Total') ? 1 : 0)}
+                                    textAlign="center"
+                                >
                                     <span
                                         style={{
                                             display: 'flex',
@@ -594,7 +621,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                                         <Switch
                                             checked={expandCompute}
                                             onChange={(e) => {
-                                                setExpandCompute(e.target.checked)
+                                                setExpandCompute?.(e.target.checked)
                                             }}
                                             size="small"
                                             color="primary"
@@ -603,18 +630,26 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                                     </span>
                                 </SUITable.HeaderCell>
                                 <SUITable.HeaderCell
-                                    colSpan={1}
+                                    colSpan={visibleColumns.has('Cloud Storage') ? 1 : 0}
                                     style={getColumnDisplayStyle('Cloud Storage')}
                                 >
                                     Storage Cost
                                 </SUITable.HeaderCell>
                                 <SUITable.HeaderCell
-                                    colSpan={headerFields.length - 2}
+                                    colSpan={
+                                        headerFields.filter(
+                                            (f) =>
+                                                f.category !== 'Daily Total' &&
+                                                f.category !== 'Cloud Storage' &&
+                                                visibleColumns.has(f.category)
+                                        ).length
+                                    }
                                     style={{
                                         display: headerFields.some(
                                             (f) =>
                                                 f.category !== 'Daily Total' &&
-                                                f.category !== 'Cloud Storage'
+                                                f.category !== 'Cloud Storage' &&
+                                                visibleColumns.has(f.category)
                                         )
                                             ? 'table-cell'
                                             : 'none',
@@ -623,7 +658,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                                     Compute Cost
                                 </SUITable.HeaderCell>
                             </TableRow>
-                            <TableRow className="ui table row">
+                            <TableRow className={`ui table row${isDarkMode ? ' inverted' : ''}`}>
                                 <SUITable.HeaderCell
                                     style={{
                                         borderBottom: 'none',
@@ -660,8 +695,14 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                     )}
                     fixedFooterContent={() => (
                         <TableRow
-                            className="ui table row"
-                            style={{ backgroundColor: '#f5f5f5', fontWeight: 'bold' }}
+                            className={`ui table row${isDarkMode ? ' inverted' : ''}`}
+                            style={{
+                                backgroundColor: isDarkMode ? '#1b1c1d' : '#f9f9f9',
+                                fontWeight: 'bold',
+                                position: 'sticky',
+                                bottom: 0,
+                                zIndex: 10,
+                            }}
                         >
                             <SUITable.Cell collapsing style={{ minWidth: '140px' }}>
                                 <b>All Time Total</b>
@@ -673,22 +714,11 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                                 </b>
                             </SUITable.Cell>
                             {headerFields.map((field) => {
-                                const total = breakdownData
-                                    ? Object.values(breakdownData).reduce((dateSum, fieldData) => {
-                                          return (
-                                              dateSum +
-                                              Object.values(fieldData).reduce(
-                                                  (fieldSum, categories) => {
-                                                      return (
-                                                          fieldSum +
-                                                          (categories[field.category] || 0)
-                                                      )
-                                                  },
-                                                  0
-                                              )
-                                          )
-                                      }, 0)
-                                    : 0
+                                // Use same calculation as summary view for consistency
+                                const total = internalData.reduce(
+                                    (acc, cur) => acc + (cur.values[field.category] || 0),
+                                    0
+                                )
                                 return (
                                     <SUITable.Cell
                                         key={`Total ${field.category}`}
@@ -708,14 +738,17 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                 <TableVirtuoso
                     style={{
                         height: Math.min(600, Math.max(200, virtuosoSummaryData.length * 50 + 100)),
-                        backgroundColor: 'white',
+                        backgroundColor: 'transparent',
                     }}
                     data={virtuosoSummaryData}
                     components={VirtuosoSummaryTableComponents}
                     fixedHeaderContent={() => (
                         <>
-                            <TableRow className="ui table row">
-                                <SUITable.HeaderCell colSpan={2} textAlign="center">
+                            <TableRow className={`ui table row${isDarkMode ? ' inverted' : ''}`}>
+                                <SUITable.HeaderCell
+                                    colSpan={1 + (visibleColumns.has('Daily Total') ? 1 : 0)}
+                                    textAlign="center"
+                                >
                                     <span
                                         style={{
                                             display: 'flex',
@@ -726,7 +759,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                                         <Switch
                                             checked={expandCompute}
                                             onChange={(e) => {
-                                                setExpandCompute(e.target.checked)
+                                                setExpandCompute?.(e.target.checked)
                                             }}
                                             size="small"
                                             color="primary"
@@ -735,18 +768,26 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                                     </span>
                                 </SUITable.HeaderCell>
                                 <SUITable.HeaderCell
-                                    colSpan={1}
+                                    colSpan={visibleColumns.has('Cloud Storage') ? 1 : 0}
                                     style={getColumnDisplayStyle('Cloud Storage')}
                                 >
                                     Storage Cost
                                 </SUITable.HeaderCell>
                                 <SUITable.HeaderCell
-                                    colSpan={headerFields.length - 2}
+                                    colSpan={
+                                        headerFields.filter(
+                                            (f) =>
+                                                f.category !== 'Daily Total' &&
+                                                f.category !== 'Cloud Storage' &&
+                                                visibleColumns.has(f.category)
+                                        ).length
+                                    }
                                     style={{
                                         display: headerFields.some(
                                             (f) =>
                                                 f.category !== 'Daily Total' &&
-                                                f.category !== 'Cloud Storage'
+                                                f.category !== 'Cloud Storage' &&
+                                                visibleColumns.has(f.category)
                                         )
                                             ? 'table-cell'
                                             : 'none',
@@ -755,7 +796,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                                     Compute Cost
                                 </SUITable.HeaderCell>
                             </TableRow>
-                            <TableRow className="ui table row">
+                            <TableRow className={`ui table row${isDarkMode ? ' inverted' : ''}`}>
                                 <SUITable.HeaderCell
                                     style={{
                                         borderBottom: 'none',
@@ -784,8 +825,14 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                     )}
                     fixedFooterContent={() => (
                         <TableRow
-                            className="ui table row"
-                            style={{ backgroundColor: '#f5f5f5', fontWeight: 'bold' }}
+                            className={`ui table row${isDarkMode ? ' inverted' : ''}`}
+                            style={{
+                                backgroundColor: isDarkMode ? '#1b1c1d' : '#f9f9f9',
+                                fontWeight: 'bold',
+                                position: 'sticky',
+                                bottom: 0,
+                                zIndex: 10,
+                            }}
                         >
                             <SUITable.Cell collapsing style={{ minWidth: '140px' }}>
                                 <b>All Time Total</b>
