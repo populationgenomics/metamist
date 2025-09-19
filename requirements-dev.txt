@@ -288,6 +288,8 @@ nest-asyncio==1.6.0
     # via -r requirements-dev.in
 nodeenv==1.9.1
     # via pre-commit
+openapi-generator-cli==5.3.0
+    # via -r requirements-dev.in
 orjson==3.10.12
     # via fastapi
 packaging==24.2
@@ -477,6 +479,7 @@ typing-extensions==4.12.2
     #   pydantic-extra-types
     #   rich-toolkit
     #   sqlalchemy
+    #   starlette
     #   strawberry-graphql
     #   testcontainers
     #   typer

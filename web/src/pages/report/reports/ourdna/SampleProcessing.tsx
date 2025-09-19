@@ -188,8 +188,8 @@ function ProcessingTimesByAncestry() {
         />
     )
 }
-
-export default function ProcessingTimes() {
+ 
+export default function ProcessingTimes({ project }: { project: string }) {
     return (
         <Report>
             <ReportRow>
@@ -198,7 +198,7 @@ export default function ProcessingTimes() {
                     flexGrow={1}
                     title="Processing times for all samples by processing site"
                     description="Time from collection to completion of PBMC processing. This excludes any samples with > 100 hour processing times, and any that have missing or malformed collection or processing times"
-                    project={PROJECT}
+                    project={project}
                     query={[
                         {
                             name: 'durations',
@@ -247,7 +247,7 @@ export default function ProcessingTimes() {
                     flexGrow={1}
                     title="Processing times for all samples by event type"
                     description="Time from collection to completion of PBMC processing. This excludes any samples with > 100 hour processing times, and any that have missing or malformed collection or processing times"
-                    project={PROJECT}
+                    project={project}
                     query={[
                         {
                             name: 'durations',
@@ -304,7 +304,7 @@ export default function ProcessingTimes() {
                     flexGrow={1}
                     title="Processing time buckets"
                     description="Count of participants with their samples processed in each bucket"
-                    project={PROJECT}
+                    project={project}
                     query={[
                         { name: 'durations', query: PROCESS_DURATION_QUERY },
                         {
@@ -346,7 +346,7 @@ export default function ProcessingTimes() {
                     flexGrow={1}
                     title="Processing time by site"
                     description="Count of participants processed in each time bucket by processing site"
-                    project={PROJECT}
+                    project={project}
                     query={[
                         { name: 'durations', query: PROCESS_DURATION_QUERY },
                         {
@@ -396,7 +396,7 @@ export default function ProcessingTimes() {
                     flexGrow={1}
                     flexBasis={300}
                     title="All sample processing times"
-                    project={PROJECT}
+                    project={project}
                     showToolbar={true}
                     query={[
                         { name: 'durations', query: PROCESS_DURATION_QUERY },
@@ -429,7 +429,7 @@ export default function ProcessingTimes() {
                     flexBasis={400}
                     title="Sample types"
                     description="Count of participants for each sample type"
-                    project={PROJECT}
+                    project={project}
                     query={[
                         {
                             name: 'result',
