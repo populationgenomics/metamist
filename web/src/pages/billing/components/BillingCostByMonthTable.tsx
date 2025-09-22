@@ -65,23 +65,27 @@ const BillingCostByMonthTable: React.FunctionComponent<IBillingCostByMonthTableP
 
         return allTopics.map((key) => (
             <>
-                {compTypes.map((compType, index) => (
+                {compTypes.map((compType, index) =>
                     // if All Topics, skip the Average Sample Cost row
-                    key === 'All Topics' && compType === 'Avg. Sample Storage Cost (Est.)' ? null : (
-                    <SUITable.Row key={`${key}-${index}-row`}>
-                        <SUITable.Cell key={`${key}-${index}-topic`}>
-                            {index === 0 && <b>{key}</b>}
-                        </SUITable.Cell>
-                        <SUITable.Cell key={`${key}-${index}-compType`}>{compType}</SUITable.Cell>
-                        {months.map((month) => (
-                            <SUITable.Cell key={`${key}-${index}-${month}`}>
-                                {data[key] && data[key][month] && data[key][month][compType]
-                                    ? formatMoney(data[key][month][compType])
-                                    : null}
+                    key === 'All Topics' &&
+                    compType === 'Avg. Sample Storage Cost (Est.)' ? null : (
+                        <SUITable.Row key={`${key}-${index}-row`}>
+                            <SUITable.Cell key={`${key}-${index}-topic`}>
+                                {index === 0 && <b>{key}</b>}
                             </SUITable.Cell>
-                        ))}
-                    </SUITable.Row>
-                )))}
+                            <SUITable.Cell key={`${key}-${index}-compType`}>
+                                {compType}
+                            </SUITable.Cell>
+                            {months.map((month) => (
+                                <SUITable.Cell key={`${key}-${index}-${month}`}>
+                                    {data[key] && data[key][month] && data[key][month][compType]
+                                        ? formatMoney(data[key][month][compType])
+                                        : null}
+                                </SUITable.Cell>
+                            ))}
+                        </SUITable.Row>
+                    )
+                )}
             </>
         ))
     }
