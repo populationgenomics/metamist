@@ -840,15 +840,7 @@ class GenericMetadataParser(GenericParser):
             raise ValueError(
                 f'Multiple ORA references were defined for {sample.primary_external_id}: {str_ora_references}'
             )
-        if len(ora_references) == 1:
-            ora_ref = next(iter(ora_references))
-        else:
-            ora_ref = self.ora_reference_assembly_location
-            if not ora_ref:
-                raise ValueError(
-                    f'Reads type for {sample.primary_external_id!r} is FASTQ ORA, but a decompression '
-                    f'reference is not defined, please set the ORA decompression reference path'
-                )
+        ora_ref = next(iter(ora_references))
 
         ora_reference = await self.create_file_object(self.file_path(ora_ref))
         return {'reads_type': 'fastq_ora', 'ora_reference': ora_reference}
