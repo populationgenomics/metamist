@@ -29,6 +29,7 @@ import FieldSelector from './components/FieldSelector'
 enum CloudSpendCategory {
     STORAGE_COST = 'Storage Cost',
     COMPUTE_COST = 'Compute Cost',
+    SAMPLE_COST = 'Avg. Sample Storage Cost (Est.)',
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any  -- too many anys in the file to fix right now but would be good to sort out when we can */
@@ -100,6 +101,10 @@ const BillingCostByTime: React.FunctionComponent = () => {
     const convertCostCategory = (costCategory: string | null | undefined) => {
         if (costCategory?.startsWith('Cloud Storage')) {
             return CloudSpendCategory.STORAGE_COST
+        }
+        // if costCategory is equal to 'Average Sample Storage Cost', then return SAMPLE_COST
+        if (costCategory === 'Average Sample Storage Cost') {
+            return CloudSpendCategory.SAMPLE_COST
         }
         return CloudSpendCategory.COMPUTE_COST
     }
@@ -184,6 +189,10 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     Object.values(CloudSpendCategory).forEach((category) => {
                         // Sum costs across all regular topics for this month/category
                         let totalCost = 0
+                        // if cost_category is SAMPLE_COST, then skip it
+                        if (category === CloudSpendCategory.SAMPLE_COST) {
+                            return
+                        }
                         Object.keys(recTotals).forEach((topic) => {
                             if (topic !== allTopicsKey && recTotals[topic][month]?.[category]) {
                                 totalCost += recTotals[topic][month][category]
@@ -386,6 +395,16 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 }),
             ]
             matrix.push(storageRow)
+
+            const sampleCostRow: [string, string, ...string[]] = [
+                topic,
+                CloudSpendCategory.SAMPLE_COST.toString(),
+                ...months.map((m) => {
+                    const val = data[topic]?.[m]?.[CloudSpendCategory.SAMPLE_COST]
+                    return val === undefined ? '' : val.toFixed(2)
+                }),
+            ]
+            matrix.push(sampleCostRow)
         })
 
         exportTable(
