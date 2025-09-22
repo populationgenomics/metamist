@@ -12,9 +12,9 @@ from models.models import (
     AnalysisCostRecord,
     BillingColumn,
     BillingCostBudgetRecord,
+    BillingRunningCostQueryModel,
     BillingSampleQueryModel,
     BillingTotalCostQueryModel,
-    BillingRunningCostQueryModel,
 )
 
 
@@ -187,12 +187,13 @@ class BillingLayer(BqBaseLayer):
     async def get_total_cost(
         self,
         query: BillingTotalCostQueryModel,
+        connection: Connection | None = None,
     ) -> list[dict] | None:
         """
         Get Total cost of selected fields for requested time interval
         """
         billing_table = self.table_factory(query.source, query.fields, query.filters)
-        return await billing_table.get_total_cost(query)
+        return await billing_table.get_total_cost(query, connection)
 
     async def get_running_cost(
         self,
