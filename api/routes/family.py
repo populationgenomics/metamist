@@ -190,11 +190,18 @@ async def import_families(
 
     family_layer = FamilyLayer(connection)
     reader = csv.reader(codecs.iterdecode(file.file, 'utf-8-sig'), delimiter=delimiter)
+    rows = [r for r in reader if not r[0].startswith('#')]
+
+    if len(rows) == 0:
+        if has_header:
+            return {'success': False, 'message': 'A header was expected but file is empty.'}, 400
+        return {}, 204
+
     headers = None
     if has_header:
-        headers = next(reader)
+        headers = rows[0]
+        rows = rows[1:]
 
-    rows = [r for r in reader if not r[0].startswith('#')]
     if len(rows[0]) == 1:
         raise ValueError(
             'Only one column was detected in the pedigree, ensure the '
