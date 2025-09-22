@@ -165,7 +165,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
     async def update_analysis(
         self,
         analysis_id: int,
-        status: AnalysisStatus,
+        status: AnalysisStatus | None,
         meta: Dict[str, Any] = None,
         active: bool | None = None,
     ):
