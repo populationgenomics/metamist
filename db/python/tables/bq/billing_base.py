@@ -581,7 +581,7 @@ class BillingBaseTable(BqDbBase):
 
     async def _get_samples_per_project(self, connection: Connection) -> dict[str, int]:
         """
-        Get number of samples per metamist project, where projects is list of topics
+        Get number of samples per metamist project, map project to dataset/topic
         """
         _query = """
             SELECT s.project, COUNT(DISTINCT s.id) as samples
@@ -593,6 +593,7 @@ class BillingBaseTable(BqDbBase):
             _query,
         )
         projects = {row.project: row.samples for row in rows}
+
         # convert project_id to project dataset/topic (GCP project names)
         project_samples_cnt: dict[str, int] = {}
         for project_id in projects.keys():
@@ -606,7 +607,7 @@ class BillingBaseTable(BqDbBase):
     ) -> list[dict] | None:
         """
         For each topic in results, calculate number of samples per metamist project
-        and divide the cost by number of samples to get average sample cost
+        and divide the cost by number of samples to get average sample storage cost
         """
         if not connection or not results:
             return results
