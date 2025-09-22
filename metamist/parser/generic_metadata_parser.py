@@ -461,7 +461,7 @@ class GenericMetadataParser(GenericParser):
             '.cram',
             '.fastq.gz',
             '.fastq',
-            'fq.gz',
+            '.fq.gz',
             '.fq',
             '.bam',
             '.fastq.ora',
@@ -793,7 +793,9 @@ class GenericMetadataParser(GenericParser):
                 ref = r.get(self.reference_assembly_location_column)
                 if ref:
                     reference_assemblies.add(ref)
-            if self.ora_reference_assembly_location_column:
+            if self.ora_reference_assembly_location:
+                ora_references.add(self.ora_reference_assembly_location)
+            elif self.ora_reference_assembly_location_column:
                 ora_ref = r.get(self.ora_reference_assembly_location_column)
                 if ora_ref:
                     ora_references.add(ora_ref)
@@ -848,13 +850,7 @@ class GenericMetadataParser(GenericParser):
                     f'reference is not defined, please set the ORA decompression reference path'
                 )
 
-        ora_ref_fp = self.file_path(ora_ref)
-        secondary_files = await self.create_secondary_file_objects_by_potential_pattern(
-            ora_ref_fp, ['.tar']
-        )
-        ora_reference = await self.create_file_object(
-            ora_ref_fp, secondary_files=secondary_files
-        )
+        ora_reference = await self.create_file_object(self.file_path(ora_ref))
         return {'reads_type': 'fastq_ora', 'ora_reference': ora_reference}
 
     async def get_assays_from_group(
