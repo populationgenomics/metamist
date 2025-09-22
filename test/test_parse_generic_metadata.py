@@ -1074,6 +1074,49 @@ class TestParseGenericMetadata(DbIsolatedTest):
             str(ctx.exception),
         )
 
+    @run_as_sync
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_ora_fastqs_mutliple_refs(self, mock_graphql_query):
+        """Test importing fastq.ora files multiple reference files for the same sample, should throw an exception"""
+        mock_graphql_query.side_effect = self.run_graphql_query_async
+        filenames = [
+            'sample_id001.filename-R1.fastq.ora',
+            'sample_id001.filename-R2.fastq.ora',
+        ]
+        ora_refs = [
+            'gs://path/to/ora_reference1.tar',
+            'gs://path/to/ora_reference2.tar',
+        ]
+
+        rows = [
+            'Participant ID\tSample ID\tFilename\tORA Reference',
+            f'Demeter\tsample_id001\t{filenames[0]}\t{ora_refs[0]}',
+            f'Demeter\tsample_id001\t{filenames[1]}\t{ora_refs[1]}',
+        ]
+
+        parser = GenericMetadataParser(
+            search_locations=[],
+            participant_primary_eid_column='Participant ID',
+            sample_primary_eid_column='Sample ID',
+            reads_column='Filename',
+            ora_reference_assembly_location_column='ORA Reference',
+            # doesn't matter, we're going to mock the call anyway
+            project=self.project_name,
+            skip_checking_gcs_objects=True,
+        )
+
+        parser.filename_map = {f: '/path/to/' + f for f in filenames}
+        file_contents = '\n'.join(rows)
+
+        with self.assertRaises(ValueError) as ctx:
+            await parser.parse_manifest(
+                StringIO(file_contents), delimiter='\t', dry_run=True
+            )
+        self.assertEqual(
+            'Multiple ORA references were defined for sample_id001: gs://path/to/ora_reference1.tar, gs://path/to/ora_reference2.tar',
+            str(ctx.exception),
+        )
+
 
 class FastqPairMatcher(unittest.TestCase):
     """Test Fastq pair matching logic explictly"""
