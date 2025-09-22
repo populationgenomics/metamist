@@ -78,12 +78,16 @@ class TestPedigree(DbIsolatedTest):
     async def test_import_families(self):
         class UploadFile:
             file = TemporaryFile()
+
         emptyCsv = UploadFile()
 
         # Test has_header = true
-        response = await family.import_families(emptyCsv, True, "\t", self.connection)
-        assert response == ({'success': False, 'message': 'A header was expected but file is empty.'}, 400)
+        response = await family.import_families(emptyCsv, True, '\t', self.connection)
+        assert response == (
+            {'success': False, 'message': 'A header was expected but file is empty.'},
+            400,
+        )
 
         # Test no op when has_header = false
-        response = await family.import_families(emptyCsv, False, "\t", self.connection)
+        response = await family.import_families(emptyCsv, False, '\t', self.connection)
         assert response == ({}, 204)

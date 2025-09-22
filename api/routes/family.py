@@ -194,7 +194,10 @@ async def import_families(
 
     if len(rows) == 0:
         if has_header:
-            return {'success': False, 'message': 'A header was expected but file is empty.'}, 400
+            return {
+                'success': False,
+                'message': 'A header was expected but file is empty.',
+            }, 400
         return {}, 204
 
     headers = None
