@@ -9,7 +9,10 @@ class TestPedigree(DbIsolatedTest):
     """Family testing methods"""
 
     @run_as_sync
-    async def test_import_families(self):
+    async def test_import_families_empty_file(self):
+        """
+        Test importing families from a file where the file is empty.
+        """
         with TemporaryFile(prefix='test', suffix='.tsv') as f:
             emptyTestFile = UploadFile(f)
 
