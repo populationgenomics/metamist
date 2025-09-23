@@ -47,7 +47,14 @@ def delete_from_audit_results(
         f'Total deletions: {all_stats["file_count"]} files, {all_stats["total_size"] / (1024**3):.2f} GiB'
     )
 
+# TODO - make sure we're tracking exactly which report the deletions came from
+# as the reviewed_files report could be updated many times with different actions/comments
+# and we want to track exactly which version of the report the deletions came from
 
+# TODO - make this script agnostic of the report name, all actions and review comments should
+# be handled in the review_audit_results.py script. This script should just delete files
+# marked for deletion, and error if any files are not marked for deletion or missing comments.
+# This will make it easier to maintain and reason about.
 def delete_files_from_report(
     gcs: GCSDataAccess,
     report_name: str,
@@ -63,6 +70,7 @@ def delete_files_from_report(
     """
     to_delete: list[AuditReportEntry] = []
     for row in rows:
+        # TODO move this into the files_to_delete report generation
         if report_name == 'files_to_delete':
             row.update_action('DELETE')
             row.update_review_comment('Deleted due to audit determination')
