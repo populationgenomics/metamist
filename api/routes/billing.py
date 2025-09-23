@@ -18,10 +18,10 @@ from db.python.layers.billing import BillingLayer
 from models.models import (
     AnalysisCostRecord,
     BillingCostBudgetRecord,
+    BillingRunningCostQueryModel,
     BillingSampleQueryModel,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
-    BillingRunningCostQueryModel,
 )
 
 router = APIRouter(prefix='/billing', tags=['billing'])
@@ -324,6 +324,7 @@ async def get_cost_by_batch_id(
 async def get_total_cost(
     query: BillingTotalCostQueryModel,
     author: str = get_author,
+    connection: Connection = get_projectless_db_connection,
 ) -> list[BillingTotalCostRecord]:
     """Get Total cost of selected fields for requested time interval
 
@@ -520,7 +521,7 @@ async def get_total_cost(
 
     """
     billing_layer = _get_billing_layer_from(author)
-    records = await billing_layer.get_total_cost(query)
+    records = await billing_layer.get_total_cost(query, connection)
     return [BillingTotalCostRecord.from_json(record) for record in records]
 
 
