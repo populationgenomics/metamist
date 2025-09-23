@@ -193,7 +193,13 @@ class BillingLayer(BqBaseLayer):
         Get Total cost of selected fields for requested time interval
         """
         billing_table = self.table_factory(query.source, query.fields, query.filters)
-        return await billing_table.get_total_cost(query, connection)
+        result = await billing_table.get_total_cost(query)
+        # if include average sample cost is requested, we need to use the extended table
+        if query.include_average_sample_cost:
+            # append 'average_sample_cost' to cost_category if cost_category and topic is present in the query.fields
+            result = await billing_table.append_sample_cost(connection, result)
+
+        return result
 
     async def get_running_cost(
         self,

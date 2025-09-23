@@ -23,6 +23,7 @@ from db.python.gcp_connect import BqDbBase
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.function_bq_filter import FunctionBQFilter
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
+from db.python.tables.sample import SampleTable
 from models.enums import BillingTimeColumn, BillingTimePeriods
 from models.models import (
     BillingColumn,
@@ -579,30 +580,7 @@ class BillingBaseTable(BqDbBase):
         # otherwise
         return None
 
-    async def _get_samples_per_project(self, connection: Connection) -> dict[str, int]:
-        """
-        Get number of samples per metamist project, map project to dataset/topic
-        """
-        _query = """
-            SELECT s.project, COUNT(DISTINCT s.id) as samples
-            FROM sample s
-            WHERE s.project IS NOT NULL AND s.active = 1
-            GROUP BY s.project
-        """
-        rows = await connection.connection.fetch_all(
-            _query,
-        )
-        projects = {row.project: row.samples for row in rows}
-
-        # convert project_id to project dataset/topic (GCP project names)
-        project_samples_cnt: dict[str, int] = {}
-        for project_id in projects.keys():
-            project_samples_cnt[connection.project_id_map[project_id].dataset] = (
-                projects[project_id]
-            )
-        return project_samples_cnt
-
-    async def _append_sample_cost(
+    async def append_sample_cost(
         self, connection: Connection | None = None, results: list[dict] | None = None
     ) -> list[dict] | None:
         """
@@ -612,18 +590,40 @@ class BillingBaseTable(BqDbBase):
         if not connection or not results:
             return results
 
-        # get number of samples per project
-        sample_counts = await self._get_samples_per_project(connection)
+        # get project_id to dataset/topic mapping
+        topic_to_project = {
+            connection.project_id_map[p].dataset: p
+            for p in connection.project_id_map.keys()
+        }
 
-        # for each record with cost_category == 'Cloud Storage' add one record with average_sample_cost
+        # get number of samples per project per month
+        samples = SampleTable(connection)
+        project_sample_counts_per_month = (
+            await samples.get_monthly_samples_count_per_project()
+        )
+        # if no samples found, return results as is
+        if not project_sample_counts_per_month:
+            return results
+
+        # for each monthly record with cost_category == 'Cloud Storage' add one record with average_sample_cost
         for row in results:
             topic = row.get('topic')
-            if row.get('cost_category') == 'Cloud Storage' and topic in sample_counts:
-                avg_cost = (
-                    row.get('cost', 0) / sample_counts[topic]
-                    if sample_counts[topic] > 0
-                    else 0
+            invoice_month = row.get('day')
+            # only continue if both topic and invoice_month / day are present
+            if topic is None or invoice_month is None:
+                continue
+
+            if row.get('cost_category') == 'Cloud Storage':
+                # convert topic to project id
+                project_id = topic_to_project.get(topic)
+                if project_id is None:
+                    continue
+
+                sample_count = project_sample_counts_per_month.get(project_id, {}).get(
+                    invoice_month, 0
                 )
+
+                avg_cost = row.get('cost', 0) / sample_count if sample_count > 0 else 0
                 # append new row into results with the same topic and day but with cost_category = 'Average Sample Storage Cost'
                 # and cost = avg_cost
                 new_row = row.copy()
@@ -640,7 +640,6 @@ class BillingBaseTable(BqDbBase):
     async def get_total_cost(
         self,
         query: BillingTotalCostQueryModel,
-        connection: Connection | None = None,
     ) -> list[dict] | None:
         """
         Get Total cost of selected fields for requested time interval from BQ views
@@ -724,13 +723,7 @@ class BillingBaseTable(BqDbBase):
         query_job_result = self._execute_query(
             _query, query_parameters, results_as_list=False
         )
-        results = self._convert_output(query_job_result)
-
-        # append 'average_sample_cost' to cost_category if cost_category and topic is present in the query.fields
-        if 'cost_category' in query.fields and 'topic' in query.fields:
-            results = await self._append_sample_cost(connection, results)
-
-        return results
+        return self._convert_output(query_job_result)
 
     async def get_running_cost_with_filters(
         self,

@@ -2,6 +2,8 @@ import asyncio
 from datetime import date
 from typing import Any, Iterable
 
+from dateutil.relativedelta import relativedelta
+
 from db.python.filters import GenericFilter
 from db.python.filters.sample import SampleFilter
 from db.python.tables.base import DbBase
@@ -247,12 +249,16 @@ class SampleTable(DbBase):
                 'participant_id': row['participant_id'],
                 'type': row['type'],
                 'active': parse_sql_bool(row['active']),
-                'sample_root_id': sample_id_format(row['sample_root_id'])
-                if row['sample_root_id']
-                else None,
-                'sample_parent_id': sample_id_format(row['sample_parent_id'])
-                if row['sample_parent_id']
-                else None,
+                'sample_root_id': (
+                    sample_id_format(row['sample_root_id'])
+                    if row['sample_root_id']
+                    else None
+                ),
+                'sample_parent_id': (
+                    sample_id_format(row['sample_parent_id'])
+                    if row['sample_parent_id']
+                    else None
+                ),
             },
             has_external_ids=True,
             has_meta=True,
@@ -687,3 +693,55 @@ class SampleTable(DbBase):
             )
         )
         return samples
+
+    async def get_monthly_samples_count_per_project(
+        self, project_ids: list[int] | None = None
+    ) -> dict[int, dict[date, int]]:
+        """
+        Get a map of {project_id: {month:count} for list of project_ids
+        If project_ids is empty, return all projects
+        """
+
+        where_str = 'WHERE project in :project_ids' if project_ids else ''
+        values = {'project_ids': project_ids} if project_ids else {}
+
+        _query = f"""
+        WITH t AS(
+            SELECT project, id, min(row_start) as sample_first_date
+            FROM sample FOR SYSTEM_TIME ALL
+            {where_str}
+            GROUP BY project, id
+        )
+        SELECT project, CAST(EXTRACT(YEAR FROM sample_first_date) AS INTEGER) AS year, CAST(EXTRACT(MONTH FROM sample_first_date) AS INTEGER) AS month, COUNT(*) AS count
+        FROM t
+        GROUP BY project, year, month
+        ORDER BY project, year, month
+        """
+
+        rows = await self.connection.fetch_all(_query, values)
+        result: dict[int, dict[date, int]] = {}
+        accumulated_sample_count: dict[int, int] = {}
+
+        # results are sorted by project, year, month
+        # accumulate projects previous months into the processed month
+        for r in rows:
+            proj = r['project']
+            if proj not in result:
+                result[proj] = {}
+
+            # append previous months count to currently processed month
+            accumulated_sample_count[proj] = (
+                accumulated_sample_count.get(proj, 0) + r['count']
+            )
+            result[proj][date.fromisoformat(f"{r['year']}-{r['month']:02d}-01")] = (
+                accumulated_sample_count[proj]
+            )
+
+        # append all the months up to the current month
+        for proj, months in result.items():
+            current_month = date.today().replace(day=1)
+            while current_month not in months:
+                months[current_month] = accumulated_sample_count[proj]
+                current_month = (current_month - relativedelta(months=1)).replace(day=1)
+
+        return result

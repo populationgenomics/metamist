@@ -220,6 +220,9 @@ class BillingTotalCostQueryModel(SMBase):
     # optional, show the min cost, e.g. 0.01, if not set, will show all
     min_cost: float | None = None
 
+    # optional, show average sample cost if True
+    include_average_sample_cost: bool = False
+
     def __hash__(self):
         """Create hash for this object to use in caching"""
         return hash(self.model_dump_json())

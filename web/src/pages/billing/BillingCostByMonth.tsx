@@ -251,6 +251,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     source: BillingSource.Aggregate,
                     time_periods: BillingTimePeriods.InvoiceMonth,
                     filters: queryFilters,
+                    include_average_sample_cost: true,
                 })
             }, 1000),
         [getData]
