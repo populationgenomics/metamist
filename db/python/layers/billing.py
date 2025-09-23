@@ -194,9 +194,10 @@ class BillingLayer(BqBaseLayer):
         """
         billing_table = self.table_factory(query.source, query.fields, query.filters)
         result = await billing_table.get_total_cost(query)
-        # if include average sample cost is requested, we need to use the extended table
+
+        # if include average sample cost is requested, we need to append that information from sample history
         if query.include_average_sample_cost:
-            # append 'average_sample_cost' to cost_category if cost_category and topic is present in the query.fields
+            # append 'average_sample_cost'
             result = await billing_table.append_sample_cost(connection, result)
 
         return result
