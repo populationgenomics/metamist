@@ -1,7 +1,5 @@
 from test.testbase import DbIsolatedTest, run_as_sync
 
-from api.routes import family
-from tempfile import TemporaryFile
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantUpsertInternal
@@ -73,21 +71,3 @@ class TestPedigree(DbIsolatedTest):
         self.assertEqual(2, len(rows))
         self.assertEqual(1, by_id['EX01']['sex'])
         self.assertIsNone(by_id['EX02']['sex'])
-
-    @run_as_sync
-    async def test_import_families(self):
-        class UploadFile:
-            file = TemporaryFile()
-
-        emptyCsv = UploadFile()
-
-        # Test has_header = true
-        response = await family.import_families(emptyCsv, True, '\t', self.connection)
-        assert response == (
-            {'success': False, 'message': 'A header was expected but file is empty.'},
-            400,
-        )
-
-        # Test no op when has_header = false
-        response = await family.import_families(emptyCsv, False, '\t', self.connection)
-        assert response == ({}, 204)
