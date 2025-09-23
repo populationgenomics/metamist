@@ -25,3 +25,4 @@ class TestPedigree(DbIsolatedTest):
             # Test no op when has_header = false
             response = await family.import_families(emptyTestFile, has_header=False, delimiter='\t', connection=self.connection)
             assert response == ({}, 204)
+            
