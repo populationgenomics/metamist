@@ -212,6 +212,8 @@ class CohortLayer(BaseLayer):
         )
 
         sgs = await self.sglayer.query(sg_filter)
+        if not sgs:
+            raise ValueError('Cannot create a cohort with no sequencing groups')
 
         if dry_run:
             sg_ids = [sg.id for sg in sgs if sg.id] if sgs else []

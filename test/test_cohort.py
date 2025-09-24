@@ -72,75 +72,17 @@ class TestCohortBasic(DbIsolatedTest):
 
     @run_as_sync
     async def test_create_empty_cohort(self):
-        """Create cohort from empty criteria"""
-        result = await self.cohortl.create_cohort_from_criteria(
-            project_to_write=self.project_id,
-            description='Cohort with no entries',
-            cohort_name='Empty cohort',
-            dry_run=False,
-            cohort_criteria=CohortCriteriaInternal(projects=[self.project_id]),
-        )
-        self.assertIsInstance(result, NewCohortInternal)
-        self.assertIsInstance(result.cohort_id, int)
-        self.assertEqual([], result.sequencing_group_ids)
-
-    @run_as_sync
-    async def test_create_duplicate_cohort(self):
-        """Can't create cohorts with duplicate names"""
-        _ = await self.cohortl.create_cohort_from_criteria(
-            project_to_write=self.project_id,
-            description='Cohort with no entries',
-            cohort_name='Trial duplicate cohort',
-            dry_run=False,
-            cohort_criteria=CohortCriteriaInternal(projects=[self.project_id]),
-        )
-
-        _ = await self.cohortl.create_cohort_from_criteria(
-            project_to_write=self.project_id,
-            description='Cohort with no entries',
-            cohort_name='Trial duplicate cohort',
-            dry_run=True,
-            cohort_criteria=CohortCriteriaInternal(projects=[self.project_id]),
-        )
-
-        with self.assertRaises(IntegrityError):
-            _ = await self.cohortl.create_cohort_from_criteria(
+        """Can't create cohorts from empty criteria"""
+        with self.assertRaises(ValueError) as context:
+            result = await self.cohortl.create_cohort_from_criteria(
                 project_to_write=self.project_id,
                 description='Cohort with no entries',
-                cohort_name='Trial duplicate cohort',
+                cohort_name='Empty cohort',
                 dry_run=False,
                 cohort_criteria=CohortCriteriaInternal(projects=[self.project_id]),
             )
 
-    @run_as_sync
-    async def test_create_template_then_cohorts(self):
-        """Test with template and cohort IDs out of sync, and creating from template"""
-        tid = await self.cohortl.create_cohort_template(
-            project=self.project_id,
-            cohort_template=CohortTemplateInternal(
-                id=None,
-                name='Empty template',
-                description='Template with no entries',
-                criteria=CohortCriteriaInternal(projects=[self.project_id]),
-                project=self.project_id,
-            ),
-        )
-
-        _ = await self.cohortl.create_cohort_from_criteria(
-            project_to_write=self.project_id,
-            description='Cohort with no entries',
-            cohort_name='Another empty cohort',
-            dry_run=False,
-            cohort_criteria=CohortCriteriaInternal(projects=[self.project_id]),
-        )
-
-        _ = await self.cohortl.create_cohort_from_criteria(
-            project_to_write=self.project_id,
-            description='Cohort from template',
-            cohort_name='Cohort from empty template',
-            dry_run=False,
-            template_id=tid,
-        )
+        self.assertIn('Cannot create a cohort with no sequencing groups', str(context.exception))
 
 
 class TestCohortQueries(DbIsolatedTest):
@@ -422,6 +364,70 @@ class TestCohortData(DbIsolatedTest):
         )
         self.assertEqual(1, len(result.sequencing_group_ids))
         self.assertIn(self.sgB_raw, result.sequencing_group_ids)
+
+    @run_as_sync
+    async def test_create_duplicate_cohort(self):
+        """Can't create cohorts with duplicate names"""
+        _ = await self.cohortl.create_cohort_from_criteria(
+            project_to_write=self.project_id,
+            description='A cohort to be duplicated',
+            cohort_name='Trial duplicate cohort',
+            dry_run=False,
+            cohort_criteria=CohortCriteriaInternal(
+                projects=[self.project_id],
+            ),
+        )
+
+        _ = await self.cohortl.create_cohort_from_criteria(
+            project_to_write=self.project_id,
+            description='A duplicate cohort',
+            cohort_name='Trial duplicate cohort',
+            dry_run=True,
+            cohort_criteria=CohortCriteriaInternal(
+                projects=[self.project_id],
+            ),
+        )
+
+        with self.assertRaises(IntegrityError):
+            _ = await self.cohortl.create_cohort_from_criteria(
+                project_to_write=self.project_id,
+                description='A duplicate cohort',
+                cohort_name='Trial duplicate cohort',
+                dry_run=False,
+                cohort_criteria=CohortCriteriaInternal(
+                    projects=[self.project_id],
+                ),
+            )
+
+    @run_as_sync
+    async def test_create_template_then_cohorts(self):
+        """Test with template and cohort IDs out of sync, and creating from template"""
+        tid = await self.cohortl.create_cohort_template(
+            project=self.project_id,
+            cohort_template=CohortTemplateInternal(
+                id=None,
+                name='Test template',
+                description='A template from which cohorts are created',
+                criteria=CohortCriteriaInternal(projects=[self.project_id]),
+                project=self.project_id,
+            ),
+        )
+
+        _ = await self.cohortl.create_cohort_from_criteria(
+            project_to_write=self.project_id,
+            description='Cohort from criteria',
+            cohort_name='Another test cohort',
+            dry_run=False,
+            cohort_criteria=CohortCriteriaInternal(projects=[self.project_id]),
+        )
+
+        _ = await self.cohortl.create_cohort_from_criteria(
+            project_to_write=self.project_id,
+            description='Cohort from template',
+            cohort_name='Cohort from test template',
+            dry_run=False,
+            template_id=tid,
+        )
 
     @run_as_sync
     async def test_reevaluate_cohort(self):
