@@ -74,7 +74,7 @@ class TestCohortBasic(DbIsolatedTest):
     async def test_create_empty_cohort(self):
         """Can't create cohorts from empty criteria"""
         with self.assertRaises(ValueError) as context:
-            result = await self.cohortl.create_cohort_from_criteria(
+            _ = await self.cohortl.create_cohort_from_criteria(
                 project_to_write=self.project_id,
                 description='Cohort with no entries',
                 cohort_name='Empty cohort',
