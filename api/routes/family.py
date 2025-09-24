@@ -196,7 +196,7 @@ async def import_families(
     if not rows:
         if has_header:
             raise HTTPException(400, 'A header was expected but file is empty.')
-        return {}, 200
+        return {'success': True, 'warnings': ['Submitted file was empty']}
 
     headers = None
     if rows and has_header:
@@ -204,7 +204,7 @@ async def import_families(
 
     # Header with no data
     if headers and not rows:
-        return {}, 200
+        return {'success': True, 'warnings': ['Submitted file contained a header with no data']}
 
     if len(headers) == 1:
         raise ValueError(
