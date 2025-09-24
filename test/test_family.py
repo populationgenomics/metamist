@@ -1,11 +1,12 @@
-from test.testbase import DbIsolatedTest, run_as_sync
-
-from fastapi import UploadFile
-from api.routes import family
 from tempfile import TemporaryFile
 
+from test.testbase import DbIsolatedTest, run_as_sync
 
-class TestPedigree(DbIsolatedTest):
+from fastapi import HTTPException, UploadFile
+from api.routes import family
+
+
+class TestFamilyImport(DbIsolatedTest):
     """Family testing methods"""
 
     @run_as_sync
@@ -17,19 +18,15 @@ class TestPedigree(DbIsolatedTest):
             emptyTestFile = UploadFile(f)
 
             # Test has_header = true
-            response = await family.import_families(
-                emptyTestFile,
-                has_header=True,
-                delimiter='\t',
-                connection=self.connection,
-            )
-            assert response == (
-                {
-                    'success': False,
-                    'message': 'A header was expected but file is empty.',
-                },
-                400,
-            )
+            with self.assertRaises(HTTPException) as context:
+                _ = await family.import_families(
+                    emptyTestFile,
+                    has_header=True,
+                    delimiter='\t',
+                    connection=self.connection,
+                )
+            self.assertEqual(context.exception.status_code, 400)
+            self.assertIn('A header was expected but file is empty.', context.exception.detail)
 
             # Test no op when has_header = false
             response = await family.import_families(
@@ -38,4 +35,23 @@ class TestPedigree(DbIsolatedTest):
                 delimiter='\t',
                 connection=self.connection,
             )
-            assert response == ({}, 204)
+            assert response == ({}, 200)
+
+    @run_as_sync
+    async def test_import_families_header_no_content(self):
+        """
+        Test importing families from a file with a header but no data.
+        """
+        with TemporaryFile(mode='wb+', prefix='test', suffix='.tsv') as f:
+            f.write(b'Some\ttest\theader\twithout\tdata\n')
+            f.seek(0)
+            emptyTestFile = UploadFile(f)
+
+            # Test has_header = true
+            response = await family.import_families(
+                emptyTestFile,
+                has_header=True,
+                delimiter='\t',
+                connection=self.connection,
+            )
+            self.assertEqual(response, ({}, 200))

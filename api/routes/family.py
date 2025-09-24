@@ -5,7 +5,7 @@ import io
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, File, Query, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
@@ -192,20 +192,21 @@ async def import_families(
     reader = csv.reader(codecs.iterdecode(file.file, 'utf-8-sig'), delimiter=delimiter)
     rows = [r for r in reader if not r[0].startswith('#')]
 
-    if len(rows) == 0:
+    # Empty file
+    if not rows:
         if has_header:
-            return {
-                'success': False,
-                'message': 'A header was expected but file is empty.',
-            }, 400
-        return {}, 204
-
+            raise HTTPException(400, 'A header was expected but file is empty.')
+        return {}, 200
+    
     headers = None
-    if has_header:
-        headers = rows[0]
-        rows = rows[1:]
+    if rows and has_header:
+        headers = rows.pop(0)
 
-    if len(rows[0]) == 1:
+    # Header with no data
+    if headers and not rows:
+        return {}, 200
+
+    if len(headers) == 1:
         raise ValueError(
             'Only one column was detected in the pedigree, ensure the '
             'file is TAB separated (\\t)'
