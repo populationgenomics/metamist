@@ -26,7 +26,9 @@ class TestFamilyImport(DbIsolatedTest):
                     connection=self.connection,
                 )
             self.assertEqual(context.exception.status_code, 400)
-            self.assertIn('A header was expected but file is empty.', context.exception.detail)
+            self.assertIn(
+                'A header was expected but file is empty.', context.exception.detail
+            )
 
             # Test no op when has_header = false
             response = await family.import_families(

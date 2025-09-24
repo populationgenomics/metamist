@@ -197,7 +197,7 @@ async def import_families(
         if has_header:
             raise HTTPException(400, 'A header was expected but file is empty.')
         return {}, 200
-    
+
     headers = None
     if rows and has_header:
         headers = rows.pop(0)
