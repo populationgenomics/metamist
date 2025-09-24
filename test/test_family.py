@@ -42,7 +42,7 @@ class TestFamilyImport(DbIsolatedTest):
                 {
                     'success': True,
                     'warnings': ['Submitted file was empty'],
-                }
+                },
             )
 
     @run_as_sync
@@ -67,5 +67,5 @@ class TestFamilyImport(DbIsolatedTest):
                 {
                     'success': True,
                     'warnings': ['Submitted file contained a header with no data'],
-                }
+                },
             )
