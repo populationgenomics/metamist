@@ -43,25 +43,26 @@ class TestCohortBuilder(DbIsolatedTest):
     async def test_empty_main(self, mock):
         """Test main with no criteria"""
         mock.side_effect = self.mock_ccfc
-        result = main(
-            project=self.project_name,
-            cohort_body_spec=metamist.models.CohortBody(
-                name='Empty cohort', description='No criteria'
-            ),
-            projects=['test'],
-            sg_ids_internal=[],
-            excluded_sg_ids=[],
-            sg_technologies=[],
-            sg_platforms=[],
-            sg_types=[],
-            sample_types=[],
-            dry_run=False,
-        )
+        with self.assertRaises(ValueError) as context:
+            _ = main(
+                project=self.project_name,
+                cohort_body_spec=metamist.models.CohortBody(
+                    name='Empty cohort', description='No criteria'
+                ),
+                projects=['test'],
+                sg_ids_internal=[],
+                excluded_sg_ids=[],
+                sg_technologies=[],
+                sg_platforms=[],
+                sg_types=[],
+                sample_types=[],
+                dry_run=False,
+            )
         mock.assert_called_once()
-        self.assertIsInstance(result, NewCohort)
-        self.assertIsInstance(result.cohort_id, str)
-        self.assertListEqual(result.sequencing_group_ids, [])
-        self.assertEqual(result.dry_run, False)
+        self.assertIn(
+            'Cohort creation criteria resulted in no sequencing groups being selected. Please check the criteria and try again',
+            str(context.exception),
+        )
 
     @run_as_sync
     @patch('metamist.apis.CohortApi.create_cohort_from_criteria')
