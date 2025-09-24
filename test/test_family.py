@@ -1,9 +1,9 @@
 from tempfile import TemporaryFile
 
-from test.testbase import DbIsolatedTest, run_as_sync
-
 from fastapi import HTTPException, UploadFile
+
 from api.routes import family
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 class TestFamilyImport(DbIsolatedTest):
