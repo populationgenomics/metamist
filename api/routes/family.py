@@ -204,7 +204,10 @@ async def import_families(
 
     # Header with no data
     if headers and not rows:
-        return {'success': True, 'warnings': ['Submitted file contained a header with no data']}
+        return {
+            'success': True,
+            'warnings': ['Submitted file contained a header with no data'],
+        }
 
     if len(headers) == 1:
         raise ValueError(
