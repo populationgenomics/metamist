@@ -54,7 +54,7 @@ class AnalysisModel(BaseModel):
 class AnalysisUpdateModel(BaseModel):
     """Update analysis model"""
 
-    status: AnalysisStatus | None = None
+    status: AnalysisStatus = AnalysisStatus.UNKNOWN
     output: str | None = None
     outputs: dict[str, Any] | None = None
     meta: dict[str, Any] | None = None

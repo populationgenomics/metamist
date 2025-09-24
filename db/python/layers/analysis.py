@@ -591,7 +591,7 @@ class AnalysisLayer(BaseLayer):
     async def update_analysis(
         self,
         analysis_id: int,
-        status: AnalysisStatus | None = None,
+        status: AnalysisStatus = AnalysisStatus.UNKNOWN,
         meta: dict[str, Any] = None,
         output: str | None = None,
         outputs: RecursiveDict | None = None,
