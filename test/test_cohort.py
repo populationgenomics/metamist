@@ -82,7 +82,9 @@ class TestCohortBasic(DbIsolatedTest):
                 cohort_criteria=CohortCriteriaInternal(projects=[self.project_id]),
             )
 
-        self.assertIn('Cannot create a cohort with no sequencing groups', str(context.exception))
+        self.assertIn(
+            'Cannot create a cohort with no sequencing groups', str(context.exception)
+        )
 
 
 class TestCohortQueries(DbIsolatedTest):
