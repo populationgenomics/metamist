@@ -37,7 +37,13 @@ class TestFamilyImport(DbIsolatedTest):
                 delimiter='\t',
                 connection=self.connection,
             )
-            assert response == ({}, 200)
+            self.assertDictEqual(
+                response,
+                {
+                    'success': True,
+                    'warnings': ['Submitted file was empty'],
+                }
+            )
 
     @run_as_sync
     async def test_import_families_header_no_content(self):
@@ -56,4 +62,10 @@ class TestFamilyImport(DbIsolatedTest):
                 delimiter='\t',
                 connection=self.connection,
             )
-            self.assertEqual(response, ({}, 200))
+            self.assertDictEqual(
+                response,
+                {
+                    'success': True,
+                    'warnings': ['Submitted file contained a header with no data'],
+                }
+            )
