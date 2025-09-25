@@ -209,7 +209,7 @@ async def import_families(
             'warnings': ['Submitted file contained a header with no data'],
         }
 
-    if len(headers) == 1:
+    if len(rows[0]) == 1:
         raise ValueError(
             'Only one column was detected in the pedigree, ensure the '
             'file is TAB separated (\\t)'

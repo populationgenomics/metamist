@@ -88,12 +88,22 @@ class TestFamilyImportEndpoint(DbIsolatedTest):
         with TemporaryFile(mode='wb+', prefix='test', suffix='.tsv') as f:
             f.write(fileContent)
             f.seek(0)
-            emptyTestFile = UploadFile(f)
+            testFile = UploadFile(f)
 
             # Test has_header = true
             response = await family.import_families(
-                emptyTestFile,
+                testFile,
                 has_header=True,
+                delimiter='\t',
+                connection=self.connection,
+            )
+            self.assertDictEqual(response, {'success': True})
+
+            f.seek(0)
+            # Test has_header = true
+            response = await family.import_families(
+                testFile,
+                has_header=False,
                 delimiter='\t',
                 connection=self.connection,
             )
