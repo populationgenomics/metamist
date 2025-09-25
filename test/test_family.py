@@ -6,7 +6,7 @@ from api.routes import family
 from test.testbase import DbIsolatedTest, run_as_sync
 
 
-class TestFamilyImport(DbIsolatedTest):
+class TestFamilyImportEndpoint(DbIsolatedTest):
     """Family testing methods"""
 
     @run_as_sync
@@ -69,3 +69,32 @@ class TestFamilyImport(DbIsolatedTest):
                     'warnings': ['Submitted file contained a header with no data'],
                 },
             )
+
+    @run_as_sync
+    async def test_import_families_valid_data(self):
+        """
+        Test importing families with valid file contents.
+        """
+        data = [
+            ['familyid', 'description', 'phenotype'],
+            ['Smith', 'Blacksmiths', 'burnt'],
+            ['Jones', 'From Wales', 'sings well'],
+            ['Taylor', 'Post Norman', 'sews'],
+        ]
+        fileContent = '\n'.join(['\t'.join(row) for row in data]).encode(
+            encoding='utf-8-sig'
+        )
+
+        with TemporaryFile(mode='wb+', prefix='test', suffix='.tsv') as f:
+            f.write(fileContent)
+            f.seek(0)
+            emptyTestFile = UploadFile(f)
+
+            # Test has_header = true
+            response = await family.import_families(
+                emptyTestFile,
+                has_header=True,
+                delimiter='\t',
+                connection=self.connection,
+            )
+            self.assertDictEqual(response, {'success': True})
