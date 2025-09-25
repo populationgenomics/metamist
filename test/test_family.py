@@ -53,11 +53,11 @@ class TestFamilyImportEndpoint(DbIsolatedTest):
         with TemporaryFile(mode='wb+', prefix='test', suffix='.tsv') as f:
             f.write(b'Some\ttest\theader\twithout\tdata\n')
             f.seek(0)
-            emptyTestFile = UploadFile(f)
+            headerOnlyFile = UploadFile(f)
 
             # Test has_header = true
             response = await family.import_families(
-                emptyTestFile,
+                headerOnlyFile,
                 has_header=True,
                 delimiter='\t',
                 connection=self.connection,
