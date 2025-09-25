@@ -100,7 +100,7 @@ class TestFamilyImportEndpoint(DbIsolatedTest):
             self.assertDictEqual(response, {'success': True})
 
             f.seek(0)
-            # Test has_header = true
+            # Test has_header = false
             response = await family.import_families(
                 testFile,
                 has_header=False,
