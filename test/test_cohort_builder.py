@@ -112,11 +112,8 @@ class TestCohortBuilderData(DbIsolatedTest):
         )
 
         self.sgA = sequencing_group_id_format(self.sA.sequencing_groups[0].id)
-        self.sgA_raw = self.sA.sequencing_groups[0].id
         self.sgB = sequencing_group_id_format(self.sB.sequencing_groups[0].id)
-        self.sgB_raw = self.sB.sequencing_groups[0].id
         self.sgC = sequencing_group_id_format(self.sC.sequencing_groups[0].id)
-        self.sgC_raw = self.sC.sequencing_groups[0].id
 
     @run_as_sync
     async def mock_ccfc(self, project, body_create_cohort_from_criteria):
