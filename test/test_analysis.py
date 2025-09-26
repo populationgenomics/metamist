@@ -377,7 +377,6 @@ class TestAnalysis(DbIsolatedTest):
         # update the analysis with some new data
         await self.al.update_analysis(
             a_id,
-            status=AnalysisStatus.COMPLETED,
             meta={'sequencing_type': 'genome', 'size': 1024},
             output='test_output',
         )
