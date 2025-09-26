@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import api.routes.cohort
 import metamist.models
-from db.python.layers import CohortLayer, SampleLayer
+from db.python.layers import SampleLayer
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
     SampleUpsertInternal,
@@ -47,7 +47,7 @@ class TestCohortBuilderBasic(DbIsolatedTest):
 
     @run_as_sync
     @patch('metamist.apis.CohortApi.create_cohort_from_criteria')
-    async def test_empty_main(self, mock):
+    async def test_build_empty_cohort(self, mock):
         """Test main with an empty cohort"""
         mock.side_effect = self.mock_ccfc
         with self.assertRaises(ValueError) as context:
@@ -98,7 +98,6 @@ class TestCohortBuilderData(DbIsolatedTest):
     @run_as_sync
     async def setUp(self):
         super().setUp()
-        self.cohortl = CohortLayer(self.connection)
         self.samplel = SampleLayer(self.connection)
 
         self.sA = await self.samplel.upsert_sample(
