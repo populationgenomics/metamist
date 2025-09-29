@@ -1,4 +1,5 @@
 import asyncio
+from collections import defaultdict
 from datetime import date
 from typing import Any, Iterable
 
@@ -712,23 +713,23 @@ class SampleTable(DbBase):
             {where_str}
             GROUP BY project, id
         )
-        SELECT project, CAST(EXTRACT(YEAR FROM sample_first_date) AS INTEGER) AS year, CAST(EXTRACT(MONTH FROM sample_first_date) AS INTEGER) AS month, COUNT(*) AS count
+        SELECT project,
+        CAST(EXTRACT(YEAR FROM sample_first_date) AS INTEGER) AS year,
+        CAST(EXTRACT(MONTH FROM sample_first_date) AS INTEGER) AS month,
+        COUNT(*) AS count
         FROM t
         GROUP BY project, year, month
         ORDER BY project, year, month
         """
 
         rows = await self.connection.fetch_all(_query, values)
-        result: dict[int, dict[date, int]] = {}
+        result: dict[int, dict[date, int]] = defaultdict(lambda: defaultdict(int))
         accumulated_sample_count: dict[int, int] = {}
 
         # results are sorted by project, year, month
         # accumulate projects previous months into the processed month
         for r in rows:
             proj = r['project']
-            if proj not in result:
-                result[proj] = {}
-
             # append previous months count to currently processed month
             accumulated_sample_count[proj] = (
                 accumulated_sample_count.get(proj, 0) + r['count']
@@ -739,6 +740,10 @@ class SampleTable(DbBase):
 
         # append all the months up to the current month
         for proj, months in result.items():
+            # in case there is no previous months available, then skip
+            if not months:
+                continue
+
             current_month = date.today().replace(day=1)
             while current_month not in months:
                 months[current_month] = accumulated_sample_count[proj]
