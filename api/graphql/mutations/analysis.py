@@ -37,7 +37,7 @@ class AnalysisInput:
 class AnalysisUpdateInput:
     """Analysis update input"""
 
-    status: AnalysisStatusType  # type: ignore [assignment]
+    status: AnalysisStatusType | None = None  # type: ignore [assignment]
     output: str | None = None
     outputs: strawberry.scalars.JSON | None = None
     meta: strawberry.scalars.JSON | None = None
