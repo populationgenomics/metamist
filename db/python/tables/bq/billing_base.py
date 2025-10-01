@@ -16,17 +16,21 @@ from api.settings import (
     BQ_DAYS_BACK_OPTIMAL,
 )
 from api.utils.dates import get_invoice_month_range, reformat_datetime
+from api.utils.db import (
+    Connection,
+)
 from db.python.gcp_connect import BqDbBase
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.function_bq_filter import FunctionBQFilter
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
+from db.python.tables.sample import SampleTable
 from models.enums import BillingTimeColumn, BillingTimePeriods
 from models.models import (
     BillingColumn,
     BillingCostBudgetRecord,
     BillingCostDetailsRecord,
-    BillingTotalCostQueryModel,
     BillingRunningCostQueryModel,
+    BillingTotalCostQueryModel,
 )
 
 # Label added to each Billing Big Query request,
@@ -576,6 +580,63 @@ class BillingBaseTable(BqDbBase):
         # otherwise
         return None
 
+    async def append_sample_cost(
+        self, connection: Connection | None = None, results: list[dict] | None = None
+    ) -> list[dict] | None:
+        """
+        For each topic in results, calculate number of samples per metamist project
+        and divide the cost by number of samples to get average sample storage cost
+        """
+        if not connection or not results:
+            return results
+
+        # get project_id to dataset/topic mapping
+        topic_to_project = {
+            connection.project_id_map[p].dataset: p
+            for p in connection.project_id_map.keys()
+        }
+
+        # get number of samples per project per month
+        samples = SampleTable(connection)
+        project_sample_counts_per_month = (
+            await samples.get_monthly_samples_count_per_project()
+        )
+        # if no samples found, return results as is
+        if not project_sample_counts_per_month:
+            return results
+
+        # for each monthly record with cost_category == 'Cloud Storage' add one record with average_sample_cost
+        for row in results:
+            topic = row.get('topic')
+            invoice_month = row.get('day')
+            # only continue if both topic and invoice_month / day are present
+            if topic is None or invoice_month is None:
+                continue
+
+            if row.get('cost_category') == 'Cloud Storage':
+                # convert topic to project id
+                project_id = topic_to_project.get(topic)
+                if project_id is None:
+                    continue
+
+                sample_count = project_sample_counts_per_month.get(project_id, {}).get(
+                    invoice_month, 0
+                )
+
+                avg_cost = row.get('cost', 0) / sample_count if sample_count > 0 else 0
+                # append new row into results with the same topic and day but with cost_category = 'Average Sample Storage Cost'
+                # and cost = avg_cost
+                new_row = row.copy()
+                new_row['cost_category'] = 'Average Sample Storage Cost'
+                new_row['cost'] = avg_cost
+                results.append(new_row)
+
+        # order results by day, topic, cost_category
+        results.sort(
+            key=lambda x: (x.get('day'), x.get('topic'), x.get('cost_category'))
+        )
+        return results
+
     async def get_total_cost(
         self,
         query: BillingTotalCostQueryModel,
@@ -662,8 +723,7 @@ class BillingBaseTable(BqDbBase):
         query_job_result = self._execute_query(
             _query, query_parameters, results_as_list=False
         )
-        results = self._convert_output(query_job_result)
-        return results
+        return self._convert_output(query_job_result)
 
     async def get_running_cost_with_filters(
         self,
