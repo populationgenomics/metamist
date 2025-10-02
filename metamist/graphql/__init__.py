@@ -143,12 +143,12 @@ def validate(doc: DocumentNode, client=None, use_local_schema=False):
 
 # use older style typing to broaden supported Python versions
 @backoff.on_exception(
-        backoff.expo,
-        factor=3,
-        jitter=None,
-        exception=(HTTPError, JSONDecodeError, TransportServerError),
-        max_tries=5,
-        max_time=60
+    backoff.expo,
+    factor=3,
+    jitter=None,
+    exception=(HTTPError, JSONDecodeError, TransportServerError),
+    max_tries=5,
+    max_time=60,
 )
 def query(
     _query: str | DocumentNode,
@@ -176,12 +176,12 @@ def query(
 
 
 @backoff.on_exception(
-        backoff.expo,
-        factor=3,
-        jitter=None,
-        exception=(HTTPError, JSONDecodeError, TransportServerError),
-        max_tries=5,
-        max_time=60
+    backoff.expo,
+    factor=3,
+    jitter=None,
+    exception=(HTTPError, JSONDecodeError, TransportServerError),
+    max_tries=5,
+    max_time=60,
 )
 async def query_async(
     _query: str | DocumentNode,
