@@ -5,9 +5,7 @@ import Report from '../../components/Report'
 import { ReportItemPlot } from '../../components/ReportItem'
 import ReportRow from '../../components/ReportRow'
 
-const PROJECT = 'ourdna'
-
-export default function ConsentAndChoices() {
+export default function ConsentAndChoices({ project }: { project: string }) {
     const [normalize, setNormalize] = useState(true)
     const [onlySamples, setOnlySamples] = useState(false)
 
@@ -46,7 +44,7 @@ export default function ConsentAndChoices() {
                         use are participants who only ticked one box. Frequency refers to the ratio
                         of participants when viewing percentages, and the absolute count when not.
                     `}
-                    project={PROJECT}
+                    project={project}
                     query={`
                         with answers as (
                             select

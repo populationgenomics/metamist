@@ -1,16 +1,174 @@
+import { Switch, ToggleButton, ToggleButtonGroup } from '@mui/material'
+import Paper from '@mui/material/Paper'
+import TableBody from '@mui/material/TableBody'
+import TableContainer from '@mui/material/TableContainer'
+import TableHead from '@mui/material/TableHead'
+import TableRow from '@mui/material/TableRow'
 import React from 'react'
-import { Checkbox, Dropdown, Header, Table as SUITable } from 'semantic-ui-react'
+import { TableComponents, TableVirtuoso } from 'react-virtuoso'
+import { Dropdown, Header, Table as SUITable, TableBodyProps, TableProps } from 'semantic-ui-react'
 import {
     ColumnConfig,
     ColumnGroup,
     ColumnVisibilityDropdown,
-    useColumnVisibility,
 } from '../../../shared/components/ColumnVisibilityDropdown'
 import { IStackedAreaByDateChartData } from '../../../shared/components/Graphs/StackedAreaByDateChart'
-import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
+
 import Table from '../../../shared/components/Table'
+import { ThemeContext } from '../../../shared/components/ThemeProvider'
 import { convertFieldName } from '../../../shared/utilities/fieldName'
 import formatMoney from '../../../shared/utilities/formatMoney'
+import { BillingColumn } from '../../../sm-api'
+
+type BreakdownRowData = {
+    date: Date | null // null for total row
+    projectOrTopic: string
+    values: { [key: string]: number }
+    headerFields: Array<{ category: string; title: string }>
+    getColumnDisplayStyle: (category: string) => React.CSSProperties
+    isTotal?: boolean
+}
+
+type SummaryRowData = {
+    date: Date
+    values: { [key: string]: number }
+    headerFields: Array<{ category: string; title: string }>
+    getColumnDisplayStyle: (category: string) => React.CSSProperties
+}
+const BreakdownTableRow: React.FC<{ item: BreakdownRowData }> = ({ item: row, ...props }) => {
+    const theme = React.useContext(ThemeContext)
+    const isDarkMode = theme.theme === 'dark-mode'
+
+    if (!row) {
+        return null
+    }
+
+    return (
+        <TableRow
+            {...props}
+            className={`ui table row${isDarkMode ? ' inverted' : ''}`}
+            style={
+                row.isTotal
+                    ? {
+                          backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#f5f5f5',
+                          fontWeight: 'bold',
+                      }
+                    : {}
+            }
+        >
+            <SUITable.Cell collapsing>
+                <b>{row.date ? row.date.toLocaleDateString() : 'All Time Total'}</b>
+            </SUITable.Cell>
+            <SUITable.Cell collapsing>
+                <b>{row.projectOrTopic}</b>
+            </SUITable.Cell>
+            {row.headerFields.map((field) => (
+                <SUITable.Cell
+                    key={`${row.date ? row.date.toISOString() : 'total'}-${field.category}`}
+                    style={row.getColumnDisplayStyle(field.category)}
+                >
+                    <span style={row.isTotal ? { fontWeight: 'bold' } : {}}>
+                        {formatMoney(row.values[field.category] || 0)}
+                    </span>
+                </SUITable.Cell>
+            ))}
+        </TableRow>
+    )
+}
+
+const SummaryTableRow: React.FC<{ item: SummaryRowData }> = ({ item: row, ...props }) => {
+    const theme = React.useContext(ThemeContext)
+    const isDarkMode = theme.theme === 'dark-mode'
+    return (
+        <TableRow {...props} className={`ui table row${isDarkMode ? ' inverted' : ''}`}>
+            <SUITable.Cell collapsing>
+                <b>{row.date.toLocaleDateString()}</b>
+            </SUITable.Cell>
+            {row.headerFields.map((field) => (
+                <SUITable.Cell
+                    key={`${row.date.toISOString()}-${field.category}`}
+                    style={row.getColumnDisplayStyle(field.category)}
+                >
+                    {formatMoney(row.values[field.category] || 0)}
+                </SUITable.Cell>
+            ))}
+        </TableRow>
+    )
+}
+
+const VirtuosoBreakdownTableComponents: TableComponents<BreakdownRowData> = {
+    Scroller: React.forwardRef(function TableContainerWrapper(props, ref) {
+        return (
+            <TableContainer
+                component={Paper}
+                // @ts-ignore
+                ref={ref}
+                {...props}
+            />
+        )
+    }),
+    Table: (props: TableProps) => (
+        <Table
+            {...props}
+            celled
+            compact
+            selectable
+            style={{ borderCollapse: 'separate', width: '100%' }}
+        />
+    ),
+    TableHead: TableHead,
+    // @ts-ignore
+    TableRow: BreakdownTableRow,
+    // @ts-ignore
+    TableBody: React.forwardRef(function TableBodyWrapper(props: TableBodyProps, ref) {
+        return <TableBody ref={ref} {...props} />
+    }),
+}
+
+const VirtuosoSummaryTableComponents: TableComponents<SummaryRowData> = {
+    Scroller: React.forwardRef(function TableContainerWrapper(props, ref) {
+        return (
+            <TableContainer
+                component={Paper}
+                // @ts-ignore
+                ref={ref}
+                {...props}
+            />
+        )
+    }),
+    Table: (props: TableProps) => (
+        <Table
+            {...props}
+            celled
+            compact
+            sortable
+            selectable
+            style={{ borderCollapse: 'separate', width: '100%' }}
+        />
+    ),
+    TableHead: TableHead,
+    // @ts-ignore
+    TableRow: SummaryTableRow,
+    // @ts-ignore
+    TableBody: React.forwardRef(function TableBodyWrapper(props: TableBodyProps, ref) {
+        return <TableBody ref={ref} {...props} />
+    }),
+}
+
+type ViewMode = 'summary' | 'breakdown'
+
+export interface ExportData {
+    headerFields: Array<{ category: string; title: string }>
+    summaryData: IStackedAreaByDateChartData[]
+    breakdownRows: Array<{
+        date: Date
+        projectOrTopic: string
+        values: { [key: string]: number }
+    }>
+    viewMode: ViewMode
+    expandCompute: boolean
+    groupBy?: BillingColumn
+}
 
 interface IBillingCostByTimeTableProps {
     heading: string
@@ -23,7 +181,17 @@ interface IBillingCostByTimeTableProps {
     setVisibleColumns: (columns: Set<string>) => void
     expandCompute?: boolean
     setExpandCompute?: (expand: boolean) => void
-    exportToFile: (format: 'csv' | 'tsv') => void
+    exportToFile: (format: 'csv' | 'tsv', exportData?: ExportData) => void
+    groupBy?: BillingColumn
+    selectedProjects?: string[]
+    breakdownData?: { [date: string]: { [field: string]: { [category: string]: number } } }
+    onViewModeChange?: (viewMode: 'summary' | 'breakdown') => void
+    onExportRequest?: (
+        viewMode: 'summary' | 'breakdown',
+        format: 'csv' | 'tsv',
+        exportData?: ExportData
+    ) => void
+    currentViewMode?: 'summary' | 'breakdown'
 }
 
 const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
@@ -38,9 +206,26 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     expandCompute: externalExpandCompute,
     setExpandCompute: externalSetExpandCompute,
     exportToFile,
+    groupBy,
+    breakdownData,
+    onViewModeChange,
+    onExportRequest,
+    currentViewMode: externalCurrentViewMode,
 }) => {
+    const theme = React.useContext(ThemeContext)
+    const isDarkMode = theme.theme === 'dark-mode'
     const [internalData, setInternalData] = React.useState<IStackedAreaByDateChartData[]>([])
     const [internalGroups, setInternalGroups] = React.useState<string[]>([])
+    const [viewMode, setViewMode] = React.useState<ViewMode>(externalCurrentViewMode || 'summary')
+
+    // Sync internal viewMode with external currentViewMode
+    React.useEffect(() => {
+        if (externalCurrentViewMode && externalCurrentViewMode !== viewMode) {
+            setViewMode(externalCurrentViewMode)
+        }
+    }, [externalCurrentViewMode, viewMode])
+
+    // No longer need expand toggling state since updates are immediate
 
     // Use external expand state if provided, otherwise use internal state
     const [internalExpandCompute, setInternalExpandCompute] = React.useState<boolean>(false)
@@ -68,8 +253,8 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         setInternalGroups(groups.concat(['Daily Total', 'Compute Cost']))
     }, [data, groups])
 
-    // Generate column configurations for the dropdown
-    const getColumnConfigs = React.useCallback((): ColumnConfig[] => {
+    // Memoize column configurations for performance
+    const columnConfigs = React.useMemo((): ColumnConfig[] => {
         const configs: ColumnConfig[] = [
             { id: 'Daily Total', label: 'Daily Total', group: 'summary' },
             { id: 'Cloud Storage', label: 'Cloud Storage', group: 'storage' },
@@ -91,15 +276,15 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         return configs
     }, [expandCompute, groups])
 
-    // Generate column groups for the dropdown
-    const getColumnGroups = React.useCallback((): ColumnGroup[] => {
+    // Memoize column groups for performance
+    const columnGroups = React.useMemo((): ColumnGroup[] => {
         const groups: ColumnGroup[] = [
             { id: 'summary', label: 'Summary', columns: ['Daily Total'] },
             { id: 'storage', label: 'Storage Cost', columns: ['Cloud Storage'] },
         ]
 
         if (expandCompute) {
-            const computeColumns = getColumnConfigs()
+            const computeColumns = columnConfigs
                 .filter((config) => config.group === 'compute')
                 .map((config) => config.id)
                 .sort((a, b) => a.localeCompare(b))
@@ -112,107 +297,157 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         }
 
         return groups
-    }, [expandCompute, getColumnConfigs])
+    }, [expandCompute, columnConfigs])
 
-    // Use the column visibility hook
-    const { isColumnVisible } = useColumnVisibility(getColumnConfigs(), visibleColumns)
+    // Create CSS classes for column visibility based on expand state and column visibility
+    const getColumnDisplayStyle = React.useCallback(
+        (group: string) => {
+            // First check if column is visible based on user selection
+            if (!visibleColumns.has(group)) {
+                return { display: 'none' }
+            }
 
-    // Handle expand toggle changes - only modify columns when user explicitly toggles expand
-    const [previousExpandState, setPreviousExpandState] = React.useState<boolean | null>(null)
-
-    React.useEffect(() => {
-        // Only respond to actual expand state changes, not initial load
-        if (previousExpandState !== null && previousExpandState !== expandCompute) {
-            const newVisibleColumns = new Set(visibleColumns)
-            let hasChanges = false
-
-            // Filter out 'Cloud Storage' from groups since it's always a storage cost, not compute cost
-            const computeGroups = groups.filter((group) => group !== 'Cloud Storage')
+            // Always show core columns if they're visible
+            if (['Daily Total', 'Cloud Storage'].includes(group)) {
+                return { display: 'table-cell' }
+            }
 
             if (expandCompute) {
-                // Switching to expanded mode - remove 'Compute Cost' summary and add individual compute groups
-                if (newVisibleColumns.has('Compute Cost')) {
-                    newVisibleColumns.delete('Compute Cost')
-                    hasChanges = true
-                }
-                // Add all compute cost columns (excluding Cloud Storage)
-                computeGroups.forEach((group) => {
-                    if (!newVisibleColumns.has(group)) {
-                        newVisibleColumns.add(group)
-                        hasChanges = true
-                    }
-                })
+                // In expanded mode: show individual compute categories, hide 'Compute Cost' summary
+                return { display: group !== 'Compute Cost' ? 'table-cell' : 'none' }
             } else {
-                // Switching to collapsed mode - remove individual compute groups and add 'Compute Cost' summary
-                computeGroups.forEach((group) => {
-                    if (newVisibleColumns.has(group)) {
-                        newVisibleColumns.delete(group)
-                        hasChanges = true
-                    }
-                })
-                if (!newVisibleColumns.has('Compute Cost')) {
-                    newVisibleColumns.add('Compute Cost')
-                    hasChanges = true
+                // In collapsed mode: show 'Compute Cost' summary, hide individual compute categories
+                if (group === 'Compute Cost') {
+                    return { display: 'table-cell' }
                 }
+                // Hide individual compute categories
+                const isComputeCategory = ![
+                    'Daily Total',
+                    'Cloud Storage',
+                    'Compute Cost',
+                ].includes(group)
+                return { display: isComputeCategory ? 'none' : 'table-cell' }
             }
+        },
+        [expandCompute, visibleColumns]
+    )
 
-            if (hasChanges) {
-                setVisibleColumns(newVisibleColumns)
-            }
+    // Properly ordered header fields to match table header structure
+    const headerFields = React.useMemo(() => {
+        // Order columns correctly: Daily Total, Cloud Storage, then compute columns
+        const orderedColumns = []
+
+        // Always add Daily Total first (under Expand header)
+        orderedColumns.push('Daily Total')
+
+        // Always add Cloud Storage second (under Storage Cost header)
+        orderedColumns.push('Cloud Storage')
+
+        // Add compute columns in order
+        if (expandCompute) {
+            // In expanded mode: show individual compute categories (excluding summary columns)
+            const computeCategories = internalGroups
+                .filter(
+                    (group) => !['Daily Total', 'Cloud Storage', 'Compute Cost'].includes(group)
+                )
+                .sort()
+            orderedColumns.push(...computeCategories)
+        } else {
+            // In collapsed mode: show Compute Cost summary
+            orderedColumns.push('Compute Cost')
         }
 
-        setPreviousExpandState(expandCompute)
-    }, [expandCompute, groups, visibleColumns, setVisibleColumns, previousExpandState])
+        const result = orderedColumns.map((group) => ({
+            category: group,
+            title: group,
+        }))
 
-    // Early return for loading - must be after all hooks
-    if (isLoading) {
-        return (
-            <div>
-                <LoadingDucks />
-            </div>
-        )
-    }
+        return result
+    }, [expandCompute, internalGroups])
 
-    // Header sort
-    const priorityColumns = ['Daily Total', 'Cloud Storage', 'Compute Cost']
-    const headerSort = (a: string, b: string) => {
-        if (priorityColumns.includes(a) && priorityColumns.includes(b)) {
-            return priorityColumns.indexOf(a) < priorityColumns.indexOf(b) ? -1 : 1
-        } else if (priorityColumns.includes(a)) {
-            return -1
-        } else if (priorityColumns.includes(b)) {
-            return 1
+    // Memoize breakdown rows processing for performance
+    const allBreakdownRows = React.useMemo(() => {
+        if (!breakdownData || viewMode !== 'breakdown') {
+            return []
         }
-        return a < b ? -1 : 1
-    }
 
-    const headerFields = () => {
-        const baseFields = expandCompute
-            ? internalGroups
-                  .sort(headerSort)
-                  .filter((group) => group != 'Compute Cost')
-                  .map((group: string) => ({
-                      category: group,
-                      title: group,
-                  }))
-            : [
-                  {
-                      category: 'Daily Total',
-                      title: 'Daily Total',
-                  },
-                  {
-                      category: 'Cloud Storage',
-                      title: 'Cloud Storage',
-                  },
-                  {
-                      category: 'Compute Cost',
-                      title: 'Compute Cost',
-                  },
-              ]
+        const rows: Array<{
+            date: Date
+            projectOrTopic: string
+            values: { [key: string]: number }
+        }> = []
 
-        // Filter by visible columns using our new hook
-        return baseFields.filter((field) => isColumnVisible(field.category))
-    }
+        Object.entries(breakdownData).forEach(([dateStr, fieldData]) => {
+            const date = new Date(dateStr)
+            Object.entries(fieldData).forEach(([projectOrTopic, categories]) => {
+                rows.push({
+                    date,
+                    projectOrTopic,
+                    values: categories,
+                })
+            })
+        })
+
+        // Sort breakdown rows by date then by project/topic
+        rows.sort((a, b) => {
+            const dateCompare = a.date.getTime() - b.date.getTime()
+            if (dateCompare !== 0) return dateCompare
+            return a.projectOrTopic.localeCompare(b.projectOrTopic)
+        })
+
+        return rows
+    }, [breakdownData, viewMode])
+
+    // Memoize sorted summary data for performance - don't recalculate on expand toggle
+    const sortedSummaryData = React.useMemo(() => {
+        if (viewMode !== 'summary') {
+            return []
+        }
+
+        const result = [...internalData].sort((a, b) => {
+            if (!sort.column) return 0
+            const props = [sort.column]
+            const orders = sort.direction === 'ascending' ? ['asc'] : ['desc']
+
+            return props.reduce((acc, prop, i) => {
+                if (acc === 0) {
+                    const [p1, p2] =
+                        orders && orders[i] === 'desc'
+                            ? [b.values[prop as keyof typeof b], a.values[prop as keyof typeof a]]
+                            : [a.values[prop as keyof typeof a], b.values[prop as keyof typeof b]]
+                    acc = p1 > p2 ? 1 : p1 < p2 ? -1 : 0
+                }
+                return acc
+            }, 0) as number
+        })
+
+        return result
+    }, [viewMode, internalData, sort.column, sort.direction])
+
+    // Prepare data for react-virtuoso breakdown table
+    const virtuosoBreakdownData = React.useMemo(() => {
+        if (viewMode !== 'breakdown') {
+            return []
+        }
+
+        return allBreakdownRows.map((row) => ({
+            ...row,
+            headerFields,
+            getColumnDisplayStyle,
+            isTotal: false,
+        }))
+    }, [viewMode, allBreakdownRows, headerFields, getColumnDisplayStyle])
+
+    // Prepare data for react-virtuoso summary table
+    const virtuosoSummaryData = React.useMemo(() => {
+        if (viewMode !== 'summary') return []
+
+        return sortedSummaryData.map((row) => ({
+            ...row,
+            headerFields,
+            getColumnDisplayStyle,
+        }))
+    }, [viewMode, sortedSummaryData, headerFields, getColumnDisplayStyle])
 
     const handleSort = (clickedColumn: string) => {
         if (sort.column !== clickedColumn) {
@@ -233,53 +468,44 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         return undefined
     }
 
-    const dataSort = (
-        data: IStackedAreaByDateChartData[],
-        props: string[],
-        orders?: ('asc' | 'desc')[]
-    ) =>
-        [...data].sort(
-            (a, b) =>
-                props.reduce((acc, prop, i) => {
-                    if (acc === 0) {
-                        const [p1, p2] =
-                            orders && orders[i] === 'desc'
-                                ? [
-                                      b.values[prop as keyof typeof b],
-                                      a.values[prop as keyof typeof a],
-                                  ]
-                                : [
-                                      a.values[prop as keyof typeof a],
-                                      b.values[prop as keyof typeof b],
-                                  ]
-                        acc = p1 > p2 ? 1 : p1 < p2 ? -1 : 0
-                    }
-                    return acc
-                }, 0) as number // explicitly cast the result to a number
-        )
-
-    const dataToBody = (data: IStackedAreaByDateChartData[]) => (
-        <>
-            {dataSort(
-                data,
-                sort.column ? [sort.column] : [],
-                sort.direction === 'ascending' ? ['asc'] : ['desc']
-            ).map((p) => (
-                <React.Fragment key={p.date.toISOString()}>
-                    <SUITable.Row>
-                        <SUITable.Cell collapsing key={`Date - ${p.date.toISOString()}`}>
-                            <b>{p.date.toLocaleDateString()}</b>
-                        </SUITable.Cell>
-                        {headerFields().map((k) => (
-                            <SUITable.Cell key={`${p.date.toISOString()} - ${k.category}`}>
-                                {formatMoney(p.values[k.category])}
-                            </SUITable.Cell>
-                        ))}
-                    </SUITable.Row>
-                </React.Fragment>
-            ))}
-        </>
+    const handleExport = React.useCallback(
+        (format: 'csv' | 'tsv') => {
+            const exportData: ExportData = {
+                headerFields,
+                summaryData: sortedSummaryData,
+                breakdownRows: allBreakdownRows,
+                viewMode,
+                expandCompute,
+                groupBy,
+            }
+            if (onExportRequest) {
+                onExportRequest(viewMode, format, exportData)
+            } else {
+                exportToFile(format, exportData)
+            }
+        },
+        [
+            headerFields,
+            sortedSummaryData,
+            allBreakdownRows,
+            viewMode,
+            expandCompute,
+            groupBy,
+            onExportRequest,
+            exportToFile,
+        ]
     )
+
+    // Early return for loading - must be after all hooks
+    if (isLoading) {
+        return (
+            <div>
+                <p style={{ textAlign: 'center', marginTop: '20px' }}>
+                    <em>Loading table...</em>
+                </p>
+            </div>
+        )
+    }
 
     return (
         <>
@@ -301,12 +527,33 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                         display: 'flex',
                         gap: '10px',
                         flex: '0 0 auto',
-                        minWidth: '240px',
+                        minWidth: '340px',
                     }}
                 >
+                    <ToggleButtonGroup
+                        value={viewMode}
+                        exclusive
+                        color="primary"
+                        onChange={(event, newMode) => {
+                            if (newMode !== null) {
+                                setViewMode(newMode)
+                                onViewModeChange?.(newMode)
+                            }
+                        }}
+                        aria-label="view mode toggle"
+                        style={{ height: '36px' }}
+                        disabled={false}
+                    >
+                        <ToggleButton value="summary" aria-label="summary view">
+                            Summary
+                        </ToggleButton>
+                        <ToggleButton value="breakdown" aria-label="breakdown view">
+                            Breakdown
+                        </ToggleButton>
+                    </ToggleButtonGroup>
                     <ColumnVisibilityDropdown
-                        columns={getColumnConfigs()}
-                        groups={getColumnGroups()}
+                        columns={columnConfigs}
+                        groups={columnGroups}
                         visibleColumns={visibleColumns}
                         onVisibilityChange={setVisibleColumns}
                         searchThreshold={8}
@@ -334,107 +581,285 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                                 key="csv"
                                 text="Export to CSV"
                                 icon="file excel"
-                                onClick={() => exportToFile('csv')}
+                                onClick={() => handleExport('csv')}
                             />
                             <Dropdown.Item
                                 key="tsv"
                                 text="Export to TSV"
                                 icon="file text outline"
-                                onClick={() => exportToFile('tsv')}
+                                onClick={() => handleExport('tsv')}
                             />
                         </Dropdown.Menu>
                     </Dropdown>
                 </div>
             </div>
-            <Table celled compact sortable selectable>
-                <SUITable.Header>
-                    <SUITable.Row>
-                        <SUITable.HeaderCell
-                            colSpan={isColumnVisible('Daily Total') ? 2 : 1}
-                            textAlign="center"
-                        >
-                            <Checkbox
-                                label="Expand"
-                                fitted
-                                toggle
-                                checked={expandCompute}
-                                onChange={() => setExpandCompute(!expandCompute)}
-                            />
-                        </SUITable.HeaderCell>
-                        <SUITable.HeaderCell
-                            colSpan={isColumnVisible('Cloud Storage') ? 1 : 0}
-                            style={{
-                                display: isColumnVisible('Cloud Storage') ? 'table-cell' : 'none',
-                            }}
-                        >
-                            Storage Cost
-                        </SUITable.HeaderCell>
-                        <SUITable.HeaderCell
-                            colSpan={
-                                headerFields().length -
-                                (isColumnVisible('Cloud Storage') ? 1 : 0) -
-                                (isColumnVisible('Daily Total') ? 1 : 0)
-                            }
-                            style={{
-                                display: headerFields().some(
-                                    (f) =>
-                                        f.category !== 'Daily Total' &&
-                                        f.category !== 'Cloud Storage'
-                                )
-                                    ? 'table-cell'
-                                    : 'none',
-                            }}
-                        >
-                            Compute Cost
-                        </SUITable.HeaderCell>
-                    </SUITable.Row>
-                    <SUITable.Row>
-                        <SUITable.HeaderCell
-                            style={{
-                                borderBottom: 'none',
-                            }}
-                        >
-                            Date
-                        </SUITable.HeaderCell>
-                        {headerFields().map((k) => (
-                            <SUITable.HeaderCell
-                                key={k.category}
-                                sorted={checkDirection(k.category)}
-                                onClick={() => handleSort(k.category)}
-                                style={{
-                                    borderBottom: 'none',
-                                    position: 'sticky',
-                                    resize: 'horizontal',
-                                }}
-                            >
-                                {convertFieldName(k.title)}
-                            </SUITable.HeaderCell>
-                        ))}
-                    </SUITable.Row>
-                </SUITable.Header>
-                <SUITable.Body>
-                    {dataToBody(internalData)}
-                    <SUITable.Row>
-                        <SUITable.Cell collapsing>
-                            <b>All Time Total</b>
-                        </SUITable.Cell>
-                        {headerFields().map((k) => (
-                            <SUITable.Cell key={`Total ${k.category}`}>
-                                <b>
-                                    {formatMoney(
-                                        internalData.reduce(
-                                            (acc, cur) => acc + cur.values[k.category],
-                                            0
+            {viewMode === 'breakdown' ? (
+                <TableVirtuoso
+                    style={{
+                        height: Math.min(
+                            600,
+                            Math.max(200, virtuosoBreakdownData.length * 50 + 100)
+                        ),
+                        backgroundColor: 'transparent',
+                    }}
+                    data={virtuosoBreakdownData}
+                    components={VirtuosoBreakdownTableComponents}
+                    fixedHeaderContent={() => (
+                        <>
+                            <TableRow className={`ui table row${isDarkMode ? ' inverted' : ''}`}>
+                                <SUITable.HeaderCell
+                                    colSpan={2 + (visibleColumns.has('Daily Total') ? 1 : 0)}
+                                    textAlign="center"
+                                >
+                                    <span
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                        }}
+                                    >
+                                        <Switch
+                                            checked={expandCompute}
+                                            onChange={(e) => {
+                                                setExpandCompute?.(e.target.checked)
+                                            }}
+                                            size="small"
+                                            color="primary"
+                                        />
+                                        <span>Expand</span>
+                                    </span>
+                                </SUITable.HeaderCell>
+                                <SUITable.HeaderCell
+                                    colSpan={visibleColumns.has('Cloud Storage') ? 1 : 0}
+                                    style={getColumnDisplayStyle('Cloud Storage')}
+                                >
+                                    Storage Cost
+                                </SUITable.HeaderCell>
+                                <SUITable.HeaderCell
+                                    colSpan={
+                                        headerFields.filter(
+                                            (f) =>
+                                                f.category !== 'Daily Total' &&
+                                                f.category !== 'Cloud Storage' &&
+                                                visibleColumns.has(f.category)
+                                        ).length
+                                    }
+                                    style={{
+                                        display: headerFields.some(
+                                            (f) =>
+                                                f.category !== 'Daily Total' &&
+                                                f.category !== 'Cloud Storage' &&
+                                                visibleColumns.has(f.category)
                                         )
-                                    )}
+                                            ? 'table-cell'
+                                            : 'none',
+                                    }}
+                                >
+                                    Compute Cost
+                                </SUITable.HeaderCell>
+                            </TableRow>
+                            <TableRow className={`ui table row${isDarkMode ? ' inverted' : ''}`}>
+                                <SUITable.HeaderCell
+                                    style={{
+                                        borderBottom: 'none',
+                                        minWidth: '140px',
+                                    }}
+                                >
+                                    Date
+                                </SUITable.HeaderCell>
+                                <SUITable.HeaderCell
+                                    style={{
+                                        borderBottom: 'none',
+                                        minWidth: '250px',
+                                    }}
+                                >
+                                    {groupBy === BillingColumn.GcpProject ? 'Project' : 'Topic'}
+                                </SUITable.HeaderCell>
+                                {headerFields.map((field) => (
+                                    <SUITable.HeaderCell
+                                        key={field.category}
+                                        sorted={checkDirection(field.category)}
+                                        onClick={() => handleSort(field.category)}
+                                        style={{
+                                            borderBottom: 'none',
+                                            position: 'sticky',
+                                            minWidth: '180px',
+                                            ...getColumnDisplayStyle(field.category),
+                                        }}
+                                    >
+                                        {convertFieldName(field.title)}
+                                    </SUITable.HeaderCell>
+                                ))}
+                            </TableRow>
+                        </>
+                    )}
+                    fixedFooterContent={() => (
+                        <TableRow
+                            className={`ui table row${isDarkMode ? ' inverted' : ''}`}
+                            style={{
+                                backgroundColor: isDarkMode ? '#1b1c1d' : '#f9f9f9',
+                                fontWeight: 'bold',
+                                position: 'sticky',
+                                bottom: 0,
+                                zIndex: 10,
+                            }}
+                        >
+                            <SUITable.Cell collapsing style={{ minWidth: '140px' }}>
+                                <b>All Time Total</b>
+                            </SUITable.Cell>
+                            <SUITable.Cell collapsing style={{ minWidth: '250px' }}>
+                                <b>
+                                    All{' '}
+                                    {groupBy === BillingColumn.GcpProject ? 'Projects' : 'Topics'}
                                 </b>
                             </SUITable.Cell>
-                        ))}
-                    </SUITable.Row>
-                </SUITable.Body>
-            </Table>
+                            {headerFields.map((field) => {
+                                // Use same calculation as summary view for consistency
+                                const total = internalData.reduce(
+                                    (acc, cur) => acc + (cur.values[field.category] || 0),
+                                    0
+                                )
+                                return (
+                                    <SUITable.Cell
+                                        key={`Total ${field.category}`}
+                                        style={{
+                                            minWidth: '180px',
+                                            ...getColumnDisplayStyle(field.category),
+                                        }}
+                                    >
+                                        <b>{formatMoney(total)}</b>
+                                    </SUITable.Cell>
+                                )
+                            })}
+                        </TableRow>
+                    )}
+                />
+            ) : (
+                <TableVirtuoso
+                    style={{
+                        height: Math.min(600, Math.max(200, virtuosoSummaryData.length * 50 + 100)),
+                        backgroundColor: 'transparent',
+                    }}
+                    data={virtuosoSummaryData}
+                    components={VirtuosoSummaryTableComponents}
+                    fixedHeaderContent={() => (
+                        <>
+                            <TableRow className={`ui table row${isDarkMode ? ' inverted' : ''}`}>
+                                <SUITable.HeaderCell
+                                    colSpan={1 + (visibleColumns.has('Daily Total') ? 1 : 0)}
+                                    textAlign="center"
+                                >
+                                    <span
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                        }}
+                                    >
+                                        <Switch
+                                            checked={expandCompute}
+                                            onChange={(e) => {
+                                                setExpandCompute?.(e.target.checked)
+                                            }}
+                                            size="small"
+                                            color="primary"
+                                        />
+                                        <span>Expand</span>
+                                    </span>
+                                </SUITable.HeaderCell>
+                                <SUITable.HeaderCell
+                                    colSpan={visibleColumns.has('Cloud Storage') ? 1 : 0}
+                                    style={getColumnDisplayStyle('Cloud Storage')}
+                                >
+                                    Storage Cost
+                                </SUITable.HeaderCell>
+                                <SUITable.HeaderCell
+                                    colSpan={
+                                        headerFields.filter(
+                                            (f) =>
+                                                f.category !== 'Daily Total' &&
+                                                f.category !== 'Cloud Storage' &&
+                                                visibleColumns.has(f.category)
+                                        ).length
+                                    }
+                                    style={{
+                                        display: headerFields.some(
+                                            (f) =>
+                                                f.category !== 'Daily Total' &&
+                                                f.category !== 'Cloud Storage' &&
+                                                visibleColumns.has(f.category)
+                                        )
+                                            ? 'table-cell'
+                                            : 'none',
+                                    }}
+                                >
+                                    Compute Cost
+                                </SUITable.HeaderCell>
+                            </TableRow>
+                            <TableRow className={`ui table row${isDarkMode ? ' inverted' : ''}`}>
+                                <SUITable.HeaderCell
+                                    style={{
+                                        borderBottom: 'none',
+                                        minWidth: '140px',
+                                    }}
+                                >
+                                    Date
+                                </SUITable.HeaderCell>
+                                {headerFields.map((field) => (
+                                    <SUITable.HeaderCell
+                                        key={field.category}
+                                        sorted={checkDirection(field.category)}
+                                        onClick={() => handleSort(field.category)}
+                                        style={{
+                                            borderBottom: 'none',
+                                            position: 'sticky',
+                                            minWidth: '180px',
+                                            ...getColumnDisplayStyle(field.category),
+                                        }}
+                                    >
+                                        {convertFieldName(field.title)}
+                                    </SUITable.HeaderCell>
+                                ))}
+                            </TableRow>
+                        </>
+                    )}
+                    fixedFooterContent={() => (
+                        <TableRow
+                            className={`ui table row${isDarkMode ? ' inverted' : ''}`}
+                            style={{
+                                backgroundColor: isDarkMode ? '#1b1c1d' : '#f9f9f9',
+                                fontWeight: 'bold',
+                                position: 'sticky',
+                                bottom: 0,
+                                zIndex: 10,
+                            }}
+                        >
+                            <SUITable.Cell collapsing style={{ minWidth: '140px' }}>
+                                <b>All Time Total</b>
+                            </SUITable.Cell>
+                            {headerFields.map((field) => {
+                                const total = internalData.reduce(
+                                    (acc, cur) => acc + (cur.values[field.category] || 0),
+                                    0
+                                )
+                                return (
+                                    <SUITable.Cell
+                                        key={`Total ${field.category}`}
+                                        style={{
+                                            minWidth: '180px',
+                                            ...getColumnDisplayStyle(field.category),
+                                        }}
+                                    >
+                                        <b>{formatMoney(total)}</b>
+                                    </SUITable.Cell>
+                                )
+                            })}
+                        </TableRow>
+                    )}
+                />
+            )}
         </>
     )
 }
 
-export default BillingCostByTimeTable
+export default React.memo(BillingCostByTimeTable)
