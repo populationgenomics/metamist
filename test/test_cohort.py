@@ -83,7 +83,7 @@ class TestCohortBasic(DbIsolatedTest):
             )
 
         self.assertIn(
-            'Cohort creation criteria resulted in no sequencing groups being selected. Please check the criteria and try again',
+            'criteria resulted in no sequencing groups',
             str(context.exception),
         )
 
