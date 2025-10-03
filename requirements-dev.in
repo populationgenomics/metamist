@@ -21,4 +21,4 @@ google-cloud-pubsub
 pytz
 pytest
 pytest-cov
-openapi-generator-cli==5.3.0
+openapi-generator-cli==7.16.0
