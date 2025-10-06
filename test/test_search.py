@@ -23,7 +23,7 @@ from models.models.sample import sample_id_format
 from models.models.sequencing_group import sequencing_group_id_format
 
 
-class TestSample(DbIsolatedTest):
+class TestSampleSearch(DbIsolatedTest):
     """Test sample class"""
 
     # tests run in 'sorted by ascii' order
