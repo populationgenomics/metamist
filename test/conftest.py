@@ -13,7 +13,7 @@ from test.testdb_container import TestDatabaseContainer
 
 
 @pytest.fixture(scope='session', autouse=True)
-def setup_before_all_tests():
+def setup_before_after_all_tests():
     db_container = TestDatabaseContainer()
     db_container.start()
     yield

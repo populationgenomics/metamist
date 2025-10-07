@@ -1,12 +1,12 @@
-"""
-Logic to create a singleton MYSQL MariaDB test database container
-"""
-
 import socket
 from testcontainers.mysql import MySqlContainer
 
 
 class TestDatabaseContainer:
+    """
+    Logic to create a singleton MYSQL MariaDB test database container
+    """
+
     _instance = None
     _db_container = None
     _db_port = None
@@ -40,7 +40,9 @@ class TestDatabaseContainer:
             self._db_port = None
 
     def get_container(self):
+        """Return the test database container"""
         return self._db_container
 
     def get_port(self):
+        """Return the free port number"""
         return self._db_port
