@@ -26,7 +26,7 @@ from db.python.connect import (
 )
 from db.python.tables.project import ProjectPermissionsTable
 from models.models.project import Project, ProjectId, ProjectMemberUpdate
-from test.testDbContainer import TestDatabaseContainer
+from test.testdb_container import TestDatabaseContainer
 
 TEST_PROJECT_NAME = 'test'
 
