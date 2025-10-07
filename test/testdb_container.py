@@ -38,8 +38,3 @@ class TestDatabaseContainer:
 
     def get_port(self):
         return self._db_port
-
-    def get_db_url(self):
-        if self._db_container is not None:
-            return self._db_container.get_connection_url()
-        return None
