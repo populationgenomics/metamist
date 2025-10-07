@@ -1908,4 +1908,71 @@
     </changeSet>
     <!--END-->
 
+	<changeSet id="2025-10-14-cascade-comment-deletion" author="john.marshall">
+		<dropForeignKeyConstraint
+			baseTableName="assay_comment"
+			constraintName="FK_ASSAY_COMMENT_COMMENT_ID" />
+		<addForeignKeyConstraint
+			baseTableName="assay_comment"
+			baseColumnNames="comment_id"
+			constraintName="FK_ASSAY_COMMENT_COMMENT_ID"
+			referencedTableName="comment"
+			referencedColumnNames="id"
+			onDelete="CASCADE" />
+
+		<dropForeignKeyConstraint
+			baseTableName="family_comment"
+			constraintName="FK_FAMILY_COMMENT_COMMENT_ID" />
+		<addForeignKeyConstraint
+			baseTableName="family_comment"
+			baseColumnNames="comment_id"
+			constraintName="FK_FAMILY_COMMENT_COMMENT_ID"
+			referencedTableName="comment"
+			referencedColumnNames="id"
+			onDelete="CASCADE" />
+
+		<dropForeignKeyConstraint
+			baseTableName="participant_comment"
+			constraintName="FK_PARTICIPANT_COMMENT_COMMENT_ID" />
+		<addForeignKeyConstraint
+			baseTableName="participant_comment"
+			baseColumnNames="comment_id"
+			constraintName="FK_PARTICIPANT_COMMENT_COMMENT_ID"
+			referencedTableName="comment"
+			referencedColumnNames="id"
+			onDelete="CASCADE" />
+
+		<dropForeignKeyConstraint
+			baseTableName="project_comment"
+			constraintName="FK_PROJECT_COMMENT_COMMENT_ID" />
+		<addForeignKeyConstraint
+			baseTableName="project_comment"
+			baseColumnNames="comment_id"
+			constraintName="FK_PROJECT_COMMENT_COMMENT_ID"
+			referencedTableName="comment"
+			referencedColumnNames="id"
+			onDelete="CASCADE" />
+
+		<dropForeignKeyConstraint
+			baseTableName="sample_comment"
+			constraintName="FK_SAMPLE_COMMENT_COMMENT_ID" />
+		<addForeignKeyConstraint
+			baseTableName="sample_comment"
+			baseColumnNames="comment_id"
+			constraintName="FK_SAMPLE_COMMENT_COMMENT_ID"
+			referencedTableName="comment"
+			referencedColumnNames="id"
+			onDelete="CASCADE" />
+
+		<dropForeignKeyConstraint
+			baseTableName="sequencing_group_comment"
+			constraintName="FK_SEQUENCING_GROUP_COMMENT_COMMENT_ID" />
+		<addForeignKeyConstraint
+			baseTableName="sequencing_group_comment"
+			baseColumnNames="comment_id"
+			constraintName="FK_SEQUENCING_GROUP_COMMENT_COMMENT_ID"
+			referencedTableName="comment"
+			referencedColumnNames="id"
+			onDelete="CASCADE" />
+	</changeSet>
 </databaseChangeLog>
