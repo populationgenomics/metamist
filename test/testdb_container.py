@@ -1,3 +1,7 @@
+"""
+Logic to create a singleton MYSQL MariaDB test database container
+"""
+
 import socket
 from testcontainers.mysql import MySqlContainer
 
@@ -21,6 +25,7 @@ class TestDatabaseContainer:
         return free_port_number
 
     def start(self):
+        """Set up the test database container"""
         if self._db_container is None:
             self._db_container = MySqlContainer('mariadb:11.2.2', password='test')
             self._db_port = self.__find_free_port()
@@ -28,6 +33,7 @@ class TestDatabaseContainer:
             self._db_container.start()
 
     def teardown(self):
+        """Stop the test database container"""
         if self._db_container is not None:
             self._db_container.stop()
             self._db_container = None
