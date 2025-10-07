@@ -14,6 +14,7 @@ from test.testdb_container import TestDatabaseContainer
 
 @pytest.fixture(scope='session', autouse=True)
 def setup_before_after_all_tests():
+    """Called once before any tests are executed and after all tests are executed."""
     db_container = TestDatabaseContainer()
     db_container.start()
     yield
