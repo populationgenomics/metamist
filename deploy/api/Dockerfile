@@ -1,4 +1,5 @@
 FROM python:3.11
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 ARG SM_ENVIRONMENT
 
@@ -14,8 +15,12 @@ RUN groupadd -r appuser && useradd -r -g appuser -d /home/appuser -m -s /bin/bas
 WORKDIR /app/sample_metadata/
 
 # Copy requirements file and install dependencies
-COPY requirements.txt requirements.txt
-RUN pip install --no-cache-dir --no-deps -r requirements.txt
+COPY pyproject.toml pyproject.toml
+COPY uv.lock uv.lock
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-install-project
 
 # Copy the application code
 COPY api api

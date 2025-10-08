@@ -47,6 +47,7 @@ jobs:
           set -euxo pipefail
 
           uv sync --group dev
+          ls
 
           # liquibase connector
           pushd db/
@@ -68,8 +69,9 @@ jobs:
 
       - name: 'build deployable API'
         run: |
+          ls
           python regenerate_api.py
-          pip install .
+          uv pip install .
 
       - name: 'Run unit tests'
         id: runtests
