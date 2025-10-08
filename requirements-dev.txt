@@ -21,7 +21,7 @@ anyio==4.7.0
     #   watchfiles
 astroid==3.2.4
     # via pylint
-async-lru==2.0.4
+async-lru==2.0.5
     # via -r requirements.in
 attrs==24.3.0
     # via
@@ -81,7 +81,7 @@ click==8.1.8
     #   uvicorn
 cloudevents==1.11.0
     # via functions-framework
-cloudpathlib[all,azure,gs,s3]==0.20.0
+cloudpathlib[all,azure,gs,s3]==0.22.0
     # via
     #   -r requirements.in
     #   cpg-utils
@@ -201,8 +201,6 @@ googleapis-common-protos[grpc]==1.66.0
     #   grpcio-status
 graphql-core==3.2.5
     # via strawberry-graphql
-greenlet==3.1.1
-    # via sqlalchemy
 grpc-google-iam-v1==0.12.7
     # via
     #   google-cloud-logging

@@ -39,11 +39,14 @@ jobs:
           distribution: 'temurin' # See 'Supported distributions' for available options
           java-version: '17'
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@6b9c6063abd6010835644d4c2e1bef4cf5cd0fca #v6.0.1 (TODO same as cpg-flow)
+
       - name: Setup build env
         run: |
           set -euxo pipefail
 
-          pip install --no-deps -r requirements-dev.txt
+          uv --group dev
 
           # liquibase connector
           pushd db/

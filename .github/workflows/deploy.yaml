@@ -63,9 +63,11 @@ jobs:
           distribution: "temurin" # See 'Supported distributions' for available options
           java-version: "17"
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@6b9c6063abd6010835644d4c2e1bef4cf5cd0fca #v6.0.1 (TODO same as cpg-flow)
+
       - name: Setup build env
-        run: |
-          pip install --no-deps -r requirements-dev.txt
+        run: uv sync --group dev
 
       - name: prepare-deployment
         run: |
@@ -75,7 +77,7 @@ jobs:
           else
             echo DEPLOYMENT_TYPE=dev >> $GITHUB_ENV
             echo SM_ENVIRONMENT=development >> $GITHUB_ENV
-            pip install bump2version
+            uv pip install bump2version
             # add
             bump2version patch \
               --no-commit --allow-dirty \
