@@ -86,6 +86,7 @@ jobs:
 
       - name: "build deployable API"
         run: |
+          source .venv/bin/activate
           python regenerate_api.py
           ls -lGh metamist
 
