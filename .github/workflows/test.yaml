@@ -76,7 +76,7 @@ jobs:
         id: runtests
         run: |
           rc=0
-          coverage run -m pytest --doctest-modules --doctest-continue-on-failure test/ --junitxml=test-execution.xml || rc=$?
+          uv run coverage run -m pytest --doctest-modules --doctest-continue-on-failure test/ --junitxml=test-execution.xml || rc=$?
           coverage xml
 
           echo "rc=$rc" >> $GITHUB_OUTPUT

@@ -64,4 +64,4 @@ jobs:
           mkdir .mypy_cache
 
       - name: pre-commit
-        run: pre-commit run --all-files
+        run: uv run pre-commit run --all-files
