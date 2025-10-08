@@ -19,7 +19,7 @@ class TestDatabaseContainer:
     def __find_free_port(self):
         """Find free port to run tests on"""
         s = socket.socket()
-        s.bind(('', 0))  # Bind to a free port provided by the host.
+        s.bind(('127.0.0.1', 0))  # Bind to a free port provided by the host.
         free_port_number = s.getsockname()[1]  # Return the port number assigned.
         s.close()  # free the port so we can immediately use
         return free_port_number
