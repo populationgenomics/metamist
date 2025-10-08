@@ -69,7 +69,7 @@ jobs:
 
       - name: 'build deployable API'
         run: |
-          ls -a
+          ls .venv/bin -a
           python regenerate_api.py
           uv pip install .
 
