@@ -71,7 +71,17 @@ class Viewer {
     }
 }
 
-export const ViewerContext = createContext<Viewer | null>(null)
+interface ViewerContextType {
+    viewer: Viewer | null
+    loading: boolean | null
+    error: ApolloError | undefined
+}
+
+export const ViewerContext = createContext<ViewerContextType>({
+    viewer: null,
+    loading: null,
+    error: undefined,
+})
 
 export function useViewer(): {
     viewer: Viewer | null
