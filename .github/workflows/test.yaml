@@ -106,8 +106,8 @@ jobs:
           pushd web
           # installs package-lock, not what it thinks it should be
           rc=0
-          alias strawberry="uv run strawberry"
           which strawberry
+          alias strawberry="uv run strawberry"
           npm ci
           npm run build || rc=$?
 
