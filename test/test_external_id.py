@@ -14,7 +14,7 @@ from models.models import (
 )
 
 
-class TestParticipantExternalIds(DbIsolatedTest):
+class TestParticipant(DbIsolatedTest):
     """Test participant external ids"""
 
     @run_as_sync
@@ -279,7 +279,7 @@ class TestParticipantExternalIds(DbIsolatedTest):
             self.assertEqual(sgid, s2.sequencing_groups[0].id)
 
 
-class TestSampleExternalIds(DbIsolatedTest):
+class TestSample(DbIsolatedTest):
     """Test sample external ids"""
 
     @run_as_sync

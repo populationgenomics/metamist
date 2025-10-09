@@ -4,7 +4,7 @@ from db.python.layers.participant import ParticipantLayer
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantUpsertInternal
 
 
-class TestGetParticipant(DbIsolatedTest):
+class TestParticipant(DbIsolatedTest):
     """Test getting participants"""
 
     @run_as_sync

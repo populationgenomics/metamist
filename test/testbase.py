@@ -86,7 +86,9 @@ class DbTest(unittest.TestCase):
         @run_as_sync
         async def setup():
             """
-            This starts a mariadb container, applies liquibase schema and inserts a project
+            This reuses the mariadb container created before executing any tests.
+            Then for each test class it applies liquibase schema and inserts a project.
+
             MAYBE, the best way in the future would be to only ever create ONE connection
             between all Test classes, and create a new database per test, new set of a connections,
             but that certainly has a host of its own problems.
@@ -115,7 +117,7 @@ class DbTest(unittest.TestCase):
                     raise ValueError('No database container found')
 
                 # create the database
-                db_name = str(cls.__name__) + 'Db'
+                db_name = f'{cls.__module__.replace(".", "_")}_{cls.__name__}Db'
 
                 _root_connection = SMConnections.make_connection(
                     CredentialedDatabaseConfiguration(
