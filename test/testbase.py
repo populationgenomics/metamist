@@ -80,6 +80,7 @@ class DbTest(unittest.TestCase):
     project_name: str
     project_id_map: dict[ProjectId, Project]
     project_name_map: dict[str, Project]
+    db_name: str
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -117,7 +118,7 @@ class DbTest(unittest.TestCase):
                     raise ValueError('No database container found')
 
                 # create the database
-                db_name = f'{cls.__module__.replace(".", "_")}_{cls.__name__}Db'
+                db_name = str(cls.__name__) + 'Db'
 
                 _root_connection = SMConnections.make_connection(
                     CredentialedDatabaseConfiguration(
@@ -226,6 +227,7 @@ class DbTest(unittest.TestCase):
 
                 cls.project_id_map = project_id_map
                 cls.project_name_map = project_name_map
+                cls.db_name = db_name
 
                 # formed_connection.project = cls.project_id
 
@@ -253,6 +255,9 @@ class DbTest(unittest.TestCase):
         async def tearDown():
             connection = cls.connections.pop(cls.__name__, None)
             if connection:
+                await connection.execute(
+                    f"""DROP DATABASE IF EXISTS `{cls.db_name}`;"""
+                )
                 await connection.disconnect()
 
         tearDown()
