@@ -1,24 +1,23 @@
 from unittest import mock
 from test.testbase import DbIsolatedTest, run_as_sync
+from datetime import date
 
 from db.python.tables.sample import SampleTable
 
-def mock_fetch_all_sample_count(*_args, **_kwargs):
+def mock_fetch_all_sample_count(fetch_all_return: list[dict[str, int]]):
     """
     This is a mockup function for fetch_all function on the Database object.
     This returns one mockup of a query result that contains the the number of samples
     in a project for each month.
     """
-    # mockup BQ query result topic cost by invoice month, return row iterator
-    mock_rows = mock.AsyncMock(args={}, spec=['__iter__', '__next__'])
-    mock_rows.total_rows = 3
-    mock_rows.__iter__.return_value = [
-        {'project': 'ourdna', 'year': '2025', 'month': 3, 'count': 100},
-        {'project': 'ourdna', 'year': '2025', 'month': 5, 'count': 150},
-        {'project': 'ourdna', 'year': '2025', 'month': 8, 'count': 170},
-    ]
+    def sample_count_mock(*_args, **_kwargs):
+        mock_rows = mock.AsyncMock(args={}, spec=['__iter__', '__next__'])
+        mock_rows.total_rows = len(fetch_all_return)
+        mock_rows.__iter__.return_value = fetch_all_return
+
+        return mock_rows
     
-    return mock_rows
+    return sample_count_mock
 
 
 class TestSample(DbIsolatedTest):
@@ -30,11 +29,37 @@ class TestSample(DbIsolatedTest):
 
         self.sample_table = SampleTable(self.connection)
 
+        # Mock calls to date.today() for all tests.
+        self.patcher = mock.patch('db.python.tables.sample.date')
+        mock_date = self.patcher.start()
+        mock_date.today.return_value = date(year=2025, month=9, day=1)
+        mock_date.fromisoformat.side_effect = lambda *args, **kw: date.fromisoformat(*args, **kw) # https://docs.python.org/3/library/unittest.mock-examples.html#partial-mocking
+
+    @run_as_sync
+    async def tearDown(self):
+        super().tearDown()
+        self.patcher.stop()
 
     @run_as_sync
     async def test_monthly_samples_count_per_project(self):
-        self.sample_table.connection.fetch_all = mock.AsyncMock(side_effect=mock_fetch_all_sample_count)
-        ret = await self.sample_table.get_monthly_samples_count_per_project([1, 2, 3])
+        # Set up sample count mocking.
+        fetch_all_mock = mock_fetch_all_sample_count([
+            {'project': 0, 'year': 2025, 'month': 2, 'count': 100},
+            {'project': 0, 'year': 2025, 'month': 4, 'count': 150},
+            {'project': 0, 'year': 2025, 'month': 7, 'count': 170},
+        ])
+        self.sample_table.connection.fetch_all = mock.AsyncMock(side_effect=fetch_all_mock)
+        result = await self.sample_table.get_monthly_samples_count_per_project()
 
-        print(ret)
-        assert ret
+        month_costs = result[0] # Retrieve the cost/month for the given test project ID.
+        self.assertDictEqual(month_costs,
+            {
+                date(year=2025, month=2, day=1): 100,
+                date(year=2025, month=3, day=1): 100,
+                date(year=2025, month=4, day=1): 250,
+                date(year=2025, month=5, day=1): 250,
+                date(year=2025, month=6, day=1): 250,
+                date(year=2025, month=7, day=1): 420,
+                date(year=2025, month=8, day=1): 420,
+                date(year=2025, month=9, day=1): 420,
+            })
