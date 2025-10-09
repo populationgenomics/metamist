@@ -99,6 +99,12 @@ jobs:
           name: execution-report
           path: ./test-execution.xml
 
+      - name: 'Configure strawberry'
+        run: |
+          which strawberry
+          alias strawberry="uv run strawberry"
+          which strawberry
+
       - id: buildweb
         name: 'build web front-end'
         run: |
@@ -106,7 +112,6 @@ jobs:
           pushd web
           # installs package-lock, not what it thinks it should be
           rc=0
-          which strawberry
           npm ci
           npm run build || rc=$?
 
