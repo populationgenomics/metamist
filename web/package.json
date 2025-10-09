@@ -54,7 +54,7 @@
         "lint:fix": "eslint --fix . --ext .ts,.tsx",
         "format": "prettier --write 'src/**/*.{ts,tsx,css}' --config ./.prettierrc.yaml",
         "format:check": "prettier --check 'src/**/*.{ts,tsx,css}' --config ./.prettierrc.yaml",
-        "compile": "cd .. && strawberry export-schema api.graphql.schema:schema > web/schema.graphql && cd - && graphql-codegen",
+        "compile": "cd .. && uv run strawberry export-schema api.graphql.schema:schema > web/schema.graphql && cd - && graphql-codegen",
         "watch": "graphql-codegen -w"
     },
     "eslintConfig": {
