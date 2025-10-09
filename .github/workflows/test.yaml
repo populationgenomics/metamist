@@ -101,9 +101,7 @@ jobs:
 
       - name: 'Configure strawberry'
         run: |
-          which strawberry
           alias strawberry="uv run strawberry"
-          which strawberry
 
       - id: buildweb
         name: 'build web front-end'
