@@ -34,10 +34,7 @@ jobs:
         with:
           activate-environment: true
           enable-cache: false
-          version: 0.8.22
-
-      - name: Verify installation
-        run: uv --version
+          version: 0.8.22 #uv version
 
       - name: Setup build env
         run: uv sync --group dev

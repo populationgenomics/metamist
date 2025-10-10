@@ -8,10 +8,16 @@ on:
 
 permissions: {}
 
+
+#TODO
+# As pof now there is no standardised method to audit dependencies defined in pyproject.toml and uv.lock
+# https://github.com/astral-sh/uv/issues/9189
+# A workaround would be - https://github.com/owenlamont/uv-secure
+
 jobs:
   pip-audit:
     runs-on: ubuntu-latest
-    name: Pip Audit #TODO need to update here
+    name: Pip Audit
     steps:
       - uses: actions/checkout@v4
         with:
