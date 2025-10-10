@@ -744,7 +744,7 @@ class SampleTable(DbBase):
             # in case there is no previous months available, then skip
             if not month_counts:
                 continue
-            
+
             # Fill in missing months between recorded dates.
             current_month = min(month_counts.keys())
             current_count = month_counts[current_month]
