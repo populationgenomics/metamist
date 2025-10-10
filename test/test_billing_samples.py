@@ -19,9 +19,30 @@ def mock_fetch_all_sample_count(fetch_all_return: list[dict[str, int]]):
     
     return sample_count_mock
 
+def mock_today(date_to_mock: date):
+    """
+    Returns a function decorator that patches the return value of date.today() before
+    the given test_fn is called.
+    Additionally, the fromisoformat of the date class is configured to function as it would
+    without mocking.
+    """
+    def today_decorator(test_fn):
+        async def test_fn_wrapper(self):
+            patcher = mock.patch('db.python.tables.sample.date')
+            mock_date = patcher.start()
+            mock_date.today.return_value = date_to_mock
+            # https://docs.python.org/3/library/unittest.mock-examples.html#partial-mocking
+            mock_date.fromisoformat.side_effect = lambda *args, **kw: date.fromisoformat(*args, **kw)
+
+            await test_fn(self)
+
+            patcher.stop()
+
+        return test_fn_wrapper
+    return today_decorator
 
 class TestMonthlySamplesPerProject(DbIsolatedTest):
-    """Test sample class"""
+    """Tests for retrieving the accumulated samples per month."""
 
     @run_as_sync
     async def setUp(self) -> None:
@@ -29,19 +50,10 @@ class TestMonthlySamplesPerProject(DbIsolatedTest):
 
         self.sample_table = SampleTable(self.connection)
 
-        # Mock calls to date.today() for all tests.
-        self.patcher = mock.patch('db.python.tables.sample.date')
-        mock_date = self.patcher.start()
-        mock_date.today.return_value = date(year=2025, month=9, day=1)
-        mock_date.fromisoformat.side_effect = lambda *args, **kw: date.fromisoformat(*args, **kw) # https://docs.python.org/3/library/unittest.mock-examples.html#partial-mocking
-
     @run_as_sync
-    async def tearDown(self):
-        super().tearDown()
-        self.patcher.stop()
-
-    @run_as_sync
-    async def test_basic(self):
+    @mock_today(date(year=2025, month=9, day=1))
+    async def test_standard_date_gaps(self):
+        """Tests the case wherein there is multiple dates in the database, separated by a few months."""
         # Set up sample count mocking.
         fetch_all_mock = mock_fetch_all_sample_count([
             {'project': 0, 'year': 2025, 'month': 2, 'count': 100},
@@ -65,7 +77,9 @@ class TestMonthlySamplesPerProject(DbIsolatedTest):
             })
         
     @run_as_sync
+    @mock_today(date(year=2025, month=9, day=1))
     async def test_only_this_month(self):
+        """Tests the case wherein the only record in the database is the current month."""
         # Set up sample count mocking.
         fetch_all_mock = mock_fetch_all_sample_count([
             {'project': 0, 'year': 2025, 'month': 9, 'count': 170},

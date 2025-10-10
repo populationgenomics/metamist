@@ -751,6 +751,7 @@ class SampleTable(DbBase):
             while current_month <= this_month:
                 if current_month in month_counts:
                     current_count = month_counts[current_month]
+
                 month_counts[current_month] = current_count
                 current_month = (current_month + relativedelta(months=1)).replace(day=1)
 
