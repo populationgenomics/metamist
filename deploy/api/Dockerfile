@@ -15,12 +15,9 @@ RUN groupadd -r appuser && useradd -r -g appuser -d /home/appuser -m -s /bin/bas
 WORKDIR /app/sample_metadata/
 
 # Copy requirements file and install dependencies
-COPY pyproject.toml pyproject.toml
-COPY uv.lock uv.lock
-RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --frozen --no-install-project
+COPY pyproject.toml uv.lock /app/sample_metadata/
+
+RUN uv sync --frozen --no-install-project
 
 # Copy the application code
 COPY api api
@@ -42,4 +39,4 @@ EXPOSE $PORT
 # some linting tools recomment exec form with a JSON array but the docker docs suggest the
 # only way to get variable substitution with exec form is by prefixing with `sh -c` which
 # is the exact same as using shell form, so ergonimcally this is much nicer
-CMD uvicorn --port ${PORT} --host 0.0.0.0 api.server:app
+CMD uv run --no-project uvicorn --port ${PORT} --host 0.0.0.0 api.server:app

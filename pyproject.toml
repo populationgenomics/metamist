@@ -39,7 +39,7 @@ dependencies = [
 ]
 description = "Python API for interacting with the Sample API system"
 readme = "README.md"
-license = {text = "MIT"}
+license-files = ["LICENSE"]
 keywords = ["bioinformatics"]
 classifiers = [
     "Environment :: Console",
