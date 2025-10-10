@@ -36,9 +36,7 @@ def mock_today(date_to_mock: date):
             mock_date = patcher.start()
             mock_date.today.return_value = date_to_mock
             # https://docs.python.org/3/library/unittest.mock-examples.html#partial-mocking
-            mock_date.fromisoformat.side_effect = (
-                lambda *args, **kw: date.fromisoformat(*args, **kw)
-            )
+            mock_date.fromisoformat.side_effect = date.fromisoformat
 
             await test_fn(self)
 
