@@ -31,6 +31,9 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@6b9c6063abd6010835644d4c2e1bef4cf5cd0fca #v6.0.1 (TODO same as cpg-flow)
+        with:
+          activate-environment: true
+          enable-cache: false
 
       - name: Setup build env
         run: uv sync --group dev
@@ -57,7 +60,6 @@ jobs:
 
       - name: Build + install packages
         run: |
-          source .venv/bin/activate
           python regenerate_api.py
           uv sync --group dev
           uv pip install .

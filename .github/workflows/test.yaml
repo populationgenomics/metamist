@@ -41,6 +41,9 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@6b9c6063abd6010835644d4c2e1bef4cf5cd0fca #v6.0.1 (TODO same as cpg-flow)
+        with:
+          activate-environment: true
+          enable-cache: false
 
       - name: Setup build env
         run: |
@@ -68,7 +71,6 @@ jobs:
 
       - name: 'build deployable API'
         run: |
-          source .venv/bin/activate
           python regenerate_api.py
           uv pip install .
 
@@ -98,10 +100,6 @@ jobs:
         with:
           name: execution-report
           path: ./test-execution.xml
-
-      - name: 'Configure strawberry'
-        run: |
-          alias strawberry="uv run strawberry"
 
       - id: buildweb
         name: 'build web front-end'
