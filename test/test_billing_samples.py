@@ -20,7 +20,7 @@ def mock_fetch_all_sample_count(fetch_all_return: list[dict[str, int]]):
     return sample_count_mock
 
 
-class TestSample(DbIsolatedTest):
+class TestMonthlySamplesPerProject(DbIsolatedTest):
     """Test sample class"""
 
     @run_as_sync
@@ -41,7 +41,7 @@ class TestSample(DbIsolatedTest):
         self.patcher.stop()
 
     @run_as_sync
-    async def test_monthly_samples_count_per_project(self):
+    async def test_basic(self):
         # Set up sample count mocking.
         fetch_all_mock = mock_fetch_all_sample_count([
             {'project': 0, 'year': 2025, 'month': 2, 'count': 100},
@@ -63,3 +63,15 @@ class TestSample(DbIsolatedTest):
                 date(year=2025, month=8, day=1): 420,
                 date(year=2025, month=9, day=1): 420,
             })
+        
+    @run_as_sync
+    async def test_only_this_month(self):
+        # Set up sample count mocking.
+        fetch_all_mock = mock_fetch_all_sample_count([
+            {'project': 0, 'year': 2025, 'month': 9, 'count': 170},
+        ])
+        self.sample_table.connection.fetch_all = mock.AsyncMock(side_effect=fetch_all_mock)
+        result = await self.sample_table.get_monthly_samples_count_per_project()
+
+        month_costs = result[0] # Retrieve the cost/month for the given test project ID.
+        self.assertDictEqual(month_costs, {date(year=2025, month=9, day=1): 170})
