@@ -739,14 +739,20 @@ class SampleTable(DbBase):
             )
 
         # append all the months up to the current month
-        for proj, months in result.items():
+        this_month = date.today().replace(day=1)
+        for proj, month_counts in result.items():
             # in case there is no previous months available, then skip
-            if not months:
+            if not month_counts:
                 continue
 
-            current_month = date.today().replace(day=1)
-            while current_month not in months:
-                months[current_month] = accumulated_sample_count[proj]
-                current_month = (current_month - relativedelta(months=1)).replace(day=1)
+            # Fill in missing months between recorded dates.
+            current_month = min(month_counts.keys())
+            current_count = month_counts[current_month]
+            while current_month <= this_month:
+                if current_month in month_counts:
+                    current_count = month_counts[current_month]
+
+                month_counts[current_month] = current_count
+                current_month = (current_month + relativedelta(months=1)).replace(day=1)
 
         return result
