@@ -26,7 +26,6 @@ Makesure [uv](https://docs.astral.sh/uv/getting-started/installation/) is locall
 # creates virtual env, install python version (3.11) as defined in the pyproject.toml and install dev dependencies
 uv sync --frozen --group dev --no-install-project
 
-# select python 3.11 for your current shell
 
 # activate virtualenv
 source .venv/bin/activate

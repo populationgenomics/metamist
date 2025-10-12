@@ -44,7 +44,6 @@ keywords = ["bioinformatics"]
 classifiers = [
     "Environment :: Console",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Natural Language :: English",
     "Operating System :: MacOS :: MacOS X",
     "Operating System :: POSIX",
@@ -166,6 +165,7 @@ dev = [
     "testcontainers[mysql]>=4.8.1",
     "types-pymysql>=1.1.0.20241103",
     "uvicorn~=0.34.2",
+    "greenlet==3.1.1"
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -175,3 +175,7 @@ dev = [
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
+
+
+[tool.setuptools]
+packages = ["metamist"]
