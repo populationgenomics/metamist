@@ -89,12 +89,6 @@ class DbTest(unittest.TestCase):
             """
             This reuses the mariadb container created before executing any tests.
             Then for each test class it applies liquibase schema and inserts a project.
-
-            MAYBE, the best way in the future would be to only ever create ONE connection
-            between all Test classes, and create a new database per test, new set of a connections,
-            but that certainly has a host of its own problems.
-
-            Then you can destroy the database within tearDownClass as all tests have been completed.
             """
             # Set environment to test
             os.environ['SM_ENVIRONMENT'] = 'test'
