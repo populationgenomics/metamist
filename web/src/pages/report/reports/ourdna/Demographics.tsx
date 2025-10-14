@@ -4,14 +4,13 @@ import { ReportItemMetric, ReportItemPlot } from '../../components/ReportItem'
 import ReportRow from '../../components/ReportRow'
 
 const ROW_HEIGHT = 450
-const PROJECT = 'ourdna'
 
-export default function Demographics() {
+export default function Demographics({ project }: { project: string }) {
     return (
         <Report>
             <ReportRow>
                 <ReportItemMetric
-                    project={PROJECT}
+                    project={project}
                     height={ROW_HEIGHT}
                     flexBasis={200}
                     flexGrow={1}
@@ -27,7 +26,7 @@ export default function Demographics() {
                     `}
                 />
                 <ReportItemPlot
-                    project={PROJECT}
+                    project={project}
                     height={ROW_HEIGHT}
                     flexGrow={3}
                     flexBasis={720}
@@ -132,7 +131,7 @@ export default function Demographics() {
             <ReportRow>
                 <ReportItemPlot
                     height={ROW_HEIGHT}
-                    project={PROJECT}
+                    project={project}
                     flexGrow={1}
                     flexBasis={400}
                     title="Participant age and reported sex"
@@ -171,7 +170,7 @@ export default function Demographics() {
                 />
                 <ReportItemPlot
                     height={ROW_HEIGHT}
-                    project={PROJECT}
+                    project={project}
                     flexGrow={1}
                     flexBasis={400}
                     title="Ancestry totals"
@@ -217,7 +216,7 @@ export default function Demographics() {
             <ReportRow>
                 <ReportItemPlot
                     height={800}
-                    project={PROJECT}
+                    project={project}
                     flexGrow={1}
                     flexBasis={400}
                     title="Ancestry by processing site"

@@ -1,3 +1,5 @@
+# pylint: disable=too-many-lines
+
 import unittest
 from datetime import datetime
 from io import StringIO
@@ -928,6 +930,192 @@ class TestParseGenericMetadata(DbIsolatedTest):
         )
         self.assertEqual(len(sg.assays), len(sg_parsed.assays))
         self.assertEqual(sg.assays[0].id, sg_parsed.assays[0].internal_id)
+
+    @run_as_sync
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_ora_fastqs_with_ref(self, mock_graphql_query):
+        """Test importing fastq.ora files with an ora reference"""
+        mock_graphql_query.side_effect = self.run_graphql_query_async
+        # Test 1 with ORA Reference in the manifest
+        filenames = [
+            'sample_id001.filename-R1.fastq.ora',
+            'sample_id001.filename-R2.fastq.ora',
+        ]
+
+        ora_ref = 'gs://path/to/ora_reference.tar'
+
+        rows = [
+            'Participant ID\tSample ID\tFilename\tORA Reference',
+            f'Demeter\tsample_id001\t{filenames[0]}\t{ora_ref}',
+            f'Demeter\tsample_id001\t{filenames[1]}\t{ora_ref}',
+        ]
+
+        parser = GenericMetadataParser(
+            search_locations=[],
+            participant_primary_eid_column='Participant ID',
+            sample_primary_eid_column='Sample ID',
+            reads_column='Filename',
+            ora_reference_assembly_location_column='ORA Reference',
+            # doesn't matter, we're going to mock the call anyway
+            project=self.project_name,
+            skip_checking_gcs_objects=True,
+        )
+
+        parser.filename_map = {f: '/path/to/' + f for f in filenames}
+        file_contents = '\n'.join(rows)
+
+        _, prows = await parser.parse_manifest(
+            StringIO(file_contents), delimiter='\t', dry_run=True
+        )
+
+        participants: list[ParsedParticipant] = prows
+
+        expected_assay_dict = {
+            'ora_reference': {
+                'location': 'gs://path/to/ora_reference.tar',
+                'basename': 'ora_reference.tar',
+                'class': 'File',
+                'checksum': None,
+                'size': None,
+                'datetime_added': None,
+            },
+            'reads': [
+                {
+                    'basename': 'sample_id001.filename-R1.fastq.ora',
+                    'checksum': None,
+                    'class': 'File',
+                    'location': '/path/to/sample_id001.filename-R1.fastq.ora',
+                    'size': None,
+                    'datetime_added': None,
+                },
+                {
+                    'basename': 'sample_id001.filename-R2.fastq.ora',
+                    'checksum': None,
+                    'class': 'File',
+                    'location': '/path/to/sample_id001.filename-R2.fastq.ora',
+                    'size': None,
+                    'datetime_added': None,
+                },
+            ],
+            'reads_type': 'fastq_ora',
+            'sequencing_platform': 'illumina',
+            'sequencing_technology': 'short-read',
+            'sequencing_type': 'genome',
+        }
+
+        assay = participants[0].samples[0].sequencing_groups[0].assays[0]
+
+        self.assertDictEqual(expected_assay_dict, assay.meta)
+
+        self.assertDictEqual(expected_assay_dict, assay.meta)
+
+        # Test 2 with default ORA Reference in the parser
+        parser = GenericMetadataParser(
+            search_locations=[],
+            participant_primary_eid_column='Participant ID',
+            sample_primary_eid_column='Sample ID',
+            reads_column='Filename',
+            # doesn't matter, we're going to mock the call anyway
+            project=self.project_name,
+            ora_reference_assembly_location=ora_ref,
+            skip_checking_gcs_objects=True,
+        )
+        parser.filename_map = {f: '/path/to/' + f for f in filenames}
+
+        rows = [
+            'Participant ID\tSample ID\tFilename',
+            f'Demeter\tsample_id001\t{filenames[0]}',
+            f'Demeter\tsample_id001\t{filenames[1]}',
+        ]
+        file_contents = '\n'.join(rows)
+        _, prows = await parser.parse_manifest(
+            StringIO(file_contents), delimiter='\t', dry_run=True
+        )
+        participants_: list[ParsedParticipant] = prows
+        assay = participants_[0].samples[0].sequencing_groups[0].assays[0]
+        self.assertDictEqual(expected_assay_dict, assay.meta)
+        return
+
+    @run_as_sync
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_ora_fastqs_no_ref(self, mock_graphql_query):
+        """Test importing fastq.ora files with no ora reference, should throw an exception"""
+        mock_graphql_query.side_effect = self.run_graphql_query_async
+        filenames = [
+            'sample_id001.filename-R1.fastq.ora',
+            'sample_id001.filename-R2.fastq.ora',
+        ]
+
+        rows = [
+            'Participant ID\tSample ID\tFilename',
+            f'Demeter\tsample_id001\t{filenames[0]}',
+            f'Demeter\tsample_id001\t{filenames[1]}',
+        ]
+
+        parser = GenericMetadataParser(
+            search_locations=[],
+            participant_primary_eid_column='Participant ID',
+            sample_primary_eid_column='Sample ID',
+            reads_column='Filename',
+            # doesn't matter, we're going to mock the call anyway
+            project=self.project_name,
+            skip_checking_gcs_objects=True,
+        )
+
+        parser.filename_map = {f: '/path/to/' + f for f in filenames}
+        file_contents = '\n'.join(rows)
+
+        with self.assertRaises(ValueError) as ctx:
+            await parser.parse_manifest(
+                StringIO(file_contents), delimiter='\t', dry_run=True
+            )
+        self.assertEqual(
+            'Missing ORA reference for fastq_ora',
+            str(ctx.exception),
+        )
+
+    @run_as_sync
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_ora_fastqs_mutliple_refs(self, mock_graphql_query):
+        """Test importing fastq.ora files multiple reference files for the same sample, should throw an exception"""
+        mock_graphql_query.side_effect = self.run_graphql_query_async
+        filenames = [
+            'sample_id001.filename-R1.fastq.ora',
+            'sample_id001.filename-R2.fastq.ora',
+        ]
+        ora_refs = [
+            'gs://path/to/ora_reference1.tar',
+            'gs://path/to/ora_reference2.tar',
+        ]
+
+        rows = [
+            'Participant ID\tSample ID\tFilename\tORA Reference',
+            f'Demeter\tsample_id001\t{filenames[0]}\t{ora_refs[0]}',
+            f'Demeter\tsample_id001\t{filenames[1]}\t{ora_refs[1]}',
+        ]
+
+        parser = GenericMetadataParser(
+            search_locations=[],
+            participant_primary_eid_column='Participant ID',
+            sample_primary_eid_column='Sample ID',
+            reads_column='Filename',
+            ora_reference_assembly_location_column='ORA Reference',
+            # doesn't matter, we're going to mock the call anyway
+            project=self.project_name,
+            skip_checking_gcs_objects=True,
+        )
+
+        parser.filename_map = {f: '/path/to/' + f for f in filenames}
+        file_contents = '\n'.join(rows)
+
+        with self.assertRaises(ValueError) as ctx:
+            await parser.parse_manifest(
+                StringIO(file_contents), delimiter='\t', dry_run=True
+            )
+        self.assertEqual(
+            'Multiple ORA references were defined for sample_id001: gs://path/to/ora_reference1.tar, gs://path/to/ora_reference2.tar',
+            str(ctx.exception),
+        )
 
 
 class FastqPairMatcher(unittest.TestCase):

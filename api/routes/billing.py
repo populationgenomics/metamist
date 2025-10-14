@@ -8,13 +8,18 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 from api.settings import BILLING_CACHE_RESPONSE_TTL, BQ_AGGREG_VIEW
-from api.utils.db import BqConnection, get_author
+from api.utils.db import (
+    BqConnection,
+    Connection,
+    get_author,
+    get_projectless_db_connection,
+)
 from db.python.layers.billing import BillingLayer
-from models.enums import BillingSource
 from models.models import (
     AnalysisCostRecord,
-    BillingColumn,
     BillingCostBudgetRecord,
+    BillingRunningCostQueryModel,
+    BillingSampleQueryModel,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 )
@@ -319,6 +324,7 @@ async def get_cost_by_batch_id(
 async def get_total_cost(
     query: BillingTotalCostQueryModel,
     author: str = get_author,
+    connection: Connection = get_projectless_db_connection,
 ) -> list[BillingTotalCostRecord]:
     """Get Total cost of selected fields for requested time interval
 
@@ -515,25 +521,33 @@ async def get_total_cost(
 
     """
     billing_layer = _get_billing_layer_from(author)
-    records = await billing_layer.get_total_cost(query)
+    records = await billing_layer.get_total_cost(query, connection)
     return [BillingTotalCostRecord.from_json(record) for record in records]
 
 
-@router.get(
-    '/running-cost/{field}',
+@router.post(
+    '/running-cost',
     response_model=list[BillingCostBudgetRecord],
     operation_id='getRunningCost',
 )
 @alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_running_costs(
-    field: BillingColumn,
-    invoice_month: str | None = None,
-    source: BillingSource | None = None,
+    query: BillingRunningCostQueryModel,
     author: str = get_author,
 ) -> list[BillingCostBudgetRecord]:
     """
-    Get running cost for specified fields in database
+    Get running cost for specified fields in database with filtering support
     e.g. fields = ['gcp_project', 'topic', 'wdl_task_names', 'cromwell_sub_workflow_name', 'compute_category']
+
+    Example request with filtering:
+    {
+        "field": "gcp_project",
+        "invoice_month": "202412",
+        "source": "gcp_billing",
+        "filters": {
+            "gcp_project": ["project1", "project2"]
+        }
+    }
     """
     # TODO replace alru_cache with async-cache?
     # so we can skip author for caching?
@@ -541,5 +555,34 @@ async def get_running_costs(
     # @AsyncTTL(time_to_live=BILLING_CACHE_RESPONSE_TTL, maxsize=1024, skip_args=2)
 
     billing_layer = _get_billing_layer_from(author)
-    records = await billing_layer.get_running_cost(field, invoice_month, source)
+    records = await billing_layer.get_running_cost_with_filters(query)
     return records
+
+
+@router.post(
+    '/cost-by-sample',
+    response_model=list[BillingTotalCostRecord],
+    operation_id='costBySample',
+)
+@alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_cost_by_sample(
+    query: BillingSampleQueryModel,
+    author: str = get_author,
+    connection: Connection = get_projectless_db_connection,
+) -> list[BillingTotalCostRecord]:
+    """Get Total cost of selected fields for requested sample or sequencing group
+
+    Here are few examples of requests:
+
+    1. Get total topic for month of March 2023, ordered by cost DESC:
+
+        {
+            "fields": ["topic"],
+            "start_date": "2023-03-01",
+            "end_date": "2023-03-31",
+            "search_ids": ["sample1", "sample2"]
+        }
+    """
+    billing_layer = _get_billing_layer_from(author)
+    records = await billing_layer.get_cost_by_sample(connection, query)
+    return [BillingTotalCostRecord.from_json(record) for record in records]

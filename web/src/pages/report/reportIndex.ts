@@ -1,3 +1,4 @@
+import OurDnaConsentAndChoices from './reports/ourdna/ConsentAndChoices'
 import OurDnaDataQuality from './reports/ourdna/DataQuality'
 import OurDnaDemographics from './reports/ourdna/Demographics'
 import OurDnaRecruitment from './reports/ourdna/Recruitment'
@@ -6,7 +7,7 @@ import OurDnaProcessingTimes from './reports/ourdna/SampleProcessing'
 type ReportTab = {
     title: string
     id: string
-    content: React.ComponentType
+    content: React.ComponentType<{ project: string }>
 }
 
 type ReportDefinition = {
@@ -23,6 +24,11 @@ export const reports: Record<string, Record<string, ReportDefinition>> = {
                     title: 'Recruitment',
                     id: 'recruitment',
                     content: OurDnaRecruitment,
+                },
+                {
+                    title: 'Consent & Choices',
+                    id: 'consent_and_choices',
+                    content: OurDnaConsentAndChoices,
                 },
                 {
                     title: 'Sample Processing',

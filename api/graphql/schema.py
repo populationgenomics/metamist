@@ -1617,5 +1617,5 @@ schema = strawberry.Schema(
     query=Query, mutation=Mutation, extensions=[QueryDepthLimiter(max_depth=10)]
 )
 MetamistGraphQLRouter: GraphQLRouter = GraphQLRouter(
-    schema, graphiql=True, context_getter=get_context
+    schema, graphql_ide='graphiql', context_getter=get_context
 )

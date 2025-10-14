@@ -29,7 +29,6 @@ export function PlotFromQuery(props: PlotProps) {
     useEffect(() => {
         if (!data) return
         const plotOptions = getPlotOptions(data)
-        console.log(width, height)
         const plot = Plot.plot({
             ...plotOptions,
             width,
