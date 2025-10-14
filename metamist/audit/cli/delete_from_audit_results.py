@@ -47,9 +47,11 @@ def delete_from_audit_results(
         f'Total deletions: {all_stats["file_count"]} files, {all_stats["total_size"] / (1024**3):.2f} GiB'
     )
 
+
 # TODO - make sure we're tracking exactly which report the deletions came from
 # as the reviewed_files report could be updated many times with different actions/comments
 # and we want to track exactly which version of the report the deletions came from
+
 
 # TODO - make this script agnostic of the report name, all actions and review comments should
 # be handled in the review_audit_results.py script. This script should just delete files

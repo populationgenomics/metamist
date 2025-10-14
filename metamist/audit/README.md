@@ -36,6 +36,13 @@ An example analysis record might look like this:
   "id": 12345,
   "type": "audit_deletion",
   "output": "gs://cpg-dataset-main-analysis/audit_results/2025-01-01_123456/deleted_files.csv",
+  "outputs": {
+    "id": 67890,
+    "path": "gs://cpg-dataset-main-analysis/audit_results/2025-01-01_123456/deleted_files.csv",
+    "basename": "deleted_files.csv",
+    "dirname": "gs://cpg-dataset-main-analysis/audit_results/2025-01-01_123456",
+    "size": 123456
+  },
   "meta": {
     "report_stats": {
       "files_to_delete": {
