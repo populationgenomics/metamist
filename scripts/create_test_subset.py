@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# pylint: disable=too-many-instance-attributes,too-many-lines,too-many-locals
+# pylint: disable=too-many-instance-attributes,too-many-locals
+# pylint: disable=C0302
 
 """ Example Invocation
 
