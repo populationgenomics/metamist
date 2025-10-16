@@ -16,7 +16,7 @@ import {
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
 import { billingPages, IBillingPage } from './BillingPages'
-import { PopGenTeamGroupBillingInfo, RDTeamGroupBillingInfo } from './data/BillingGroupInfo'
+import { BillingGroupListPopGen, BillingGroupListRD } from './data/BillingGroupInfo'
 
 // Google Slides
 const Slides = React.memo(function ReactGoogleSlidesWrapper({ link }: { link: string }) {
@@ -30,13 +30,15 @@ interface MenuProps {
     onItemSelect: (e: MouseEvent, page: IBillingPage) => void
 }
 
-type BillingProjectInfo = {
+// Group of GCP projects
+type BillingProjectGroup = {
     name: string
     groupBy: string
     gcpProjects: string
 }
 
-type BillingTopicInfo = {
+// Group of topics
+type BillingTopicGroup = {
     name: string
     groupBy: string
     topics: string
@@ -101,9 +103,9 @@ const renderLinkItem = (label: string, href: string) => (
     </List.Item>
 )
 
-const renderGridCell = (
+const renderGridColumn = (
     teamName: string,
-    billingGroupInfoList: (BillingProjectInfo | BillingTopicInfo)[],
+    billingGroupInfoList: (BillingProjectGroup | BillingTopicGroup)[],
     location: Location
 ) => (
     <Grid.Column>
@@ -113,7 +115,7 @@ const renderGridCell = (
 
         <List relaxed>
             {billingGroupInfoList
-                .filter((item): item is BillingProjectInfo => item.groupBy === 'gcp_project')
+                .filter((item): item is BillingProjectGroup => item.groupBy === 'gcp_project')
                 .map((item) =>
                     renderLinkItem(
                         `${item.name}`,
@@ -126,7 +128,7 @@ const renderGridCell = (
 
         <List divided relaxed>
             {billingGroupInfoList
-                .filter((item): item is BillingTopicInfo => item.groupBy === 'topic')
+                .filter((item): item is BillingTopicGroup => item.groupBy === 'topic')
                 .map((item) =>
                     renderLinkItem(
                         `${item.name}`,
@@ -139,7 +141,7 @@ const renderGridCell = (
 
         <List divided relaxed>
             {billingGroupInfoList
-                .filter((item): item is BillingTopicInfo => item.groupBy === 'topic')
+                .filter((item): item is BillingTopicGroup => item.groupBy === 'topic')
                 .map((item) =>
                     renderLinkItem(
                         `${item.name}`,
@@ -178,10 +180,10 @@ const BillingHome = () => {
                 <Container fluid style={{ padding: '2em 0', margin: '0px' }}>
                     <Grid stackable columns={2} relaxed>
                         {/* R&D Team */}
-                        {renderGridCell('R&D', RDTeamGroupBillingInfo, location)}
+                        {renderGridColumn('R&D', BillingGroupListRD, location)}
 
                         {/* PopGen Team */}
-                        {renderGridCell('PopGen', PopGenTeamGroupBillingInfo, location)}
+                        {renderGridColumn('PopGen', BillingGroupListPopGen, location)}
                     </Grid>
                 </Container>
 

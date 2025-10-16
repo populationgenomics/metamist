@@ -1,4 +1,5 @@
-export const RDTeamGroupBillingInfo = [
+//Add Billing groups of R&D Team here
+export const BillingGroupListRD = [
     {
         name: 'rare-disease',
         groupBy: 'topic',
@@ -11,7 +12,8 @@ export const RDTeamGroupBillingInfo = [
     },
 ]
 
-export const PopGenTeamGroupBillingInfo = [
+//Add Billing groups of PopGen Team here
+export const BillingGroupListPopGen = [
     {
         name: 'rare-disease',
         groupBy: 'topic',
