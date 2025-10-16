@@ -111,3 +111,14 @@ class TestProjectInsights(DbIsolatedTest):
         ]
 
         self.assertEqual(result, expected)
+
+    @run_as_sync
+    async def test_project_insights_details(self):
+        """Test getting the details for all available projects"""
+
+        await self.partl.upsert_participant(get_test_participant())
+
+        # There's not enough data set up to usefully verify the result
+        _ = await self.pil.get_project_insights_details(
+            project_names=[self.project_name], sequencing_types=['genome', 'exome']
+        )

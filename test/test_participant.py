@@ -1,4 +1,4 @@
-from test.testbase import DbIsolatedTest, run_as_sync
+from typing import Any
 
 from db.python.filters import GenericFilter
 from db.python.layers.participant import ParticipantLayer
@@ -8,6 +8,7 @@ from models.models.assay import AssayUpsertInternal
 from models.models.participant import ParticipantUpsertInternal
 from models.models.sample import SampleUpsertInternal
 from models.models.sequencing_group import SequencingGroupUpsertInternal
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 def get_participant_to_insert(id_suffix='1'):
@@ -172,3 +173,163 @@ query TestGraphqlQueryById($projectName: String!, $pid: Int!) {
 
         self.assertEqual(len(participants), 1)
         self.assertEqual(participants[0].id, p2.id)
+
+    @run_as_sync
+    async def test_upsert_participant_with_phenotypes(self):
+        """Test upserting participant with phenotypes"""
+
+        phenotypes: dict[str, Any] = {
+            'phenotype1': 'value1',
+            'phenotype2': {'number': 123},
+        }
+        p = await self.player.upsert_participant(
+            ParticipantUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'},
+                meta={},
+                samples=[],
+                phenotypes=phenotypes,
+            )
+        )
+
+        q = """
+        query GetParticipant($pid: Int!) {
+            participant(id: $pid) {
+                id
+                phenotypes
+            }
+        }"""
+
+        resp = await self.run_graphql_query_async(q, {'pid': p.id})
+
+        resp_participant = resp['participant']
+
+        self.assertEqual(resp_participant['id'], p.id)
+
+        self.assertDictEqual(resp_participant['phenotypes'], phenotypes)
+
+    @run_as_sync
+    async def test_upsert_participant_with_phenotypes_twice(self):
+        """Test upserting and then updating participant with phenotypes"""
+
+        phenotypes1: dict[str, Any] = {
+            'phenotype1': 'value1',
+            'phenotype2': {'number': 123},
+        }
+
+        phenotypes2: dict[str, Any] = {
+            'phenotype1': 'value2',
+            'phenotype2': {'number': 345},
+            'phenotype3': {'number': 678},
+        }
+
+        p1 = await self.player.upsert_participant(
+            ParticipantUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'},
+                meta={},
+                samples=[],
+                phenotypes=phenotypes1,
+            )
+        )
+
+        p2 = await self.player.upsert_participant(
+            ParticipantUpsertInternal(
+                id=p1.id,
+                meta={},
+                samples=[],
+                phenotypes=phenotypes2,
+            )
+        )
+
+        # ensure second upsert didn't create a new participant
+        self.assertEqual(p1.id, p2.id)
+
+        q = """
+        query GetParticipant($pid: Int!) {
+            participant(id: $pid) {
+                id
+                phenotypes
+            }
+        }"""
+
+        resp = await self.run_graphql_query_async(q, {'pid': p1.id})
+
+        resp_participant = resp['participant']
+
+        self.assertEqual(resp_participant['id'], p2.id)
+
+        self.assertDictEqual(resp_participant['phenotypes'], phenotypes2)
+
+    @run_as_sync
+    async def test_graphql_upsert_participant_with_phenotypes(self):
+        """Test upserting and then updating participant with phenotypes, via graphql"""
+
+        phenotypes1: dict[str, Any] = {
+            'phenotype1': 'value1',
+            'phenotype2': {'number': 123},
+        }
+
+        phenotypes2: dict[str, Any] = {
+            'phenotype1': 'value2',
+            'phenotype2': {'number': 345},
+            'phenotype3': {'number': 678},
+        }
+
+        mutation = """
+        mutation ParticipantPhenotype($participants:[ParticipantUpsertInput!]!, $project: String!) {
+            participant {
+                upsertParticipants(project: $project, participants:$participants) {
+                    id
+                    phenotypes
+                }
+            }
+        }
+        """
+
+        p1_resp = await self.run_graphql_query_async(
+            mutation,
+            {
+                'project': self.project_name,
+                'participants': [
+                    {
+                        'externalIds': {PRIMARY_EXTERNAL_ORG: 'Demeter'},
+                        'phenotypes': phenotypes1,
+                    }
+                ],
+            },
+        )
+
+        p1 = p1_resp['participant']['upsertParticipants'][0]
+
+        p1_resp = await self.run_graphql_query_async(
+            mutation,
+            {
+                'project': self.project_name,
+                'participants': [
+                    {
+                        'id': p1['id'],
+                        'phenotypes': phenotypes2,
+                    }
+                ],
+            },
+        )
+
+        p2 = p1_resp['participant']['upsertParticipants'][0]
+
+        # ensure second upsert didn't create a new participant
+        self.assertEqual(p1['id'], p2['id'])
+
+        q = """
+        query GetParticipant($pid: Int!) {
+            participant(id: $pid) {
+                id
+                phenotypes
+            }
+        }"""
+
+        resp = await self.run_graphql_query_async(q, {'pid': p1['id']})
+
+        resp_participant = resp['participant']
+
+        self.assertEqual(resp_participant['id'], p2['id'])
+
+        self.assertDictEqual(resp_participant['phenotypes'], phenotypes2)

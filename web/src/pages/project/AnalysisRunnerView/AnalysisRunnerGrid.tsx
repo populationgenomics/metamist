@@ -1,11 +1,11 @@
+import get from 'lodash/get'
 import * as React from 'react'
-import { Table as SUITable, Popup, Checkbox, Button, Label, Icon } from 'semantic-ui-react'
-import _, { Dictionary } from 'lodash'
+import { Button, Checkbox, Icon, Label, Popup, Table as SUITable } from 'semantic-ui-react'
 import Table from '../../../shared/components/Table'
 import sanitiseValue from '../../../shared/utilities/sanitiseValue'
 
-import { Filter } from './Filter'
 import './AnalysisGrid.css'
+import { Filter } from './Filter'
 
 export interface AnalysisRunnerGridItem {
     arGuid: string
@@ -23,7 +23,7 @@ export interface AnalysisRunnerGridItem {
     batchUrl: string
     submittingUser: string
     outputPath: string
-    meta: any
+    meta: Record<string, unknown>
 
     // internal
     position: number
@@ -377,13 +377,13 @@ const AnalysisRunnerGrid: React.FC<IAnalysisRunnerGridProps> = ({
                                         style={{ width: `${width || 100}px` }}
                                     >
                                         {renderer?.(log, filters, updateFilter) ||
-                                            sanitiseValue(_.get(log, field))}
+                                            sanitiseValue(get(log, field))}
                                     </SUITable.Cell>
                                 ))}
                             </SUITable.Row>
                             {isExpanded &&
                                 EXTRA_FIELDS.filter(
-                                    ({ field, renderer }) => !renderer || _.get(log, field)
+                                    ({ field, renderer }) => !renderer || get(log, field)
                                 ).map(({ title, field, renderer }, i) => (
                                     <SUITable.Row key={`extra-field-${log.arGuid}-${i}`}>
                                         <SUITable.Cell style={{ border: 'none' }} />
@@ -392,7 +392,7 @@ const AnalysisRunnerGrid: React.FC<IAnalysisRunnerGridProps> = ({
                                         </SUITable.Cell>
                                         <SUITable.Cell colSpan={MAIN_FIELDS.length - 1}>
                                             {renderer?.(log, filters, updateFilter) || (
-                                                <code>{sanitiseValue(_.get(log, field))}</code>
+                                                <code>{sanitiseValue(get(log, field))}</code>
                                             )}
                                         </SUITable.Cell>
                                     </SUITable.Row>

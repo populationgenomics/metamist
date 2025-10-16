@@ -10,6 +10,7 @@ from models.utils import sample_id_format, sequencing_group_id_format
 @dataclass
 class AnalysisStatsInternal:
     """Model for Analysis Sequencing Group Stats"""
+
     id: int | None = None
     name: str | None = None
     sg_count: int | None = None
@@ -19,7 +20,11 @@ class AnalysisStatsInternal:
         """Convert to transport model"""
         if self.id is None:
             return None
-        timestamp = self.timestamp if isinstance(self.timestamp, str) else self.timestamp.isoformat()
+        timestamp = (
+            self.timestamp
+            if isinstance(self.timestamp, str)
+            else self.timestamp.isoformat()
+        )
         return AnalysisStats(
             id=self.id,
             name=self.name,
@@ -54,7 +59,7 @@ class ProjectInsightsDetailsInternal:
     sample_id: int
     sample_ext_ids: list[str]
     sequencing_group_id: int
-    completed_cram: bool
+    cram: dict[str, Any]
     in_latest_annotate_dataset: bool
     in_latest_snv_es_index: bool
     in_latest_sv_es_index: bool
@@ -75,8 +80,10 @@ class ProjectInsightsDetailsInternal:
             participant_ext_id=self.participant_ext_id,
             sample_id=sample_id_format.sample_id_format(self.sample_id),
             sample_ext_ids=self.sample_ext_ids,
-            sequencing_group_id=sequencing_group_id_format.sequencing_group_id_format(self.sequencing_group_id),
-            completed_cram=self.completed_cram,
+            sequencing_group_id=sequencing_group_id_format.sequencing_group_id_format(
+                self.sequencing_group_id
+            ),
+            cram=self.cram,
             in_latest_annotate_dataset=self.in_latest_annotate_dataset,
             in_latest_snv_es_index=self.in_latest_snv_es_index,
             in_latest_sv_es_index=self.in_latest_sv_es_index,
@@ -100,7 +107,7 @@ class ProjectInsightsDetails(SMBase):
     sample_id: str
     sample_ext_ids: list[str]
     sequencing_group_id: str
-    completed_cram: bool
+    cram: dict[str, Any]
     in_latest_annotate_dataset: bool
     in_latest_snv_es_index: bool
     in_latest_sv_es_index: bool
@@ -136,9 +143,15 @@ class ProjectInsightsSummaryInternal:
             total_samples=self.total_samples,
             total_sequencing_groups=self.total_sequencing_groups,
             total_crams=self.total_crams,
-            latest_annotate_dataset=self.latest_annotate_dataset.to_external() if self.latest_annotate_dataset else None,
-            latest_snv_es_index=self.latest_snv_es_index.to_external() if self.latest_snv_es_index else None,
-            latest_sv_es_index=self.latest_sv_es_index.to_external() if self.latest_sv_es_index else None,
+            latest_annotate_dataset=self.latest_annotate_dataset.to_external()
+            if self.latest_annotate_dataset
+            else None,
+            latest_snv_es_index=self.latest_snv_es_index.to_external()
+            if self.latest_snv_es_index
+            else None,
+            latest_sv_es_index=self.latest_sv_es_index.to_external()
+            if self.latest_sv_es_index
+            else None,
         )
 
 

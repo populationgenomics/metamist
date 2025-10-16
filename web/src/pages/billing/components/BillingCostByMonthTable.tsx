@@ -1,31 +1,50 @@
-import { Header, Table as SUITable } from 'semantic-ui-react'
-import Table from '../../../shared/components/Table'
 import React from 'react'
-import formatMoney from '../../../shared/utilities/formatMoney'
+import { Header, Table as SUITable } from 'semantic-ui-react'
 import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
+import Table from '../../../shared/components/Table'
+import formatMoney from '../../../shared/utilities/formatMoney'
 
 const date2Month = (dt: string): string => {
     if (dt === undefined || dt === null) {
         return ''
     }
+
+    // Convert from format like "202505" to a proper date and format it nicely
+    if (dt.length === 6) {
+        const year = dt.substring(0, 4)
+        const month = dt.substring(4, 6)
+        const date = new Date(parseInt(year), parseInt(month) - 1, 1)
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+        })
+    }
+
+    // Fallback for other date formats
     const date = new Date(dt)
-    return `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}`
+    return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+    })
 }
+type DataDict = { [key: string]: { [key: string]: { [key: string]: number } } }
 
 interface IBillingCostByMonthTableProps {
     start: string
     end: string
     isLoading: boolean
-    data: any
+    data: DataDict
     months: string[]
+    orderedTopics: string[]
 }
 
-const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
+const BillingCostByMonthTable: React.FunctionComponent<IBillingCostByMonthTableProps> = ({
     start,
     end,
     isLoading,
     data,
     months,
+    orderedTopics,
 }) => {
     if (isLoading) {
         return (
@@ -34,27 +53,39 @@ const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
             </div>
         )
     }
-    const compTypes = ['Compute Cost', 'Storage Cost']
+    const compTypes = ['Compute Cost', 'Storage Cost', 'Avg. Sample Storage Cost (Est.)']
 
-    const dataToBody = (data: any) => {
-        const sortedKeys = Object.keys(data).sort()
-        return sortedKeys.map((key) => (
+    // Get all topics in the order they were provided
+    const getAllTopics = () => {
+        return orderedTopics
+    }
+
+    const dataToBody = (data: DataDict) => {
+        const allTopics = getAllTopics()
+
+        return allTopics.map((key) => (
             <>
-                {compTypes.map((compType, index) => (
-                    <SUITable.Row key={`${key}-${index}-row`}>
-                        <SUITable.Cell key={`${key}-${index}-topic`}>
-                            {index === 0 && <b>{key}</b>}
-                        </SUITable.Cell>
-                        <SUITable.Cell key={`${key}-${index}-compType`}>{compType}</SUITable.Cell>
-                        {months.map((month) => (
-                            <SUITable.Cell key={`${key}-${index}-${month}`}>
-                                {data[key] && data[key][month] && data[key][month][compType]
-                                    ? formatMoney(data[key][month][compType])
-                                    : null}
+                {compTypes.map((compType, index) =>
+                    // if All Topics, skip the Average Sample Cost row
+                    key === 'All Topics' &&
+                    compType === 'Avg. Sample Storage Cost (Est.)' ? null : (
+                        <SUITable.Row key={`${key}-${index}-row`}>
+                            <SUITable.Cell key={`${key}-${index}-topic`}>
+                                {index === 0 && <b>{key}</b>}
                             </SUITable.Cell>
-                        ))}
-                    </SUITable.Row>
-                ))}
+                            <SUITable.Cell key={`${key}-${index}-compType`}>
+                                {compType}
+                            </SUITable.Cell>
+                            {months.map((month) => (
+                                <SUITable.Cell key={`${key}-${index}-${month}`}>
+                                    {data[key] && data[key][month] && data[key][month][compType]
+                                        ? formatMoney(data[key][month][compType])
+                                        : null}
+                                </SUITable.Cell>
+                            ))}
+                        </SUITable.Row>
+                    )
+                )}
             </>
         ))
     }
@@ -62,7 +93,8 @@ const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
     return (
         <>
             <Header as="h3">
-                SUM of Cost (AUD) By Topic from {start} to {end}
+                SUM of Cost in AUD (excluding GST) By Topic from {date2Month(start)} to{' '}
+                {date2Month(end)}
             </Header>
             <Table celled compact sortable selectable>
                 <SUITable.Header>

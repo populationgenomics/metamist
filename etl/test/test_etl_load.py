@@ -18,7 +18,7 @@ class TestGetParserInstance(GenericMetadataParser):
     ):
         super().__init__(
             project=project,
-            sample_name_column='sample',
+            sample_primary_eid_column='sample',
             search_locations=[],
             participant_meta_map={},
             sample_meta_map={},
@@ -27,7 +27,7 @@ class TestGetParserInstance(GenericMetadataParser):
             allow_extra_files_in_search_path=False,
         )
 
-    def get_sample_id(self, row) -> str:
+    def get_primary_sample_id(self, row) -> str:
         """Get external sample ID from row"""
         return row['sample']
 

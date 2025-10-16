@@ -53,7 +53,9 @@ class TestSample(DbIsolatedTest):
         Mock this in testing by limiting scope to non-existent project IDs
         """
         sample = await self.slayer.upsert_sample(
-            SampleUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'EX001'}, type='blood')
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'EX001'}, type='blood'
+            )
         )
         cpg_id = sample_id_format(sample.id)
 
@@ -68,7 +70,9 @@ class TestSample(DbIsolatedTest):
         Search by valid CPG sample ID (special case)
         """
         sample = await self.slayer.upsert_sample(
-            SampleUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'EX001'}, type='blood')
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'EX001'}, type='blood'
+            )
         )
         cpg_id = sample_id_format(sample.id)
         results = await self.schlay.search(query=cpg_id, project_ids=[self.project_id])
@@ -88,7 +92,9 @@ class TestSample(DbIsolatedTest):
         Search by valid CPG sequencing group ID (special case)
         """
         sample = await self.slayer.upsert_sample(
-            SampleUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'EXS001'}, type='blood')
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'EXS001'}, type='blood'
+            )
         )
         sg = await self.sglayer.upsert_sequencing_groups(
             [
@@ -135,7 +141,9 @@ class TestSample(DbIsolatedTest):
         should only return one result
         """
         sample = await self.slayer.upsert_sample(
-            SampleUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'EX001'}, type='blood')
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'EX001'}, type='blood'
+            )
         )
         results = await self.schlay.search(query='EX001', project_ids=[self.project_id])
 
@@ -180,7 +188,7 @@ class TestSample(DbIsolatedTest):
         Search family by External ID
         should only return one result
         """
-        f_id = await self.flayer.create_family(external_id='FAMXX01')
+        f_id = await self.flayer.create_family(external_ids={'forg': 'FAMXX01'})
         results = await self.schlay.search(
             query='FAMXX01', project_ids=[self.project_id]
         )
@@ -200,7 +208,7 @@ class TestSample(DbIsolatedTest):
         p = await self.player.upsert_participant(
             ParticipantUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'X:PART01'})
         )
-        f_id = await self.flayer.create_family(external_id='X:FAM01')
+        f_id = await self.flayer.create_family(external_ids={'famxorg': 'X:FAM01'})
         await fptable.create_rows(
             [
                 PedRowInternal(

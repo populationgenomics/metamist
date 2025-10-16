@@ -28,6 +28,10 @@ const getCellValue = (details: ProjectInsightsDetails, key: ColumnKey): React.Re
         const report = details.web_reports?.[key]
         return report ? <a href={(report as { url: string }).url}>Link</a> : 'N/A'
     }
+    if (key === 'cram') {
+        // Return the cram timestamp_completed string if it exists, otherwise return 'N/A'
+        return (details.cram as { timestamp_completed?: string })?.timestamp_completed || 'N/A'
+    }
 
     const value = details[key as keyof ProjectInsightsDetails]
 
@@ -135,8 +139,7 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                 const value = getCellValue(details, config.key)
                 if (value === '✅') return 'TRUE'
                 if (value === '❌') return 'FALSE'
-                if (React.isValidElement(value) && value.type === 'a')
-                    return (value.props as any).href
+                if (React.isValidElement(value) && value.type === 'a') return value.props.href
                 return String(value)
             })
         )

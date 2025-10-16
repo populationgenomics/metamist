@@ -1,11 +1,11 @@
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name,dangerous-default-value
 import codecs
 import csv
 import io
 from datetime import date
-from typing import List, Optional
+from typing import Annotated
 
-from fastapi import APIRouter, File, Query, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
@@ -30,9 +30,9 @@ class FamilyUpdateModel(BaseModel):
     """Model for updating a family"""
 
     id: int
-    external_id: Optional[str] = None
-    description: Optional[str] = None
-    coded_phenotype: Optional[str] = None
+    external_ids: dict[str, str] | None = None
+    description: str | None = None
+    coded_phenotype: str | None = None
 
 
 @router.post('/{project}/pedigree', operation_id='importPedigree', tags=['seqr'])
@@ -69,12 +69,12 @@ async def import_pedigree(
 
 @router.get('/{project}/pedigree', operation_id='getPedigree', tags=['seqr'])
 async def get_pedigree(
-    internal_family_ids: List[int] = Query(None),
+    internal_family_ids: Annotated[list[int], Query()],
     export_type: ExportType = ExportType.JSON,
     replace_with_participant_external_ids: bool = True,
     replace_with_family_external_ids: bool = True,
     include_header: bool = True,
-    empty_participant_value: Optional[str] = None,
+    empty_participant_value: str | None = None,
     connection: Connection = get_project_db_connection(ReadAccessRoles),
     include_participants_not_in_families: bool = False,
 ):
@@ -140,10 +140,10 @@ async def get_pedigree(
     tags=['seqr'],
 )
 async def get_families(
-    participant_ids: Optional[List[int]] = Query(None),
-    sample_ids: Optional[List[str]] = Query(None),
+    participant_ids: Annotated[list[int], Query()] = [],  # noqa
+    sample_ids: Annotated[list[str], Query()] = [],  # noqa
     connection: Connection = get_project_db_connection(ReadAccessRoles),
-) -> List[Family]:
+) -> list[Family]:
     """Get families for some project"""
     family_layer = FamilyLayer(connection)
     sample_ids_raw = sample_id_transform_to_raw_list(sample_ids) if sample_ids else None
@@ -154,6 +154,7 @@ async def get_families(
                 GenericFilter(in_=participant_ids) if participant_ids else None
             ),
             sample_id=GenericFilter(in_=sample_ids_raw) if sample_ids_raw else None,
+            project=GenericFilter(eq=connection.project_id),
         )
     )
 
@@ -170,7 +171,7 @@ async def update_family(
     return {
         'success': await family_layer.update_family(
             id_=family.id,
-            external_id=family.external_id,
+            external_ids=family.external_ids,
             description=family.description,
             coded_phenotype=family.coded_phenotype,
         )
@@ -189,11 +190,25 @@ async def import_families(
 
     family_layer = FamilyLayer(connection)
     reader = csv.reader(codecs.iterdecode(file.file, 'utf-8-sig'), delimiter=delimiter)
-    headers = None
-    if has_header:
-        headers = next(reader)
-
     rows = [r for r in reader if not r[0].startswith('#')]
+
+    # Empty file
+    if not rows:
+        if has_header:
+            raise HTTPException(400, 'A header was expected but file is empty.')
+        return {'success': True, 'warnings': ['Submitted file was empty']}
+
+    headers = None
+    if rows and has_header:
+        headers = rows.pop(0)
+
+    # Header with no data
+    if headers and not rows:
+        return {
+            'success': True,
+            'warnings': ['Submitted file contained a header with no data'],
+        }
+
     if len(rows[0]) == 1:
         raise ValueError(
             'Only one column was detected in the pedigree, ensure the '

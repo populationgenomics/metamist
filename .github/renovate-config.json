@@ -1,0 +1,44 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "onboarding": true,
+    "requireConfig": "ignored",
+    "platform": "github",
+    "repositories": ["populationgenomics/metamist"],
+    "prConcurrentLimit": 10,
+    "prHourlyLimit": 5,
+    "semanticCommits": "enabled",
+    "enabledManagers": ["pip-compile"],
+    "constraints": {
+      "python": "==3.11"
+    },
+    "platformCommit": "enabled",
+    "pip-compile": {
+      "fileMatch": ["^requirements\\.txt$", "^requirements-dev\\.txt$"],
+      "lockFileMaintenance": {
+        "enabled": true,
+        "branchTopic": "pip-compile-refresh",
+        "commitMessageAction": "Refresh pip-compile outputs"
+      }
+    },
+    "packageRules": [
+      {
+        "groupName": "all non-major dependencies",
+        "groupSlug": "all-minor-patch",
+        "matchUpdateTypes": [
+          "minor",
+          "patch"
+        ],
+        "matchPackagePatterns": ["*"],
+        "minimumReleaseAge": "48 hours"
+      },
+      {
+        "groupName": "all major dependencies",
+        "groupSlug": "all-major",
+        "matchUpdateTypes": [
+          "major"
+        ],
+        "matchPackagePatterns": ["*"],
+        "minimumReleaseAge": "48 hours"
+      }
+    ]
+  }

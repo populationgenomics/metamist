@@ -1,3 +1,6 @@
+import { createTheme, ThemeProvider as MuiThemeProvider } from '@mui/material/styles'
+import { LocalizationProvider } from '@mui/x-date-pickers'
+import { AdapterLuxon } from '@mui/x-date-pickers/AdapterLuxon'
 import * as React from 'react'
 import { useMediaQuery } from 'react-responsive'
 
@@ -36,9 +39,28 @@ const ThemeProvider: React.FunctionComponent<{ children?: React.ReactNode }> = (
         setTheme(savedTheme)
     }, [savedTheme])
 
+    const muiTheme = createTheme({
+        palette: {
+            mode: savedTheme === 'dark-mode' ? 'dark' : 'light',
+        },
+        typography: {
+            button: {
+                textTransform: 'none',
+            },
+            fontFamily: `-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
+        'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif`,
+        },
+    })
+
     return (
         <div>
-            <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>
+            <MuiThemeProvider theme={muiTheme}>
+                <LocalizationProvider dateAdapter={AdapterLuxon}>
+                    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+                        {children}
+                    </ThemeContext.Provider>
+                </LocalizationProvider>
+            </MuiThemeProvider>
         </div>
     )
 }

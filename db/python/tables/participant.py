@@ -6,6 +6,7 @@ from typing import Any
 from db.python.filters import GenericFilter
 from db.python.filters.participant import ParticipantFilter
 from db.python.tables.base import DbBase
+from db.python.tables.meta_table import MetaTable
 from db.python.utils import NotFoundError, escape_like_term, to_db_json
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantInternal, ProjectId
 
@@ -53,6 +54,7 @@ class ParticipantTable(DbBase):
     ) -> tuple[str, dict[str, Any]]:
         """Construct a participant query"""
         needs_family = False
+        needs_family_eid = False
         needs_participant_eid = True  # always join, query optimiser can figure it out
         needs_sample = False
         needs_sample_eid = False
@@ -75,13 +77,21 @@ class ParticipantTable(DbBase):
             fwheres, fvalues = filter_.family.to_sql(
                 {
                     'id': 'f.id',
-                    'external_id': 'f.external_id',
                     'meta': 'f.meta',
-                }
+                },
+                exclude=['external_id'],
             )
             values.update(fvalues)
             if fwheres:
                 wheres.append(fwheres)
+
+            if filter_.family.external_id:
+                needs_family_eid = True
+                feid_wheres, feid_values = filter_.family.to_sql(
+                    {'external_id': 'feid.external_id'}, only=['external_id']
+                )
+                wheres.append(feid_wheres)
+                values.update(feid_values)
 
         if filter_.sample:
             needs_sample = True
@@ -168,6 +178,10 @@ class ParticipantTable(DbBase):
             query_lines.append(
                 'INNER JOIN family_participant fp ON fp.participant_id = pp.id\n'
                 'INNER JOIN family f ON f.id = fp.family_id'
+            )
+        if needs_family_eid:
+            query_lines.append(
+                'INNER JOIN family_external_id feid ON feid.family_id = f.id'
             )
 
         if wheres:
@@ -271,6 +285,37 @@ class ParticipantTable(DbBase):
         )
         return particicpants
 
+    async def export_participant_table(self, project: int):
+        """Export a parquet table of participants, including external_ids and meta"""
+        mt = MetaTable(self._connection)
+        query = f"""
+            SELECT
+                p.id,
+                p.reported_sex,
+                p.reported_gender,
+                p.karyotype,
+                p.meta,
+                {mt.external_id_query('peid')}
+            FROM participant p
+            LEFT JOIN participant_external_id peid
+            ON peid.participant_id = p.id
+            WHERE p.project = :project
+            GROUP BY p.id
+        """
+
+        return await mt.entity_meta_table(
+            project=project,
+            query=query,
+            row_getter=lambda row: {
+                'participant_id': row['id'],
+                'reported_sex': row['reported_sex'],
+                'reported_gender': row['reported_gender'],
+                'karyotype': row['karyotype'],
+            },
+            has_external_ids=True,
+            has_meta=True,
+        )
+
     async def create_participant(
         self,
         external_ids: dict[str, str],
@@ -364,7 +409,7 @@ RETURNING id
 
         keys = list(values.keys())
         list_values = [
-            {k: l[idx] for k, l in values.items()}
+            {k: item[idx] for k, item in values.items()}
             for idx in range(len(values[keys[0]]))
         ]
 

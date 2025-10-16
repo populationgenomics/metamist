@@ -1,4 +1,4 @@
-""" A script to test that tests the validity of a database backup
+"""A script to test that tests the validity of a database backup
 in the event of recovery.
 NOTE: DO NOT RUN THIS SCRIPT ON A PRODUCTION SERVER.
 It will drop the local mysql database after each run.

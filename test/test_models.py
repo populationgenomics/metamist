@@ -23,7 +23,9 @@ class TestParticipantModels(TestCase):
 
     def test_participant_to_external_basic(self):
         """Test converting a basic participant to external model"""
-        internal = ParticipantUpsertInternal(id=1, external_ids={PRIMARY_EXTERNAL_ORG: 'hey-hey'})
+        internal = ParticipantUpsertInternal(
+            id=1, external_ids={PRIMARY_EXTERNAL_ORG: 'hey-hey'}
+        )
         external = internal.to_external()
 
         self.assertIsInstance(external, ParticipantUpsert)
@@ -44,7 +46,9 @@ class TestSampleModels(TestCase):
 
     def test_sample_to_external_basic(self):
         """Test converting a basic sample to external model"""
-        internal = SampleUpsertInternal(id=1, external_ids={PRIMARY_EXTERNAL_ORG: 'hey-hey'})
+        internal = SampleUpsertInternal(
+            id=1, external_ids={PRIMARY_EXTERNAL_ORG: 'hey-hey'}
+        )
         external = internal.to_external()
 
         self.assertIsInstance(external, SampleUpsert)

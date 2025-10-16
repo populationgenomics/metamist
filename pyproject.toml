@@ -1,18 +1,55 @@
-[tool.black]
+[tool.ruff]
 line-length = 88
-skip-string-normalization = true
-exclude = "metamist/"
-include = "metamist/parser/"
+
+exclude = [
+    "metamist/api/*",
+    "metamist/apis/*",
+    "metamist/model/*",
+    "metamist/models/*",
+
+]
+
+[tool.ruff.format]
+quote-style = "single"
+
+
+[tool.ruff.lint.isort]
+
+section-order = ["future", "standard-library", "third-party", "hail", "cpg", "first-party", "local-folder"]
+
+[tool.ruff.lint.isort.sections]
+hail = [
+    "hail",
+    "hailtop",
+]
+# Adjust these for each repository, e.g., removing those that should be
+# local rather than CPG. Also fill in extend_skip below if there are any
+# subdirectories that should be ignored.
+cpg = [
+    "analysis_runner",
+    "cpg_infra",
+    "cpg_utils",
+    "cpg_workflows",
+    "gnomad",
+    "hail_scripts",
+    "metamist",
+]
+
 
 [tool.isort]
 py_version = 311
 profile = "black"
 line_length = 88
-sections = ["FUTURE", "STDLIB", "THIRDPARTY", "HAIL", "CPG", "FIRSTPARTY", "LOCALFOLDER"]
-known_hail = [
-    "hail",
-    "hailtop",
+sections = [
+    "FUTURE",
+    "STDLIB",
+    "THIRDPARTY",
+    "HAIL",
+    "CPG",
+    "FIRSTPARTY",
+    "LOCALFOLDER",
 ]
+known_hail = ["hail", "hailtop"]
 # Adjust these for each repository, e.g., removing those that should be
 # local rather than CPG. Also fill in extend_skip below if there are any
 # subdirectories that should be ignored.
@@ -24,3 +61,7 @@ known_cpg = [
     "gnomad",
     "hail_scripts",
 ]
+
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]

@@ -56,7 +56,7 @@ class TestBillingRawTable(BqTest):
             BillingRawTable(None)
 
         self.assertTrue(
-            'No connection was provided to the table \'BillingRawTable\''
+            "No connection was provided to the table 'BillingRawTable'"
             in str(context.exception)
         )
 

@@ -1,6 +1,6 @@
 import * as React from 'react'
-import muck from '../../muck-the-duck.svg'
 import muckDark from '../../muck-the-dark-duck.svg'
+import muck from '../../muck-the-duck.svg'
 import { ThemeContext } from './ThemeProvider'
 
 const MuckTheDuck: React.FunctionComponent<

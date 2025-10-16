@@ -378,8 +378,14 @@ def prepare_query_from_dict_field(
             raise ValueError(f'Filter {field_name} must be a GenericFilter')
         if '"' in key:
             raise ValueError('Meta key contains " character, which is not allowed')
+
+        # using JSON_UNQUOTE is important here as by default JSON_EXTRACT will return
+        # a quoted string which means that filters like in_ and startswith will not
+        # work as the returned value starts with a " character. Strangely `eq` queries
+        # were working fine as mariadb was casting the filter value to a JSON string
+        # before comparing.
         fconditionals, fvalues = value.to_sql(
-            f"JSON_EXTRACT({column_name}, '$.{key}')",
+            f"JSON_UNQUOTE(JSON_EXTRACT({column_name}, '$.{key}'))",
             column_name=f'{column_name}_{key}',
         )
         conditionals.append(fconditionals)

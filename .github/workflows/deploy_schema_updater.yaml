@@ -3,16 +3,19 @@ name: Deploy Schema Updater
 on:
   workflow_dispatch:
 
-permissions:
-  contents: 'read'
-  id-token: 'write'
+permissions: {}
 
 jobs:
   build-image:
     runs-on: ubuntu-latest
     environment: production
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - id: "branch-check"
         name: Fail if branch is not main or dev
@@ -23,7 +26,7 @@ jobs:
 
       - id: "google-cloud-auth"
         name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@v2"
+        uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: "projects/774248915715/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
           service_account: "sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com"

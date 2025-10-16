@@ -3,6 +3,7 @@
 Make metamist architecture available to production pulumi stack
 so it can be centrally deployed. Do this through a plugin, and submodule.
 """
+
 from enum import Enum
 from functools import cached_property
 from pathlib import Path

@@ -1,84 +1,50 @@
 import * as React from 'react'
-import { Link } from 'react-router-dom'
+import { Link, LinkProps } from 'react-router-dom'
 import { Dropdown, Menu, Popup } from 'semantic-ui-react'
 
 import { BillingApi } from '../../../sm-api'
 
 // this wasn't working, so added import to HTML
 // import 'bootstrap/dist/css/bootstrap.min.css'
+import AnalyticsIcon from '@mui/icons-material/Analytics'
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney'
 import DescriptionIcon from '@mui/icons-material/Description'
+import DisplaySettingsIcon from '@mui/icons-material/DisplaySettings'
 import ExploreIcon from '@mui/icons-material/Explore'
-import HomeIcon from '@mui/icons-material/Home'
 import InsightsIcon from '@mui/icons-material/Insights'
-import TableRowsIcon from '@mui/icons-material/TableRows'
+import SummarizeIcon from '@mui/icons-material/Summarize'
 import TroubleshootIcon from '@mui/icons-material/Troubleshoot'
 import MuckTheDuck from '../MuckTheDuck'
 import SwaggerIcon from '../SwaggerIcon'
 import DarkModeTriButton from './DarkModeTriButton/DarkModeTriButton'
 import Searchbar from './Search'
 
+import { billingPages } from '../../../pages/billing/BillingPages'
 import { ThemeContext } from '../ThemeProvider'
 
 import './NavBar.css'
 
-const billingPages = {
+const billingPagesMenu = {
     title: 'Billing',
     url: '/billing',
     icon: <AttachMoneyIcon />,
-    submenu: [
-        {
-            title: 'Home',
-            url: '/billing',
-            icon: <HomeIcon />,
-        },
-        {
-            title: 'Cost By Invoice Month',
-            url: '/billing/invoiceMonthCost',
-            icon: <TableRowsIcon />,
-        },
-        {
-            title: 'Cost Across Invoice Months (Topics only)',
-            url: '/billing/costByMonth',
-            icon: <TableRowsIcon />,
-        },
-        {
-            title: 'Cost By Time',
-            url: '/billing/costByTime',
-            icon: <TableRowsIcon />,
-        },
-        {
-            title: 'Cost By Analysis',
-            url: '/billing/costByAnalysis',
-            icon: <TableRowsIcon />,
-        },
-        {
-            title: 'Cost By Category',
-            url: '/billing/costByCategory',
-            icon: <TableRowsIcon />,
-        },
-        {
-            title: 'Seqr Prop Map',
-            url: '/billing/seqrPropMap',
-            icon: <TableRowsIcon />,
-        },
-    ],
+    submenu: billingPages,
 }
 
 const InsightsPages = {
     title: 'Insights',
     url: '/insights',
-    icon: <InsightsIcon />,
+    icon: <AnalyticsIcon />,
     submenu: [
         {
             title: 'Details',
             url: '/insights/details',
-            icon: <TableRowsIcon />,
+            icon: <DisplaySettingsIcon />,
         },
         {
             title: 'Summary',
             url: '/insights/summary',
-            icon: <TableRowsIcon />,
+            icon: <SummarizeIcon />,
         },
     ],
 }
@@ -88,22 +54,38 @@ interface MenuItem {
     url: string
     icon: JSX.Element
     submenu?: MenuItem[]
+    reloadDocument?: boolean
 }
 interface MenuItemProps {
     index: number
     item: MenuItem
 }
 
+// A link component that reloads the document when clicked
+// This is used for the graphiql link which doesn't render
+// properly without a reload
+const ReloadingLink = (props: LinkProps) => {
+    return <Link reloadDocument={true} {...props} />
+}
+
 const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
     const theme = React.useContext(ThemeContext)
     const isDarkMode = theme.theme === 'dark-mode'
 
+    const MenuLinkComponent = item.reloadDocument ? ReloadingLink : Link
+
     const dropdown = (item: MenuItem) => (
-        <Dropdown text={item.title} key={index}>
-            <Dropdown.Menu id="navDrop">
+        <Dropdown id="navDrop" text={item.title} key={index} inverted={isDarkMode}>
+            <Dropdown.Menu id="navDropMenu">
                 {item.submenu &&
                     item.submenu.map((subitem, subindex) => (
-                        <Dropdown.Item as={Link} id="navItem" to={subitem.url} key={subindex}>
+                        <Dropdown.Item
+                            id="navDropMenuItem"
+                            as={MenuLinkComponent}
+                            to={subitem.url}
+                            key={subindex}
+                        >
+                            {subitem.icon} <span />
                             {subitem.title}
                         </Dropdown.Item>
                     ))}
@@ -121,27 +103,24 @@ const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
                     trigger={icon}
                     hoverable
                     position="bottom center"
+                    pinned
                 >
-                    <h5>{child}</h5>
+                    {child}
                 </Popup>
             </span>
         </>
     )
 
     return item.submenu ? (
-        <Menu.Item className="navItem">{popup(dropdown(item), item.icon)}</Menu.Item>
+        <Menu.Item className="headerMenuItem">{popup(dropdown(item), item.icon)}</Menu.Item>
     ) : (
-        <Menu.Item as={Link} className="navItem" to={item.url} key={index}>
+        <Menu.Item className="headerMenuItem" as={MenuLinkComponent} to={item.url} key={index}>
             {popup(item.title, item.icon)}
         </Menu.Item>
     )
 }
 
-interface NavBarProps {
-    fixed?: boolean
-}
-
-const NavBar: React.FC<NavBarProps> = ({ fixed }) => {
+const NavBar = () => {
     const [menuItems, setMenuItems] = React.useState<MenuItem[]>([
         {
             title: 'Explore',
@@ -153,11 +132,7 @@ const NavBar: React.FC<NavBarProps> = ({ fixed }) => {
             url: '/analysis-runner',
             icon: <InsightsIcon />,
         },
-        {
-            title: 'OurDNA',
-            url: '/ourdna',
-            icon: <InsightsIcon />,
-        },
+
         {
             title: 'Swagger',
             url: '/swagger',
@@ -171,6 +146,7 @@ const NavBar: React.FC<NavBarProps> = ({ fixed }) => {
         {
             title: 'GraphQL',
             url: '/graphql',
+            reloadDocument: true,
             icon: <TroubleshootIcon />,
         },
         InsightsPages,
@@ -179,7 +155,11 @@ const NavBar: React.FC<NavBarProps> = ({ fixed }) => {
     React.useEffect(() => {
         new BillingApi().isBillingEnabled().then((response) => {
             if (response.status === 200 && response.data === true) {
-                setMenuItems([...menuItems.slice(0, 2), billingPages, ...menuItems.slice(2)])
+                setMenuItems((menuItems) => [
+                    ...menuItems.slice(0, 2),
+                    billingPagesMenu,
+                    ...menuItems.slice(2),
+                ])
             }
         })
     }, [])

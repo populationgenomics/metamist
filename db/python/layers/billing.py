@@ -1,3 +1,6 @@
+from api.utils.db import (
+    Connection,
+)
 from db.python.layers.bq_base import BqBaseLayer
 from db.python.tables.bq.billing_ar_batch import BillingArBatchTable
 from db.python.tables.bq.billing_daily import BillingDailyTable
@@ -9,6 +12,8 @@ from models.models import (
     AnalysisCostRecord,
     BillingColumn,
     BillingCostBudgetRecord,
+    BillingRunningCostQueryModel,
+    BillingSampleQueryModel,
     BillingTotalCostQueryModel,
 )
 
@@ -182,12 +187,20 @@ class BillingLayer(BqBaseLayer):
     async def get_total_cost(
         self,
         query: BillingTotalCostQueryModel,
+        connection: Connection | None = None,
     ) -> list[dict] | None:
         """
         Get Total cost of selected fields for requested time interval
         """
         billing_table = self.table_factory(query.source, query.fields, query.filters)
-        return await billing_table.get_total_cost(query)
+        result = await billing_table.get_total_cost(query)
+
+        # if include average sample cost is requested, we need to append that information from sample history
+        if query.include_average_sample_cost:
+            # append 'average_sample_cost'
+            result = await billing_table.append_sample_cost(connection, result)
+
+        return result
 
     async def get_running_cost(
         self,
@@ -199,7 +212,19 @@ class BillingLayer(BqBaseLayer):
         Get Running costs including monthly budget
         """
         billing_table = self.table_factory(source, [field])
-        return await billing_table.get_running_cost(field, invoice_month)
+        return await billing_table.get_running_cost_with_filters(
+            BillingRunningCostQueryModel(field=field, invoice_month=invoice_month)
+        )
+
+    async def get_running_cost_with_filters(
+        self,
+        query: BillingRunningCostQueryModel,
+    ) -> list[BillingCostBudgetRecord]:
+        """
+        Get Running costs including monthly budget with filtering support
+        """
+        billing_table = self.table_factory(query.source, [query.field], query.filters)
+        return await billing_table.get_running_cost_with_filters(query)
 
     async def get_cost_by_ar_guid(
         self,
@@ -266,3 +291,21 @@ class BillingLayer(BqBaseLayer):
             start_day, end_day, batches, ar_guid
         )
         return results
+
+    async def get_cost_by_sample(
+        self,
+        connection: Connection,
+        query: BillingSampleQueryModel,
+    ) -> list[dict] | None:
+        """
+        Get Sample cost with selected fields for requested time interval
+        """
+        if not query.start_date or not query.end_date:
+            raise ValueError('Dates are required')
+
+        if not query.search_ids:
+            raise ValueError('Search IDs are required')
+
+        ar_batch_able = BillingArBatchTable(self.connection)
+
+        return await ar_batch_able.get_cost_by_sample(connection, query)

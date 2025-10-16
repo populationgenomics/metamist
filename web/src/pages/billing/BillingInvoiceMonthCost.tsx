@@ -1,14 +1,35 @@
+import { ToggleButton, ToggleButtonGroup } from '@mui/material'
+import { SelectChangeEvent } from '@mui/material/Select'
+import { debounce } from 'lodash'
+import orderBy from 'lodash/orderBy'
 import * as React from 'react'
-import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom'
-import { Table as SUITable, Message, Button, Checkbox, Dropdown, Grid } from 'semantic-ui-react'
-import _ from 'lodash'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import {
+    Button,
+    Checkbox,
+    Dropdown,
+    DropdownProps,
+    Grid,
+    Message,
+    Table as SUITable,
+} from 'semantic-ui-react'
+import {
+    ColumnConfig,
+    ColumnGroup,
+    ColumnVisibilityDropdown,
+    useColumnVisibility,
+} from '../../shared/components/ColumnVisibilityDropdown'
+import { HorizontalStackedBarChart } from '../../shared/components/Graphs/HorizontalStackedBarChart'
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import Table from '../../shared/components/Table'
-import { BillingApi, BillingColumn, BillingCostBudgetRecord } from '../../sm-api'
-import FieldSelector from './components/FieldSelector'
+import { exportTable } from '../../shared/utilities/exportTable'
 import { convertFieldName } from '../../shared/utilities/fieldName'
-import { HorizontalStackedBarChart } from '../../shared/components/Graphs/HorizontalStackedBarChart'
+import formatMoney from '../../shared/utilities/formatMoney'
 import generateUrl from '../../shared/utilities/generateUrl'
+import { BillingApi, BillingColumn, BillingCostBudgetRecord, BillingSource } from '../../sm-api'
+import './components/BillingCostByTimeTable.css'
+import FieldSelector from './components/FieldSelector'
 
 const BillingCurrentCost = () => {
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
@@ -23,6 +44,20 @@ const BillingCurrentCost = () => {
 
     const [showAsChart, setShowAsChart] = React.useState<boolean>(true)
 
+    // State for column visibility
+    const [visibleColumns, setVisibleColumns] = React.useState<Set<string>>(
+        new Set([
+            'field',
+            'compute_daily',
+            'storage_daily',
+            'total_daily',
+            'compute_monthly',
+            'storage_monthly',
+            'total_monthly',
+            'budget_spent',
+        ])
+    )
+
     // Pull search params for use in the component
     const [searchParams] = useSearchParams()
     const inputGroupBy: string | null = searchParams.get('groupBy')
@@ -30,15 +65,45 @@ const BillingCurrentCost = () => {
         ? (inputGroupBy as BillingColumn)
         : BillingColumn.GcpProject
     const inputInvoiceMonth = searchParams.get('invoiceMonth')
+    // GCP projects are stored as comma-separated values in URL: gcpProjects=project1,project2,project3
+    const inputGcpProjects = searchParams.get('gcpProjects')
+    // Only use GCP projects from URL if we're grouping by GCP Project
+    const initialGcpProjects =
+        fixedGroupBy === BillingColumn.GcpProject && inputGcpProjects
+            ? inputGcpProjects.split(',').filter((p) => p.trim() !== '')
+            : []
+
+    // Topics are stored as comma-separated values in URL: topics=topic1,topic2,topic3
+    const inputTopics = searchParams.get('topics')
+    // Only use topics from URL if we're grouping by Topic
+    const initialTopics =
+        fixedGroupBy === BillingColumn.Topic && inputTopics
+            ? inputTopics.split(',').filter((t) => t.trim() !== '')
+            : []
 
     // use navigate and update url params
     const location = useLocation()
     const navigate = useNavigate()
 
-    const updateNav = (grp: BillingColumn, invoiceMonth: string | undefined) => {
+    const updateNav = (
+        grp: BillingColumn,
+        invoiceMonth: string | undefined,
+        gcpProjects?: string[],
+        topics?: string[]
+    ) => {
         const url = generateUrl(location, {
             groupBy: grp,
             invoiceMonth: invoiceMonth,
+            // Only include gcpProjects in URL if grouping by GCP Project and there are selected projects
+            gcpProjects:
+                grp === BillingColumn.GcpProject && gcpProjects && gcpProjects.length > 0
+                    ? gcpProjects.join(',')
+                    : undefined,
+            // Only include topics in URL if grouping by Topic and there are selected topics
+            topics:
+                grp === BillingColumn.Topic && topics && topics.length > 0
+                    ? topics.join(',')
+                    : undefined,
         })
         navigate(url)
     }
@@ -58,53 +123,275 @@ const BillingCurrentCost = () => {
         fixedGroupBy ?? BillingColumn.GcpProject
     )
     const [invoiceMonth, setInvoiceMonth] = React.useState<string>(inputInvoiceMonth ?? thisMonth)
+    const [selectedGcpProjects, setSelectedGcpProjects] =
+        React.useState<string[]>(initialGcpProjects)
+    const [selectedTopics, setSelectedTopics] = React.useState<string[]>(initialTopics)
 
     const [lastLoadedDay, setLastLoadedDay] = React.useState<string>()
 
-    const getCosts = (grp: BillingColumn, invoiceMth: string | undefined) => {
-        updateNav(grp, invoiceMth)
+    // Pre-fetched data state for FieldSelector components
+    const [availableGcpProjects, setAvailableGcpProjects] = React.useState<string[]>([])
+    const [availableTopics, setAvailableTopics] = React.useState<string[]>([])
+    const [_isPreFetching, setIsPreFetching] = React.useState<boolean>(true)
+
+    // Create a debounced version of getCosts for project and topic selections
+    const debouncedGetData = React.useMemo(
+        () =>
+            debounce(
+                (
+                    grp: BillingColumn,
+                    invoiceMth: string | undefined,
+                    gcpProjectFilters?: string[],
+                    topicFilters?: string[]
+                ) => {
+                    getData(grp, invoiceMth, gcpProjectFilters, topicFilters)
+                },
+                1000
+            ), // 1000ms delay
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        []
+    )
+
+    // Cleanup debounced function on unmount
+    React.useEffect(() => {
+        return () => {
+            debouncedGetData.cancel()
+        }
+    }, [debouncedGetData])
+
+    // Pre-fetch GCP projects and topics data on component mount
+    React.useEffect(() => {
+        setIsPreFetching(true)
+
+        // Pre-fetch GCP projects and topics in parallel
+        Promise.all([new BillingApi().getGcpProjects(), new BillingApi().getTopics()])
+            .then(([gcpProjectsResponse, topicsResponse]) => {
+                setAvailableGcpProjects(gcpProjectsResponse.data || [])
+                setAvailableTopics(topicsResponse.data || [])
+            })
+            .catch((error) => {
+                console.error('Error pre-fetching data:', error)
+                setAvailableGcpProjects([])
+                setAvailableTopics([])
+            })
+            .finally(() => {
+                setIsPreFetching(false)
+            })
+    }, [])
+
+    const getData = (
+        grp: BillingColumn,
+        invoiceMth: string | undefined,
+        gcpProjectFilters?: string[],
+        topicFilters?: string[]
+    ) => {
+        // Use provided filters or fall back to current state
+        const gcpFiltersToUse =
+            grp === BillingColumn.GcpProject
+                ? gcpProjectFilters !== undefined
+                    ? gcpProjectFilters
+                    : selectedGcpProjects
+                : []
+
+        const topicFiltersToUse =
+            grp === BillingColumn.Topic
+                ? topicFilters !== undefined
+                    ? topicFilters
+                    : selectedTopics
+                : []
+
+        updateNav(grp, invoiceMth, gcpFiltersToUse, topicFiltersToUse)
         setIsLoading(true)
         setError(undefined)
-        let source = 'aggregate'
+        let source = BillingSource.Aggregate
         if (grp === BillingColumn.GcpProject) {
-            source = 'gcp_billing'
+            source = BillingSource.GcpBilling
         }
+
+        // Create the query model with filters for both GCP Project and Topic grouping
+
+        // Determine if we need any filters
+        const hasGcpProjectFilter = grp === BillingColumn.GcpProject && gcpFiltersToUse.length > 0
+        const hasTopicFilter = grp === BillingColumn.Topic && topicFiltersToUse.length > 0
+        const hasAnyFilters = hasGcpProjectFilter || hasTopicFilter
+
+        // Build the filters object
+        let filters: { gcp_project?: string[]; topic?: string[] } | undefined = undefined
+        if (hasAnyFilters) {
+            filters = {}
+            if (hasGcpProjectFilter) {
+                filters.gcp_project = gcpFiltersToUse
+            }
+            if (hasTopicFilter) {
+                filters.topic = topicFiltersToUse
+            }
+        }
+
+        const queryModel = {
+            field: grp,
+            invoice_month: invoiceMth,
+            source: source,
+            filters: filters,
+        }
+
         new BillingApi()
-            // @ts-ignore
-            .getRunningCost(grp, invoiceMth, source)
+            .getRunningCost(queryModel)
             .then((response) => {
                 setIsLoading(false)
                 if (response.data.length > 0) {
                     setCosts(response.data)
                     setLastLoadedDay(response.data[0].last_loaded_day || '')
+                } else {
+                    setCosts([])
                 }
             })
-            .catch((er) => setError(er.message))
+            .catch((er) => {
+                setIsLoading(false)
+                setError(er.message)
+            })
     }
 
-    const onGroupBySelect = (event: any, data: any) => {
-        setGroupBy(data.value)
-        getCosts(data.value, invoiceMonth)
+    const onGroupBySelect = (event: unknown, data: DropdownProps) => {
+        const value = data.value
+        if (typeof value == 'string') {
+            setGroupBy(value as BillingColumn)
+            // Clear filters when switching groupBy
+            if (value !== BillingColumn.GcpProject) {
+                setSelectedGcpProjects([])
+            }
+            if (value !== BillingColumn.Topic) {
+                setSelectedTopics([])
+            }
+            // Immediate data fetch for Group By selector (no debouncing)
+            getData(value as BillingColumn, invoiceMonth, [], [])
+        }
     }
 
-    const onInvoiceMonthSelect = (event: any, data: any) => {
-        setInvoiceMonth(data.value)
-        getCosts(groupBy, data.value)
+    const onInvoiceMonthSelect = (event: unknown, data: DropdownProps) => {
+        const value = data.value
+        if (typeof value == 'string') {
+            setInvoiceMonth(value)
+            // Immediate data fetch for Invoice Month selector (no debouncing)
+            if (groupBy === BillingColumn.GcpProject) {
+                getData(groupBy, value, selectedGcpProjects, [])
+            } else if (groupBy === BillingColumn.Topic) {
+                getData(groupBy, value, [], selectedTopics)
+            } else {
+                getData(groupBy, value, [], [])
+            }
+        }
     }
 
+    const onGcpProjectsSelect = (
+        event: SelectChangeEvent<string | string[]> | undefined,
+        data: { value: string | string[] }
+    ) => {
+        const value = Array.isArray(data.value) ? data.value : [data.value]
+        setSelectedGcpProjects(value)
+    }
+
+    const onTopicsSelect = (
+        event: SelectChangeEvent<string | string[]> | undefined,
+        data: { value: string | string[] }
+    ) => {
+        const value = Array.isArray(data.value) ? data.value : [data.value]
+        setSelectedTopics(value)
+    }
+
+    // Separate useEffect for GCP Project filter changes only
     React.useEffect(() => {
-        getCosts(groupBy, invoiceMonth)
-    }, [])
+        if (groupBy === BillingColumn.GcpProject) {
+            debouncedGetData(groupBy, invoiceMonth, selectedGcpProjects, [])
+        }
+    }, [selectedGcpProjects, debouncedGetData, groupBy, invoiceMonth])
 
+    // Separate useEffect for Topic filter changes only
+    React.useEffect(() => {
+        if (groupBy === BillingColumn.Topic) {
+            debouncedGetData(groupBy, invoiceMonth, [], selectedTopics)
+        }
+    }, [selectedTopics, debouncedGetData, groupBy, invoiceMonth])
+
+    // Define column groups for easier management
+    const DAILY_COLUMNS = ['compute_daily', 'storage_daily', 'total_daily']
+    const MONTHLY_COLUMNS = ['compute_monthly', 'storage_monthly', 'total_monthly']
+    const BUDGET_COLUMNS = ['budget_spent']
+
+    // Define header fields for table rendering
     const HEADER_FIELDS = [
-        { category: 'field', title: groupBy.toUpperCase(), show_always: true },
-        { category: 'compute_daily', title: 'C', show_always: false },
-        { category: 'storage_daily', title: 'S', show_always: false },
-        { category: 'total_daily', title: 'Total', show_always: false },
-        { category: 'compute_monthly', title: 'C', show_always: true },
-        { category: 'storage_monthly', title: 'S', show_always: true },
-        { category: 'total_monthly', title: 'Total', show_always: true },
+        { category: 'field', title: groupBy.toUpperCase() },
+        // Daily columns (only if current month)
+        ...(invoiceMonth === thisMonth
+            ? [
+                  { category: 'compute_daily', title: 'COMPUTE_DAILY' },
+                  { category: 'storage_daily', title: 'STORAGE_DAILY' },
+                  { category: 'total_daily', title: 'TOTAL_DAILY' },
+              ]
+            : []),
+        // Monthly columns
+        { category: 'compute_monthly', title: 'COMPUTE_MONTHLY' },
+        { category: 'storage_monthly', title: 'STORAGE_MONTHLY' },
+        { category: 'total_monthly', title: 'TOTAL_MONTHLY' },
     ]
+
+    // Generate column configurations for the dropdown
+    const getColumnConfigs = (): ColumnConfig[] => {
+        const configs: ColumnConfig[] = [
+            { id: 'field', label: convertFieldName(groupBy.toUpperCase()), isRequired: true },
+        ]
+
+        // Add daily columns if current month
+        if (invoiceMonth === thisMonth) {
+            configs.push(
+                { id: 'compute_daily', label: 'Compute (Daily)', group: 'daily' },
+                { id: 'storage_daily', label: 'Storage (Daily)', group: 'daily' },
+                { id: 'total_daily', label: 'Total (Daily)', group: 'daily' }
+            )
+        }
+
+        // Add monthly columns
+        configs.push(
+            { id: 'compute_monthly', label: 'Compute (Monthly)', group: 'monthly' },
+            { id: 'storage_monthly', label: 'Storage (Monthly)', group: 'monthly' },
+            { id: 'total_monthly', label: 'Total (Monthly)', group: 'monthly' }
+        )
+
+        // Add budget column if applicable
+        if (
+            groupBy === BillingColumn.GcpProject &&
+            costRecords.length > 0 &&
+            costRecords[0].budget_spent !== null
+        ) {
+            configs.push({ id: 'budget_spent', label: 'Budget Spent %', group: 'budget' })
+        }
+
+        return configs
+    }
+
+    // Generate column groups for the dropdown
+    const getColumnGroups = (): ColumnGroup[] => {
+        const groups: ColumnGroup[] = [
+            { id: 'monthly', label: 'Monthly Costs', columns: MONTHLY_COLUMNS },
+        ]
+
+        if (invoiceMonth === thisMonth) {
+            groups.unshift({ id: 'daily', label: 'Daily Costs', columns: DAILY_COLUMNS })
+        }
+
+        // Add budget group if budget data is available
+        if (
+            groupBy === BillingColumn.GcpProject &&
+            costRecords.length > 0 &&
+            costRecords[0].budget_spent !== null
+        ) {
+            groups.push({ id: 'budget', label: 'Budget', columns: BUDGET_COLUMNS })
+        }
+
+        return groups
+    }
+
+    // Use the column visibility hook for easier export handling
+    const { isColumnVisible } = useColumnVisibility(getColumnConfigs(), visibleColumns)
 
     const handleToggle = (field: string) => {
         if (!openRows.includes(field)) {
@@ -112,14 +399,6 @@ const BillingCurrentCost = () => {
         } else {
             setOpenRows(openRows.filter((i) => i !== field))
         }
-    }
-
-    function currencyFormat(num: number | undefined | null): string {
-        if (num === undefined || num === null) {
-            return ''
-        }
-
-        return `$${num.toFixed(2).replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')}`
     }
 
     function percFormat(num: number | undefined | null): string {
@@ -130,12 +409,19 @@ const BillingCurrentCost = () => {
         return `${num.toFixed(0).toString()} % `
     }
 
+    // Helper function to calculate consistent totals from rounded components
+    const getConsistentTotal = (compute: number | null, storage: number | null): number => {
+        const computeRounded = compute ? Math.round(compute * 100) / 100 : 0
+        const storageRounded = storage ? Math.round(storage * 100) / 100 : 0
+        return computeRounded + storageRounded
+    }
+
     if (error)
         return (
             <Message negative>
                 {error}
                 <br />
-                <Button negative onClick={() => getCosts(groupBy, invoiceMonth)}>
+                <Button negative onClick={() => getData(groupBy, invoiceMonth, [], [])}>
                     Retry
                 </Button>
             </Message>
@@ -190,47 +476,212 @@ const BillingCurrentCost = () => {
         return `/billing/costByTime?groupBy=${groupBy}&selectedData=${data}&start=${startDate}&end=${endDate}`
     }
 
+    const exportToFile = (format: 'csv' | 'tsv') => {
+        // Filter based on user-selected visible columns
+        const visibleFields = HEADER_FIELDS.filter((k) => isColumnVisible(k.category))
+        const headerFields: string[] = visibleFields.map((k) => convertFieldName(k.category))
+
+        // Add Budget % spend if it should be shown and is selected
+        const budgetSpendVisible =
+            groupBy === BillingColumn.GcpProject &&
+            invoiceMonth === thisMonth &&
+            isColumnVisible('budget_spent')
+
+        if (budgetSpendVisible) headerFields.push('Budget Spend %')
+
+        // Prepare 2D matrix of data strings
+        const matrix = costRecords.map((rec) => {
+            const row = visibleFields.map((k) =>
+                k.category === 'field'
+                    ? String(rec[k.category] ?? '')
+                    : formatMoney(
+                          (rec as unknown as Record<string, number | undefined>)[k.category] ?? 0
+                      )
+            )
+            if (budgetSpendVisible) {
+                row.push(percFormat(rec.budget_spent))
+            }
+            return row
+        })
+
+        exportTable({ headerFields, matrix }, format, 'billing-cost-by-invoice-month')
+    }
+
+    // Prepare header cells for daily and monthly columns (simplified, no block scope)
+    const visibleDailyCount = ['compute_daily', 'storage_daily', 'total_daily'].filter((col) =>
+        isColumnVisible(col)
+    ).length
+    const dailyHeaderCell =
+        invoiceMonth === thisMonth && visibleDailyCount > 0 ? (
+            <SUITable.HeaderCell colSpan={visibleDailyCount}>
+                24H (day UTC {lastLoadedDay})
+            </SUITable.HeaderCell>
+        ) : null
+
+    const baseMonthlyColumns = ['compute_monthly', 'storage_monthly', 'total_monthly']
+    const budgetColumnVisible =
+        groupBy === BillingColumn.GcpProject &&
+        invoiceMonth === thisMonth &&
+        isColumnVisible('budget_spent')
+    const visibleMonthlyCount =
+        baseMonthlyColumns.filter((col) => isColumnVisible(col)).length +
+        (budgetColumnVisible ? 1 : 0)
+    const monthlyHeaderCell =
+        visibleMonthlyCount > 0 ? (
+            <SUITable.HeaderCell colSpan={visibleMonthlyCount}>
+                Invoice Month (Acc)
+            </SUITable.HeaderCell>
+        ) : null
+
     return (
         <>
             <h1>Cost By Invoice Month</h1>
 
-            <Grid columns="equal" stackable doubling>
-                <Grid.Column>
-                    <FieldSelector
-                        label="Group By"
-                        fieldName="Group"
-                        onClickFunction={onGroupBySelect}
-                        selected={groupBy}
-                    />
-                </Grid.Column>
-                <Grid.Column>
-                    <FieldSelector
-                        label="Invoice Month"
-                        fieldName={BillingColumn.InvoiceMonth}
-                        onClickFunction={onInvoiceMonthSelect}
-                        selected={invoiceMonth}
-                    />
-                </Grid.Column>
+            <Grid stackable doubling style={{ marginBottom: '1rem' }}>
+                <Grid.Row>
+                    <Grid.Column width={3}>
+                        <div style={{ marginLeft: '1rem' }}>
+                            <FieldSelector
+                                label="Group By"
+                                fieldName="Group"
+                                onClickFunction={onGroupBySelect}
+                                selected={groupBy}
+                            />
+                        </div>
+                    </Grid.Column>
+                    <Grid.Column width={3}>
+                        <div style={{ marginLeft: '1rem' }}>
+                            <FieldSelector
+                                label="Invoice Month"
+                                fieldName={BillingColumn.InvoiceMonth}
+                                onClickFunction={onInvoiceMonthSelect}
+                                selected={invoiceMonth}
+                            />
+                        </div>
+                    </Grid.Column>
+                    {groupBy === BillingColumn.GcpProject && (
+                        <Grid.Column width={3}>
+                            <div style={{ marginLeft: '1rem' }}>
+                                <FieldSelector
+                                    label="Filter GCP Projects"
+                                    fieldName={BillingColumn.GcpProject}
+                                    selected={selectedGcpProjects}
+                                    multiple={true}
+                                    preloadedData={availableGcpProjects}
+                                    onClickFunction={onGcpProjectsSelect}
+                                />
+                            </div>
+                        </Grid.Column>
+                    )}
+                    {groupBy === BillingColumn.Topic && (
+                        <Grid.Column width={3}>
+                            <div style={{ marginLeft: '1rem' }}>
+                                <FieldSelector
+                                    label="Filter Topics"
+                                    fieldName={BillingColumn.Topic}
+                                    selected={selectedTopics}
+                                    multiple={true}
+                                    preloadedData={availableTopics}
+                                    onClickFunction={onTopicsSelect}
+                                />
+                            </div>
+                        </Grid.Column>
+                    )}
+                    <Grid.Column
+                        width={7}
+                        textAlign="right"
+                        style={{ display: 'flex', justifyContent: 'flex-end' }}
+                    >
+                        <div
+                            className="button-container"
+                            style={{
+                                display: 'flex',
+                                gap: '10px',
+                                alignItems: 'center',
+                                justifyContent: 'flex-end',
+                                width: 'auto',
+                            }}
+                        >
+                            <ColumnVisibilityDropdown
+                                columns={getColumnConfigs()}
+                                groups={getColumnGroups()}
+                                visibleColumns={visibleColumns}
+                                onVisibilityChange={setVisibleColumns}
+                                searchThreshold={8}
+                                searchPlaceholder="Search topics and months..."
+                                enableUrlPersistence={true}
+                                urlParamName="columns"
+                                buttonStyle={{
+                                    minWidth: '115px',
+                                    height: '36px',
+                                }}
+                            />
 
-                <Grid.Column>
-                    <Checkbox
-                        label="Show as Chart / Table"
-                        fitted
-                        toggle
-                        checked={showAsChart}
-                        onChange={() => setShowAsChart(!showAsChart)}
-                    />
-                </Grid.Column>
+                            <Dropdown
+                                button
+                                className="icon"
+                                floating
+                                labeled
+                                icon="download"
+                                text="Export"
+                                style={{
+                                    minWidth: '115px',
+                                    height: '36px',
+                                }}
+                            >
+                                <Dropdown.Menu>
+                                    <Dropdown.Item
+                                        key="csv"
+                                        text="Export to CSV"
+                                        icon="file excel"
+                                        onClick={() => exportToFile('csv')}
+                                    />
+                                    <Dropdown.Item
+                                        key="tsv"
+                                        text="Export to TSV"
+                                        icon="file text outline"
+                                        onClick={() => exportToFile('tsv')}
+                                    />
+                                </Dropdown.Menu>
+                            </Dropdown>
+                        </div>
+                    </Grid.Column>
+                </Grid.Row>
             </Grid>
+
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2rem' }}>
+                <ToggleButtonGroup
+                    value={showAsChart ? 'chart' : 'table'}
+                    exclusive
+                    onChange={(event, newValue) => {
+                        if (newValue !== null) {
+                            setShowAsChart(newValue === 'chart')
+                        }
+                    }}
+                    aria-label="view mode"
+                    size="small"
+                    color="primary"
+                >
+                    <ToggleButton value="chart" aria-label="chart view">
+                        Chart
+                    </ToggleButton>
+                    <ToggleButton value="table" aria-label="table view">
+                        Table
+                    </ToggleButton>
+                </ToggleButtonGroup>
+            </div>
 
             {(() => {
                 if (!showAsChart) return null
+
+                const chartData = isLoading ? [] : costRecords
+
                 if (String(invoiceMonth) === String(thisMonth)) {
                     return (
                         <Grid columns={2} stackable doubling>
                             <Grid.Column width={8} className="chart-card">
                                 <HorizontalStackedBarChart
-                                    data={costRecords}
+                                    data={chartData}
                                     title={`24H (day UTC ${lastLoadedDay})`}
                                     series={['compute_daily', 'storage_daily']}
                                     labels={['Compute', 'Storage']}
@@ -244,7 +695,7 @@ const BillingCurrentCost = () => {
                             </Grid.Column>
                             <Grid.Column width={8} className="chart-card donut-chart">
                                 <HorizontalStackedBarChart
-                                    data={costRecords}
+                                    data={chartData}
                                     title="Invoice Month (Acc)"
                                     series={['compute_monthly', 'storage_monthly']}
                                     labels={['Compute', 'Storage']}
@@ -263,7 +714,7 @@ const BillingCurrentCost = () => {
                     <Grid>
                         <Grid.Column width={12}>
                             <HorizontalStackedBarChart
-                                data={costRecords}
+                                data={chartData}
                                 title="Invoice Month (Acc)"
                                 series={['compute_monthly', 'storage_monthly']}
                                 labels={['Compute', 'Storage']}
@@ -279,7 +730,9 @@ const BillingCurrentCost = () => {
                 )
             })()}
 
-            {!showAsChart ? (
+            {!showAsChart && isLoading ? <LoadingDucks /> : null}
+
+            {!showAsChart && !isLoading ? (
                 <Table celled compact sortable>
                     <SUITable.Header>
                         <SUITable.Row>
@@ -287,48 +740,36 @@ const BillingCurrentCost = () => {
 
                             <SUITable.HeaderCell></SUITable.HeaderCell>
 
-                            {invoiceMonth === thisMonth ? (
-                                <SUITable.HeaderCell colSpan="3">
-                                    24H (day UTC {lastLoadedDay})
-                                </SUITable.HeaderCell>
-                            ) : null}
-
-                            {groupBy === BillingColumn.GcpProject ? (
-                                <SUITable.HeaderCell colSpan="4">
-                                    Invoice Month (Acc)
-                                </SUITable.HeaderCell>
-                            ) : (
-                                <SUITable.HeaderCell colSpan="3">
-                                    Invoice Month (Acc)
-                                </SUITable.HeaderCell>
-                            )}
+                            {dailyHeaderCell}
+                            {monthlyHeaderCell}
                         </SUITable.Row>
                         <SUITable.Row>
                             <SUITable.HeaderCell></SUITable.HeaderCell>
 
                             {HEADER_FIELDS.map((k) => {
-                                switch (k.show_always || invoiceMonth === thisMonth) {
-                                    case true:
-                                        return (
-                                            <SUITable.HeaderCell
-                                                key={k.category}
-                                                sorted={checkDirection(k.category)}
-                                                onClick={() => handleSort(k.category)}
-                                                style={{
-                                                    borderBottom: 'none',
-                                                    position: 'sticky',
-                                                    resize: 'horizontal',
-                                                }}
-                                            >
-                                                {convertFieldName(k.title)}
-                                            </SUITable.HeaderCell>
-                                        )
-                                    default:
-                                        return null
+                                // Only show columns that are visible
+                                if (isColumnVisible(k.category)) {
+                                    return (
+                                        <SUITable.HeaderCell
+                                            key={k.category}
+                                            sorted={checkDirection(k.category)}
+                                            onClick={() => handleSort(k.category)}
+                                            style={{
+                                                borderBottom: 'none',
+                                                position: 'sticky',
+                                                resize: 'horizontal',
+                                            }}
+                                        >
+                                            {convertFieldName(k.title)}
+                                        </SUITable.HeaderCell>
+                                    )
                                 }
+                                return null
                             })}
 
-                            {groupBy === BillingColumn.GcpProject && invoiceMonth === thisMonth ? (
+                            {groupBy === BillingColumn.GcpProject &&
+                            invoiceMonth === thisMonth &&
+                            isColumnVisible('budget_spent') ? (
                                 <SUITable.HeaderCell
                                     key={'budget_spent'}
                                     sorted={checkDirection('budget_spent')}
@@ -345,7 +786,7 @@ const BillingCurrentCost = () => {
                         </SUITable.Row>
                     </SUITable.Header>
                     <SUITable.Body>
-                        {_.orderBy(
+                        {orderBy(
                             costRecords,
                             [sort.column],
                             sort.direction === 'ascending' ? ['asc'] : ['desc']
@@ -370,10 +811,18 @@ const BillingCurrentCost = () => {
                                         />
                                     </SUITable.Cell>
                                     {HEADER_FIELDS.map((k) => {
+                                        // Skip columns that are not visible
+                                        if (!isColumnVisible(k.category)) {
+                                            return null
+                                        }
+
                                         switch (k.category) {
                                             case 'field':
                                                 return (
-                                                    <SUITable.Cell className="billing-href">
+                                                    <SUITable.Cell
+                                                        key={k.category}
+                                                        className="billing-href"
+                                                    >
                                                         <b>
                                                             <Link
                                                                 to={
@@ -389,28 +838,38 @@ const BillingCurrentCost = () => {
                                                         </b>
                                                     </SUITable.Cell>
                                                 )
-                                            default:
-                                                switch (
-                                                    k.show_always ||
-                                                    invoiceMonth === thisMonth
-                                                ) {
-                                                    case true:
-                                                        return (
-                                                            <SUITable.Cell>
-                                                                {
-                                                                    // @ts-ignore
-                                                                    currencyFormat(p[k.category])
-                                                                }
-                                                            </SUITable.Cell>
-                                                        )
-                                                    default:
-                                                        return null
+                                            default: {
+                                                // We already checked visibility above, so just render
+                                                const record = p as BillingCostBudgetRecord
+                                                let value = record[
+                                                    k.category as keyof BillingCostBudgetRecord
+                                                ] as number
+
+                                                // Recalculate totals from rounded components for consistency
+                                                if (k.category === 'total_monthly') {
+                                                    value = getConsistentTotal(
+                                                        record.compute_monthly,
+                                                        record.storage_monthly
+                                                    )
+                                                } else if (k.category === 'total_daily') {
+                                                    value = getConsistentTotal(
+                                                        record.compute_daily,
+                                                        record.storage_daily
+                                                    )
                                                 }
+
+                                                return (
+                                                    <SUITable.Cell key={k.category}>
+                                                        {formatMoney(value)}
+                                                    </SUITable.Cell>
+                                                )
+                                            }
                                         }
                                     })}
 
                                     {groupBy === BillingColumn.GcpProject &&
-                                    invoiceMonth === thisMonth ? (
+                                    invoiceMonth === thisMonth &&
+                                    isColumnVisible('budget_spent') ? (
                                         <SUITable.Cell>
                                             {
                                                 // @ts-ignore
@@ -421,7 +880,7 @@ const BillingCurrentCost = () => {
                                 </SUITable.Row>
                                 {typeof p === 'object' &&
                                     'details' in p &&
-                                    _.orderBy(p?.details, ['monthly_cost'], ['desc']).map((dk) => (
+                                    orderBy(p?.details, ['monthly_cost'], ['desc']).map((dk) => (
                                         <SUITable.Row
                                             style={{
                                                 // @ts-ignore
@@ -436,42 +895,55 @@ const BillingCurrentCost = () => {
                                             <SUITable.Cell style={{ border: 'none' }} />
                                             <SUITable.Cell>{dk.cost_category}</SUITable.Cell>
 
-                                            {dk.cost_group === 'C' ? (
-                                                <React.Fragment>
-                                                    {invoiceMonth === thisMonth ? (
-                                                        <React.Fragment>
-                                                            <SUITable.Cell>
-                                                                {currencyFormat(dk.daily_cost)}
-                                                            </SUITable.Cell>
+                                            {HEADER_FIELDS.map((field) => {
+                                                if (
+                                                    field.category === 'field' ||
+                                                    !isColumnVisible(field.category)
+                                                ) {
+                                                    return null
+                                                }
 
-                                                            <SUITable.Cell colSpan="2" />
-                                                        </React.Fragment>
-                                                    ) : null}
-                                                    <SUITable.Cell>
-                                                        {currencyFormat(dk.monthly_cost)}
+                                                let shouldShowData = false
+                                                let dataValue = 0
+
+                                                if (dk.cost_group === 'C') {
+                                                    // Compute costs: show in compute columns
+                                                    if (
+                                                        field.category === 'compute_daily' ||
+                                                        field.category === 'compute_monthly'
+                                                    ) {
+                                                        shouldShowData = true
+                                                        dataValue =
+                                                            field.category === 'compute_daily'
+                                                                ? dk.daily_cost ?? 0
+                                                                : dk.monthly_cost ?? 0
+                                                    }
+                                                } else {
+                                                    // Storage costs: show in storage columns
+                                                    if (
+                                                        field.category === 'storage_daily' ||
+                                                        field.category === 'storage_monthly'
+                                                    ) {
+                                                        shouldShowData = true
+                                                        dataValue =
+                                                            field.category === 'storage_daily'
+                                                                ? dk.daily_cost ?? 0
+                                                                : dk.monthly_cost ?? 0
+                                                    }
+                                                }
+
+                                                return (
+                                                    <SUITable.Cell key={field.category}>
+                                                        {shouldShowData
+                                                            ? formatMoney(dataValue)
+                                                            : ''}
                                                     </SUITable.Cell>
-                                                    <SUITable.Cell colSpan="2" />
-                                                </React.Fragment>
-                                            ) : (
-                                                <React.Fragment>
-                                                    <SUITable.Cell />
-                                                    {invoiceMonth === thisMonth ? (
-                                                        <React.Fragment>
-                                                            <SUITable.Cell>
-                                                                {currencyFormat(dk.daily_cost)}
-                                                            </SUITable.Cell>
+                                                )
+                                            })}
 
-                                                            <SUITable.Cell colSpan="2" />
-                                                        </React.Fragment>
-                                                    ) : null}
-                                                    <SUITable.Cell>
-                                                        {currencyFormat(dk.monthly_cost)}
-                                                    </SUITable.Cell>
-                                                    <SUITable.Cell />
-                                                </React.Fragment>
-                                            )}
-
-                                            {groupBy === BillingColumn.GcpProject ? (
+                                            {groupBy === BillingColumn.GcpProject &&
+                                            invoiceMonth === thisMonth &&
+                                            isColumnVisible('budget_spent') ? (
                                                 <SUITable.Cell />
                                             ) : null}
                                         </SUITable.Row>
@@ -485,4 +957,10 @@ const BillingCurrentCost = () => {
     )
 }
 
-export default BillingCurrentCost
+export default function BillingCurrentCostPage() {
+    return (
+        <PaddedPage>
+            <BillingCurrentCost />
+        </PaddedPage>
+    )
+}

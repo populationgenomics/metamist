@@ -3,6 +3,7 @@
 This script goes through all CRAMS in sample-metadata, gets the size,
 and updates the meta['size'] attribute on the analysis.
 """
+
 import asyncio
 import logging
 import os
@@ -119,9 +120,9 @@ async def process_project(project: str):
                     for blob in client.list_blobs(bucket, prefix=prefix):
                         if not blob.name.endswith('.cram'):
                             continue
-                        file_size_by_name[
-                            os.path.join(bucket_path, blob.name)
-                        ] = blob.size
+                        file_size_by_name[os.path.join(bucket_path, blob.name)] = (
+                            blob.size
+                        )
                 except NotFound:
                     continue
         except NotFound:

@@ -10,6 +10,7 @@
 :root {
     --color-bg: #f5f7f9;
     --color-bg-card: #fff;
+    --color-bg-highlight: rgb(95, 169, 209, 0.2);
     --color-bg-disabled-card: #eeeeee;
     --color-table-header: #eaeaea;
     --color-text-red: #ff0000;
@@ -37,17 +38,9 @@
 
     --color-text-href: rgb(65, 131, 196);
 
-    --ourdna-blue-transparent: rgba(113, 172, 225, 0.5);
-    --ourdna-red-transparent: rgba(191, 0, 59, 0.5);
-    --ourdna-yellow-transparent: rgba(232, 199, 29, 0.5);
-    --ourdna-green-transparent: rgba(159, 201, 54, 0.5);
-    --ourdna-charcoal-transparent: rgba(85, 85, 85, 0.5);
-
-    --ourdna-blue: rgba(113, 172, 225);
-    --ourdna-red: rgba(191, 0, 59);
-    --ourdna-yellow: rgba(232, 199, 29);
-    --ourdna-green: rgba(159, 201, 54);
-    --ourdna-charcoal: rgba(85, 85, 85);
+    --color-pedigree-person-border: rgb(50, 50, 50);
+    --color-pedigree-affected: rgb(76, 76, 76);
+    --color-pedigree-unaffected: rgb(240, 240, 240);
 
     --color-header-row: #f9f9f9;
     --color-exome-row: #ededa1;
@@ -63,10 +56,11 @@ html[data-theme='dark-mode'] {
     /* .dark-mode { */
     --color-bg: #1d1d1d;
     --color-bg-card: #2c2c2c;
+    --color-bg-highlight: rgb(95, 169, 209, 0.2);
     --color-bg-disabled-card: #353535;
     --color-table-header: #383838;
 
-    --color-border-color: #3a3a3a;
+    --color-border-color: #565656;
     --color-border-default: #292a2b;
     --color-border-red: #921111;
     --color-divider: rgba(255, 255, 255, 0.2);
@@ -84,6 +78,10 @@ html[data-theme='dark-mode'] {
     --color-bg-under-budget: rgba(0, 128, 0, 0.5);
 
     --color-text-href: rgb(188, 188, 251);
+
+    --color-pedigree-person-border: rgb(169, 169, 169);
+    --color-pedigree-affected: rgb(153, 153, 153);
+    --color-pedigree-unaffected: rgb(51, 51, 51);
 
     --color-header-row: #383838;
     --color-exome-row: #887830;
@@ -141,7 +139,6 @@ body {
 
     background-color: var(--color-bg);
     color: var(--color-text-primary);
-    background: var(--color-bg);
 }
 
 code {
@@ -166,14 +163,6 @@ blockquote {
     font-style: italic;
 }
 
-.body {
-    /* padding: 10px 20px;
-  max-width: 768px;
-  margin: calc(50px + 1vmin) auto 0 auto; */
-    padding: 80px;
-    padding-top: 40px;
-}
-
 @media screen and (min-width: 1200px) {
     .dataStyle {
         max-width: 1200px;
@@ -190,11 +179,26 @@ blockquote {
     color: var(--color-text-primary);
 }
 
+.ui.card,
 .ui .card,
 .ui .segment {
     background: var(--color-bg-card);
     color: var(--color-text-primary);
     border: 1px solid var(--color-border-default);
+}
+
+.ui .modal > .content {
+    background: var(--color-bg-card);
+}
+
+.ui .modal > .header {
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
+}
+
+.ui .modal > .actions {
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
 }
 
 textarea {
@@ -203,18 +207,10 @@ textarea {
     border: 1px solid var(--color-border-default);
 }
 
-/* https://alexandergottlieb.com/2018/02/22/overflow-scroll-and-the-right-padding-problem-a-css-only-solution/ */
-.projectSummaryGrid::after {
-    content: '';
-    display: block;
-    position: absolute;
-    right: -80px;
-    width: 80px;
-    height: 1px;
-}
-
 html[data-theme='dark-mode'] .ui.styled.accordion {
-    box-shadow: 0 1px 2px 0 rgba(84, 84, 84, 0.87), 0 0 0 1px rgba(84, 84, 84, 0.87);
+    box-shadow:
+        0 1px 2px 0 rgba(84, 84, 84, 0.87),
+        0 0 0 1px rgba(84, 84, 84, 0.87);
 }
 
 html[data-theme='dark-mode'] .ui.styled.accordion .content {
@@ -350,17 +346,6 @@ html[data-theme='dark-mode'] .ui.table {
     color: var(--color-text-primary);
 }
 
-.dashboard-tile {
-    color: var(--color-text-primary) !important;
-}
-
-.ourdna-logo-responsive {
-    width: 50%;
-    height: auto;
-    max-width: 200px;
-    max-height: 100px;
-}
-
 /* Project Insights dashboard */
 .html-tooltip .MuiTooltip-tooltip {
     background-color: #f5f5f9;
@@ -428,6 +413,7 @@ html[data-theme='dark-mode'] .ui.table {
 .ui.table .header-cell.collapsible-header.expanded {
     width: 150px !important;
 }
+
 .ui.table .header-cell.collapsible-header:not(.expanded) {
     width: 70px !important;
 }
@@ -470,4 +456,25 @@ html[data-theme='dark-mode'] .ui.table {
     label {
         color: var(--color-text-primary) !important;
     }
+}
+
+/* See on billing home page - fixes attached menu dark mode border */
+.ui.attached.inverted.menu {
+    border: 1px solid #555 !important;
+}
+
+.dimmed.dimmable > .ui.modals.dimmer.visible {
+    display: flex !important;
+}
+
+/*
+    hax to fix bad cascading styles.
+    There are a few conflicting css frameworks on metamist for strange historical reasons.
+    While we're working to move to mui and remove other conflicting styles at the moment it
+    is sometimes necessary to remove styles that cascade from bad global definitions.
+*/
+
+.MuiTablePagination-selectLabel,
+.MuiTablePagination-displayedRows {
+    margin-bottom: 0 !important;
 }

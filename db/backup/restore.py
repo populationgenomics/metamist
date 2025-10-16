@@ -1,5 +1,5 @@
-""" A script to restore the database instance to the latest
-backup """
+"""A script to restore the database instance to the latest
+backup"""
 
 import os
 import subprocess

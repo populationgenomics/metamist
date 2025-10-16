@@ -1,8 +1,7 @@
-import React from 'react'
 import * as d3 from 'd3'
-import LoadingDucks from '../LoadingDucks/LoadingDucks'
+import React, { useEffect } from 'react'
 import { BillingCostBudgetRecord } from '../../../sm-api'
-import { grey } from '@mui/material/colors'
+import LoadingDucks from '../LoadingDucks/LoadingDucks'
 
 interface HorizontalStackedBarChartProps {
     data: BillingCostBudgetRecord[]
@@ -31,51 +30,38 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
     isLoading,
     showLegend,
 }) => {
-    if (!isLoading && (!data || data.length === 0)) {
-        return <div>No data available</div>
-    }
-
-    const colorFunc: (t: number) => string | undefined = colors ?? d3.interpolateRainbow
-
-    // set the dimensions and margins of the graph
-    const margin = { top: 80, right: 20, bottom: 50, left: 250 }
-    const width = 650 - margin.left - margin.right
-    const outsideHeight = 2850
-    const height = outsideHeight - margin.top - margin.bottom
-
     const containerDivRef = React.useRef<HTMLDivElement | null>(null)
 
-    const [clientWidth, setClientWidth] = React.useState(650)
+    useEffect(() => {
+        const colorFunc: (t: number) => string | undefined = colors ?? d3.interpolateRainbow
 
-    React.useEffect(() => {
-        function updateWindowWidth() {
-            setClientWidth(containerDivRef.current?.clientWidth ?? 650)
-        }
-        if (containerDivRef.current) {
-            updateWindowWidth()
-        }
-        window.addEventListener('resize', updateWindowWidth)
+        // set the dimensions and margins of the graph
+        const margin = { top: 80, right: 20, bottom: 50, left: 250 }
+        const width = 650 - margin.left - margin.right
+        // Calculate dynamic height based on number of data items
+        // For full datasets (many items), use original fixed height
+        // For smaller filtered datasets, use responsive sizing
+        const originalHeight = 2850 - margin.top - margin.bottom
+        const minItemsForFixedHeight = 40 // Threshold for using fixed vs dynamic height
 
-        return () => {
-            window.removeEventListener('resize', updateWindowWidth)
+        let height: number
+        if (data.length >= minItemsForFixedHeight) {
+            // Use original fixed height for full datasets
+            height = originalHeight
+        } else {
+            // Use responsive height for smaller filtered datasets
+            const barHeight = 50
+            const minHeight = 400
+            height = Math.max(minHeight, data.length * barHeight)
         }
-    }, [])
 
-    const contDiv = containerDivRef.current
-    if (contDiv) {
-        // reset svg
+        const outsideHeight = height + margin.top + margin.bottom
+
+        if (!containerDivRef.current) return
+
+        const contDiv = containerDivRef.current
+
         contDiv.innerHTML = ''
-
-        if (isLoading) {
-            return (
-                <div>
-                    <LoadingDucks />
-                    <p style={{ textAlign: 'center', marginTop: '5px' }}>
-                        <em>This query takes a while...</em>
-                    </p>
-                </div>
-            )
-        }
 
         // prepare data
         // @ts-ignore
@@ -175,10 +161,6 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
             .style('font-size', '18px') // make the axis labels bigger
             .call(d3.axisLeft(yScale).tickSize(0).tickPadding(5))
 
-        // color palette
-        // @ts-ignore
-        const color = d3.scaleOrdinal().domain(typeKeys).range(['url(#pattern0)', 'url(#pattern1)'])
-
         // @ts-ignore
         const color_fnc = (d) => {
             if (threshold_series === undefined) {
@@ -213,17 +195,17 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
         const tooltip = d3.select('body').append('div').attr('id', 'chart').attr('class', 'tooltip')
 
         // tooltip events
-        const mouseover = (d: any) => {
+        const mouseover = () => {
             tooltip.style('opacity', 0.8)
         }
-        const mousemove = (event: any, d: any) => {
+        const mousemove = (event: MouseEvent, d: { data: { 0: number; 1: number } }) => {
             const mformater = d3.format(',.2f')
             tooltip
                 .html(mformater(d.data[1] - d.data[0]) + ' AUD')
                 .style('top', event.pageY - 10 + 'px')
                 .style('left', event.pageX + 10 + 'px')
         }
-        const mouseleave = (d: any) => {
+        const mouseleave = () => {
             tooltip.style('opacity', 0)
         }
 
@@ -247,8 +229,7 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
             .selectAll('g')
             .data(indexedData)
             .join('g')
-            // @ts-ignore
-            .attr('fill', (d) => color(d))
+            .attr('fill', (_d, i) => `url(#pattern${i})`)
             .selectAll('rect')
             .data((d) => d)
             .join('rect')
@@ -262,7 +243,13 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
             .on('mouseleave', mouseleave)
 
         // create bidgetn line
-        const budgetFnc = (d: any) => {
+        const budgetFnc = (d: {
+            outerIdx: number
+            innerIdx: number
+            data: d3.SeriesPoint<{
+                [key: string]: number
+            }>
+        }) => {
             if (showLegend) {
                 // @ts-ignore
                 return xScale(budgetData[d.data.data.field])
@@ -270,7 +257,13 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
             return 0
         }
 
-        const budgetColor = (d: any) => {
+        const budgetColor = (d: {
+            outerIdx: number
+            innerIdx: number
+            data: d3.SeriesPoint<{
+                [key: string]: number
+            }>
+        }) => {
             // @ts-ignore
             const budgetVal = budgetData[d.data.data.field]
             if (showLegend && budgetVal !== null && budgetVal !== undefined) {
@@ -289,7 +282,7 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
             .attr('x', (d) => budgetFnc(d))
             // @ts-ignore
             .attr('y', (d) => yScale(d.data.data.field) - 5)
-            .attr('width', (d) => 3)
+            .attr('width', () => 3)
             .attr('height', yScale.bandwidth() + 10)
             .attr('fill', (d) => budgetColor(d))
 
@@ -358,7 +351,35 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
                     .text('Budget')
             }
         }
+    }, [
+        containerDivRef,
+        data,
+        colors,
+        labels,
+        series,
+        showLegend,
+        sorted_by,
+        threshold_series,
+        threshold_values,
+        title,
+        total_series,
+    ])
+
+    if (!isLoading && (!data || data.length === 0)) {
+        return <div>No data available</div>
     }
+
+    if (isLoading) {
+        return (
+            <div>
+                <LoadingDucks />
+                <p style={{ textAlign: 'center', marginTop: '5px' }}>
+                    <em>This query takes a while...</em>
+                </p>
+            </div>
+        )
+    }
+
     return <div ref={containerDivRef}></div>
 }
 

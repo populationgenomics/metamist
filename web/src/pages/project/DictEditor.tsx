@@ -9,7 +9,9 @@ export type DictEditorInput = { [key: string]: InputValue } | string
 
 interface DictEditorProps {
     input: DictEditorInput
-    onChange: (json: object) => void
+    height?: string
+    readonly?: boolean
+    onChange?: (json: object) => void
 }
 
 const getStringFromValue = (input: DictEditorInput) => {
@@ -32,13 +34,18 @@ const parseString = (str: string) => {
     } catch (yamlErr) {
         try {
             return JSON.parse(str)
-        } catch (jsonErr) {
+        } catch (_jsonErr) {
             throw yamlErr
         }
     }
 }
 
-export const DictEditor: React.FunctionComponent<DictEditorProps> = ({ input, onChange }) => {
+export const DictEditor: React.FunctionComponent<DictEditorProps> = ({
+    input,
+    onChange,
+    height,
+    readonly,
+}) => {
     const [textValue, setInnerTextValue] = React.useState<string>(getStringFromValue(input))
     const theme = React.useContext(ThemeContext)
 
@@ -51,37 +58,41 @@ export const DictEditor: React.FunctionComponent<DictEditorProps> = ({ input, on
     const handleChange = (value: string) => {
         setInnerTextValue(value)
         try {
-            const _ = parseString(value)
+            parseString(value)
             setError(undefined)
-        } catch (e: any) {
-            setError(e.message)
+        } catch (e) {
+            const err = e as unknown as { message: string }
+            setError(err.message)
         }
     }
 
     const submit = () => {
         try {
             const newJson = parseString(textValue)
-            onChange(newJson)
-        } catch (e: any) {
-            setError(e.message)
+            onChange?.(newJson)
+        } catch (e) {
+            const err = e as unknown as { message: string }
+            setError(err.message)
         }
     }
 
     return (
         <div
             style={{
-                border: !!error ? '3px solid var(--color-border-red)' : '1px solid #ccc',
+                border: error ? '3px solid var(--color-border-red)' : '1px solid #ccc',
             }}
         >
             <Editor
                 value={textValue}
-                height="200px"
+                height={height || '200px'}
                 theme={theme.theme === 'dark-mode' ? 'vs-dark' : 'vs-light'}
                 language="yaml"
                 onChange={(value) => handleChange(value || '')}
                 options={{
                     minimap: { enabled: false },
                     automaticLayout: true,
+                    readOnly: readonly,
+                    scrollBeyondLastLine: false,
                 }}
             />
             {error && (
@@ -89,11 +100,13 @@ export const DictEditor: React.FunctionComponent<DictEditorProps> = ({ input, on
                     <em style={{ color: 'var(--color-text-red)' }}>{error}</em>
                 </p>
             )}
-            <p>
-                <Button onClick={submit} disabled={!!error}>
-                    Apply
-                </Button>
-            </p>
+            {!readonly && (
+                <p>
+                    <Button onClick={submit} disabled={!!error}>
+                        Apply
+                    </Button>
+                </p>
+            )}
         </div>
     )
 }

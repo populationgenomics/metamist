@@ -3,7 +3,7 @@ import TableBody from '@mui/material/TableBody'
 import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
-import * as _ from 'lodash'
+import orderBy from 'lodash/orderBy'
 import React from 'react'
 import { AnalysisCostRecordBatch, AnalysisCostRecordBatchJob } from '../../../sm-api'
 
@@ -46,30 +46,34 @@ const ExpandableRow: React.FC<{ item: AnalysisCostRecordBatchJob }> = ({ item, .
 }
 
 const TblComponents: TableComponents = {
-    Scroller: React.forwardRef((props, ref) => (
-        <TableContainer
-            component={Paper}
-            // @ts-ignore
-            ref={ref}
-            {...props}
-        />
-    )),
+    Scroller: React.forwardRef(function TableContainerWrapper(props, ref) {
+        return (
+            <TableContainer
+                component={Paper}
+                // @ts-ignore
+                ref={ref}
+                {...props}
+            />
+        )
+    }),
     Table: (props: TableProps) => <Table {...props} style={{ borderCollapse: 'separate' }} />,
     TableHead: TableHead,
     // @ts-ignore
     TableRow: ExpandableRow,
     // @ts-ignore
-    TableBody: React.forwardRef((props: TableBodyProps, ref) => <TableBody ref={ref} {...props} />),
+    TableBody: React.forwardRef(function TableBodyWrapper(props: TableBodyProps, ref) {
+        return <TableBody ref={ref} {...props} />
+    }),
 }
 
 export const BatchJobsTable: React.FC<{ batch: AnalysisCostRecordBatch }> = ({ batch }) => {
     const [sortedData, setSortedData] = React.useState(
-        _.orderBy(batch.jobs, (j) => parseInt(j.job_id))
+        orderBy(batch.jobs, (j) => parseInt(j.job_id))
     )
 
     React.useEffect(() => {
         // sort here to avoid sorting on each render
-        setSortedData(_.orderBy(batch.jobs, (j) => parseInt(j.job_id)))
+        setSortedData(orderBy(batch.jobs, (j) => parseInt(j.job_id)))
     }, [batch])
 
     return (

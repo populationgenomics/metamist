@@ -31,9 +31,32 @@ KeyMap = {
     READS_COL_NAME: ['filename', 'filenames', 'files', 'file'],
     SEQ_TYPE_COL_NAME: ['type', 'types', 'sequencing type', 'sequencing_type'],
     SEQ_FACILITY_COL_NAME: ['facility', 'sequencing facility', 'sequencing_facility'],
-    SEQ_LIBRARY_COL_NAME: ['library', 'library_prep', 'library prep', 'library type', 'library_type', 'sequencing_library', 'sequencing library'],
-    READ_END_TYPE_COL_NAME: ['read_end_type', 'read end type', 'read_end_types', 'read end types', 'end type', 'end_type', 'end_types', 'end types'],
-    READ_LENGTH_COL_NAME: ['length', 'read length', 'read_length', 'read lengths', 'read_lengths'],
+    SEQ_LIBRARY_COL_NAME: [
+        'library',
+        'library_prep',
+        'library prep',
+        'library type',
+        'library_type',
+        'sequencing_library',
+        'sequencing library',
+    ],
+    READ_END_TYPE_COL_NAME: [
+        'read_end_type',
+        'read end type',
+        'read_end_types',
+        'read end types',
+        'end type',
+        'end_type',
+        'end_types',
+        'end types',
+    ],
+    READ_LENGTH_COL_NAME: [
+        'length',
+        'read length',
+        'read_length',
+        'read lengths',
+        'read_lengths',
+    ],
     CHECKSUM_COL_NAME: ['md5', 'checksum'],
 }
 
@@ -91,7 +114,7 @@ logger.setLevel(logging.INFO)
 class SampleFileMapParser(GenericMetadataParser):
     """Parser for SampleFileMap"""
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         search_locations: list[str],
         project: str,
@@ -99,8 +122,8 @@ class SampleFileMapParser(GenericMetadataParser):
         default_sequencing=DefaultSequencing(
             seq_type='genome', technology='short-read', platform='illumina'
         ),
-        default_read_end_type: str = None,
-        default_read_length: str | int = None,
+        default_read_end_type: str | None = None,
+        default_read_length: str | int | None = None,
         allow_extra_files_in_search_path=False,
         default_reference_assembly_location: str | None = None,
         ora_reference_assembly_location: str | None = None,
@@ -110,8 +133,8 @@ class SampleFileMapParser(GenericMetadataParser):
         super().__init__(
             search_locations=search_locations,
             project=project,
-            participant_column=PARTICIPANT_COL_NAME,
-            sample_name_column=SAMPLE_ID_COL_NAME,
+            participant_primary_eid_column=PARTICIPANT_COL_NAME,
+            sample_primary_eid_column=SAMPLE_ID_COL_NAME,
             reads_column=READS_COL_NAME,
             checksum_column=CHECKSUM_COL_NAME,
             seq_type_column=SEQ_TYPE_COL_NAME,
@@ -131,13 +154,13 @@ class SampleFileMapParser(GenericMetadataParser):
             **kwargs,
         )
 
-    def get_sample_id(self, row: SingleRow) -> str:
+    def get_primary_sample_id(self, row: SingleRow) -> str:
         """Get external sample ID from row"""
 
-        if self.sample_name_column and self.sample_name_column in row:
-            return row[self.sample_name_column]
+        if self.sample_primary_eid_column and self.sample_primary_eid_column in row:
+            return row[self.sample_primary_eid_column]
 
-        return self.get_participant_id(row)
+        return self.get_primary_participant_id(row)
 
     @staticmethod
     def get_info() -> tuple[str, str]:
@@ -204,12 +227,12 @@ async def main(  # pylint: disable=too-many-arguments
     default_sequencing_type='genome',
     default_sequencing_technology='short-read',
     default_sequencing_platform='illumina',
-    default_sequencing_facility: str = None,
-    default_sequencing_library: str = None,
-    default_read_end_type: str = None,
-    default_read_length: str = None,
-    default_reference_assembly: str = None,
-    default_ora_reference_assembly: str = None,
+    default_sequencing_facility: str | None = None,
+    default_sequencing_library: str | None = None,
+    default_read_end_type: str | None = None,
+    default_read_length: str | None = None,
+    default_reference_assembly: str | None = None,
+    default_ora_reference_assembly: str | None = None,
     allow_extra_files_in_search_path=False,
     confirm=False,
     dry_run=False,

@@ -1,4 +1,5 @@
-import _, { capitalize } from 'lodash'
+import capitalize from 'lodash/capitalize'
+import startCase from 'lodash/startCase'
 import * as React from 'react'
 
 import { TableBody, TableHeader, TableHeaderCell, TableRow } from 'semantic-ui-react'
@@ -125,7 +126,7 @@ const ProjectGridCategoryHeader: React.FC<{
                             backgroundColor: 'var(--color-table-header)',
                         }}
                     >
-                        {_.startCase(metaSearchEntityToTitle(category))}
+                        {startCase(metaSearchEntityToTitle(category))}
                     </TableHeaderCell>
                 )
             })}

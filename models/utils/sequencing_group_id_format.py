@@ -1,3 +1,4 @@
+import functools
 from typing import Iterable
 
 from api.settings import SEQUENCING_GROUP_CHECKSUM_OFFSET, SEQUENCING_GROUP_PREFIX
@@ -48,7 +49,9 @@ def sequencing_group_id_transform_to_raw(identifier: int | str, strict=True) -> 
     if not luhn_is_valid(
         sequencing_group_id_with_checksum, offset=SEQUENCING_GROUP_CHECKSUM_OFFSET
     ):
-        raise ValueError(f'The provided sequencing group ID was not valid: {identifier!r}')
+        raise ValueError(
+            f'The provided sequencing group ID was not valid: {identifier!r}'
+        )
 
     return int(stripped_identifier[:-1])
 
@@ -63,6 +66,9 @@ def sequencing_group_id_format_list(sg_ids: Iterable[int | str]) -> list[str]:
     return [sequencing_group_id_format(s) for s in sg_ids]
 
 
+# This potentially gets called a lot in loops when iterating over lots of sgs,
+# so maintain a cache.
+@functools.lru_cache(maxsize=1024)
 def sequencing_group_id_format(sequencing_group_id: int | str) -> str:
     """
     Transform raw (int) sequencing-group identifier to format (CPGXXXH) where:

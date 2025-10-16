@@ -91,6 +91,10 @@ class ProjectParticipantGridFilterType(Enum):
     neq = 'neq'
     startswith = 'startswith'
     icontains = 'icontains'
+    gt = 'gt'
+    gte = 'gte'
+    lt = 'lt'
+    lte = 'lte'
 
 
 class ProjectParticipantGridField(SMBase):
@@ -154,6 +158,9 @@ class ProjectParticipantGridResponse(SMBase):
         """
         Read through nested participants and full out the keys for the grid response
         """
+        has_sequencing_groups = False
+        has_assays = False
+
         hidden_participant_meta_keys: set[str] = set()
         hidden_sample_meta_keys = {'reads', 'vcfs', 'gvcf'}
         hidden_assay_meta_keys = {
@@ -211,17 +218,19 @@ class ProjectParticipantGridResponse(SMBase):
             for s in p.samples:
                 if s.meta:
                     update_d_from_meta(sample_meta_keys, s.meta)
-                if not s.sequencing_groups:
-                    continue
                 if s.sample_parent_id is not None:
                     has_nested_samples = True
 
+                if not s.sequencing_groups:
+                    continue
+                has_sequencing_groups = True
                 for sg in s.sequencing_groups or []:
                     if sg.meta:
                         update_d_from_meta(sg_meta_keys, sg.meta)
 
                     if not sg.assays:
                         continue
+                    has_assays = True
                     for a in sg.assays:
                         if a.meta:
                             update_d_from_meta(assay_meta_keys, a.meta)
@@ -235,7 +244,7 @@ class ProjectParticipantGridResponse(SMBase):
 
         family_fields: list[ProjectParticipantGridField] = [
             Field(
-                key='external_id',
+                key='external_ids',
                 label='Family ID',
                 is_visible=True,
                 filter_key='external_id',
@@ -249,8 +258,22 @@ class ProjectParticipantGridResponse(SMBase):
         )
         participant_fields = [
             Field(
-                key='external_ids',
+                key='id',
                 label='Participant ID',
+                is_visible=True,
+                filter_key='id',
+                filter_types=[
+                    ProjectParticipantGridFilterType.eq,
+                    ProjectParticipantGridFilterType.neq,
+                    ProjectParticipantGridFilterType.gt,
+                    ProjectParticipantGridFilterType.gte,
+                    ProjectParticipantGridFilterType.lt,
+                    ProjectParticipantGridFilterType.lte,
+                ],
+            ),
+            Field(
+                key='external_ids',
+                label='External Participant ID',
                 is_visible=True,
                 filter_key='external_id',
             ),
@@ -301,9 +324,14 @@ class ProjectParticipantGridResponse(SMBase):
                 filter_key='external_id',
             ),
             Field(
+                key='type',
+                label='Type',
+                is_visible=True,
+            ),
+            Field(
                 key='sample_root_id',
                 label='Root Sample ID',
-                is_visible=False,
+                is_visible=has_nested_samples,
                 filter_key='sample_root_id',
             ),
             Field(
@@ -330,11 +358,21 @@ class ProjectParticipantGridResponse(SMBase):
         )
         assay_fields = [
             Field(
+                key='id',
+                label='Assay ID',
+                is_visible=True,
+                filter_key='id',
+                filter_types=[
+                    ProjectParticipantGridFilterType.eq,
+                    ProjectParticipantGridFilterType.neq,
+                ],
+            ),
+            Field(
                 key='type',
                 label='Type',
-                is_visible=True,
+                is_visible=has_assays,
                 filter_key='type',
-            )
+            ),
         ]
         assay_fields.extend(
             Field(
@@ -350,7 +388,7 @@ class ProjectParticipantGridResponse(SMBase):
             Field(
                 key='id',
                 label='Sequencing Group ID',
-                is_visible=True,
+                is_visible=has_sequencing_groups,
                 filter_key='id',
                 filter_types=[
                     ProjectParticipantGridFilterType.eq,
@@ -360,19 +398,19 @@ class ProjectParticipantGridResponse(SMBase):
             Field(
                 key='type',
                 label='Type',
-                is_visible=True,
+                is_visible=has_sequencing_groups,
                 filter_key='type',
             ),
             Field(
                 key='technology',
                 label='Technology',
-                is_visible=True,
+                is_visible=has_sequencing_groups,
                 filter_key='technology',
             ),
             Field(
                 key='platform',
                 label='Platform',
-                is_visible=True,
+                is_visible=has_sequencing_groups,
                 filter_key='platform',
             ),
         ]

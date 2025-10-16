@@ -4,28 +4,33 @@ import { Route, Routes as Switch } from 'react-router-dom'
 import SwaggerUI from 'swagger-ui-react'
 
 import ProjectsAdmin from './pages/admin/ProjectsAdmin'
+import { AnalysisViewPage } from './pages/analysis/AnalysisView'
 import {
     BillingCostByAnalysis,
     BillingCostByCategory,
     BillingCostByMonth,
+    BillingCostBySample,
     BillingCostByTime,
     BillingHome,
     BillingInvoiceMonthCost,
     BillingSeqrProp,
 } from './pages/billing'
 import DocumentationArticle from './pages/docs/Documentation'
-import FamilyView from './pages/family/FamilyView'
+import { FamilyPage } from './pages/family/FamilyView'
 import Details from './pages/insights/Details'
 import Summary from './pages/insights/Summary'
-import OurDnaDashboard from './pages/ourdna/OurDnaDashboard'
+import { ParticipantPage } from './pages/participant/ParticipantViewContainer'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
 import ProjectOverview from './pages/project/ProjectOverview'
+import ProjectReport from './pages/report/ProjectReport'
+import SqlQueryUI from './pages/report/SqlQueryUI'
 import SampleView from './pages/sample/SampleView'
 import ErrorBoundary from './shared/utilities/errorBoundary'
 
 const Routes: React.FunctionComponent = () => (
     <Switch>
         <Route path="/" element={<DocumentationArticle articleid="index" />} />
+        {/* <Route path="/tt" element={<TangledTreeExamples />} /> */}
 
         <Route path="admin" element={<ProjectsAdmin />} />
         <Route
@@ -36,11 +41,28 @@ const Routes: React.FunctionComponent = () => (
                 </ErrorBoundary>
             }
         />
+
         <Route
-            path="project/:projectName/participant/:participantName"
+            path="/project/:projectName/query/:tableName?"
             element={
                 <ErrorBoundary>
-                    <SampleView />
+                    <SqlQueryUI />
+                </ErrorBoundary>
+            }
+        />
+        <Route
+            path="/project/:projectName/report/:reportName/:tabName?"
+            element={
+                <ErrorBoundary>
+                    <ProjectReport />
+                </ErrorBoundary>
+            }
+        />
+        <Route
+            path="/participant/:participantId"
+            element={
+                <ErrorBoundary>
+                    <ParticipantPage />
                 </ErrorBoundary>
             }
         />
@@ -88,6 +110,14 @@ const Routes: React.FunctionComponent = () => (
             }
         />
         <Route
+            path="/billing/costBySample"
+            element={
+                <ErrorBoundary>
+                    <BillingCostBySample />
+                </ErrorBoundary>
+            }
+        />
+        <Route
             path="/billing/seqrPropMap"
             element={
                 <ErrorBoundary>
@@ -96,14 +126,12 @@ const Routes: React.FunctionComponent = () => (
             }
         />
 
-        <Route path="/ourdna" element={<OurDnaDashboard />} />
-
         <Route path="/swagger" element={<SwaggerUI url="/openapi.json" tryItOutEnabled={true} />} />
 
         <Route path="/documentation/:id?" element={<DocumentationArticle />} />
 
         <Route
-            path="sample/:sampleName/:sequencingGroupName?"
+            path="/sample/:sampleName/:sequencingGroupName?"
             element={
                 <ErrorBoundary>
                     <SampleView />
@@ -112,10 +140,19 @@ const Routes: React.FunctionComponent = () => (
         />
 
         <Route
-            path="/family/:familyID"
+            path="/family/:familyId"
             element={
                 <ErrorBoundary>
-                    <FamilyView />
+                    <FamilyPage />
+                </ErrorBoundary>
+            }
+        />
+
+        <Route
+            path="/analysis/:analysisId"
+            element={
+                <ErrorBoundary>
+                    <AnalysisViewPage />
                 </ErrorBoundary>
             }
         />

@@ -1,9 +1,11 @@
 import { useQuery } from '@apollo/client'
-import _ from 'lodash'
+import get from 'lodash/get'
+import orderBy from 'lodash/orderBy'
 import * as React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Dropdown } from 'semantic-ui-react'
 import { gql } from '../../../__generated__/gql'
+import { PaddedPage } from '../../../shared/components/Layout/PaddedPage'
 import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
 import MuckError from '../../../shared/components/MuckError'
 import sanitiseValue from '../../../shared/utilities/sanitiseValue'
@@ -67,13 +69,6 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
         setSort({ column: null, direction: null })
     }
 
-    const projectSelectorOnClick = React.useCallback(
-        (__, { value }) => {
-            navigate(`/analysis-runner/${value}`)
-        },
-        [navigate]
-    )
-
     const handleOnClick = React.useCallback((p) => {
         setPageNumber(p)
     }, [])
@@ -119,7 +114,7 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
     )
 
     return (
-        <>
+        <PaddedPage>
             <ProjectSelector
                 onProjectSelect={(project) => navigate(`/analysis-runner/${project.name}`)}
             />
@@ -156,14 +151,14 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
                             totalPageNumbers={Math.ceil(
                                 (flatData.filter((log) =>
                                     filters.every(({ category, value }) =>
-                                        _.get(log, category, '').includes(value)
+                                        get(log, category, '').includes(value)
                                     )
                                 ).length || 0) / pageLimit
                             )}
                             total={Math.ceil(
                                 flatData.filter((log) =>
                                     filters.every(({ category, value }) =>
-                                        _.get(log, category, '').includes(value)
+                                        get(log, category, '').includes(value)
                                     )
                                 ).length
                             )}
@@ -175,7 +170,7 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
                     <AnalysisRunnerGrid
                         data={(!sort.column
                             ? flatData
-                            : _.orderBy(
+                            : orderBy(
                                   flatData,
                                   [sort.column],
                                   sort.direction === 'ascending' ? ['asc'] : ['desc']
@@ -183,7 +178,7 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
                         )
                             .filter((log) =>
                                 filters.every(({ category, value }) =>
-                                    _.get(log, category, '').includes(value)
+                                    get(log, category, '').includes(value)
                                 )
                             )
                             .slice((pageNumber - 1) * pageLimit, pageNumber * pageLimit)}
@@ -196,16 +191,12 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
                         isLoading={loading}
                         totalPageNumbers={Math.ceil(
                             (flatData.filter((log) =>
-                                filters.every(
-                                    ({ category, value }) => _.get(log, category) === value
-                                )
+                                filters.every(({ category, value }) => get(log, category) === value)
                             ).length || 0) / pageLimit
                         )}
                         total={Math.ceil(
                             flatData.filter((log) =>
-                                filters.every(
-                                    ({ category, value }) => _.get(log, category) === value
-                                )
+                                filters.every(({ category, value }) => get(log, category) === value)
                             ).length
                         )}
                         title="records"
@@ -214,7 +205,7 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
                     />
                 </>
             )}
-        </>
+        </PaddedPage>
     )
 }
 

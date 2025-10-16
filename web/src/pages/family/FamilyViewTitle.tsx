@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { Popup, Button, Grid } from 'semantic-ui-react'
+import { Button, Grid, Popup } from 'semantic-ui-react'
 
 import Diversity3RoundedIcon from '@mui/icons-material/Diversity3Rounded'
 import { ThemeContext } from '../../shared/components/ThemeProvider'

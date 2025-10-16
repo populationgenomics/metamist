@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Table as SUITable } from 'semantic-ui-react'
 
-import _ from 'lodash'
+import capitalize from 'lodash/capitalize'
 import { GraphQlAssay } from '../../__generated__/graphql'
 import formatBytes from '../utilities/formatBytes'
 import safeValue from '../utilities/safeValue'
@@ -18,7 +18,7 @@ interface File {
 
 interface SequenceMeta {
     reads?: File | Array<File> | Array<Array<File>>
-    [key: string]: any
+    [key: string]: unknown
 }
 
 const excludedSequenceFields = ['id', '__typename']
@@ -97,7 +97,7 @@ const AssayInfo: React.FunctionComponent<{
                                 return (
                                     <SUITable.Row key={`${k1}`}>
                                         <SUITable.Cell>
-                                            <b>{_.capitalize(k1)}</b>
+                                            <b>{capitalize(k1)}</b>
                                         </SUITable.Cell>
                                         <SUITable.Cell>
                                             {renderReadsMetadata(v1 as File[], key)}
@@ -106,11 +106,12 @@ const AssayInfo: React.FunctionComponent<{
                                 )
                             }
                             if (v1 && typeof v1 === 'object' && !Array.isArray(v1)) {
+                                // @ts-ignore
                                 if (!!v1.location && !!v1.size) {
                                     return (
                                         <SUITable.Row key={`${k1}`}>
                                             <SUITable.Cell>
-                                                <b>{_.capitalize(k1)}:</b>
+                                                <b>{capitalize(k1)}:</b>
                                             </SUITable.Cell>
                                             <SUITable.Cell>
                                                 {renderReadsMetadata([v1] as File[], k1)}
@@ -123,7 +124,7 @@ const AssayInfo: React.FunctionComponent<{
                             return (
                                 <SUITable.Row key={`${k1}-${stringifiedValue}`}>
                                     <SUITable.Cell>
-                                        <b>{_.capitalize(k1)}</b>
+                                        <b>{capitalize(k1)}</b>
                                     </SUITable.Cell>
                                     <SUITable.Cell>
                                         {stringifiedValue ?? <em>no-value</em>}
@@ -137,7 +138,7 @@ const AssayInfo: React.FunctionComponent<{
                 return (
                     <SUITable.Row key={`${key}-${stringifiedValue}`}>
                         <SUITable.Cell>
-                            <b>{_.capitalize(key)}</b>
+                            <b>{capitalize(key)}</b>
                         </SUITable.Cell>
                         <SUITable.Cell>{stringifiedValue ?? <em>no-value</em>}</SUITable.Cell>
                     </SUITable.Row>

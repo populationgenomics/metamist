@@ -69,7 +69,7 @@ class TestExistingCohortParser(DbIsolatedTest):
         self.assertEqual(0, summary.assays.update)
 
         sample_to_add = participants[0].samples[0]
-        self.assertEqual('EXTID1234', sample_to_add.external_sid)
+        self.assertEqual('EXTID1234', sample_to_add.primary_external_id)
         expected_sequence_dict = {
             'reference_genome': 'hg38',
             'platform': 'App',

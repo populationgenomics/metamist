@@ -5,7 +5,10 @@ from db.python.tables.assay import AssayFilter, AssayTable
 from db.python.tables.sample import SampleTable
 from db.python.utils import NoOpAenter
 from models.models.assay import AssayInternal, AssayUpsertInternal
-from models.models.project import FullWriteAccessRoles, ReadAccessRoles
+from models.models.project import (
+    FullWriteAccessRoles,
+    ReadAccessRoles,
+)
 
 
 class AssayLayer(BaseLayer):
@@ -13,8 +16,8 @@ class AssayLayer(BaseLayer):
 
     def __init__(self, connection: Connection):
         super().__init__(connection)
-        self.seqt: AssayTable = AssayTable(connection)
-        self.sampt: SampleTable = SampleTable(connection)
+        self.seqt = AssayTable(connection)
+        self.sampt = SampleTable(connection)
 
     # GET
     async def query(self, filter_: AssayFilter = None):

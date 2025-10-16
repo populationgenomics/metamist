@@ -643,7 +643,7 @@
 		<!--		In MariaDB, you can do _conditional_ unique values in a sort of hacky way.
 			You make a combined key, with one of the fields only NOT NULL when the row should participant in
 		the check.
-			IE: if you archive a sequencing group, marking the "nullIfInactitve field to NULL will allow
+			IE: if you archive a sequencing group, marking the "nullIfInactive" field to NULL will allow
 		multiple
 			copies - allowing for us to reuse the same external_ids for multiple sequencing groups. 	-->
 		<createTable tableName="sequencing_group_external_id">
@@ -1509,9 +1509,384 @@
 		</sql>
 
 	</changeSet>
+	<changeSet id="2024-06-26_output_file" author="yash.pankhania">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<createTable tableName="output_file">
+			<column name="id" type="INT" autoIncrement="true">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="path" type="VARCHAR(255)">
+				<constraints
+					nullable="false"
+					unique="true"
+				/>
+			</column>
+			<column name="basename" type="VARCHAR(255)">
+				<constraints
+					nullable="false"
+				/>
+			</column>
+			<column name="dirname" type="VARCHAR(100)">
+				<constraints
+					nullable="false"
+				/>
+			</column>
+			<column name="nameroot" type="VARCHAR(255)">
+				<constraints
+					nullable="false"
+				/>
+			</column>
+			<column name="nameext" type="VARCHAR(25)">
+				<constraints
+					nullable="true"
+				/>
+			</column>
+			<column name="file_checksum" type="VARCHAR(255)">
+				<constraints
+					nullable="true"
+				/>
+			</column>
+			<column name="size" type="BIGINT">
+				<constraints
+					nullable="false"
+				/>
+			</column>
+			<column name="meta" type="VARCHAR(255)">
+				<constraints
+					nullable="true"
+				/>
+			</column>
+			<column name="valid" type="BOOLEAN" />
+			<column name="parent_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_SECONDARY_FILE_PARENT_ID"
+					references="output_file(id)"
+				/>
+			</column>
+		</createTable>
+		<createTable tableName="analysis_outputs">
+			<column name="analysis_id" type="INT">
+				<constraints
+				nullable="false"
+				foreignKeyName="FK_ANALYSIS_OUTPUTS_ANALYSIS_ID"
+				references="analysis(id)"
+				/>
+			</column>
+			<column name="file_id" type="INT">
+				<constraints
+				nullable="true"
+				foreignKeyName="FK_ANALYSIS_OUTPUTS_FILE_ID"
+				references="output_file(id)"
+				/>
+			</column>
+			<column name="output" type="VARCHAR(255)">
+				<constraints
+				nullable="true"
+				/>
+			</column>
+			<column name="json_structure" type="VARCHAR(255)">
+				<constraints
+					nullable="true"
+				/>
+			</column>
+		</createTable>
+		<sql>ALTER TABLE `output_file` ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE `analysis_outputs` ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE `analysis_outputs` ADD CONSTRAINT `chk_file_id_output` CHECK ((file_id IS NOT NULL AND output IS NULL) OR (file_id IS NULL AND output IS NOT NULL));</sql>
+	</changeSet>
+	<changeSet id="2024-08-22_fcf_dirname" author="yash.pankhania">
+		<sql>ALTER TABLE `output_file` DROP SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE output_file MODIFY dirname VARCHAR(255);</sql>
+		<sql>ALTER TABLE `output_file` ADD SYSTEM VERSIONING;</sql>
+	</changeSet>
+	<changeSet id="2024-08-22_fcf_nameext" author="yash.pankhania">
+		<sql>ALTER TABLE `output_file` DROP SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE `output_file` MODIFY nameext VARCHAR(255);</sql>
+		<sql>ALTER TABLE `output_file` MODIFY dirname VARCHAR(255) NOT NULL;</sql>
+		<sql>ALTER TABLE `output_file` ADD SYSTEM VERSIONING;</sql>
+	</changeSet>
+
+	<changeSet id="2024-07-25_comment_table" author="dan.coates">
+		<createTable tableName="comment">
+			<column name="id" type="INT" autoIncrement="true">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+
+			<column
+				name="parent_id"
+				type="INT"
+			>
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_COMMENT_PARENT_COMMENT"
+					references="comment(id)"
+					deleteCascade="true"
+				/>
+			</column>
+
+			<column name="content" type="TEXT"></column>
+
+			<column name="status" type="ENUM('active', 'deleted')">
+				<constraints
+					nullable="false"
+				/>
+			</column>
+
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_COMMENT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
 
 
+		</createTable>
+
+		<!-- Add fulltext search index -->
+		<sql>ALTER TABLE comment ADD FULLTEXT INDEX `COMMENT_CONTENT_FULLTEXT_INDEX` (content);</sql>
+		<sql>ALTER TABLE comment ADD SYSTEM VERSIONING;</sql>
+	</changeSet>
+
+	<changeSet id="2024-07-25_sample_comments" author="dan.coates">
+		<createTable tableName="sample_comment">
+			<column name="comment_id" type="INT">
+				<!--
+					Even though this is a foreign key, it is also the primary key of this table as
+					a comment should only ever be attached to a single sample
+				-->
+				<constraints primaryKey="true" nullable="false" foreignKeyName="FK_SAMPLE_COMMENT_COMMENT_ID"
+					references="comment(id)" />
+			</column>
+			<column name="sample_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_SAMPLE_COMMENT_SAMPLE_ID"
+					references="sample(id)" />
+			</column>
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_SAMPLE_COMMENT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+
+		<sql>ALTER TABLE sample_comment ADD SYSTEM VERSIONING;</sql>
+	</changeSet>
+
+	<changeSet id="2024-08-07_other_entity_comments" author="dan.coates">
+		<createTable tableName="project_comment">
+			<column name="comment_id" type="INT">
+				<constraints primaryKey="true" nullable="false" foreignKeyName="FK_PROJECT_COMMENT_COMMENT_ID"
+					references="comment(id)" />
+			</column>
+			<column name="project_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_PROJECT_COMMENT_PROJECT_ID"
+					references="project(id)" />
+			</column>
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_PROJECT_COMMENT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+
+		<sql>ALTER TABLE project_comment ADD SYSTEM VERSIONING;</sql>
+
+		<createTable tableName="assay_comment">
+			<column name="comment_id" type="INT">
+				<constraints primaryKey="true" nullable="false" foreignKeyName="FK_ASSAY_COMMENT_COMMENT_ID"
+					references="comment(id)" />
+			</column>
+			<column name="assay_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_ASSAY_COMMENT_ASSAY_ID"
+					references="assay(id)" />
+			</column>
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_ASSAY_COMMENT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+
+		<sql>ALTER TABLE assay_comment ADD SYSTEM VERSIONING;</sql>
+
+		<createTable tableName="sequencing_group_comment">
+			<column name="comment_id" type="INT">
+				<constraints primaryKey="true" nullable="false" foreignKeyName="FK_SEQUENCING_GROUP_COMMENT_COMMENT_ID"
+					references="comment(id)" />
+			</column>
+			<column name="sequencing_group_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_SEQUENCING_GROUP_COMMENT_SEQUENCING_GROUP_ID"
+					references="sequencing_group(id)" />
+			</column>
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_SEQUENCING_GROUP_COMMENT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+
+		<sql>ALTER TABLE sequencing_group_comment ADD SYSTEM VERSIONING;</sql>
 
 
+		<createTable tableName="participant_comment">
+			<column name="comment_id" type="INT">
+				<constraints primaryKey="true" nullable="false" foreignKeyName="FK_PARTICIPANT_COMMENT_COMMENT_ID"
+					references="comment(id)" />
+			</column>
+			<column name="participant_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_PARTICIPANT_COMMENT_PARTICIPANT_ID"
+					references="participant(id)" />
+			</column>
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_PARTICIPANT_COMMENT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
 
+		<sql>ALTER TABLE participant_comment ADD SYSTEM VERSIONING;</sql>
+
+
+	</changeSet>
+
+	<changeSet id="2024-08-13_family_comments" author="dan.coates">
+		<createTable tableName="family_comment">
+			<column name="comment_id" type="INT">
+				<constraints primaryKey="true" nullable="false" foreignKeyName="FK_FAMILY_COMMENT_COMMENT_ID"
+					references="comment(id)" />
+			</column>
+			<column name="family_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_FAMILY_COMMENT_FAMILY_ID"
+					references="family(id)" />
+			</column>
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_FAMILY_COMMENT_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+
+		<sql>ALTER TABLE family_comment ADD SYSTEM VERSIONING;</sql>
+	</changeSet>
+	<changeSet id="2024-09-25_add_unique_fcf_constraint" author="yash.pankhania">
+		<!-- Adding Unique Constraint to analysis_outputs table -->
+		<sql>ALTER TABLE `analysis_outputs` DROP SYSTEM VERSIONING;</sql>
+		<sql>
+        ALTER TABLE analysis_outputs
+		ADD CONSTRAINT unique_analysis_file
+    	UNIQUE (analysis_id, file_id, json_structure);</sql>
+		<sql>
+		ALTER TABLE analysis_outputs
+		ADD CONSTRAINT unique_analysis_output
+    	UNIQUE (analysis_id, output, json_structure);
+		</sql>
+		<sql>ALTER TABLE `analysis_outputs` ADD SYSTEM VERSIONING;</sql>
+	</changeSet>
+
+	<changeSet id="2024-07-25-family-external-ids" author="john.marshall">
+		<createTable tableName="family_external_id">
+			<column name="project" type="INT">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_PROJECT_FAMILY_EXTERNAL_ID"
+					references="project(id)" />
+			</column>
+			<column name="family_id" type="INT">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_FAMILY_FAMILY_EXTERNAL_ID"
+					references="family(id)" />
+			</column>
+			<column name="name" type="VARCHAR(255)" />
+			<column name="external_id" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="meta" type="LONGTEXT" />
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_FAMILY_EXTERNAL_ID_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+		</createTable>
+		<addPrimaryKey
+			tableName="family_external_id"
+			columnNames="family_id,name"
+			constraintName="PK_FAMILY_EXTERNAL_ID"
+			validate="true"
+		/>
+		<addUniqueConstraint
+			tableName="family_external_id"
+			columnNames="project,external_id"
+			constraintName="UK_FAMILY_EXTERNAL_ID_UNIQUE_EIDS"
+			validate="true"
+		/>
+		<createIndex tableName="family" indexName="fk_project_family">
+			<column name="project" />
+		</createIndex>
+		<dropUniqueConstraint
+			tableName="family"
+			constraintName="UK_FAMILY_PROJECT_EXTERNALID"
+		/>
+
+		<sql>ALTER TABLE family_external_id ADD SYSTEM VERSIONING;</sql>
+
+		<!-- Migrate existing external_ids to the new tables, keyed by PRIMARY_EXTERNAL_ORG, i.e. '' -->
+		<sql>INSERT INTO audit_log (author, on_behalf_of, ar_guid, comment, auth_project, meta)
+		     VALUES ('liquibase', NULL, NULL, 'family external_id migration', NULL, NULL)
+		     RETURNING @audit_log_id := id;
+
+		     INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
+		       SELECT project, id, '', external_id, @audit_log_id
+		       FROM family;
+		</sql>
+	</changeSet>
+
+	<changeSet id="2024-07-26-drop-old-external-id-columns" author="john.marshall">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+
+		<dropNotNullConstraint
+			tableName="family"
+			columnName="external_id"
+			columnDataType="VARCHAR(255)"
+		/>
+		<sql>UPDATE family SET external_id = NULL</sql>
+		<renameColumn
+			tableName="family"
+			oldColumnName="external_id"
+			newColumnName="_external_id_unused"
+			columnDataType="VARCHAR(255)"
+			remarks="Migration of family external IDs to separate table"
+		/>
+	</changeSet>
+	<changeSet author="dan.coates" id="2024-11-27_clean_up_project_table">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+
+		<dropForeignKeyConstraint baseTableName="project"
+			constraintName="FK_PROJECT_READ_GROUP_GROUP_ID" />
+		<dropForeignKeyConstraint baseTableName="project"
+			constraintName="FK_PROJECT_WRITE_GROUP_GROUP_ID" />
+		<dropColumn
+			tableName="project"
+			columnName="read_group_id"
+		/>
+		<dropColumn
+			tableName="project"
+			columnName="write_group_id"
+		/>
+		<dropColumn
+			tableName="project"
+			columnName="read_group_name"
+		/>
+		<dropColumn
+			tableName="project"
+			columnName="write_group_name"
+		/>
+	</changeSet>
 </databaseChangeLog>

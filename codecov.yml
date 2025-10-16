@@ -5,7 +5,11 @@ coverage:
         # basic
         target: auto
         threshold: 0%
+        informational: true
         paths:
           - "db"
           - "scripts"
           - "metamist/parser"
+    patch:
+      default:
+        informational: true

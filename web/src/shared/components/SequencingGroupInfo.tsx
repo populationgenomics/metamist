@@ -1,11 +1,11 @@
 import * as React from 'react'
 import { Table as SUITable } from 'semantic-ui-react'
 
-import _ from 'lodash'
-import { GraphQlSequencingGroup, GraphQlAssay } from '../../__generated__/graphql'
-import Table from './Table'
+import capitalize from 'lodash/capitalize'
+import { GraphQlAssay, GraphQlSequencingGroup } from '../../__generated__/graphql'
 import { DeepPartial } from '../utilities/deepPartial'
 import AssayInfo from './AssayInfo'
+import Table from './Table'
 
 const excludedSequencingGroupFields = ['id', '__typename']
 
@@ -21,7 +21,7 @@ const SequencingGroupInfo: React.FunctionComponent<{
                         return (
                             <SUITable.Row key={`${key}-${value}`}>
                                 <SUITable.Cell>
-                                    <b>{_.capitalize(key)}</b>
+                                    <b>{capitalize(key)}</b>
                                 </SUITable.Cell>
                                 <SUITable.Cell>
                                     {value.map((assay: GraphQlAssay) => (
@@ -37,7 +37,7 @@ const SequencingGroupInfo: React.FunctionComponent<{
                     return (
                         <SUITable.Row key={`${key}-${value}`}>
                             <SUITable.Cell>
-                                <b>{_.capitalize(key)}</b>
+                                <b>{capitalize(key)}</b>
                             </SUITable.Cell>
                             <SUITable.Cell>{value?.toString() ?? <em>no value</em>}</SUITable.Cell>
                         </SUITable.Row>

@@ -8,7 +8,11 @@ from db.python.layers.base import BaseLayer, Connection
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.sample import SampleFilter, SampleTable
 from db.python.utils import NoOpAenter, NotFoundError
-from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
+from models.models.project import (
+    FullWriteAccessRoles,
+    ProjectId,
+    ReadAccessRoles,
+)
 from models.models.sample import SampleInternal, SampleUpsertInternal
 from models.utils.sample_id_format import sample_id_format_list
 
@@ -18,7 +22,7 @@ class SampleLayer(BaseLayer):
 
     def __init__(self, connection: Connection):
         super().__init__(connection)
-        self.st: SampleTable = SampleTable(connection)
+        self.st = SampleTable(connection)
         self.connection = connection
 
     # GETS
@@ -204,6 +208,10 @@ class SampleLayer(BaseLayer):
         )
         return await self.st.get_samples_create_date(sample_ids)
 
+    async def export_sample_table(self, project: int):
+        """Export a parquet table of samples"""
+        return await self.st.export_sample_table(project)
+
     # CREATE / UPDATES
     async def upsert_sample(
         self,
@@ -219,6 +227,18 @@ class SampleLayer(BaseLayer):
         with_function = (
             self.connection.connection.transaction if open_transaction else NoOpAenter
         )
+        if sample.id:
+            pjcts = await self.st.get_project_ids_for_sample_ids([sample.id])
+            self.connection.check_access_to_projects_for_ids(
+                pjcts, allowed_roles=FullWriteAccessRoles
+            )
+
+        # Needed for the create_sample mutation
+        if project:
+            self.connection.check_access_to_projects_for_ids(
+                [project], allowed_roles=FullWriteAccessRoles
+            )
+
         # safely ignore nested samples here
         async with with_function():
             for r in self.unwrap_nested_samples([sample]):
@@ -243,8 +263,8 @@ class SampleLayer(BaseLayer):
                         participant_id=s.participant_id,
                         type_=s.type,
                         active=s.active,
-                        sample_parent_id=sample_parent_id,
-                        sample_root_id=sample_root_id,
+                        sample_parent_id=r.parent.id if r.parent else sample_parent_id,
+                        sample_root_id=r.root.id if r.root else sample_root_id,
                     )
 
                 if sample.sequencing_groups:
@@ -283,7 +303,7 @@ class SampleLayer(BaseLayer):
         if sids:
             pjcts = await self.st.get_project_ids_for_sample_ids(sids)
             self.connection.check_access_to_projects_for_ids(
-                pjcts, allowed_roles=ReadAccessRoles
+                pjcts, allowed_roles=FullWriteAccessRoles
             )
 
         async with with_function():
@@ -361,7 +381,6 @@ class SampleLayer(BaseLayer):
             new_round = []
             round_idx += 1
             for root, parent, nested_samples in prev_round:
-
                 for sample in nested_samples:
                     retval.append(
                         SampleLayer.UnwrappedSample(
@@ -435,7 +454,7 @@ class SampleLayer(BaseLayer):
 
         projects = set(r.project for r in rows)
         self.connection.check_access_to_projects_for_ids(
-            projects, allowed_roles=FullWriteAccessRoles
+            projects, allowed_roles=ReadAccessRoles
         )
 
         return rows

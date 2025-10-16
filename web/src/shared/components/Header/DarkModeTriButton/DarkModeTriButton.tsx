@@ -1,10 +1,10 @@
-import * as React from 'react'
-import './DarkModeTriButton.css'
-import LightModeIcon from '@mui/icons-material/LightMode'
-import DarkModeIcon from '@mui/icons-material/DarkMode'
 import ComputerIcon from '@mui/icons-material/Computer'
+import DarkModeIcon from '@mui/icons-material/DarkMode'
+import LightModeIcon from '@mui/icons-material/LightMode'
+import * as React from 'react'
 import { Popup } from 'semantic-ui-react'
 import { ThemeContext } from '../../ThemeProvider'
+import './DarkModeTriButton.css'
 
 const TriButtonOptions = [
     { theme: 'light-mode', icon: <LightModeIcon />, text: 'Light Theme' },

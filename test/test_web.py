@@ -1,5 +1,4 @@
 import unittest
-from test.testbase import DbIsolatedTest, run_as_sync
 from typing import Any
 
 from api.routes.web import (
@@ -43,6 +42,7 @@ from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
     sequencing_group_id_transform_to_raw,
 )
+from test.testbase import DbIsolatedTest, run_as_sync
 
 default_assay_meta = {
     'sequencing_type': 'genome',
@@ -52,7 +52,7 @@ default_assay_meta = {
 
 DEFAULT_FAMILY_FIELDS = [
     ProjectParticipantGridField(
-        key='external_id',
+        key='external_ids',
         label='Family ID',
         is_visible=True,
         filter_key='external_id',
@@ -61,8 +61,22 @@ DEFAULT_FAMILY_FIELDS = [
 
 DEFAULT_PARTICIPANT_FIELDS = [
     ProjectParticipantGridField(
-        key='external_ids',
+        key='id',
         label='Participant ID',
+        is_visible=True,
+        filter_key='id',
+        filter_types=[
+            ProjectParticipantGridFilterType.eq,
+            ProjectParticipantGridFilterType.neq,
+            ProjectParticipantGridFilterType.gt,
+            ProjectParticipantGridFilterType.gte,
+            ProjectParticipantGridFilterType.lt,
+            ProjectParticipantGridFilterType.lte,
+        ],
+    ),
+    ProjectParticipantGridField(
+        key='external_ids',
+        label='External Participant ID',
         is_visible=True,
         filter_key='external_id',
     ),
@@ -118,6 +132,9 @@ DEFAULT_SAMPLE_FIELDS = [
         filter_key='sample_root_id',
     ),
     ProjectParticipantGridField(
+        key='type', label='Type', is_visible=True, filter_key=None, filter_types=None
+    ),
+    ProjectParticipantGridField(
         key='created_date',
         label='Created date',
         is_visible=True,
@@ -158,6 +175,16 @@ DEFAULT_SEQ_GROUP_FIELDS = [
 ]
 
 DEFAULT_ASSAY_TYPES = [
+    ProjectParticipantGridField(
+        key='id',
+        label='Assay ID',
+        is_visible=True,
+        filter_key='id',
+        filter_types=[
+            ProjectParticipantGridFilterType.eq,
+            ProjectParticipantGridFilterType.neq,
+        ],
+    ),
     ProjectParticipantGridField(
         key='type', label='Type', is_visible=True, filter_key='type', filter_types=None
     ),
@@ -335,7 +362,7 @@ SINGLE_PARTICIPANT_QUERY_RESULT = ProjectParticipantGridResponse(
     fields={
         MetaSearchEntityPrefix.FAMILY: [
             ProjectParticipantGridField(
-                key='external_id', label='Family ID', is_visible=True
+                key='external_ids', label='Family ID', is_visible=True
             )
         ],
         MetaSearchEntityPrefix.PARTICIPANT: [
@@ -729,7 +756,7 @@ class WebNonDBTests(unittest.TestCase):
             id=1,
             external_ids={PRIMARY_EXTERNAL_ORG: 'pex1'},
             meta={'pkey': 'value'},
-            families=[FamilySimple(id=-2, external_id='fex1')],
+            families=[FamilySimple(id=-2, external_ids={'family_org': 'fex1'})],
             samples=[
                 NestedSample(
                     id='xpgA',
@@ -773,7 +800,7 @@ class WebNonDBTests(unittest.TestCase):
             fields={
                 MetaSearchEntityPrefix.FAMILY: [
                     ProjectParticipantGridField(
-                        key='external_id', label='', is_visible=True
+                        key='external_ids', label='', is_visible=True
                     )
                 ],
                 MetaSearchEntityPrefix.PARTICIPANT: [
@@ -813,7 +840,7 @@ class WebNonDBTests(unittest.TestCase):
         self.assertTupleEqual(
             headers,
             (
-                'family.external_id',
+                'family.external_ids',
                 'participant.external_ids',
                 'participant.meta.pkey',
                 'sample.meta.skey',
@@ -825,7 +852,7 @@ class WebNonDBTests(unittest.TestCase):
             ),
         )
         non_sg_keys = (
-            'fex1',
+            'family_org: fex1',
             'pex1',
             'value',
             'svalue',

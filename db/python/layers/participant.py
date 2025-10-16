@@ -1,4 +1,4 @@
-# pylint: disable=invalid-name,too-many-lines
+# pylint: disable=invalid-name,too-many-lines,too-many-public-methods
 import re
 from collections import defaultdict
 from enum import Enum
@@ -20,7 +20,11 @@ from db.python.utils import NoOpAenter, NotFoundError, split_generic_terms
 from models.models import PRIMARY_EXTERNAL_ORG
 from models.models.family import PedRowInternal
 from models.models.participant import ParticipantInternal, ParticipantUpsertInternal
-from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
+from models.models.project import (
+    FullWriteAccessRoles,
+    ProjectId,
+    ReadAccessRoles,
+)
 
 HPO_REGEX_MATCHER = re.compile(r'HP\:\d+$')
 
@@ -386,7 +390,7 @@ class ParticipantLayer(BaseLayer):
         return f'Updated {len(sample_ids_to_update)} records'
 
     async def insert_participant_phenotypes(
-        self, participant_phenotypes: dict[int, dict]
+        self, participant_phenotypes: dict[int, dict[str, Any]]
     ):
         """
         Insert participant phenotypes, with format: {pid: {key: value}}
@@ -528,7 +532,7 @@ class ParticipantLayer(BaseLayer):
                 # they might not be missing
                 for external_family_id in missing_family_ids:
                     new_pid = await ftable.create_family(
-                        external_id=external_family_id,
+                        external_ids={PRIMARY_EXTERNAL_ORG: external_family_id},
                         description=None,
                         coded_phenotype=None,
                     )
@@ -616,6 +620,10 @@ class ParticipantLayer(BaseLayer):
             project=project, sequencing_type=sequencing_type
         )
 
+    async def export_participant_table(self, project: int):
+        """Export a parquet table of participants"""
+        return await self.pttable.export_participant_table(project)
+
     # region UPSERTS / UPDATES
 
     async def upsert_participant(
@@ -662,12 +670,17 @@ class ParticipantLayer(BaseLayer):
             if participant.samples:
                 slayer = SampleLayer(self.connection)
                 for s in participant.samples:
-                    s.participant_id = participant.id
+                    s.update_participant_id(participant.id)
 
                 await slayer.upsert_samples(
                     participant.samples,
                     project=project,
                     open_transaction=False,
+                )
+
+            if participant.phenotypes:
+                await self.insert_participant_phenotypes(
+                    {participant.id: participant.phenotypes}
                 )
 
             return participant

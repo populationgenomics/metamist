@@ -14,7 +14,9 @@ class TestImportIndividualMetadata(DbIsolatedTest):
         """Test import hpo terms from many columns"""
         pl = ParticipantLayer(self.connection)
 
-        await pl.upsert_participant(ParticipantUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'TP01'}))
+        await pl.upsert_participant(
+            ParticipantUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'TP01'})
+        )
 
         headers = [
             'Individual ID',

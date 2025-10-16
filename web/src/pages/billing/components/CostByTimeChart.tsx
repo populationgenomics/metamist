@@ -1,11 +1,10 @@
 import * as React from 'react'
-import _ from 'lodash'
 
-import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
 import {
     IStackedAreaByDateChartData,
     StackedAreaByDateChart,
 } from '../../../shared/components/Graphs/StackedAreaByDateChart'
+import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
 
 interface ICostByTimeChartProps {
     start: string
@@ -48,4 +47,4 @@ const CostByTimeChart: React.FunctionComponent<ICostByTimeChartProps> = ({
     )
 }
 
-export default CostByTimeChart
+export default React.memo(CostByTimeChart)

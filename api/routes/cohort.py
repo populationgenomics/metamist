@@ -3,7 +3,12 @@ from fastapi import APIRouter
 from api.utils.db import Connection, get_project_db_connection
 from db.python.layers.cohort import CohortLayer
 from models.models.cohort import CohortBody, CohortCriteria, CohortTemplate, NewCohort
-from models.models.project import ProjectId, ProjectMemberRole, ReadAccessRoles
+from models.models.project import (
+    FullWriteAccessRoles,
+    ProjectId,
+    ProjectMemberRole,
+    ReadAccessRoles,
+)
 from models.utils.cohort_template_id_format import (
     cohort_template_id_format,
     cohort_template_id_transform_to_raw,
@@ -85,7 +90,7 @@ async def create_cohort_template(
     if template.criteria.projects:
         projects_for_criteria = connection.get_and_check_access_to_projects_for_names(
             project_names=template.criteria.projects,
-            allowed_roles=ReadAccessRoles,
+            allowed_roles=FullWriteAccessRoles,
         )
         criteria_project_ids = [p.id for p in projects_for_criteria if p.id]
 

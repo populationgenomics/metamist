@@ -2,7 +2,9 @@ from test.testbase import DbIsolatedTest, run_as_sync
 
 from pymysql.err import IntegrityError
 
+from db.python.filters import GenericFilter
 from db.python.layers import FamilyLayer, ParticipantLayer, SampleLayer
+from db.python.tables.family import FamilyFilter, FamilyTable
 from db.python.utils import NotFoundError
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
@@ -22,7 +24,11 @@ class TestParticipant(DbIsolatedTest):
 
         self.p1 = await self.player.upsert_participant(
             ParticipantUpsertInternal(
-                external_ids={PRIMARY_EXTERNAL_ORG: 'P1', 'CONTROL': '86', 'KAOS': 'shoe'},
+                external_ids={
+                    PRIMARY_EXTERNAL_ORG: 'P1',
+                    'CONTROL': '86',
+                    'KAOS': 'shoe',
+                },
             )
         )
         self.p1_external_ids = {k.lower(): v for k, v in self.p1.external_ids.items()}
@@ -78,19 +84,29 @@ class TestParticipant(DbIsolatedTest):
             _ = await self.player.upsert_participant(
                 ParticipantUpsertInternal(
                     external_ids={PRIMARY_EXTERNAL_ORG: None},
-                    )
                 )
+            )
 
         with self.assertRaises(ValueError):
-            _ = await self.player.upsert_participant(ParticipantUpsertInternal(external_ids={'OTHER': 'P1'}))
+            _ = await self.player.upsert_participant(
+                ParticipantUpsertInternal(external_ids={'OTHER': 'P1'})
+            )
 
         result = await self.player.upsert_participant(
             ParticipantUpsertInternal(
-                external_ids={PRIMARY_EXTERNAL_ORG: 'P10', 'A': 'A1', 'B': None, 'C': 'C1'},
-                )
+                external_ids={
+                    PRIMARY_EXTERNAL_ORG: 'P10',
+                    'A': 'A1',
+                    'B': None,
+                    'C': 'C1',
+                },
             )
+        )
         participants = await self.player.get_participants_by_ids([result.id])
-        self.assertDictEqual(participants[0].external_ids, {PRIMARY_EXTERNAL_ORG: 'P10', 'a': 'A1', 'c': 'C1'})
+        self.assertDictEqual(
+            participants[0].external_ids,
+            {PRIMARY_EXTERNAL_ORG: 'P10', 'a': 'A1', 'c': 'C1'},
+        )
 
     @run_as_sync
     async def test_update(self):
@@ -100,17 +116,26 @@ class TestParticipant(DbIsolatedTest):
                 ParticipantUpsertInternal(
                     id=self.p1.id,
                     external_ids={PRIMARY_EXTERNAL_ORG: None},
-                    )
                 )
+            )
 
         result = await self.player.upsert_participant(
             ParticipantUpsertInternal(
                 id=self.p1.id,
-                external_ids={PRIMARY_EXTERNAL_ORG: 'P1B', 'CONTROL': '86B', 'KAOS': None, 'B': None, 'C': 'A1'},
-                )
+                external_ids={
+                    PRIMARY_EXTERNAL_ORG: 'P1B',
+                    'CONTROL': '86B',
+                    'KAOS': None,
+                    'B': None,
+                    'C': 'A1',
+                },
             )
+        )
         participants = await self.player.get_participants_by_ids([result.id])
-        self.assertDictEqual(participants[0].external_ids, {PRIMARY_EXTERNAL_ORG: 'P1B', 'control': '86B', 'c': 'A1'})
+        self.assertDictEqual(
+            participants[0].external_ids,
+            {PRIMARY_EXTERNAL_ORG: 'P1B', 'control': '86B', 'c': 'A1'},
+        )
 
     @run_as_sync
     async def test_fill_in_missing(self):
@@ -118,17 +143,25 @@ class TestParticipant(DbIsolatedTest):
         slayer = SampleLayer(self.connection)
 
         s1 = await slayer.upsert_sample(
-            SampleUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'E1'}, participant_id=self.p1.id),
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'E1'}, participant_id=self.p1.id
+            ),
         )
-        sa = await slayer.upsert_sample(SampleUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'EA', 'foo': 'FA'}))
-        sb = await slayer.upsert_sample(SampleUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'EB', 'foo': 'FB'}))
+        sa = await slayer.upsert_sample(
+            SampleUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'EA', 'foo': 'FA'})
+        )
+        sb = await slayer.upsert_sample(
+            SampleUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'EB', 'foo': 'FB'})
+        )
 
         result = await self.player.fill_in_missing_participants()
         self.assertEqual(result, 'Updated 2 records')
 
         samples = await slayer.get_samples_by(sample_ids=[s1.id, sa.id, sb.id])
 
-        participants = await self.player.get_participants_by_ids([s.participant_id for s in samples])
+        participants = await self.player.get_participants_by_ids(
+            [s.participant_id for s in samples]
+        )
         p_map = {p.id: p for p in participants}
 
         for s in samples:
@@ -139,10 +172,12 @@ class TestParticipant(DbIsolatedTest):
     async def test_get_by_families(self):
         """Exercise get_participants_by_families() method"""
         flayer = FamilyLayer(self.connection)
-        fid = await flayer.create_family(external_id='Jones')
+        fid = await flayer.create_family(external_ids={'org': 'Jones'})
 
         child = await self.player.upsert_participant(
-            ParticipantUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'P20', 'd': 'D20'}),
+            ParticipantUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'P20', 'd': 'D20'}
+            ),
         )
 
         await self.player.add_participant_to_family(
@@ -156,19 +191,57 @@ class TestParticipant(DbIsolatedTest):
         result = await self.player.get_participants_by_families([fid])
         self.assertEqual(len(result), 1)
         self.assertEqual(len(result[fid]), 1)
-        self.assertDictEqual(result[fid][0].external_ids, {PRIMARY_EXTERNAL_ORG: 'P20', 'd': 'D20'})
+        self.assertDictEqual(
+            result[fid][0].external_ids, {PRIMARY_EXTERNAL_ORG: 'P20', 'd': 'D20'}
+        )
+
+    @run_as_sync
+    async def test_get_families_by_participants(self):
+        """Exercise FamilyLayer's get_families_by_participants() method"""
+        flayer = FamilyLayer(self.connection)
+        fid = await flayer.create_family(
+            external_ids={PRIMARY_EXTERNAL_ORG: 'Smith'},
+            description='Blacksmiths',
+            coded_phenotype='burnt',
+        )
+
+        child = await self.player.upsert_participant(
+            ParticipantUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'P20', 'd': 'D20'}
+            ),
+        )
+
+        await self.player.add_participant_to_family(
+            family_id=fid,
+            participant_id=child.id,
+            paternal_id=self.p1.id,
+            maternal_id=self.p2.id,
+            affected=2,
+        )
+
+        result = await flayer.get_families_by_participants([child.id, self.p1.id])
+        self.assertEqual(len(result), 1)
+        self.assertEqual(len(result[child.id]), 1)
+        self.assertEqual(result[child.id][0].description, 'Blacksmiths')
 
     @run_as_sync
     async def test_update_many(self):
         """Exercise update_many_participant_external_ids() method"""
-        result = await self.player.update_many_participant_external_ids({self.p1.id: 'P1B', self.p2.id: 'P2B'})
+        result = await self.player.update_many_participant_external_ids(
+            {self.p1.id: 'P1B', self.p2.id: 'P2B'}
+        )
         self.assertTrue(result)
 
-        participants = await self.player.get_participants_by_ids([self.p1.id, self.p2.id])
+        participants = await self.player.get_participants_by_ids(
+            [self.p1.id, self.p2.id]
+        )
         p_map = {p.id: p for p in participants}
         outp1 = p_map[self.p1.id]
         outp2 = p_map[self.p2.id]
-        self.assertDictEqual(outp1.external_ids, {PRIMARY_EXTERNAL_ORG: 'P1B', 'control': '86', 'kaos': 'shoe'})
+        self.assertDictEqual(
+            outp1.external_ids,
+            {PRIMARY_EXTERNAL_ORG: 'P1B', 'control': '86', 'kaos': 'shoe'},
+        )
         self.assertDictEqual(outp2.external_ids, {PRIMARY_EXTERNAL_ORG: 'P2B'})
 
     @run_as_sync
@@ -177,7 +250,9 @@ class TestParticipant(DbIsolatedTest):
         slayer = SampleLayer(self.connection)
 
         _ = await slayer.upsert_sample(
-            SampleUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'SE1'}, participant_id=self.p1.id),
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'SE1'}, participant_id=self.p1.id
+            ),
         )
 
         s2 = await slayer.upsert_sample(
@@ -195,7 +270,9 @@ class TestParticipant(DbIsolatedTest):
             ),
         )
 
-        result = await self.player.get_external_participant_id_to_internal_sequencing_group_id_map(self.project_id)
+        result = await self.player.get_external_participant_id_to_internal_sequencing_group_id_map(
+            self.project_id
+        )
         self.assertEqual(len(result), 3)
         for eid, sgid in result:
             self.assertIn(eid, self.p1.external_ids.values())
@@ -212,7 +289,11 @@ class TestSample(DbIsolatedTest):
 
         self.s1 = await self.slayer.upsert_sample(
             SampleUpsertInternal(
-                external_ids={PRIMARY_EXTERNAL_ORG: 'S1', 'CONTROL': '86', 'KAOS': 'shoe'},
+                external_ids={
+                    PRIMARY_EXTERNAL_ORG: 'S1',
+                    'CONTROL': '86',
+                    'KAOS': 'shoe',
+                },
             )
         )
 
@@ -267,19 +348,28 @@ class TestSample(DbIsolatedTest):
             _ = await self.slayer.upsert_sample(
                 SampleUpsertInternal(
                     external_ids={PRIMARY_EXTERNAL_ORG: None},
-                    )
                 )
+            )
 
         with self.assertRaises(ValueError):
-            _ = await self.slayer.upsert_sample(SampleUpsertInternal(external_ids={'OTHER': 'S1'}))
+            _ = await self.slayer.upsert_sample(
+                SampleUpsertInternal(external_ids={'OTHER': 'S1'})
+            )
 
         result = await self.slayer.upsert_sample(
             SampleUpsertInternal(
-                external_ids={PRIMARY_EXTERNAL_ORG: 'S10', 'A': 'A1', 'B': None, 'C': 'C1'},
-                )
+                external_ids={
+                    PRIMARY_EXTERNAL_ORG: 'S10',
+                    'A': 'A1',
+                    'B': None,
+                    'C': 'C1',
+                },
             )
+        )
         sample = await self.slayer.get_sample_by_id(result.id)
-        self.assertDictEqual(sample.external_ids, {PRIMARY_EXTERNAL_ORG: 'S10', 'a': 'A1', 'c': 'C1'})
+        self.assertDictEqual(
+            sample.external_ids, {PRIMARY_EXTERNAL_ORG: 'S10', 'a': 'A1', 'c': 'C1'}
+        )
 
     @run_as_sync
     async def test_update(self):
@@ -289,23 +379,34 @@ class TestSample(DbIsolatedTest):
                 SampleUpsertInternal(
                     id=self.s1.id,
                     external_ids={PRIMARY_EXTERNAL_ORG: None},
-                    )
                 )
+            )
 
         result = await self.slayer.upsert_sample(
             SampleUpsertInternal(
                 id=self.s1.id,
-                external_ids={PRIMARY_EXTERNAL_ORG: 'S1B', 'CONTROL': '86B', 'KAOS': None, 'B': None, 'C': 'A1'},
-                )
+                external_ids={
+                    PRIMARY_EXTERNAL_ORG: 'S1B',
+                    'CONTROL': '86B',
+                    'KAOS': None,
+                    'B': None,
+                    'C': 'A1',
+                },
             )
+        )
         sample = await self.slayer.get_sample_by_id(result.id)
-        self.assertDictEqual(sample.external_ids, {PRIMARY_EXTERNAL_ORG: 'S1B', 'control': '86B', 'c': 'A1'})
+        self.assertDictEqual(
+            sample.external_ids,
+            {PRIMARY_EXTERNAL_ORG: 'S1B', 'control': '86B', 'c': 'A1'},
+        )
 
     @run_as_sync
     async def test_get_single(self):
         """Exercise get_single_by_external_id() method"""
         with self.assertRaises(NotFoundError):
-            _ = await self.slayer.get_single_by_external_id('non-existent', self.project_id)
+            _ = await self.slayer.get_single_by_external_id(
+                'non-existent', self.project_id
+            )
 
         result = await self.slayer.get_single_by_external_id('86', self.project_id)
         self.assertEqual(result.id, self.s1.id)
@@ -316,28 +417,34 @@ class TestSample(DbIsolatedTest):
     @run_as_sync
     async def test_get_internal_to_external(self):
         """Exercise get_internal_to_external_sample_id_map() method"""
-        result = await self.slayer.get_internal_to_external_sample_id_map([self.s1.id, self.s2.id])
+        result = await self.slayer.get_internal_to_external_sample_id_map(
+            [self.s1.id, self.s2.id]
+        )
         self.assertDictEqual(result, {self.s1.id: 'S1', self.s2.id: 'S2'})
 
     @run_as_sync
     async def test_get_all(self):
         """Exercise get_all_sample_id_map_by_internal_ids() method"""
-        result = await self.slayer.get_all_sample_id_map_by_internal_ids(self.project_id)
+        result = await self.slayer.get_all_sample_id_map_by_internal_ids(
+            self.project_id
+        )
         self.assertDictEqual(result, {self.s1.id: 'S1', self.s2.id: 'S2'})
 
     @run_as_sync
     async def test_get_history(self):
         """Exercise get_history_of_sample() method"""
         # First create some history
-        await self.slayer.upsert_sample(SampleUpsertInternal(id=self.s1.id, meta={'foo': 'bar'}))
+        await self.slayer.upsert_sample(
+            SampleUpsertInternal(id=self.s1.id, meta={'foo': 'bar'})
+        )
 
         await self.slayer.upsert_sample(
             SampleUpsertInternal(
                 id=self.s1.id,
                 external_ids={'fruit': 'apple'},
                 meta={'fruit': 'banana'},
-                )
             )
+        )
 
         sample = await self.slayer.get_sample_by_id(self.s1.id)
 
@@ -347,3 +454,120 @@ class TestSample(DbIsolatedTest):
         self.assertDictEqual(result[1].meta, {'foo': 'bar'})
         self.assertDictEqual(result[2].meta, {'foo': 'bar', 'fruit': 'banana'})
         self.assertDictEqual(result[2].meta, sample.meta)
+
+
+class TestFamily(DbIsolatedTest):
+    """Test family external ids"""
+
+    @run_as_sync
+    async def setUp(self):
+        super().setUp()
+        self.flayer = FamilyLayer(self.connection)
+
+    @run_as_sync
+    async def test_create_update(self):
+        """Exercise create_family() and update_family() methods"""
+        family_id = await self.flayer.create_family(
+            external_ids={PRIMARY_EXTERNAL_ORG: 'Smith'},
+            description='Blacksmiths',
+            coded_phenotype='burnt',
+        )
+
+        family = await self.flayer.get_family_by_internal_id(family_id)
+        self.assertDictEqual(family.external_ids, {PRIMARY_EXTERNAL_ORG: 'Smith'})
+        self.assertEqual(family.description, 'Blacksmiths')
+        self.assertEqual(family.coded_phenotype, 'burnt')
+
+        await self.flayer.update_family(family_id, external_ids={'foo': 'bar'})
+        family = await self.flayer.get_family_by_internal_id(family_id)
+        self.assertEqual(family.external_ids['foo'], 'bar')
+
+        await self.flayer.update_family(family_id, external_ids={'foo': 'baz'})
+        family = await self.flayer.get_family_by_internal_id(family_id)
+        self.assertEqual(family.external_ids['foo'], 'baz')
+
+        await self.flayer.update_family(family_id, external_ids={'foo': None})
+        family = await self.flayer.get_family_by_internal_id(family_id)
+        self.assertDictEqual(family.external_ids, {PRIMARY_EXTERNAL_ORG: 'Smith'})
+
+        await self.flayer.update_family(family_id, description='Goldsmiths')
+        family = await self.flayer.get_family_by_internal_id(family_id)
+        self.assertEqual(family.description, 'Goldsmiths')
+        self.assertEqual(family.coded_phenotype, 'burnt')
+
+        await self.flayer.update_family(family_id, coded_phenotype='gilt')
+        family = await self.flayer.get_family_by_internal_id(family_id)
+        self.assertEqual(family.description, 'Goldsmiths')
+        self.assertEqual(family.coded_phenotype, 'gilt')
+
+    @run_as_sync
+    async def test_bad_query(self):
+        """Exercise invalid query() usage"""
+        with self.assertRaises(ValueError):
+            await self.flayer.query(FamilyFilter())
+
+    @run_as_sync
+    async def test_none_by_participants(self):
+        """Exercise get_families_by_participants() method"""
+        result = await self.flayer.get_families_by_participants([])
+        self.assertDictEqual(result, {})
+
+    @run_as_sync
+    async def test_import_families(self):
+        """Exercise import_families() method"""
+        await self.flayer.import_families(
+            ['familyid', 'description', 'phenotype'],
+            [
+                ['Smith', 'Blacksmiths', 'burnt'],
+                ['Jones', 'From Wales', 'sings well'],
+                ['Taylor', 'Post Norman', 'sews'],
+            ],
+        )
+
+        result = await self.flayer.query(
+            FamilyFilter(project=GenericFilter(eq=self.project_id))
+        )
+        self.assertEqual(len(result), 3)
+        family = {f.external_ids[PRIMARY_EXTERNAL_ORG]: f for f in result}
+        self.assertEqual(family['Smith'].description, 'Blacksmiths')
+        self.assertEqual(family['Smith'].coded_phenotype, 'burnt')
+        self.assertEqual(family['Jones'].description, 'From Wales')
+        self.assertEqual(family['Jones'].coded_phenotype, 'sings well')
+        self.assertEqual(family['Taylor'].description, 'Post Norman')
+        self.assertEqual(family['Taylor'].coded_phenotype, 'sews')
+
+        await self.flayer.import_families(
+            ['familyid', 'description', 'phenotype'],
+            [
+                ['Smith', 'Goldsmiths actually', 'gilt'],
+                ['Brown', 'From Jamaica', 'brunette'],
+            ],
+        )
+
+        result = await self.flayer.query(
+            FamilyFilter(project=GenericFilter(eq=self.project_id))
+        )
+        self.assertEqual(len(result), 4)
+        family = {f.external_ids[PRIMARY_EXTERNAL_ORG]: f for f in result}
+        self.assertEqual(family['Smith'].description, 'Goldsmiths actually')
+        self.assertEqual(family['Smith'].coded_phenotype, 'gilt')
+        self.assertEqual(family['Brown'].description, 'From Jamaica')
+        self.assertEqual(family['Brown'].coded_phenotype, 'brunette')
+        self.assertEqual(family['Jones'].description, 'From Wales')
+        self.assertEqual(family['Jones'].coded_phenotype, 'sings well')
+        self.assertEqual(family['Taylor'].description, 'Post Norman')
+        self.assertEqual(family['Taylor'].coded_phenotype, 'sews')
+
+    @run_as_sync
+    async def test_direct_get_id_map(self):
+        """Exercise the table's get_id_map_by_internal_ids() method"""
+        ftable = FamilyTable(self.connection)
+
+        result = await ftable.get_id_map_by_internal_ids([])
+        self.assertDictEqual(result, {})
+
+        result = await ftable.get_id_map_by_internal_ids([42], allow_missing=True)
+        self.assertDictEqual(result, {})
+
+        with self.assertRaises(NotFoundError):
+            _ = await ftable.get_id_map_by_internal_ids([42])

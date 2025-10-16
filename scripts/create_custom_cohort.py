@@ -1,4 +1,4 @@
-""" A script to create a custom cohort """
+"""A script to create a custom cohort"""
 
 import argparse
 
@@ -45,7 +45,9 @@ def main(
 
 
 def get_cohort_spec(
-    cohort_name: str | None, cohort_description: str | None, cohort_template_id: str | None
+    cohort_name: str | None,
+    cohort_description: str | None,
+    cohort_template_id: str | None,
 ) -> CohortBody:
     """Get the cohort spec"""
 
@@ -62,7 +64,6 @@ def get_cohort_spec(
 
 
 if __name__ == '__main__':
-
     parser = argparse.ArgumentParser(description='Create a custom cohort')
     parser.add_argument(
         '--project', type=str, help='The project to create the cohort in'
@@ -112,7 +113,9 @@ if __name__ == '__main__':
     parser.add_argument(
         '--sample_type', required=False, type=list[str], help='sample type'
     )
-    parser.add_argument('--dry-run', '--dry_run', action='store_true', help='Dry run mode')
+    parser.add_argument(
+        '--dry-run', '--dry_run', action='store_true', help='Dry run mode'
+    )
 
     args = parser.parse_args()
 

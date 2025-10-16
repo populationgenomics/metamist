@@ -13,7 +13,7 @@ import {
     ProjectParticipantGridResponse,
     WebApi,
 } from '../../sm-api'
-import { DictEditor } from './DictEditor'
+import { DictEditor, DictEditorInput } from './DictEditor'
 import PageOptions from './PageOptions'
 import { defaultHeaderGroupsFromResponse, ProjectColumnOptions } from './ProjectColumnOptions'
 import ProjectGrid from './ProjectGrid'
@@ -36,7 +36,7 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
     const [searchParams] = useSearchParams()
 
     const [isLoading, setIsLoading] = React.useState<boolean>(false)
-    let [error, setError] = React.useState<React.ReactElement | undefined>()
+    const [error, setError] = React.useState<React.ReactElement | undefined>()
     const [projectColOptionsAreOpen, setProjectColOptionsAreOpen] = React.useState<boolean>(false)
     const [headerGroups, setHeaderGroups] = React.useState<
         Record<MetaSearchEntityPrefix, ProjectParticipantGridField[]>
@@ -48,28 +48,31 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
     >()
 
     const hasOptionErrors: Partial<
-        Record<keyof IPageChangeOptions, { error: string; default: any; value: any }>
+        Record<
+            keyof IPageChangeOptions,
+            { error: string; default: DictEditorInput; value: DictEditorInput }
+        >
     > = {}
 
     const { page } = useParams()
 
     // parse pageSize
     const _pageSizeFromSearch = searchParams.get('size')
-    let pageSize = parseInt(_pageSizeFromSearch || '20')
+    const pageSize = parseInt(_pageSizeFromSearch || '20')
     if (isNaN(pageSize)) {
         hasOptionErrors.pageSize = {
             error: `Invalid page size ${_pageSizeFromSearch}`,
-            default: 20,
-            value: pageSize,
+            default: '20',
+            value: pageSize.toString(),
         }
     }
     // parse pageNumber
-    let pageNumber = parseInt(page || '1')
+    const pageNumber = parseInt(page || '1')
     if (isNaN(pageNumber)) {
         hasOptionErrors.pageNumber = {
             error: `Invalid page number ${pageNumber}`,
-            default: 1,
-            value: pageNumber,
+            default: '1',
+            value: pageNumber.toString(),
         }
     }
 
@@ -91,7 +94,7 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
     const _filterOptions = searchParams.get('filter') || '{}'
     try {
         filterOptions = JSON.parse(_filterOptions)
-    } catch (e) {
+    } catch (_e) {
         hasOptionErrors.filter = {
             error: `Error parsing filter options: ${_filterOptions}`,
             default: {},
@@ -142,10 +145,12 @@ export const ProjectGridContainer: React.FunctionComponent<IProjectGridContainer
     }
 
     // load every time the project name changes
+    /* eslint-disable react-hooks/exhaustive-deps */
     React.useEffect(() => {
         getParticipantsFor()
         // use the raw _filterOptions, otherwise it breaks
     }, [projectName, pageSize, pageNumber, _filterOptions])
+    /* eslint-enable react-hooks/exhaustive-deps */
 
     const totalPageNumbers = Math.ceil((participants?.total_results || 0) / pageSize)
 

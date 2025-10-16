@@ -8,6 +8,7 @@
     "allowed_elements": ["details", "img"]
   },
   "ul-indent": false,          // To allow indenting the whole list to distinguish it visually
+  "ol-prefix": false,          // Don't enforce strict ordering of lists, github markdown is flexible with this
   "no-multiple-blanks": false  // To allow multiple blank lines between a header and
                                // the previous paragraph
 }

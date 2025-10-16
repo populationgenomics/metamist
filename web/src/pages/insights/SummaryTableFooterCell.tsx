@@ -48,7 +48,7 @@ export const footerCellConfigs: FooterCellConfig[] = [
     {
         key: 'grand-total',
         label: 'Grand Total',
-        calculateValue: (data) => 'Grand Total',
+        calculateValue: () => 'Grand Total',
     },
     {
         key: 'total-entries',

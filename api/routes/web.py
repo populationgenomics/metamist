@@ -6,7 +6,6 @@ Web routes
 import asyncio
 import csv
 import io
-from datetime import date
 from typing import Any, Generator
 
 from fastapi import APIRouter
@@ -139,14 +138,11 @@ async def export_project_participants(
     for row in prepare_participants_for_export(participants, fields=fields):
         writer.writerow(row)
 
-    basefn = f'{connection.project}-project-summary-{connection.author}-{date.today().isoformat()}'
-
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type=export_type.get_mime_type(),
-        headers={
-            'Content-Disposition': f'filename={basefn}{export_type.get_extension()}'
-        },
+        # content-disposition doesn't work here :(
+        headers={},
     )
 
 
@@ -311,3 +307,21 @@ async def sync_seqr_project(
     except Exception as e:
         raise ConnectionError(f'Failed to synchronise seqr project: {str(e)}') from e
         # return {'success': False, 'message': str(e)}
+
+
+@router.get(
+    '/{project}/{sequencing_type}/seqr-family-guid-map',
+    operation_id='getSeqrFamilyGuidMap',
+)
+async def get_seqr_family_guid_map(
+    sequencing_type: str,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
+):
+    """
+    Get the mapping of seqr family GUIDs to internal family IDs
+    """
+    seqr = SeqrLayer(connection)
+    if not connection.project_id:
+        raise ValueError('Project not set')
+
+    return await seqr.get_family_guid_map(sequencing_type=sequencing_type)

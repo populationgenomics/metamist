@@ -5,6 +5,7 @@ This is a test program to deploy the Metamist Infrastructure to
 development gcloud project.
 
 """
+
 import os
 from typing import NamedTuple
 

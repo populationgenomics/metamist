@@ -1,10 +1,10 @@
 import React from 'react'
 
-import Table, { CheckboxRow, DisplayRow } from '../../../shared/components/Table'
-import { Table as SUITable, TableProps } from 'semantic-ui-react'
+import { Table as SUITable } from 'semantic-ui-react'
 import { DonutChart } from '../../../shared/components/Graphs/DonutChart'
-import { AnalysisCostRecordSeqGroup, AnalysisCostRecordSku } from '../../../sm-api'
+import Table from '../../../shared/components/Table'
 import formatMoney from '../../../shared/utilities/formatMoney'
+import { AnalysisCostRecordSeqGroup, AnalysisCostRecordSku } from '../../../sm-api'
 
 export const calcDuration = (start: string | number | Date, end: string | number | Date) => {
     const duration = new Date(end).valueOf() - new Date(start).valueOf()
@@ -20,7 +20,7 @@ export const CostBySkuRow: React.FC<{
     chartMaxWidth?: string
     colSpan: number
     skus: AnalysisCostRecordSku[]
-}> = ({ chartId, chartMaxWidth, colSpan, skus }) => (
+}> = ({ chartId, chartMaxWidth, skus }) => (
     <>
         {chartId && (
             <DonutChart
