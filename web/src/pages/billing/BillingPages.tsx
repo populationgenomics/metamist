@@ -78,6 +78,13 @@ const billingPages: IBillingPage[] = [
         icon: <SsidChartIcon />,
         description: 'View the relative distribution of seqr costs across topics over time.',
     },
+    {
+        title: 'Storage Cost Per Sample',
+        name: 'storageCostPerSample',
+        url: '/billing/storageCostPerSample',
+        icon: <SampleIcon />,
+        description: 'Cost per sample',
+    },
 ]
 
 export { billingPages }
