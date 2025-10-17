@@ -113,7 +113,7 @@ const renderGridColumn = (
 
         <Header as="h5">Cost By Invoice Month by Project</Header>
 
-        <List relaxed>
+        <List>
             {billingGroupInfoList
                 .filter((item): item is BillingProjectGroup => item.groupBy === 'gcp_project')
                 .map((item) =>
@@ -126,7 +126,7 @@ const renderGridColumn = (
 
         <Header as="h5">Cost By Invoice Month by Topic</Header>
 
-        <List divided relaxed>
+        <List>
             {billingGroupInfoList
                 .filter((item): item is BillingTopicGroup => item.groupBy === 'topic')
                 .map((item) =>
@@ -139,7 +139,7 @@ const renderGridColumn = (
 
         <Header as="h5">Cost Across Invoice Months by Topic</Header>
 
-        <List divided relaxed>
+        <List>
             {billingGroupInfoList
                 .filter((item): item is BillingTopicGroup => item.groupBy === 'topic')
                 .map((item) =>
@@ -180,7 +180,7 @@ const BillingHome = () => {
                 <Container fluid style={{ padding: '2em 0', margin: '0px' }}>
                     <Grid stackable columns={2} relaxed>
                         {/* R&D Team */}
-                        {renderGridColumn('R&D', BillingGroupListRD, location)}
+                        {renderGridColumn('RD', BillingGroupListRD, location)}
 
                         {/* PopGen Team */}
                         {renderGridColumn('PopGen', BillingGroupListPopGen, location)}
