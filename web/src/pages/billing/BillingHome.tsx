@@ -1,9 +1,22 @@
+import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import * as React from 'react'
 import ReactGoogleSlides from 'react-google-slides'
-import { Button, Menu, MenuItem, Segment, SemanticWIDTHS } from 'semantic-ui-react'
+import { Location, useLocation } from 'react-router-dom'
+import {
+    Button,
+    Container,
+    Grid,
+    Header,
+    List,
+    Menu,
+    MenuItem,
+    Segment,
+    SemanticWIDTHS,
+} from 'semantic-ui-react'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
 import { billingPages, IBillingPage } from './BillingPages'
+import { BillingGroupListPopGen, BillingGroupListRD } from './data/BillingGroupInfo'
 
 // Google Slides
 const Slides = React.memo(function ReactGoogleSlidesWrapper({ link }: { link: string }) {
@@ -15,6 +28,20 @@ interface MenuProps {
     inverted: boolean
     activeItem: string
     onItemSelect: (e: MouseEvent, page: IBillingPage) => void
+}
+
+// Group of GCP projects
+type BillingProjectGroup = {
+    name: string
+    groupBy: string
+    gcpProjects: string
+}
+
+// Group of topics
+type BillingTopicGroup = {
+    name: string
+    groupBy: string
+    topics: string
 }
 
 const MenuItems = (props: MenuProps) => {
@@ -68,6 +95,63 @@ const MenuItems = (props: MenuProps) => {
     )
 }
 
+const renderLinkItem = (label: string, href: string) => (
+    <List.Item key={label}>
+        <a href={href} target="_blank" rel="noreferrer">
+            {label} <OpenInNewIcon />
+        </a>
+    </List.Item>
+)
+
+const renderGridColumn = (
+    teamName: string,
+    billingGroupInfoList: (BillingProjectGroup | BillingTopicGroup)[],
+    location: Location
+) => (
+    <Grid.Column>
+        <Header as="h3">{teamName} Team</Header>
+
+        <Header as="h5">Cost By Invoice Month by Project</Header>
+
+        <List>
+            {billingGroupInfoList
+                .filter((item): item is BillingProjectGroup => item.groupBy === 'gcp_project')
+                .map((item) =>
+                    renderLinkItem(
+                        `${item.name}`,
+                        `${location.pathname}/invoiceMonthCost?groupBy=gcp_project&gcpProjects=${item.gcpProjects}`
+                    )
+                )}
+        </List>
+
+        <Header as="h5">Cost By Invoice Month by Topic</Header>
+
+        <List>
+            {billingGroupInfoList
+                .filter((item): item is BillingTopicGroup => item.groupBy === 'topic')
+                .map((item) =>
+                    renderLinkItem(
+                        `${item.name}`,
+                        `${location.pathname}/invoiceMonthCost?groupBy=topic&topics=${item.topics}`
+                    )
+                )}
+        </List>
+
+        <Header as="h5">Cost Across Invoice Months by Topic</Header>
+
+        <List>
+            {billingGroupInfoList
+                .filter((item): item is BillingTopicGroup => item.groupBy === 'topic')
+                .map((item) =>
+                    renderLinkItem(
+                        `${item.name}`,
+                        `${location.pathname}/costByMonth?groupBy=topic&topics=${item.topics}`
+                    )
+                )}
+        </List>
+    </Grid.Column>
+)
+
 const BillingHome = () => {
     const theme = React.useContext(ThemeContext)
     const isDarkMode = theme.theme === 'dark-mode'
@@ -82,12 +166,26 @@ const BillingHome = () => {
         () => 'https://docs.google.com/presentation/d/12cyHMMVx82f5RjJhg_VrGIdQBTCrAWJrMPWAtDLmBxU',
         []
     )
+    const location = useLocation()
 
     return (
         <PaddedPage>
             <div className="article">
                 <h1> Billing Homepage </h1>
                 <p>Welcome to the Billing Homepage</p>
+
+                <h2>Useful Shortcuts </h2>
+                <p>Billing shortcuts for quick access</p>
+
+                <Container fluid style={{ padding: '2em 0', margin: '0px' }}>
+                    <Grid stackable columns={2} relaxed>
+                        {/* R&D Team */}
+                        {renderGridColumn('RD', BillingGroupListRD, location)}
+
+                        {/* PopGen Team */}
+                        {renderGridColumn('PopGen', BillingGroupListPopGen, location)}
+                    </Grid>
+                </Container>
 
                 <h2>Pages</h2>
                 <p>Here you can find an overview of the different pages in the Billing section</p>
