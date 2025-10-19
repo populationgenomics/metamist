@@ -7,7 +7,7 @@ flake8
 flake8-bugbear
 nest-asyncio
 pre-commit
-pylint==3.2.7
+pylint==4.0.1
 testcontainers[mysql]>=4.8.1
 types-PyMySQL
 pymysql==1.1.1
@@ -21,4 +21,4 @@ google-cloud-pubsub
 pytz
 pytest
 pytest-cov
-openapi-generator-cli==5.3.0
+openapi-generator-cli==7.16.0
