@@ -19,7 +19,7 @@ anyio==4.7.0
     #   httpx
     #   starlette
     #   watchfiles
-astroid==3.2.4
+astroid==4.0.1
     # via pylint
 async-lru==2.0.4
     # via -r requirements.in
@@ -140,7 +140,7 @@ frozenlist==1.5.0
     # via
     #   aiohttp
     #   aiosignal
-fsspec==2024.10.0
+fsspec==2025.9.0
     # via -r requirements.in
 functions-framework==3.8.2
     # via -r requirements-dev.in
@@ -160,22 +160,23 @@ google-auth==2.37.0
     #   google-api-core
     #   google-cloud-appengine-logging
     #   google-cloud-core
+    #   google-cloud-logging
     #   google-cloud-secret-manager
     #   google-cloud-storage
 google-cloud-appengine-logging==1.5.0
     # via google-cloud-logging
-google-cloud-audit-log==0.3.0
+google-cloud-audit-log==0.4.0
     # via google-cloud-logging
 google-cloud-bigquery==3.11.4
     # via
     #   -r requirements-dev.in
     #   -r requirements.in
-google-cloud-core==2.4.1
+google-cloud-core==2.4.3
     # via
     #   google-cloud-bigquery
     #   google-cloud-logging
     #   google-cloud-storage
-google-cloud-logging==2.7.0
+google-cloud-logging==3.12.1
     # via -r requirements.in
 google-cloud-pubsub==2.18.3
     # via
@@ -183,12 +184,14 @@ google-cloud-pubsub==2.18.3
     #   -r requirements.in
 google-cloud-secret-manager==2.22.0
     # via cpg-utils
-google-cloud-storage==1.43.0
+google-cloud-storage==3.4.1
     # via
     #   -r requirements.in
     #   cloudpathlib
 google-crc32c==1.6.0
-    # via google-resumable-media
+    # via
+    #   google-cloud-storage
+    #   google-resumable-media
 google-resumable-media==2.7.2
     # via
     #   google-cloud-bigquery
@@ -243,6 +246,8 @@ idna==3.10
     #   httpx
     #   requests
     #   yarl
+importlib-metadata==8.7.0
+    # via opentelemetry-api
 iniconfig==2.0.0
     # via pytest
 isodate==0.7.2
@@ -288,8 +293,10 @@ nest-asyncio==1.6.0
     # via -r requirements-dev.in
 nodeenv==1.9.1
     # via pre-commit
-openapi-generator-cli==5.3.0
+openapi-generator-cli==7.16.0
     # via -r requirements-dev.in
+opentelemetry-api==1.38.0
+    # via google-cloud-logging
 orjson==3.10.12
     # via fastapi
 packaging==24.2
@@ -329,14 +336,14 @@ protobuf==4.25.8
     #   google-cloud-appengine-logging
     #   google-cloud-audit-log
     #   google-cloud-bigquery
+    #   google-cloud-logging
     #   google-cloud-pubsub
     #   google-cloud-secret-manager
-    #   google-cloud-storage
     #   googleapis-common-protos
     #   grpc-google-iam-v1
     #   grpcio-status
     #   proto-plus
-pyarrow==18.1.0
+pyarrow==21.0.0
     # via -r requirements.in
 pyasn1==0.6.1
     # via
@@ -366,7 +373,7 @@ pygments==2.18.0
     # via
     #   rich
     #   strawberry-graphql
-pylint==3.2.7
+pylint==4.0.1
     # via -r requirements-dev.in
 pymysql[rsa]==1.1.1
     # via
@@ -433,7 +440,6 @@ shellingham==1.5.4
 six==1.17.0
     # via
     #   azure-core
-    #   google-cloud-storage
     #   python-dateutil
 slack-sdk==3.20.2
     # via -r requirements.in
@@ -474,6 +480,7 @@ typing-extensions==4.12.2
     #   azure-storage-blob
     #   azure-storage-file-datalake
     #   fastapi
+    #   opentelemetry-api
     #   pydantic
     #   pydantic-core
     #   pydantic-extra-types
@@ -519,3 +526,5 @@ wrapt==1.17.0
     #   testcontainers
 yarl==1.18.3
     # via aiohttp
+zipp==3.23.0
+    # via importlib-metadata
