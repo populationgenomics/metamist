@@ -34,8 +34,8 @@ def setup_logger(
     return logging.LoggerAdapter(logger, {'dataset': dataset})
 
 
-class AuditLogs:
-    """Logging wrapper for audit operations."""
+class BucketAuditLogger:
+    """Logging wrapper for bucket audit operations."""
 
     def __init__(self, dataset: str, name: str):
         """Initialize the audit logger."""
