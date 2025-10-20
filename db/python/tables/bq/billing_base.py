@@ -450,7 +450,7 @@ class BillingBaseTable(BqDbBase):
             time_group = prepare_time_periods(query)
 
         # overrides time specific fields with relevant time column name
-        query_filter = self._query_to_partitioned_filter(query)
+        query_filter = query_to_partitioned_filter(query)
 
         # prepare where string and SQL parameters
         where_str, sql_parameters = query_filter.to_sql()
