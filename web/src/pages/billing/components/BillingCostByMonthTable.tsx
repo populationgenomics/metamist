@@ -53,7 +53,12 @@ const BillingCostByMonthTable: React.FunctionComponent<IBillingCostByMonthTableP
             </div>
         )
     }
-    const compTypes = ['Compute Cost', 'Storage Cost', 'Avg. Sample Storage Cost (Est.)', 'Avg. Sample Compute Cost (Est.)']
+    const compTypes = [
+        'Compute Cost',
+        'Storage Cost',
+        'Avg. Sample Storage Cost (Est.)',
+        'Avg. Sample Compute Cost (Est.)',
+    ]
 
     // Get all topics in the order they were provided
     const getAllTopics = () => {
@@ -69,7 +74,7 @@ const BillingCostByMonthTable: React.FunctionComponent<IBillingCostByMonthTableP
                     // if All Topics, skip the Average Sample Cost row
                     key === 'All Topics' &&
                     (compType === 'Avg. Sample Storage Cost (Est.)' ||
-                    compType === 'Avg. Sample Compute Cost (Est.)') ? null : (
+                        compType === 'Avg. Sample Compute Cost (Est.)') ? null : (
                         <SUITable.Row key={`${key}-${index}-row`}>
                             <SUITable.Cell key={`${key}-${index}-topic`}>
                                 {index === 0 && <b>{key}</b>}
