@@ -774,7 +774,7 @@ class SampleTable(DbBase):
         return {r['project']: r['sample_count'] for r in rows}
 
     async def match_seq_grp_to_project(
-        self, sg_compute_per_month: dict[str, list[int]] | None
+        self, sg_compute_per_month: dict[date, list[int]] | None
     ) -> dict[int, dict[date, int]]:
         """
         Match passed month->list of sequencing groups to projects
@@ -787,11 +787,10 @@ class SampleTable(DbBase):
             return result
 
         for month, seq_groups in sg_compute_per_month.items():
-            for seq_group in seq_groups:
-                project_sample_count = (
-                    await self._get_sample_count_per_project_by_seq_group(seq_group)
-                )
-                for project_id, sample_count in project_sample_count.items():
-                    result[project_id][month] += sample_count
+            project_sample_count = (
+                await self._get_sample_count_per_project_by_seq_group(seq_groups)
+            )
+            for project_id, sample_count in project_sample_count.items():
+                result[project_id][month] += sample_count
 
         return result

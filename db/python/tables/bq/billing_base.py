@@ -3,7 +3,7 @@ import logging
 import re
 from abc import ABCMeta, abstractmethod
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from google.cloud import bigquery
@@ -20,10 +20,11 @@ from api.utils.db import (
     Connection,
 )
 from db.python.gcp_connect import BqDbBase
+from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.billing_utils import (
     TimeGroupingDetails,
     abbrev_cost_category,
-    append_budget_records,
+    append_detailed_cost_records,
     append_sample_cost_record,
     append_total_running_cost,
     convert_output,
@@ -34,9 +35,9 @@ from db.python.tables.bq.billing_utils import (
     prepare_labels_function,
     prepare_order_by_string,
     prepare_time_periods,
-    query_to_partitioned_filter,
     time_optimisation_parameter,
 )
+from db.python.tables.bq.generic_bq_filter import GenericBQFilter
 from db.python.tables.sample import SampleTable
 from models.models import (
     BillingColumn,
@@ -44,7 +45,9 @@ from models.models import (
     BillingRunningCostQueryModel,
     BillingTotalCostQueryModel,
 )
-from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
+from models.utils.sequencing_group_id_format import (
+    sequencing_group_id_transform_to_raw,
+)
 
 # Label added to each Billing Big Query request,
 # so we can track the cost of metamist-api BQ usage
@@ -289,7 +292,7 @@ class BillingBaseTable(BqDbBase):
 
     async def get_processed_sequencing_groups_per_month(
         self,
-    ) -> dict[str, list[int]] | None:
+    ) -> dict[date, list[int]]:
         """
         Call BQ table to get all processed sequencing groups per month
         some of the sequencing_group values could be just rubish
@@ -310,17 +313,26 @@ class BillingBaseTable(BqDbBase):
             WHERE LENGTH(sg) > 3
             GROUP BY 1
         """
+        result: dict[date, list[int]] = {}
         query_job_result = self._execute_query(_query)
         if query_job_result:
             # need to reformat sg group ids into raw format
-            return {
-                row.invoice_month: sequencing_group_id_transform_to_raw(
-                    row.all_sequencing_groups
-                )
-                for row in query_job_result
-            }
+            # skip those sg ids that are invalid
+            for row in query_job_result:
+                valid_sg_ids = []
+                for sg in str(row.all_sequencing_groups).split(','):
+                    try:
+                        valid_sg_ids.append(sequencing_group_id_transform_to_raw(sg))
+                    except ValueError:
+                        # skip any invalid sg id
+                        continue
+                result[
+                    date.fromisoformat(
+                        f'{row.invoice_month[:4]}-{row.invoice_month[4:]}-01'
+                    )
+                ] = valid_sg_ids
 
-        return None
+        return result
 
     async def append_sample_cost(
         self, connection: Connection | None = None, results: list[dict] | None = None
@@ -377,7 +389,7 @@ class BillingBaseTable(BqDbBase):
             )
             results = await append_sample_cost_record(
                 results,
-                'Compute Cost',
+                None,
                 'Average Sample Compute Cost',
                 project_sample_compute_counts_per_month,
                 row,
@@ -390,6 +402,31 @@ class BillingBaseTable(BqDbBase):
             key=lambda x: (x.get('day'), x.get('topic'), x.get('cost_category'))
         )
         return results
+
+    @staticmethod
+    def _query_to_partitioned_filter(
+        query: BillingTotalCostQueryModel,
+    ) -> BillingFilter:
+        """
+        By default views are partitioned by 'day',
+        if different then overwrite in the subclass
+        """
+        billing_filter = query.to_filter()
+
+        # initial partition filter
+        billing_filter.day = GenericBQFilter[datetime](
+            gte=(
+                datetime.strptime(query.start_date, '%Y-%m-%d')
+                if query.start_date
+                else None
+            ),
+            lte=(
+                datetime.strptime(query.end_date, '%Y-%m-%d')
+                if query.end_date
+                else None
+            ),
+        )
+        return billing_filter
 
     async def get_total_cost(
         self,
@@ -413,7 +450,7 @@ class BillingBaseTable(BqDbBase):
             time_group = prepare_time_periods(query)
 
         # overrides time specific fields with relevant time column name
-        query_filter = query_to_partitioned_filter(query)
+        query_filter = self._query_to_partitioned_filter(query)
 
         # prepare where string and SQL parameters
         where_str, sql_parameters = query_filter.to_sql()
@@ -570,9 +607,8 @@ class BillingBaseTable(BqDbBase):
         )
 
         # add rest of the records: compute + storage
-        results = await append_budget_records(
+        results = await append_detailed_cost_records(
             budgets_per_gcp_project,
-            query.field,
             is_current_month,
             last_loaded_day,
             total_monthly,

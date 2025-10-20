@@ -2,7 +2,6 @@
 # across different billing tables and views
 # in Big Query.
 from collections import namedtuple
-from datetime import datetime
 
 from google.cloud import bigquery
 
@@ -12,9 +11,7 @@ from api.settings import (
 from api.utils.db import (
     Connection,
 )
-from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.function_bq_filter import FunctionBQFilter
-from db.python.tables.bq.generic_bq_filter import GenericBQFilter
 from models.enums import BillingTimeColumn, BillingTimePeriods
 from models.models import (
     BillingColumn,
@@ -88,13 +85,13 @@ async def get_topic_to_project_map(
     connection: Connection | None = None,
 ) -> dict[str, str]:
     """Get project_id to dataset/topic mapping"""
-    result = {}
+    result: dict[str, str] = {}
     if not connection:
         return result
 
     # run the SQL to get all topics and their projects
     _query = """select id as project_id, dataset from project;"""
-    _query_results = await connection.fetch_all(
+    _query_results = await connection.connection.fetch_all(
         _query,
     )
 
@@ -106,7 +103,7 @@ async def get_topic_to_project_map(
 
 async def append_sample_cost_record(
     results: list[dict],
-    cost_category: str,
+    cost_category: str | None,
     label: str,
     sample_counts_per_month: dict,
     row: dict,
@@ -117,7 +114,7 @@ async def append_sample_cost_record(
 
     Args:
         results (list[dict]): The list of result records.
-        cost_category (str): The cost category to match.
+        cost_category (str | None): The cost category to match.
         label (str): The label to assign to the new record.
         sample_counts_per_month (dict): The sample counts per month.
         row (dict): The original row to copy.
@@ -137,6 +134,37 @@ async def append_sample_cost_record(
         new_row['cost_category'] = label
         new_row['cost'] = avg_cost
         results.append(new_row)
+
+    elif cost_category is None:
+        # When cost_category is None, we need to sum all the costs except 'Cloud Storage' and group by topic and day
+        if row.get('cost_category') != 'Cloud Storage':
+            sample_count = sample_counts_per_month.get(project_id, {}).get(
+                invoice_month, 0
+            )
+
+            avg_cost = row.get('cost', 0) / sample_count if sample_count > 0 else 0
+
+            # if topic and day does not exist, add new row into results
+            # otherwise add cost to existing row
+            new_row = row.copy()
+            new_row['cost_category'] = label
+            new_row['cost'] = avg_cost
+
+            if not results:
+                results.append(new_row)
+            else:
+                found = False
+                for existing_row in results:
+                    if (
+                        existing_row.get('topic') == new_row.get('topic')
+                        and existing_row.get('day') == new_row.get('day')
+                        and existing_row.get('cost_category') == label
+                    ):
+                        existing_row['cost'] += new_row['cost']
+                        found = True
+                        break
+                if not found:
+                    results.append(new_row)
 
     return results
 
@@ -196,9 +224,8 @@ async def append_total_running_cost(
     return results
 
 
-async def append_budget_records(
+async def append_detailed_cost_records(
     budgets_per_gcp_project: dict[str, float],
-    field: BillingColumn,
     is_current_month: bool,
     last_loaded_day: str | None,
     total_monthly: dict,
@@ -288,6 +315,7 @@ def prepare_aggregation(query: BillingTotalCostQueryModel) -> tuple[str, str]:
 
 
 def prepare_labels_function(query: BillingTotalCostQueryModel):
+    """Prepare labels function filter if labels filter is present"""
     if not query.filters:
         return None
 
@@ -314,27 +342,6 @@ def prepare_labels_function(query: BillingTotalCostQueryModel):
 
     # otherwise
     return None
-
-
-def query_to_partitioned_filter(
-    query: BillingTotalCostQueryModel,
-) -> BillingFilter:
-    """
-    By default views are partitioned by 'day',
-    if different then overwrite in the subclass
-    """
-    billing_filter = query.to_filter()
-
-    # initial partition filter
-    billing_filter.day = GenericBQFilter[datetime](
-        gte=(
-            datetime.strptime(query.start_date, '%Y-%m-%d')
-            if query.start_date
-            else None
-        ),
-        lte=(datetime.strptime(query.end_date, '%Y-%m-%d') if query.end_date else None),
-    )
-    return billing_filter
 
 
 def filter_to_optimise_query() -> str:
