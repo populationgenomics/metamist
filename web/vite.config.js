@@ -2,7 +2,6 @@ import { defineConfig } from 'vite'
 import { createHtmlPlugin } from 'vite-plugin-html'
 import react from '@vitejs/plugin-react'
 import svgr from 'vite-plugin-svgr'
-
 export default defineConfig({
     root: 'src',
     build: {
@@ -32,4 +31,7 @@ export default defineConfig({
         }),
         svgr(),
     ],
+    define: {
+        PROJECT_GROUPS: JSON.stringify(process.env.PROJECT_GROUPS) || '[]',
+    },
 })
