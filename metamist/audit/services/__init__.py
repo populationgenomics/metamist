@@ -9,7 +9,7 @@ from .file_matcher import (
 )
 from .audit_analyzer import AuditAnalyzer
 from .reporter import Reporter
-from .audit_logging import AuditLogs
+from .audit_logging import BucketAuditLogger
 
 __all__ = [
     # File matching
@@ -21,5 +21,5 @@ __all__ = [
     # Core services
     'AuditAnalyzer',
     'Reporter',
-    'AuditLogs',
+    'BucketAuditLogger',
 ]
