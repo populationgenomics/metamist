@@ -773,12 +773,13 @@ class SampleTable(DbBase):
         )
         return {r['project']: r['sample_count'] for r in rows}
 
-    async def match_seq_grp_to_project(
+    async def get_sample_count_per_project_per_month(
         self, sg_compute_per_month: dict[date, list[int]] | None
     ) -> dict[int, dict[date, int]]:
         """
-        Match passed month->list of sequencing groups to projects
-        Return a map of {project_id: {month: count of samples used in compute}}
+        Match passed month->list of sequencing groups to sample counts per project
+        used in compute for those sequencing groups
+        Return a map of {metamist project_id: {month: count of samples used in compute}}
         """
         # Map to hold the results
         result: dict[int, dict[date, int]] = defaultdict(lambda: defaultdict(int))

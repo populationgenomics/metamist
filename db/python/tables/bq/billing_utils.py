@@ -103,68 +103,60 @@ async def get_topic_to_project_map(
 
 async def append_sample_cost_record(
     results: list[dict],
-    cost_category: str | None,
     label: str,
     sample_counts_per_month: dict,
     row: dict,
     invoice_month: str,
     project_id: int,
+    include_cost_category: str | None = None,
+    exclude_cost_category: str | None = None,
 ):
     """Add a sample cost record to the results.
 
     Args:
         results (list[dict]): The list of result records.
-        cost_category (str | None): The cost category to match.
         label (str): The label to assign to the new record.
         sample_counts_per_month (dict): The sample counts per month.
         row (dict): The original row to copy.
         invoice_month (str): The invoice month to filter by.
         project_id (int): The project ID to filter by.
-
+        include_cost_category (str | None): The cost category to include.
+        exclude_cost_category (str | None): The cost category to exclude.
     Returns:
         list[dict]: The updated list of result records.
     """
-    if row.get('cost_category') == cost_category:
-        sample_count = sample_counts_per_month.get(project_id, {}).get(invoice_month, 0)
 
-        avg_cost = row.get('cost', 0) / sample_count if sample_count > 0 else 0
-        # append new row into results with the same topic and day but with cost_category = label
-        # and cost = avg_cost
-        new_row = row.copy()
-        new_row['cost_category'] = label
-        new_row['cost'] = avg_cost
+    sample_count = sample_counts_per_month.get(project_id, {}).get(invoice_month, 0)
+    avg_cost = row.get('cost', 0) / sample_count if sample_count > 0 else 0
+    # create new row based on passed row
+    # with the same topic and day but with cost_category = label
+    # and cost = avg_cost
+    new_row = row.copy()
+    new_row['cost_category'] = label
+    new_row['cost'] = avg_cost
+
+    if include_cost_category and row.get('cost_category') == include_cost_category:
+        # When include_cost_category is defined, we only need to add average sample cost for that category
         results.append(new_row)
 
-    elif cost_category is None:
-        # When cost_category is None, we need to sum all the costs except 'Cloud Storage' and group by topic and day
-        if row.get('cost_category') != 'Cloud Storage':
-            sample_count = sample_counts_per_month.get(project_id, {}).get(
-                invoice_month, 0
-            )
+    elif exclude_cost_category and row.get('cost_category') != exclude_cost_category:
+        # When exclude_cost_category is defined,
+        # we need to sum all the costs except exclude_cost_category and group by topic and day
+        # if topic and day does not exist, add new row into results
+        # otherwise add cost to existing row
+        found = False
+        for existing_row in results:
+            if (
+                existing_row.get('topic') == new_row.get('topic')
+                and existing_row.get('day') == new_row.get('day')
+                and existing_row.get('cost_category') == label
+            ):
+                existing_row['cost'] += new_row['cost']
+                found = True
+                break
 
-            avg_cost = row.get('cost', 0) / sample_count if sample_count > 0 else 0
-
-            # if topic and day does not exist, add new row into results
-            # otherwise add cost to existing row
-            new_row = row.copy()
-            new_row['cost_category'] = label
-            new_row['cost'] = avg_cost
-
-            if not results:
-                results.append(new_row)
-            else:
-                found = False
-                for existing_row in results:
-                    if (
-                        existing_row.get('topic') == new_row.get('topic')
-                        and existing_row.get('day') == new_row.get('day')
-                        and existing_row.get('cost_category') == label
-                    ):
-                        existing_row['cost'] += new_row['cost']
-                        found = True
-                        break
-                if not found:
-                    results.append(new_row)
+        if not found:
+            results.append(new_row)
 
     return results
 

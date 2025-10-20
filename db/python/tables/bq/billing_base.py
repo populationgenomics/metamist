@@ -362,7 +362,7 @@ class BillingBaseTable(BqDbBase):
         # pass sg_compute_per_month to sample table
         # and per each month get number of samples per project used in compute
         project_sample_compute_counts_per_month = (
-            await samples.match_seq_grp_to_project(sg_compute_per_month)
+            await samples.get_sample_count_per_project_per_month(sg_compute_per_month)
         )
 
         # for each monthly record with cost_category == 'Cloud Storage' add one record with average_sample_cost
@@ -378,23 +378,26 @@ class BillingBaseTable(BqDbBase):
             if project_id is None:
                 continue
 
+            # append new row based on Cloud Storage cost
             results = await append_sample_cost_record(
                 results,
-                'Cloud Storage',
                 'Average Sample Storage Cost',
                 project_sample_counts_per_month,
                 row,
                 invoice_month,
                 int(project_id),
+                include_cost_category='Cloud Storage',
             )
+
+            # aggregate all but Cloud Storage costs into one average sample compute cost
             results = await append_sample_cost_record(
                 results,
-                None,
                 'Average Sample Compute Cost',
                 project_sample_compute_counts_per_month,
                 row,
                 invoice_month,
                 int(project_id),
+                exclude_cost_category='Cloud Storage',
             )
 
         # order results by day, topic, cost_category
