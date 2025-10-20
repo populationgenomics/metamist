@@ -208,14 +208,14 @@ audit_upload_bucket(config)
 ```python
 from metamist.audit.data_access import MetamistDataAccess, GCSDataAccess
 from metamist.audit.models import AuditConfig, SequencingGroup
-from metamist.audit.services import AuditAnalyzer, AuditLogs, Reporter
+from metamist.audit.services import AuditAnalyzer, BucketAuditLogger, Reporter
 from metamist.audit.cli import AuditOrchestrator
 
 # Create custom components
 metamist = MetamistDataAccess()
 gcs = GCSDataAccess()
 analyzer = AuditAnalyzer()
-audit_logs = AuditLogs()
+audit_logs = BucketAuditLogger()
 reporter = Reporter(gcs, audit_logs)
 
 

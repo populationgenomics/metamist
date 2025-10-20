@@ -22,9 +22,19 @@ class FileType(Enum):
         return self.value
 
     @classmethod
+    def all_read_filetypes(cls) -> tuple['FileType', ...]:
+        """Get all read file types (FASTQ, BAM, CRAM)."""
+        return (cls.FASTQ, cls.BAM, cls.CRAM)
+
+    @classmethod
     def all_read_extensions(cls) -> tuple[str, ...]:
         """Get all read file extensions (FASTQ, BAM, CRAM)."""
         return cls.FASTQ.value + cls.BAM.value + cls.CRAM.value
+
+    @classmethod
+    def all_filetypes(cls) -> tuple['FileType', ...]:
+        """Get all file types."""
+        return tuple(cls)
 
     @classmethod
     def all_extensions(cls) -> tuple[str, ...]:
@@ -83,10 +93,10 @@ class AuditConfig:  # pylint: disable=too-many-instance-attributes
         file_types = []
         for ft in args.file_types:
             if ft == 'all':
-                file_types = list(FileType.all_extensions())
+                file_types = list(FileType.all_filetypes())
                 break
             if ft == 'all_reads':
-                file_types = list(FileType.all_read_extensions())
+                file_types = list(FileType.all_read_filetypes())
                 break
             # Map string to FileType
             ft_map = {
