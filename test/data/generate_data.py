@@ -57,7 +57,7 @@ query EnumsQuery {
 
 
 async def main(
-    ped_path=default_ped_location, project='greek-myth', sample_prefix='GRK'
+    ped_path=default_ped_location, project='greek-myth', sample_prefix='GRK', num=0
 ):
     """Doing the generation for you"""
 
@@ -108,6 +108,9 @@ async def main(
         project=project, request_body=participant_eids
     )
 
+    if num > 0:
+        participant_eids = random.sample(participant_eids, num)
+        
     how_many_samples = {1: 0.78, 2: 0.16, 3: 0.05, 4: 0.01}
     how_many_sequencing_groups = {1: 0.78, 2: 0.16, 3: 0.05}
 
@@ -270,5 +273,6 @@ if __name__ == '__main__':
     )
     parser.add_argument('--project', type=str, default='greek-myth')
     parser.add_argument('--sample-prefix', type=str, default='GRK')
+    parser.add_argument('--num', type=int, default=0)
     args = vars(parser.parse_args())
     asyncio.new_event_loop().run_until_complete(main(**args))

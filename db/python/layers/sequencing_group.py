@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import date
 
 from db.python.connect import Connection
@@ -159,6 +160,44 @@ class SequencingGroupLayer(BaseLayer):
     async def get_type_numbers_for_project(self, project: ProjectId) -> dict[str, int]:
         """Get sequencing type numbers (of groups) for a project"""
         return await self.seqgt.get_type_numbers_for_project(project)
+    
+    async def get_type_numbers_for_project_history(self, project_ids: list[ProjectId] = []) -> dict[ProjectId, dict[date, dict[str, int]]]:
+        # Retrieve the raw data from the Sequencing Group/Sample tables.
+        rows = await self.seqgt.get_type_numbers_history(project_ids)
+
+        # Organise the data by project into a dictionary.
+        project_histories: dict[ProjectId, dict[date, dict[str, int]]] = {}
+        for row in rows:
+            # Extract values from the table row.
+            project_id = row['project_id']
+            date_created = date.fromisoformat(row['date_created'])
+            type = row['type']
+            num_sg = row['num_sg']
+            
+            # Organise the projet's data into a dictionary, based on dates.
+            if project_id not in project_histories:
+                project_histories[project_id] = {}
+            
+            # Organise the date's data into a dictionary, based on sample type.
+            if date_created not in project_histories[project_id]:
+                project_histories[project_id][date_created] = {}
+
+            project_histories[project_id][date_created][type] = num_sg
+
+        # Interpolate between dates by holding the last recorded number.
+        for proj, month_counts in project_histories.items():
+            type_totals = defaultdict(int)
+
+            if not month_counts:
+                continue
+
+            current_month = min(month_counts.keys())
+            for month, types in month_counts.items():
+                for type, count in types.items():
+                    type_totals[type] += count
+
+
+        return project_histories
 
     # region CREATE / MUTATE
 

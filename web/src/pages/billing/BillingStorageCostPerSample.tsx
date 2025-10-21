@@ -3,7 +3,7 @@ import { debounce } from 'lodash'
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
-import { Button, Card, Checkbox, Dropdown, Grid, Input, Message } from 'semantic-ui-react'
+import { Button, Card, Dropdown, Grid, Message } from 'semantic-ui-react'
 import {
     generateInvoiceMonths,
     getAdjustedDay,
@@ -16,13 +16,10 @@ import generateUrl from '../../shared/utilities/generateUrl'
 import {
     BillingApi,
     BillingColumn,
-    BillingSource,
-    BillingTimePeriods,
-    BillingTotalCostQueryModel,
-    BillingTotalCostRecord,
 } from '../../sm-api'
 import './components/BillingCostByTimeTable.css'
 import FieldSelector from './components/FieldSelector'
+import CostByTimeChart from './components/CostByTimeChart'
 
 /* eslint-disable @typescript-eslint/no-explicit-any  -- too many anys in the file to fix right now but would be good to sort out when we can */
 const BillingStorageCostPerSample: React.FunctionComponent = () => {
@@ -160,6 +157,46 @@ const [searchParams] = useSearchParams()
         }
         return null
     }
+
+    const dataComponent = () => {
+            if (message || error || isLoading) {
+                return null
+            }
+    
+            if (!message && !error && !isLoading && (!data || data.length === 0)) {
+                return (
+                    <Card
+                        fluid
+                        style={{ padding: '20px', overflowX: 'scroll' }}
+                        id="billing-container-charts"
+                    >
+                        No Data
+                    </Card>
+                )
+            }
+    
+            return (
+                <>
+                    <Card
+                        fluid
+                        style={{ padding: '20px', overflowX: 'scroll' }}
+                        id="billing-container-charts"
+                    >
+                        <Grid>
+                            <Grid.Column width={16} className="chart-card">
+                                <CostByTimeChart
+                                    start={start}
+                                    end={end}
+                                    groups={groups}
+                                    isLoading={isLoading}
+                                    data={data}
+                                />
+                            </Grid.Column>
+                        </Grid>
+                    </Card>
+                </>
+            )
+        }
 
     const onMonthStart = (event: any, data: any) => {
         changeDate('start', data.value)
@@ -310,6 +347,8 @@ const [searchParams] = useSearchParams()
                     </Grid.Column>
                 </Grid>
             </Card>
+
+            {messageComponent()}
         </>
     )
 }
@@ -318,6 +357,7 @@ export default function BillingStorageCostPerSamplePage() {
     return (
         <PaddedPage>
             <BillingStorageCostPerSample />
+
         </PaddedPage>
     )
 }

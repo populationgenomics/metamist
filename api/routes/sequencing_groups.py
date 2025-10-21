@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Any
 
 from fastapi import APIRouter
@@ -9,7 +10,7 @@ from api.utils.db import (
     get_projectless_db_connection,
 )
 from db.python.layers.sequencing_group import SequencingGroupLayer
-from models.models.project import FullWriteAccessRoles, ReadAccessRoles
+from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
 from models.models.sequencing_group import (
     SequencingGroup,
     SequencingGroupUpsertInternal,
@@ -90,5 +91,16 @@ async def archive_sequencing_groups(
     )
     return True
 
+
+# endregion
+
+# region QUERIES
+
+@router.get('/{project}/history', operation_id='projectSGHistory')
+async def get_project_sg_history(
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
+) -> dict[ProjectId, dict[date, dict[str, int]]]:
+    sq_layer = SequencingGroupLayer(connection)
+    await sq_layer.get_type_numbers_for_project_history() # TODO: Figure out how to create test data for this.
 
 # endregion
