@@ -1,3 +1,4 @@
+import { Box, Link as MuiLink, Modal as MuiModal, Typography } from '@mui/material'
 import { SelectChangeEvent } from '@mui/material/Select'
 import { debounce } from 'lodash'
 import * as React from 'react'
@@ -29,7 +30,8 @@ import FieldSelector from './components/FieldSelector'
 enum CloudSpendCategory {
     STORAGE_COST = 'Storage Cost',
     COMPUTE_COST = 'Compute Cost',
-    SAMPLE_COST = 'Avg. Sample Storage Cost (Est.)',
+    SAMPLE_STORAGE_COST = 'Avg. Sample Storage Cost (Est.)',
+    SAMPLE_COMPUTE_COST = 'Avg. Sample Compute Cost (Est.)',
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any  -- too many anys in the file to fix right now but would be good to sort out when we can */
@@ -39,6 +41,8 @@ const BillingCostByTime: React.FunctionComponent = () => {
     // Pull search params for use in the component
     const inputTopics = searchParams.get('topics')
     const initialTopics = inputTopics ? inputTopics.split(',').filter((t) => t.trim() !== '') : []
+
+    const [showingInfo, setShowingInfo] = React.useState(false)
 
     const [start, setStart] = React.useState<string>(
         searchParams.get('start') ?? getCurrentInvoiceYearStart()
@@ -102,9 +106,13 @@ const BillingCostByTime: React.FunctionComponent = () => {
         if (costCategory?.startsWith('Cloud Storage')) {
             return CloudSpendCategory.STORAGE_COST
         }
-        // if costCategory is equal to 'Average Sample Storage Cost', then return SAMPLE_COST
+        // if costCategory is equal to 'Average Sample Storage Cost', then return SAMPLE_STORAGE_COST
         if (costCategory === 'Average Sample Storage Cost') {
-            return CloudSpendCategory.SAMPLE_COST
+            return CloudSpendCategory.SAMPLE_STORAGE_COST
+        }
+        // if costCategory is equal to 'Average Sample Compute Cost', then return SAMPLE_COMPUTE_COST
+        if (costCategory === 'Average Sample Compute Cost') {
+            return CloudSpendCategory.SAMPLE_COMPUTE_COST
         }
         return CloudSpendCategory.COMPUTE_COST
     }
@@ -190,7 +198,10 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         // Sum costs across all regular topics for this month/category
                         let totalCost = 0
                         // if cost_category is SAMPLE_COST, then skip it
-                        if (category === CloudSpendCategory.SAMPLE_COST) {
+                        if (category === CloudSpendCategory.SAMPLE_STORAGE_COST) {
+                            return
+                        }
+                        if (category === CloudSpendCategory.SAMPLE_COMPUTE_COST) {
                             return
                         }
                         Object.keys(recTotals).forEach((topic) => {
@@ -397,15 +408,25 @@ const BillingCostByTime: React.FunctionComponent = () => {
             ]
             matrix.push(storageRow)
 
-            const sampleCostRow: [string, string, ...string[]] = [
+            const sampleCostStorageRow: [string, string, ...string[]] = [
                 topic,
-                CloudSpendCategory.SAMPLE_COST.toString(),
+                CloudSpendCategory.SAMPLE_STORAGE_COST.toString(),
                 ...months.map((m) => {
-                    const val = data[topic]?.[m]?.[CloudSpendCategory.SAMPLE_COST]
+                    const val = data[topic]?.[m]?.[CloudSpendCategory.SAMPLE_STORAGE_COST]
                     return val === undefined ? '' : val.toFixed(2)
                 }),
             ]
-            matrix.push(sampleCostRow)
+            matrix.push(sampleCostStorageRow)
+
+            const sampleComputeCostRow: [string, string, ...string[]] = [
+                topic,
+                CloudSpendCategory.SAMPLE_COMPUTE_COST.toString(),
+                ...months.map((m) => {
+                    const val = data[topic]?.[m]?.[CloudSpendCategory.SAMPLE_COMPUTE_COST]
+                    return val === undefined ? '' : val.toFixed(2)
+                }),
+            ]
+            matrix.push(sampleComputeCostRow)
         })
 
         exportTable(
@@ -431,15 +452,30 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         marginBottom: '20px',
                     }}
                 >
-                    <h1
-                        style={{
-                            fontSize: 40,
-                            margin: 0,
-                            flex: '1 1 200px',
-                        }}
-                    >
-                        Cost Across Invoice Months (Topic only)
-                    </h1>
+                    <Box>
+                        <h1
+                            style={{
+                                fontSize: 40,
+                                margin: 0,
+                                flex: '1 1 200px',
+                            }}
+                        >
+                            Cost Across Invoice Months (Topic only)
+                        </h1>
+
+                        <MuiLink
+                            href="#"
+                            sx={{ fontSize: 12, mr: 2 }}
+                            color="info"
+                            onClick={(e) => {
+                                e.preventDefault()
+                                setShowingInfo(true)
+                            }}
+                        >
+                            How is this calculated?
+                        </MuiLink>
+                    </Box>
+
                     <Dropdown
                         button
                         className="icon"
@@ -505,6 +541,84 @@ const BillingCostByTime: React.FunctionComponent = () => {
             {messageComponent()}
 
             {dataComponent()}
+
+            <MuiModal open={showingInfo} onClose={() => setShowingInfo(false)}>
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        width: '100%',
+                        maxWidth: 900,
+                        bgcolor: 'background.paper',
+                        boxShadow: 24,
+                        p: 4,
+                    }}
+                >
+                    <Typography variant="h5" component="h2" mb={2}>
+                        How are topic costs calculated?
+                    </Typography>
+
+                    <Typography variant="h6" component="h2" mt={2}>
+                        Storage cost type calculations
+                    </Typography>
+                    <Typography mb={2}>
+                        Contains all Cloud Storage costs as provided by GCP.
+                    </Typography>
+
+                    <Typography variant="h6" component="h2" mt={2}>
+                        Compute cost type calculations
+                    </Typography>
+
+                    <Typography mb={2}>
+                        Compute cost is total of all other than Cloud Storage costs associated with
+                        the topic.
+                        <br />
+                        E.g. costs for Ingress, Egress, BigQuery, Compute Engine, etc.
+                        <br />
+                        It includes as well distributed Compute costs from Hail Batch and Seqr
+                        projects.
+                    </Typography>
+
+                    <Typography variant="h6" component="h2" mt={2}>
+                        Avg Sample Storage Cost (Est.)
+                    </Typography>
+
+                    <Typography mb={2}>
+                        Avg. Sample Storage Cost is an estimate of the storage costs associated with
+                        the topic.
+                        <br />
+                        It is calculated by taking the total Cloud Storage costs for the topic and
+                        dividing it by the average number of samples stored in the topic.
+                        <br />
+                        This provides an estimate of the storage cost per sample for the topic.
+                        <br />
+                        As GCP does not provide detailed cost breakdowns by bucket type, this value
+                        is an approximation.
+                    </Typography>
+
+                    <Typography variant="h6" component="h2" mt={2}>
+                        Avg Sample Compute Cost (Est.)
+                    </Typography>
+
+                    <Typography mb={2}>
+                        Avg. Sample Compute Cost is an estimate of the compute costs associated with
+                        the topic.
+                        <br />
+                        It is calculated by taking the total Compute costs for the topic and
+                        dividing it by the number of samples processed for the invoice month.
+                        <br />
+                        Number of samples as obtained from Analysis Runner labels, especially
+                        sequencing group labels.
+                        <br />
+                        There was a period where AR labels where switched off so not all jobs were
+                        labeled correctly, causing discrepancies in Sample Compute Cost
+                        calculations.
+                        <br />
+                    </Typography>
+                </Box>
+            </MuiModal>
         </PaddedPage>
     )
 }
