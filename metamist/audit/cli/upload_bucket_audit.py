@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 from metamist.audit.data_access import MetamistDataAccess, GCSDataAccess
 from metamist.audit.models import AuditConfig, SequencingGroup
-from metamist.audit.services import AuditAnalyzer, AuditLogs, Reporter
+from metamist.audit.services import AuditAnalyzer, BucketAuditLogger, Reporter
 
 
 class AuditOrchestrator:
@@ -19,7 +19,7 @@ class AuditOrchestrator:
         gcs_data_access: GCSDataAccess,
         analyzer: AuditAnalyzer,
         reporter: Reporter,
-        audit_logs: AuditLogs,
+        audit_logs: BucketAuditLogger,
     ):
         """
         Initialize the orchestrator.
@@ -175,7 +175,7 @@ async def audit_upload_bucket_async(config_args: SimpleNamespace):
         AuditConfig.from_cli_args(config_args)
     )
 
-    audit_logs = AuditLogs(audit.dataset, 'upload_bucket_audit')
+    audit_logs = BucketAuditLogger(audit.dataset, 'upload_bucket_audit')
     gcs = GCSDataAccess(audit.dataset)
     reporter = Reporter(gcs, audit_logs, audit.results_folder)
     orchestrator = AuditOrchestrator(
