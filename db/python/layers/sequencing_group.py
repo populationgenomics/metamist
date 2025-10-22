@@ -1,6 +1,8 @@
 from collections import defaultdict
 from datetime import date
 
+from dateutil.relativedelta import relativedelta
+
 from db.python.connect import Connection
 from db.python.filters.generic import GenericFilter
 from db.python.layers.assay import AssayLayer
@@ -162,6 +164,7 @@ class SequencingGroupLayer(BaseLayer):
         return await self.seqgt.get_type_numbers_for_project(project)
     
     async def get_type_numbers_for_project_history(self, project_ids: list[ProjectId] = []) -> dict[ProjectId, dict[date, dict[str, int]]]:
+        """Returns a record of the number of each sequencing group type for the given projects over time."""
         # Retrieve the raw data from the Sequencing Group/Sample tables.
         rows = await self.seqgt.get_type_numbers_history(project_ids)
 
@@ -170,7 +173,7 @@ class SequencingGroupLayer(BaseLayer):
         for row in rows:
             # Extract values from the table row.
             project_id = row['project_id']
-            date_created = date.fromisoformat(row['date_created'])
+            month_created = date.fromisoformat(row['date_created']).replace(day=1)
             type = row['type']
             num_sg = row['num_sg']
             
@@ -179,23 +182,32 @@ class SequencingGroupLayer(BaseLayer):
                 project_histories[project_id] = {}
             
             # Organise the date's data into a dictionary, based on sample type.
-            if date_created not in project_histories[project_id]:
-                project_histories[project_id][date_created] = {}
+            if month_created not in project_histories[project_id]:
+                project_histories[project_id][month_created] = {}
 
-            project_histories[project_id][date_created][type] = num_sg
+            project_histories[project_id][month_created][type] = num_sg
 
-        # Interpolate between dates by holding the last recorded number.
-        for proj, month_counts in project_histories.items():
-            type_totals = defaultdict(int)
-
+        # We want the total number of each sg type over time, so performing this summing and
+        # fill in the months between data points.
+        todays_month = date.today().replace(day=1)
+        for month_counts in project_histories.values():
+            type_totals: dict[str, int] = defaultdict(lambda: 0)
             if not month_counts:
                 continue
 
-            current_month = min(month_counts.keys())
-            for month, types in month_counts.items():
-                for type, count in types.items():
+            # Start from the earliest recorded month and work towards the current month.
+            iteration_month = min(month_counts.keys())
+            while iteration_month <= todays_month:
+                iteration_counts = month_counts.get(iteration_month, {})
+                # If there's any recorded Sequencing Group counts for this iteration's month, 
+                # add them to the cumulative count.
+                for type, count in iteration_counts.items():
                     type_totals[type] += count
 
+                iteration_counts.update(type_totals)
+                month_counts[iteration_month] = iteration_counts
+
+                iteration_month += relativedelta(months=1)
 
         return project_histories
 
