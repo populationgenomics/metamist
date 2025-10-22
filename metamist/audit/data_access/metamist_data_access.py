@@ -129,7 +129,7 @@ class MetamistDataAccess:
         cohort_id = self.graphql_client.get_dataset_cohort(dataset, cohort_name)
         return self.graphql_client.create_audit_deletion_analysis(
             dataset,
-            cohort_id,
+            [cohort_id],
             deletion_report_path,
             meta={audited_report_name: stats},
         )
