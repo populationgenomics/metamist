@@ -96,11 +96,17 @@ async def archive_sequencing_groups(
 
 # region QUERIES
 
-@router.get('/{project}/history', operation_id='projectSGHistory')
+@router.post('/history', operation_id='sequencingGroupHistory')
 async def get_project_sg_history(
-    connection: Connection = get_project_db_connection(ReadAccessRoles),
-) -> dict[ProjectId, dict[date, dict[str, int]]]:
+    project_ids: list[str],
+    connection: Connection = get_projectless_db_connection
+):
     sq_layer = SequencingGroupLayer(connection)
-    await sq_layer.get_type_numbers_for_project_history() # TODO: Figure out how to create test data for this.
+
+    projects = connection.get_and_check_access_to_projects_for_names(
+        project_ids, allowed_roles=ReadAccessRoles
+    )
+    pids = [p.id for p in projects]
+    return await sq_layer.get_type_numbers_for_project_history(pids)
 
 # endregion
