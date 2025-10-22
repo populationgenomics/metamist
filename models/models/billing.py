@@ -1,6 +1,6 @@
 import datetime
 from enum import Enum
-
+from pydantic import Field
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
 from models.base import SMBase
@@ -595,3 +595,28 @@ class BillingRunningCostQueryModel(SMBase):
                     setattr(billing_filter, fk.value, GenericBQFilter(eq=fv))
 
         return billing_filter
+
+
+class BillingProjectGroup(SMBase):
+    """Return class for the Billing Project Group"""
+
+    name: str
+    group_by: str = Field(validation_alias='groupBy')
+    gcp_projects: str = Field(validation_alias='gcpProjects')
+
+
+class BillingTopicGroup(SMBase):
+    """Return class for the Billing Topic Group"""
+
+    name: str
+    group_by: str = Field(validation_alias='groupBy')
+    topics: str
+
+
+class BillingTeamRecord(SMBase):
+    """Return class for the Billing groups information of CPG teams"""
+
+    team_name: str = Field(validation_alias='teamName')
+    billing_groups: list[BillingTopicGroup | BillingProjectGroup] = Field(
+        validation_alias='billingGroups'
+    )
