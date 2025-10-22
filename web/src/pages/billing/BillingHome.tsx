@@ -164,7 +164,7 @@ const BillingHome = () => {
             .then((result) => {
                 setBillingGroupList(result.data)
             })
-            .catch((err) => {
+            .catch(() => {
                 setBillingGroupList([])
             })
     }, [])
