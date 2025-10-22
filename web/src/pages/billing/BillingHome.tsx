@@ -81,19 +81,19 @@ const MenuItems = (props: MenuProps) => {
     )
 }
 
-const renderLinkItem = (label: string, href: string) => (
-    <List.Item key={label}>
+const LinkItem: React.FC<{ label: string; href: string }> = ({ label, href }) => (
+    <List.Item>
         <a href={href} target="_blank" rel="noreferrer">
             {label} <OpenInNewIcon />
         </a>
     </List.Item>
 )
 
-const renderGridColumn = (
-    teamName: string,
-    billingGroupInfoList: (BillingProjectGroup | BillingTopicGroup)[],
+const GridColumn: React.FC<{
+    teamName: string
+    billingGroupInfoList: (BillingProjectGroup | BillingTopicGroup)[]
     location: Location
-) => (
+}> = ({ teamName, billingGroupInfoList, location }) => (
     <Grid.Column>
         <Header as="h3">{teamName} Team</Header>
 
@@ -102,12 +102,13 @@ const renderGridColumn = (
         <List>
             {billingGroupInfoList
                 .filter((item): item is BillingProjectGroup => item.group_by === 'gcp_project')
-                .map((item) =>
-                    renderLinkItem(
-                        `${item.name}`,
-                        `${location.pathname}/invoiceMonthCost?groupBy=gcp_project&gcpProjects=${item.gcp_projects}`
-                    )
-                )}
+                .map((item) => (
+                    <LinkItem
+                        key={item.name}
+                        label={item.name}
+                        href={`${location.pathname}/invoiceMonthCost?groupBy=gcp_project&gcpProjects=${item.gcp_projects}`}
+                    />
+                ))}
         </List>
 
         <Header as="h5">Cost By Invoice Month by Topic</Header>
@@ -115,12 +116,13 @@ const renderGridColumn = (
         <List>
             {billingGroupInfoList
                 .filter((item): item is BillingTopicGroup => item.group_by === 'topic')
-                .map((item) =>
-                    renderLinkItem(
-                        `${item.name}`,
-                        `${location.pathname}/invoiceMonthCost?groupBy=topic&topics=${item.topics}`
-                    )
-                )}
+                .map((item) => (
+                    <LinkItem
+                        key={item.name}
+                        label={item.name}
+                        href={`${location.pathname}/invoiceMonthCost?groupBy=topic&topics=${item.topics}`}
+                    />
+                ))}
         </List>
 
         <Header as="h5">Cost Across Invoice Months by Topic</Header>
@@ -128,12 +130,13 @@ const renderGridColumn = (
         <List>
             {billingGroupInfoList
                 .filter((item): item is BillingTopicGroup => item.group_by === 'topic')
-                .map((item) =>
-                    renderLinkItem(
-                        `${item.name}`,
-                        `${location.pathname}/costByMonth?groupBy=topic&topics=${item.topics}`
-                    )
-                )}
+                .map((item) => (
+                    <LinkItem
+                        key={item.name}
+                        label={item.name}
+                        href={`${location.pathname}/costByMonth?groupBy=topic&topics=${item.topics}`}
+                    />
+                ))}
         </List>
     </Grid.Column>
 )
@@ -180,9 +183,14 @@ const BillingHome = () => {
 
                 <Container fluid style={{ padding: '2em 0', margin: '0px' }}>
                     <Grid stackable columns={2} relaxed>
-                        {billingGroupList.map((item) =>
-                            renderGridColumn(item.team_name, item.billing_groups, location)
-                        )}
+                        {billingGroupList.map((item) => (
+                            <GridColumn
+                                teamName={item.team_name}
+                                billingGroupInfoList={item.billing_groups}
+                                location={location}
+                                key={item.team_name}
+                            />
+                        ))}
                     </Grid>
                 </Container>
 

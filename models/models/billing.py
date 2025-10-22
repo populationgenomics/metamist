@@ -1,6 +1,6 @@
 import datetime
 from enum import Enum
-
+from pydantic import Field
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
 from models.base import SMBase
@@ -601,54 +601,22 @@ class BillingProjectGroup(SMBase):
     """Return class for the Billing Project Group"""
 
     name: str
-    group_by: str
-    gcp_projects: str
-
-    @staticmethod
-    def from_json(record):
-        """Create BillingProjectGroup from json"""
-        return BillingProjectGroup(
-            name=record.get('name'),
-            group_by=record.get('groupBy'),
-            gcp_projects=record.get('gcpProjects'),
-        )
+    group_by: str = Field(validation_alias='groupBy')
+    gcp_projects: str = Field(validation_alias='gcpProjects')
 
 
 class BillingTopicGroup(SMBase):
     """Return class for the Billing Topic Group"""
 
     name: str
-    group_by: str
+    group_by: str = Field(validation_alias='groupBy')
     topics: str
-
-    @staticmethod
-    def from_json(record):
-        """Create BillingTopicGroup from json"""
-        return BillingTopicGroup(
-            name=record.get('name'),
-            group_by=record.get('groupBy'),
-            topics=record.get('topics'),
-        )
 
 
 class BillingTeamRecord(SMBase):
     """Return class for the Billing groups information of CPG teams"""
 
-    team_name: str
-    billing_groups: list[BillingTopicGroup | BillingProjectGroup]
-
-    @staticmethod
-    def from_json(record):
-        """Create BillingTeamRecord from json"""
-        billing_groups = []
-        for row in record.get('billingGroups') or []:
-            if 'topics' in row:
-                billing_groups.append(BillingTopicGroup.from_json(row))
-            elif 'gcpProjects' in row:
-                billing_groups.append(BillingProjectGroup.from_json(row))
-            else:
-                raise ValueError(f'Unknown billing group type')
-
-        return BillingTeamRecord(
-            team_name=record.get('teamName'), billing_groups=billing_groups
-        )
+    team_name: str = Field(validation_alias='teamName')
+    billing_groups: list[BillingTopicGroup | BillingProjectGroup] = Field(
+        validation_alias='billingGroups'
+    )

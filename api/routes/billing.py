@@ -2,13 +2,11 @@
 Billing routes
 """
 
-import json
-
 from async_lru import alru_cache
 from fastapi import APIRouter
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from google.cloud import secretmanager
+from google.cloud import secretmanager_v1
 from api.settings import (
     BILLING_CACHE_RESPONSE_TTL,
     BQ_AGGREG_VIEW,
@@ -31,6 +29,7 @@ from models.models import (
     BillingTotalCostRecord,
 )
 from models.models.billing import BillingTeamRecord
+from pydantic import TypeAdapter
 
 router = APIRouter(prefix='/billing', tags=['billing'])
 
@@ -605,10 +604,11 @@ async def get_billing_group_info() -> list[BillingTeamRecord]:
     name = (
         f'projects/{METAMIST_GCP_PROJECT}/secrets/{BILLING_GROUP_INFO}/versions/latest'
     )
-    response = secretmanager.SecretManagerServiceClient().access_secret_version(
-        name=name
+    response = (
+        await secretmanager_v1.SecretManagerServiceAsyncClient().access_secret_version(
+            name=name
+        )
     )
-    return [
-        BillingTeamRecord.from_json(record)
-        for record in json.loads(response.payload.data.decode('UTF-8'))
-    ]
+    return TypeAdapter(list[BillingTeamRecord]).validate_json(
+        response.payload.data.decode('UTF-8')
+    )
