@@ -4,7 +4,7 @@ import click
 
 from metamist.audit.data_access.gcs_data_access import GCSDataAccess
 from metamist.audit.models import AuditReportEntry, ReviewResult
-from metamist.audit.services import AuditLogs, Reporter
+from metamist.audit.services import BucketAuditLogger, Reporter
 
 from cpg_utils import to_path
 
@@ -20,7 +20,7 @@ def review_audit_report(
     filter_expressions: list[str] | None = None,
 ):
     """Review files listed in the audit results."""
-    audit_logs = AuditLogs(dataset, 'audit_review')
+    audit_logs = BucketAuditLogger(dataset, 'audit_review')
 
     gcs_data = GCSDataAccess(dataset)
     reporter = Reporter(gcs_data, audit_logs, results_folder)
@@ -43,7 +43,7 @@ def review_rows(
     rows: list[AuditReportEntry],
     action: str,
     comment: str,
-    audit_logs: AuditLogs,
+    audit_logs: BucketAuditLogger,
 ) -> ReviewResult:
     """Review files from audit results based on filters and comments."""
     action = action.upper()

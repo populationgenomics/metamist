@@ -49,7 +49,7 @@ from .models import (
 )
 
 from .services import (
-    AuditLogs,
+    BucketAuditLogger,
     AuditAnalyzer,
     Reporter,
     FileMatchingService,
@@ -96,7 +96,7 @@ __all__ = [
     'DeletionResult',
     # Services
     'AuditAnalyzer',
-    'AuditLogs',
+    'BucketAuditLogger',
     'Reporter',
     'FileMatchingService',
     # Value objects

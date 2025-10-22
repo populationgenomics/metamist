@@ -114,7 +114,7 @@ class GraphQLClient:
 
     CREATE_ANALYSIS_MUTATION = gql(
         """
-        mutation createAnalysisMutation($dataset: String!, $type: String!, $cohortIds: String!, $output: String!, $meta: JSON!) {
+        mutation createAnalysisMutation($dataset: String!, $type: String!, $cohortIds: [String!], $output: String!, $meta: JSON!) {
           analysis {
             createAnalysis(analysis: {type: $type, status: COMPLETED, cohortIds: $cohortIds, output: $output, meta: $meta}, project: $dataset) {
                 id
@@ -283,7 +283,7 @@ class GraphQLClient:
         return result['cohort']['createCohortFromCriteria']['id']
 
     def create_audit_deletion_analysis(
-        self, dataset: str, cohort_ids: str, output: str, meta: dict
+        self, dataset: str, cohort_ids: list[str], output: str, meta: dict
     ) -> int:
         """
         Create a new audit deletion analysis.
