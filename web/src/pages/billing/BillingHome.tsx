@@ -15,6 +15,7 @@ import {
 } from 'semantic-ui-react'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
+import { BillingApi, BillingProjectGroup, BillingTeamRecord, BillingTopicGroup } from '../../sm-api'
 import { billingPages, IBillingPage } from './BillingPages'
 
 // Google Slides
@@ -100,11 +101,11 @@ const renderGridColumn = (
 
         <List>
             {billingGroupInfoList
-                .filter((item): item is BillingProjectGroup => item.groupBy === 'gcp_project')
+                .filter((item): item is BillingProjectGroup => item.group_by === 'gcp_project')
                 .map((item) =>
                     renderLinkItem(
                         `${item.name}`,
-                        `${location.pathname}/invoiceMonthCost?groupBy=gcp_project&gcpProjects=${item.gcpProjects}`
+                        `${location.pathname}/invoiceMonthCost?groupBy=gcp_project&gcpProjects=${item.gcp_projects}`
                     )
                 )}
         </List>
@@ -113,7 +114,7 @@ const renderGridColumn = (
 
         <List>
             {billingGroupInfoList
-                .filter((item): item is BillingTopicGroup => item.groupBy === 'topic')
+                .filter((item): item is BillingTopicGroup => item.group_by === 'topic')
                 .map((item) =>
                     renderLinkItem(
                         `${item.name}`,
@@ -126,7 +127,7 @@ const renderGridColumn = (
 
         <List>
             {billingGroupInfoList
-                .filter((item): item is BillingTopicGroup => item.groupBy === 'topic')
+                .filter((item): item is BillingTopicGroup => item.group_by === 'topic')
                 .map((item) =>
                     renderLinkItem(
                         `${item.name}`,
@@ -137,10 +138,14 @@ const renderGridColumn = (
     </Grid.Column>
 )
 
+const billingApi = new BillingApi()
+
 const BillingHome = () => {
     const theme = React.useContext(ThemeContext)
     const isDarkMode = theme.theme === 'dark-mode'
     const [activeItem, setActiveItem] = React.useState('home')
+    const [billingGroupList, setBillingGroupList] = React.useState<BillingTeamRecord[] | []>([])
+
     const handleItemClick = (e: MouseEvent, page: IBillingPage) => {
         e.preventDefault()
         e.stopPropagation()
@@ -152,7 +157,17 @@ const BillingHome = () => {
         []
     )
     const location = useLocation()
-    const billingGroupList = PROJECT_GROUPS
+
+    React.useEffect(() => {
+        billingApi
+            .getBillingGroupInfo()
+            .then((result) => {
+                setBillingGroupList(result.data)
+            })
+            .catch((err) => {
+                setBillingGroupList([])
+            })
+    }, [])
 
     return (
         <PaddedPage>
@@ -166,7 +181,7 @@ const BillingHome = () => {
                 <Container fluid style={{ padding: '2em 0', margin: '0px' }}>
                     <Grid stackable columns={2} relaxed>
                         {billingGroupList.map((item) =>
-                            renderGridColumn(item.teamName, item.billingGroups, location)
+                            renderGridColumn(item.team_name, item.billing_groups, location)
                         )}
                     </Grid>
                 </Container>

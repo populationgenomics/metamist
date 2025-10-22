@@ -46,12 +46,6 @@ jobs:
           workload_identity_provider: "projects/774248915715/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
           service_account: "sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com"
 
-      - id: 'secrets'
-        uses: 'google-github-actions/get-secretmanager-secrets@v3'
-        with:
-          secrets: |-
-            project_groups:projects/774248915715/secrets/billing-project-groups
-
       - id: "google-cloud-sdk-setup"
         name: "Set up Cloud SDK"
         uses: google-github-actions/setup-gcloud@v2
@@ -95,8 +89,6 @@ jobs:
 
         # also copies build artifacts to api/public
       - name: "build web front-end"
-        env:
-          PROJECT_GROUPS: '${{ steps.secrets.outputs.project_groups }}'
         run: |
           set -eo pipefail
           pushd web

@@ -31,7 +31,4 @@ export default defineConfig({
         }),
         svgr(),
     ],
-    define: {
-        PROJECT_GROUPS: JSON.stringify(process.env.PROJECT_GROUPS) || '[]',
-    },
 })
