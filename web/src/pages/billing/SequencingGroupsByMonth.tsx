@@ -5,8 +5,6 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { Button, Card, Dropdown, Grid, Message } from 'semantic-ui-react'
 import {
-    generateInvoiceMonths,
-    getAdjustedDay,
     getCurrentInvoiceMonth,
     getCurrentInvoiceYearStart,
 } from '../../shared/utilities/formatDates'
@@ -16,13 +14,18 @@ import generateUrl from '../../shared/utilities/generateUrl'
 import {
     BillingApi,
     BillingColumn,
+    SequencingGroupApi,
 } from '../../sm-api'
 import './components/BillingCostByTimeTable.css'
 import FieldSelector from './components/FieldSelector'
-import CostByTimeChart from './components/CostByTimeChart'
+import CostByTimeBarChart from './components/CostByTimeBarChart'
+import { RequiredError } from '../../sm-api/base'
+
+type TypeCounts = Record<string, number>
+type ProjectHistory = Record<string, TypeCounts>
 
 /* eslint-disable @typescript-eslint/no-explicit-any  -- too many anys in the file to fix right now but would be good to sort out when we can */
-const BillingStorageCostPerSample: React.FunctionComponent = () => {
+const SequencingGroupsByMonth: React.FunctionComponent = () => {
 const [searchParams] = useSearchParams()
 
     // Pull search params for use in the component
@@ -37,8 +40,8 @@ const [searchParams] = useSearchParams()
     )
 
     // Topic filtering state
-    const [selectedTopics, setSelectedTopics] = React.useState<string[]>(initialTopics)
-    const [availableTopics, setAvailableTopics] = React.useState<string[]>([])
+    const [selectedProjects, setSelectedProjects] = React.useState<string[]>(initialTopics)
+    const [availableProjects, setAvailableProjects] = React.useState<string[]>([])
 
     // use navigate and update url params
     const location = useLocation()
@@ -50,20 +53,13 @@ const [searchParams] = useSearchParams()
     const [message, setMessage] = React.useState<string | undefined>()
     const [months, setMonths] = React.useState<string[]>([])
     const [data, setData] = React.useState<any>([])
+    const [groups, setGroups] = React.useState<string[]>([])
 
-    // Helper function to get topics in the order they appear in the data
-    const getOrderedTopics = React.useCallback(() => {
-        if (data && data._topicOrder) {
-            return data._topicOrder
-        }
-        return Object.keys(data)
-    }, [data])
-
-    const updateNav = (st: string, ed: string, topics?: string[]) => {
+    const updateNav = (st: string, ed: string, projects?: string[]) => {
         const url = generateUrl(location, {
             start: st,
             end: ed,
-            topics: topics && topics.length > 0 ? topics.join(',') : undefined,
+            projects: projects && projects.length > 0 ? projects.join(',') : undefined,
         })
         navigate(url)
     }
@@ -75,56 +71,77 @@ const [searchParams] = useSearchParams()
         if (name === 'end') end_update = value
         setStart(start_update)
         setEnd(end_update)
-        updateNav(start_update, end_update, selectedTopics)
+        updateNav(start_update, end_update, selectedProjects)
     }
 
-    const convertInvoiceMonth = (invoiceMonth: string, start: boolean) => {
-        const year = invoiceMonth.substring(0, 4)
-        const month = invoiceMonth.substring(4, 6)
-        if (start) return `${year}-${month}-01`
-        // get last day of month
-        const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate()
-        return `${year}-${month}-${lastDay}`
-    }
-
-    // Pre-fetch topics data on component mount
+    // Pre-fetch projects data on component mount
     React.useEffect(() => {
-        // Pre-fetch topics in parallel (consistent with other files pattern)
-        Promise.all([new BillingApi().getTopics()])
-            .then(([topicsResponse]) => {
-                setAvailableTopics(topicsResponse.data || [])
+        // Pre-fetch projects in parallel (consistent with other files pattern)
+        Promise.all([new BillingApi().getGcpProjects()])
+            .then(([projectsResponse]) => {
+                setAvailableProjects(projectsResponse.data || [])
             })
             .catch((error) => {
                 console.error('Error pre-fetching data:', error)
-                setAvailableTopics([])
+                setAvailableProjects([])
             })
             .finally(() => {})
     }, [])
 
-    // Callback to get data for plotting
-    // const getData = React.useCallback((query: BillingTotalCostQueryModel) => {...}
-
-    const onTopicsSelect = (
+    // Callback to get data for plotting.
+    const onProjectSelect = (
         event: SelectChangeEvent<string | string[]> | undefined,
         data: { value: string | string[] }
     ) => {
         const value = Array.isArray(data.value) ? data.value : [data.value]
-        setSelectedTopics(value)
+        setSelectedProjects(value)
         updateNav(start, end, value)
     }
 
-    // Create a debounced version of getData for topic selections
-    // const debouncedGetData = React.useMemo(
-    //     () => debounce((start: string, end: string, topics: string[]) => {...}, 1000),
-    //     [getData]
-    // )
+    const getData = React.useCallback(async (query: Array<string>) => {
+        setIsLoading(true)
+        setError(undefined)
+        setMessage(undefined)
+        try {
+            const sg_api = new SequencingGroupApi()
+            const result = await sg_api.sequencingGroupHistory(query)
+            setIsLoading(false)
+            
+            const resultData = result.data as Record<string, ProjectHistory>
 
-    // Cleanup debounced function on unmount
-    // React.useEffect(() => {
-    //     return () => {
-    //         debouncedGetData.cancel()
-    //     }
-    // }, [debouncedGetData])
+            const newGroups = new Set<string>()
+            const newDataset = Object.entries(resultData["1"]).map(([date, typeCounts]) => ({
+                date: new Date(date),
+                values: typeCounts
+            }))
+            
+            newDataset.forEach((dateRecord) => {
+                Object.keys(dateRecord.values).forEach((typeKey) => newGroups.add(typeKey))
+            })
+
+            setData(newDataset)
+            setGroups(Array.from(newGroups))
+        } catch(er: any) {
+            setError(er.message)
+        }
+    }, [])
+
+    // Memo of debounced getData so that its only re-runs when selectedProjects changes.
+    const debouncedGetData = React.useMemo(() => {return debounce(() => {getData(selectedProjects)}, 1000)},
+        [selectedProjects]
+    )
+
+    // Cleanup debounced function on unmount.
+    React.useEffect(() => {
+        return () => {
+            debouncedGetData.cancel()
+        }
+    }, [selectedProjects])
+
+    // Effect to trigger data retrieval on initial load and filter value changes.
+    React.useEffect(() => {
+        debouncedGetData()
+    }, [debouncedGetData])
 
     const messageComponent = () => {
         if (message) {
@@ -159,44 +176,43 @@ const [searchParams] = useSearchParams()
     }
 
     const dataComponent = () => {
-            if (message || error || isLoading) {
-                return null
-            }
-    
-            if (!message && !error && !isLoading && (!data || data.length === 0)) {
-                return (
-                    <Card
-                        fluid
-                        style={{ padding: '20px', overflowX: 'scroll' }}
-                        id="billing-container-charts"
-                    >
-                        No Data
-                    </Card>
-                )
-            }
-    
+        if (message || error || isLoading) {
+            return null
+        }
+        console.log(data)
+        if (!message && !error && !isLoading && (!data || data.length === 0)) {
             return (
-                <>
-                    <Card
-                        fluid
-                        style={{ padding: '20px', overflowX: 'scroll' }}
-                        id="billing-container-charts"
-                    >
-                        <Grid>
-                            <Grid.Column width={16} className="chart-card">
-                                <CostByTimeChart
-                                    start={start}
-                                    end={end}
-                                    groups={groups}
-                                    isLoading={isLoading}
-                                    data={data}
-                                />
-                            </Grid.Column>
-                        </Grid>
-                    </Card>
-                </>
+                <Card
+                    fluid
+                    style={{ padding: '20px', overflowX: 'scroll' }}
+                    id="billing-container-charts"
+                >
+                    No Data
+                </Card>
             )
         }
+
+        return (
+            <>
+                <Card
+                    fluid
+                    style={{ padding: '20px', overflowX: 'scroll' }}
+                    id="billing-container-charts"
+                >
+                    <Grid>
+                        <Grid.Column width={16} className="chart-card">
+                            <CostByTimeBarChart
+                            isLoading={isLoading}
+                            accumulate={false}
+                            data={data}
+                            extrapolate={false}
+                        />
+                        </Grid.Column>
+                    </Grid>
+                </Card>
+            </>
+        )
+    }
 
     const onMonthStart = (event: any, data: any) => {
         changeDate('start', data.value)
@@ -219,7 +235,7 @@ const [searchParams] = useSearchParams()
                 return
             }
             // Use debounced function for topic filtering
-            // debouncedGetData(start, end, selectedTopics)
+            // debouncedGetData(start, end, selectedProjects)
         } else {
             // invalid selection,
             setIsLoading(false)
@@ -231,28 +247,8 @@ const [searchParams] = useSearchParams()
                 setMessage('Please select End date')
             }
         }
-    }, [start, end, selectedTopics]) //, debouncedGetData])
+    }, [start, end, selectedProjects]) //, debouncedGetData])
     /* eslint-enable react-hooks/exhaustive-deps */
-
-    const exportToFile = (format: 'csv' | 'tsv') => {
-        // Export all topics
-        const allTopics = getOrderedTopics()
-        const headerFields = ['Topic', 'Cost Type', ...months]
-
-        const matrix: string[][] = []
-
-        allTopics.forEach((topic: string) => {
-        })
-
-        exportTable(
-            {
-                headerFields,
-                matrix,
-            },
-            format,
-            'billing_cost_by_month'
-        )
-    }
 
     return (
         <>
@@ -274,7 +270,7 @@ const [searchParams] = useSearchParams()
                             flex: '1 1 200px',
                         }}
                     >
-                        Storage Cost Per Sample
+                        Sequencing Groups By Month
                     </h1>
                     <div
                         className="button-container"
@@ -303,13 +299,15 @@ const [searchParams] = useSearchParams()
                                     key="csv"
                                     text="Export to CSV"
                                     icon="file excel"
-                                    onClick={() => exportToFile('csv')}
+                                    // onClick={() => exportToFile('csv')}
+                                    onClick={() => {}}
                                 />
                                 <Dropdown.Item
                                     key="tsv"
                                     text="Export to TSV"
                                     icon="file text outline"
-                                    onClick={() => exportToFile('tsv')}
+                                    // onClick={() => exportToFile('tsv')}
+                                    onClick={() => {}}
                                 />
                             </Dropdown.Menu>
                         </Dropdown>
@@ -337,18 +335,20 @@ const [searchParams] = useSearchParams()
 
                     <Grid.Column className="field-selector-label">
                         <FieldSelector
-                            label="Filter Topics"
-                            fieldName={BillingColumn.Topic}
-                            selected={selectedTopics}
-                            multiple={true}
-                            preloadedData={availableTopics}
-                            onClickFunction={onTopicsSelect}
+                            label="Filter GCP Projects"
+                            fieldName={BillingColumn.GcpProject}
+                            selected={selectedProjects}
+                            multiple={false}
+                            preloadedData={availableProjects}
+                            onClickFunction={onProjectSelect}
                         />
                     </Grid.Column>
                 </Grid>
             </Card>
 
             {messageComponent()}
+
+            {dataComponent()}
         </>
     )
 }
@@ -356,8 +356,7 @@ const [searchParams] = useSearchParams()
 export default function BillingStorageCostPerSamplePage() {
     return (
         <PaddedPage>
-            <BillingStorageCostPerSample />
-
+            <SequencingGroupsByMonth />
         </PaddedPage>
     )
 }

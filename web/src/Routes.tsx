@@ -14,7 +14,7 @@ import {
     BillingHome,
     BillingInvoiceMonthCost,
     BillingSeqrProp,
-    BillingStorageCostPerSample
+    SequencingGroupsByMonth
 } from './pages/billing'
 import DocumentationArticle from './pages/docs/Documentation'
 import { FamilyPage } from './pages/family/FamilyView'
@@ -126,7 +126,7 @@ const Routes: React.FunctionComponent = () => (
                 </ErrorBoundary>
             }
         />
-        <Route path="/billing/storageCostPerSample" element={<BillingStorageCostPerSample />} />
+        <Route path="/billing/sequencingGroupsByMonth" element={<SequencingGroupsByMonth />} />
 
         <Route path="/swagger" element={<SwaggerUI url="/openapi.json" tryItOutEnabled={true} />} />
 

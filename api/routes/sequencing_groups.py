@@ -97,10 +97,10 @@ async def archive_sequencing_groups(
 # region QUERIES
 
 @router.post('/history', operation_id='sequencingGroupHistory')
-async def get_project_sg_history(
+async def get_sequencing_groups_history(
     project_ids: list[str],
     connection: Connection = get_projectless_db_connection
-):
+) -> dict[ProjectId, dict[date, dict[str, int]]]:
     sq_layer = SequencingGroupLayer(connection)
 
     projects = connection.get_and_check_access_to_projects_for_names(

@@ -9,12 +9,14 @@ interface ICostByTimeBarChartProps {
     accumulate: boolean
     isLoading: boolean
     data: IStackedBarChartData[]
+    extrapolate?: boolean
 }
 
 const CostByTimeBarChart: React.FunctionComponent<ICostByTimeBarChartProps> = ({
     accumulate,
     isLoading,
     data,
+    extrapolate=true,
 }) => {
     if (isLoading) {
         return (
@@ -27,9 +29,10 @@ const CostByTimeBarChart: React.FunctionComponent<ICostByTimeBarChartProps> = ({
         )
     }
 
+    console.log(data)
     return (
         <>
-            <StackedBarChart data={data} accumulate={accumulate} />
+            <StackedBarChart data={data} accumulate={accumulate} extrapolate={extrapolate} />
         </>
     )
 }

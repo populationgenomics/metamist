@@ -79,11 +79,11 @@ const billingPages: IBillingPage[] = [
         description: 'View the relative distribution of seqr costs across topics over time.',
     },
     {
-        title: 'Storage Cost Per Sample',
-        name: 'storageCostPerSample',
-        url: '/billing/storageCostPerSample',
+        title: 'Sequencing Groups By Month',
+        name: 'sequencingGroupsByMonth',
+        url: '/billing/sequencingGroupsByMonth',
         icon: <SampleIcon />,
-        description: 'Cost per sample',
+        description: 'The number of each type of sequencing group each month.',
     },
 ]
 
