@@ -175,14 +175,14 @@ class SequencingGroupLayer(BaseLayer):
         for row in rows:
             # Extract values from the table row.
             month_created = date.fromisoformat(row['date_created']).replace(day=1)
-            type = row['type']
+            sg_type = row['type']
             num_sg = row['num_sg']
 
             # Organise the date's data into a dictionary, based on sample type.
             if month_created not in project_history:
                 project_history[month_created] = {}
 
-            project_history[month_created][type] = num_sg
+            project_history[month_created][sg_type] = num_sg
 
         # We want the total number of each sg type over time, so performing this summing and
         # fill in the months between data points.
@@ -197,8 +197,8 @@ class SequencingGroupLayer(BaseLayer):
             iteration_counts = project_history.get(iteration_month, {})
             # If there's any recorded Sequencing Group counts for this iteration's month,
             # add them to the cumulative count.
-            for type, count in iteration_counts.items():
-                type_totals[type] += count
+            for sg_type, count in iteration_counts.items():
+                type_totals[sg_type] += count
 
             iteration_counts.update(type_totals)
             project_history[iteration_month] = iteration_counts

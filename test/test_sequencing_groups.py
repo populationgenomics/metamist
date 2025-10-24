@@ -12,7 +12,6 @@ from models.models import (
     SampleUpsertInternal,
     SequencingGroupUpsertInternal,
 )
-from models.models.project import ProjectId
 from test.testbase import DbIsolatedTest, run_as_sync
 
 
@@ -411,10 +410,12 @@ class TestSequencingGroup(DbIsolatedTest):
             {'type': 'genome', 'date_created': '2025-11-01', 'num_sg': 4},
             {'type': 'exome', 'date_created': '2025-11-01', 'num_sg': 5},
         ]
-        self.sglayer.seqgt.get_type_numbers_history = mock.AsyncMock()
-        self.sglayer.seqgt.get_type_numbers_history.return_value = rows_mock
+        with mock.patch(
+            'db.python.layers.sequencing_group.SequencingGroupTable.get_type_numbers_history',
+            return_value=rows_mock,
+        ):
+            result = await self.sglayer.get_type_numbers_for_project_history(0)
 
-        result = await self.sglayer.get_type_numbers_for_project_history(0)
         self.assertDictEqual(
             result,
             {
@@ -447,10 +448,12 @@ class TestSequencingGroup(DbIsolatedTest):
             {'type': 'genome', 'date_created': '2025-12-01', 'num_sg': 4},
             {'type': 'exome', 'date_created': '2025-12-01', 'num_sg': 5},
         ]
-        self.sglayer.seqgt.get_type_numbers_history = mock.AsyncMock()
-        self.sglayer.seqgt.get_type_numbers_history.return_value = rows_mock
+        with mock.patch(
+            'db.python.layers.sequencing_group.SequencingGroupTable.get_type_numbers_history',
+            return_value=rows_mock,
+        ):
+            result = await self.sglayer.get_type_numbers_for_project_history(0)
 
-        result = await self.sglayer.get_type_numbers_for_project_history(0)
         self.assertDictEqual(
             result,
             {
