@@ -9,7 +9,6 @@ export interface IStackedBarChartData {
 interface IStackedBarChartProps {
     data?: IStackedBarChartData[]
     accumulate: boolean
-    extrapolate: boolean
 }
 
 function getSeries(data: IStackedBarChartData[] | undefined) {
@@ -108,7 +107,7 @@ const colorFunc: (t: number) => string | undefined = d3.interpolateRainbow
 const margin = { top: 0, right: 10, bottom: 200, left: 100 }
 const height = 800 - margin.top - margin.bottom
 
-export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumulate, extrapolate }) => {
+export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumulate }) => {
     const svgRef = React.useRef(null)
     const legendRef = React.useRef(null)
 
@@ -128,7 +127,7 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
         }
 
         // Prepare all data structures and predicted data
-        const newDates = extrapolate ? getNewDates(data) : []
+        const newDates = getNewDates(data)
         const combinedData = prepareData(series, data, accumulate, newDates)
 
         // X - values
