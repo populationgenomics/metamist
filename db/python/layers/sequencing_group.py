@@ -1,4 +1,7 @@
+from collections import defaultdict
 from datetime import date
+
+from dateutil.relativedelta import relativedelta
 
 from db.python.connect import Connection
 from db.python.filters.generic import GenericFilter
@@ -159,6 +162,50 @@ class SequencingGroupLayer(BaseLayer):
     async def get_type_numbers_for_project(self, project: ProjectId) -> dict[str, int]:
         """Get sequencing type numbers (of groups) for a project"""
         return await self.seqgt.get_type_numbers_for_project(project)
+
+    async def get_type_numbers_for_project_history(
+        self, project_id: ProjectId
+    ) -> dict[date, dict[str, int]]:
+        """Returns a record of the number of each sequencing group type for the given projects over time."""
+        # Retrieve the raw data from the Sequencing Group/Sample tables.
+        rows = await self.seqgt.get_type_numbers_history(project_id)
+
+        # Organise the data by project into a dictionary.
+        project_history: dict[date, dict[str, int]] = {}
+        for row in rows:
+            # Extract values from the table row.
+            month_created = date.fromisoformat(row['date_created']).replace(day=1)
+            sg_type = row['type']
+            num_sg = row['num_sg']
+
+            # Organise the date's data into a dictionary, based on sample type.
+            if month_created not in project_history:
+                project_history[month_created] = {}
+
+            project_history[month_created][sg_type] = num_sg
+
+        # We want the total number of each sg type over time, so performing this summing and
+        # fill in the months between data points.
+        todays_month = date.today().replace(day=1)
+        iteration_month = min(
+            project_history.keys()
+        )  # The month currently being filled in.
+        type_totals: dict[str, int] = defaultdict(lambda: 0)
+
+        # Start from the earliest recorded month and work towards the current month.
+        while iteration_month <= todays_month:
+            iteration_counts = project_history.get(iteration_month, {})
+            # If there's any recorded Sequencing Group counts for this iteration's month,
+            # add them to the cumulative count.
+            for sg_type, count in iteration_counts.items():
+                type_totals[sg_type] += count
+
+            iteration_counts.update(type_totals)
+            project_history[iteration_month] = iteration_counts
+
+            iteration_month += relativedelta(months=1)
+
+        return project_history
 
     # region CREATE / MUTATE
 

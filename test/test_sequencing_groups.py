@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import date, datetime
+from unittest import mock
 
 from db.python.filters import GenericFilter
 from db.python.layers import AnalysisLayer, SampleLayer, SequencingGroupLayer
@@ -394,3 +395,78 @@ class TestSequencingGroup(DbIsolatedTest):
         self.assertEqual(archived_sgs[0]['archived'], True)
         self.assertEqual(archived_sgs[1]['id'], sg2)
         self.assertEqual(archived_sgs[1]['archived'], True)
+
+    @run_as_sync
+    @mock.patch('db.python.layers.sequencing_group.date', wraps=date)
+    async def test_history_full_sum(self, mock_date):
+        """Test the trivial case where the same types are present at all times and accumulate over time."""
+        # Mock today's date.
+        mock_date.today.return_value = date(year=2025, month=12, day=31)
+
+        # Set up mocking for rows returned from the table query.
+        rows_mock = [
+            {'type': 'genome', 'date_created': '2025-10-01', 'num_sg': 2},
+            {'type': 'exome', 'date_created': '2025-10-01', 'num_sg': 3},
+            {'type': 'genome', 'date_created': '2025-11-01', 'num_sg': 4},
+            {'type': 'exome', 'date_created': '2025-11-01', 'num_sg': 5},
+        ]
+        with mock.patch(
+            'db.python.layers.sequencing_group.SequencingGroupTable.get_type_numbers_history',
+            return_value=rows_mock,
+        ):
+            result = await self.sglayer.get_type_numbers_for_project_history(0)
+
+        self.assertDictEqual(
+            result,
+            {
+                date(year=2025, month=10, day=1): {
+                    'genome': 2,
+                    'exome': 3,
+                },
+                date(year=2025, month=11, day=1): {
+                    'genome': 6,
+                    'exome': 8,
+                },
+                date(year=2025, month=12, day=1): {
+                    'genome': 6,
+                    'exome': 8,
+                },
+            },
+        )
+
+    @run_as_sync
+    @mock.patch('db.python.layers.sequencing_group.date', wraps=date)
+    async def test_history_partial_sum(self, mock_date):
+        """Test the case where less types are present initially and more are added over time."""
+        # Mock today's date.
+        mock_date.today.return_value = date(year=2025, month=12, day=31)
+
+        # Set up mocking for rows returned from the table query.
+        rows_mock = [
+            {'type': 'genome', 'date_created': '2025-10-01', 'num_sg': 2},
+            {'type': 'exome', 'date_created': '2025-11-01', 'num_sg': 3},
+            {'type': 'genome', 'date_created': '2025-12-01', 'num_sg': 4},
+            {'type': 'exome', 'date_created': '2025-12-01', 'num_sg': 5},
+        ]
+        with mock.patch(
+            'db.python.layers.sequencing_group.SequencingGroupTable.get_type_numbers_history',
+            return_value=rows_mock,
+        ):
+            result = await self.sglayer.get_type_numbers_for_project_history(0)
+
+        self.assertDictEqual(
+            result,
+            {
+                date(year=2025, month=10, day=1): {
+                    'genome': 2,
+                },
+                date(year=2025, month=11, day=1): {
+                    'genome': 2,
+                    'exome': 3,
+                },
+                date(year=2025, month=12, day=1): {
+                    'genome': 6,
+                    'exome': 8,
+                },
+            },
+        )
