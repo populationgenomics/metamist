@@ -6,10 +6,9 @@ import { Button, Card, Grid, Message } from 'semantic-ui-react'
 import ProjectSelector, { IMetamistProject } from '../project/ProjectSelector'
 
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
-import generateUrl from '../../shared/utilities/generateUrl'
+import { StackedBarByTime } from '../../shared/components/Graphs/StackedBarByTime'
 import { SequencingGroupApi } from '../../sm-api'
 import './components/BillingCostByTimeTable.css'
-import CostByTimeBarChart from './components/CostByTimeBarChart'
 
 type TypeCounts = Record<string, number>
 type ProjectHistory = Record<string, TypeCounts>
@@ -25,7 +24,6 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
     const [error, setError] = React.useState<string | undefined>()
     const [message, setMessage] = React.useState<string | undefined>()
     const [data, setData] = React.useState<any>([])
-    const [groups, setGroups] = React.useState<string[]>([])
 
     // Callback to get data for plotting.
     const onProjectSelect = (_project: IMetamistProject) => {
@@ -48,18 +46,12 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
             
             const resultData = result.data as ProjectHistory
             console.log('here')
-            const newGroups = new Set<string>()
             const newDataset = Object.entries(resultData).map(([date, typeCounts]) => ({
                 date: new Date(date),
                 values: typeCounts
             }))
-            
-            newDataset.forEach((dateRecord) => {
-                Object.keys(dateRecord.values).forEach((typeKey) => newGroups.add(typeKey))
-            })
 
             setData(newDataset)
-            setGroups(Array.from(newGroups))
         } catch(er: any) {
             setIsLoading(false)
             setError(er.message)
@@ -140,12 +132,7 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
             >
                 <Grid>
                     <Grid.Column width={16} className="chart-card">
-                        <CostByTimeBarChart
-                            isLoading={isLoading}
-                            accumulate={false}
-                            data={data}
-                            extrapolate={false}
-                        />
+                        <StackedBarByTime data={data} unit={'sequencing groups'} />
                     </Grid.Column>
                 </Grid>
             </Card>
