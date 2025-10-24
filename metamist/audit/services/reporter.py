@@ -6,7 +6,7 @@ from io import StringIO
 
 from cpg_utils import Path, to_path
 
-from .audit_logging import AuditLogs
+from .audit_logging import BucketAuditLogger
 from metamist.audit.data_access import GCSDataAccess
 from metamist.audit.models import (
     AuditResult,
@@ -24,7 +24,7 @@ class Reporter:
     def __init__(
         self,
         gcs_data: GCSDataAccess,
-        audit_logs: AuditLogs,
+        audit_logs: BucketAuditLogger,
         timestamp: str | None = None,
     ):
         """
