@@ -527,7 +527,6 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         (item): item is string => item !== undefined
                     )
                     setGroups(no_undefined)
-                    console.log(no_undefined)
 
                     // Include additional columns that will be added by the table component
                     const allColumns = [
@@ -552,12 +551,12 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     } else {
                         setVisibleColumns(new Set(allColumns))
                     }
-                    const d = Object.keys(records).map((key) => ({
-                        date: new Date(key),
-                        values: records[key],
-                    }))
-                    console.log(d)
-                    setData(d)
+                    setData(
+                        Object.keys(records).map((key) => ({
+                            date: new Date(key),
+                            values: records[key],
+                        }))
+                    )
                     const aggData: IData[] = Object.entries(sortedRecTotals)
                         .map(([label, value]) => ({ label, value }))
                         .reduce((acc: IData[], curr: IData, index: number, arr: IData[]) => {
