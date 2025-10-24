@@ -163,53 +163,45 @@ class SequencingGroupLayer(BaseLayer):
         """Get sequencing type numbers (of groups) for a project"""
         return await self.seqgt.get_type_numbers_for_project(project)
     
-    async def get_type_numbers_for_project_history(self, project_ids: list[ProjectId] = []) -> dict[ProjectId, dict[date, dict[str, int]]]:
+    async def get_type_numbers_for_project_history(self, project_id: ProjectId) -> dict[ProjectId, dict[date, dict[str, int]]]:
         """Returns a record of the number of each sequencing group type for the given projects over time."""
         # Retrieve the raw data from the Sequencing Group/Sample tables.
-        rows = await self.seqgt.get_type_numbers_history(project_ids)
+        rows = await self.seqgt.get_type_numbers_history(project_id)
 
         # Organise the data by project into a dictionary.
-        project_histories: dict[ProjectId, dict[date, dict[str, int]]] = {}
+        project_history: dict[date, dict[str, int]] = {}
         for row in rows:
             # Extract values from the table row.
-            project_id = row['project_id']
             month_created = date.fromisoformat(row['date_created']).replace(day=1)
             type = row['type']
             num_sg = row['num_sg']
             
-            # Organise the projet's data into a dictionary, based on dates.
-            if project_id not in project_histories:
-                project_histories[project_id] = {}
-            
             # Organise the date's data into a dictionary, based on sample type.
-            if month_created not in project_histories[project_id]:
-                project_histories[project_id][month_created] = {}
+            if month_created not in project_history:
+                project_history[month_created] = {}
 
-            project_histories[project_id][month_created][type] = num_sg
+            project_history[month_created][type] = num_sg
 
         # We want the total number of each sg type over time, so performing this summing and
         # fill in the months between data points.
         todays_month = date.today().replace(day=1)
-        for month_counts in project_histories.values():
-            type_totals: dict[str, int] = defaultdict(lambda: 0)
-            if not month_counts:
-                continue
+        iteration_month = min(project_history.keys()) # The month currently being filled in.
+        type_totals: dict[str, int] = defaultdict(lambda: 0)
 
-            # Start from the earliest recorded month and work towards the current month.
-            iteration_month = min(month_counts.keys())
-            while iteration_month <= todays_month:
-                iteration_counts = month_counts.get(iteration_month, {})
-                # If there's any recorded Sequencing Group counts for this iteration's month, 
-                # add them to the cumulative count.
-                for type, count in iteration_counts.items():
-                    type_totals[type] += count
+        # Start from the earliest recorded month and work towards the current month.
+        while iteration_month <= todays_month:
+            iteration_counts = project_history.get(iteration_month, {})
+            # If there's any recorded Sequencing Group counts for this iteration's month, 
+            # add them to the cumulative count.
+            for type, count in iteration_counts.items():
+                type_totals[type] += count
 
-                iteration_counts.update(type_totals)
-                month_counts[iteration_month] = iteration_counts
+            iteration_counts.update(type_totals)
+            project_history[iteration_month] = iteration_counts
 
-                iteration_month += relativedelta(months=1)
+            iteration_month += relativedelta(months=1)
 
-        return project_histories
+        return project_history
 
     # region CREATE / MUTATE
 

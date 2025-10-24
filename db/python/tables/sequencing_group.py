@@ -557,13 +557,10 @@ GROUP BY sg.type
         rows = await self.connection.fetch_all(_query, {'project': project})
         return {r['type']: r['n'] for r in rows}
     
-    async def get_type_numbers_history(self, project_ids: list[ProjectId]) -> list[dict[str, Any]]:
+    async def get_type_numbers_history(self, project_id: ProjectId) -> list[dict[str, Any]]:
         """
         Returns the history of the number of each sequencing groups of each type for a list of projects.
         """
-        where_statement = 'WHERE project in :project_ids' if project_ids else ''
-        values = {'project_ids': project_ids} if project_ids else {}
-
         _query = f"""
         WITH sg AS (
             SELECT id, sample_id, type, min(row_start) as sg_first_date
@@ -572,14 +569,13 @@ GROUP BY sg.type
         )
         SELECT project, sg.type, CONVERT(sg_first_date, DATE) as sg_date, COUNT(sg.id) as num_sg
         FROM sample INNER JOIN sg ON sample.id = sg.sample_id
-        {where_statement}
+        WHERE project = {project_id}
         GROUP BY project, sg_date, sg.type
         """
 
-        rows = await self.connection.fetch_all(_query, values)
+        rows = await self.connection.fetch_all(_query, {})
 
         return [{
-            'project_id': r['project'], 
             'type': r['type'],
             'num_sg': r['num_sg'],
             'date_created': str(r['sg_date'])

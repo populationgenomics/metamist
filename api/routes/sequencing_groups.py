@@ -96,17 +96,14 @@ async def archive_sequencing_groups(
 
 # region QUERIES
 
-@router.post('/history', operation_id='sequencingGroupHistory')
+@router.get('/history/{project}', operation_id='sequencingGroupHistory')
 async def get_sequencing_groups_history(
-    project_ids: list[str],
-    connection: Connection = get_projectless_db_connection
-) -> dict[ProjectId, dict[date, dict[str, int]]]:
+    project: str,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
+) -> dict[date, dict[str, int]]:
     sq_layer = SequencingGroupLayer(connection)
 
-    projects = connection.get_and_check_access_to_projects_for_names(
-        project_ids, allowed_roles=ReadAccessRoles
-    )
-    pids = [p.id for p in projects]
-    return await sq_layer.get_type_numbers_for_project_history(pids)
+    project_id = connection.project_name_map[project].id
+    return await sq_layer.get_type_numbers_for_project_history(project_id)
 
 # endregion

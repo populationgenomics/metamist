@@ -126,7 +126,7 @@ const Routes: React.FunctionComponent = () => (
                 </ErrorBoundary>
             }
         />
-        <Route path="/billing/sequencingGroupsByMonth" element={<SequencingGroupsByMonth />} />
+        <Route path="/billing/sequencingGroupsByMonth/:projectName?" element={<SequencingGroupsByMonth />} />
 
         <Route path="/swagger" element={<SwaggerUI url="/openapi.json" tryItOutEnabled={true} />} />
 
