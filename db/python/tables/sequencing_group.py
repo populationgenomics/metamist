@@ -556,8 +556,10 @@ GROUP BY sg.type
         """
         rows = await self.connection.fetch_all(_query, {'project': project})
         return {r['type']: r['n'] for r in rows}
-    
-    async def get_type_numbers_history(self, project_id: ProjectId) -> list[dict[str, Any]]:
+
+    async def get_type_numbers_history(
+        self, project_id: ProjectId
+    ) -> list[dict[str, Any]]:
         """
         Returns the history of the number of each sequencing groups of each type for a list of projects.
         """
@@ -575,8 +577,11 @@ GROUP BY sg.type
 
         rows = await self.connection.fetch_all(_query, {})
 
-        return [{
-            'type': r['type'],
-            'num_sg': r['num_sg'],
-            'date_created': str(r['sg_date'])
-            } for r in rows]
+        return [
+            {
+                'type': r['type'],
+                'num_sg': r['num_sg'],
+                'date_created': str(r['sg_date']),
+            }
+            for r in rows
+        ]

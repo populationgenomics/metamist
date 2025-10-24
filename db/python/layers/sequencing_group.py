@@ -162,8 +162,10 @@ class SequencingGroupLayer(BaseLayer):
     async def get_type_numbers_for_project(self, project: ProjectId) -> dict[str, int]:
         """Get sequencing type numbers (of groups) for a project"""
         return await self.seqgt.get_type_numbers_for_project(project)
-    
-    async def get_type_numbers_for_project_history(self, project_id: ProjectId) -> dict[ProjectId, dict[date, dict[str, int]]]:
+
+    async def get_type_numbers_for_project_history(
+        self, project_id: ProjectId
+    ) -> dict[ProjectId, dict[date, dict[str, int]]]:
         """Returns a record of the number of each sequencing group type for the given projects over time."""
         # Retrieve the raw data from the Sequencing Group/Sample tables.
         rows = await self.seqgt.get_type_numbers_history(project_id)
@@ -175,7 +177,7 @@ class SequencingGroupLayer(BaseLayer):
             month_created = date.fromisoformat(row['date_created']).replace(day=1)
             type = row['type']
             num_sg = row['num_sg']
-            
+
             # Organise the date's data into a dictionary, based on sample type.
             if month_created not in project_history:
                 project_history[month_created] = {}
@@ -185,13 +187,15 @@ class SequencingGroupLayer(BaseLayer):
         # We want the total number of each sg type over time, so performing this summing and
         # fill in the months between data points.
         todays_month = date.today().replace(day=1)
-        iteration_month = min(project_history.keys()) # The month currently being filled in.
+        iteration_month = min(
+            project_history.keys()
+        )  # The month currently being filled in.
         type_totals: dict[str, int] = defaultdict(lambda: 0)
 
         # Start from the earliest recorded month and work towards the current month.
         while iteration_month <= todays_month:
             iteration_counts = project_history.get(iteration_month, {})
-            # If there's any recorded Sequencing Group counts for this iteration's month, 
+            # If there's any recorded Sequencing Group counts for this iteration's month,
             # add them to the cumulative count.
             for type, count in iteration_counts.items():
                 type_totals[type] += count

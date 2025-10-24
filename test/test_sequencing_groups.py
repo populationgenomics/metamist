@@ -430,7 +430,7 @@ class TestSequencingGroup(DbIsolatedTest):
                     'genome': 6,
                     'exome': 8,
                 },
-            }
+            },
         )
 
     @run_as_sync
@@ -465,5 +465,5 @@ class TestSequencingGroup(DbIsolatedTest):
                     'genome': 6,
                     'exome': 8,
                 },
-            }
+            },
         )

@@ -1,6 +1,6 @@
 import { debounce } from 'lodash'
 import * as React from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { Button, Card, Grid, Message } from 'semantic-ui-react'
 import ProjectSelector, { IMetamistProject } from '../project/ProjectSelector'
@@ -38,12 +38,12 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
         setIsLoading(true)
         setError(undefined)
         setMessage(undefined)
-        
+
         try {
             const sg_api = new SequencingGroupApi()
             const result = await sg_api.sequencingGroupHistory(project)
             setIsLoading(false)
-            
+
             const resultData = result.data as ProjectHistory
             console.log('here')
             const newDataset = Object.entries(resultData).map(([date, typeCounts]) => ({

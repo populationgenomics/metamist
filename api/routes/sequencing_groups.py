@@ -96,6 +96,7 @@ async def archive_sequencing_groups(
 
 # region QUERIES
 
+
 @router.get('/history/{project}', operation_id='sequencingGroupHistory')
 async def get_sequencing_groups_history(
     project: str,
@@ -105,5 +106,6 @@ async def get_sequencing_groups_history(
 
     project_id = connection.project_name_map[project].id
     return await sq_layer.get_type_numbers_for_project_history(project_id)
+
 
 # endregion

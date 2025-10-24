@@ -15,7 +15,7 @@ function getSeries(data: IStackedBarByTimeData[]) {
     if (!data || data.length === 0) {
         return []
     }
-            
+
     const newGroups = new Set<string>()
     data.forEach((dateRecord) => {
         Object.keys(dateRecord.values).forEach((typeKey) => newGroups.add(typeKey))
