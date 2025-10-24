@@ -165,7 +165,7 @@ class SequencingGroupLayer(BaseLayer):
 
     async def get_type_numbers_for_project_history(
         self, project_id: ProjectId
-    ) -> dict[ProjectId, dict[date, dict[str, int]]]:
+    ) -> dict[date, dict[str, int]]:
         """Returns a record of the number of each sequencing group type for the given projects over time."""
         # Retrieve the raw data from the Sequencing Group/Sample tables.
         rows = await self.seqgt.get_type_numbers_history(project_id)
