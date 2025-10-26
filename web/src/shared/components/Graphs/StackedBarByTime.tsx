@@ -271,7 +271,7 @@ export const StackedBarByTime: React.FC<IStackedBarByTimeProps> = ({ data = [], 
             updateWindowWidth()
         }
         window.addEventListener('resize', updateWindowWidth)
-    }, [data, series, series.length])
+    }, [data, series, series.length, orderedData, unit])
 
     if (!data || data.length === 0) {
         return <>No Data</>
