@@ -13,7 +13,6 @@ import './components/BillingCostByTimeTable.css'
 type TypeCounts = Record<string, number>
 type ProjectHistory = Record<string, TypeCounts>
 
-/* eslint-disable @typescript-eslint/no-explicit-any  -- too many anys in the file to fix right now but would be good to sort out when we can */
 const SequencingGroupsByMonth: React.FunctionComponent = () => {
     // Use navigate and update url params
     const navigate = useNavigate()
@@ -195,5 +194,3 @@ export default function BillingStorageCostPerSamplePage() {
         </PaddedPage>
     )
 }
-
-/* eslint-enable @typescript-eslint/no-explicit-any   */

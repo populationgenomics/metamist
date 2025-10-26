@@ -172,33 +172,32 @@ class SequencingGroupLayer(BaseLayer):
         if not rows:
             return {}
 
-        # Organise the data by project into a dictionary.
+        # Organise the data by month into a dictionary, grouping sequencing group types together by month.
         project_history: dict[date, dict[str, int]] = {}
         for row in rows:
-            # Extract values from the table row.
             month_created = date.fromisoformat(row['date_created']).replace(day=1)
             sg_type = row['type']
             num_sg = row['num_sg']
 
-            # Organise the date's data into a dictionary, based on sample type.
             if month_created not in project_history:
                 project_history[month_created] = {}
 
             project_history[month_created][sg_type] = num_sg
 
-        # We want the total number of each sg type over time, so performing this summing and
-        # fill in the months between data points.
+        # We want the total number of each sg type over time, so we need to accumulate and
+        # fill in the missing months.
         todays_month = date.today().replace(day=1)
         iteration_month = min(
             project_history.keys()
         )  # The month currently being filled in.
         type_totals: dict[str, int] = defaultdict(lambda: 0)
 
-        # Start from the earliest recorded month and work towards the current month.
+        # By starting at the earliest month and working towards today, we won't skip any dates.
         while iteration_month <= todays_month:
             iteration_counts = project_history.get(iteration_month, {})
-            # If there's any recorded Sequencing Group counts for this iteration's month,
-            # add them to the cumulative count.
+
+            # The result from the database provides the sq types added in a given month,
+            # but we want the total number.
             for sg_type, count in iteration_counts.items():
                 type_totals[sg_type] += count
 
