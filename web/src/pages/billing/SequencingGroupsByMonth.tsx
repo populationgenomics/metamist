@@ -63,14 +63,14 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
         return debounce(() => {
             getData(projectName)
         }, 1000)
-    }, [projectName])
+    }, [projectName, getData])
 
     // Cleanup debounced function on unmount.
     React.useEffect(() => {
         return () => {
             debouncedGetData.cancel()
         }
-    }, [projectName])
+    }, [projectName, debouncedGetData])
 
     // Effect to trigger data retrieval on initial load and project value changes.
     React.useEffect(() => {

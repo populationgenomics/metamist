@@ -59,8 +59,7 @@ export const StackedBarByTime: React.FC<IStackedBarByTimeProps> = ({ data = [], 
         const x_vals = orderedData.map((d) => d.date.toISOString().substring(0, 10))
 
         // prepare stacked data
-        let stackedData
-        stackedData = d3
+        const stackedData = d3
             .stack()
             .offset(d3.stackOffsetNone)
             // @ts-ignore
