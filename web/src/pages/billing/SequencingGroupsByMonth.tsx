@@ -45,7 +45,6 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
             setIsLoading(false)
 
             const resultData = result.data as ProjectHistory
-            console.log('here')
             const newDataset = Object.entries(resultData).map(([date, typeCounts]) => ({
                 date: new Date(date),
                 values: typeCounts,

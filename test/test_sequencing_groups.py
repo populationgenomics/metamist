@@ -397,9 +397,22 @@ class TestSequencingGroup(DbIsolatedTest):
         self.assertEqual(archived_sgs[1]['archived'], True)
 
     @run_as_sync
+    async def test_history_no_sum(self):
+        """Test the trivial case where there are no sequencing groups."""
+
+        # Set up mocking for rows returned from the table query.
+        with mock.patch(
+            'db.python.layers.sequencing_group.SequencingGroupTable.get_type_numbers_history',
+            return_value=[],
+        ):
+            result = await self.sglayer.get_type_numbers_for_project_history(0)
+
+        self.assertDictEqual(result, {})
+
+    @run_as_sync
     @mock.patch('db.python.layers.sequencing_group.date', wraps=date)
     async def test_history_full_sum(self, mock_date):
-        """Test the trivial case where the same types are present at all times and accumulate over time."""
+        """Test the case where the same types are present at all times and accumulate over time."""
         # Mock today's date.
         mock_date.today.return_value = date(year=2025, month=12, day=31)
 
