@@ -5,7 +5,7 @@ import { Button, Card, Grid, Message } from 'semantic-ui-react'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import ProjectSelector, { IMetamistProject } from '../project/ProjectSelector'
 
-import { StackedBarByTime } from '../../shared/components/Graphs/StackedBarByTime'
+import { StackedBarByTime, IStackedBarByTimeData } from '../../shared/components/Graphs/StackedBarByTime'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import { SequencingGroupApi } from '../../sm-api'
 import './components/BillingCostByTimeTable.css'
@@ -13,6 +13,7 @@ import './components/BillingCostByTimeTable.css'
 type TypeCounts = Record<string, number>
 type ProjectHistory = Record<string, TypeCounts>
 
+/* eslint-disable @typescript-eslint/no-explicit-any  -- too many anys in the file to fix right now but would be good to sort out when we can */
 const SequencingGroupsByMonth: React.FunctionComponent = () => {
     // Use navigate and update url params
     const navigate = useNavigate()
@@ -22,7 +23,7 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
     const [error, setError] = React.useState<string | undefined>()
     const [message, setMessage] = React.useState<string | undefined>()
-    const [data, setData] = React.useState<any>([])
+    const [data, setData] = React.useState<IStackedBarByTimeData[]>([])
 
     // Callback to get data for plotting.
     const onProjectSelect = (_project: IMetamistProject) => {
@@ -194,3 +195,5 @@ export default function BillingStorageCostPerSamplePage() {
         </PaddedPage>
     )
 }
+
+/* eslint-enable @typescript-eslint/no-explicit-any   */
