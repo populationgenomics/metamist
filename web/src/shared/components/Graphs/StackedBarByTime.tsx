@@ -24,7 +24,7 @@ function getSeries(data: IStackedBarByTimeData[]) {
 }
 
 const colorFunc: (t: number) => string | undefined = d3.interpolateRainbow
-const margin = { top: 0, right: 10, bottom: 200, left: 100 }
+const margin = { top: 100, right: 10, bottom: 100, left: 100 }
 const height = 800 - margin.top - margin.bottom
 
 export const StackedBarByTime: React.FC<IStackedBarByTimeProps> = ({ data=[], unit='' }) => {
@@ -287,17 +287,17 @@ export const StackedBarByTime: React.FC<IStackedBarByTimeProps> = ({ data=[], un
                     height="100%" // {height}
                     viewBox={`0 0 ${minWidth} ${height}`}
                     preserveAspectRatio="xMinYMin"
-                    width={width < 1000 ? '100%' : width - 410}
+                    width={width < 1000 ? '100%' : width - 210}
                 ></svg>
                 <svg
                     ref={legendRef}
                     viewBox={
                         width < 1000
-                            ? `-50 0 450 ${50 + 20 * series.length}`
-                            : `0 0 400 ${20 * series.length}`
+                            ? `-50 0 250 ${50 + 20 * series.length}`
+                            : `0 0 200 ${20 * series.length}`
                     }
                     height="100%"
-                    width="400px"
+                    width="200px"
                 ></svg>
             </div>
             <div id="chart" className="tooltip" ref={tooltipDivRef} />
