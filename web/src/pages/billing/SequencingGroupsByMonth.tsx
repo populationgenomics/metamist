@@ -5,7 +5,10 @@ import { Button, Card, Grid, Message } from 'semantic-ui-react'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import ProjectSelector, { IMetamistProject } from '../project/ProjectSelector'
 
-import { StackedBarByTime, IStackedBarByTimeData } from '../../shared/components/Graphs/StackedBarByTime'
+import {
+    IStackedBarByTimeData,
+    StackedBarByTime,
+} from '../../shared/components/Graphs/StackedBarByTime'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import { SequencingGroupApi } from '../../sm-api'
 import './components/BillingCostByTimeTable.css'
