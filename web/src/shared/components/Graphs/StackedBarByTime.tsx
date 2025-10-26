@@ -27,7 +27,7 @@ const colorFunc: (t: number) => string | undefined = d3.interpolateRainbow
 const margin = { top: 100, right: 10, bottom: 100, left: 100 }
 const height = 800 - margin.top - margin.bottom
 
-export const StackedBarByTime: React.FC<IStackedBarByTimeProps> = ({ data=[], unit='' }) => {
+export const StackedBarByTime: React.FC<IStackedBarByTimeProps> = ({ data = [], unit = '' }) => {
     const svgRef = React.useRef(null)
     const legendRef = React.useRef(null)
 

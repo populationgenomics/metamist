@@ -14,7 +14,7 @@ import {
     BillingHome,
     BillingInvoiceMonthCost,
     BillingSeqrProp,
-    SequencingGroupsByMonth
+    SequencingGroupsByMonth,
 } from './pages/billing'
 import DocumentationArticle from './pages/docs/Documentation'
 import { FamilyPage } from './pages/family/FamilyView'
@@ -126,7 +126,10 @@ const Routes: React.FunctionComponent = () => (
                 </ErrorBoundary>
             }
         />
-        <Route path="/billing/sequencingGroupsByMonth/:projectName?" element={<SequencingGroupsByMonth />} />
+        <Route
+            path="/billing/sequencingGroupsByMonth/:projectName?"
+            element={<SequencingGroupsByMonth />}
+        />
 
         <Route path="/swagger" element={<SwaggerUI url="/openapi.json" tryItOutEnabled={true} />} />
 

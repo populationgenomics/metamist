@@ -1,12 +1,12 @@
 import { debounce } from 'lodash'
 import * as React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { Button, Card, Grid, Message } from 'semantic-ui-react'
+import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import ProjectSelector, { IMetamistProject } from '../project/ProjectSelector'
 
-import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import { StackedBarByTime } from '../../shared/components/Graphs/StackedBarByTime'
+import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import { SequencingGroupApi } from '../../sm-api'
 import './components/BillingCostByTimeTable.css'
 
@@ -48,20 +48,22 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
             console.log('here')
             const newDataset = Object.entries(resultData).map(([date, typeCounts]) => ({
                 date: new Date(date),
-                values: typeCounts
+                values: typeCounts,
             }))
 
             setData(newDataset)
-        } catch(er: any) {
+        } catch (er: any) {
             setIsLoading(false)
             setError(er.message)
         }
     }, [])
 
     // Memo of debounced getData so that the debounce function will only be regenerated when the project changes.
-    const debouncedGetData = React.useMemo(() => {return debounce(() => {getData(projectName)}, 1000)},
-        [projectName]
-    )
+    const debouncedGetData = React.useMemo(() => {
+        return debounce(() => {
+            getData(projectName)
+        }, 1000)
+    }, [projectName])
 
     // Cleanup debounced function on unmount.
     React.useEffect(() => {
@@ -170,13 +172,12 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
                             flex: '0 0 auto',
                             minWidth: '115px',
                         }}
-                    >
-                    </div>
+                    ></div>
                 </div>
 
                 <Grid columns="equal" stackable doubling>
                     <Grid.Column className="field-selector-label">
-                            <ProjectSelector onProjectSelect={onProjectSelect} />
+                        <ProjectSelector onProjectSelect={onProjectSelect} />
                     </Grid.Column>
                 </Grid>
             </Card>
