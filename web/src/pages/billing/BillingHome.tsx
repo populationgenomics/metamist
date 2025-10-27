@@ -1,8 +1,21 @@
+import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import * as React from 'react'
 import ReactGoogleSlides from 'react-google-slides'
-import { Button, Menu, MenuItem, Segment, SemanticWIDTHS } from 'semantic-ui-react'
+import { Location, useLocation } from 'react-router-dom'
+import {
+    Button,
+    Container,
+    Grid,
+    Header,
+    List,
+    Menu,
+    MenuItem,
+    Segment,
+    SemanticWIDTHS,
+} from 'semantic-ui-react'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
+import { BillingApi, BillingProjectGroup, BillingTeamRecord, BillingTopicGroup } from '../../sm-api'
 import { billingPages, IBillingPage } from './BillingPages'
 
 // Google Slides
@@ -68,10 +81,74 @@ const MenuItems = (props: MenuProps) => {
     )
 }
 
+const LinkItem: React.FC<{ label: string; href: string }> = ({ label, href }) => (
+    <List.Item>
+        <a href={href} target="_blank" rel="noreferrer">
+            {label} <OpenInNewIcon />
+        </a>
+    </List.Item>
+)
+
+const GridColumn: React.FC<{
+    teamName: string
+    billingGroupInfoList: (BillingProjectGroup | BillingTopicGroup)[]
+    location: Location
+}> = ({ teamName, billingGroupInfoList, location }) => (
+    <Grid.Column>
+        <Header as="h3">{teamName} Team</Header>
+
+        <Header as="h5">Cost By Invoice Month by Project</Header>
+
+        <List>
+            {billingGroupInfoList
+                .filter((item): item is BillingProjectGroup => item.group_by === 'gcp_project')
+                .map((item) => (
+                    <LinkItem
+                        key={item.name}
+                        label={item.name}
+                        href={`${location.pathname}/invoiceMonthCost?groupBy=gcp_project&gcpProjects=${item.gcp_projects}`}
+                    />
+                ))}
+        </List>
+
+        <Header as="h5">Cost By Invoice Month by Topic</Header>
+
+        <List>
+            {billingGroupInfoList
+                .filter((item): item is BillingTopicGroup => item.group_by === 'topic')
+                .map((item) => (
+                    <LinkItem
+                        key={item.name}
+                        label={item.name}
+                        href={`${location.pathname}/invoiceMonthCost?groupBy=topic&topics=${item.topics}`}
+                    />
+                ))}
+        </List>
+
+        <Header as="h5">Cost Across Invoice Months by Topic</Header>
+
+        <List>
+            {billingGroupInfoList
+                .filter((item): item is BillingTopicGroup => item.group_by === 'topic')
+                .map((item) => (
+                    <LinkItem
+                        key={item.name}
+                        label={item.name}
+                        href={`${location.pathname}/costByMonth?groupBy=topic&topics=${item.topics}`}
+                    />
+                ))}
+        </List>
+    </Grid.Column>
+)
+
+const billingApi = new BillingApi()
+
 const BillingHome = () => {
     const theme = React.useContext(ThemeContext)
     const isDarkMode = theme.theme === 'dark-mode'
     const [activeItem, setActiveItem] = React.useState('home')
+    const [billingGroupList, setBillingGroupList] = React.useState<BillingTeamRecord[] | []>([])
+
     const handleItemClick = (e: MouseEvent, page: IBillingPage) => {
         e.preventDefault()
         e.stopPropagation()
@@ -82,12 +159,40 @@ const BillingHome = () => {
         () => 'https://docs.google.com/presentation/d/12cyHMMVx82f5RjJhg_VrGIdQBTCrAWJrMPWAtDLmBxU',
         []
     )
+    const location = useLocation()
+
+    React.useEffect(() => {
+        billingApi
+            .getBillingGroupInfo()
+            .then((result) => {
+                setBillingGroupList(result.data)
+            })
+            .catch(() => {
+                setBillingGroupList([])
+            })
+    }, [])
 
     return (
         <PaddedPage>
             <div className="article">
                 <h1> Billing Homepage </h1>
                 <p>Welcome to the Billing Homepage</p>
+
+                <h2>Useful Shortcuts </h2>
+                <p>Billing shortcuts for quick access</p>
+
+                <Container fluid style={{ padding: '2em 0', margin: '0px' }}>
+                    <Grid stackable columns={2} relaxed>
+                        {billingGroupList.map((item) => (
+                            <GridColumn
+                                teamName={item.team_name}
+                                billingGroupInfoList={item.billing_groups}
+                                location={location}
+                                key={item.team_name}
+                            />
+                        ))}
+                    </Grid>
+                </Container>
 
                 <h2>Pages</h2>
                 <p>Here you can find an overview of the different pages in the Billing section</p>
