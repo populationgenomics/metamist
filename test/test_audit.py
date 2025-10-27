@@ -13,7 +13,7 @@ from metamist.audit.services import (
     AuditAnalyzer,
     FileMatchingService,
     Reporter,
-    AuditLogs,
+    BucketAuditLogger,
 )
 from metamist.audit.models import (
     SequencingGroup,
@@ -69,7 +69,7 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
         self.gcs_data_access = GCSDataAccess('dataset', 'test')
         self.file_matcher = FileMatchingService()
         self.audit_analyzer = AuditAnalyzer()
-        self.audit_logs = AuditLogs('dataset', 'test')
+        self.audit_logs = BucketAuditLogger('dataset', 'test')
         self.reporter = Reporter(self.gcs_data_access, self.audit_logs)
 
         self.sample_csv_content = """File Path,File Size,SG ID,SG Type,SG Technology,SG Platform,Assay ID,Sample ID,Sample External ID,Participant ID,Participant External ID,CRAM Analysis ID,CRAM Path,Action,Review Comment
@@ -562,8 +562,8 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             self.metamist_data_access,
             self.gcs_data_access,
             self.audit_analyzer,
-            Reporter(self.gcs_data_access, AuditLogs('dataset', 'test')),
-            AuditLogs('dataset', 'test'),
+            Reporter(self.gcs_data_access, BucketAuditLogger('dataset', 'test')),
+            BucketAuditLogger('dataset', 'test'),
         )
 
         config = AuditConfig(
