@@ -236,6 +236,28 @@ class ProjectPermissionsTable:
 
         async with self.connection.transaction():
             _query = """
+DELETE FROM assay_comment WHERE assay_id IN (
+    SELECT a.id FROM assay a
+    INNER JOIN sample s ON a.sample_id = s.id
+    WHERE s.project = :project
+);
+DELETE FROM family_comment WHERE family_id IN (
+    SELECT id FROM family WHERE project = :project
+);
+DELETE FROM participant_comment WHERE participant_id IN (
+    SELECT id FROM participant WHERE project = :project
+);
+DELETE FROM project_comment WHERE project_id = :project;
+DELETE FROM sample_comment WHERE sample_id IN (
+    SELECT id FROM sample WHERE project = :project
+);
+DELETE FROM sequencing_group_comment WHERE sequencing_group_id IN (
+    SELECT sg.id FROM sequencing_group sg
+    INNER JOIN sample s ON sg.sample_id = s.id
+    WHERE s.project = :project
+);
+-- Deletion from the above `*_comment` tables cascades to the corresponding `comment` rows
+DELETE FROM project_member WHERE project_id = :project;
 DELETE FROM participant_phenotypes where participant_id IN (
     SELECT id FROM participant WHERE project = :project
 );
@@ -262,12 +284,28 @@ DELETE FROM analysis_sample WHERE sample_id in (
     SELECT s.id FROM sample s
     WHERE s.project = :project
 );
+DELETE FROM output_file WHERE id in (
+    SELECT file_id FROM analysis_outputs ao
+    INNER JOIN analysis a ON ao.analysis_id = a.id
+    WHERE a.project = :project
+);
+DELETE FROM analysis_outputs WHERE analysis_id IN (
+    SELECT id FROM analysis WHERE project = :project
+);
 DELETE FROM analysis_sequencing_group WHERE analysis_id in (
     SELECT id FROM analysis WHERE project = :project
 );
 DELETE FROM analysis_sample WHERE analysis_id in (
     SELECT id FROM analysis WHERE project = :project
 );
+DELETE FROM analysis_cohort WHERE cohort_id IN (
+    SELECT id FROM cohort WHERE project = :project
+);
+DELETE FROM cohort_sequencing_group WHERE cohort_id IN (
+    SELECT id FROM cohort WHERE project = :project
+);
+DELETE FROM cohort_template WHERE project = :project;
+DELETE FROM cohort WHERE project = :project;
 DELETE FROM assay WHERE sample_id in (SELECT id FROM sample WHERE project = :project);
 DELETE FROM sequencing_group WHERE sample_id IN (
     SELECT id FROM sample WHERE project = :project
