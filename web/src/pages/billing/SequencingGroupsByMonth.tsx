@@ -1,20 +1,28 @@
 import { debounce } from 'lodash'
 import * as React from 'react'
+import { useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useMeasure } from 'react-use'
 import { Button, Card, Grid, Message } from 'semantic-ui-react'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import ProjectSelector, { IMetamistProject } from '../project/ProjectSelector'
 
-import {
-    IStackedBarByTimeData,
-    StackedBarByTime,
-} from '../../shared/components/Graphs/StackedBarByTime'
+import * as Plot from '@observablehq/plot'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import { SequencingGroupApi } from '../../sm-api'
 import './components/BillingCostByTimeTable.css'
 
-type TypeCounts = Record<string, number>
-type ProjectHistory = Record<string, TypeCounts>
+type ProjectHistory = {
+    [key: string]: {
+        [key: string]: number
+    }
+}
+
+interface TypeData {
+    date: Date
+    type: string
+    count: number
+}
 
 /* eslint-disable @typescript-eslint/no-explicit-any  -- too many anys in the file to fix right now but would be good to sort out when we can */
 const SequencingGroupsByMonth: React.FunctionComponent = () => {
@@ -26,7 +34,11 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
     const [error, setError] = React.useState<string | undefined>()
     const [message, setMessage] = React.useState<string | undefined>()
-    const [data, setData] = React.useState<IStackedBarByTimeData[]>([])
+    const [data, setData] = React.useState<TypeData[]>([])
+
+    // Chart refs
+    const containerRef = useRef<HTMLDivElement>(null)
+    const [measureRef, { width, height }] = useMeasure<HTMLDivElement>()
 
     // Callback to get data for plotting.
     const onProjectSelect = (_project: IMetamistProject) => {
@@ -48,10 +60,16 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
             setIsLoading(false)
 
             const resultData = result.data as ProjectHistory
-            const newDataset = Object.entries(resultData).map(([date, typeCounts]) => ({
-                date: new Date(date),
-                values: typeCounts,
-            }))
+            let newDataset: TypeData[] = []
+            for (const [date, counts] of Object.entries(resultData)) {
+                for (const [typeName, count] of Object.entries(counts)) {
+                    newDataset.push({
+                        date: new Date(date),
+                        type: typeName,
+                        count: count,
+                    })
+                }
+            }
 
             setData(newDataset)
         } catch (er: any) {
@@ -78,6 +96,39 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
     React.useEffect(() => {
         debouncedGetData()
     }, [debouncedGetData])
+
+    React.useEffect(() => {
+        if (!data) return
+
+        const plot = Plot.plot({
+            color: {
+                scheme: 'spectral',
+                legend: true,
+            },
+            y: { grid: true },
+            marks: [
+                Plot.rectY(data, {
+                    x: 'date',
+                    y: 'count',
+                    interval: 'month',
+                    fill: 'type',
+                    tip: true,
+                    // Tip display text
+                    title: (d) => {
+                        const month: string = d.date.toLocaleDateString(undefined, {
+                            month: 'short',
+                        })
+                        const year = d.date.getFullYear()
+                        return `${d.type}: ${d.count}\n${month} ${year}`
+                    },
+                }),
+                Plot.ruleY([0]),
+            ],
+        })
+        containerRef.current?.append(plot)
+
+        return () => plot.remove()
+    }, [data])
 
     const messageComponent = () => {
         if (message) {
@@ -136,7 +187,18 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
             >
                 <Grid>
                     <Grid.Column width={16} className="chart-card">
-                        <StackedBarByTime data={data} unit={'sequencing groups'} />
+                        <div
+                            ref={measureRef}
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                position: 'absolute',
+                                zIndex: -1,
+                                top: 0,
+                                left: 0,
+                            }}
+                        />
+                        <div ref={containerRef} />
                     </Grid.Column>
                 </Grid>
             </Card>
