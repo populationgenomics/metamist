@@ -1,7 +1,5 @@
 # pylint: disable=protected-access too-many-public-methods
 from datetime import datetime
-from test.testbase import run_as_sync
-from test.testbqbase import BqTest
 from typing import Any
 from unittest import mock
 
@@ -9,20 +7,31 @@ import google.cloud.bigquery as bq
 
 from db.python.tables.bq.billing_base import (
     BillingBaseTable,
-    abbrev_cost_category,
-    prepare_time_periods,
 )
 from db.python.tables.bq.billing_daily_extended import BillingDailyExtendedTable
 from db.python.tables.bq.billing_filter import BillingFilter
+from db.python.tables.bq.billing_utils import (
+    abbrev_cost_category,
+    append_detailed_cost_records,
+    append_total_running_cost,
+    convert_output,
+    filter_to_optimise_query,
+    last_loaded_day_filter,
+    prepare_aggregation,
+    prepare_order_by_string,
+    prepare_time_periods,
+)
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
 from models.enums import BillingTimePeriods
 from models.models import (
     BillingColumn,
     BillingCostBudgetRecord,
     BillingCostDetailsRecord,
-    BillingTotalCostQueryModel,
     BillingRunningCostQueryModel,
+    BillingTotalCostQueryModel,
 )
+from test.testbase import run_as_sync
+from test.testbqbase import BqTest
 
 
 def mock_execute_query_running_cost(query, *_args, **_kwargs):
@@ -194,7 +203,7 @@ class TestBillingBaseTable(BqTest):
     def test_filter_to_optimise_query(self):
         """Test _filter_to_optimise_query"""
 
-        result = BillingBaseTable._filter_to_optimise_query()
+        result = filter_to_optimise_query()
         self.assertEqual(
             'day >= TIMESTAMP(@start_day) AND day <= TIMESTAMP(@last_day)', result
         )
@@ -202,25 +211,25 @@ class TestBillingBaseTable(BqTest):
     def test_last_loaded_day_filter(self):
         """Test _last_loaded_day_filter"""
 
-        result = BillingBaseTable._last_loaded_day_filter()
+        result = last_loaded_day_filter()
         self.assertEqual('day = TIMESTAMP(@last_loaded_day)', result)
 
     def test_convert_output_empty_results(self):
         """Test _convert_output - various empty results"""
 
-        empty_results = BillingBaseTable._convert_output(None)
+        empty_results = convert_output(None)
         self.assertEqual([], empty_results)
 
         query_job_result = mock.MagicMock(spec=bq.job.QueryJob)
         query_job_result.result.total_rows = 0
 
-        empty_list = BillingBaseTable._convert_output(query_job_result)
+        empty_list = convert_output(query_job_result)
         self.assertEqual([], empty_list)
 
         query_job_result = mock.MagicMock(spec=bq.job.QueryJob)
         query_job_result.result.return_value = mock.MagicMock(spec=bq.table.RowIterator)
 
-        empty_row_iterator = BillingBaseTable._convert_output(query_job_result)
+        empty_row_iterator = convert_output(query_job_result)
         self.assertEqual([], empty_row_iterator)
 
     def test_convert_output_one_record(self):
@@ -233,7 +242,7 @@ class TestBillingBaseTable(BqTest):
         query_job_result = mock.MagicMock(spec=bq.job.QueryJob)
         query_job_result.result.return_value = mock_rows
 
-        single_row = BillingBaseTable._convert_output(query_job_result)
+        single_row = convert_output(query_job_result)
         self.assertEqual([{}], single_row)
 
     def test_convert_output_label_record(self):
@@ -247,7 +256,7 @@ class TestBillingBaseTable(BqTest):
         query_job_result = mock.MagicMock(spec=bq.job.QueryJob)
         query_job_result.result.return_value = mock_rows
 
-        row_iterator = BillingBaseTable._convert_output(query_job_result)
+        row_iterator = convert_output(query_job_result)
         self.assertEqual(
             [
                 {
@@ -263,7 +272,7 @@ class TestBillingBaseTable(BqTest):
     def test_prepare_order_by_string_empty(self):
         """Test _prepare_order_by_string - empty results"""
 
-        self.assertEqual('', BillingBaseTable._prepare_order_by_string(None))
+        self.assertEqual('', prepare_order_by_string(None))
 
     def test_prepare_order_by_string_order_by_one_column(self):
         """Test _prepare_order_by_string"""
@@ -271,20 +280,20 @@ class TestBillingBaseTable(BqTest):
         # DESC order by column
         self.assertEqual(
             'ORDER BY cost DESC',
-            BillingBaseTable._prepare_order_by_string({BillingColumn.COST: True}),
+            prepare_order_by_string({BillingColumn.COST: True}),
         )
 
         # ASC order by column
         self.assertEqual(
             'ORDER BY cost ASC',
-            BillingBaseTable._prepare_order_by_string({BillingColumn.COST: False}),
+            prepare_order_by_string({BillingColumn.COST: False}),
         )
 
     def test_prepare_order_by_string_order_by_two_columns(self):
         """Test _prepare_order_by_string - order by 2 columns"""
         self.assertEqual(
             'ORDER BY cost ASC,day DESC',
-            BillingBaseTable._prepare_order_by_string(
+            prepare_order_by_string(
                 {BillingColumn.COST: False, BillingColumn.DAY: True}
             ),
         )
@@ -296,7 +305,7 @@ class TestBillingBaseTable(BqTest):
             fields=[], start_date='2024-01-01', end_date='2024-01-01'
         )
 
-        fields_selected, group_by = BillingBaseTable._prepare_aggregation(query)
+        fields_selected, group_by = prepare_aggregation(query)
         # no fields selected so it is empty
         self.assertEqual('', fields_selected)
         # by default results are grouped by day
@@ -313,7 +322,7 @@ class TestBillingBaseTable(BqTest):
             group_by=False,
         )
 
-        fields_selected, group_by = BillingBaseTable._prepare_aggregation(query)
+        fields_selected, group_by = prepare_aggregation(query)
         # topic field is selected
         self.assertEqual('topic', fields_selected)
         # group by is switched off
@@ -331,7 +340,7 @@ class TestBillingBaseTable(BqTest):
             group_by=True,
         )
 
-        fields_selected, group_by = BillingBaseTable._prepare_aggregation(query)
+        fields_selected, group_by = prepare_aggregation(query)
         self.assertEqual('topic', fields_selected)
         # always group by day and any field that can be grouped by
         self.assertEqual('GROUP BY day,topic', group_by)
@@ -394,7 +403,7 @@ class TestBillingBaseTable(BqTest):
         """Test _append_total_running_cost"""
 
         # test _append_total_running_cost function, no topic present
-        total_record = await BillingBaseTable._append_total_running_cost(
+        total_record = await append_total_running_cost(
             field=BillingColumn.TOPIC,
             is_current_month=True,
             last_loaded_day=None,
@@ -429,7 +438,7 @@ class TestBillingBaseTable(BqTest):
         """Test _append_total_running_cost"""
 
         # test _append_total_running_cost function, not current month
-        total_record = await BillingBaseTable._append_total_running_cost(
+        total_record = await append_total_running_cost(
             field=BillingColumn.TOPIC,
             is_current_month=False,
             last_loaded_day=None,
@@ -463,7 +472,7 @@ class TestBillingBaseTable(BqTest):
     async def test_append_total_running_cost_current_month(self):
         """Test _append_total_running_cost"""
 
-        total_record = await BillingBaseTable._append_total_running_cost(
+        total_record = await append_total_running_cost(
             field=BillingColumn.TOPIC,
             is_current_month=True,
             last_loaded_day=None,
@@ -623,12 +632,12 @@ class TestBillingBaseTable(BqTest):
         self.assertEqual([], query_job_result)
 
     @run_as_sync
-    async def test_append_running_cost_records_empty_results(self):
-        """Test _append_running_cost_records"""
+    async def test_append_total_running_cost_empty_results(self):
+        """Test append_total_running_cost"""
 
         # test empty results
-        empty_results = await self.table_obj._append_running_cost_records(
-            field=BillingColumn.TOPIC,
+        empty_results = await append_detailed_cost_records(
+            budgets_per_gcp_project={},
             is_current_month=False,
             last_loaded_day=None,
             total_monthly={},
@@ -641,15 +650,15 @@ class TestBillingBaseTable(BqTest):
 
     @run_as_sync
     async def test_append_running_cost_records_simple_data(self):
-        """Test _append_running_cost_records"""
+        """Test append_running_cost_records"""
 
         # prepare simple input data
         field_details: dict[str, Any] = {
             'Project1': [],
         }
 
-        simple_result = await self.table_obj._append_running_cost_records(
-            field=BillingColumn.GCP_PROJECT,
+        simple_result = await append_detailed_cost_records(
+            budgets_per_gcp_project={},
             is_current_month=False,
             last_loaded_day=None,
             total_monthly={'C': {}, 'S': {}},
@@ -679,7 +688,7 @@ class TestBillingBaseTable(BqTest):
 
     @run_as_sync
     async def test_append_running_cost_records_with_details(self):
-        """Test _append_running_cost_records"""
+        """Test append_running_cost_records"""
 
         # prepare input data with more details
         field_details = {
@@ -693,8 +702,8 @@ class TestBillingBaseTable(BqTest):
             ],
         }
 
-        detailed_result = await self.table_obj._append_running_cost_records(
-            field=BillingColumn.GCP_PROJECT,
+        detailed_result = await append_detailed_cost_records(
+            budgets_per_gcp_project={},
             is_current_month=False,
             last_loaded_day=None,
             total_monthly={'C': {}, 'S': {}},
