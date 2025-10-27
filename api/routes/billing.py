@@ -6,8 +6,13 @@ from async_lru import alru_cache
 from fastapi import APIRouter
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-
-from api.settings import BILLING_CACHE_RESPONSE_TTL, BQ_AGGREG_VIEW
+from google.cloud import secretmanager_v1
+from api.settings import (
+    BILLING_CACHE_RESPONSE_TTL,
+    BQ_AGGREG_VIEW,
+    METAMIST_GCP_PROJECT,
+    BILLING_GROUP_INFO,
+)
 from api.utils.db import (
     BqConnection,
     Connection,
@@ -23,6 +28,8 @@ from models.models import (
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 )
+from models.models.billing import BillingTeamRecord
+from pydantic import TypeAdapter
 
 router = APIRouter(prefix='/billing', tags=['billing'])
 
@@ -586,3 +593,22 @@ async def get_cost_by_sample(
     billing_layer = _get_billing_layer_from(author)
     records = await billing_layer.get_cost_by_sample(connection, query)
     return [BillingTotalCostRecord.from_json(record) for record in records]
+
+
+@router.get('/group-info', operation_id='getBillingGroupInfo')
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_billing_group_info() -> list[BillingTeamRecord]:
+    """
+    Get billing groups and topics related to CPG teams
+    """
+    name = (
+        f'projects/{METAMIST_GCP_PROJECT}/secrets/{BILLING_GROUP_INFO}/versions/latest'
+    )
+    response = (
+        await secretmanager_v1.SecretManagerServiceAsyncClient().access_secret_version(
+            name=name
+        )
+    )
+    return TypeAdapter(list[BillingTeamRecord]).validate_json(
+        response.payload.data.decode('UTF-8')
+    )
