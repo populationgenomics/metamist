@@ -295,7 +295,7 @@ class BillingBaseTable(BqDbBase):
     ) -> dict[date, list[int]]:
         """
         Call BQ table to get all processed sequencing groups per month
-        some of the sequencing_group values could be just rubish
+        some of the sequencing_group values could be just rubbish
         so we only return those with length > 3
         3 is arbitrary, but should be enough to filter out most of the rubbish
         """
