@@ -297,7 +297,7 @@ class BillingBaseTable(BqDbBase):
         Call BQ table to get all processed sequencing groups per month
         some of the sequencing_group values could be just rubish
         so we only return those with length > 3
-        3 is arbitrary, but should be enough to filter out most of the rubish
+        3 is arbitrary, but should be enough to filter out most of the rubbish
         """
         _query = f"""
             WITH total AS (
