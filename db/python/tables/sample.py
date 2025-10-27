@@ -761,6 +761,10 @@ class SampleTable(DbBase):
         self, sequencing_group_ids: list[int]
     ) -> dict[int, int]:
         """Get the count of samples per project based on provided seq groups"""
+        # if no sequencing groups, return empty dict
+        if not sequencing_group_ids:
+            return {}
+
         _query = """
             SELECT s.project, COUNT(DISTINCT s.id) AS sample_count
             FROM sequencing_group sg
