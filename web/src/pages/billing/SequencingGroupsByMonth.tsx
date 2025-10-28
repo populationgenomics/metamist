@@ -60,7 +60,7 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
             setIsLoading(false)
 
             const resultData = result.data as ProjectHistory
-            let newDataset: TypeData[] = []
+            const newDataset: TypeData[] = []
             for (const [date, counts] of Object.entries(resultData)) {
                 for (const [typeName, count] of Object.entries(counts)) {
                     newDataset.push({
@@ -105,30 +105,28 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
                 scheme: 'spectral',
                 legend: true,
             },
+            x: { interval: 'month' },
             y: { grid: true },
+            width,
+            height,
             marks: [
-                Plot.rectY(data, {
-                    x: 'date',
-                    y: 'count',
-                    interval: 'month',
-                    fill: 'type',
-                    tip: true,
-                    // Tip display text
-                    title: (d) => {
-                        const month: string = d.date.toLocaleDateString(undefined, {
-                            month: 'short',
-                        })
-                        const year = d.date.getFullYear()
-                        return `${d.type}: ${d.count}\n${month} ${year}`
-                    },
-                }),
+                Plot.barY(
+                    data,
+                    Plot.stackY({
+                        x: 'date',
+                        y: 'count',
+                        interval: 'month',
+                        fill: 'type',
+                        tip: true,
+                    })
+                ),
                 Plot.ruleY([0]),
             ],
         })
         containerRef.current?.append(plot)
 
         return () => plot.remove()
-    }, [data])
+    }, [data, width, height])
 
     const messageComponent = () => {
         if (message) {
@@ -192,6 +190,7 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
                             style={{
                                 width: '100%',
                                 height: '100%',
+                                maxHeight: '35em',
                                 position: 'absolute',
                                 zIndex: -1,
                                 top: 0,
