@@ -125,6 +125,9 @@ async def append_sample_cost_record(
     Returns:
         list[dict]: The updated list of result records.
     """
+    if row.get('cost_category').startswith('Average Sample'):
+        # skip sample average cost rows to avoid double counting
+        return results
 
     sample_count = sample_counts_per_month.get(project_id, {}).get(invoice_month, 0)
     avg_cost = row.get('cost', 0) / sample_count if sample_count > 0 else 0
