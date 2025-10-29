@@ -1,8 +1,21 @@
 from fastapi import APIRouter
 
-from api.utils.db import Connection, get_project_db_connection
+from api.utils.db import (
+    Connection,
+    get_project_db_connection,
+    get_projectless_db_connection,
+)
+from db.python.filters import GenericFilter
 from db.python.layers.cohort import CohortLayer
-from models.models.cohort import CohortBody, CohortCriteria, CohortTemplate, NewCohort
+from db.python.tables.cohort import CohortFilter
+from models.models.cohort import (
+    CohortBody,
+    CohortCriteria,
+    CohortTemplate,
+    NewCohort,
+    CohortUpdateBody,
+    CohortExternal,
+)
 from models.models.project import (
     FullWriteAccessRoles,
     ProjectId,
@@ -104,3 +117,33 @@ async def create_cohort_template(
     )
 
     return cohort_template_id_format(cohort_raw_id)
+
+@router.get('/{cohort_id}', operation_id='getCohortById')
+async def get_cohort_by_id(
+    cohort_id: int, connection: Connection = get_projectless_db_connection
+) -> CohortExternal:
+
+    """Get cohort by ID"""
+
+    cohort_layer = CohortLayer(connection)
+    resp = await cohort_layer.query(CohortFilter(id=GenericFilter(eq=cohort_id)))
+
+    if not resp:
+        raise ValueError(f'Cohort with ID {cohort_id} not found')
+
+    return resp[0].to_external()
+
+
+@router.patch('/{cohort_id}', operation_id='updateCohortById')
+async def update_cohort_by_id(
+    cohort_id: int,
+    cohort: CohortUpdateBody,
+    connection: Connection = get_projectless_db_connection
+) -> CohortExternal:
+
+    """update cohort by ID"""
+
+    cohort_layer = CohortLayer(connection)
+    await cohort_layer.update_cohort(cohort, cohort_id)
+    updated_cohort = (await cohort_layer.query(CohortFilter(id=GenericFilter(eq=cohort_id))))[0]
+    return updated_cohort.to_external()

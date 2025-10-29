@@ -1,4 +1,7 @@
+from pydantic import Field
+
 from models.base import SMBase, parse_sql_dict
+from models.enums.cohort import CohortStatus
 from models.models.project import ProjectId
 from models.utils.cohort_id_format import cohort_id_format
 from models.utils.sequencing_group_id_format import (
@@ -16,18 +19,19 @@ class CohortInternal(SMBase):
     project: ProjectId
     description: str
     template_id: int
+    status: CohortStatus
 
     @staticmethod
-    def from_db(d: dict):
+    def from_db(d: dict, cohort_status: CohortStatus):
         """
         Convert from db keys, mainly converting id to id_
         """
-        _id = d.pop('id', None)
-        project = d.pop('project', None)
-        description = d.pop('description', None)
-        name = d.pop('name', None)
-        author = d.pop('author', None)
-        template_id = d.pop('template_id', None)
+        _id = d.pop('c_id', None)
+        project = d.pop('c_project', None)
+        description = d.pop('c_description', None)
+        name = d.pop('c_name', None)
+        author = d.pop('c_author', None)
+        template_id = d.pop('c_template_id', None)
 
         return CohortInternal(
             id=_id,
@@ -36,7 +40,40 @@ class CohortInternal(SMBase):
             project=project,
             description=description,
             template_id=template_id,
+            status= cohort_status,
         )
+
+    def to_external(self):
+        """Convert to external model"""
+        return CohortExternal(
+            id=self.id,
+            name=self.name,
+            author=self.author,
+            project=self.project,
+            description=self.description,
+            template_id=self.template_id,
+            status=self.cohort_status,
+        )
+
+
+class CohortExternal(SMBase):
+    """External model for Cohort"""
+
+    id: int
+    name: str
+    author: str
+    project: ProjectId
+    description: str
+    template_id: int
+    status: CohortStatus
+
+
+class CohortUpdateBody(SMBase):
+    """Represents the expected JSON body of the update cohort request"""
+
+    name: str | None
+    description: str | None
+    status: CohortStatus | None
 
 
 class CohortCriteriaInternal(SMBase):

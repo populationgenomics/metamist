@@ -1,10 +1,13 @@
 # pylint: disable=too-many-instance-attributes
 import dataclasses
 import datetime
+from collections import defaultdict
+from typing import DefaultDict
 
 from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
 from db.python.utils import NotFoundError, to_db_json
+from models.enums.cohort import CohortStatus
 from models.models.cohort import (
     CohortCriteriaInternal,
     CohortInternal,
@@ -26,6 +29,7 @@ class CohortFilter(GenericFilterModel):
     template_id: GenericFilter[int] | None = None
     timestamp: GenericFilter[datetime.datetime] | None = None
     project: GenericFilter[ProjectId] | None = None
+    status: GenericFilter[CohortStatus] | None = None
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -47,13 +51,16 @@ class CohortTable(DbBase):
     """
 
     table_name = 'cohort'
-    common_get_keys = [
-        'id',
-        'name',
-        'template_id',
-        'description',
-        'author',
-        'project',
+    cohort_get_keys = [
+        'c.id as c_id',
+        'c.name as c_name',
+        'c.template_id as c_template_id',
+        'c.description as c_description',
+        'c.author as c_author',
+        'c.project as c_project',
+        'c.status as c_status',
+        's.active as s_active',
+        'sg.archived as sg_archived',
     ]
 
     template_keys = ['id', 'name', 'description', 'criteria', 'project']
@@ -62,19 +69,61 @@ class CohortTable(DbBase):
         self, filter_: CohortFilter
     ) -> tuple[list[CohortInternal], set[ProjectId]]:
         """Query Cohorts"""
-        wheres, values = filter_.to_sql(field_overrides={})
+        wheres, values = filter_.to_sql(field_overrides={'id':'c.id', 'name':'c.name',
+                                                         'template_id':'c.template_id',
+                                                         'author':'c.author',
+                                                         'project':'c.project',
+                                                         'status':'c.status'})
         if not wheres:
             raise ValueError(f'Invalid filter: {filter_}')
 
-        common_get_keys_str = ','.join(self.common_get_keys)
+        cohort_get_keys_str = ','.join(self.cohort_get_keys)
+
+        # TODO: check how the status filter work as it is not injected to the query
         _query = f"""
-        SELECT {common_get_keys_str}
-        FROM cohort
+        SELECT {cohort_get_keys_str}
+        FROM cohort_sequencing_group csg
+        JOIN cohort c ON c.id = csg.cohort_id
+        JOIN sequencing_group sg ON sg.id = csg.sequencing_group_id
+        JOIN sample s ON s.id = sg.sample_id
         WHERE {wheres}
         """
 
         rows = await self.connection.fetch_all(_query, values)
-        cohorts = [CohortInternal.from_db(dict(row)) for row in rows]
+
+        unique_cohorts = {}
+        cohort_statuses: DefaultDict[str, CohortStatus] = defaultdict(
+            lambda: CohortStatus.ACTIVE
+        )
+
+        for row in rows:
+            row_dict = dict(row)
+            cohort_id = row_dict['c_id']
+            if cohort_id not in unique_cohorts:
+                unique_cohorts[cohort_id] = row_dict
+            if (
+                cohort_statuses[cohort_id] == CohortStatus.ACTIVE
+                and row_dict['s_active'] == True
+                and row_dict['sg_archived'] == False
+                and row_dict['c_status'].lower() == CohortStatus.ACTIVE.value
+            ):
+                cohort_statuses[cohort_id] = CohortStatus.ACTIVE
+            else:
+                cohort_statuses[cohort_id] = CohortStatus.INACTIVE
+                # TODO:piyumi early termination
+
+        if filter_.status:
+            cohorts = [
+                CohortInternal.from_db(dict(row), status)
+                for cohort_id, row in unique_cohorts.items()
+                if (status := cohort_statuses[cohort_id]) == filter_.status
+            ]
+        else:
+            cohorts = [
+                CohortInternal.from_db(dict(row), cohort_statuses[cohort_id])
+                for cohort_id, row in unique_cohorts.items()
+            ]
+
         projects = {c.project for c in cohorts}
         return cohorts, projects
 
@@ -170,8 +219,8 @@ class CohortTable(DbBase):
             audit_log_id = await self.audit_log_id()
 
             _query = """
-            INSERT INTO cohort (name, template_id, author, description, project, timestamp, audit_log_id)
-            VALUES (:name, :template_id, :author, :description, :project, :timestamp, :audit_log_id)
+            INSERT INTO cohort (name, template_id, author, description, project, timestamp, status, audit_log_id)
+            VALUES (:name, :template_id, :author, :description, :project, :timestamp, :status, :audit_log_id)
             RETURNING id
             """
 
@@ -184,6 +233,7 @@ class CohortTable(DbBase):
                     'project': project,
                     'name': cohort_name,
                     'timestamp': datetime.datetime.now(),
+                    'status': CohortStatus.ACTIVE.value.upper(),
                     'audit_log_id': audit_log_id,
                 },
             )
@@ -215,14 +265,61 @@ class CohortTable(DbBase):
         """
         Get the cohort by its ID
         """
+        # TODO:piyumi. Current usage only consume template id
+
+        cohort_get_keys_str = ','.join(self.cohort_get_keys)
+
+        _query = f"""
+        SELECT {cohort_get_keys_str}
+        FROM cohort_sequencing_group csg
+        JOIN cohort c ON c.id = csg.cohort_id
+        JOIN sequencing_group sg ON sg.id = csg.sequencing_group_id
+        JOIN sample s ON s.id = sg.sample_id
+        WHERE c.id = :cohort_id
+        """
+
+        rows = await self.connection.fetch_all(_query, {'cohort_id': cohort_id})
+
+        if not rows:
+            raise ValueError(f'Cohort with ID {cohort_id} not found')
+
+        cohort_status = CohortStatus.ACTIVE
+
+        for row in rows:
+            row_dict = dict(row)
+            if (
+                cohort_status == CohortStatus.ACTIVE
+                and row_dict['s_active'] == True
+                and row_dict['s_archived'] == False
+                and row_dict['c_status'].lower() == CohortStatus.ACTIVE.value
+            ):
+                cohort_status = CohortStatus.ACTIVE
+            else:
+                cohort_status = CohortStatus.INACTIVE
+                break
+
+        return CohortInternal.from_db(dict(rows[0]), cohort_status)
+
+    async def update_cohort_given_id(
+        self, name: str, description: str, status: CohortStatus, cohort_id: int
+    ):
+        """
+        Update the cohort given its ID
+        """
         _query = """
-        SELECT id, name, template_id, author, description, project, timestamp
-        FROM cohort
+        UPDATE cohort
+        SET name = :name, description = :description, status = :status
         WHERE id = :cohort_id
         """
 
-        cohort = await self.connection.fetch_one(_query, {'cohort_id': cohort_id})
-        if not cohort:
-            raise ValueError(f'Cohort with ID {cohort_id} not found')
+        #TODO:piyumi when values are not provided what happens
+        await self.connection.execute(
+            _query,
+            {
+                'name': name,
+                'description': description,
+                'status': status.value.upper(),
+                'cohort_id': cohort_id,
+            },
+        )
 
-        return CohortInternal.from_db(dict(cohort))

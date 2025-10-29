@@ -46,6 +46,7 @@ from db.python.tables.participant import ParticipantFilter
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
 from models.enums import AnalysisStatus
+from models.enums.cohort import CohortStatus
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
     AnalysisInternal,
@@ -118,6 +119,7 @@ class GraphQLCohort:
     name: str
     description: str
     author: str
+    status: CohortStatus
 
     project_id: strawberry.Private[int]
 
@@ -129,6 +131,7 @@ class GraphQLCohort:
             description=internal.description,
             author=internal.author,
             project_id=internal.project,
+            status=internal.status
         )
 
     @strawberry.field()
@@ -602,6 +605,7 @@ class GraphQLProject:
             project=GenericFilter(eq=root.id),
         )
 
+        #TODO:piyumi status returned
         cohorts = await CohortLayer(connection).query(c_filter)
         return [GraphQLCohort.from_internal(c) for c in cohorts]
 
@@ -1376,6 +1380,7 @@ class Query:  # entry point to graphql.
         name: GraphQLFilter[str] | None = None,
         author: GraphQLFilter[str] | None = None,
         template_id: GraphQLFilter[str] | None = None,
+        status: GraphQLFilter[CohortStatus] | None = None, #TODO:piyumi str or enum
     ) -> list[GraphQLCohort]:
         connection = info.context['connection']
         cohort_layer = CohortLayer(connection)
@@ -1404,6 +1409,7 @@ class Query:  # entry point to graphql.
                 if template_id
                 else None
             ),
+            status=status.to_internal_filter() if status else None,
         )
 
         cohorts = await cohort_layer.query(filter_)

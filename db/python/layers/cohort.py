@@ -14,8 +14,9 @@ from models.models.cohort import (
     CohortInternal,
     CohortTemplateInternal,
     NewCohortInternal,
+    CohortUpdateBody,
 )
-from models.models.project import ProjectId, ReadAccessRoles
+from models.models.project import ProjectId, ReadAccessRoles, FullWriteAccessRoles
 
 logger = get_logger()
 
@@ -248,4 +249,26 @@ class CohortLayer(BaseLayer):
             sequencing_group_ids=[sg.id for sg in sgs if sg.id],
             description=description,
             template_id=template_id,
+        )
+
+    async def update_cohort(
+        self, cohort_update_body: CohortUpdateBody, cohort_id: int
+    ):
+        """update Cohorts"""
+        cohorts, project_ids = await self.ct.query(
+            CohortFilter(id=GenericFilter(eq=cohort_id))
+        )
+
+        self.connection.check_access_to_projects_for_ids(
+            project_ids, allowed_roles=FullWriteAccessRoles
+        )
+
+        if not cohorts:
+            raise ValueError(f'Cohort with ID {cohort_id} not found')
+
+        await self.ct.update_cohort_given_id(
+            name=cohort_update_body.name,
+            description=cohort_update_body.description,
+            status=cohort_update_body.status,
+            cohort_id=cohort_id,
         )
