@@ -106,7 +106,7 @@ async def get_sequencing_groups_history(
     sq_layer = SequencingGroupLayer(connection)
 
     project_id = connection.project_name_map[project].id
-    return await sq_layer.get_type_numbers_for_project_history(project_id)
+    return await sq_layer.get_sequencing_group_counts_by_month(project_id)
 
 
 # endregion
