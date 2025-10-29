@@ -117,6 +117,7 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
                         y: 'count',
                         interval: 'month',
                         fill: 'type',
+                        order: '-sum',
                         tip: true,
                     })
                 ),
