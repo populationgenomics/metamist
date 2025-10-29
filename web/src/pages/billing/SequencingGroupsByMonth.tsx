@@ -71,9 +71,10 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
             }
 
             setData(newDataset)
-        } catch (er: any) {
+        } catch (er: unknown) {
             setIsLoading(false)
-            setError(er.message)
+            if (er instanceof Error)
+                setError(er.message)
         }
     }, [])
 
