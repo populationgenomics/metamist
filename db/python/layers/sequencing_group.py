@@ -163,51 +163,6 @@ class SequencingGroupLayer(BaseLayer):
         """Get sequencing type numbers (of groups) for a project"""
         return await self.seqgt.get_type_numbers_for_project(project)
 
-    async def get_sequencing_group_counts_by_month(
-        self, project_id: ProjectId
-    ) -> dict[date, dict[str, int]]:
-        """Returns a record of the number of each sequencing group type for the given projects over time."""
-        # Retrieve the raw data from the Sequencing Group/Sample tables.
-        rows = await self.seqgt.get_sequencing_group_counts_by_month(project_id)
-        if not rows:
-            return {}
-
-        # Organise the data by month into a dictionary, grouping sequencing group types together by month.
-        project_history: dict[date, dict[str, int]] = {}
-        for row in rows:
-            month_created = date.fromisoformat(row['date_created']).replace(day=1)
-            sg_type = row['type']
-            num_sg = row['num_sg']
-
-            if month_created not in project_history:
-                project_history[month_created] = {}
-
-            project_history[month_created][sg_type] = num_sg
-
-        # We want the total number of each sg type over time, so we need to accumulate and
-        # fill in the missing months.
-        todays_month = date.today().replace(day=1)
-        iteration_month = min(
-            project_history.keys()
-        )  # The month currently being filled in.
-        type_totals: dict[str, int] = defaultdict(lambda: 0)
-
-        # By starting at the earliest month and working towards today, we won't skip any dates.
-        while iteration_month <= todays_month:
-            iteration_counts = project_history.get(iteration_month, {})
-
-            # The result from the database provides the sq types added in a given month,
-            # but we want the total number.
-            for sg_type, count in iteration_counts.items():
-                type_totals[sg_type] += count
-
-            iteration_counts.update(type_totals)
-            project_history[iteration_month] = iteration_counts
-
-            iteration_month += relativedelta(months=1)
-
-        return project_history
-
     # region CREATE / MUTATE
 
     async def create_sequencing_group_from_assays(
