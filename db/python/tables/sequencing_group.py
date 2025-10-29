@@ -571,11 +571,12 @@ GROUP BY sg.type
         )
         SELECT project, sg.type, CONVERT(sg_first_date, DATE) as sg_date, COUNT(sg.id) as num_sg
         FROM sample INNER JOIN sg ON sample.id = sg.sample_id
-        WHERE project = {project_id}
+        WHERE project = :project_id
         GROUP BY project, sg_date, sg.type
         """
+        values = {'project_id': project_id}
 
-        rows = await self.connection.fetch_all(_query, {})
+        rows = await self.connection.fetch_all(_query, values)
 
         return [
             {
