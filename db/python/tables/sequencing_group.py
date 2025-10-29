@@ -561,7 +561,7 @@ GROUP BY sg.type
 
     async def get_sequencing_group_counts_by_month(
         self, project_id: ProjectId
-    ) -> dict[date, dict[str, int]]:
+    ) -> dict[str, dict[str, int]]:
         """
         Returns the history of the number of each sequencing groups of each type for a list of projects.
         """
@@ -586,7 +586,7 @@ GROUP BY sg.type
         # Organise the data by month into a dictionary, grouping sequencing group types together by month.
         project_history: dict[date, dict[str, int]] = {}
         for row in rows:
-            month_created = row['sg_date'].replace(day=1)
+            month_created: date = row['sg_date'].replace(day=1)
             sg_type = row['type']
             num_sg = row['num_sg']
 
@@ -604,6 +604,7 @@ GROUP BY sg.type
         type_totals: dict[str, int] = defaultdict(lambda: 0)
 
         # By starting at the earliest month and working towards today, we won't skip any dates.
+        full_history = {}
         while iteration_month <= todays_month:
             iteration_counts = project_history.get(iteration_month, {})
 
@@ -613,8 +614,8 @@ GROUP BY sg.type
                 type_totals[sg_type] += count
 
             iteration_counts.update(type_totals)
-            project_history[iteration_month] = iteration_counts
+            full_history[str(iteration_month)] = iteration_counts
 
             iteration_month += relativedelta(months=1)
 
-        return project_history
+        return full_history

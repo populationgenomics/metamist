@@ -613,6 +613,16 @@ class GraphQLProject:
         discussion = await loader.load(root.id)
         return GraphQLDiscussion.from_internal(discussion)
 
+    @strawberry.field()
+    async def sequencing_group_history(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLProject'
+    ) -> strawberry.scalars.JSON:
+        loader = info.context['loaders'][
+            LoaderKeys.SEQUENCING_GROUPS_COUNTS_FOR_PROJECT
+        ]
+        counts = await loader.load(root.id)
+        return strawberry.scalars.JSON(counts)
+
 
 @strawberry.type
 class GraphQLAuditLog:

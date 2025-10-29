@@ -1,7 +1,4 @@
-from collections import defaultdict
 from datetime import date
-
-from dateutil.relativedelta import relativedelta
 
 from db.python.connect import Connection
 from db.python.filters.generic import GenericFilter
