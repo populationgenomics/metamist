@@ -1,6 +1,8 @@
 import { debounce } from 'lodash'
 import * as React from 'react'
 import { useRef } from 'react'
+import { useQuery } from '@apollo/client'
+import { gql } from '../../__generated__/gql'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMeasure } from 'react-use'
 import { Button, Card, Grid, Message } from 'semantic-ui-react'
@@ -11,6 +13,18 @@ import * as Plot from '@observablehq/plot'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import { SequencingGroupApi } from '../../sm-api'
 import './components/BillingCostByTimeTable.css'
+
+const GET_SG_BY_MONTH = gql(`
+    query SequencingGroupHistory {
+        project($name: String!) {
+            sequencingGroupHistory {
+                type
+                date
+                count
+            }
+        }
+    }`
+)
 
 type ProjectHistory = {
     [key: string]: {
@@ -30,10 +44,11 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
     const { projectName } = useParams()
 
     // Data loading
-    const [isLoading, setIsLoading] = React.useState<boolean>(true)
-    const [error, setError] = React.useState<string | undefined>()
+    const { loading, error, data, refetch } = useQuery(GET_SG_BY_MONTH, {
+        variables: { name: projectName },
+        notifyOnNetworkStatusChange: true,
+    })
     const [message, setMessage] = React.useState<string | undefined>()
-    const [data, setData] = React.useState<TypeData[]>([])
 
     // Chart refs
     const containerRef = useRef<HTMLDivElement>(null)
