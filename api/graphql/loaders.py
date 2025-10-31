@@ -28,7 +28,10 @@ from db.python.tables.assay import AssayFilter
 from db.python.tables.family import FamilyFilter
 from db.python.tables.participant import ParticipantFilter
 from db.python.tables.sample import SampleFilter
-from db.python.tables.sequencing_group import SequencingGroupFilter
+from db.python.tables.sequencing_group import (
+    SequencingGroupFilter,
+    SequencingGroupTable,
+)
 from db.python.utils import NotFoundError
 from models.models import (
     AnalysisInternal,
@@ -82,6 +85,7 @@ class LoaderKeys(enum.Enum):
     SEQUENCING_GROUPS_FOR_SAMPLES = 'sequencing_groups_for_samples'
     SEQUENCING_GROUPS_FOR_PROJECTS = 'sequencing_groups_for_projects'
     SEQUENCING_GROUPS_FOR_ANALYSIS = 'sequencing_groups_for_analysis'
+    SEQUENCING_GROUPS_COUNTS_FOR_PROJECT = 'sequencing_groups_counts_for_project'
 
     COMMENTS_FOR_SAMPLE_IDS = 'comments_for_sample_ids'
     COMMENTS_FOR_PARTICIPANT_IDS = 'comments_for_participant_ids'
@@ -292,6 +296,18 @@ async def load_sequencing_groups_for_samples(
     sequencing_groups = await sglayer.query(_filter)
     sg_map = group_by(sequencing_groups, lambda sg: sg.sample_id)
     return sg_map
+
+
+@connected_data_loader(LoaderKeys.SEQUENCING_GROUPS_COUNTS_FOR_PROJECT)
+async def load_sequencing_group_counts_by_month(
+    id: ProjectId, connection: Connection
+) -> dict[str, dict[str, int]]:
+    """
+    DataLoader: get_sequencing_group_counts_by_month
+    """
+    sgt = SequencingGroupTable(connection)
+    counts_by_month = await sgt.get_sequencing_group_counts_by_month(id)
+    return [counts_by_month]
 
 
 @connected_data_loader(LoaderKeys.SAMPLES_FOR_IDS)

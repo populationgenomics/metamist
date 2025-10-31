@@ -78,6 +78,13 @@ const billingPages: IBillingPage[] = [
         icon: <SsidChartIcon />,
         description: 'View the relative distribution of seqr costs across topics over time.',
     },
+    {
+        title: 'Sequencing Groups By Month',
+        name: 'sequencingGroupsByMonth',
+        url: '/billing/sequencingGroupsByMonth',
+        icon: <SampleIcon />,
+        description: 'The number of each type of sequencing group each month.',
+    },
 ]
 
 export { billingPages }

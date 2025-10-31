@@ -35,7 +35,7 @@ enum CloudSpendCategory {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any  -- too many anys in the file to fix right now but would be good to sort out when we can */
-const BillingCostByTime: React.FunctionComponent = () => {
+const BillingCostByMonth: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
 
     // Pull search params for use in the component
@@ -623,6 +623,6 @@ const BillingCostByTime: React.FunctionComponent = () => {
     )
 }
 
-export default BillingCostByTime
+export default BillingCostByMonth
 
 /* eslint-enable @typescript-eslint/no-explicit-any  */

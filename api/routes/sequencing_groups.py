@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Any
 
 from fastapi import APIRouter
@@ -9,6 +10,7 @@ from api.utils.db import (
     get_projectless_db_connection,
 )
 from db.python.layers.sequencing_group import SequencingGroupLayer
+from db.python.tables.sequencing_group import SequencingGroupTable
 from models.models.project import FullWriteAccessRoles, ReadAccessRoles
 from models.models.sequencing_group import (
     SequencingGroup,
@@ -89,6 +91,23 @@ async def archive_sequencing_groups(
         [sequencing_group_id_transform_to_raw(sgid) for sgid in sequencing_group_ids]
     )
     return True
+
+
+# endregion
+
+# region QUERIES
+
+
+@router.get('/history/{project}', operation_id='sequencingGroupHistory')
+async def get_sequencing_groups_history(
+    project: str,
+    connection: Connection = get_project_db_connection(ReadAccessRoles),
+) -> dict[date, dict[str, int]]:
+    """Returns the number of sequencing groups in the database for each month of a given project"""
+    sq_table = SequencingGroupTable(connection)
+
+    project_id = connection.project_name_map[project].id
+    return await sq_table.get_sequencing_group_counts_by_month(project_id)
 
 
 # endregion
