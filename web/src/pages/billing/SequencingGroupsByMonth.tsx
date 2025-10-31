@@ -23,8 +23,8 @@ const GET_SG_BY_MONTH = gql(`
                 count
             }
         }
-    }`
-)
+    }
+`)
 
 type ProjectHistory = {
     [key: string]: {
