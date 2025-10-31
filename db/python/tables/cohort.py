@@ -79,13 +79,13 @@ class CohortTable(DbBase):
 
         cohort_get_keys_str = ','.join(self.cohort_get_keys)
 
-        # TODO: check how the status filter work as it is not injected to the query
+        # TODO: check how the status filter work as it is not injected to the query parse_sql_bool
         _query = f"""
         SELECT {cohort_get_keys_str}
-        FROM cohort_sequencing_group csg
-        JOIN cohort c ON c.id = csg.cohort_id
-        JOIN sequencing_group sg ON sg.id = csg.sequencing_group_id
-        JOIN sample s ON s.id = sg.sample_id
+        FROM cohort c
+        LEFT JOIN cohort_sequencing_group csg ON c.id = csg.cohort_id
+        LEFT JOIN sequencing_group sg ON sg.id = csg.sequencing_group_id
+        LEFT JOIN sample s ON s.id = sg.sample_id
         WHERE {wheres}
         """
 
@@ -271,10 +271,10 @@ class CohortTable(DbBase):
 
         _query = f"""
         SELECT {cohort_get_keys_str}
-        FROM cohort_sequencing_group csg
-        JOIN cohort c ON c.id = csg.cohort_id
-        JOIN sequencing_group sg ON sg.id = csg.sequencing_group_id
-        JOIN sample s ON s.id = sg.sample_id
+        FROM cohort c
+        LEFT JOIN cohort_sequencing_group csg ON c.id = csg.cohort_id
+        LEFT JOIN sequencing_group sg ON sg.id = csg.sequencing_group_id
+        LEFT JOIN sample s ON s.id = sg.sample_id
         WHERE c.id = :cohort_id
         """
 

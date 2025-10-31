@@ -155,6 +155,10 @@ CREATE_COHORT_TEMPLATE_MUTATION = """
     }
 """
 
+#TODO:piyumi add query
+UPDATE_COHORT_MUTATION = """
+"""
+
 # endregion COHORT MUTATIONS
 
 # region FAMILY MUTATIONS
