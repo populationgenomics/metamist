@@ -1,10 +1,10 @@
+import { useQuery } from '@apollo/client'
 import * as React from 'react'
 import { useRef } from 'react'
-import { useQuery } from '@apollo/client'
-import { gql } from '../../__generated__/gql'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMeasure } from 'react-use'
 import { Button, Card, Grid, Message } from 'semantic-ui-react'
+import { gql } from '../../__generated__/gql'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import ProjectSelector, { IMetamistProject } from '../project/ProjectSelector'
 
@@ -36,11 +36,10 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
     const { projectName } = useParams()
 
     // Data loading
-    const { loading, error, data, refetch } = useQuery(GET_SG_BY_MONTH, {
-        variables: { name: projectName ? projectName : 'greek-myth'},
+    const { loading, error, data } = useQuery(GET_SG_BY_MONTH, {
+        variables: { name: projectName || '' },
         notifyOnNetworkStatusChange: true,
     })
-    const [message, setMessage] = React.useState<string | undefined>()
 
     // Chart refs
     const containerRef = useRef<HTMLDivElement>(null)
@@ -51,9 +50,20 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
         navigate(`/billing/sequencingGroupsByMonth/${_project.name}`)
     }
 
+    const plotData = React.useMemo(() => {
+        if (loading || error || !data) return []
+
+        return data.project.sequencingGroupHistory.map((i) => {
+            return {
+                date: new Date(i.date),
+                type: i.type,
+                count: i.count,
+            } as TypeData
+        })
+    }, [data, loading])
+
     React.useEffect(() => {
-        if (!data) return
-        console.log(data)
+        if (plotData.length == 0) return
 
         const plot = Plot.plot({
             color: {
@@ -66,7 +76,7 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
             height,
             marks: [
                 Plot.barY(
-                    data.project.sequencingGroupHistory,
+                    plotData,
                     Plot.stackY({
                         x: 'date',
                         y: 'count',
@@ -85,13 +95,6 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
     }, [data, width, height])
 
     const messageComponent = () => {
-        if (message) {
-            return (
-                <Message>
-                    {message}
-                </Message>
-            )
-        }
         if (error) {
             return (
                 <Message>
@@ -117,11 +120,11 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
     }
 
     const dataComponent = () => {
-        if (message || error || loading) {
+        if (error || loading) {
             return null
         }
 
-        if (!message && !error && !loading && (!data || data.project.sequencingGroupHistory.length === 0)) {
+        if (!error && !loading && plotData.length === 0) {
             return (
                 <Card
                     fluid
