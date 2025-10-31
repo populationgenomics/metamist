@@ -604,7 +604,6 @@ GROUP BY sg.type
         type_totals: dict[str, int] = defaultdict(lambda: 0)
 
         # By starting at the earliest month and working towards today, we won't skip any dates.
-        full_history = {}
         while iteration_month <= todays_month:
             iteration_counts = project_history.get(iteration_month, {})
 
@@ -614,8 +613,8 @@ GROUP BY sg.type
                 type_totals[sg_type] += count
 
             iteration_counts.update(type_totals)
-            full_history[str(iteration_month)] = iteration_counts
+            project_history[iteration_month] = iteration_counts
 
             iteration_month += relativedelta(months=1)
 
-        return full_history
+        return project_history

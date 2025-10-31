@@ -1307,12 +1307,12 @@ class GraphQLSequencingGroupTypeByDate:
     """
     GraphQL representation of the number of Sequencing Groups of a given type that exist at a given date.
     """
-    date: str
+    date: datetime.date
     type: str
     count: int
 
     @staticmethod
-    def from_dict(date_type_count_map: dict[str, dict[str, int]]):
+    def from_dict(date_type_count_map: dict[datetime.date, dict[str, int]]):
         return [GraphQLSequencingGroupTypeByDate(date=month, type=type, count=count) 
                 for (month, type_counts) in date_type_count_map.items() 
                 for (type, count) in type_counts.items()]

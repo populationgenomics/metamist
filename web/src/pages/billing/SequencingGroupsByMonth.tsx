@@ -1,4 +1,3 @@
-import { debounce } from 'lodash'
 import * as React from 'react'
 import { useRef } from 'react'
 import { useQuery } from '@apollo/client'
@@ -11,12 +10,11 @@ import ProjectSelector, { IMetamistProject } from '../project/ProjectSelector'
 
 import * as Plot from '@observablehq/plot'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
-import { SequencingGroupApi } from '../../sm-api'
 import './components/BillingCostByTimeTable.css'
 
 const GET_SG_BY_MONTH = gql(`
-    query SequencingGroupHistory {
-        project($name: String!) {
+    query SequencingGroupHistory($name: String!) {
+        project(name: $name) {
             sequencingGroupHistory {
                 type
                 date
@@ -25,12 +23,6 @@ const GET_SG_BY_MONTH = gql(`
         }
     }
 `)
-
-type ProjectHistory = {
-    [key: string]: {
-        [key: string]: number
-    }
-}
 
 interface TypeData {
     date: Date
@@ -45,7 +37,7 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
 
     // Data loading
     const { loading, error, data, refetch } = useQuery(GET_SG_BY_MONTH, {
-        variables: { name: projectName },
+        variables: { name: projectName ? projectName : 'greek-myth'},
         notifyOnNetworkStatusChange: true,
     })
     const [message, setMessage] = React.useState<string | undefined>()
@@ -59,61 +51,9 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
         navigate(`/billing/sequencingGroupsByMonth/${_project.name}`)
     }
 
-    const getData = React.useCallback(async (project: string | undefined) => {
-        if (project == undefined) {
-            return
-        }
-
-        setIsLoading(true)
-        setError(undefined)
-        setMessage(undefined)
-
-        try {
-            const sg_api = new SequencingGroupApi()
-            const result = await sg_api.sequencingGroupHistory(project)
-            setIsLoading(false)
-
-            const resultData = result.data as ProjectHistory
-            const newDataset: TypeData[] = []
-            for (const [date, counts] of Object.entries(resultData)) {
-                for (const [typeName, count] of Object.entries(counts)) {
-                    newDataset.push({
-                        date: new Date(date),
-                        type: typeName,
-                        count: count,
-                    })
-                }
-            }
-
-            setData(newDataset)
-        } catch (er: unknown) {
-            setIsLoading(false)
-            if (er instanceof Error)
-                setError(er.message)
-        }
-    }, [])
-
-    // Memo of debounced getData so that the debounce function will only be regenerated when the project changes.
-    const debouncedGetData = React.useMemo(() => {
-        return debounce(() => {
-            getData(projectName)
-        }, 1000)
-    }, [projectName, getData])
-
-    // Cleanup debounced function on unmount.
-    React.useEffect(() => {
-        return () => {
-            debouncedGetData.cancel()
-        }
-    }, [projectName, debouncedGetData])
-
-    // Effect to trigger data retrieval on initial load and project value changes.
-    React.useEffect(() => {
-        debouncedGetData()
-    }, [debouncedGetData])
-
     React.useEffect(() => {
         if (!data) return
+        console.log(data)
 
         const plot = Plot.plot({
             color: {
@@ -126,7 +66,7 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
             height,
             marks: [
                 Plot.barY(
-                    data,
+                    data.project.sequencingGroupHistory,
                     Plot.stackY({
                         x: 'date',
                         y: 'count',
@@ -147,14 +87,14 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
     const messageComponent = () => {
         if (message) {
             return (
-                <Message negative onDismiss={() => setError(undefined)}>
+                <Message>
                     {message}
                 </Message>
             )
         }
         if (error) {
             return (
-                <Message negative onDismiss={() => setError(undefined)}>
+                <Message>
                     {error}
                     <br />
                     <Button negative onClick={() => window.location.reload()}>
@@ -163,7 +103,7 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
                 </Message>
             )
         }
-        if (isLoading) {
+        if (loading) {
             return (
                 <div>
                     <LoadingDucks />
@@ -177,11 +117,11 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
     }
 
     const dataComponent = () => {
-        if (message || error || isLoading) {
+        if (message || error || loading) {
             return null
         }
 
-        if (!message && !error && !isLoading && (!data || data.length === 0)) {
+        if (!message && !error && !loading && (!data || data.project.sequencingGroupHistory.length === 0)) {
             return (
                 <Card
                     fluid
