@@ -24,7 +24,11 @@ const GET_SG_BY_MONTH = gql(`
     }
 `)
 
-interface TypeData {
+interface ISGByMonthDisplayProps {
+    projectName: string
+}
+
+interface ITypeData {
     date: Date
     type: string
     count: number
@@ -35,6 +39,61 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
     const navigate = useNavigate()
     const { projectName } = useParams()
 
+    // Callback to update the url.
+    const onProjectSelect = (_project: IMetamistProject) => {
+        navigate(`/billing/sequencingGroupsByMonth/${_project.name}`)
+    }
+
+    const content = () => {
+        if (!projectName) {
+            return <Message negative>No project selected</Message>
+        }
+
+        return (
+            // <Card style={{ width: '100%', padding: '40px' }}>
+            <SequencingGroupsByMonthDisplay projectName={projectName} />
+            // </Card>
+        )
+    }
+
+    return (
+        <>
+        <Card fluid style={{ padding: '20px' }} id="billing-container">
+            <div
+                className="header-container"
+                style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    flexWrap: 'wrap',
+                    gap: '10px',
+                }}
+            >
+                <h1
+                    style={{
+                        fontSize: 40,
+                        margin: 0,
+                        flex: '1 1 200px',
+                    }}
+                >
+                    Sequencing Groups By Month
+                </h1>
+            </div>
+
+            <Grid columns="equal" stackable doubling>
+                <Grid.Column className="field-selector-label">
+                    <ProjectSelector onProjectSelect={onProjectSelect} />
+                </Grid.Column>
+            </Grid>
+
+        </Card>
+
+        {content()}
+        </>
+    )
+}
+
+const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayProps> = ({ projectName }) => {
     // Data loading
     const { loading, error, data } = useQuery(GET_SG_BY_MONTH, {
         variables: { name: projectName || '' },
@@ -45,11 +104,6 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
     const containerRef = useRef<HTMLDivElement>(null)
     const [measureRef, { width, height }] = useMeasure<HTMLDivElement>()
 
-    // Callback to get data for plotting.
-    const onProjectSelect = (_project: IMetamistProject) => {
-        navigate(`/billing/sequencingGroupsByMonth/${_project.name}`)
-    }
-
     const plotData = React.useMemo(() => {
         if (loading || error || !data) return []
 
@@ -58,7 +112,7 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
                 date: new Date(i.date),
                 type: i.type,
                 count: i.count,
-            } as TypeData
+            } as ITypeData
         })
     }, [data, loading])
 
@@ -106,6 +160,7 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
                 </Message>
             )
         }
+        
         if (loading) {
             return (
                 <div>
@@ -131,7 +186,7 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
                     style={{ padding: '20px', overflowX: 'scroll' }}
                     id="billing-container-charts"
                 >
-                    No Data
+                    <Message negative>No Data</Message>
                 </Card>
             )
         }
@@ -165,45 +220,6 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
 
     return (
         <>
-            <Card fluid style={{ padding: '20px' }} id="billing-container">
-                <div
-                    className="header-container"
-                    style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start',
-                        flexWrap: 'wrap',
-                        gap: '10px',
-                    }}
-                >
-                    <h1
-                        style={{
-                            fontSize: 40,
-                            margin: 0,
-                            flex: '1 1 200px',
-                        }}
-                    >
-                        Sequencing Groups By Month
-                    </h1>
-                    <div
-                        className="button-container"
-                        style={{
-                            display: 'flex',
-                            gap: '10px',
-                            alignItems: 'stretch',
-                            flex: '0 0 auto',
-                            minWidth: '115px',
-                        }}
-                    ></div>
-                </div>
-
-                <Grid columns="equal" stackable doubling>
-                    <Grid.Column className="field-selector-label">
-                        <ProjectSelector onProjectSelect={onProjectSelect} />
-                    </Grid.Column>
-                </Grid>
-            </Card>
-
             {messageComponent()}
 
             {dataComponent()}
