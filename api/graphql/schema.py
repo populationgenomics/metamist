@@ -1314,7 +1314,7 @@ class GraphQLSequencingGroupTypeByDate:
     @staticmethod
     def from_dict(date_type_count_map: dict[datetime.date, dict[str, int]]):
         return [GraphQLSequencingGroupTypeByDate(date=month, type=type, count=count) 
-                for (month, type_counts) in date_type_count_map.items() 
+                for (month, type_counts) in sorted(date_type_count_map.items(), key=lambda x: x[0]) 
                 for (type, count) in type_counts.items()]
 
 
