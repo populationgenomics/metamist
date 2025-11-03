@@ -160,7 +160,7 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
                 </Message>
             )
         }
-        
+
         if (loading) {
             return (
                 <div>

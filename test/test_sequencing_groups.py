@@ -400,10 +400,10 @@ class TestSequencingGroup(DbIsolatedTest):
     async def test_history_no_sum(self):
         """Test the trivial case where there are no sequencing groups."""
 
-        self.sg_table = self.sglayer.seqgt
+        sg_table = self.sglayer.seqgt
         # Set up mocking for rows returned from the table query.
-        self.sg_table.connection.fetch_all = mock.AsyncMock(return_value=[])
-        result = await self.sg_table.get_sequencing_group_counts_by_month(0)
+        sg_table.connection.fetch_all = mock.AsyncMock(return_value=[])
+        result = await sg_table.get_sequencing_group_counts_by_month([])
 
         self.assertDictEqual(result, {})
 
@@ -414,40 +414,34 @@ class TestSequencingGroup(DbIsolatedTest):
         # Mock today's date.
         mock_date.today.return_value = date(year=2025, month=12, day=31)
 
-        self.sg_table = self.sglayer.seqgt
+        sg_table = self.sglayer.seqgt
         # Set up mocking for rows returned from the table query.
         rows_mock = [
-            {
-                'type': 'genome',
-                'sg_date': date.fromisoformat('2025-10-01'),
-                'num_sg': 2,
-            },
-            {'type': 'exome', 'sg_date': date.fromisoformat('2025-10-01'), 'num_sg': 3},
-            {
-                'type': 'genome',
-                'sg_date': date.fromisoformat('2025-11-01'),
-                'num_sg': 4,
-            },
-            {'type': 'exome', 'sg_date': date.fromisoformat('2025-11-01'), 'num_sg': 5},
+            {'project': 0, 'type': 'typeA', 'sg_date': date(2025, 10, 1), 'num_sg': 2},
+            {'project': 0, 'type': 'typeB', 'sg_date': date(2025, 10, 1), 'num_sg': 3},
+            {'project': 0, 'type': 'typeA', 'sg_date': date(2025, 11, 1), 'num_sg': 4},
+            {'project': 0, 'type': 'typeB', 'sg_date': date(2025, 11, 1), 'num_sg': 5},
         ]
-        self.sg_table.connection.fetch_all = mock.AsyncMock(return_value=rows_mock)
-        result = await self.sg_table.get_sequencing_group_counts_by_month(0)
+        sg_table.connection.fetch_all = mock.AsyncMock(return_value=rows_mock)
+        result = await sg_table.get_sequencing_group_counts_by_month([0])
 
         self.assertDictEqual(
             result,
             {
-                '2025-10-01': {
-                    'genome': 2,
-                    'exome': 3,
-                },
-                '2025-11-01': {
-                    'genome': 6,
-                    'exome': 8,
-                },
-                '2025-12-01': {
-                    'genome': 6,
-                    'exome': 8,
-                },
+                0: {
+                    date(2025, 10, 1): {
+                        'typeA': 2,
+                        'typeB': 3,
+                    },
+                    date(2025, 11, 1): {
+                        'typeA': 6,
+                        'typeB': 8,
+                    },
+                    date(2025, 12, 1): {
+                        'typeA': 6,
+                        'typeB': 8,
+                    },
+                }
             },
         )
 
@@ -458,38 +452,32 @@ class TestSequencingGroup(DbIsolatedTest):
         # Mock today's date.
         mock_date.today.return_value = date(year=2025, month=12, day=31)
 
-        self.sg_table = self.sglayer.seqgt
+        sg_table = self.sglayer.seqgt
         # Set up mocking for rows returned from the table query.
         rows_mock = [
-            {
-                'type': 'genome',
-                'sg_date': date.fromisoformat('2025-10-01'),
-                'num_sg': 2,
-            },
-            {'type': 'exome', 'sg_date': date.fromisoformat('2025-11-01'), 'num_sg': 3},
-            {
-                'type': 'genome',
-                'sg_date': date.fromisoformat('2025-12-01'),
-                'num_sg': 4,
-            },
-            {'type': 'exome', 'sg_date': date.fromisoformat('2025-12-01'), 'num_sg': 5},
+            {'project': 0, 'type': 'typeA', 'sg_date': date(2025, 10, 1), 'num_sg': 2},
+            {'project': 0, 'type': 'typeB', 'sg_date': date(2025, 11, 1), 'num_sg': 3},
+            {'project': 0, 'type': 'typeA', 'sg_date': date(2025, 12, 1), 'num_sg': 4},
+            {'project': 0, 'type': 'typeB', 'sg_date': date(2025, 12, 1), 'num_sg': 5},
         ]
-        self.sg_table.connection.fetch_all = mock.AsyncMock(return_value=rows_mock)
-        result = await self.sg_table.get_sequencing_group_counts_by_month(0)
+        sg_table.connection.fetch_all = mock.AsyncMock(return_value=rows_mock)
+        result = await sg_table.get_sequencing_group_counts_by_month([0])
 
         self.assertDictEqual(
             result,
             {
-                '2025-10-01': {
-                    'genome': 2,
-                },
-                '2025-11-01': {
-                    'genome': 2,
-                    'exome': 3,
-                },
-                '2025-12-01': {
-                    'genome': 6,
-                    'exome': 8,
-                },
+                0: {
+                    date(2025, 10, 1): {
+                        'typeA': 2,
+                    },
+                    date(2025, 11, 1): {
+                        'typeA': 2,
+                        'typeB': 3,
+                    },
+                    date(2025, 12, 1): {
+                        'typeA': 6,
+                        'typeB': 8,
+                    },
+                }
             },
         )

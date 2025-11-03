@@ -4,6 +4,7 @@ import copy
 import dataclasses
 import enum
 from collections import defaultdict
+from datetime import date
 from typing import Any, TypedDict
 
 from fastapi import Request
@@ -300,8 +301,8 @@ async def load_sequencing_groups_for_samples(
 
 @connected_data_loader(LoaderKeys.SEQUENCING_GROUPS_COUNTS_FOR_PROJECT)
 async def load_sequencing_group_counts_by_month(
-    ids: ProjectId, connection: Connection
-) -> dict[str, dict[str, int]]:
+    ids: list[ProjectId], connection: Connection
+) -> list[dict[date, dict[str, int]]]:
     """
     DataLoader: get_sequencing_group_counts_by_month
     """
