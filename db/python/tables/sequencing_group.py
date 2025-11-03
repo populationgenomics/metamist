@@ -560,8 +560,8 @@ GROUP BY sg.type
         return {r['type']: r['n'] for r in rows}
 
     async def get_sequencing_group_counts_by_month(
-        self, project_id: ProjectId
-    ) -> dict[str, dict[str, int]]:
+        self, project_ids: list[ProjectId]
+    ) -> defaultdict[ProjectId, dict[date, dict[str, int]]]:
         """
         Returns the history of the number of each sequencing groups of each type for a list of projects.
         """
@@ -573,10 +573,10 @@ GROUP BY sg.type
         )
         SELECT project, sg.type, CONVERT(sg_first_date, DATE) as sg_date, COUNT(sg.id) as num_sg
         FROM sample INNER JOIN sg ON sample.id = sg.sample_id
-        WHERE project = :project_id
+        WHERE project in :project_ids
         GROUP BY project, sg_date, sg.type
         """
-        values = {'project_id': project_id}
+        values = {'project_ids': project_ids}
 
         rows = await self.connection.fetch_all(_query, values)
 
@@ -584,37 +584,42 @@ GROUP BY sg.type
             return {}
 
         # Organise the data by month into a dictionary, grouping sequencing group types together by month.
-        project_history: dict[date, dict[str, int]] = {}
+        project_histories: dict[ProjectId, dict[date, dict[str, int]]] = defaultdict(lambda: {})
         for row in rows:
+            project = row['project']
             month_created: date = row['sg_date'].replace(day=1)
             sg_type = row['type']
             num_sg = row['num_sg']
 
-            if month_created not in project_history:
-                project_history[month_created] = {}
+            if project not in project_histories:
+                project_histories[project] = {}
 
-            project_history[month_created][sg_type] = num_sg
+            if month_created not in project_histories[project]:
+                project_histories[project][month_created] = {}
+
+            project_histories[project][month_created][sg_type] = num_sg
 
         # We want the total number of each sg type over time, so we need to accumulate and
         # fill in the missing months.
         todays_month = date.today().replace(day=1)
-        iteration_month = min(
-            project_history.keys()
-        )  # The month currently being filled in.
-        type_totals: dict[str, int] = defaultdict(lambda: 0)
+        for history in project_histories.values():
+            iteration_month = min(
+                history.keys()
+            )  # The month currently being filled in.
+            type_totals: dict[str, int] = defaultdict(lambda: 0)
 
-        # By starting at the earliest month and working towards today, we won't skip any dates.
-        while iteration_month <= todays_month:
-            iteration_counts = project_history.get(iteration_month, {})
+            # By starting at the earliest month and working towards today, we won't skip any dates.
+            while iteration_month <= todays_month:
+                iteration_counts = history.get(iteration_month, {})
 
-            # The result from the database provides the sq types added in a given month,
-            # but we want the total number.
-            for sg_type, count in iteration_counts.items():
-                type_totals[sg_type] += count
+                # The result from the database provides the sq types added in a given month,
+                # but we want the total number.
+                for sg_type, count in iteration_counts.items():
+                    type_totals[sg_type] += count
 
-            iteration_counts.update(type_totals)
-            project_history[iteration_month] = iteration_counts
+                iteration_counts.update(type_totals)
+                history[iteration_month] = iteration_counts
 
-            iteration_month += relativedelta(months=1)
+                iteration_month += relativedelta(months=1)
 
-        return project_history
+        return project_histories
