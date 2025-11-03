@@ -2,8 +2,8 @@
 import logging
 import re
 from abc import ABCMeta, abstractmethod
-from collections import Counter, defaultdict, namedtuple
-from datetime import datetime
+from collections import Counter, defaultdict
+from datetime import date, datetime
 from typing import Any
 
 from google.cloud import bigquery
@@ -11,9 +11,9 @@ from google.cloud import bigquery
 from api.settings import (
     BQ_AGGREG_EXT_VIEW,
     BQ_AGGREG_VIEW,
+    BQ_BATCHES_VIEW,
     BQ_BUDGET_VIEW,
     BQ_COST_PER_TB,
-    BQ_DAYS_BACK_OPTIMAL,
 )
 from api.utils.dates import get_invoice_month_range, reformat_datetime
 from api.utils.db import (
@@ -21,16 +21,32 @@ from api.utils.db import (
 )
 from db.python.gcp_connect import BqDbBase
 from db.python.tables.bq.billing_filter import BillingFilter
-from db.python.tables.bq.function_bq_filter import FunctionBQFilter
+from db.python.tables.bq.billing_utils import (
+    TimeGroupingDetails,
+    abbrev_cost_category,
+    append_detailed_cost_records,
+    append_sample_cost_record,
+    append_total_running_cost,
+    convert_output,
+    filter_to_optimise_query,
+    get_topic_to_project_map,
+    last_loaded_day_filter,
+    prepare_aggregation,
+    prepare_labels_function,
+    prepare_order_by_string,
+    prepare_time_periods,
+    time_optimisation_parameter,
+)
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
 from db.python.tables.sample import SampleTable
-from models.enums import BillingTimeColumn, BillingTimePeriods
 from models.models import (
     BillingColumn,
     BillingCostBudgetRecord,
-    BillingCostDetailsRecord,
     BillingRunningCostQueryModel,
     BillingTotalCostQueryModel,
+)
+from models.utils.sequencing_group_id_format import (
+    sequencing_group_id_transform_to_raw,
 )
 
 # Label added to each Billing Big Query request,
@@ -40,66 +56,6 @@ BQ_LABELS = {'source': 'metamist-api'}
 # Set up logging for debugging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-# Day Time details used in grouping and parsing formulas
-TimeGroupingDetails = namedtuple(
-    'TimeGroupingDetails', ['field', 'formula', 'separator']
-)
-
-# constants to abbrevate (S)tores and (C)ompute
-STORAGE = 'S'
-COMPUTE = 'C'
-
-
-def abbrev_cost_category(cost_category: str) -> str:
-    """abbreviate cost category"""
-    return STORAGE if cost_category.startswith('Cloud Storage') else COMPUTE
-
-
-def prepare_time_periods(
-    query: BillingTotalCostQueryModel,
-) -> TimeGroupingDetails:
-    """Prepare Time periods grouping and parsing formulas"""
-    time_column: BillingTimeColumn = query.time_column or BillingTimeColumn.DAY
-
-    # Based on specified time period, add the corresponding column
-    if query.time_periods == BillingTimePeriods.DAY:
-        return TimeGroupingDetails(
-            field=f'FORMAT_DATE("%Y-%m-%d", {time_column.value}) as day',
-            formula='PARSE_DATE("%Y-%m-%d", day) as day',
-            separator=',',
-        )
-
-    if query.time_periods == BillingTimePeriods.WEEK:
-        return TimeGroupingDetails(
-            field=f'FORMAT_DATE("%Y%W", {time_column.value}) as day',
-            formula='PARSE_DATE("%Y%W", day) as day',
-            separator=',',
-        )
-
-    if query.time_periods == BillingTimePeriods.MONTH:
-        return TimeGroupingDetails(
-            field=f'FORMAT_DATE("%Y%m", {time_column.value}) as day',
-            formula='PARSE_DATE("%Y%m", day) as day',
-            separator=',',
-        )
-
-    if query.time_periods == BillingTimePeriods.INVOICE_MONTH:
-        return TimeGroupingDetails(
-            field='invoice_month as day',
-            formula='PARSE_DATE("%Y%m", day) as day',
-            separator=',',
-        )
-
-    return TimeGroupingDetails('', '', '')
-
-
-def time_optimisation_parameter() -> bigquery.ScalarQueryParameter:
-    """
-    BQ tables and views are partitioned by day, to avoid full scans
-    we need to limit the amount of data scanned
-    """
-    return bigquery.ScalarQueryParameter('days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL))
 
 
 class BillingBaseTable(BqDbBase):
@@ -152,63 +108,6 @@ class BillingBaseTable(BqDbBase):
 
         # otherwise return as BQ iterator
         return query_job
-
-    @staticmethod
-    def _query_to_partitioned_filter(
-        query: BillingTotalCostQueryModel,
-    ) -> BillingFilter:
-        """
-        By default views are partitioned by 'day',
-        if different then overwrite in the subclass
-        """
-        billing_filter = query.to_filter()
-
-        # initial partition filter
-        billing_filter.day = GenericBQFilter[datetime](
-            gte=(
-                datetime.strptime(query.start_date, '%Y-%m-%d')
-                if query.start_date
-                else None
-            ),
-            lte=(
-                datetime.strptime(query.end_date, '%Y-%m-%d')
-                if query.end_date
-                else None
-            ),
-        )
-        return billing_filter
-
-    @staticmethod
-    def _filter_to_optimise_query() -> str:
-        """Filter string to optimise BQ query"""
-        return 'day >= TIMESTAMP(@start_day) AND day <= TIMESTAMP(@last_day)'
-
-    @staticmethod
-    def _last_loaded_day_filter() -> str:
-        """Last Loaded day filter string"""
-        return 'day = TIMESTAMP(@last_loaded_day)'
-
-    @staticmethod
-    def _convert_output(query_job_result):
-        """Convert query result to json"""
-        if not query_job_result or query_job_result.result().total_rows == 0:
-            # return empty list if no record found
-            return []
-
-        records = query_job_result.result()
-        results = []
-
-        def transform_labels(row):
-            return {r['key']: r['value'] for r in row}
-
-        for record in records:
-            drec = dict(record)
-            if 'labels' in drec:
-                drec.update(transform_labels(drec['labels']))
-
-            results.append(drec)
-
-        return results
 
     async def _budgets_by_gcp_project(
         self, field: BillingColumn, is_current_month: bool
@@ -272,7 +171,7 @@ class BillingBaseTable(BqDbBase):
                 SUM(cost) as cost
             FROM
             `{self.get_table_name()}`
-            WHERE {self._last_loaded_day_filter()}
+            WHERE {last_loaded_day_filter()}
             GROUP BY
                 field,
                 cost_category
@@ -348,7 +247,7 @@ class BillingBaseTable(BqDbBase):
         query_parameters.extend(query_params)
 
         # Add additional filters to where clause
-        additional_filters = [self._filter_to_optimise_query()]
+        additional_filters = [filter_to_optimise_query()]
         if where_str:
             additional_filters.append(where_str)
 
@@ -391,194 +290,49 @@ class BillingBaseTable(BqDbBase):
             self._execute_query(_query, query_parameters),
         )
 
-    @staticmethod
-    async def _append_total_running_cost(
-        field: BillingColumn,
-        is_current_month: bool,
-        last_loaded_day: str | None,
-        total_monthly: dict,
-        total_daily: dict,
-        total_monthly_category: dict,
-        total_daily_category: dict,
-        results: list[BillingCostBudgetRecord],
-    ) -> list[BillingCostBudgetRecord]:
-        """
-        Add total row: compute + storage to the results
-        """
-        # construct ALL fields details
-        all_details = []
-        for cat, mth_cost in total_monthly_category.items():
-            all_details.append(
-                BillingCostDetailsRecord(
-                    cost_group=abbrev_cost_category(cat),
-                    cost_category=cat,
-                    daily_cost=total_daily_category[cat] if is_current_month else None,
-                    monthly_cost=mth_cost,
-                )
-            )
-
-        # Generate appropriate title based on whether filters are applied
-        # Always use consistent "All X" naming for aggregate rows
-        field_title = f'{BillingColumn.generate_all_title(field)}'
-
-        # add total row: compute + storage
-        results.append(
-            BillingCostBudgetRecord(
-                field=field_title,
-                total_monthly=(
-                    total_monthly[COMPUTE]['ALL'] + total_monthly[STORAGE]['ALL']
-                ),
-                total_daily=(
-                    (total_daily[COMPUTE]['ALL'] + total_daily[STORAGE]['ALL'])
-                    if is_current_month
-                    else None
-                ),
-                compute_monthly=total_monthly[COMPUTE]['ALL'],
-                compute_daily=(
-                    (total_daily[COMPUTE]['ALL']) if is_current_month else None
-                ),
-                storage_monthly=total_monthly[STORAGE]['ALL'],
-                storage_daily=(
-                    (total_daily[STORAGE]['ALL']) if is_current_month else None
-                ),
-                details=all_details,
-                budget_spent=None,
-                budget=None,
-                last_loaded_day=last_loaded_day,
-            )
-        )
-
-        return results
-
-    async def _append_running_cost_records(
+    async def get_processed_sequencing_groups_per_month(
         self,
-        field: BillingColumn,
-        is_current_month: bool,
-        last_loaded_day: str | None,
-        total_monthly: dict,
-        total_daily: dict,
-        field_details: dict,
-        results: list[BillingCostBudgetRecord],
-    ) -> list[BillingCostBudgetRecord]:
+    ) -> dict[date, list[int]]:
         """
-        Add all the selected field rows: compute + storage to the results
+        Call BQ table to get all processed sequencing groups per month
+        some of the sequencing_group values could be just rubbish
+        so we only return those with length > 3
+        3 is arbitrary, but should be enough to filter out most of the rubbish
         """
-        # get budget map per gcp project
-        budgets_per_gcp_project = await self._budgets_by_gcp_project(
-            field, is_current_month
-        )
-
-        # add rows by field
-        for key, details in field_details.items():
-            compute_daily = (
-                total_daily[COMPUTE][key] if key in total_daily[COMPUTE] else 0
+        _query = f"""
+            WITH total AS (
+            SELECT DISTINCT
+                t.invoice_month,
+                sequencing_group AS sg
+            FROM
+                `{BQ_BATCHES_VIEW}` AS t,
+                UNNEST(SPLIT(t.sequencing_group, ',')) AS sequencing_group
             )
-            storage_daily = (
-                total_daily[STORAGE][key] if key in total_daily[STORAGE] else 0
-            )
-            compute_monthly = (
-                total_monthly[COMPUTE][key] if key in total_monthly[COMPUTE] else 0
-            )
-            storage_monthly = (
-                total_monthly[STORAGE][key] if key in total_monthly[STORAGE] else 0
-            )
-            monthly = compute_monthly + storage_monthly
-            budget_monthly = budgets_per_gcp_project.get(key)
+            SELECT invoice_month, STRING_AGG(sg, ',') as all_sequencing_groups
+            FROM total
+            WHERE LENGTH(sg) > 3
+            GROUP BY 1
+        """
+        result: dict[date, list[int]] = {}
+        query_job_result = self._execute_query(_query)
+        if query_job_result:
+            # need to reformat sg group ids into raw format
+            # skip those sg ids that are invalid
+            for row in query_job_result:
+                valid_sg_ids = []
+                for sg in str(row.all_sequencing_groups).split(','):
+                    try:
+                        valid_sg_ids.append(sequencing_group_id_transform_to_raw(sg))
+                    except ValueError:
+                        # skip any invalid sg id
+                        continue
+                result[
+                    date.fromisoformat(
+                        f'{row.invoice_month[:4]}-{row.invoice_month[4:]}-01'
+                    )
+                ] = valid_sg_ids
 
-            results.append(
-                BillingCostBudgetRecord.from_json(
-                    {
-                        'field': key,
-                        'total_monthly': monthly,
-                        'total_daily': (
-                            (compute_daily + storage_daily)
-                            if is_current_month
-                            else None
-                        ),
-                        'compute_monthly': compute_monthly,
-                        'compute_daily': compute_daily,
-                        'storage_monthly': storage_monthly,
-                        'storage_daily': storage_daily,
-                        'details': details,
-                        'budget_spent': (
-                            100 * monthly / budget_monthly if budget_monthly else None
-                        ),
-                        'budget': budget_monthly,
-                        'last_loaded_day': last_loaded_day,
-                    }
-                )
-            )
-
-        return results
-
-    @staticmethod
-    def _prepare_order_by_string(order_by: dict[BillingColumn, bool] | None) -> str:
-        """Prepare order by string"""
-        if not order_by:
-            return ''
-
-        order_by_cols = []
-        for order_field, reverse in order_by.items():
-            col_name = str(order_field.value)
-            col_order = 'DESC' if reverse else 'ASC'
-            order_by_cols.append(f'{col_name} {col_order}')
-
-        return f'ORDER BY {",".join(order_by_cols)}' if order_by_cols else ''
-
-    @staticmethod
-    def _prepare_aggregation(query: BillingTotalCostQueryModel) -> tuple[str, str]:
-        """Prepare both fields for aggregation and group by string"""
-        # Get columns to group by
-
-        # if group by is populated, then we need to group by day as well
-        grp_columns = ['day'] if query.group_by else []
-
-        for field in query.fields:
-            col_name = str(field.value)
-            if not BillingColumn.can_group_by(field):
-                # if the field cannot be grouped by, skip it
-                continue
-
-            # append to potential columns to group by
-            grp_columns.append(col_name)
-
-        fields_selected = ','.join(
-            (field.value for field in query.fields if field != BillingColumn.COST)
-        )
-
-        grp_selected = ','.join(grp_columns)
-        group_by = f'GROUP BY {grp_selected}' if query.group_by else ''
-
-        return fields_selected, group_by
-
-    @staticmethod
-    def _prepare_labels_function(query: BillingTotalCostQueryModel):
-        if not query.filters:
-            return None
-
-        if BillingColumn.LABELS in query.filters and isinstance(
-            query.filters[BillingColumn.LABELS], dict
-        ):
-            # prepare labels as function filters, parameterized both sides
-            func_filter = FunctionBQFilter(
-                name='getLabelValue',
-                implementation="""
-                    CREATE TEMP FUNCTION getLabelValue(
-                        labels ARRAY<STRUCT<key STRING, value STRING>>, label STRING
-                    ) AS (
-                        (SELECT value FROM UNNEST(labels) WHERE key = label LIMIT 1)
-                    );
-                """,
-            )
-            func_filter.to_sql(
-                BillingColumn.LABELS,
-                query.filters[BillingColumn.LABELS],
-                query.filters_op,
-            )
-            return func_filter
-
-        # otherwise
-        return None
+        return result
 
     async def append_sample_cost(
         self, connection: Connection | None = None, results: list[dict] | None = None
@@ -591,10 +345,7 @@ class BillingBaseTable(BqDbBase):
             return results
 
         # get project_id to dataset/topic mapping
-        topic_to_project = {
-            connection.project_id_map[p].dataset: p
-            for p in connection.project_id_map.keys()
-        }
+        topic_to_project = await get_topic_to_project_map(connection)
 
         # get number of samples per project per month
         samples = SampleTable(connection)
@@ -605,6 +356,15 @@ class BillingBaseTable(BqDbBase):
         if not project_sample_counts_per_month:
             return results
 
+        # get all processes sequencing groups per invoice month
+        sg_compute_per_month = await self.get_processed_sequencing_groups_per_month()
+
+        # pass sg_compute_per_month to sample table
+        # and per each month get number of samples per project used in compute
+        project_sample_compute_counts_per_month = (
+            await samples.get_sample_count_per_project_per_month(sg_compute_per_month)
+        )
+
         # for each monthly record with cost_category == 'Cloud Storage' add one record with average_sample_cost
         for row in results:
             topic = row.get('topic')
@@ -613,29 +373,63 @@ class BillingBaseTable(BqDbBase):
             if topic is None or invoice_month is None:
                 continue
 
-            if row.get('cost_category') == 'Cloud Storage':
-                # convert topic to project id
-                project_id = topic_to_project.get(topic)
-                if project_id is None:
-                    continue
+            # convert topic to project id
+            project_id = topic_to_project.get(topic)
+            if project_id is None:
+                continue
 
-                sample_count = project_sample_counts_per_month.get(project_id, {}).get(
-                    invoice_month, 0
-                )
+            # append new row based on Cloud Storage cost
+            results = await append_sample_cost_record(
+                results,
+                'Average Sample Storage Cost',
+                project_sample_counts_per_month,
+                row,
+                invoice_month,
+                int(project_id),
+                include_cost_category='Cloud Storage',
+            )
 
-                avg_cost = row.get('cost', 0) / sample_count if sample_count > 0 else 0
-                # append new row into results with the same topic and day but with cost_category = 'Average Sample Storage Cost'
-                # and cost = avg_cost
-                new_row = row.copy()
-                new_row['cost_category'] = 'Average Sample Storage Cost'
-                new_row['cost'] = avg_cost
-                results.append(new_row)
+            # aggregate all but Cloud Storage costs into one average sample compute cost
+            results = await append_sample_cost_record(
+                results,
+                'Average Sample Compute Cost',
+                project_sample_compute_counts_per_month,
+                row,
+                invoice_month,
+                int(project_id),
+                exclude_cost_category='Cloud Storage',
+            )
 
         # order results by day, topic, cost_category
         results.sort(
             key=lambda x: (x.get('day'), x.get('topic'), x.get('cost_category'))
         )
         return results
+
+    @staticmethod
+    def _query_to_partitioned_filter(
+        query: BillingTotalCostQueryModel,
+    ) -> BillingFilter:
+        """
+        By default views are partitioned by 'day',
+        if different then overwrite in the subclass
+        """
+        billing_filter = query.to_filter()
+
+        # initial partition filter
+        billing_filter.day = GenericBQFilter[datetime](
+            gte=(
+                datetime.strptime(query.start_date, '%Y-%m-%d')
+                if query.start_date
+                else None
+            ),
+            lte=(
+                datetime.strptime(query.end_date, '%Y-%m-%d')
+                if query.end_date
+                else None
+            ),
+        )
+        return billing_filter
 
     async def get_total_cost(
         self,
@@ -648,10 +442,10 @@ class BillingBaseTable(BqDbBase):
             raise ValueError('Date and Fields are required')
 
         # Get columns to select and to group by
-        fields_selected, group_by = self._prepare_aggregation(query)
+        fields_selected, group_by = prepare_aggregation(query)
 
         # construct order by
-        order_by_str = self._prepare_order_by_string(query.order_by)
+        order_by_str = prepare_order_by_string(query.order_by)
 
         # prepare grouping by time periods
         time_group = TimeGroupingDetails('', '', '')
@@ -672,7 +466,7 @@ class BillingBaseTable(BqDbBase):
         query_parameters.extend(sql_parameters.values())
 
         # prepare labels as function filters if present
-        func_filter = self._prepare_labels_function(query)
+        func_filter = prepare_labels_function(query)
         if func_filter:
             # extend where_str and query_parameters
             query_parameters.extend(func_filter.func_sql_parameters)
@@ -723,7 +517,7 @@ class BillingBaseTable(BqDbBase):
         query_job_result = self._execute_query(
             _query, query_parameters, results_as_list=False
         )
-        return self._convert_output(query_job_result)
+        return convert_output(query_job_result)
 
     async def get_running_cost_with_filters(
         self,
@@ -799,7 +593,7 @@ class BillingBaseTable(BqDbBase):
                 total_daily[cost_group][row.field] += row.daily_cost
 
         # add total row: compute + storage
-        results = await self._append_total_running_cost(
+        results = await append_total_running_cost(
             query.field,
             is_current_month,
             last_loaded_day,
@@ -810,9 +604,14 @@ class BillingBaseTable(BqDbBase):
             results,
         )
 
+        # get budget map per gcp project
+        budgets_per_gcp_project = await self._budgets_by_gcp_project(
+            query.field, is_current_month
+        )
+
         # add rest of the records: compute + storage
-        results = await self._append_running_cost_records(
-            query.field,
+        results = await append_detailed_cost_records(
+            budgets_per_gcp_project,
             is_current_month,
             last_loaded_day,
             total_monthly,
@@ -880,7 +679,7 @@ class BillingBaseTable(BqDbBase):
             _query, query_parameters, results_as_list=False
         )
 
-        return self._convert_output(query_job_result)
+        return convert_output(query_job_result)
 
     def get_storage_costs_by_project(
         self, query: BillingTotalCostQueryModel, gcp_project_name: str
