@@ -581,7 +581,7 @@ GROUP BY sg.type
         rows = await self.connection.fetch_all(_query, values)
 
         if not rows:
-            return {}
+            return defaultdict(lambda: {})
 
         # Organise the data by month into a dictionary, grouping sequencing group types together by month.
         project_histories: dict[ProjectId, dict[date, dict[str, int]]] = defaultdict(

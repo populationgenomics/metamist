@@ -1,4 +1,3 @@
-from datetime import date
 from typing import Any
 
 from fastapi import APIRouter
@@ -10,7 +9,6 @@ from api.utils.db import (
     get_projectless_db_connection,
 )
 from db.python.layers.sequencing_group import SequencingGroupLayer
-from db.python.tables.sequencing_group import SequencingGroupTable
 from models.models.project import FullWriteAccessRoles, ReadAccessRoles
 from models.models.sequencing_group import (
     SequencingGroup,
