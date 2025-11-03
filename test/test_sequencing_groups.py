@@ -401,7 +401,9 @@ class TestSequencingGroup(DbIsolatedTest):
         """Test the trivial case where there are no sequencing groups."""
 
         # Set up mocking for rows returned from the table query.
-        with mock.patch('db.python.connect.databases.Database.fetch_all', return_value=[]):
+        with mock.patch(
+            'db.python.connect.databases.Database.fetch_all', return_value=[]
+        ):
             sg_table = self.sglayer.seqgt
             result = await sg_table.get_sequencing_group_counts_by_month([])
 
@@ -421,7 +423,9 @@ class TestSequencingGroup(DbIsolatedTest):
             {'project': 0, 'type': 'typeA', 'sg_date': date(2025, 11, 1), 'num_sg': 4},
             {'project': 0, 'type': 'typeB', 'sg_date': date(2025, 11, 1), 'num_sg': 5},
         ]
-        with mock.patch('db.python.connect.databases.Database.fetch_all', return_value=rows_mock):
+        with mock.patch(
+            'db.python.connect.databases.Database.fetch_all', return_value=rows_mock
+        ):
             sg_table = self.sglayer.seqgt
             result = await sg_table.get_sequencing_group_counts_by_month([0])
 
@@ -459,7 +463,9 @@ class TestSequencingGroup(DbIsolatedTest):
             {'project': 0, 'type': 'typeA', 'sg_date': date(2025, 12, 1), 'num_sg': 4},
             {'project': 0, 'type': 'typeB', 'sg_date': date(2025, 12, 1), 'num_sg': 5},
         ]
-        with mock.patch('db.python.connect.databases.Database.fetch_all', return_value=rows_mock):
+        with mock.patch(
+            'db.python.connect.databases.Database.fetch_all', return_value=rows_mock
+        ):
             sg_table = self.sglayer.seqgt
             result = await sg_table.get_sequencing_group_counts_by_month([0])
 
@@ -479,5 +485,47 @@ class TestSequencingGroup(DbIsolatedTest):
                         'typeB': 8,
                     },
                 }
+            },
+        )
+
+    @run_as_sync
+    @mock.patch('db.python.tables.sequencing_group.date', wraps=date)
+    async def test_history_multiple_projects(self, mock_date):
+        """Test the case where multiple projects need their sequencing group history independently tracked."""
+        # Mock today's date.
+        mock_date.today.return_value = date(year=2025, month=12, day=31)
+
+        # Set up mocking for rows returned from the table query.
+        rows_mock = [
+            {'project': 0, 'type': 'typeA', 'sg_date': date(2025, 11, 1), 'num_sg': 2},
+            {'project': 0, 'type': 'typeA', 'sg_date': date(2025, 12, 1), 'num_sg': 3},
+            {'project': 1, 'type': 'typeA', 'sg_date': date(2025, 11, 1), 'num_sg': 4},
+            {'project': 1, 'type': 'typeA', 'sg_date': date(2025, 12, 1), 'num_sg': 5},
+        ]
+        with mock.patch(
+            'db.python.connect.databases.Database.fetch_all', return_value=rows_mock
+        ):
+            sg_table = self.sglayer.seqgt
+            result = await sg_table.get_sequencing_group_counts_by_month([0])
+
+        self.assertDictEqual(
+            result,
+            {
+                0: {
+                    date(2025, 11, 1): {
+                        'typeA': 2,
+                    },
+                    date(2025, 12, 1): {
+                        'typeA': 5,
+                    },
+                },
+                1: {
+                    date(2025, 11, 1): {
+                        'typeA': 4,
+                    },
+                    date(2025, 12, 1): {
+                        'typeA': 9,
+                    },
+                },
             },
         )
