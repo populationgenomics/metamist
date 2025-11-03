@@ -49,9 +49,7 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
             return <Message negative>No project selected</Message>
         }
 
-        return (
-            <SequencingGroupsByMonthDisplay projectName={projectName} />
-        )
+        return <SequencingGroupsByMonthDisplay projectName={projectName} />
     }
 
     return (
@@ -83,7 +81,6 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
                         <ProjectSelector onProjectSelect={onProjectSelect} />
                     </Grid.Column>
                 </Grid>
-
             </Card>
 
             {content()}
@@ -91,7 +88,9 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
     )
 }
 
-const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayProps> = ({ projectName }) => {
+const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayProps> = ({
+    projectName,
+}) => {
     // Data loading
     const { loading, error, data } = useQuery(GET_SG_BY_MONTH, {
         variables: { name: projectName },
