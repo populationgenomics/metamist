@@ -50,45 +50,43 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
         }
 
         return (
-            // <Card style={{ width: '100%', padding: '40px' }}>
             <SequencingGroupsByMonthDisplay projectName={projectName} />
-            // </Card>
         )
     }
 
     return (
         <>
-        <Card fluid style={{ padding: '20px' }} id="billing-container">
-            <div
-                className="header-container"
-                style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    flexWrap: 'wrap',
-                    gap: '10px',
-                }}
-            >
-                <h1
+            <Card fluid style={{ padding: '20px' }} id="billing-container">
+                <div
+                    className="header-container"
                     style={{
-                        fontSize: 40,
-                        margin: 0,
-                        flex: '1 1 200px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        flexWrap: 'wrap',
+                        gap: '10px',
                     }}
                 >
-                    Sequencing Groups By Month
-                </h1>
-            </div>
+                    <h1
+                        style={{
+                            fontSize: 40,
+                            margin: 0,
+                            flex: '1 1 200px',
+                        }}
+                    >
+                        Sequencing Groups By Month
+                    </h1>
+                </div>
 
-            <Grid columns="equal" stackable doubling>
-                <Grid.Column className="field-selector-label">
-                    <ProjectSelector onProjectSelect={onProjectSelect} />
-                </Grid.Column>
-            </Grid>
+                <Grid columns="equal" stackable doubling>
+                    <Grid.Column className="field-selector-label">
+                        <ProjectSelector onProjectSelect={onProjectSelect} />
+                    </Grid.Column>
+                </Grid>
 
-        </Card>
+            </Card>
 
-        {content()}
+            {content()}
         </>
     )
 }
@@ -96,7 +94,7 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
 const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayProps> = ({ projectName }) => {
     // Data loading
     const { loading, error, data } = useQuery(GET_SG_BY_MONTH, {
-        variables: { name: projectName || '' },
+        variables: { name: projectName },
         notifyOnNetworkStatusChange: true,
     })
 
@@ -104,18 +102,19 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
     const containerRef = useRef<HTMLDivElement>(null)
     const [measureRef, { width, height }] = useMeasure<HTMLDivElement>()
 
+    // Converting the date that GraphQL gives from a string to a Date type.
     const plotData = React.useMemo(() => {
         if (loading || error || !data) return []
 
-        return data.project.sequencingGroupHistory.map((i) => {
+        return data.project.sequencingGroupHistory.map((item) => {
             return {
-                date: new Date(i.date),
-                type: i.type,
-                count: i.count,
+                ...item,
+                date: new Date(item.date),
             } as ITypeData
         })
     }, [data, loading])
 
+    // Code for generating the sequencing groups by month plot.
     React.useEffect(() => {
         if (plotData.length == 0) return
 
@@ -148,6 +147,7 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
         return () => plot.remove()
     }, [data, width, height])
 
+    // Component to display a message when data isn't loaded or there's an error.
     const messageComponent = () => {
         if (error) {
             return (
@@ -174,6 +174,7 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
         return null
     }
 
+    // Component to display the sequencing groups by month plot when data is available.
     const dataComponent = () => {
         if (error || loading) {
             return null
