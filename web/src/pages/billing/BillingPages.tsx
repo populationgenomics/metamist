@@ -6,6 +6,7 @@ import QueryStatsIcon from '@mui/icons-material/QueryStats'
 import SellIcon from '@mui/icons-material/Sell'
 import SsidChartIcon from '@mui/icons-material/SsidChart'
 import SampleIcon from '../../shared/components/icons/SampleIcon'
+import SequencingGroupIcon from '../../shared/components/icons/SequencingGroupIcon'
 
 interface IBillingPage {
     title: string
@@ -82,7 +83,7 @@ const billingPages: IBillingPage[] = [
         title: 'Sequencing Groups By Month',
         name: 'sequencingGroupsByMonth',
         url: '/billing/sequencingGroupsByMonth',
-        icon: <SampleIcon />,
+        icon: <SequencingGroupIcon />,
         description: 'The number of each type of sequencing group each month.',
     },
 ]
