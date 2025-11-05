@@ -585,19 +585,13 @@ GROUP BY sg.type
 
         # Organise the data by month into a dictionary, grouping sequencing group types together by month.
         project_histories: dict[ProjectId, dict[date, dict[str, int]]] = defaultdict(
-            lambda: {}
+            lambda: defaultdict(dict)
         )
         for row in rows:
             project = row['project']
             month_created: date = row['sg_date'].replace(day=1)
             sg_type = row['type']
             num_sg = row['num_sg']
-
-            if project not in project_histories:
-                project_histories[project] = {}
-
-            if month_created not in project_histories[project]:
-                project_histories[project][month_created] = {}
 
             project_histories[project][month_created][sg_type] = num_sg
 
