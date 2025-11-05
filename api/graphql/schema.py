@@ -120,7 +120,7 @@ class GraphQLCohort:
     name: str
     description: str
     author: str
-    status: CohortStatus
+    status: GraphQLCohortStatus
 
     project_id: strawberry.Private[int]
 
