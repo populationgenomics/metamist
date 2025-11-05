@@ -39,18 +39,18 @@ class CohortInternal(SMBase):
             project=project,
             description=description,
             template_id=template_id,
-            status= cohort_status,
+            status=cohort_status,
         )
 
     def to_external(self):
         """Convert to external model"""
-        return CohortExternal (
-            id= cohort_id_format(self.id),
+        return CohortExternal(
+            id=cohort_id_format(self.id),
             name=self.name,
             author=self.author,
-            project=self.project, #This will return an internal id, should we not include this ??
+            project=self.project,  # This will return an internal id, should we not include this ??
             description=self.description,
-            template_id=  cohort_template_id_format(self.template_id),
+            template_id=cohort_template_id_format(self.template_id),
             status=self.status,
         )
 

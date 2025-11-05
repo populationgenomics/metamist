@@ -2,7 +2,7 @@
 import dataclasses
 import datetime
 from collections import defaultdict
-from typing import DefaultDict
+from typing import DefaultDict, Any
 
 from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
@@ -305,10 +305,11 @@ class CohortTable(DbBase):
 
         for row in rows:
             row_dict = dict(row)
-            if (cohort_status == CohortStatus.ACTIVE
-                    and parse_sql_bool(row_dict['s_active'])
-                    and (not parse_sql_bool(row_dict['sg_archived']))
-                    and row_dict['c_status'].lower() == CohortStatus.ACTIVE.value
+            if (
+                cohort_status == CohortStatus.ACTIVE
+                and parse_sql_bool(row_dict['s_active'])
+                and (not parse_sql_bool(row_dict['sg_archived']))
+                and row_dict['c_status'].lower() == CohortStatus.ACTIVE.value
             ):
                 cohort_status = CohortStatus.ACTIVE
             else:
@@ -331,7 +332,7 @@ class CohortTable(DbBase):
             'status': status.value.upper() if status else None,
         }
 
-        query_params = {**{k: v for k, v in cohort_fields.items() if v is not None}}
+        query_params: dict[str, Any] = {**{k: v for k, v in cohort_fields.items() if v is not None}}
 
         if not query_params:
             raise ValueError(f'No field to update')
@@ -341,5 +342,5 @@ class CohortTable(DbBase):
             SET {', '.join(f"{k} = :{k}" for k, v in query_params.items() if v is not None)}
             WHERE id = :cohort_id
         """
-        query_params["cohort_id"] = cohort_id
+        query_params['cohort_id'] = cohort_id
         await self.connection.execute(query, values=query_params)

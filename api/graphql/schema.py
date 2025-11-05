@@ -108,7 +108,7 @@ for enum in enum_tables.__dict__.values():
 GraphQLEnum = strawberry.type(type('GraphQLEnum', (object,), enum_methods))
 
 GraphQLAnalysisStatus = strawberry.enum(AnalysisStatus)  # type: ignore
-GraphQLCohortStatus = strawberry.enum(CohortStatus)
+GraphQLCohortStatus: type = strawberry.enum(CohortStatus)
 
 
 # Create cohort GraphQL model

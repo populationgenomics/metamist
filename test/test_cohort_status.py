@@ -54,13 +54,13 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
     @run_as_sync
     async def setUp(self):
         super().setUp()
+
         self.cohort_layer = CohortLayer(self.connection)
         self.sample_layer = SampleLayer(self.connection)
         self.sg_layer = SequencingGroupLayer(self.connection)
 
-        self.sA = await self.sample_layer.upsert_sample(get_sample_model('A'))
-        self.sB = await self.sample_layer.upsert_sample(
-            get_sample_model('B', 'saliva', 'exome', 'ONT')
+        self.sA = await self.sample_layer.upsert_sample(
+            get_sample_model('A', 'saliva', 'exome', 'ONT')
         )
 
         self.sgA = [
@@ -68,12 +68,9 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
         ]
         self.sgA_raw = [sg.id for sg in self.sA.sequencing_groups]
 
-        self.sgB = [
-            sequencing_group_id_format(sg.id) for sg in self.sB.sequencing_groups
-        ]
-        self.sgB_raw = [sg.id for sg in self.sB.sequencing_groups]
+        await self.sample_layer.upsert_sample(get_sample_model('B'))
 
-        # SG_B will be associated to this cohort (based on sample_type)
+        # SG_A will be associated to this cohort (based on sample_type)
         self.cohort = await self.cohort_layer.create_cohort_from_criteria(
             project_to_write=self.project_id,
             description='Sample cohort',
@@ -88,7 +85,7 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
     @run_as_sync
     async def test_create_custom_cohort_and_verify_status(self):
         """Test to create a custom cohort and verify its status
-          (Here the one created in the setup method is tested)
+        (Here the one created in the setup method is tested)
         """
 
         created_cohort_in_list = await self.cohort_layer.query(
@@ -107,16 +104,28 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
     async def test_get_cohort_with_inactive_sample(self):
         """Test cohort status when inactive sample"""
 
-        await self.sample_layer.upsert_sample(SampleUpsertInternal(id=self.sB.id, active=False))
-        cohort = (await self.cohort_layer.query(CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))))[0]
+        await self.sample_layer.upsert_sample(
+            SampleUpsertInternal(id=self.sA.id, active=False)
+        )
+        cohort = (
+            await self.cohort_layer.query(
+                CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
+            )
+        )[0]
         self.assertEqual(cohort.status, CohortStatus.INACTIVE)
 
     @run_as_sync
     async def test_get_cohort_with_archived_sg(self):
         """Test cohort status when inactive sequencing group"""
 
-        await self.sg_layer.archive_sequencing_group(sequencing_group_id=self.sgB_raw[0])
-        cohort = (await self.cohort_layer.query(CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))))[0]
+        await self.sg_layer.archive_sequencing_group(
+            sequencing_group_id=self.sgA_raw[0]
+        )
+        cohort = (
+            await self.cohort_layer.query(
+                CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
+            )
+        )[0]
         self.assertEqual(cohort.status, CohortStatus.INACTIVE)
 
     @run_as_sync
@@ -124,12 +133,12 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
         """Test computed cohort status when sample/s active,
         sg/s not archived and cohort status is active in the DB"""
 
-        queried_sample = await self.sample_layer.get_by_id(sample_id=self.sB.id)
+        queried_sample = await self.sample_layer.get_by_id(sample_id=self.sA.id)
         self.assertTrue(queried_sample.active)
 
         queried_sg = (
             await self.sg_layer.query(
-                SequencingGroupFilter(id=GenericFilter(in_=[self.sgB_raw[0]]))
+                SequencingGroupFilter(id=GenericFilter(in_=[self.sgA_raw[0]]))
             )
         )[0]
         self.assertFalse(queried_sg.archived)
@@ -161,11 +170,11 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
             dry_run=False,
             cohort_criteria=CohortCriteriaInternal(
                 projects=[self.project_id],
-                sg_ids_internal_raw=[self.sgA_raw[0], self.sgB_raw[0]],
+                sg_ids_internal_raw=[self.sgA_raw[0], self.sgA_raw[0]],
             ),
         )
         await self.sample_layer.upsert_sample(
-            SampleUpsertInternal(id=self.sB.id, active=False)
+            SampleUpsertInternal(id=self.sA.id, active=False)
         )
 
         cohort = (
@@ -210,19 +219,17 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
         )[0]
         self.assertEqual(cohort.status, CohortStatus.INACTIVE)
 
+
 class TestCohortStatusGraphQL(DbIsolatedTest):
     """Test cohort querying via GraphQL"""
 
     @run_as_sync
     async def setUp(self):
         super().setUp()
-        self.cohortl = CohortLayer(self.connection)
 
         self.cohort_layer = CohortLayer(self.connection)
-        self.sample_layer = SampleLayer(self.connection)
-        self.sg_layer = SequencingGroupLayer(self.connection)
-
-        self.sA = await self.sample_layer.upsert_sample(
+        sample_layer = SampleLayer(self.connection)
+        self.sA = await sample_layer.upsert_sample(
             get_sample_model('A', 'saliva', 'exome', 'ONT')
         )
 
@@ -244,7 +251,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
 
     @run_as_sync
     async def test_create_custom_cohort_response(self):
-        """Test status field in create_custom_cohort mutation restponse """
+        """Test status field in create_custom_cohort mutation response"""
 
         mutation_result = (
             await self.run_graphql_query_async(
@@ -275,7 +282,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                 },
             )
         )['cohort']['createCohortFromCriteria']
-        self.assertEqual(mutation_result['status'], "ACTIVE")
+        self.assertEqual(mutation_result['status'], 'ACTIVE')
 
     @run_as_sync
     async def test_query_cohort_with_filter_by_id(self):
@@ -314,7 +321,6 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
             self.project_name,
         )
         self.assertEqual(queried_cohort['status'], 'ACTIVE')
-
 
     @run_as_sync
     async def test_query_cohort_with_filter_status_eq(self):
@@ -423,12 +429,13 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
     async def test_update_cohort_fields(self):
         """Test GraphQL mutation for updating cohort fields"""
 
-        new_name = 'Updated Illama'
+        new_name = 'Updated Llama'
         new_status = 'INACTIVE'
         new_description = 'Updated description'
 
-        queried_cohort = (await self.run_graphql_query_async(
-            """
+        queried_cohort = (
+            await self.run_graphql_query_async(
+                """
             query CohortQuery($id: String!) {
                 cohorts(id: {eq: $id}) {
                     status
@@ -438,15 +445,17 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                 }
             }
         """,
-            {'id': cohort_id_format(self.cohort.cohort_id)},
-        ))['cohorts'][0]
+                {'id': cohort_id_format(self.cohort.cohort_id)},
+            )
+        )['cohorts'][0]
 
         self.assertNotEqual(queried_cohort['name'], new_name)
         self.assertNotEqual(queried_cohort['status'], new_status)
         self.assertNotEqual(queried_cohort['description'], new_description)
 
-        updated_cohort = (await self.run_graphql_query_async(
-            """
+        updated_cohort = (
+            await self.run_graphql_query_async(
+                """
                 mutation updateCohort($id : String!, $cohort: CohortUpdateBodyInput!) 
                 { 
                   cohort{
@@ -460,21 +469,20 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                  
                 }
         """,
-            {
-                'id': cohort_id_format(self.cohort.cohort_id),
-                'cohort': {
-                    'name': new_name,
-                    'status': new_status,
-                    'description': new_description,
+                {
+                    'id': cohort_id_format(self.cohort.cohort_id),
+                    'cohort': {
+                        'name': new_name,
+                        'status': new_status,
+                        'description': new_description,
+                    },
                 },
-            },
-        ))['cohort']['updateCohort']
+            )
+        )['cohort']['updateCohort']
 
         self.assertEqual(updated_cohort['name'], new_name)
         self.assertEqual(updated_cohort['status'], new_status)
-        self.assertEqual(
-            updated_cohort['description'], new_description
-        )
+        self.assertEqual(updated_cohort['description'], new_description)
 
     @run_as_sync
     async def test_update_cohort_immutable_fields(self):
@@ -554,20 +562,9 @@ class TestCohortStatusAPI(DbIsolatedTest):
     @run_as_sync
     async def setUp(self):
         super().setUp()
-        self.cohortl = CohortLayer(self.connection)
 
         self.cohort_layer = CohortLayer(self.connection)
-        self.sample_layer = SampleLayer(self.connection)
-        self.sg_layer = SequencingGroupLayer(self.connection)
-
-        self.sA = await self.sample_layer.upsert_sample(
-            get_sample_model('A', 'saliva', 'exome', 'ONT')
-        )
-
-        self.sgA = [
-            sequencing_group_id_format(sg.id) for sg in self.sA.sequencing_groups
-        ]
-        self.sgA_raw = [sg.id for sg in self.sA.sequencing_groups]
+        await SampleLayer(self.connection).upsert_sample(get_sample_model('A', 'saliva', 'exome', 'ONT'))
 
         self.cohort_name = 'Sample cohort'
         self.cohort_description = 'Sample cohort 1'

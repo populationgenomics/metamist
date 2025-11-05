@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class CohortStatus(str, Enum):
     """
     Enum for cohort status.
