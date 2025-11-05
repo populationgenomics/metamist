@@ -285,38 +285,19 @@ class CohortTable(DbBase):
         """
         Get the cohort by its ID
         """
-        cohort_get_keys_str = ','.join(self.cohort_get_keys)
 
-        _query = f"""
-        SELECT {cohort_get_keys_str}
-        FROM cohort c
-        LEFT JOIN cohort_sequencing_group csg ON c.id = csg.cohort_id
-        LEFT JOIN sequencing_group sg ON sg.id = csg.sequencing_group_id
-        LEFT JOIN sample s ON s.id = sg.sample_id
-        WHERE c.id = :cohort_id
+        _query = """
+        SELECT id, name, template_id, author, description, project, timestamp
+        FROM cohort
+        WHERE id = :cohort_id
         """
 
-        rows = await self.connection.fetch_all(_query, {'cohort_id': cohort_id})
+        cohort = await self.connection.fetch_one(_query, {'cohort_id': cohort_id})
+        if not cohort:
+            raise ValueError(f'Cohort with ID {cohort_id} not found')
 
-        if not rows:
-            raise ValueError(f'Cohort not found')
-
-        cohort_status = CohortStatus.ACTIVE
-
-        for row in rows:
-            row_dict = dict(row)
-            if (
-                cohort_status == CohortStatus.ACTIVE
-                and parse_sql_bool(row_dict['s_active'])
-                and (not parse_sql_bool(row_dict['sg_archived']))
-                and row_dict['c_status'].lower() == CohortStatus.ACTIVE.value
-            ):
-                cohort_status = CohortStatus.ACTIVE
-            else:
-                cohort_status = CohortStatus.INACTIVE
-                break
-
-        return CohortInternal.from_db(dict(rows[0]), cohort_status)
+        # status criteria not computed in this function as current usage only consume template id
+        return CohortInternal.from_db(dict(cohort), None)
 
     async def update_cohort_given_id(
         self, name: str, description: str, status: CohortStatus, cohort_id: int
@@ -332,7 +313,9 @@ class CohortTable(DbBase):
             'status': status.value.upper() if status else None,
         }
 
-        query_params: dict[str, Any] = {**{k: v for k, v in cohort_fields.items() if v is not None}}
+        query_params: dict[str, Any] = {
+            **{k: v for k, v in cohort_fields.items() if v is not None}
+        }
 
         if not query_params:
             raise ValueError(f'No field to update')

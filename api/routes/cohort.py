@@ -129,12 +129,14 @@ async def get_cohort_by_id(
     cohort_layer = CohortLayer(connection)
 
     cohort_id_raw = cohort_id_transform_to_raw(cohort_id)
-    resp = await cohort_layer.query(CohortFilter(id=GenericFilter(eq=cohort_id_raw)))
+    queried_cohort_in_list = await cohort_layer.query(
+        CohortFilter(id=GenericFilter(eq=cohort_id_raw))
+    )
 
-    if not resp:
+    if not queried_cohort_in_list:
         raise ValueError(f'Cohort with ID {cohort_id} not found')
 
-    return resp[0].to_external()
+    return queried_cohort_in_list[0].to_external()
 
 
 @router.patch('/{cohort_id}', operation_id='updateCohortById')

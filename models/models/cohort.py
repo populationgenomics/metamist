@@ -18,10 +18,10 @@ class CohortInternal(SMBase):
     project: ProjectId
     description: str
     template_id: int
-    status: CohortStatus
+    status: CohortStatus | None
 
     @staticmethod
-    def from_db(d: dict, cohort_status: CohortStatus):
+    def from_db(d: dict, cohort_status: CohortStatus | None):
         """
         Convert from db keys, mainly converting id to id_
         """
