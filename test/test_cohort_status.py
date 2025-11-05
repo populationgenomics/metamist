@@ -334,15 +334,17 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
     async def test_query_cohort_with_filter_status_eq(self):
         """Test GraphQL query cohort with filter by status (eq)"""
 
-        query_cohort_status_eq = await self.run_graphql_query_async(
-            """
-            query CohortQuery($cohort_status: CohortStatus!) {
+        query_cohort_filter_status_eq = """
+                    query CohortQuery($cohort_status: CohortStatus!) {
                 cohorts(status: {eq: $cohort_status}) {
                     name
                     status
                 }
             }
-        """,
+        """
+
+        query_cohort_status_eq = await self.run_graphql_query_async(
+            query_cohort_filter_status_eq,
             {'cohort_status': 'ACTIVE'},
         )
 
@@ -351,6 +353,16 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
 
         self.assertEqual(queried_cohort['name'], self.cohort_name)
         self.assertEqual(queried_cohort['status'], 'ACTIVE')
+
+        # update cohort status and retrieve
+        await self.cohort_layer.update_cohort(
+            CohortUpdateBody(status=CohortStatus.INACTIVE), self.cohort.cohort_id
+        )
+        query_cohort_status_eq = await self.run_graphql_query_async(
+            query_cohort_filter_status_eq,
+            {'cohort_status': 'ACTIVE'},
+        )
+        self.assertFalse(query_cohort_status_eq['cohorts'])
 
     @run_as_sync
     async def test_query_cohort_with_filter_status_in(self):
@@ -373,19 +385,32 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
             )
         )['cohort']['createCohortFromCriteria']
 
-        query_cohort_status_in = await self.run_graphql_query_async(
-            """
+        query_cohort_filter_status_in = """
             query CohortQuery($cohort_status_list: [CohortStatus!]!) {
                 cohorts(status: {in_: $cohort_status_list}) {
                     status
                 }
             }
-        """,
+        """
+
+        query_cohort_status_in = await self.run_graphql_query_async(
+            query_cohort_filter_status_in,
             {'cohort_status_list': ['ACTIVE']},
         )
         self.assertTrue(len(query_cohort_status_in['cohorts']) == 2)
         for cohort in query_cohort_status_in['cohorts']:
             self.assertEqual(cohort['status'], 'ACTIVE')
+
+        # update cohort status and retrieve
+        await self.cohort_layer.update_cohort(
+            CohortUpdateBody(status=CohortStatus.INACTIVE), self.cohort.cohort_id
+        )
+
+        query_cohort_status_in = await self.run_graphql_query_async(
+            query_cohort_filter_status_in,
+            {'cohort_status_list': ['ACTIVE']},
+        )
+        self.assertTrue(len(query_cohort_status_in['cohorts']) == 1)
 
     @run_as_sync
     async def test_query_cohort_with_filter_status_nin(self):
@@ -401,7 +426,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
         """,
             {'cohort_status_list': ['ACTIVE']},
         )
-        self.assertFalse(len(query_cohort_status_nin['cohorts']))
+        self.assertFalse(query_cohort_status_nin['cohorts'])
 
     @run_as_sync
     async def test_query_cohort_with_filter_status_criteria_not_defined(self):
@@ -481,8 +506,8 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
         updated_cohort = (
             await self.run_graphql_query_async(
                 """
-                mutation updateCohort($id : String!, $cohort: CohortUpdateBodyInput!) 
-                { 
+                mutation updateCohort($id : String!, $cohort: CohortUpdateBodyInput!)
+                {
                   cohort{
                     updateCohort(id:$id, cohort:$cohort){
                       id
@@ -491,7 +516,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                       status
                     }
                   }
-                 
+
                 }
         """,
                 {
@@ -516,8 +541,8 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
         with self.assertRaises(GraphQLError):
             _ = await self.run_graphql_query_async(
                 """
-                    mutation updateCohort($id : String!, $cohort: CohortUpdateBodyInput!) 
-                    { 
+                    mutation updateCohort($id : String!, $cohort: CohortUpdateBodyInput!)
+                    {
                       cohort{
                         updateCohort(id:$id, cohort:$cohort){
                           id
@@ -543,8 +568,8 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
         with self.assertRaises(GraphQLError):
             _ = await self.run_graphql_query_async(
                 """
-                    mutation updateCohort($id : String!, $cohort: CohortUpdateBodyInput!) 
-                    { 
+                    mutation updateCohort($id : String!, $cohort: CohortUpdateBodyInput!)
+                    {
                       cohort{
                         updateCohort(id:$id, cohort:$cohort){
                           id
@@ -565,8 +590,8 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
         with self.assertRaises(GraphQLError):
             _ = await self.run_graphql_query_async(
                 """
-                    mutation updateCohort($id : String!, $cohort: CohortUpdateBodyInput!) 
-                    { 
+                    mutation updateCohort($id : String!, $cohort: CohortUpdateBodyInput!)
+                    {
                       cohort{
                         updateCohort(id:$id, cohort:$cohort){
                           id

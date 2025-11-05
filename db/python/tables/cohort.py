@@ -107,6 +107,8 @@ class CohortTable(DbBase):
         for row in rows:
             row_dict = dict(row)
             cohort_id = row_dict['c_id']
+            if cohort_statuses.get(cohort_id) == CohortStatus.INACTIVE:
+                continue
             if cohort_id not in unique_cohorts:
                 unique_cohorts[cohort_id] = row_dict
             if (
@@ -118,7 +120,6 @@ class CohortTable(DbBase):
                 cohort_statuses[cohort_id] = CohortStatus.ACTIVE
             else:
                 cohort_statuses[cohort_id] = CohortStatus.INACTIVE
-                # TODO:piyumi early termination
 
         if filter_status is not None:
             cohorts = []
@@ -287,7 +288,7 @@ class CohortTable(DbBase):
         """
 
         _query = """
-        SELECT id as c_id, name as c_name, template_id as c_template_id, author as c_author, 
+        SELECT id as c_id, name as c_name, template_id as c_template_id, author as c_author,
         description as c_description, project as c_project, timestamp as c_timestamp
         FROM cohort WHERE id = :cohort_id
         """

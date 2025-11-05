@@ -213,7 +213,7 @@ class CohortMutations:
 
         connection: Connection = info.context['connection']
         clayer = CohortLayer(connection)
-        cohort_id_raw = cohort_id_transform_to_raw(id) if id else None
+        cohort_id_raw = cohort_id_transform_to_raw(id)
 
         await clayer.update_cohort(
             CohortUpdateBody(

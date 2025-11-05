@@ -228,7 +228,7 @@ class NewCohortInternal(SMBase):
         Convert to external model
         """
 
-        # TODO: piyumi status field is not returned here as it could break any consumers
+        # status field is not returned here as it could break any consumers
         return NewCohort(
             dry_run=self.dry_run,
             cohort_id=(

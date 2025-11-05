@@ -262,7 +262,7 @@ class CohortLayer(BaseLayer):
         )
 
         if not cohorts:
-            raise ValueError(f'Cohort with ID {cohort_id} not found')
+            raise ValueError(f'Cohort ID not found')
 
         await self.ct.update_cohort_given_id(
             name=cohort_update_body.name,
