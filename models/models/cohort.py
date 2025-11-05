@@ -1,9 +1,8 @@
-from pydantic import Field
-
 from models.base import SMBase, parse_sql_dict
 from models.enums.cohort import CohortStatus
 from models.models.project import ProjectId
 from models.utils.cohort_id_format import cohort_id_format
+from models.utils.cohort_template_id_format import cohort_template_id_format
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format_list,
     sequencing_group_id_transform_to_raw_list,
@@ -45,35 +44,35 @@ class CohortInternal(SMBase):
 
     def to_external(self):
         """Convert to external model"""
-        return CohortExternal(
-            id=self.id,
+        return CohortExternal (
+            id= cohort_id_format(self.id),
             name=self.name,
             author=self.author,
-            project=self.project,
+            project=self.project, #This will return an internal id, should we not include this ??
             description=self.description,
-            template_id=self.template_id,
-            status=self.cohort_status,
+            template_id=  cohort_template_id_format(self.template_id),
+            status=self.status,
         )
 
 
 class CohortExternal(SMBase):
     """External model for Cohort"""
 
-    id: int
+    id: str
     name: str
     author: str
     project: ProjectId
     description: str
-    template_id: int
+    template_id: str
     status: CohortStatus
 
 
 class CohortUpdateBody(SMBase):
     """Represents the expected JSON body of the update cohort request"""
 
-    name: str | None
-    description: str | None
-    status: CohortStatus | None
+    name: str | None = None
+    description: str | None = None
+    status: CohortStatus | None = None
 
 
 class CohortCriteriaInternal(SMBase):
@@ -228,6 +227,8 @@ class NewCohortInternal(SMBase):
         """
         Convert to external model
         """
+
+        # TODO: piyumi status field is not returned here as it could break any consumers
         return NewCohort(
             dry_run=self.dry_run,
             cohort_id=(

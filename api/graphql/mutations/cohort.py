@@ -15,6 +15,7 @@ from models.models.cohort import (
     CohortUpdateBody,
 )
 from models.models.project import ProjectId, ProjectMemberRole, ReadAccessRoles
+from models.utils.cohort_id_format import cohort_id_transform_to_raw
 from models.utils.cohort_template_id_format import (
     cohort_template_id_transform_to_raw,
 )
@@ -138,7 +139,7 @@ class CohortMutations:
                 CohortFilter(id=GenericFilter(eq=cohort_output.cohort_id))
             )
         )[0]
-        # TODO:piyumi status will be returned
+
         return GraphQLCohort.from_internal(created_cohort)
 
     @strawberry.mutation
@@ -202,24 +203,26 @@ class CohortMutations:
     @strawberry.mutation
     async def update_cohort(
         self,
-        cohort_id: int,
+        id: str,
         cohort: CohortUpdateBodyInput,
         info: Info,
     ) -> Annotated['GraphQLCohort', strawberry.lazy('api.graphql.schema')]:
-        """Update status of a Cohort."""
+        """Support updating name, description and status of a Cohort"""
 
         from api.graphql.schema import GraphQLCohort
 
         connection: Connection = info.context['connection']
         clayer = CohortLayer(connection)
+        cohort_id_raw = cohort_id_transform_to_raw(id) if id else None
+
         await clayer.update_cohort(
             CohortUpdateBody(
                 name=cohort.name, description=cohort.description, status=cohort.status
             ),
-            cohort_id,
+            cohort_id_raw,
         )
 
         updated_cohort = (
-            await clayer.query(CohortFilter(id=GenericFilter(eq=cohort_id)))
+            await clayer.query(CohortFilter(id=GenericFilter(eq=cohort_id_raw)))
         )[0]
         return GraphQLCohort.from_internal(updated_cohort)

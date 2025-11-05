@@ -7,6 +7,7 @@ from typing import DefaultDict
 from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
 from db.python.utils import NotFoundError, to_db_json
+from models.base import parse_sql_bool
 from models.enums.cohort import CohortStatus
 from models.models.cohort import (
     CohortCriteriaInternal,
@@ -69,17 +70,24 @@ class CohortTable(DbBase):
         self, filter_: CohortFilter
     ) -> tuple[list[CohortInternal], set[ProjectId]]:
         """Query Cohorts"""
-        wheres, values = filter_.to_sql(field_overrides={'id':'c.id', 'name':'c.name',
-                                                         'template_id':'c.template_id',
-                                                         'author':'c.author',
-                                                         'project':'c.project',
-                                                         'status':'c.status'})
+
+        filter_status = filter_.status
+        filter_.status = None  # reset filter and use to filter on the rows fetched
+
+        wheres, values = filter_.to_sql(
+            field_overrides={
+                'id': 'c.id',
+                'name': 'c.name',
+                'template_id': 'c.template_id',
+                'author': 'c.author',
+                'project': 'c.project',
+            }
+        )
         if not wheres:
             raise ValueError(f'Invalid filter: {filter_}')
 
         cohort_get_keys_str = ','.join(self.cohort_get_keys)
 
-        # TODO: check how the status filter work as it is not injected to the query parse_sql_bool
         _query = f"""
         SELECT {cohort_get_keys_str}
         FROM cohort c
@@ -103,8 +111,8 @@ class CohortTable(DbBase):
                 unique_cohorts[cohort_id] = row_dict
             if (
                 cohort_statuses[cohort_id] == CohortStatus.ACTIVE
-                and row_dict['s_active'] == True
-                and row_dict['sg_archived'] == False
+                and parse_sql_bool(row_dict['s_active'])
+                and (not parse_sql_bool(row_dict['sg_archived']))
                 and row_dict['c_status'].lower() == CohortStatus.ACTIVE.value
             ):
                 cohort_statuses[cohort_id] = CohortStatus.ACTIVE
@@ -112,12 +120,24 @@ class CohortTable(DbBase):
                 cohort_statuses[cohort_id] = CohortStatus.INACTIVE
                 # TODO:piyumi early termination
 
-        if filter_.status:
-            cohorts = [
-                CohortInternal.from_db(dict(row), status)
-                for cohort_id, row in unique_cohorts.items()
-                if (status := cohort_statuses[cohort_id]) == filter_.status
-            ]
+        if filter_status is not None:
+            cohorts = []
+            for cohort_id, row in unique_cohorts.items():
+                status = cohort_statuses[cohort_id]
+                include = True
+
+                if filter_status.eq is not None and status != filter_status.eq:
+                    include = False
+                if filter_status.neq is not None and status == filter_status.neq:
+                    include = False
+                if filter_status.in_ is not None and status not in filter_status.in_:
+                    include = False
+                if filter_status.nin is not None and status in filter_status.nin:
+                    include = False
+
+                # The remaining filter criteria in GenericFilter are not considered and will be by-passed
+                if include:
+                    cohorts.append(CohortInternal.from_db(dict(row), status))
         else:
             cohorts = [
                 CohortInternal.from_db(dict(row), cohort_statuses[cohort_id])
@@ -265,8 +285,6 @@ class CohortTable(DbBase):
         """
         Get the cohort by its ID
         """
-        # TODO:piyumi. Current usage only consume template id
-
         cohort_get_keys_str = ','.join(self.cohort_get_keys)
 
         _query = f"""
@@ -281,17 +299,16 @@ class CohortTable(DbBase):
         rows = await self.connection.fetch_all(_query, {'cohort_id': cohort_id})
 
         if not rows:
-            raise ValueError(f'Cohort with ID {cohort_id} not found')
+            raise ValueError(f'Cohort not found')
 
         cohort_status = CohortStatus.ACTIVE
 
         for row in rows:
             row_dict = dict(row)
-            if (
-                cohort_status == CohortStatus.ACTIVE
-                and row_dict['s_active'] == True
-                and row_dict['s_archived'] == False
-                and row_dict['c_status'].lower() == CohortStatus.ACTIVE.value
+            if (cohort_status == CohortStatus.ACTIVE
+                    and parse_sql_bool(row_dict['s_active'])
+                    and (not parse_sql_bool(row_dict['sg_archived']))
+                    and row_dict['c_status'].lower() == CohortStatus.ACTIVE.value
             ):
                 cohort_status = CohortStatus.ACTIVE
             else:
@@ -306,20 +323,23 @@ class CohortTable(DbBase):
         """
         Update the cohort given its ID
         """
-        _query = """
-        UPDATE cohort
-        SET name = :name, description = :description, status = :status
-        WHERE id = :cohort_id
+
+        # The following fields are allowed to update
+        cohort_fields = {
+            'name': name,
+            'description': description,
+            'status': status.value.upper() if status else None,
+        }
+
+        query_params = {**{k: v for k, v in cohort_fields.items() if v is not None}}
+
+        if not query_params:
+            raise ValueError(f'No field to update')
+
+        query = f"""
+            UPDATE cohort
+            SET {', '.join(f"{k} = :{k}" for k, v in query_params.items() if v is not None)}
+            WHERE id = :cohort_id
         """
-
-        #TODO:piyumi when values are not provided what happens
-        await self.connection.execute(
-            _query,
-            {
-                'name': name,
-                'description': description,
-                'status': status.value.upper(),
-                'cohort_id': cohort_id,
-            },
-        )
-
+        query_params["cohort_id"] = cohort_id
+        await self.connection.execute(query, values=query_params)

@@ -251,10 +251,8 @@ class CohortLayer(BaseLayer):
             template_id=template_id,
         )
 
-    async def update_cohort(
-        self, cohort_update_body: CohortUpdateBody, cohort_id: int
-    ):
-        """update Cohorts"""
+    async def update_cohort(self, cohort_update_body: CohortUpdateBody, cohort_id: int):
+        """update Cohort given id"""
         cohorts, project_ids = await self.ct.query(
             CohortFilter(id=GenericFilter(eq=cohort_id))
         )

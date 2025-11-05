@@ -108,6 +108,7 @@ for enum in enum_tables.__dict__.values():
 GraphQLEnum = strawberry.type(type('GraphQLEnum', (object,), enum_methods))
 
 GraphQLAnalysisStatus = strawberry.enum(AnalysisStatus)  # type: ignore
+GraphQLCohortStatus = strawberry.enum(CohortStatus)
 
 
 # Create cohort GraphQL model
@@ -131,7 +132,7 @@ class GraphQLCohort:
             description=internal.description,
             author=internal.author,
             project_id=internal.project,
-            status=internal.status
+            status=internal.status,
         )
 
     @strawberry.field()
@@ -587,6 +588,7 @@ class GraphQLProject:
         author: GraphQLFilter[str] | None = None,
         template_id: GraphQLFilter[str] | None = None,
         timestamp: GraphQLFilter[datetime.datetime] | None = None,
+        status: GraphQLFilter[GraphQLCohortStatus] | None = None,
     ) -> list['GraphQLCohort']:
         connection = info.context['connection']
 
@@ -603,9 +605,9 @@ class GraphQLProject:
             ),
             timestamp=timestamp.to_internal_filter() if timestamp else None,
             project=GenericFilter(eq=root.id),
+            status=status.to_internal_filter() if status else None,
         )
 
-        #TODO:piyumi status returned
         cohorts = await CohortLayer(connection).query(c_filter)
         return [GraphQLCohort.from_internal(c) for c in cohorts]
 
@@ -1380,7 +1382,7 @@ class Query:  # entry point to graphql.
         name: GraphQLFilter[str] | None = None,
         author: GraphQLFilter[str] | None = None,
         template_id: GraphQLFilter[str] | None = None,
-        status: GraphQLFilter[CohortStatus] | None = None, #TODO:piyumi str or enum
+        status: GraphQLFilter[GraphQLCohortStatus] | None = None,
     ) -> list[GraphQLCohort]:
         connection = info.context['connection']
         cohort_layer = CohortLayer(connection)
