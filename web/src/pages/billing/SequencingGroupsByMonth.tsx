@@ -111,7 +111,7 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
                 date: new Date(item.date),
             } as ITypeData
         })
-    }, [data, loading])
+    }, [data, loading, error])
 
     // Code for generating the sequencing groups by month plot.
     React.useEffect(() => {
@@ -144,15 +144,14 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
         containerRef.current?.append(plot)
 
         return () => plot.remove()
-    }, [data, width, height])
+    }, [plotData, width, height])
 
     // Component to display a message when data isn't loaded or there's an error.
     const messageComponent = () => {
         if (error) {
             return (
-                <Message>
-                    {error}
-                    <br />
+                <Message negative>
+                    <p>{error.message}</p>
                     <Button negative onClick={() => window.location.reload()}>
                         Retry
                     </Button>
