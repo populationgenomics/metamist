@@ -287,9 +287,9 @@ class CohortTable(DbBase):
         """
 
         _query = """
-        SELECT id, name, template_id, author, description, project, timestamp
-        FROM cohort
-        WHERE id = :cohort_id
+        SELECT id as c_id, name as c_name, template_id as c_template_id, author as c_author, 
+        description as c_description, project as c_project, timestamp as c_timestamp
+        FROM cohort WHERE id = :cohort_id
         """
 
         cohort = await self.connection.fetch_one(_query, {'cohort_id': cohort_id})
@@ -297,7 +297,7 @@ class CohortTable(DbBase):
             raise ValueError(f'Cohort with ID {cohort_id} not found')
 
         # status criteria not computed in this function as current usage only consume template id
-        return CohortInternal.from_db(dict(cohort), None)
+        return CohortInternal.from_db(dict(cohort))
 
     async def update_cohort_given_id(
         self, name: str, description: str, status: CohortStatus, cohort_id: int
@@ -319,6 +319,8 @@ class CohortTable(DbBase):
 
         if not query_params:
             raise ValueError(f'No field to update')
+
+        query_params['audit_log_id'] = await self.audit_log_id()
 
         query = f"""
             UPDATE cohort

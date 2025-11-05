@@ -216,8 +216,16 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
         )[0]
         self.assertEqual(cohort.status, CohortStatus.INACTIVE)
 
+    @run_as_sync
+    async def test_query_cohort_in_get_template_by_cohort_id(self):
+        """Test template query for retrieved based on cohort id"""
+        template = await self.cohort_layer.get_template_by_cohort_id(
+            self.cohort.cohort_id
+        )
+        self.assertTrue(template)
 
-CREATE_COHORT_MUTATION ="""
+
+CREATE_COHORT_MUTATION = """
   mutation CreateCohortFromCriteria($project: String!, $cohortSpec: CohortBodyInput!, $cohortCriteria: CohortCriteriaInput!, $dryRun: Boolean) {
       cohort {
         createCohortFromCriteria(

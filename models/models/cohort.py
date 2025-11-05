@@ -21,7 +21,7 @@ class CohortInternal(SMBase):
     status: CohortStatus | None
 
     @staticmethod
-    def from_db(d: dict, cohort_status: CohortStatus | None):
+    def from_db(d: dict, cohort_status: CohortStatus | None = None):
         """
         Convert from db keys, mainly converting id to id_
         """
