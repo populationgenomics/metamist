@@ -9,10 +9,6 @@ on:
 permissions: {}
 
 
-# TODO
-# As pof now there is no standardised method to audit dependencies defined in pyproject.toml and uv.lock
-# https://github.com/astral-sh/uv/issues/9189
-# A workaround would be - https://github.com/owenlamont/uv-secure
 jobs:
   pip-audit:
     runs-on: ubuntu-latest
@@ -22,13 +18,17 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@6b9c6063abd6010835644d4c2e1bef4cf5cd0fca #v6.0.1
+
+      - name: Install project dependencies
+        run: |
+          uv sync
+          source .venv/bin/activate
+
       - uses: pypa/gh-action-pip-audit@v1.1.0
         name: Pip Audit Dependencies
         with:
-          inputs: requirements.txt
+          virtual-environment: .venv #audit the env
           summary: true
-      - uses: pypa/gh-action-pip-audit@v1.1.0
-        name: Pip Audit Dev Dependencies
-        with:
-          inputs: requirements-dev.txt
-          summary: true
+
