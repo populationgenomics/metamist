@@ -443,7 +443,7 @@ sqlalchemy==2.0.36
     # via
     #   databases
     #   testcontainers
-starlette==0.47.2
+starlette==0.49.1
     # via
     #   fastapi
     #   strawberry-graphql
