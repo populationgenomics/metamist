@@ -613,6 +613,18 @@ class GraphQLProject:
         discussion = await loader.load(root.id)
         return GraphQLDiscussion.from_internal(discussion)
 
+    @strawberry.field()
+    async def sequencing_group_history(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLProject'
+    ) -> list['GraphQLSequencingGroupTypeByDate']:
+        loader = info.context['loaders'][
+            LoaderKeys.SEQUENCING_GROUPS_COUNTS_FOR_PROJECT
+        ]
+
+        counts = await loader.load(root.id)
+
+        return GraphQLSequencingGroupTypeByDate.from_dict(counts)
+
 
 @strawberry.type
 class GraphQLAuditLog:
@@ -1288,6 +1300,27 @@ class GraphQLViewer:
 
     username: str
     projects: list[GraphQLProject]
+
+
+@strawberry.type
+class GraphQLSequencingGroupTypeByDate:
+    """
+    GraphQL representation of the number of Sequencing Groups of a given type that exist at a given date.
+    """
+
+    date: datetime.date
+    type: str
+    count: int
+
+    @staticmethod
+    def from_dict(date_type_count_map: dict[datetime.date, dict[str, int]]):
+        return [
+            GraphQLSequencingGroupTypeByDate(date=month, type=type, count=count)
+            for (month, type_counts) in sorted(
+                date_type_count_map.items(), key=lambda x: x[0]
+            )
+            for (type, count) in type_counts.items()
+        ]
 
 
 @strawberry.type
