@@ -4,7 +4,7 @@ import click
 
 from metamist.audit.data_access import GCSDataAccess, MetamistDataAccess
 from metamist.audit.models import AuditReportEntry, DeletionResult
-from metamist.audit.services import AuditLogs, Reporter
+from metamist.audit.services import BucketAuditLogger, Reporter
 
 from cpg_utils import Path, to_path
 
@@ -16,7 +16,7 @@ def delete_from_audit_results(
     dry_run: bool = False,
 ):
     """Delete files listed in the audit results."""
-    audit_logs = AuditLogs(dataset, 'audit_deletions')
+    audit_logs = BucketAuditLogger(dataset, 'audit_deletions')
 
     gcs = GCSDataAccess(dataset)
     reporter = Reporter(gcs, audit_logs, results_folder)
@@ -61,7 +61,7 @@ def delete_files_from_report(
     gcs: GCSDataAccess,
     report_name: str,
     rows: list[AuditReportEntry],
-    audit_logs: AuditLogs,
+    audit_logs: BucketAuditLogger,
     dry_run: bool,
 ) -> DeletionResult:
     """
@@ -116,7 +116,7 @@ def upsert_deleted_files_analysis(
     results_folder: str,
     deletion_report: Path,
     stats: dict,
-    audit_logs: AuditLogs,
+    audit_logs: BucketAuditLogger,
 ):
     """
     Inserts or updates an analysis record for deleted files.
