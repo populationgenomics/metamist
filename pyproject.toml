@@ -35,7 +35,7 @@ dependencies = [
     "requests",
     "tabulate >= 0.9.0",
     "urllib3 >= 1.25.3",
-    "setuptools>=80.9.0",
+    "setuptools>=80.9.0"
 ]
 description = "Python API for interacting with the Sample API system"
 readme = "README.md"
@@ -59,6 +59,7 @@ Homepage = "https://github.com/populationgenomics/metamist"
 [project.entry-points.metamist_parser]
 GenericMetadataParser = "metamist.parser.generic_metadata_parser:GenericMetadataParser"
 SampleFileMapParser = "metamist.parser.sample_file_map_parser:SampleFileMapParser"
+
 [tool.ruff]
 line-length = 88
 
@@ -178,4 +179,4 @@ build-backend = "setuptools.build_meta"
 
 
 [tool.setuptools]
-packages = ["metamist"]
+packages = { find = { include = ["metamist", "metamist.*"] } }
