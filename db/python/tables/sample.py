@@ -739,14 +739,63 @@ class SampleTable(DbBase):
             )
 
         # append all the months up to the current month
-        for proj, months in result.items():
+        this_month = date.today().replace(day=1)
+        for proj, month_counts in result.items():
             # in case there is no previous months available, then skip
-            if not months:
+            if not month_counts:
                 continue
 
-            current_month = date.today().replace(day=1)
-            while current_month not in months:
-                months[current_month] = accumulated_sample_count[proj]
-                current_month = (current_month - relativedelta(months=1)).replace(day=1)
+            # Fill in missing months between recorded dates.
+            current_month = min(month_counts.keys())
+            current_count = month_counts[current_month]
+            while current_month <= this_month:
+                if current_month in month_counts:
+                    current_count = month_counts[current_month]
+
+                month_counts[current_month] = current_count
+                current_month = (current_month + relativedelta(months=1)).replace(day=1)
+
+        return result
+
+    async def _get_sample_count_per_project_by_seq_group(
+        self, sequencing_group_ids: list[int]
+    ) -> dict[int, int]:
+        """Get the count of samples per project based on provided seq groups"""
+        # if no sequencing groups, return empty dict
+        if not sequencing_group_ids:
+            return {}
+
+        _query = """
+            SELECT s.project, COUNT(DISTINCT s.id) AS sample_count
+            FROM sequencing_group sg
+            INNER JOIN sample s ON s.id = sg.sample_id
+            WHERE sg.id in :sequencing_group_ids
+            GROUP BY s.project
+        """
+        rows = await self.connection.fetch_all(
+            _query, {'sequencing_group_ids': sequencing_group_ids}
+        )
+        return {r['project']: r['sample_count'] for r in rows}
+
+    async def get_sample_count_per_project_per_month(
+        self, sg_compute_per_month: dict[date, list[int]] | None
+    ) -> dict[int, dict[date, int]]:
+        """
+        Match passed month->list of sequencing groups to sample counts per project
+        used in compute for those sequencing groups
+        Return a map of {metamist project_id: {month: count of samples used in compute}}
+        """
+        # Map to hold the results
+        result: dict[int, dict[date, int]] = defaultdict(lambda: defaultdict(int))
+
+        if not sg_compute_per_month:
+            return result
+
+        for month, seq_groups in sg_compute_per_month.items():
+            project_sample_count = (
+                await self._get_sample_count_per_project_by_seq_group(seq_groups)
+            )
+            for project_id, sample_count in project_sample_count.items():
+                result[project_id][month] += sample_count
 
         return result
