@@ -50,7 +50,7 @@ jobs:
         run: |
           set -euxo pipefail
 
-          uv sync --only-dev
+          uv sync --group dev
 
           # liquibase connector
           pushd db/
