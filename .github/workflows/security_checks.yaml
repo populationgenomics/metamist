@@ -25,7 +25,9 @@ jobs:
 
       - name: Install project dependencies
         run: |
+          pip --version
           uv sync
+          pip --version
 
       - uses: pypa/gh-action-pip-audit@v1.1.0
         name: Pip Audit Dependencies
