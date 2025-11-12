@@ -174,7 +174,7 @@ dev = [
 
 
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=42", "pip"]
 build-backend = "setuptools.build_meta"
 
 
