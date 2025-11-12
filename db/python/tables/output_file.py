@@ -119,6 +119,10 @@ class OutputFileTable(DbBase):
         output: str | None = None,
     ):
         """Add file to an analysis (through the join table)"""
+
+        # The IGNORE is to avoid duplicate entries if the same file is added multiple times
+        # and we used this over ON DUPLICATE because there are reported deadlocks with that
+        # syntax in high concurrency situations?
         _query = dedent(
             """
             INSERT IGNORE INTO analysis_outputs
@@ -202,6 +206,7 @@ class OutputFileTable(DbBase):
                 pass
 
             _update_query = dedent(
+                # Delete analysis outputs not in the current set of file_ids or outputs
                 """
                 DELETE ao FROM analysis_outputs ao
                 WHERE ao.analysis_id = :analysis_id
