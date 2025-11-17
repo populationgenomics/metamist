@@ -1,7 +1,7 @@
 [project]
 name = "metamist"
 version = "7.11.1"
-requires-python = "==3.11.*"
+requires-python = ">=3.10, <3.12" #for compatibility with cpg-flow
 dependencies = [
     "aiohttp~=3.12.14",
     "async-lru>=2.0.5",
