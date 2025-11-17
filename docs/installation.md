@@ -28,7 +28,6 @@ uv python install 3.11
 
 uv sync --frozen --group dev --no-install-project
 
-
 # activate virtualenv
 source .venv/bin/activate
 ```
