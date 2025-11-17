@@ -715,9 +715,12 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
         mock_blob = unittest.mock.MagicMock()
         mock_blob.exists.return_value = False
         mock_blob.size = 0
-        with unittest.mock.patch.object(
-            StorageClient, 'get_blob', return_value=mock_blob
-        ), unittest.mock.patch.object(StorageClient, 'upload_from_buffer'):
+        with (
+            unittest.mock.patch.object(
+                StorageClient, 'get_blob', return_value=mock_blob
+            ),
+            unittest.mock.patch.object(StorageClient, 'upload_from_buffer'),
+        ):
             self.reporter.write_csv_report('test/path.csv', entries, 'TEST REPORT')
 
             # Verify blob operations
@@ -746,9 +749,12 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
         mock_blob.exists.return_value = True
         mock_blob.size = 100  # Non-zero size
         mock_blob.download_as_text.return_value = existing_content
-        with unittest.mock.patch.object(
-            StorageClient, 'get_blob', return_value=mock_blob
-        ), unittest.mock.patch.object(StorageClient, 'upload_from_buffer'):
+        with (
+            unittest.mock.patch.object(
+                StorageClient, 'get_blob', return_value=mock_blob
+            ),
+            unittest.mock.patch.object(StorageClient, 'upload_from_buffer'),
+        ):
             new_entries = [
                 AuditReportEntry(
                     filepath='gs://bucket/new.bam',
@@ -1070,13 +1076,17 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
             return_value=mock_path,
         ):
             # Mock MetamistDataAccess methods
-            with unittest.mock.patch.object(
-                MetamistDataAccess, 'get_audit_deletion_analysis'
-            ) as mock_get_analysis, unittest.mock.patch.object(
-                MetamistDataAccess, 'create_audit_deletion_analysis'
-            ) as mock_create_analysis, unittest.mock.patch.object(
-                MetamistDataAccess, 'update_audit_deletion_analysis'
-            ) as mock_update_analysis:
+            with (
+                unittest.mock.patch.object(
+                    MetamistDataAccess, 'get_audit_deletion_analysis'
+                ) as mock_get_analysis,
+                unittest.mock.patch.object(
+                    MetamistDataAccess, 'create_audit_deletion_analysis'
+                ) as mock_create_analysis,
+                unittest.mock.patch.object(
+                    MetamistDataAccess, 'update_audit_deletion_analysis'
+                ) as mock_update_analysis,
+            ):
                 mock_get_analysis.return_value = None
                 mock_create_analysis.return_value = 1
                 mock_update_analysis.return_value = 1
