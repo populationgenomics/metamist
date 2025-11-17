@@ -39,7 +39,7 @@ jobs:
       - name: Setup build env
         run: |
           set -euxo pipefail
-          
+
           uv sync --only-dev
 
       - name: 'install frontend deps'
