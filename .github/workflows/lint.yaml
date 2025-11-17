@@ -37,7 +37,10 @@ jobs:
           version: 0.8.22 #uv version
 
       - name: Setup build env
-        run: uv sync --only-dev
+        run: |
+          set -euxo pipefail
+          
+          uv sync --only-dev
 
       - name: 'install frontend deps'
         working-directory: ./web
