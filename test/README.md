@@ -2,7 +2,8 @@
 
 Running tests requires mariadb-java client, docker (for mariadb), and all the regular dev dependencies.
 
-Install mariadb-java client with 
+Install mariadb-java client with:
+
 ```shell
 cd db
 wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.0.3/mariadb-java-client-3.0.3.jar

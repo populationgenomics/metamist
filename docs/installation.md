@@ -23,7 +23,7 @@ Makesure [uv](https://docs.astral.sh/uv/getting-started/installation/) is locall
 
 
 ```bash
-# creates virtual env, install python version (3.11) as defined in the pyproject.toml and install dependencies
+# creates virtual env, install python version (3.11) and install dependencies
 uv python install 3.11
 
 uv sync --frozen --group dev --no-install-project
@@ -198,7 +198,7 @@ This is handled by the `regenerate_api.py` script.
 This script requires [openapi-generator](https://openapi-generator.tech/docs/installation/) to be installed, this is included as part of Metamist's python dev requirements, so make sure that you have your virtual env activated before running:
 
 ```bash
-python regenerate_api.py
+uv run python regenerate_api.py
 ```
 
 If you have installed openapi generator using a different method you can set the `OPENAPI_COMMAND` environment variable to configure the command to use.
@@ -230,7 +230,7 @@ To add some data to your database, you can run the `test/data/generate_data.py` 
 
 
 ```bash
-python3 test/data/generate_data.py
+uv run python3 test/data/generate_data.py
 ```
 
 
