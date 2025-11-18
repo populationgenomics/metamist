@@ -112,7 +112,7 @@ jobs:
             .
 
       - name: Build python package
-        run: python setup.py sdist
+        run: uv build --sdist
 
       - name: "push server image"
         run: |

@@ -3,10 +3,10 @@ COPY --from=ghcr.io/astral-sh/uv:0.8.22 /uv /uvx /bin/
 
 ARG SM_ENVIRONMENT
 
-ENV PORT 8000
-ENV SM_ENVIRONMENT ${SM_ENVIRONMENT}
+ENV PORT=8000
+ENV SM_ENVIRONMENT=${SM_ENVIRONMENT}
 # Allow statements and log messages to immediately appear in the Knative logs.
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONUNBUFFERED=1
 
 # Create a non-root user and group
 RUN groupadd -r appuser && useradd -r -g appuser -d /home/appuser -m -s /bin/bash appuser
