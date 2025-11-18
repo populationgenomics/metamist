@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - dev
+      # - fix-version-in-deployment-workflow
 
 permissions: {}
 
@@ -113,6 +114,7 @@ jobs:
           docker push $SM_DOCKER
 
       - name: "deploy to Cloud Run"
+        if: false
         run: |
           if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
             gcloud_deploy_name=sample-metadata-api
