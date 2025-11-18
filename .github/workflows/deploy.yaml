@@ -6,7 +6,7 @@ on:
     branches:
       - main
       - dev
-      # - fix-version-in-deployment-workflow
+      - fix-version-in-deployment-workflow
 
 permissions: {}
 
