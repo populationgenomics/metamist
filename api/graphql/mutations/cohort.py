@@ -8,7 +8,7 @@ from db.python.connect import Connection
 from db.python.filters.generic import GenericFilter
 from db.python.layers.cohort import CohortLayer
 from db.python.tables.cohort import CohortFilter, CohortTemplateFilter
-from models.enums.cohort import CohortStatus
+from models.enums.cohort import CohortStatus, CohortUpdateStatus
 from models.models.cohort import (
     CohortCriteria,
     CohortTemplate,
@@ -62,7 +62,7 @@ class CohortUpdateBodyInput:
 
     name: str | None = None
     description: str | None = None
-    status: CohortStatus | None = None
+    status: CohortUpdateStatus | None = None
 
 
 @strawberry.type

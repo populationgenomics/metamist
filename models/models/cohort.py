@@ -1,8 +1,7 @@
 from models.base import SMBase, parse_sql_dict
-from models.enums.cohort import CohortStatus
+from models.enums.cohort import CohortStatus, CohortUpdateStatus
 from models.models.project import ProjectId
 from models.utils.cohort_id_format import cohort_id_format
-from models.utils.cohort_template_id_format import cohort_template_id_format
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format_list,
     sequencing_group_id_transform_to_raw_list,
@@ -42,37 +41,13 @@ class CohortInternal(SMBase):
             status=cohort_status,
         )
 
-    def to_external(self):
-        """Convert to external model"""
-        return CohortExternal(
-            id=cohort_id_format(self.id),
-            name=self.name,
-            author=self.author,
-            project=self.project,  # This will return an internal id, should we not include this ??
-            description=self.description,
-            template_id=cohort_template_id_format(self.template_id),
-            status=self.status,
-        )
-
-
-class CohortExternal(SMBase):
-    """External model for Cohort"""
-
-    id: str
-    name: str
-    author: str
-    project: ProjectId
-    description: str
-    template_id: str
-    status: CohortStatus
-
 
 class CohortUpdateBody(SMBase):
     """Represents the expected JSON body of the update cohort request"""
 
     name: str | None = None
     description: str | None = None
-    status: CohortStatus | None = None
+    status: CohortUpdateStatus | None = None
 
 
 class CohortCriteriaInternal(SMBase):

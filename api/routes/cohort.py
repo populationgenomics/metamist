@@ -3,18 +3,13 @@ from fastapi import APIRouter
 from api.utils.db import (
     Connection,
     get_project_db_connection,
-    get_projectless_db_connection,
 )
-from db.python.filters import GenericFilter
 from db.python.layers.cohort import CohortLayer
-from db.python.tables.cohort import CohortFilter
 from models.models.cohort import (
     CohortBody,
     CohortCriteria,
     CohortTemplate,
     NewCohort,
-    CohortUpdateBody,
-    CohortExternal,
 )
 from models.models.project import (
     FullWriteAccessRoles,
@@ -22,7 +17,7 @@ from models.models.project import (
     ProjectMemberRole,
     ReadAccessRoles,
 )
-from models.utils.cohort_id_format import cohort_id_transform_to_raw
+
 from models.utils.cohort_template_id_format import (
     cohort_template_id_format,
     cohort_template_id_transform_to_raw,
@@ -118,40 +113,3 @@ async def create_cohort_template(
     )
 
     return cohort_template_id_format(cohort_raw_id)
-
-
-@router.get('/{cohort_id}', operation_id='getCohortById')
-async def get_cohort_by_id(
-    cohort_id: str, connection: Connection = get_projectless_db_connection
-) -> CohortExternal:
-    """Get cohort by ID"""
-
-    cohort_layer = CohortLayer(connection)
-
-    cohort_id_raw = cohort_id_transform_to_raw(cohort_id)
-    queried_cohort_in_list = await cohort_layer.query(
-        CohortFilter(id=GenericFilter(eq=cohort_id_raw))
-    )
-
-    if not queried_cohort_in_list:
-        raise ValueError(f'Cohort with ID {cohort_id} not found')
-
-    return queried_cohort_in_list[0].to_external()
-
-
-@router.patch('/{cohort_id}', operation_id='updateCohortById')
-async def update_cohort_by_id(
-    cohort_id: str,
-    cohort: CohortUpdateBody,
-    connection: Connection = get_projectless_db_connection,
-) -> CohortExternal:
-    """update cohort by ID"""
-
-    cohort_layer = CohortLayer(connection)
-    cohort_id_raw = cohort_id_transform_to_raw(cohort_id)
-
-    await cohort_layer.update_cohort(cohort, cohort_id_raw)
-    updated_cohort = (
-        await cohort_layer.query(CohortFilter(id=GenericFilter(eq=cohort_id_raw)))
-    )[0]
-    return updated_cohort.to_external()

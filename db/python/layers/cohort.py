@@ -9,6 +9,7 @@ from db.python.tables.sequencing_group import (
     SequencingGroupTable,
 )
 from db.python.utils import get_logger
+from models.enums.cohort import CohortStatus, CohortUpdateStatus
 from models.models.cohort import (
     CohortCriteriaInternal,
     CohortInternal,
@@ -264,9 +265,15 @@ class CohortLayer(BaseLayer):
         if not cohorts:
             raise ValueError(f'Cohort ID not found')
 
-        await self.ct.update_cohort_given_id(
+        if (
+            cohort_update_body.status == CohortUpdateStatus.ACTIVE
+            and cohorts[0].status == CohortStatus.INVALID
+        ):
+            raise ValueError(f'Cohort already invalid')
+
+        await self.ct.update_cohort(
+            cohort_id=cohort_id,
             name=cohort_update_body.name,
             description=cohort_update_body.description,
             status=cohort_update_body.status,
-            cohort_id=cohort_id,
         )

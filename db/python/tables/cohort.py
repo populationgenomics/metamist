@@ -1,14 +1,13 @@
 # pylint: disable=too-many-instance-attributes
 import dataclasses
 import datetime
-from collections import defaultdict
-from typing import DefaultDict, Any
+from typing import Any
 
 from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
 from db.python.utils import NotFoundError, to_db_json
 from models.base import parse_sql_bool
-from models.enums.cohort import CohortStatus
+from models.enums.cohort import CohortStatus, CohortUpdateStatus
 from models.models.cohort import (
     CohortCriteriaInternal,
     CohortInternal,
@@ -60,8 +59,6 @@ class CohortTable(DbBase):
         'c.author as c_author',
         'c.project as c_project',
         'c.status as c_status',
-        's.active as s_active',
-        'sg.archived as sg_archived',
     ]
 
     template_keys = ['id', 'name', 'description', 'criteria', 'project']
@@ -89,64 +86,40 @@ class CohortTable(DbBase):
         cohort_get_keys_str = ','.join(self.cohort_get_keys)
 
         _query = f"""
-        SELECT {cohort_get_keys_str}
+        SELECT {cohort_get_keys_str},
+        exists (
+            select 1
+            from cohort_sequencing_group csg
+            join sequencing_group sg
+            on sg.id = csg.sequencing_group_id
+            join sample s
+            on s.id = sg.sample_id
+            where csg.cohort_id = c.id
+            and (sg.archived or not s.active)
+        ) as is_invalid
         FROM cohort c
-        LEFT JOIN cohort_sequencing_group csg ON c.id = csg.cohort_id
-        LEFT JOIN sequencing_group sg ON sg.id = csg.sequencing_group_id
-        LEFT JOIN sample s ON s.id = sg.sample_id
         WHERE {wheres}
         """
 
         rows = await self.connection.fetch_all(_query, values)
-
-        unique_cohorts = {}
-        cohort_statuses: DefaultDict[str, CohortStatus] = defaultdict(
-            lambda: CohortStatus.ACTIVE
-        )
-
+        cohorts_list = []
         for row in rows:
             row_dict = dict(row)
-            cohort_id = row_dict['c_id']
-            if cohort_statuses.get(cohort_id) == CohortStatus.INACTIVE:
-                continue
-            if cohort_id not in unique_cohorts:
-                unique_cohorts[cohort_id] = row_dict
-            if (
-                cohort_statuses[cohort_id] == CohortStatus.ACTIVE
-                and parse_sql_bool(row_dict['s_active'])
-                and (not parse_sql_bool(row_dict['sg_archived']))
-                and row_dict['c_status'].lower() == CohortStatus.ACTIVE.value
-            ):
-                cohort_statuses[cohort_id] = CohortStatus.ACTIVE
+            is_active = row_dict['c_status'].lower() == CohortStatus.ACTIVE.value
+            is_invalid = parse_sql_bool(row_dict['is_invalid'])
+
+            if is_active:
+                cohort_status = (
+                    CohortStatus.INVALID if is_invalid else CohortStatus.ACTIVE
+                )
             else:
-                cohort_statuses[cohort_id] = CohortStatus.INACTIVE
+                cohort_status = CohortStatus.ARCHIVED
 
-        if filter_status is not None:
-            cohorts = []
-            for cohort_id, row in unique_cohorts.items():
-                status = cohort_statuses[cohort_id]
-                include = True
+            if _custom_matches_filter(cohort_status, filter_status):
+                cohorts_list.append(CohortInternal.from_db(row_dict, cohort_status))
 
-                if filter_status.eq is not None and status != filter_status.eq:
-                    include = False
-                if filter_status.neq is not None and status == filter_status.neq:
-                    include = False
-                if filter_status.in_ is not None and status not in filter_status.in_:
-                    include = False
-                if filter_status.nin is not None and status in filter_status.nin:
-                    include = False
-
-                # The remaining filter criteria in GenericFilter are not considered and will be by-passed
-                if include:
-                    cohorts.append(CohortInternal.from_db(dict(row), status))
-        else:
-            cohorts = [
-                CohortInternal.from_db(dict(row), cohort_statuses[cohort_id])
-                for cohort_id, row in unique_cohorts.items()
-            ]
-
-        projects = {c.project for c in cohorts}
-        return cohorts, projects
+        projects = {c.project for c in cohorts_list}
+        return cohorts_list, projects
 
     async def get_cohort_sequencing_group_ids(self, cohort_id: int) -> list[int]:
         """
@@ -300,8 +273,12 @@ class CohortTable(DbBase):
         # status criteria not computed in this function as current usage only consume template id
         return CohortInternal.from_db(dict(cohort))
 
-    async def update_cohort_given_id(
-        self, name: str, description: str, status: CohortStatus, cohort_id: int
+    async def update_cohort(
+        self,
+        cohort_id: int,
+        name: str | None,
+        description: str | None,
+        status: CohortUpdateStatus | None,
     ):
         """
         Update the cohort given its ID
@@ -315,7 +292,7 @@ class CohortTable(DbBase):
         }
 
         query_params: dict[str, Any] = {
-            **{k: v for k, v in cohort_fields.items() if v is not None}
+            k: v for k, v in cohort_fields.items() if v is not None
         }
 
         if not query_params:
@@ -330,3 +307,25 @@ class CohortTable(DbBase):
         """
         query_params['cohort_id'] = cohort_id
         await self.connection.execute(query, values=query_params)
+
+
+def _custom_matches_filter(
+    status: CohortStatus, filter_: GenericFilter[CohortStatus]
+) -> bool:
+    """
+    Util method to filter based on cohort status
+    """
+
+    if filter_ is None:
+        return True
+
+    if filter_.eq is not None and status != filter_.eq:
+        return False
+    if filter_.neq is not None and status == filter_.neq:
+        return False
+    if filter_.in_ is not None and status not in filter_.in_:
+        return False
+    if filter_.nin is not None and status in filter_.nin:
+        return False
+
+    return True
