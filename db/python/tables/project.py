@@ -299,9 +299,7 @@ DELETE FROM output_file WHERE id IN (
     INNER JOIN analysis a ON ao.analysis_id = a.id
     WHERE a.project = :project
 );
-DELETE FROM analysis_outputs WHERE analysis_id IN (
-    SELECT id FROM analysis WHERE project = :project
-);
+-- Deletion from `output_file` cascades to `analysis_outputs`
 DELETE FROM analysis_sequencing_group WHERE analysis_id in (
     SELECT id FROM analysis WHERE project = :project
 );

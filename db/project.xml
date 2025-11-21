@@ -1908,7 +1908,7 @@
     </changeSet>
     <!--END-->
 
-	<changeSet id="2025-10-14-cascade-comment-deletion" author="john.marshall">
+	<changeSet id="2025-10-14-cascade-comment-and-outputs-deletion" author="john.marshall">
 		<dropForeignKeyConstraint
 			baseTableName="assay_comment"
 			constraintName="FK_ASSAY_COMMENT_COMMENT_ID" />
@@ -1974,5 +1974,27 @@
 			referencedTableName="comment"
 			referencedColumnNames="id"
 			onDelete="CASCADE" />
+
+		<dropForeignKeyConstraint
+			baseTableName="analysis_outputs"
+			constraintName="FK_ANALYSIS_OUTPUTS_FILE_ID" />
+		<addForeignKeyConstraint
+			baseTableName="analysis_outputs"
+			baseColumnNames="file_id"
+			constraintName="FK_ANALYSIS_OUTPUTS_FILE_ID"
+			referencedTableName="output_file"
+			referencedColumnNames="id"
+			onDelete="CASCADE" />
+
+		<dropForeignKeyConstraint
+			baseTableName="output_file"
+			constraintName="FK_SECONDARY_FILE_PARENT_ID" />
+		<addForeignKeyConstraint
+			baseTableName="output_file"
+			baseColumnNames="parent_id"
+			constraintName="FK_SECONDARY_FILE_PARENT_ID"
+			referencedTableName="output_file"
+			referencedColumnNames="id"
+			onDelete="SET NULL" />
 	</changeSet>
 </databaseChangeLog>
