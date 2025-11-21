@@ -286,6 +286,11 @@ class DbTest(unittest.TestCase):
             client_options={'api_endpoint': 'http://localhost:4443'},
         )
 
+    async def row_count(self, table: str) -> int:
+        """Return the number of rows in the specified table (via raw SQL)"""
+        query = f'SELECT COUNT(*) FROM {table}'
+        return await self.connection.connection.fetch_val(query)
+
     @run_as_sync
     async def run_graphql_query(self, query, variables=None):
         """Run SYNC graphql query on internal database"""
