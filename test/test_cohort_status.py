@@ -4,6 +4,7 @@ from random import randint
 from db.python.filters import GenericFilter
 from db.python.layers import CohortLayer, SampleLayer, SequencingGroupLayer
 from db.python.tables.cohort import CohortFilter
+from db.python.tables.sequencing_group import SequencingGroupFilter
 from graphql.error import GraphQLError
 from models.enums.cohort import CohortStatus, CohortUpdateStatus
 from models.models.cohort import CohortCriteriaInternal, CohortUpdateBody
@@ -11,7 +12,6 @@ from models.utils.cohort_id_format import cohort_id_format
 from models.utils.cohort_template_id_format import cohort_template_id_format
 from test.testbase import DbIsolatedTest
 from test.testbase import run_as_sync
-from db.python.tables.sequencing_group import SequencingGroupFilter
 
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
