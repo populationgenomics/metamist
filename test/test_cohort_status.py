@@ -11,6 +11,7 @@ from models.utils.cohort_id_format import cohort_id_format
 from models.utils.cohort_template_id_format import cohort_template_id_format
 from test.testbase import DbIsolatedTest
 from test.testbase import run_as_sync
+from db.python.tables.sequencing_group import SequencingGroupFilter
 
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
@@ -122,7 +123,6 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
     async def test_query_cohort_status_with_all_active(self):
         """Test computed cohort status when sample/s active,
         sg/s not archived and cohort status is active in the DB"""
-        from db.python.filters.sequencing_group import SequencingGroupFilter
 
         queried_sample = await self.sample_layer.get_by_id(sample_id=self.sample_a.id)
         self.assertTrue(queried_sample.active)
