@@ -590,7 +590,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
 
     @run_as_sync
     async def test_update_status_of_invalid_cohort(self):
-        """Test GraphQL mutation for updating status of an archived cohort"""
+        """Test GraphQL mutation for updating status of an INVALID cohort"""
 
         await SampleLayer(self.connection).upsert_sample(
             SampleUpsertInternal(id=self.sample_a.id, active=False)
@@ -601,6 +601,49 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
             )
         )[0]
         self.assertEqual(cohort.status, CohortStatus.INVALID)
+
+        updated_cohort = (
+            await self.run_graphql_query_async(
+                """
+                    mutation updateCohort($id : String!, $cohort: CohortUpdateBodyInput!)
+                    {
+                      cohort{
+                        updateCohort(id:$id, cohort:$cohort){
+                          status
+                        }
+                      }
+                    }
+            """,
+                {
+                    'id': cohort_id_format(self.cohort.cohort_id),
+                    'cohort': {'status': 'ACTIVE'},
+                },
+            )
+        )['cohort']['updateCohort']
+
+        self.assertEqual(updated_cohort['status'], 'INVALID')
+
+    @run_as_sync
+    async def test_update_status_of_archived_cohort_with_archived_samples(self):
+        """Test GraphQL mutation for updating status of an archived cohort with archived samples"""
+
+        # directly update cohort DB status
+        await self.connection.connection.fetch_one(
+            'UPDATE cohort SET status = :status WHERE id = :cohort_id',
+            {
+                'cohort_id': self.cohort.cohort_id,
+                'status': CohortUpdateStatus.INACTIVE.value.upper(),
+            },
+        )
+        await SampleLayer(self.connection).upsert_sample(
+            SampleUpsertInternal(id=self.sample_a.id, active=False)
+        )
+        cohort = (
+            await self.cohort_layer.query(
+                CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
+            )
+        )[0]
+        self.assertEqual(cohort.status, CohortStatus.ARCHIVED)
 
         with self.assertRaises(GraphQLError):
             _ = await self.run_graphql_query_async(
@@ -619,3 +662,37 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                     'cohort': {'status': 'ACTIVE'},
                 },
             )
+
+    @run_as_sync
+    async def test_update_status_of_archived_cohort_with_active_samples(self):
+        """Test GraphQL mutation for updating status of an archived cohort with archived samples"""
+
+        # directly update cohort DB status
+        await self.connection.connection.fetch_one(
+            'UPDATE cohort SET status = :status WHERE id = :cohort_id',
+            {
+                'cohort_id': self.cohort.cohort_id,
+                'status': CohortUpdateStatus.INACTIVE.value.upper(),
+            },
+        )
+
+        updated_cohort = (
+            await self.run_graphql_query_async(
+                """
+                    mutation updateCohort($id : String!, $cohort: CohortUpdateBodyInput!)
+                    {
+                      cohort{
+                        updateCohort(id:$id, cohort:$cohort){
+                          status
+                        }
+                      }
+                    }
+            """,
+                {
+                    'id': cohort_id_format(self.cohort.cohort_id),
+                    'cohort': {'status': 'ACTIVE'},
+                },
+            )
+        )['cohort']['updateCohort']
+
+        self.assertEqual(updated_cohort['status'], 'ACTIVE')

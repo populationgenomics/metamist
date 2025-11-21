@@ -308,6 +308,30 @@ class CohortTable(DbBase):
         query_params['cohort_id'] = cohort_id
         await self.connection.execute(query, values=query_params)
 
+    async def is_cohort_sample_sg_invalid(self, cohort_id: int) -> bool:
+        """Query sample and sequencing group status for cohort"""
+
+        _query = f"""
+            SELECT
+            exists (
+                select 1
+                from cohort_sequencing_group csg
+                join sequencing_group sg
+                on sg.id = csg.sequencing_group_id
+                join sample s
+                on s.id = sg.sample_id
+                where csg.cohort_id = c.id
+                and (sg.archived or not s.active)
+            ) as is_invalid
+            FROM cohort c
+            WHERE c.id = :cohort_id
+            """
+
+        row = await self.connection.fetch_one(_query, values={'cohort_id': cohort_id})
+        if row:
+            return parse_sql_bool(row['is_invalid'])
+        return False
+
 
 def _custom_matches_filter(
     status: CohortStatus, filter_: GenericFilter[CohortStatus]
