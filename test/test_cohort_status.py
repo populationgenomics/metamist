@@ -107,7 +107,7 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
 
     @run_as_sync
     async def test_query_cohort_with_archived_sg(self):
-        """Test cohort status when inactive sequencing group"""
+        """Test cohort status when archived sequencing group"""
 
         await (SequencingGroupLayer(self.connection)).archive_sequencing_group(
             sequencing_group_id=self.sgA_raw[0]
@@ -180,15 +180,15 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
         self.assertEqual(cohort.status, CohortStatus.INVALID)
 
     @run_as_sync
-    async def test_query_cohort_with_inactive_db_status(self):
-        """Test computed cohort status when cohort is inactive in the DB"""
+    async def test_query_cohort_with_archived_db_status(self):
+        """Test computed cohort status when cohort is archived in the DB"""
 
         # directly update without using the cohort_db_layer
         await self.connection.connection.fetch_one(
             'UPDATE cohort SET status = :status WHERE id = :cohort_id',
             {
                 'cohort_id': self.cohort.cohort_id,
-                'status': CohortUpdateStatus.INACTIVE.value.upper(),
+                'status': CohortUpdateStatus.ARCHIVED.value.upper(),
             },
         )
 
@@ -339,7 +339,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
 
         # update cohort status and retrieve
         await self.cohort_layer.update_cohort(
-            CohortUpdateBody(status=CohortUpdateStatus.INACTIVE), self.cohort.cohort_id
+            CohortUpdateBody(status=CohortUpdateStatus.ARCHIVED), self.cohort.cohort_id
         )
         query_cohort_status_eq = await self.run_graphql_query_async(
             query_cohort_filter_status_eq,
@@ -386,7 +386,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
 
         # update cohort status and retrieve
         await self.cohort_layer.update_cohort(
-            CohortUpdateBody(status=CohortUpdateStatus.INACTIVE), self.cohort.cohort_id
+            CohortUpdateBody(status=CohortUpdateStatus.ARCHIVED), self.cohort.cohort_id
         )
 
         query_cohort_status_in = await self.run_graphql_query_async(
@@ -463,7 +463,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
         """Test GraphQL mutation for updating cohort fields"""
 
         new_name = 'Updated Llama'
-        new_status = 'INACTIVE'
+        new_status = 'ARCHIVED'
         new_description = 'Updated description'
 
         queried_cohort = (
@@ -632,7 +632,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
             'UPDATE cohort SET status = :status WHERE id = :cohort_id',
             {
                 'cohort_id': self.cohort.cohort_id,
-                'status': CohortUpdateStatus.INACTIVE.value.upper(),
+                'status': CohortUpdateStatus.ARCHIVED.value.upper(),
             },
         )
         await SampleLayer(self.connection).upsert_sample(
@@ -672,7 +672,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
             'UPDATE cohort SET status = :status WHERE id = :cohort_id',
             {
                 'cohort_id': self.cohort.cohort_id,
-                'status': CohortUpdateStatus.INACTIVE.value.upper(),
+                'status': CohortUpdateStatus.ARCHIVED.value.upper(),
             },
         )
 

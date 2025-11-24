@@ -1892,7 +1892,7 @@
 	<changeSet author="piyumi.amarasinghe" id="2025-10-29_add_status_column_cohort_table">
         <sql>SET @@system_versioning_alter_history = 1;</sql>
 		<addColumn tableName="cohort">
-        <column name="status" type="ENUM('ACTIVE','INACTIVE')" defaultValue="ACTIVE"  remarks="Cohort status">
+        <column name="status" type="ENUM('ACTIVE','ARCHIVED')" defaultValue="ACTIVE"  remarks="Cohort status">
            <constraints nullable="false"/>
         </column>
 		</addColumn>

@@ -23,6 +23,8 @@ from models.utils.cohort_template_id_format import (
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLCohort, GraphQLCohortTemplate
 
+GraphQLCohortUpdateStatus: type = strawberry.enum(CohortUpdateStatus)
+
 
 @strawberry.input
 class CohortCriteriaInput:
@@ -62,7 +64,7 @@ class CohortUpdateBodyInput:
 
     name: str | None = None
     description: str | None = None
-    status: CohortUpdateStatus | None = None
+    status: GraphQLCohortUpdateStatus | None = None
 
 
 @strawberry.type

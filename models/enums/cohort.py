@@ -9,7 +9,7 @@ class CohortStatus(str, Enum):
     """
 
     ACTIVE = 'active'
-    ARCHIVED = 'archived'  # when cohort marked inactive
+    ARCHIVED = 'archived'  # when cohort marked archived
     INVALID = 'invalid'  # when sgs or samples marked inactive/archived
 
 
@@ -19,4 +19,4 @@ class CohortUpdateStatus(str, Enum):
     """
 
     ACTIVE = 'active'
-    INACTIVE = 'inactive'
+    ARCHIVED = 'archived'
