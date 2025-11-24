@@ -1,14 +1,23 @@
 from fastapi import APIRouter
 
-from api.utils.db import Connection, get_project_db_connection
+from api.utils.db import (
+    Connection,
+    get_project_db_connection,
+)
 from db.python.layers.cohort import CohortLayer
-from models.models.cohort import CohortBody, CohortCriteria, CohortTemplate, NewCohort
+from models.models.cohort import (
+    CohortBody,
+    CohortCriteria,
+    CohortTemplate,
+    NewCohort,
+)
 from models.models.project import (
     FullWriteAccessRoles,
     ProjectId,
     ProjectMemberRole,
     ReadAccessRoles,
 )
+
 from models.utils.cohort_template_id_format import (
     cohort_template_id_format,
     cohort_template_id_transform_to_raw,
