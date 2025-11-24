@@ -154,7 +154,6 @@ CREATE_COHORT_TEMPLATE_MUTATION = """
         }
     }
 """
-
 # endregion COHORT MUTATIONS
 
 # region FAMILY MUTATIONS
