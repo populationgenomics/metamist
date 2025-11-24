@@ -208,8 +208,8 @@ class OutputFileTable(DbBase):
             _update_query = dedent(
                 # Delete analysis outputs not in the current set of file_ids or outputs
                 """
-                DELETE ao FROM analysis_outputs ao
-                WHERE ao.analysis_id = :analysis_id
+                DELETE FROM analysis_outputs
+                WHERE analysis_id = :analysis_id
                 """
             )
 
@@ -223,13 +223,13 @@ class OutputFileTable(DbBase):
             # Add file_id condition if file_ids is not empty
             if file_ids:
                 conditions.append(
-                    'ao.file_id IS NOT NULL AND ao.file_id NOT IN :file_ids'
+                    'file_id IS NOT NULL AND file_id NOT IN :file_ids'
                 )
                 query_params['file_ids'] = file_ids  # Add file_ids to query parameters
 
             # Add output condition if outputs is not empty
             if outputs:
-                conditions.append('ao.output IS NOT NULL AND ao.output NOT IN :outputs')
+                conditions.append('output IS NOT NULL AND output NOT IN :outputs')
                 query_params['outputs'] = outputs  # Add outputs to query parameters
 
             # Join the conditions with OR since either can be valid
