@@ -222,9 +222,7 @@ class OutputFileTable(DbBase):
 
             # Add file_id condition if file_ids is not empty
             if file_ids:
-                conditions.append(
-                    'file_id IS NOT NULL AND file_id NOT IN :file_ids'
-                )
+                conditions.append('file_id IS NOT NULL AND file_id NOT IN :file_ids')
                 query_params['file_ids'] = file_ids  # Add file_ids to query parameters
 
             # Add output condition if outputs is not empty
