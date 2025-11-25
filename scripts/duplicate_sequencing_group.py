@@ -297,7 +297,7 @@ async def upsert_analyses_records(
 
 async def get_participant_sample(
     dataset: str, participant_id: str, sample_id: str
-) -> Tuple[int, str]:
+) -> Tuple[int, str | None]:
     """
     Fetch a participant and sample from the specified dataset and validate their existence.
     """
@@ -309,7 +309,7 @@ def validate_ids(
     new_sample_id: str,
     new_participant_id: str,
     participants: Any,
-) -> Tuple[int, str]:
+) -> Tuple[int, str | None]:
     """
     Validate that the provided sample ID and participant ID exist and are consistent.
 
@@ -326,6 +326,10 @@ def validate_ids(
                     or new_sample_id == sample['id']
                 ):
                     return participant['id'], sample['id']
+
+            return participant[
+                'id'
+            ], None  # Participant found, sample not found, so create new sample
 
     raise ValueError(
         'Provided sample ID and participant ID are not consistent or do not exist.'
