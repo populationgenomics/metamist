@@ -452,22 +452,13 @@ async def reheader_analysis_files_in_batch(
             )
         elif str(old_path).endswith('.gz'):
             job.storage(file_size(old_path) + 512 * 1024**2)  # Allow 512 MiB extra
-            if file_tabixable(str(old_path)):
-                bgzipped_file_commands(
-                    batch,
-                    job,
-                    str(old_path),
-                    str(new_path),
-                    (source_sequencing_group_id, new_sequencing_group_id),
-                )
-            else:
-                gzipped_file_commands(
-                    batch,
-                    job,
-                    str(old_path),
-                    str(new_path),
-                    (source_sequencing_group_id, new_sequencing_group_id),
-                )
+            bgzipped_file_commands(
+                batch,
+                job,
+                str(old_path),
+                str(new_path),
+                (source_sequencing_group_id, new_sequencing_group_id),
+            )
         else:
             text_file_commands(
                 batch,
@@ -585,33 +576,25 @@ def somalier_file_commands(old_path: str, new_path: str, sid: tuple[str, str]):
     logger.info(f"Successfully replaced ID '{sid[0]}' with '{sid[1]}' in {new_path}")
 
 
-def gzipped_file_commands(
-    batch, job, old_path: str, new_path: str, sid: tuple[str, str]
-):
-    """Adds the commands required to regenerate gzipped files"""
-    job.image(config_retrieve(['workflow', 'driver_image']))
-    old_file = batch.read_input(old_path)
-    # Simple gunzip and gzip to regenerate the gzipped file after sed replacement
-    job.command(rf"""
-        gunzip -c {old_file} | sed "s/{{{sid[0]}}}/{{{sid[1]}}}/g" | gzip > {job.new_file}
-    """)
-    batch.write_output(job.new_file, new_path)
-
-
 def bgzipped_file_commands(
     batch, job, old_path: str, new_path: str, sid: tuple[str, str]
 ):
-    """Adds the commands required to regenerate bgzipped files"""
+    """Adds the commands required to regenerate bgzipped files originally produced by GATK-SV"""
     job.image(image_path('bcftools'))
     old_file = batch.read_input(old_path)
     job.declare_resource_group(new_file={'outfile': '{root}.gz', 'tbi': '{root}.gz.tbi'})
-    # Simple gunzip and bgzip to regenerate the bgzipped file after sed replacement
+    
+    # Use bgzip to decompress, sed to replace, and bgzip to recompress
+    # Compression level 3 seems to be what GATK-SV uses, so we match that here
     job.command(rf"""
-        bgzip --decompress {old_file} | sed "s/{{{sid[0]}}}/{{{sid[1]}}}/g" | bgzip > {job.new_file.outfile}
+        bgzip -c --decompress {old_file} | sed "s/{sid[0]}/{sid[1]}/g" | bgzip -c -l 3 > {job.new_file.outfile}
     """)
     if file_tabixable(new_path):
+        # Regenerate the tabix index for the CollectSVEvidence files (pe.txt.gz, sd.txt.gz, sr.txt.gz)
+        # Use the tabix -0 -s1 -b2 -e2 options to index the standard 1-based coordinate files
+        # See: https://github.com/populationgenomics/gatk-sv/blob/890582922bccb4b651275506a34311c949417f6c/wdl/PETestChromosome.wdl#L227
         job.command(rf"""
-            tabix {job.new_file.outfile}
+            tabix -0 -s1 -b2 -e2 {job.new_file.outfile}
             # Mention {job.new_file.tbi} for hail as tabix has no -o option
         """)
         batch.write_output(job.new_file.tbi, new_path + '.tbi')
@@ -765,3 +748,4 @@ if __name__ == '__main__':
             deactivate_original_sg=bool(args.deactivate_original_sg),
         )
     )
+    asyncio.get_event_loop().close()
