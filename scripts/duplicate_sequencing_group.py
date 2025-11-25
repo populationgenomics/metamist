@@ -422,7 +422,7 @@ async def upsert_analyses_records(
         analysis_to_create = Analysis(
             type=analysis['type'],
             status=AnalysisStatus('completed'),
-            outputs={'basename': analysis['output']['basename']},  # this is the correct syntax for autofilling outputs dict
+            outputs={'basename': analysis['output']},  # this is the correct syntax for autofilling outputs dict
             meta=analysis['meta'],  # add some provenance info here?
             sequencing_group_ids=[analysis['sg_id']],
         )
