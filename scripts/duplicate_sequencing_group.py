@@ -296,18 +296,18 @@ async def upsert_analyses_records(
 
 
 async def get_participant_sample(
-    dataset: str, participant_id: str, sample_id: str
+    dataset: str, new_participant_id: str | None, new_sample_id: str | None
 ) -> Tuple[int, str | None]:
     """
     Fetch a participant and sample from the specified dataset and validate their existence.
     """
     response = await query_async(PARTICIPANT_SAMPLES_QUERY, {'dataset': dataset})
-    return validate_ids(participant_id, sample_id, response['project']['participants'])
+    return validate_ids(new_participant_id, new_sample_id, response['project']['participants'])
 
 
 def validate_ids(
-    new_sample_id: str,
-    new_participant_id: str,
+    new_participant_id: str | None,
+    new_sample_id: str | None,
     participants: Any,
 ) -> Tuple[int, str | None]:
     """
