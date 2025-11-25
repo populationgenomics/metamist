@@ -858,7 +858,7 @@ if __name__ == '__main__':
         help='Optional flag to deactivate the original sequencing group.',
     )
     args = parser.parse_args()
-    asyncio.run(
+    asyncio.get_event_loop().run_until_complete(
         main(
             original_sg_id=args.original_sg_id,
             source_dataset=args.source_dataset,
@@ -870,4 +870,4 @@ if __name__ == '__main__':
             deactivate_original_sg=bool(args.deactivate_original_sg),
         )
     )
-    asyncio.get_event_loop().close()
+    
