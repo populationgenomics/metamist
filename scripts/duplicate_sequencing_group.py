@@ -11,7 +11,7 @@ Steps:
     user can provide a sample ID and participant ID to associate with the new sequencing group.
 2. Script queries the original dataset for the sequencing group and its associated analysis files.
 3. Script creates a new sequencing group in the new dataset, copying over the analysis files to
-    the new dataset's storage bucket(s). This is also done for unrecorded analysis files that are not 
+    the new dataset's storage bucket(s). This is also done for unrecorded analysis files that are not
     listed in the analysis records.
 4. Script then invokes batch jobs to update the copied analysis files to reflect the new sequencing group ID.
     This includes samtools/bcftools reheader operations within the file headers for crams and vcfs,
@@ -42,7 +42,11 @@ from metamist.models import (
 )
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s', stream=sys.stderr, level=logging.INFO)
+logging.basicConfig(
+    format='%(levelname)s (%(name)s %(lineno)s): %(message)s',
+    stream=sys.stderr,
+    level=logging.INFO,
+)
 
 # ============================================================================
 # CONSTANTS AND CONFIGURATION
@@ -303,9 +307,9 @@ async def get_analyses_to_upsert(
 
             # Create the new outputs by replacing the source dataset and SG ID with the new ones
             source_path = current_outputs['path']
-            new_path = source_path.replace(
-                source_dataset, new_dataset
-            ).replace(source_sequencing_group_id, new_sequencing_group_id)
+            new_path = source_path.replace(source_dataset, new_dataset).replace(
+                source_sequencing_group_id, new_sequencing_group_id
+            )
 
             # Build the (source_path, new_path) tuples for moving the files
             if (
@@ -314,9 +318,7 @@ async def get_analyses_to_upsert(
             ) in files_to_move:
                 continue  # Avoid duplicates
 
-            files_to_move.append(
-                (to_path(source_path), to_path(new_path))
-            )
+            files_to_move.append((to_path(source_path), to_path(new_path)))
 
             # Update the analysis meta with the new dataset and SG ID
             source_meta: dict = analysis['meta']
@@ -422,7 +424,9 @@ async def upsert_analyses_records(
         analysis_to_create = Analysis(
             type=analysis['type'],
             status=AnalysisStatus('completed'),
-            outputs={'basename': analysis['output']},  # this is the correct syntax for autofilling outputs dict
+            outputs={
+                'basename': analysis['output']
+            },  # this is the correct syntax for autofilling outputs dict
             meta=analysis['meta'],  # add some provenance info here?
             sequencing_group_ids=[analysis['sg_id']],
         )
@@ -505,9 +509,7 @@ async def reheader_analysis_files_in_batch(
                 (source_sequencing_group_id, new_sequencing_group_id),
             )
             continue
-        job = batch.new_job(
-            f'Update SG ID in {old_path!s}'
-        )
+        job = batch.new_job(f'Update SG ID in {old_path!s}')
         if file_reheaderable(str(old_path)):
             job.storage(file_size(old_path) + 2 * 1024**3)  # Allow 2 GiB extra
             main_file_commands(
@@ -851,4 +853,3 @@ if __name__ == '__main__':
             deactivate_original_sg=bool(args.deactivate_original_sg),
         )
     )
-    
