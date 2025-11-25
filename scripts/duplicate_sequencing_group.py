@@ -46,9 +46,8 @@ from metamist.models import (
     SequencingGroupUpsert,
 )
 
-logging.basicConfig(stream=sys.stderr, level=logging.INFO)
-logger = logging.getLogger(__name__)
-
+logger = logging.getLogger(__file__)
+logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s', stream=sys.stderr, level=logging.INFO)
 
 # ============================================================================
 # CONSTANTS AND CONFIGURATION
@@ -161,7 +160,9 @@ async def get_participant_sample(
     """
     Fetch a participant and sample from the specified dataset and validate their existence.
     """
+    logger.setLevel(logging.WARN)
     response = await query_async(PARTICIPANT_SAMPLES_QUERY, {'dataset': dataset})
+    logger.setLevel(logging.INFO)
     return validate_ids(
         new_participant_id,
         new_sample_id,
@@ -216,6 +217,7 @@ async def get_sample_upsert(
     Returns with the upsert model with nested sequencing group and assays.
     """
     # Fetch the original sequencing group data using the original_sg_id
+    logger.setLevel(logging.WARN)
     response = await query_async(
         SG_DATA_QUERY,
         {
@@ -224,6 +226,7 @@ async def get_sample_upsert(
             'analysisTypes': [],
         },
     )
+    logger.setLevel(logging.INFO)
     original_sg_data = response['project']['sequencingGroups'][0]
     assays = [
         AssayUpsert(
@@ -275,6 +278,7 @@ async def get_analyses_to_upsert(
     Queries Metamist for the analyses from the source SG that need to be copied,
     and extracts their filepaths to be renamed and copied to the new SG.
     """
+    logger.setLevel(logging.WARN)
     analysis_query_result = await query_async(
         SG_DATA_QUERY,
         variables={
@@ -283,6 +287,7 @@ async def get_analyses_to_upsert(
             'analysisTypes': ANALYSIS_TYPES,
         },
     )
+    logger.setLevel(logging.INFO)
 
     analyses_to_copy = []
     files_to_move = []
@@ -511,9 +516,6 @@ async def reheader_analysis_files_in_batch(
         if str(old_path).endswith(
             '.somalier'
         ):  # special case for binary .somalier files, run locally
-            logger.info(
-                f'Reheadering .somalier file for {old_path}, writing to {new_path!s}'
-            )
             somalier_file_commands(
                 str(old_path),
                 str(new_path),
