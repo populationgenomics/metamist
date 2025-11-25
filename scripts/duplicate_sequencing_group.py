@@ -105,8 +105,6 @@ UNRECORDED_ANALYSIS_FILES = [
     # CramQc stage files
     'gs://{bucket_name}/qc/{sg_id}.variant_calling_detail_metrics',
     'gs://{bucket_name}/qc/{sg_id}.variant_calling_summary_metrics',
-    'gs://{bucket_name}/qc/{sg_id}_fastqc.html',
-    'gs://{bucket_name}/qc/{sg_id}_fastqc.zip',
     'gs://{bucket_name}/qc/{sg_id}_picard_wgs_metrics.csv',
     'gs://{bucket_name}/qc/{sg_id}_samtools_stats.txt',
     'gs://{bucket_name}/qc/{sg_id}_verify_bamid.selfSM',
@@ -121,11 +119,8 @@ UNRECORDED_ANALYSIS_FILES = [
     # Single Sample SV stage files
     'gs://{bucket_name}/sv_evidence/{sg_id}.coverage_counts.tsv.gz',
     'gs://{bucket_name}/sv_evidence/{sg_id}.pe.txt.gz',
-    'gs://{bucket_name}/sv_evidence/{sg_id}.pe.txt.gz.tbi',
     'gs://{bucket_name}/sv_evidence/{sg_id}.sd.txt.gz',
-    'gs://{bucket_name}/sv_evidence/{sg_id}.sd.txt.gz.tbi',
     'gs://{bucket_name}/sv_evidence/{sg_id}.sr.txt.gz',
-    'gs://{bucket_name}/sv_evidence/{sg_id}.sr.txt.gz.tbi',
     # Somalier stage files
     'gs://{bucket_name}/cram/{sg_id}.cram.somalier',
     'gs://{bucket_name}/gvcf/{sg_id}.g.vcf.gz.somalier',
@@ -386,7 +381,20 @@ def file_size(path: str) -> int:
 
 def file_reheaderable(path: str) -> bool:
     """Returns whether this is a file that can be reheadered with samtools/bcftools"""
-    return any(path.endswith(e) for e in ['.cram', '.vcf.gz', '.g.vcf.gz'])
+    return any(
+        path.endswith(e)
+        for e in [
+            '.cram',
+            '.vcf.gz',
+            '.vcf.bgz',
+            '.g.vcf.gz',
+        ]
+    )
+
+
+def file_tabixable(path: str) -> bool:
+    """Returns whether this is a file that should be indexed with tabix"""
+    return any(path.endswith(e) for e in ['.pe.txt.gz', '.sd.txt.gz', '.sr.txt.gz'])
 
 
 async def reheader_analysis_files_in_batch(
@@ -405,10 +413,28 @@ async def reheader_analysis_files_in_batch(
         logger.info(
             f'Adding job to replace {source_sequencing_group_id} with {new_sequencing_group_id} in {new_path!s}.'
         )
+        if str(old_path).endswith(
+            '.somalier'
+        ):  # special case for binary somalier files
+            somalier_file_commands(
+                str(old_path),
+                str(new_path),
+                (source_sequencing_group_id, new_sequencing_group_id),
+            )
+            continue
         job = batch.new_job(f'Replace SG ID in {new_path!s}')
         if file_reheaderable(str(old_path)):
             job.storage(file_size(old_path) + 2 * 1024**3)  # Allow 2 GiB extra
             main_file_commands(
+                batch,
+                job,
+                str(old_path),
+                str(new_path),
+                (source_sequencing_group_id, new_sequencing_group_id),
+            )
+        elif str(old_path).endswith('.gz'):
+            job.storage(file_size(old_path) + 512 * 1024**2)  # Allow 512 MiB extra
+            gzipped_file_commands(
                 batch,
                 job,
                 str(old_path),
@@ -429,8 +455,15 @@ async def reheader_analysis_files_in_batch(
 
 def main_file_commands(batch, job, old_path: str, new_path: str, sid: tuple[str, str]):
     """
-    Adds the commands required to reheader the CRAM/VCF/GVCF files.
-    Also queues the regeneration of associated secondary files, such as .crai and .tbi files.
+    Adds the commands required to reheader the analysis files.
+
+    Uses samtools/bcftools for CRAM/VCF/GVCF files, also queueing the regeneration of
+    associated secondary files, such as .crai and .tbi files.
+
+    Uses sed for find-and-replace in other text based files, gunzipping and gzipping
+    as necessary for gzipped text files.
+
+    Handles
     """
     if new_path.endswith('.cram'):
         job.image(image_path('samtools'))
@@ -439,27 +472,31 @@ def main_file_commands(batch, job, old_path: str, new_path: str, sid: tuple[str,
             new_file={'outfile': '{root}.cram', 'crai': '{root}.cram.crai'}
         )
         job.command(rf"""
-            samtools head {old_file} | sed '/^@RG/s/\<SM:{sid[0]}\>/SM:{sid[1]}/g' > $BATCH_TMPDIR/header.txt
+            samtools head {old_file} | sed '/^@RG/ s/{sid[0]}/{sid[1]}/g' > $BATCH_TMPDIR/header.txt
             samtools reheader --no-PG --in-place $BATCH_TMPDIR/header.txt {old_file}
             mv {old_file} {job.new_file.outfile}
         """)
         secondary_file_commands(batch, job, new_path + '.crai')
         batch.write_output(job.new_file.outfile, new_path)
 
-    elif new_path.endswith('.vcf.gz'):
+    elif new_path.endswith(('.vcf.gz', '.vcf.bgz', '.g.vcf.gz')):
         job.image(image_path('bcftools'))
         old_file = batch.read_input(old_path)
         if new_path.endswith('.g.vcf.gz'):  # Handling both VCF and GVCF
             job.declare_resource_group(
                 new_file={'outfile': '{root}.g.vcf.gz', 'tbi': '{root}.g.vcf.gz.tbi'}
             )
-        else:
+        elif new_path.endswith('.vcf.gz'):
             job.declare_resource_group(
                 new_file={'outfile': '{root}.vcf.gz', 'tbi': '{root}.vcf.gz.tbi'}
             )
+        elif new_path.endswith('.vcf.bgz'):
+            job.declare_resource_group(
+                new_file={'outfile': '{root}.vcf.bgz', 'tbi': '{root}.vcf.bgz.tbi'}
+            )
         job.command(rf"""
-            echo {sid[0]} {sid[1]} > $BATCH_TMPDIR/samples.txt
-            bcftools reheader --samples $BATCH_TMPDIR/samples.txt -o {job.new_file.outfile} {old_file}
+            bcftools head {old_file} | sed '/^#CHROM/ s/{sid[0]}/{sid[1]}/' > $BATCH_TMPDIR/header.txt
+            bcftools reheader --header $BATCH_TMPDIR/header.txt -o {job.new_file.outfile} {old_file}
         """)
         secondary_file_commands(batch, job, new_path + '.tbi')
         batch.write_output(job.new_file.outfile, new_path)
@@ -481,6 +518,63 @@ def secondary_file_commands(batch, job, new_path: str):
     elif new_path.endswith('.md5'):
         job.command(rf"md5sum {job.new_file.outfile} | cut -d' ' -f1 > {job.new_md5}")
         batch.write_output(job.new_md5, new_path)
+
+
+def somalier_file_commands(old_path: str, new_path: str, sid: tuple[str, str]):
+    """Uses python to read and rewrite the binary somalier files with updated SG IDs"""
+    logger.info(f'Reheadering somalier file for {old_path}, writing to {new_path}')
+    data = to_path(old_path).read_bytes()
+    # Extract the old length and sample ID
+    sample_L_old = int.from_bytes(data[1:2], byteorder='little')
+    sample_id_start_idx = 2
+    sample_id_end_idx = sample_id_start_idx + sample_L_old
+    current_sample_id = data[sample_id_start_idx:sample_id_end_idx].decode()
+
+    # Check that the current sample ID matches the expected old SG ID
+    if current_sample_id != sid[0]:
+        raise ValueError(
+            f'Unexpected sample ID in somalier file: {current_sample_id}, expected: {sid[0]}'
+        )
+
+    # Create the new sample ID bytes
+    new_sample_bytes = sid[1].encode()
+    sample_L_new = len(new_sample_bytes)
+
+    # The file is built by concatenating four parts:
+    # 1. Fixed header: Version byte (1 byte)
+    header_version = data[:1]
+    # 2. Variable header: New sample ID length (1 byte)
+    header_length_new = sample_L_new.to_bytes(1, byteorder='little')
+    # 3. Variable data: New sample ID string (N bytes)
+    data_new_sample_id = new_sample_bytes
+    # 4. Remaining file data (from after the old ID)
+    remaining_data = data[sample_id_end_idx:]
+
+    # Combine the pieces
+    new_data = header_version + header_length_new + data_new_sample_id + remaining_data
+
+    # --- 4. Write the New File ---
+    to_path(new_path).write_bytes(new_data)
+    logger.info(f"Successfully replaced ID '{sid[0]}' with '{sid[1]}' in {new_path}")
+
+
+def gzipped_file_commands(
+    batch, job, old_path: str, new_path: str, sid: tuple[str, str]
+):
+    """Adds the commands required to regenerate gzipped files"""
+    job.image(image_path('driver_image'))
+    old_file = batch.read_input(old_path)
+    # Simple gunzip and gzip to regenerate the gzipped file after sed replacement
+    job.command(rf"""
+        gunzip -c {old_file} | sed "s/{{{sid[0]}}}/{{{sid[1]}}}/g" | gzip > {job.new_file}
+    """)
+    if file_tabixable(new_path):
+        job.command(rf"""
+            tabix {job.new_file}
+            # Mention {job.new_file}.tbi for hail as tabix has no -o option
+        """)
+        batch.write_output(job.new_file.tbi, new_path + '.tbi')
+    batch.write_output(job.new_file.outfile, new_path)
 
 
 def text_file_commands(batch, job, old_path: str, new_path: str, sid: tuple[str, str]):
