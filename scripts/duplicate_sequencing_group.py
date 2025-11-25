@@ -167,7 +167,12 @@ async def get_analyses_to_upsert(
                 # Skip the SV analyses that are not the GatherSampleEvidence stage
                 continue
 
-            current_outputs: dict = analysis['outputs']
+            current_outputs = analysis['outputs']
+            if isinstance(current_outputs, str):
+                current_outputs = {
+                    'path': current_outputs,
+                    'dirname': to_path(current_outputs).parent.as_uri(),
+                }
 
             # Create the new outputs by replacing the source dataset and SG ID with the new ones
             new_outputs = current_outputs.copy()
