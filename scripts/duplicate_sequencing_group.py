@@ -95,13 +95,9 @@ UNRECORDED_ANALYSIS_FILES = [
     # Mito CRAM files
     'gs://{bucket_name}/mito/{sg_id}.base_level_coverage.tsv',
     'gs://{bucket_name}/mito/{sg_id}.mito.cram',
-    'gs://{bucket_name}/mito/{sg_id}.mito.cram.crai',
     'gs://{bucket_name}/mito/{sg_id}.mito.vcf.bgz',
-    'gs://{bucket_name}/mito/{sg_id}.mito.vcf.bgz.tbi',
     'gs://{bucket_name}/mito/{sg_id}.mito.vep.vcf.gz',
-    'gs://{bucket_name}/mito/{sg_id}.mito.vep.vcf.gz.tbi',
     'gs://{bucket_name}/mito/{sg_id}.shifted_mito.cram',
-    'gs://{bucket_name}/mito/{sg_id}.shifted_mito.cram.crai',
     # CramQc stage files
     'gs://{bucket_name}/qc/{sg_id}.variant_calling_detail_metrics',
     'gs://{bucket_name}/qc/{sg_id}.variant_calling_summary_metrics',
@@ -287,7 +283,7 @@ async def upsert_analyses_records(
             type=analysis['type'],
             status=AnalysisStatus('completed'),
             outputs=analysis['outputs'],
-            meta=analysis['meta'],
+            meta=analysis['meta'],  # add some provenance info here?
             sequencing_group_ids=[analysis['sg_id']],
         )
         promises.append(analysis_api.create_analysis_async(dataset, analysis_to_create))
@@ -368,6 +364,7 @@ async def get_sample_upsert(
         id=None,
         type=original_sg_data['type'],
         technology=original_sg_data['technology'],
+        #meta={},  # Add the original provenance into the SG meta
         platform=original_sg_data['platform'],
         assays=assays,
     )
