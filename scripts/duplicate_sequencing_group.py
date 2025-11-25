@@ -627,7 +627,7 @@ async def main(
 
     # Prepare the sample upsert for the new dataset.
     sample_upsert = await get_sample_upsert(
-        source_dataset, original_sg_id, participant_id, sample_id
+        source_dataset, original_sg_id, new_sample_external_id, participant_id, sample_id
     )
 
     # Upsert the new sequencing group (nested within the sample upsert) and get the new SG ID.
