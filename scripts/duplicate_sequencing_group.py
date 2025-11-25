@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """
 For creating duplicate sequencing groups in a different dataset.
 
@@ -23,9 +25,9 @@ Steps:
 """
 
 import argparse
+import asyncio
 import logging
 import sys
-
 from typing import Any, Tuple
 
 from google.cloud import storage
@@ -43,11 +45,14 @@ from metamist.models import (
     SampleUpsert,
     SequencingGroupUpsert,
 )
-import asyncio
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+# ============================================================================
+# CONSTANTS AND CONFIGURATION
+# ============================================================================
 
 # GraphQL queries
 PARTICIPANT_SAMPLES_QUERY = gql(
@@ -94,6 +99,8 @@ SG_DATA_QUERY = gql(
 )
 
 ANALYSIS_TYPES = ['cram', 'gvcf', 'web', 'sv']
+
+# File paths that are not recorded in the analysis records but need to be copied
 UNRECORDED_ANALYSIS_FILES = [
     # Mito CRAM files
     'gs://{bucket_name}/mito/{sg_id}.base_level_coverage.tsv',
@@ -140,187 +147,27 @@ UNRECORDED_ANALYSIS_FOLDERS = [
 ]
 
 
-async def get_analyses_to_upsert(
-    source_dataset: str,
-    source_sequencing_group_id: str,
-    new_dataset: str,
-    new_sequencing_group_id: str,
-) -> tuple[list[dict[str, Any]], list[tuple[Path, Path]]]:
-    """
-    Queries Metamist for the analyses from the source SG that need to be copied,
-    and extracts their filepaths to be renamed and copied to the new SG.
-    """
-    analysis_query_result = await query_async(
-        SG_DATA_QUERY,
-        variables={
-            'sequencingGroupId': source_sequencing_group_id,
-            'dataset': source_dataset,
-            'analysisTypes': ANALYSIS_TYPES,
-        },
-    )
-
-    analyses_to_copy = []
-    files_to_move = []
-    for sg in analysis_query_result['project']['sequencingGroups']:
-        for analysis in sg['analyses']:
-            if (
-                analysis['type'] == 'sv'
-                and analysis['meta'].get('stage') != 'GatherSampleEvidence'
-            ):
-                # Skip the SV analyses that are not the GatherSampleEvidence stage
-                continue
-
-            current_outputs = analysis['outputs']
-            if isinstance(current_outputs, str):
-                current_outputs = {
-                    'path': current_outputs,
-                    'dirname': to_path(current_outputs).parent.as_uri(),
-                }
-            
-            if not current_outputs.get('path'):
-                logger.warning(
-                    f'Analysis {analysis["id"]} of type {analysis["type"]} has no recorded outputs path, skipping.'
-                )
-                continue
-
-            # Create the new outputs by replacing the source dataset and SG ID with the new ones
-            new_outputs = current_outputs.copy()
-            new_outputs['path'] = (
-                current_outputs['path']
-                .replace(source_dataset, new_dataset)
-                .replace(source_sequencing_group_id, new_sequencing_group_id)
-            )
-            new_outputs['dirname'] = (
-                current_outputs['dirname']
-                .replace(source_dataset, new_dataset)
-                .replace(source_sequencing_group_id, new_sequencing_group_id)
-            )
-
-            # Build the (source_path, new_path) tuples for moving the files
-            if (to_path(current_outputs['path']), to_path(new_outputs['path'])) in files_to_move:
-                continue  # Avoid duplicates
-            
-            files_to_move.append(
-                (to_path(current_outputs['path']), to_path(new_outputs['path']))
-            )
-
-            # Update the analysis meta with the new dataset and SG ID
-            source_meta: dict = analysis['meta']
-            new_meta = source_meta.copy()
-            for key, value in source_meta.items():
-                if isinstance(value, str):
-                    new_value = value.replace(source_dataset, new_dataset).replace(
-                        source_sequencing_group_id, new_sequencing_group_id
-                    )
-                    new_meta[key] = new_value
-
-            new_meta['dataset'] = new_dataset
-            new_meta['sequencing_group_id'] = new_sequencing_group_id
-
-            analyses_to_copy.append(
-                {
-                    'sg_id': new_sequencing_group_id,
-                    'type': analysis['type'],
-                    'outputs': new_outputs,
-                    'meta': new_meta,
-                }
-            )
-            logger.info(f'Found analysis of type {analysis["type"]} to copy. {new_outputs["path"]=}')
-
-    return analyses_to_copy, files_to_move
-
-
-def get_unrecorded_analysis_files(
-    source_dataset: str,
-    source_sequencing_group_id: str,
-    new_dataset: str,
-    new_sequencing_group_id: str,
-) -> list[tuple[Path, Path]]:
-    """
-    Returns the list of filepaths which are unrecorded in the
-    analysis records, but still need to be copied over to the new dataset.
-    """
-    storage_client = storage.Client()
-    billing_project = config_retrieve(['workflow', 'dataset_gcp_project'])
-
-    if config_retrieve(['workflow', 'access_level']) == 'test':
-        source_bucket_name = f'cpg-{source_dataset}'
-    else:
-        source_bucket_name = f'cpg-{source_dataset}-main'
-
-    files_to_move = []
-    for source_path_template in UNRECORDED_ANALYSIS_FILES + UNRECORDED_ANALYSIS_FOLDERS:
-        source_path = source_path_template.format(
-            bucket_name=source_bucket_name,
-            sg_id=source_sequencing_group_id,
-        )
-        if source_path.endswith('/'):  # If the path is a folder
-            source_bucket = storage_client.bucket(
-                bucket_name=source_bucket_name,
-                user_project=billing_project,
-            )
-            blobs = storage_client.list_blobs(
-                source_bucket,
-                prefix=source_path.removeprefix(f'gs://{source_bucket.name}/'),
-            )
-            file_paths = [blob.path for blob in blobs]
-        else:
-            if to_path(source_path).exists():
-                file_paths = [source_path]  # Single file
-            else:
-                file_paths = []  # File does not exist
-
-        for source_path in file_paths:  # Rename and add to move list
-            new_path = source_path.replace(source_dataset, new_dataset).replace(
-                source_sequencing_group_id, new_sequencing_group_id
-            )
-            files_to_move.append((to_path(source_path), to_path(new_path)))
-            
-    return files_to_move
-
-
-async def upsert_analyses_records(
-    dataset: str,
-    analyses_to_upsert: list[dict[str, Any]],
-    dry_run: bool,
-):
-    """
-    Updates the analyses with the new outputs and meta data.
-    """
-    analysis_api = AnalysisApi()
-
-    promises = []
-    for analysis in analyses_to_upsert:
-        logger.info(
-            f'New Analysis for SG: {analysis["sg_id"]}, Type: {analysis["type"]}.'
-        )
-        logger.info(f'    New outputs path: {analysis["outputs"]["path"]}')
-        logger.info(f'    New meta dataset: {analysis["meta"]["dataset"]}')
-        if dry_run:
-            logger.info(
-                f'DRY RUN :: Skipping analysis creation for {analysis["type"]} analysis.'
-            )
-            continue
-        analysis_to_create = Analysis(
-            type=analysis['type'],
-            status=AnalysisStatus('completed'),
-            outputs=analysis['outputs'],
-            meta=analysis['meta'],  # add some provenance info here?
-            sequencing_group_ids=[analysis['sg_id']],
-        )
-        promises.append(analysis_api.create_analysis_async(dataset, analysis_to_create))
-
-    return asyncio.gather(*promises)
+# ============================================================================
+# DATABASE QUERY AND VALIDATION FUNCTIONS
+# ============================================================================
 
 
 async def get_participant_sample(
-    dataset: str, new_participant_id: str | None, new_sample_id: str | None, new_sample_external_id: str,
+    dataset: str,
+    new_participant_id: str | None,
+    new_sample_id: str | None,
+    new_sample_external_id: str,
 ) -> Tuple[int, str | None]:
     """
     Fetch a participant and sample from the specified dataset and validate their existence.
     """
     response = await query_async(PARTICIPANT_SAMPLES_QUERY, {'dataset': dataset})
-    return validate_ids(new_participant_id, new_sample_id, new_sample_external_id, response['project']['participants'])
+    return validate_ids(
+        new_participant_id,
+        new_sample_id,
+        new_sample_external_id,
+        response['project']['participants'],
+    )
 
 
 def validate_ids(
@@ -370,7 +217,12 @@ async def get_sample_upsert(
     """
     # Fetch the original sequencing group data using the original_sg_id
     response = await query_async(
-        SG_DATA_QUERY, {'dataset': source_dataset, 'sequencingGroupId': original_sg_id, 'analysisTypes': []}
+        SG_DATA_QUERY,
+        {
+            'dataset': source_dataset,
+            'sequencingGroupId': original_sg_id,
+            'analysisTypes': [],
+        },
     )
     original_sg_data = response['project']['sequencingGroups'][0]
     assays = [
@@ -389,28 +241,218 @@ async def get_sample_upsert(
             type=original_sg_data['type'],
             technology=original_sg_data['technology'],
             platform=original_sg_data['platform'],
-        ) 
+        )
     else:  # Create new SG and assays
         sg = SequencingGroupUpsert(
             id=None,
             type=original_sg_data['type'],
             technology=original_sg_data['technology'],
-            #meta={},  # Add the original provenance into the SG meta
+            # meta={},  # Add the original provenance into the SG meta
             platform=original_sg_data['platform'],
             assays=assays,
         )
     sample = SampleUpsert(
-        id=sample_id, external_ids={'': external_sample_id}, participant_id=participant_id, sequencing_groups=[sg]
+        id=sample_id,
+        external_ids={'': external_sample_id},
+        participant_id=participant_id,
+        sequencing_groups=[sg],
     )
     return sample
+
+
+# ============================================================================
+# ANALYSIS DISCOVERY AND PREPARATION FUNCTIONS
+# ============================================================================
+
+
+async def get_analyses_to_upsert(
+    source_dataset: str,
+    source_sequencing_group_id: str,
+    new_dataset: str,
+    new_sequencing_group_id: str,
+) -> tuple[list[dict[str, Any]], list[tuple[Path, Path]]]:
+    """
+    Queries Metamist for the analyses from the source SG that need to be copied,
+    and extracts their filepaths to be renamed and copied to the new SG.
+    """
+    analysis_query_result = await query_async(
+        SG_DATA_QUERY,
+        variables={
+            'sequencingGroupId': source_sequencing_group_id,
+            'dataset': source_dataset,
+            'analysisTypes': ANALYSIS_TYPES,
+        },
+    )
+
+    analyses_to_copy = []
+    files_to_move = []
+    for sg in analysis_query_result['project']['sequencingGroups']:
+        for analysis in sg['analyses']:
+            if (
+                analysis['type'] == 'sv'
+                and analysis['meta'].get('stage') != 'GatherSampleEvidence'
+            ):
+                # Skip the SV analyses that are not the GatherSampleEvidence stage
+                continue
+
+            current_outputs = analysis['outputs']
+            if isinstance(current_outputs, str):
+                current_outputs = {
+                    'path': current_outputs,
+                    'dirname': to_path(current_outputs).parent.as_uri(),
+                }
+
+            if not current_outputs.get('path'):
+                logger.warning(
+                    f'Analysis {analysis["id"]} of type {analysis["type"]} has no recorded outputs path, skipping.'
+                )
+                continue
+
+            # Create the new outputs by replacing the source dataset and SG ID with the new ones
+            new_outputs = current_outputs.copy()
+            new_outputs['path'] = (
+                current_outputs['path']
+                .replace(source_dataset, new_dataset)
+                .replace(source_sequencing_group_id, new_sequencing_group_id)
+            )
+            new_outputs['dirname'] = (
+                current_outputs['dirname']
+                .replace(source_dataset, new_dataset)
+                .replace(source_sequencing_group_id, new_sequencing_group_id)
+            )
+
+            # Build the (source_path, new_path) tuples for moving the files
+            if (
+                to_path(current_outputs['path']),
+                to_path(new_outputs['path']),
+            ) in files_to_move:
+                continue  # Avoid duplicates
+
+            files_to_move.append(
+                (to_path(current_outputs['path']), to_path(new_outputs['path']))
+            )
+
+            # Update the analysis meta with the new dataset and SG ID
+            source_meta: dict = analysis['meta']
+            new_meta = source_meta.copy()
+            for key, value in source_meta.items():
+                if isinstance(value, str):
+                    new_value = value.replace(source_dataset, new_dataset).replace(
+                        source_sequencing_group_id, new_sequencing_group_id
+                    )
+                    new_meta[key] = new_value
+
+            new_meta['dataset'] = new_dataset
+            new_meta['sequencing_group_id'] = new_sequencing_group_id
+
+            analyses_to_copy.append(
+                {
+                    'sg_id': new_sequencing_group_id,
+                    'type': analysis['type'],
+                    'outputs': new_outputs,
+                    'meta': new_meta,
+                }
+            )
+            logger.info(
+                f'Found analysis of type {analysis["type"]} to copy. {new_outputs["path"]=}'
+            )
+
+    return analyses_to_copy, files_to_move
+
+
+def get_unrecorded_analysis_files(
+    source_dataset: str,
+    source_sequencing_group_id: str,
+    new_dataset: str,
+    new_sequencing_group_id: str,
+) -> list[tuple[Path, Path]]:
+    """
+    Returns the list of filepaths which are unrecorded in the
+    analysis records, but still need to be copied over to the new dataset.
+    """
+    storage_client = storage.Client()
+    billing_project = config_retrieve(['workflow', 'dataset_gcp_project'])
+
+    if config_retrieve(['workflow', 'access_level']) == 'test':
+        source_bucket_name = f'cpg-{source_dataset}'
+    else:
+        source_bucket_name = f'cpg-{source_dataset}-main'
+
+    files_to_move = []
+    for source_path_template in UNRECORDED_ANALYSIS_FILES + UNRECORDED_ANALYSIS_FOLDERS:
+        source_path = source_path_template.format(
+            bucket_name=source_bucket_name,
+            sg_id=source_sequencing_group_id,
+        )
+        if source_path.endswith('/'):  # If the path is a folder
+            source_bucket = storage_client.bucket(
+                bucket_name=source_bucket_name,
+                user_project=billing_project,
+            )
+            blobs = storage_client.list_blobs(
+                source_bucket,
+                prefix=source_path.removeprefix(f'gs://{source_bucket.name}/'),
+            )
+            file_paths = [blob.path for blob in blobs]
+        else:
+            if to_path(source_path).exists():
+                file_paths = [source_path]  # Single file
+            else:
+                file_paths = []  # File does not exist
+
+        for source_path in file_paths:  # Rename and add to move list
+            new_path = source_path.replace(source_dataset, new_dataset).replace(
+                source_sequencing_group_id, new_sequencing_group_id
+            )
+            files_to_move.append((to_path(source_path), to_path(new_path)))
+
+    return files_to_move
+
+
+async def upsert_analyses_records(
+    dataset: str,
+    analyses_to_upsert: list[dict[str, Any]],
+    dry_run: bool,
+):
+    """
+    Updates the analyses with the new outputs and meta data.
+    """
+    analysis_api = AnalysisApi()
+
+    promises = []
+    for analysis in analyses_to_upsert:
+        logger.info(
+            f'New Analysis for SG: {analysis["sg_id"]}, Type: {analysis["type"]}.'
+        )
+        logger.info(f'    New outputs path: {analysis["outputs"]["path"]}')
+        logger.info(f'    New meta dataset: {analysis["meta"]["dataset"]}')
+        if dry_run:
+            logger.info(
+                f'DRY RUN :: Skipping analysis creation for {analysis["type"]} analysis.'
+            )
+            continue
+        analysis_to_create = Analysis(
+            type=analysis['type'],
+            status=AnalysisStatus('completed'),
+            outputs=analysis['outputs'],
+            meta=analysis['meta'],  # add some provenance info here?
+            sequencing_group_ids=[analysis['sg_id']],
+        )
+        promises.append(analysis_api.create_analysis_async(dataset, analysis_to_create))
+
+    return asyncio.gather(*promises)
+
+
+# ============================================================================
+# FILE UTILITY FUNCTIONS
+# ============================================================================
 
 
 def file_size(path: Path) -> int:
     """Return the size (in bytes) of the object, which is assumed to exist"""
     if path.exists():
         return path.stat().st_size
-    else:    
-        return 0
+    return 0
 
 
 def file_reheaderable(path: str) -> bool:
@@ -435,11 +477,9 @@ def file_gatk_check(path: str):
         # paired-end evidence (sample ID in column 2)
         # chr1    10000   SAMPLE_ID       174     0       0       3
         '.sd.txt.gz': 2,
-        
         # split-read evidence (sample ID in column 4)
         # chr1    10000   left    4       SAMPLE_ID
         '.sr.txt.gz': 4,
-        
         # discordant paired-end evidence (sample ID in column 6)
         # chr1    10000   -       chr5    10495   +       SAMPLE_ID
         '.pe.txt.gz': 6,
@@ -448,6 +488,11 @@ def file_gatk_check(path: str):
         if path.endswith(suffix):
             return sample_id_col
     return None
+
+
+# ============================================================================
+# BATCH PROCESSING AND FILE REHEADERING FUNCTIONS
+# ============================================================================
 
 
 async def reheader_analysis_files_in_batch(
@@ -466,14 +511,18 @@ async def reheader_analysis_files_in_batch(
         if str(old_path).endswith(
             '.somalier'
         ):  # special case for binary .somalier files, run locally
-            logger.info(f'Reheadering .somalier file for {old_path}, writing to {new_path!s}')
+            logger.info(
+                f'Reheadering .somalier file for {old_path}, writing to {new_path!s}'
+            )
             somalier_file_commands(
                 str(old_path),
                 str(new_path),
                 (source_sequencing_group_id, new_sequencing_group_id),
             )
             continue
-        job = batch.new_job(f'Replace SG ID {source_sequencing_group_id} from {old_path!s} with {new_sequencing_group_id} in {new_path!s}')
+        job = batch.new_job(
+            f'Replace SG ID {source_sequencing_group_id} from {old_path!s} with {new_sequencing_group_id} in {new_path!s}'
+        )
         if file_reheaderable(str(old_path)):
             job.storage(file_size(old_path) + 2 * 1024**3)  # Allow 2 GiB extra
             main_file_commands(
@@ -615,7 +664,9 @@ def bgzipped_file_commands(
     """Adds the commands required to regenerate bgzipped files originally produced by GATK-SV"""
     job.image(image_path('bcftools'))
     old_file = batch.read_input(old_path)
-    job.declare_resource_group(new_file={'outfile': '{root}.gz', 'tbi': '{root}.gz.tbi'})
+    job.declare_resource_group(
+        new_file={'outfile': '{root}.gz', 'tbi': '{root}.gz.tbi'}
+    )
 
     if column_index := file_gatk_check(new_path):
         # The CollectSVEvidence files (pe.txt.gz, sd.txt.gz, sr.txt.gz)
@@ -637,7 +688,7 @@ def bgzipped_file_commands(
         job.command(rf"""
             bgzip -c --decompress {old_file} | sed "s/{sid[0]}/{sid[1]}/g" | bgzip -c > {job.new_file.outfile}
         """)
-    
+
     batch.write_output(job.new_file.outfile, new_path)
 
 
@@ -697,14 +748,21 @@ async def main(
         )
         # Prepare the sample upsert for the new dataset.
         sample_upsert = await get_sample_upsert(
-            source_dataset, original_sg_id, new_sample_external_id, reuse_sequencing_group_id, participant_id, sample_id
+            source_dataset,
+            original_sg_id,
+            new_sample_external_id,
+            reuse_sequencing_group_id,
+            participant_id,
+            sample_id,
         )
 
         # Upsert the new sequencing group (nested within the sample upsert) and get the new SG ID.
         logger.info(
             f'Prepared sample upsert for new dataset {new_dataset}: {sample_upsert}'
         )
-        new_sample = await SampleApi().upsert_samples_async(new_dataset, [sample_upsert])
+        new_sample = await SampleApi().upsert_samples_async(
+            new_dataset, [sample_upsert]
+        )
         new_sequencing_group_id = new_sample[0]['sequencing_groups'][0]['id']
 
     # Fetch the analysis file paths
@@ -768,7 +826,11 @@ if __name__ == '__main__':
     parser.add_argument(
         'new_dataset', type=str, help='Dataset to create the new sequencing group in.'
     )
-    parser.add_argument('--new_sample_external_id', type=str,  help='External sample ID to associate with the new sequencing group.')
+    parser.add_argument(
+        '--new_sample_external_id',
+        type=str,
+        help='External sample ID to associate with the new sequencing group.',
+    )
     parser.add_argument(
         '--new_sample_id',
         type=str,
