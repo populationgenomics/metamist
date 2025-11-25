@@ -426,9 +426,28 @@ def file_reheaderable(path: str) -> bool:
     )
 
 
-def file_tabixable(path: str) -> bool:
-    """Returns whether this is a file that should be indexed with tabix"""
-    return any(path.endswith(e) for e in ['.pe.txt.gz', '.sd.txt.gz', '.sr.txt.gz'])
+def file_gatk_check(path: str):
+    """
+    Check if this is a file from GATK-SV CollectSVEvidence that needs bgzip reheadering,
+    and return the column index of the sample ID to replace.
+    """
+    file_dict = {
+        # paired-end evidence (sample ID in column 2)
+        # chr1    10000   SAMPLE_ID       174     0       0       3
+        '.sd.txt.gz': 2,
+        
+        # split-read evidence (sample ID in column 4)
+        # chr1    10000   left    4       SAMPLE_ID
+        '.sr.txt.gz': 4,
+        
+        # discordant paired-end evidence (sample ID in column 6)
+        # chr1    10000   -       chr5    10495   +       SAMPLE_ID
+        '.pe.txt.gz': 6,
+    }
+    for suffix, sample_id_col in file_dict.items():
+        if path.endswith(suffix):
+            return sample_id_col
+    return None
 
 
 async def reheader_analysis_files_in_batch(
@@ -597,21 +616,28 @@ def bgzipped_file_commands(
     job.image(image_path('bcftools'))
     old_file = batch.read_input(old_path)
     job.declare_resource_group(new_file={'outfile': '{root}.gz', 'tbi': '{root}.gz.tbi'})
-    
-    # Use bgzip to decompress, sed to replace, and bgzip to recompress
-    # Compression level 3 seems to be what GATK-SV uses, so we match that here
-    job.command(rf"""
-        bgzip -c --decompress {old_file} | sed "s/{sid[0]}/{sid[1]}/g" | bgzip -c -l 3 > {job.new_file.outfile}
-    """)
-    if file_tabixable(new_path):
-        # Regenerate the tabix index for the CollectSVEvidence files (pe.txt.gz, sd.txt.gz, sr.txt.gz)
-        # Use the tabix -0 -s1 -b2 -e2 options to index the standard 1-based coordinate files
+
+    if column_index := file_gatk_check(new_path):
+        # The CollectSVEvidence files (pe.txt.gz, sd.txt.gz, sr.txt.gz)
+        job.command(rf"""
+            bgzip -c --decompress {old_file} | \
+            awk -v OFS='\t' -v col={column_index} '{{if(NR>1){{$col="{sid[1]}"}}; print}}' | \
+            bgzip -c > {job.new_file.outfile}
+        """)
+
+        # Use the tabix -0 -s1 -b2 -e2 options to index the standard 0-based coordinate files
         # See: https://github.com/populationgenomics/gatk-sv/blob/890582922bccb4b651275506a34311c949417f6c/wdl/PETestChromosome.wdl#L227
         job.command(rf"""
             tabix -0 -s1 -b2 -e2 {job.new_file.outfile}
             # Mention {job.new_file.tbi} for hail as tabix has no -o option
         """)
         batch.write_output(job.new_file.tbi, new_path + '.tbi')
+    else:
+        # Generic bgzipped text file find-and-replace
+        job.command(rf"""
+            bgzip -c --decompress {old_file} | sed "s/{sid[0]}/{sid[1]}/g" | bgzip -c > {job.new_file.outfile}
+        """)
+    
     batch.write_output(job.new_file.outfile, new_path)
 
 
