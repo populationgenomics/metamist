@@ -298,7 +298,6 @@ async def get_analyses_to_upsert(
             if isinstance(current_outputs, str):
                 current_outputs = {
                     'path': current_outputs,
-                    'dirname': to_path(current_outputs).parent.as_uri(),
                 }
 
             if not current_outputs.get('path'):
@@ -308,32 +307,26 @@ async def get_analyses_to_upsert(
                 continue
 
             # Create the new outputs by replacing the source dataset and SG ID with the new ones
-            new_outputs = current_outputs.copy()
-            new_outputs['path'] = (
-                current_outputs['path']
-                .replace(source_dataset, new_dataset)
-                .replace(source_sequencing_group_id, new_sequencing_group_id)
-            )
-            new_outputs['dirname'] = (
-                current_outputs['dirname']
-                .replace(source_dataset, new_dataset)
-                .replace(source_sequencing_group_id, new_sequencing_group_id)
-            )
+            source_path = current_outputs['path']
+            new_path = source_path.replace(
+                source_dataset, new_dataset
+            ).replace(source_sequencing_group_id, new_sequencing_group_id)
 
             # Build the (source_path, new_path) tuples for moving the files
             if (
-                to_path(current_outputs['path']),
-                to_path(new_outputs['path']),
+                to_path(source_path),
+                to_path(new_path),
             ) in files_to_move:
                 continue  # Avoid duplicates
 
             files_to_move.append(
-                (to_path(current_outputs['path']), to_path(new_outputs['path']))
+                (to_path(source_path), to_path(new_path))
             )
 
             # Update the analysis meta with the new dataset and SG ID
             source_meta: dict = analysis['meta']
             new_meta = source_meta.copy()
+            new_meta['dataset'] = new_dataset
             for key, value in source_meta.items():
                 if isinstance(value, str):
                     new_value = value.replace(source_dataset, new_dataset).replace(
@@ -341,19 +334,20 @@ async def get_analyses_to_upsert(
                     )
                     new_meta[key] = new_value
 
-            new_meta['dataset'] = new_dataset
-            new_meta['sequencing_group_id'] = new_sequencing_group_id
+            new_meta['original_dataset'] = source_dataset
+            new_meta['original_analysis_id'] = analysis['id']
+            new_meta['original_sequencing_group_id'] = source_sequencing_group_id
 
             analyses_to_copy.append(
                 {
                     'sg_id': new_sequencing_group_id,
                     'type': analysis['type'],
-                    'outputs': new_outputs,
+                    'output': new_path,
                     'meta': new_meta,
                 }
             )
             logger.info(
-                f'Found analysis of type {analysis["type"]} to copy. {new_outputs["path"]=}'
+                f'Copying {analysis["type"]} analysis: {source_path} -> {new_path}'
             )
 
     return analyses_to_copy, files_to_move
@@ -423,7 +417,7 @@ async def upsert_analyses_records(
         logger.info(
             f'New Analysis for SG: {analysis["sg_id"]}, Type: {analysis["type"]}.'
         )
-        logger.info(f'    New outputs path: {analysis["outputs"]["path"]}')
+        logger.info(f'    New output path: {analysis["output"]}')
         logger.info(f'    New meta dataset: {analysis["meta"]["dataset"]}')
         if dry_run:
             logger.info(
@@ -433,7 +427,7 @@ async def upsert_analyses_records(
         analysis_to_create = Analysis(
             type=analysis['type'],
             status=AnalysisStatus('completed'),
-            outputs=analysis['outputs'],
+            outputs={'basename': analysis['output']['basename']},  # this is the correct syntax for autofilling outputs dict
             meta=analysis['meta'],  # add some provenance info here?
             sequencing_group_ids=[analysis['sg_id']],
         )
