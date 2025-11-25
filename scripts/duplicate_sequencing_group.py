@@ -523,7 +523,7 @@ async def reheader_analysis_files_in_batch(
             )
             continue
         job = batch.new_job(
-            f'Replace SG ID {source_sequencing_group_id} from {old_path!s} with {new_sequencing_group_id} in {new_path!s}'
+            f'Update SG ID in {old_path!s}'
         )
         if file_reheaderable(str(old_path)):
             job.storage(file_size(old_path) + 2 * 1024**3)  # Allow 2 GiB extra
