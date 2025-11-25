@@ -570,14 +570,15 @@ def gzipped_file_commands(
     """Adds the commands required to regenerate gzipped files"""
     job.image(config_retrieve(['workflow', 'driver_image']))
     old_file = batch.read_input(old_path)
+    job.declare_resource_group(new_file={'outfile': '{root}.gz', 'tbi': '{root}.gz.tbi'})
     # Simple gunzip and gzip to regenerate the gzipped file after sed replacement
     job.command(rf"""
-        gunzip -c {old_file} | sed "s/{{{sid[0]}}}/{{{sid[1]}}}/g" | gzip > {job.new_file}
+        gunzip -c {old_file} | sed "s/{{{sid[0]}}}/{{{sid[1]}}}/g" | gzip > {job.new_file.outfile}
     """)
     if file_tabixable(new_path):
         job.command(rf"""
-            tabix {job.new_file}
-            # Mention {job.new_file}.tbi for hail as tabix has no -o option
+            tabix {job.new_file.outfile}
+            # Mention {job.new_file.tbi} for hail as tabix has no -o option
         """)
         batch.write_output(job.new_file.tbi, new_path + '.tbi')
     batch.write_output(job.new_file.outfile, new_path)
