@@ -353,6 +353,7 @@ async def get_sample_upsert(
     source_dataset: str,
     original_sg_id: str,
     external_sample_id: str,
+    reuse_sequencing_group_id: str | None = None,
     participant_id: int | None = None,
     sample_id: str | None = None,
 ) -> SampleUpsert:
@@ -375,14 +376,22 @@ async def get_sample_upsert(
         )
         for assay in original_sg_data['assays']
     ]
-    sg = SequencingGroupUpsert(
-        id=None,
-        type=original_sg_data['type'],
-        technology=original_sg_data['technology'],
-        #meta={},  # Add the original provenance into the SG meta
-        platform=original_sg_data['platform'],
-        assays=assays,
-    )
+    if reuse_sequencing_group_id:  # Reuse existing SG ID and it's assays
+        sg = SequencingGroupUpsert(
+            id=reuse_sequencing_group_id,
+            type=original_sg_data['type'],
+            technology=original_sg_data['technology'],
+            platform=original_sg_data['platform'],
+        ) 
+    else:  # Create new SG and assays
+        sg = SequencingGroupUpsert(
+            id=None,
+            type=original_sg_data['type'],
+            technology=original_sg_data['technology'],
+            #meta={},  # Add the original provenance into the SG meta
+            platform=original_sg_data['platform'],
+            assays=assays,
+        )
     sample = SampleUpsert(
         id=sample_id, external_ids={'': external_sample_id}, participant_id=participant_id, sequencing_groups=[sg]
     )
@@ -621,6 +630,7 @@ async def main(
     new_sample_external_id: str,
     new_sample_id: str = None,
     new_participant_id: str = None,
+    reuse_sequencing_group_id: str = None,
     deactivate_original_sg: bool = False,
 ) -> None:
     """
@@ -634,6 +644,7 @@ async def main(
         new_dataset (str): The dataset to create the new sequencing group in.
         new_sample_id (str, optional): Optional sample ID (or external sample ID) to associate with the new sequencing group.
         new_participant_id (str, optional): Optional participant ID (or external participant ID) to associate with the new sequencing group.
+        reuse_sequencing_group_id (str, optional): Optional existing sequencing group ID to reuse instead of creating a new one.
         deactivate_original_sg (bool, optional): Optional flag to deactivate the original sequencing group.
     """
     if new_sample_id or new_participant_id:
@@ -646,7 +657,7 @@ async def main(
 
     # Prepare the sample upsert for the new dataset.
     sample_upsert = await get_sample_upsert(
-        source_dataset, original_sg_id, new_sample_external_id, participant_id, sample_id
+        source_dataset, original_sg_id, new_sample_external_id, reuse_sequencing_group_id, participant_id, sample_id
     )
 
     # Upsert the new sequencing group (nested within the sample upsert) and get the new SG ID.
@@ -731,6 +742,12 @@ if __name__ == '__main__':
         help='Optional participant ID (or external participant ID) to associate with the new sequencing group. Must be consistent with the new sample if provided.',
     )
     parser.add_argument(
+        '--reuse_sequencing_group_id',
+        type=str,
+        default=None,
+        help='Optional existing sequencing group ID to reuse instead of creating a new one.',
+    )
+    parser.add_argument(
         '--deactivate_original_sg',
         type=bool,
         default=False,
@@ -745,6 +762,7 @@ if __name__ == '__main__':
             new_sample_external_id=args.new_sample_external_id,
             new_sample_id=args.new_sample_id,
             new_participant_id=args.new_participant_id,
+            reuse_sequencing_group_id=args.reuse_sequencing_group_id,
             deactivate_original_sg=bool(args.deactivate_original_sg),
         )
     )
