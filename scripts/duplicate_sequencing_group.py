@@ -374,13 +374,9 @@ async def get_sample_upsert(
     return sample
 
 
-def file_size(path: str) -> int:
+def file_size(path: Path) -> int:
     """Return the size (in bytes) of the object, which is assumed to exist"""
-    if path.startswith('gs://'):
-        (bucket, path) = path.removeprefix('gs://').split('/', maxsplit=1)
-        return storage.Client().get_bucket(bucket).get_blob(path).size
-
-    return os.path.getsize(path)
+    return path.stat().st_size
 
 
 def file_reheaderable(path: str) -> bool:
@@ -428,7 +424,7 @@ async def reheader_analysis_files_in_batch(
             continue
         job = batch.new_job(f'Replace SG ID in {new_path!s}')
         if file_reheaderable(str(old_path)):
-            job.storage(file_size(str(old_path)) + 2 * 1024**3)  # Allow 2 GiB extra
+            job.storage(file_size(old_path) + 2 * 1024**3)  # Allow 2 GiB extra
             main_file_commands(
                 batch,
                 job,
@@ -437,7 +433,7 @@ async def reheader_analysis_files_in_batch(
                 (source_sequencing_group_id, new_sequencing_group_id),
             )
         elif str(old_path).endswith('.gz'):
-            job.storage(file_size(str(old_path)) + 512 * 1024**2)  # Allow 512 MiB extra
+            job.storage(file_size(old_path) + 512 * 1024**2)  # Allow 512 MiB extra
             gzipped_file_commands(
                 batch,
                 job,
