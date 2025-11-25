@@ -350,7 +350,7 @@ async def get_sample_upsert(
     response = await query_async(
         SG_DATA_QUERY, {'dataset': source_dataset, 'sequencingGroupId': original_sg_id, 'analysisTypes': []}
     )
-    original_sg_data = response['project']['sequencingGroup']
+    original_sg_data = response['project']['sequencingGroups']
     assays = [
         AssayUpsert(
             id=None,
