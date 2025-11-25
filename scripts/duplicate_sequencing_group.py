@@ -188,6 +188,9 @@ async def get_analyses_to_upsert(
             )
 
             # Build the (source_path, new_path) tuples for moving the files
+            if (to_path(current_outputs['path']), to_path(new_outputs['path'])) in files_to_move:
+                continue  # Avoid duplicates
+            
             files_to_move.append(
                 (to_path(current_outputs['path']), to_path(new_outputs['path']))
             )
