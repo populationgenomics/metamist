@@ -567,7 +567,7 @@ def gzipped_file_commands(
     batch, job, old_path: str, new_path: str, sid: tuple[str, str]
 ):
     """Adds the commands required to regenerate gzipped files"""
-    job.image(image_path('driver_image'))
+    job.image(config_retrieve(['workflow', 'driver_image']))
     old_file = batch.read_input(old_path)
     # Simple gunzip and gzip to regenerate the gzipped file after sed replacement
     job.command(rf"""
@@ -585,7 +585,7 @@ def gzipped_file_commands(
 def text_file_commands(batch, job, old_path: str, new_path: str, sid: tuple[str, str]):
     """Adds the commands required to regenerate the various text based files"""
     # Simple find and replace for all other text based files
-    job.image(image_path('driver_image'))
+    job.image(config_retrieve(['workflow', 'driver_image']))
     old_file = batch.read_input(old_path)
     job.command(rf"""
         old_sg_id="{sid[0]}"
