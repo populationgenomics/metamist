@@ -317,12 +317,12 @@ def validate_ids(
     """
     for participant in participants:
         if (
-            new_participant_id in participant['externalIds']
+            new_participant_id in participant['externalIds'].values()
             or new_participant_id == participant['id']
         ):
             for sample in participant['samples']:
                 if (
-                    new_sample_id in sample['externalIds']
+                    new_sample_id in sample['externalIds'].values()
                     or new_sample_id == sample['id']
                 ):
                     return participant['id'], sample['id']
