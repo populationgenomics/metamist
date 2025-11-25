@@ -9,13 +9,15 @@ from db.python.tables.sequencing_group import (
     SequencingGroupTable,
 )
 from db.python.utils import get_logger
+from models.enums.cohort import CohortStatus, CohortUpdateStatus
 from models.models.cohort import (
     CohortCriteriaInternal,
     CohortInternal,
     CohortTemplateInternal,
     NewCohortInternal,
+    CohortUpdateBody,
 )
-from models.models.project import ProjectId, ReadAccessRoles
+from models.models.project import ProjectId, ReadAccessRoles, FullWriteAccessRoles
 
 logger = get_logger()
 
@@ -248,4 +250,39 @@ class CohortLayer(BaseLayer):
             sequencing_group_ids=[sg.id for sg in sgs if sg.id],
             description=description,
             template_id=template_id,
+        )
+
+    async def update_cohort(self, cohort_update_body: CohortUpdateBody, cohort_id: int):
+        """update Cohort given id"""
+        cohorts, project_ids = await self.ct.query(
+            CohortFilter(id=GenericFilter(eq=cohort_id))
+        )
+
+        self.connection.check_access_to_projects_for_ids(
+            project_ids, allowed_roles=FullWriteAccessRoles
+        )
+
+        if not cohorts:
+            raise ValueError(f'Cohort ID not found')
+
+        # raise error if reactivating a cohort with archived samples or sgs
+        if cohort_update_body.status == CohortUpdateStatus.ACTIVE:
+            cohort = cohorts[0]
+            current_status = cohort.status
+
+            if (
+                current_status == CohortStatus.ARCHIVED
+                and await self.ct.is_cohort_sample_sg_invalid(
+                    cohort.id
+                )  # check if samples or sgs are archived
+            ):
+                raise ValueError(
+                    'Cohort contains archived samples or sequencing groups and cannot be activated'
+                )
+
+        await self.ct.update_cohort(
+            cohort_id=cohort_id,
+            name=cohort_update_body.name,
+            description=cohort_update_body.description,
+            status=cohort_update_body.status,
         )
