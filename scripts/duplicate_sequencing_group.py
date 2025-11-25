@@ -8,8 +8,12 @@ Steps:
 1. User provides original sequencing group ID, source dataset, new dataset. Optionally,
     user can provide a sample ID and participant ID to associate with the new sequencing group.
 2. Script queries the original dataset for the sequencing group and its associated analysis files.
-3. Script creates a new sequencing group in the new dataset, copying over the analysis files to
+4.Script creates a new sequencing group in the new dataset, copying over the analysis files to
     the new dataset's storage bucket(s), replacing the source sequencing group ID with the new one.
+3. Script finds all analysis files associated with the original sequencing group, including
+    unrecorded files, and prepares the new file paths by replacing the source dataset and
+    sequencing group ID with the new dataset and new sequencing group ID.
+
 4. Script then invokes batch jobs to update the copied analysis files to reflect the new sequencing group ID.
     This includes samtools/bcftools reheader operations within the file headers for crams and vcfs,
     and find-and-replace operations within the text based analysis files and web reports.
@@ -41,8 +45,9 @@ from metamist.models import (
 )
 import asyncio
 
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 # GraphQL queries
 PARTICIPANT_SAMPLES_QUERY = gql(
@@ -220,6 +225,7 @@ async def get_analyses_to_upsert(
                     'meta': new_meta,
                 }
             )
+            logger.info(f'Found analysis of type {analysis["type"]} to copy. {new_outputs["path"]=}')
 
     return analyses_to_copy, files_to_move
 
@@ -269,6 +275,7 @@ def get_unrecorded_analysis_files(
                 source_sequencing_group_id, new_sequencing_group_id
             )
             files_to_move.append((to_path(source_path), to_path(new_path)))
+            
     return files_to_move
 
 
@@ -437,19 +444,17 @@ async def reheader_analysis_files_in_batch(
     """
     batch = get_batch()
     for old_path, new_path in source_paths_new_paths:
-        logger.info(
-            f'Adding job to replace {source_sequencing_group_id} with {new_sequencing_group_id} in {new_path!s}.'
-        )
         if str(old_path).endswith(
             '.somalier'
-        ):  # special case for binary somalier files
+        ):  # special case for binary .somalier files, run locally
+            logger.info(f'Reheadering .somalier file for {old_path}, writing to {new_path!s}')
             somalier_file_commands(
                 str(old_path),
                 str(new_path),
                 (source_sequencing_group_id, new_sequencing_group_id),
             )
             continue
-        job = batch.new_job(f'Replace SG ID in {new_path!s}')
+        job = batch.new_job(f'Replace SG ID {source_sequencing_group_id} from {old_path!s} with {new_sequencing_group_id} in {new_path!s}')
         if file_reheaderable(str(old_path)):
             job.storage(file_size(old_path) + 2 * 1024**3)  # Allow 2 GiB extra
             main_file_commands(
@@ -655,17 +660,26 @@ async def main(
     else:
         participant_id, sample_id = None, None
 
-    # Prepare the sample upsert for the new dataset.
-    sample_upsert = await get_sample_upsert(
-        source_dataset, original_sg_id, new_sample_external_id, reuse_sequencing_group_id, participant_id, sample_id
-    )
+    if reuse_sequencing_group_id:
+        logger.info(
+            f'Reusing existing sequencing group ID {reuse_sequencing_group_id} in new dataset {new_dataset}.'
+        )
+        new_sequencing_group_id = reuse_sequencing_group_id
+    else:
+        logger.info(
+            f'Creating new sequencing group in dataset {new_dataset} from original SG ID {original_sg_id} in dataset {source_dataset}.'
+        )
+        # Prepare the sample upsert for the new dataset.
+        sample_upsert = await get_sample_upsert(
+            source_dataset, original_sg_id, new_sample_external_id, reuse_sequencing_group_id, participant_id, sample_id
+        )
 
-    # Upsert the new sequencing group (nested within the sample upsert) and get the new SG ID.
-    logger.info(
-        f'Prepared sample upsert for new dataset {new_dataset}: {sample_upsert}'
-    )
-    new_sample = await SampleApi().upsert_samples_async(new_dataset, [sample_upsert])
-    new_sequencing_group_id = new_sample[0]['sequencing_groups'][0]['id']
+        # Upsert the new sequencing group (nested within the sample upsert) and get the new SG ID.
+        logger.info(
+            f'Prepared sample upsert for new dataset {new_dataset}: {sample_upsert}'
+        )
+        new_sample = await SampleApi().upsert_samples_async(new_dataset, [sample_upsert])
+        new_sequencing_group_id = new_sample[0]['sequencing_groups'][0]['id']
 
     # Fetch the analysis file paths
     logger.info(
