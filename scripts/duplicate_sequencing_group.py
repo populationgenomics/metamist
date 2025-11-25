@@ -247,7 +247,10 @@ def get_unrecorded_analysis_files(
             )
             file_paths = [blob.path for blob in blobs]
         else:
-            file_paths = [source_path]  # Single file
+            if to_path(source_path).exists():
+                file_paths = [source_path]  # Single file
+            else:
+                file_paths = []  # File does not exist
 
         for source_path in file_paths:  # Rename and add to move list
             new_path = source_path.replace(source_dataset, new_dataset).replace(
@@ -376,7 +379,10 @@ async def get_sample_upsert(
 
 def file_size(path: Path) -> int:
     """Return the size (in bytes) of the object, which is assumed to exist"""
-    return path.stat().st_size
+    if path.exists():
+        return path.stat().st_size
+    else:    
+        return 0
 
 
 def file_reheaderable(path: str) -> bool:
