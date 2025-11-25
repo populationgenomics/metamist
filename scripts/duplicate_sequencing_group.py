@@ -339,6 +339,7 @@ def validate_ids(
 async def get_sample_upsert(
     source_dataset: str,
     original_sg_id: str,
+    external_sample_id: str,
     participant_id: int | None = None,
     sample_id: str | None = None,
 ) -> SampleUpsert:
@@ -369,7 +370,7 @@ async def get_sample_upsert(
         assays=assays,
     )
     sample = SampleUpsert(
-        id=sample_id, participant_id=participant_id, sequencing_groups=[sg]
+        id=sample_id, external_ids={'': external_sample_id}, participant_id=participant_id, sequencing_groups=[sg]
     )
     return sample
 
@@ -598,6 +599,7 @@ async def main(
     original_sg_id: str,
     source_dataset: str,
     new_dataset: str,
+    new_sample_external_id: str,
     new_sample_id: str = None,
     new_participant_id: str = None,
     deactivate_original_sg: bool = False,
@@ -696,11 +698,12 @@ if __name__ == '__main__':
     parser.add_argument(
         'new_dataset', type=str, help='Dataset to create the new sequencing group in.'
     )
+    parser.add_argument('--new_sample_external_id', type=str,  help='External sample ID to associate with the new sequencing group.')
     parser.add_argument(
         '--new_sample_id',
         type=str,
         default=None,
-        help='Optional sample ID (or external sample ID) to associate with the new sequencing group.',
+        help='Optional internal sample ID to associate with the new sequencing group.',
     )
     parser.add_argument(
         '--new_participant_id',
@@ -720,6 +723,7 @@ if __name__ == '__main__':
             original_sg_id=args.original_sg_id,
             source_dataset=args.source_dataset,
             new_dataset=args.new_dataset,
+            new_sample_external_id=args.new_sample_external_id,
             new_sample_id=args.new_sample_id,
             new_participant_id=args.new_participant_id,
             deactivate_original_sg=bool(args.deactivate_original_sg),
