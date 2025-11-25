@@ -151,7 +151,7 @@ async def get_analyses_to_upsert(
         SG_DATA_QUERY,
         variables={
             'sequencingGroupId': source_sequencing_group_id,
-            'dataset': new_dataset,
+            'dataset': source_dataset,
             'analysisTypes': ANALYSIS_TYPES,
         },
     )
@@ -568,7 +568,7 @@ def gzipped_file_commands(
     batch, job, old_path: str, new_path: str, sid: tuple[str, str]
 ):
     """Adds the commands required to regenerate gzipped files"""
-    job.image(config_retrieve(['workflow', 'driver_image']))
+    job.image(image_path('bcftools'))
     old_file = batch.read_input(old_path)
     job.declare_resource_group(new_file={'outfile': '{root}.gz', 'tbi': '{root}.gz.tbi'})
     # Simple gunzip and gzip to regenerate the gzipped file after sed replacement
