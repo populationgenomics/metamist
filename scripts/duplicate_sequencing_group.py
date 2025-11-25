@@ -171,6 +171,12 @@ async def get_analyses_to_upsert(
                     'path': current_outputs,
                     'dirname': to_path(current_outputs).parent.as_uri(),
                 }
+            
+            if not current_outputs.get('path'):
+                logger.warning(
+                    f'Analysis {analysis["id"]} of type {analysis["type"]} has no recorded outputs path, skipping.'
+                )
+                continue
 
             # Create the new outputs by replacing the source dataset and SG ID with the new ones
             new_outputs = current_outputs.copy()
@@ -208,7 +214,7 @@ async def get_analyses_to_upsert(
 
             analyses_to_copy.append(
                 {
-                    'sg_id': sg['id'],
+                    'sg_id': new_sequencing_group_id,
                     'type': analysis['type'],
                     'outputs': new_outputs,
                     'meta': new_meta,
