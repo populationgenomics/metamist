@@ -10,18 +10,13 @@ Steps:
 1. User provides original sequencing group ID, source dataset, new dataset. Optionally,
     user can provide a sample ID and participant ID to associate with the new sequencing group.
 2. Script queries the original dataset for the sequencing group and its associated analysis files.
-4.Script creates a new sequencing group in the new dataset, copying over the analysis files to
-    the new dataset's storage bucket(s), replacing the source sequencing group ID with the new one.
-3. Script finds all analysis files associated with the original sequencing group, including
-    unrecorded files, and prepares the new file paths by replacing the source dataset and
-    sequencing group ID with the new dataset and new sequencing group ID.
-
+3. Script creates a new sequencing group in the new dataset, copying over the analysis files to
+    the new dataset's storage bucket(s). This is also done for unrecorded analysis files that are not 
+    listed in the analysis records.
 4. Script then invokes batch jobs to update the copied analysis files to reflect the new sequencing group ID.
     This includes samtools/bcftools reheader operations within the file headers for crams and vcfs,
     and find-and-replace operations within the text based analysis files and web reports.
 5. Finally, the script registers the copied analysis files under the new sequencing group, completing the duplication process.
-6. (Optional) If sample ID and participant ID were provided, the script associates the new sequencing group
-    with the specified sample and participant in the new dataset. (This will be checked for validity on script run.)
 """
 
 import argparse
