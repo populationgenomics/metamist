@@ -66,9 +66,9 @@ PARTICIPANT_SAMPLES_QUERY = gql(
 
 SG_DATA_QUERY = gql(
     """
-    query sgAnalyses($sequencingGroupIds: [String!], $dataset: String!, $analysisTypes: [String!]) {
+    query sgAnalyses($sequencingGroupId: String!, $dataset: String!, $analysisTypes: [String!]) {
         project(name: $dataset) {
-            sequencingGroups(id: {in_: $sequencingGroupIds}) {
+            sequencingGroups(id: {eq: $sequencingGroupId}) {
                 id
                 type
                 technology
@@ -154,7 +154,7 @@ async def get_analyses_to_upsert(
     analysis_query_result = await query_async(
         SG_DATA_QUERY,
         variables={
-            'sequencingGroupIds': [source_sequencing_group_id],
+            'sequencingGroupId': source_sequencing_group_id,
             'dataset': new_dataset,
             'analysisTypes': ANALYSIS_TYPES,
         },
@@ -348,7 +348,7 @@ async def get_sample_upsert(
     """
     # Fetch the original sequencing group data using the original_sg_id
     response = await query_async(
-        SG_DATA_QUERY, {'dataset': source_dataset, 'sgId': original_sg_id}
+        SG_DATA_QUERY, {'dataset': source_dataset, 'sequencingGroupId': original_sg_id, 'analysisTypes': []}
     )
     original_sg_data = response['project']['sequencingGroup']
     assays = [
