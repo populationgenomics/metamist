@@ -683,9 +683,7 @@ def text_file_commands(batch, job, old_path: str, new_path: str, sid: tuple[str,
     job.image(config_retrieve(['workflow', 'driver_image']))
     old_file = batch.read_input(old_path)
     job.command(rf"""
-        old_sg_id="{sid[0]}"
-        new_sg_id="{sid[1]}"
-        sed "s/{{${{old_sg_id}}}}/{{${{new_sg_id}}}}/g" {old_file} > {job.new_file}
+        sed "s/{sid[0]}/{sid[1]}/g" {old_file} > {job.new_file}
     """)
     batch.write_output(job.new_file, new_path)
 
