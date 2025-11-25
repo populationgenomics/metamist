@@ -308,6 +308,7 @@ async def get_participant_sample(
 def validate_ids(
     new_participant_id: str | None,
     new_sample_id: str | None,
+    new_sample_external_id: str | None,
     participants: Any,
 ) -> Tuple[int, str | None]:
     """
@@ -323,6 +324,7 @@ def validate_ids(
             for sample in participant['samples']:
                 if (
                     new_sample_id in sample['externalIds'].values()
+                    or new_sample_external_id in sample['externalIds'].values()
                     or new_sample_id == sample['id']
                 ):
                     return participant['id'], sample['id']
