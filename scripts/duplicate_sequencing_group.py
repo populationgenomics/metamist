@@ -20,9 +20,7 @@ Steps:
 
 import argparse
 import logging
-import os
 import sys
-
 
 from typing import Any, Tuple
 
@@ -448,13 +446,22 @@ async def reheader_analysis_files_in_batch(
             )
         elif str(old_path).endswith('.gz'):
             job.storage(file_size(old_path) + 512 * 1024**2)  # Allow 512 MiB extra
-            gzipped_file_commands(
-                batch,
-                job,
-                str(old_path),
-                str(new_path),
-                (source_sequencing_group_id, new_sequencing_group_id),
-            )
+            if file_tabixable(str(old_path)):
+                bgzipped_file_commands(
+                    batch,
+                    job,
+                    str(old_path),
+                    str(new_path),
+                    (source_sequencing_group_id, new_sequencing_group_id),
+                )
+            else:
+                gzipped_file_commands(
+                    batch,
+                    job,
+                    str(old_path),
+                    str(new_path),
+                    (source_sequencing_group_id, new_sequencing_group_id),
+                )
         else:
             text_file_commands(
                 batch,
@@ -576,12 +583,26 @@ def gzipped_file_commands(
     batch, job, old_path: str, new_path: str, sid: tuple[str, str]
 ):
     """Adds the commands required to regenerate gzipped files"""
+    job.image(config_retrieve(['workflow', 'driver_image']))
+    old_file = batch.read_input(old_path)
+    job.declare_resource(new_file='{root}.gz')
+    # Simple gunzip and gzip to regenerate the gzipped file after sed replacement
+    job.command(rf"""
+        gunzip -c {old_file} | sed "s/{{{sid[0]}}}/{{{sid[1]}}}/g" | gzip > {job.new_file}
+    """)
+    batch.write_output(job.new_file, new_path)
+
+
+def bgzipped_file_commands(
+    batch, job, old_path: str, new_path: str, sid: tuple[str, str]
+):
+    """Adds the commands required to regenerate bgzipped files"""
     job.image(image_path('bcftools'))
     old_file = batch.read_input(old_path)
     job.declare_resource_group(new_file={'outfile': '{root}.gz', 'tbi': '{root}.gz.tbi'})
-    # Simple gunzip and gzip to regenerate the gzipped file after sed replacement
+    # Simple gunzip and bgzip to regenerate the bgzipped file after sed replacement
     job.command(rf"""
-        gunzip -c {old_file} | sed "s/{{{sid[0]}}}/{{{sid[1]}}}/g" | gzip > {job.new_file.outfile}
+        bgzip --decompress {old_file} | sed "s/{{{sid[0]}}}/{{{sid[1]}}}/g" | bgzip > {job.new_file.outfile}
     """)
     if file_tabixable(new_path):
         job.command(rf"""
