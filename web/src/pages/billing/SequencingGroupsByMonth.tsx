@@ -13,12 +13,12 @@ import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import './components/BillingCostByTimeTable.css'
 
 const GET_SG_BY_MONTH = gql(`
-    query SequencingGroupHistory($name: String!, $split: Boolean!) {
+    query SequencingGroupHistory($name: String!) {
         project(name: $name) {
             sequencingGroupHistory {
                 date
                 type
-                technology @include(if: $split)
+                technology
                 count
             }
         }
@@ -109,7 +109,7 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
 }) => {
     // Data loading
     const { loading, error, data } = useQuery(GET_SG_BY_MONTH, {
-        variables: { name: projectName, split: !groupTypes },
+        variables: { name: projectName },
         notifyOnNetworkStatusChange: true,
     })
 
@@ -121,16 +121,44 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
     const plotData = React.useMemo(() => {
         if (loading || error || !data) return []
 
-        if (groupTypes) {
+        if (!groupTypes) {
+            return data.project.sequencingGroupHistory.map((item) => {
+                return {
+                    date: new Date(item.date),
+                    type: item.type + ': ' + item.technology,
+                    grouping: item.type,
+                    count: item.count,
+                } as ITypeData
+            })
         }
-        return data.project.sequencingGroupHistory.map((item) => {
-            return {
-                date: new Date(item.date),
-                type: groupTypes ? item.type : item.type + ': ' + item.technology,
-                grouping: item.type,
-                count: item.count,
-            } as ITypeData
+
+        // Coalesce different technologies of the same type and combine their counts.
+        const intermediateData = data.project.sequencingGroupHistory.reduce(
+            (acc, item) => {
+                const dateKey: string = item.date
+                const typeKey: string = item.type
+
+                if (!acc[dateKey]) acc[dateKey] = {}
+                if (!acc[dateKey][typeKey]) acc[dateKey][typeKey] = 0
+
+                acc[dateKey][typeKey] += item.count
+
+                return acc
+            },
+            {} as Record<string, Record<string, number>>
+        )
+
+        // Convert back into an array.
+        const result: ITypeData[] = []
+        Object.entries(intermediateData).forEach(([dateStr, typeMap]) => {
+            const date = new Date(dateStr)
+
+            Object.entries(typeMap).forEach(([type, count]) => {
+                result.push({ date, type, grouping: type, count })
+            })
         })
+
+        return result
     }, [data, loading, error, groupTypes])
 
     // Code for generating the sequencing groups by month plot.
