@@ -567,14 +567,14 @@ GROUP BY sg.type
         """
         _query = f"""
         WITH sg AS (
-            SELECT id, sample_id, type, min(row_start) as sg_first_date
+            SELECT id, sample_id, type, technology, min(row_start) as sg_first_date
             FROM sequencing_group FOR SYSTEM_TIME ALL
             GROUP BY id
         )
-        SELECT project, sg.type, CONVERT(sg_first_date, DATE) as sg_date, COUNT(sg.id) as num_sg
+        SELECT project, sg.type, sg.technology, CONVERT(sg_first_date, DATE) as sg_date, COUNT(sg.id) as num_sg
         FROM sample INNER JOIN sg ON sample.id = sg.sample_id
         WHERE project in :project_ids
-        GROUP BY project, sg_date, sg.type
+        GROUP BY project, sg_date, sg.type, sg.technology
         """
         values = {'project_ids': project_ids}
 
@@ -591,9 +591,10 @@ GROUP BY sg.type
             project = row['project']
             month_created: date = row['sg_date'].replace(day=1)
             sg_type = row['type']
+            sg_tech = row['technology']
             num_sg = row['num_sg']
 
-            project_histories[project][month_created][sg_type] = num_sg
+            project_histories[project][month_created][sg_type + ':' + sg_tech] = num_sg
 
         # We want the total number of each sg type over time, so we need to accumulate and
         # fill in the missing months.
@@ -610,8 +611,8 @@ GROUP BY sg.type
 
                 # The result from the database provides the sq types added in a given month,
                 # but we want the total number.
-                for sg_type, count in iteration_counts.items():
-                    type_totals[sg_type] += count
+                for sg_key, count in iteration_counts.items():
+                    type_totals[sg_key] += count
 
                 iteration_counts.update(type_totals)
                 history[iteration_month] = iteration_counts
