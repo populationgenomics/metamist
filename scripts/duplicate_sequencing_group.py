@@ -205,7 +205,6 @@ async def get_sample_upsert(
     source_dataset: str,
     original_sg_id: str,
     external_sample_id: str,
-    reuse_sequencing_group_id: str | None = None,
     participant_id: int | None = None,
     sample_id: str | None = None,
 ) -> SampleUpsert:
@@ -233,22 +232,14 @@ async def get_sample_upsert(
         )
         for assay in original_sg_data['assays']
     ]
-    if reuse_sequencing_group_id:  # Reuse existing SG ID and it's assays
-        sg = SequencingGroupUpsert(
-            id=reuse_sequencing_group_id,
-            type=original_sg_data['type'],
-            technology=original_sg_data['technology'],
-            platform=original_sg_data['platform'],
-        )
-    else:  # Create new SG and assays
-        sg = SequencingGroupUpsert(
-            id=None,
-            type=original_sg_data['type'],
-            technology=original_sg_data['technology'],
-            # meta={},  # Add the original provenance into the SG meta
-            platform=original_sg_data['platform'],
-            assays=assays,
-        )
+    sg = SequencingGroupUpsert(
+        id=None,
+        type=original_sg_data['type'],
+        technology=original_sg_data['technology'],
+        # meta={},  # Add the original provenance into the SG meta
+        platform=original_sg_data['platform'],
+        assays=assays,
+    )
     sample = SampleUpsert(
         id=sample_id,
         external_ids={'': external_sample_id},
@@ -500,6 +491,9 @@ async def reheader_analysis_files_in_batch(
     """
     batch = get_batch()
     for old_path, new_path in source_paths_new_paths:
+        if new_path.exists():
+            logger.info(f'Skipping update for existing file: {new_path!s}')
+            continue
         if str(old_path).endswith(
             '.somalier'
         ):  # special case for binary .somalier files, run locally
@@ -736,7 +730,6 @@ async def main(
             source_dataset,
             original_sg_id,
             new_sample_external_id,
-            reuse_sequencing_group_id,
             participant_id,
             sample_id,
         )
