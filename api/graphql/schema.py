@@ -619,21 +619,23 @@ class GraphQLProject:
     ) -> list['GraphQLSequencingGroupsByDate']:
         split_technology = False
         for field in info.selected_fields[0].selections:
-            if hasattr(field, 'name') and field.name == "technology":
-                split_technology = 'include' in field.directives and field.directives['include']['if'] is True
+            if hasattr(field, 'name') and field.name == 'technology':
+                split_technology = (
+                    'include' in field.directives
+                    and field.directives['include']['if'] is True
+                )
                 break
 
         loader = info.context['loaders'][
             LoaderKeys.SEQUENCING_GROUPS_COUNTS_FOR_PROJECT
         ]
 
-        obj = {
-            'id': root.id,
-            'split_technology': split_technology
-        }
+        obj = {'id': root.id, 'split_technology': split_technology}
         counts = await loader.load(obj)
 
-        return GraphQLSequencingGroupsByDate.from_dict(counts, split_technology=split_technology)
+        return GraphQLSequencingGroupsByDate.from_dict(
+            counts, split_technology=split_technology
+        )
 
 
 @strawberry.type
@@ -1324,12 +1326,20 @@ class GraphQLSequencingGroupsByDate:
     count: int
 
     @staticmethod
-    def from_dict(date_type_count_map: dict[datetime.date, dict[str, int]], split_technology: bool):
+    def from_dict(
+        date_type_count_map: dict[datetime.date, dict[str, int]], split_technology: bool
+    ):
         entries: list[GraphQLSequencingGroupsByDate] = []
-        for month, type_counts in sorted(date_type_count_map.items(), key=lambda x: x[0]):
+        for month, type_counts in sorted(
+            date_type_count_map.items(), key=lambda x: x[0]
+        ):
             for key, count in type_counts.items():
                 type, tech = key.split(':') if split_technology else (key, '')
-                entries.append(GraphQLSequencingGroupsByDate(date=month, type=type, technology=tech, count=count))
+                entries.append(
+                    GraphQLSequencingGroupsByDate(
+                        date=month, type=type, technology=tech, count=count
+                    )
+                )
 
         return entries
 

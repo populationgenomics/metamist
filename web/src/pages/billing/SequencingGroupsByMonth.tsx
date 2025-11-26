@@ -11,7 +11,6 @@ import ProjectSelector, { IMetamistProject } from '../project/ProjectSelector'
 import * as Plot from '@observablehq/plot'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import './components/BillingCostByTimeTable.css'
-import { read } from 'fs'
 
 const GET_SG_BY_MONTH = gql(`
     query SequencingGroupHistory($name: String!, $split: Boolean!) {
@@ -43,7 +42,7 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
     const navigate = useNavigate()
     const { projectName } = useParams()
 
-    const [groupTypes, setGroupTypes] = React.useState<boolean>(false);
+    const [groupTypes, setGroupTypes] = React.useState<boolean>(false)
 
     // Callback to update the url.
     const onProjectSelect = (_project: IMetamistProject) => {
@@ -105,7 +104,8 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
 }
 
 const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayProps> = ({
-    projectName, groupTypes
+    projectName,
+    groupTypes,
 }) => {
     // Data loading
     const { loading, error, data } = useQuery(GET_SG_BY_MONTH, {
@@ -120,16 +120,15 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
     // Converting the date that GraphQL gives from a string to a Date type.
     const plotData = React.useMemo(() => {
         if (loading || error || !data) return []
-        
-        if (groupTypes) {
 
+        if (groupTypes) {
         }
         return data.project.sequencingGroupHistory.map((item) => {
             return {
                 date: new Date(item.date),
                 type: groupTypes ? item.type : item.type + ': ' + item.technology,
                 grouping: item.type,
-                count: item.count
+                count: item.count,
             } as ITypeData
         })
     }, [data, loading, error, groupTypes])
@@ -158,9 +157,9 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
                         order: '-sum',
                         z: 'grouping',
                         tip: true,
-                        inset: 0
-                    }),
-                )
+                        inset: 0,
+                    })
+                ),
             ],
         })
         containerRef.current?.append(plot)
