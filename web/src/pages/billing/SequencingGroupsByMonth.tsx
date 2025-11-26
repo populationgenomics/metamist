@@ -16,8 +16,9 @@ const GET_SG_BY_MONTH = gql(`
     query SequencingGroupHistory($name: String!) {
         project(name: $name) {
             sequencingGroupHistory {
-                type
                 date
+                type
+                technology
                 count
             }
         }
@@ -31,6 +32,7 @@ interface ISGByMonthDisplayProps {
 interface ITypeData {
     date: Date
     type: string
+    grouping: string
     count: number
 }
 
@@ -104,11 +106,13 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
     // Converting the date that GraphQL gives from a string to a Date type.
     const plotData = React.useMemo(() => {
         if (loading || error || !data) return []
-
+        console.log(data)
         return data.project.sequencingGroupHistory.map((item) => {
             return {
-                ...item,
                 date: new Date(item.date),
+                type: item.type + ': ' + item.technology,
+                grouping: item.type,
+                count: item.count
             } as ITypeData
         })
     }, [data, loading, error])
@@ -135,8 +139,9 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
                         interval: 'month',
                         fill: 'type',
                         order: '-sum',
+                        z: 'grouping',
                         tip: true,
-                    })
+                    }),
                 ),
                 Plot.ruleY([0]),
             ],
