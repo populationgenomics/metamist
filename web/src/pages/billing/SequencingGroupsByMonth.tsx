@@ -3,7 +3,7 @@ import * as React from 'react'
 import { useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMeasure } from 'react-use'
-import { Button, Card, Grid, Message } from 'semantic-ui-react'
+import { Button, Card, Checkbox, Grid, Message } from 'semantic-ui-react'
 import { gql } from '../../__generated__/gql'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import ProjectSelector, { IMetamistProject } from '../project/ProjectSelector'
@@ -11,14 +11,15 @@ import ProjectSelector, { IMetamistProject } from '../project/ProjectSelector'
 import * as Plot from '@observablehq/plot'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import './components/BillingCostByTimeTable.css'
+import { read } from 'fs'
 
 const GET_SG_BY_MONTH = gql(`
-    query SequencingGroupHistory($name: String!) {
+    query SequencingGroupHistory($name: String!, $split: Boolean!) {
         project(name: $name) {
             sequencingGroupHistory {
                 date
                 type
-                technology
+                technology @include(if: $split)
                 count
             }
         }
@@ -27,6 +28,7 @@ const GET_SG_BY_MONTH = gql(`
 
 interface ISGByMonthDisplayProps {
     projectName: string
+    groupTypes: boolean
 }
 
 interface ITypeData {
@@ -41,6 +43,8 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
     const navigate = useNavigate()
     const { projectName } = useParams()
 
+    const [groupTypes, setGroupTypes] = React.useState<boolean>(false);
+
     // Callback to update the url.
     const onProjectSelect = (_project: IMetamistProject) => {
         navigate(`/billing/sequencingGroupsByMonth/${_project.name}`)
@@ -51,7 +55,7 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
             return <Message negative>No project selected</Message>
         }
 
-        return <SequencingGroupsByMonthDisplay projectName={projectName} />
+        return <SequencingGroupsByMonthDisplay projectName={projectName} groupTypes={groupTypes} />
     }
 
     return (
@@ -82,6 +86,16 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
                     <Grid.Column className="field-selector-label">
                         <ProjectSelector onProjectSelect={onProjectSelect} />
                     </Grid.Column>
+                    <Grid.Column width={2}>
+                        <Checkbox
+                            label="Group by Type"
+                            fitted
+                            toggle
+                            checked={groupTypes}
+                            onChange={() => setGroupTypes(!groupTypes)}
+                            style={{ position: 'absolute', bottom: '20px' }}
+                        />
+                    </Grid.Column>
                 </Grid>
             </Card>
 
@@ -91,11 +105,11 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
 }
 
 const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayProps> = ({
-    projectName,
+    projectName, groupTypes
 }) => {
     // Data loading
     const { loading, error, data } = useQuery(GET_SG_BY_MONTH, {
-        variables: { name: projectName },
+        variables: { name: projectName, split: !groupTypes },
         notifyOnNetworkStatusChange: true,
     })
 
@@ -106,16 +120,19 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
     // Converting the date that GraphQL gives from a string to a Date type.
     const plotData = React.useMemo(() => {
         if (loading || error || !data) return []
-        console.log(data)
+        
+        if (groupTypes) {
+
+        }
         return data.project.sequencingGroupHistory.map((item) => {
             return {
                 date: new Date(item.date),
-                type: item.type + ': ' + item.technology,
+                type: groupTypes ? item.type : item.type + ': ' + item.technology,
                 grouping: item.type,
                 count: item.count
             } as ITypeData
         })
-    }, [data, loading, error])
+    }, [data, loading, error, groupTypes])
 
     // Code for generating the sequencing groups by month plot.
     React.useEffect(() => {
@@ -141,9 +158,9 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
                         order: '-sum',
                         z: 'grouping',
                         tip: true,
+                        inset: 0
                     }),
-                ),
-                Plot.ruleY([0]),
+                )
             ],
         })
         containerRef.current?.append(plot)
