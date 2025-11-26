@@ -463,18 +463,18 @@ def file_reheaderable(path: str) -> bool:
 def file_gatk_check(path: str):
     """
     Check if this is a file from GATK-SV CollectSVEvidence that needs bgzip reheadering,
-    and return the column index of the sample ID to replace.
+    and return the (1-based) column index of the sample ID to replace.
     """
     file_dict = {
-        # paired-end evidence (sample ID in column 2)
+        # paired-end evidence (sample ID in column 3)
         # chr1    10000   SAMPLE_ID       174     0       0       3
-        '.sd.txt.gz': 2,
-        # split-read evidence (sample ID in column 4)
+        '.sd.txt.gz': 3,
+        # split-read evidence (sample ID in column 5)
         # chr1    10000   left    4       SAMPLE_ID
-        '.sr.txt.gz': 4,
-        # discordant paired-end evidence (sample ID in column 6)
+        '.sr.txt.gz': 5,
+        # discordant paired-end evidence (sample ID in column 7)
         # chr1    10000   -       chr5    10495   +       SAMPLE_ID
-        '.pe.txt.gz': 6,
+        '.pe.txt.gz': 7,
     }
     for suffix, sample_id_col in file_dict.items():
         if path.endswith(suffix):
@@ -659,7 +659,7 @@ def bgzipped_file_commands(
         # The CollectSVEvidence files (pe.txt.gz, sd.txt.gz, sr.txt.gz)
         job.command(rf"""
             bgzip -c --decompress {old_file} | \
-            awk -v OFS='\t' -v col={column_index} '{{if(NR>1){{$col="{sid[1]}"}}; print}}' | \
+            awk -v OFS='\t' -v col={column_index} '{{{{$col="{sid[1]}"}}; print}}' | \
             bgzip -c > {job.new_file.outfile}
         """)
 
