@@ -236,7 +236,10 @@ async def get_sample_upsert(
         id=None,
         type=original_sg_data['type'],
         technology=original_sg_data['technology'],
-        meta={'original_sequencing_group_id': original_sg_id, 'original_dataset': source_dataset},
+        meta={
+            'original_sequencing_group_id': original_sg_id,
+            'original_dataset': source_dataset,
+        },
         platform=original_sg_data['platform'],
         assays=assays,
     )
