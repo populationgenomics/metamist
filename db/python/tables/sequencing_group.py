@@ -560,12 +560,11 @@ GROUP BY sg.type
         return {r['type']: r['n'] for r in rows}
 
     async def get_sequencing_group_counts_by_month(
-        self, project_ids: list[ProjectId], split_technology: bool
-    ) -> dict[ProjectId, dict[date, dict[str, int]]]:
+        self, project_ids: list[ProjectId]
+    ) -> dict[ProjectId, dict[date, dict[str, dict[str, int]]]]:
         """
         Returns the history of the number of each sequencing groups of each type for a list of projects.
         """
-        split_str = ', sg.technology' if split_technology else ''
         _query = f"""
         WITH sg AS (
             SELECT id, sample_id, type, technology, min(row_start) as sg_first_date
@@ -575,7 +574,7 @@ GROUP BY sg.type
         SELECT project, sg.type, sg.technology, CONVERT(sg_first_date, DATE) as sg_date, COUNT(sg.id) as num_sg
         FROM sample INNER JOIN sg ON sample.id = sg.sample_id
         WHERE project in :project_ids
-        GROUP BY project, sg_date, sg.type{split_str}
+        GROUP BY project, sg_date, sg.type, sg.technology
         """
         values = {'project_ids': project_ids}
 
@@ -586,7 +585,7 @@ GROUP BY sg.type
 
         # Organise the data by month into a dictionary, grouping sequencing group types together by month.
         project_histories: dict[ProjectId, dict[date, dict[str, int]]] = defaultdict(
-            lambda: defaultdict(dict)
+            lambda: defaultdict(lambda: defaultdict(dict))
         )
         for row in rows:
             project = row['project']
@@ -595,8 +594,7 @@ GROUP BY sg.type
             sg_tech = row['technology']
             num_sg = row['num_sg']
 
-            key = sg_type + ':' + sg_tech if split_technology else sg_type
-            project_histories[project][month_created][key] = num_sg
+            project_histories[project][month_created][sg_type][sg_tech] = num_sg
 
         # We want the total number of each sg type over time, so we need to accumulate and
         # fill in the missing months.
@@ -605,19 +603,22 @@ GROUP BY sg.type
             iteration_month = min(
                 history.keys()
             )  # The month currently being filled in.
-            type_totals: dict[str, int] = defaultdict(lambda: 0)
+            type_totals: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
 
             # By starting at the earliest month and working towards today, we won't skip any dates.
             while iteration_month <= todays_month:
-                iteration_counts = history.get(iteration_month, {})
+                this_month_totals = history.get(iteration_month, defaultdict(lambda: defaultdict(lambda: 0)))
 
                 # The result from the database provides the sq types added in a given month,
                 # but we want the total number.
-                for sg_key, count in iteration_counts.items():
-                    type_totals[sg_key] += count
+                for type, tech_dict in this_month_totals.items():
+                    for tech, count in tech_dict.items():
+                        type_totals[type][tech] += count
 
-                iteration_counts.update(type_totals)
-                history[iteration_month] = iteration_counts
+                for type in type_totals.keys():
+                    this_month_totals[type].update(type_totals[type])
+                # this_month_totals.update(type_totals)
+                history[iteration_month] = this_month_totals
 
                 iteration_month += relativedelta(months=1)
 

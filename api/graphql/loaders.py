@@ -299,21 +299,15 @@ async def load_sequencing_groups_for_samples(
     return sg_map
 
 
-@connected_data_loader_with_params(
-    LoaderKeys.SEQUENCING_GROUPS_COUNTS_FOR_PROJECT, default_factory=dict
-)
-async def load_sequencing_group_counts_by_month(
-    ids: list[ProjectId], split_technology: bool, connection: Connection
-) -> list[dict[date, dict[str, int]]]:
+@connected_data_loader(LoaderKeys.SEQUENCING_GROUPS_COUNTS_FOR_PROJECT)
+async def load_sequencing_group_counts_by_month(ids: list[ProjectId], connection: Connection) -> list[dict[date, dict[str, dict[str, int]]]]:
     """
     DataLoader: get_sequencing_group_counts_by_month
     """
     sgt = SequencingGroupTable(connection)
-    counts_by_month = await sgt.get_sequencing_group_counts_by_month(
-        ids, split_technology
-    )
+    counts_by_month = await sgt.get_sequencing_group_counts_by_month(ids)
 
-    return counts_by_month
+    return [counts_by_month[id] for id in ids]
 
 
 @connected_data_loader(LoaderKeys.SAMPLES_FOR_IDS)
