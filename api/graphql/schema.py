@@ -1316,10 +1316,16 @@ class GraphQLSequencingGroupsByDate:
     @staticmethod
     def from_dict(date_type_count_map: dict[datetime.date, dict[str, int]]):
         entries: list[GraphQLSequencingGroupsByDate] = []
-        for month, type_counts in sorted(date_type_count_map.items(), key=lambda x: x[0]):
+        for month, type_counts in sorted(
+            date_type_count_map.items(), key=lambda x: x[0]
+        ):
             for key, count in type_counts.items():
                 type, tech = key.split(':')
-                entries.append(GraphQLSequencingGroupsByDate(date=month, type=type, technology=tech, count=count))
+                entries.append(
+                    GraphQLSequencingGroupsByDate(
+                        date=month, type=type, technology=tech, count=count
+                    )
+                )
 
         return entries
 

@@ -204,7 +204,7 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
             const date = new Date(dateStr)
             result.push({ date, type: 'Sequencing Groups', grouping: 'Sequencing Groups', count })
         })
-        
+
         return result
     }, [])
 
