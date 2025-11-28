@@ -25,7 +25,7 @@ from db.python.connect import SMConnections
 from db.python.utils import get_logger
 
 # This tag is automatically updated by bump2version
-_VERSION = '7.13.0'
+_VERSION = '7.13.1'
 
 
 logger = get_logger()
