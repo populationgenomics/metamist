@@ -192,6 +192,7 @@ const MAIN_FIELDS: IMainField[] = [
     {
         field: 'driverImage',
         title: 'Driver Image',
+        filterable: true,
         renderer: (log: AnalysisRunnerGridItem) => {
             // format: australia.southeast1-docker.pkg.dev/populationgenomics-internal/hail-driver/hail-driver:latest
             const parts = log.driverImage.split('/')
