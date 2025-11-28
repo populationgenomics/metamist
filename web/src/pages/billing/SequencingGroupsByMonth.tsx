@@ -28,7 +28,7 @@ const GET_SG_BY_MONTH = gql(`
 enum SeqGroupBreakdown {
     None = 0,
     Type = 1,
-    Tech = 2,
+    Technology = 2,
     Both = 3,
 }
 
@@ -121,10 +121,10 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
                             fitted
                             toggle
                             checked={
-                                breakdown == SeqGroupBreakdown.Tech ||
+                                breakdown == SeqGroupBreakdown.Technology ||
                                 breakdown == SeqGroupBreakdown.Both
                             }
-                            onChange={() => toggleDisplay(SeqGroupBreakdown.Tech)}
+                            onChange={() => toggleDisplay(SeqGroupBreakdown.Technology)}
                             style={{ paddingTop: '5px' }}
                         />
                     </Grid.Column>
@@ -150,17 +150,18 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
     const containerRef = useRef<HTMLDivElement>(null)
     const [measureRef, { width, height }] = useMeasure<HTMLDivElement>()
 
+    // Merges counts, grouped by either type or technology.
     const mergeTypeOrTechCount = React.useCallback(
-        (gqlData: ISequencingGroupQueryData[], breakdown: SeqGroupBreakdown) => {
-            if (breakdown === SeqGroupBreakdown.None || breakdown === SeqGroupBreakdown.Both) {
+        (gqlData: ISequencingGroupQueryData[], groupBy: string) => {
+            if (groupBy != 'type' && groupBy != 'technology') {
                 return []
             }
 
             const intermediateData = gqlData.reduce(
                 (acc, item) => {
                     const dateKey: string = item.date
-                    const groupKey: string =
-                        breakdown == SeqGroupBreakdown.Type ? item.type : item.technology
+                    const groupKey: string = item[groupBy]
+
                     if (!acc[dateKey]) acc[dateKey] = {}
                     if (!acc[dateKey][groupKey]) acc[dateKey][groupKey] = 0
 
@@ -176,8 +177,8 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
             Object.entries(intermediateData).forEach(([dateStr, typeMap]) => {
                 const date = new Date(dateStr)
 
-                Object.entries(typeMap).forEach(([type, count]) => {
-                    result.push({ date, type, grouping: type, count })
+                Object.entries(typeMap).forEach(([groupKey, count]) => {
+                    result.push({ date, type: groupKey, grouping: groupKey, count })
                 })
             })
             return result
@@ -185,6 +186,7 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
         []
     )
 
+    // Merges all counts, grouped by date.
     const mergeAllCounts = React.useCallback((gqlData: ISequencingGroupQueryData[]) => {
         const intermediateData = gqlData.reduce(
             (acc, item) => {
@@ -212,6 +214,7 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
     const plotData = React.useMemo(() => {
         if (loading || error || !data) return []
 
+        // Breakdown by both Type and Technology, which is already how the data is returned from the backend.
         if (sgBreakdown == SeqGroupBreakdown.Both) {
             return data.project.sequencingGroupHistory.map((item) => {
                 return {
@@ -224,10 +227,17 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
         }
 
         // Breakdown by Type XOR Technology.
-        if ((sgBreakdown == SeqGroupBreakdown.Type) != (sgBreakdown == SeqGroupBreakdown.Tech)) {
-            return mergeTypeOrTechCount(data.project.sequencingGroupHistory, sgBreakdown)
+        if (
+            (sgBreakdown == SeqGroupBreakdown.Type) !=
+            (sgBreakdown == SeqGroupBreakdown.Technology)
+        ) {
+            return mergeTypeOrTechCount(
+                data.project.sequencingGroupHistory,
+                SeqGroupBreakdown[sgBreakdown].toLowerCase()
+            )
         }
 
+        // Merge all counts to just show the number of sequencing groups per month.
         return mergeAllCounts(data.project.sequencingGroupHistory)
     }, [data, loading, error, sgBreakdown])
 
@@ -238,7 +248,7 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
         const plot = Plot.plot({
             color: {
                 scheme: 'spectral',
-                legend: sgBreakdown != SeqGroupBreakdown.Both,
+                legend: true,
             },
             x: { interval: 'month' },
             y: { grid: true },
