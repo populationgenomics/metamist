@@ -29,12 +29,19 @@ enum SeqGroupBreakdown {
     None = 0,
     Type = 1,
     Tech = 2,
-    Both = 3
+    Both = 3,
 }
 
 interface ISGByMonthDisplayProps {
     projectName: string
     sgBreakdown: SeqGroupBreakdown
+}
+
+interface ISequencingGroupQueryData {
+    date: string
+    type: string
+    technology: string
+    count: number
 }
 
 interface ITypeData {
@@ -97,22 +104,28 @@ const SequencingGroupsByMonth: React.FunctionComponent = () => {
                     <Grid.Column className="field-selector-label">
                         <ProjectSelector onProjectSelect={onProjectSelect} />
                     </Grid.Column>
-                    <Grid.Column width={4}>
+                    <Grid.Column width={3}>
                         <Checkbox
                             label="Display Type"
                             fitted
                             toggle
-                            checked={breakdown == SeqGroupBreakdown.Type || breakdown == SeqGroupBreakdown.Both}
+                            checked={
+                                breakdown == SeqGroupBreakdown.Type ||
+                                breakdown == SeqGroupBreakdown.Both
+                            }
                             onChange={() => toggleDisplay(SeqGroupBreakdown.Type)}
-                            style={{paddingBottom: '5px'}}
+                            style={{ paddingBottom: '5px' }}
                         />
                         <Checkbox
                             label="Display Technology"
                             fitted
                             toggle
-                            checked={breakdown == SeqGroupBreakdown.Tech || breakdown == SeqGroupBreakdown.Both}
+                            checked={
+                                breakdown == SeqGroupBreakdown.Tech ||
+                                breakdown == SeqGroupBreakdown.Both
+                            }
                             onChange={() => toggleDisplay(SeqGroupBreakdown.Tech)}
-                            style={{paddingTop: '5px'}}
+                            style={{ paddingTop: '5px' }}
                         />
                     </Grid.Column>
                 </Grid>
@@ -137,46 +150,47 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
     const containerRef = useRef<HTMLDivElement>(null)
     const [measureRef, { width, height }] = useMeasure<HTMLDivElement>()
 
-    const mergeTypeOrTechCount = React.useCallback((breakdown: SeqGroupBreakdown) => {
-        if (breakdown === SeqGroupBreakdown.None || breakdown === SeqGroupBreakdown.Both) {
-            return []
-        }
-        const intermediateData = data!.project.sequencingGroupHistory.reduce(
-            (acc, item) => {
-                const dateKey: string = item.date
-                const groupKey: string = breakdown == SeqGroupBreakdown.Type ? item['type'] : item.technology
+    const mergeTypeOrTechCount = React.useCallback(
+        (gqlData: ISequencingGroupQueryData[], breakdown: SeqGroupBreakdown) => {
+            if (breakdown === SeqGroupBreakdown.None || breakdown === SeqGroupBreakdown.Both) {
+                return []
+            }
 
-                if (!acc[dateKey]) 
-                    acc[dateKey] = {}
-                if (!acc[dateKey][groupKey]) 
-                    acc[dateKey][groupKey] = 0
+            const intermediateData = gqlData.reduce(
+                (acc, item) => {
+                    const dateKey: string = item.date
+                    const groupKey: string =
+                        breakdown == SeqGroupBreakdown.Type ? item.type : item.technology
+                    if (!acc[dateKey]) acc[dateKey] = {}
+                    if (!acc[dateKey][groupKey]) acc[dateKey][groupKey] = 0
 
-                acc[dateKey][groupKey] += item.count
+                    acc[dateKey][groupKey] += item.count
 
-                return acc
-            },
-            {} as Record<string, Record<string, number>>
-        )
+                    return acc
+                },
+                {} as Record<string, Record<string, number>>
+            )
 
-        // Convert back into an array.
-        const result: ITypeData[] = []
-        Object.entries(intermediateData).forEach(([dateStr, typeMap]) => {
-            const date = new Date(dateStr)
+            // Convert back into an array.
+            const result: ITypeData[] = []
+            Object.entries(intermediateData).forEach(([dateStr, typeMap]) => {
+                const date = new Date(dateStr)
 
-            Object.entries(typeMap).forEach(([type, count]) => {
-                result.push({ date, type, grouping: type, count })
+                Object.entries(typeMap).forEach(([type, count]) => {
+                    result.push({ date, type, grouping: type, count })
+                })
             })
-        })
-        return result
-    }, [])
+            return result
+        },
+        []
+    )
 
-    const mergeAllCounts = React.useCallback(() => {
-        const intermediateData = data!.project.sequencingGroupHistory.reduce(
+    const mergeAllCounts = React.useCallback((gqlData: ISequencingGroupQueryData[]) => {
+        const intermediateData = gqlData.reduce(
             (acc, item) => {
                 const dateKey: string = item.date
 
-                if (!acc[dateKey]) 
-                    acc[dateKey] = 0
+                if (!acc[dateKey]) acc[dateKey] = 0
 
                 acc[dateKey] += item.count
                 return acc
@@ -190,14 +204,14 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
             const date = new Date(dateStr)
             result.push({ date, type: 'Sequencing Groups', grouping: 'Sequencing Groups', count })
         })
-        // console.log(result)
+        
         return result
     }, [])
 
     // Converting the date that GraphQL gives from a string to a Date type.
     const plotData = React.useMemo(() => {
         if (loading || error || !data) return []
-        
+
         if (sgBreakdown == SeqGroupBreakdown.Both) {
             return data.project.sequencingGroupHistory.map((item) => {
                 return {
@@ -209,22 +223,22 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
             })
         }
 
-        if (sgBreakdown == SeqGroupBreakdown.Type || sgBreakdown == SeqGroupBreakdown.Tech) {
-            return mergeTypeOrTechCount(sgBreakdown)
+        // Breakdown by Type XOR Technology.
+        if ((sgBreakdown == SeqGroupBreakdown.Type) != (sgBreakdown == SeqGroupBreakdown.Tech)) {
+            return mergeTypeOrTechCount(data.project.sequencingGroupHistory, sgBreakdown)
         }
 
-        return mergeAllCounts()
+        return mergeAllCounts(data.project.sequencingGroupHistory)
     }, [data, loading, error, sgBreakdown])
-
 
     // Code for generating the sequencing groups by month plot.
     React.useEffect(() => {
         if (plotData!.length == 0) return
-        
+
         const plot = Plot.plot({
             color: {
                 scheme: 'spectral',
-                legend: true,
+                legend: sgBreakdown != SeqGroupBreakdown.Both,
             },
             x: { interval: 'month' },
             y: { grid: true },
@@ -249,7 +263,7 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
         containerRef.current?.append(plot)
 
         return () => plot.remove()
-    }, [plotData, width, height])
+    }, [plotData, width, height, sgBreakdown])
 
     // Component to display a message when data isn't loaded or there's an error.
     const messageComponent = () => {
