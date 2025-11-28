@@ -8,9 +8,9 @@ class CohortStatus(str, Enum):
     this list can be extended.
     """
 
-    ACTIVE = 'active'
-    ARCHIVED = 'archived'  # when cohort marked archived
-    INVALID = 'invalid'  # when sgs or samples marked inactive/archived
+    active = 'active'
+    archived = 'archived'  # when cohort marked archived
+    invalid = 'invalid'  # when sgs or samples marked archived
 
 
 class CohortUpdateStatus(str, Enum):
@@ -18,5 +18,5 @@ class CohortUpdateStatus(str, Enum):
     Enum for update cohort status.
     """
 
-    ACTIVE = 'active'
-    ARCHIVED = 'archived'
+    active = 'active'
+    archived = 'archived'
