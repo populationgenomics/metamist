@@ -7,7 +7,6 @@ and defaults to decide the GraphQL schema, so it might not necessarily look corr
 """
 
 import datetime
-from collections import defaultdict
 from inspect import isclass
 from typing import (  # pylint: disable=unused-import; Union is used, pylint just doesn't know about it
     Annotated,
@@ -618,38 +617,13 @@ class GraphQLProject:
     async def sequencing_group_history(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLProject'
     ) -> list['GraphQLSequencingGroupsByDate']:
-        split_technology = False
-        for field in info.selected_fields[0].selections:
-            if field.name == 'technology':
-                split_technology = True
-                break
-
         loader = info.context['loaders'][
             LoaderKeys.SEQUENCING_GROUPS_COUNTS_FOR_PROJECT
         ]
 
         counts = await loader.load(root.id)
-        # Used for grouping counts together under the same type.
-        coalesced_by_type: dict[datetime.date, dict[str, int]] = defaultdict(
-            lambda: defaultdict(lambda: 0)
-        )
 
-        results: list[GraphQLSequencingGroupsByDate] = []
-        for month, type_dict in sorted(counts.items(), key=lambda x: x[0]):
-            for type, tech_dict in type_dict.items():
-                for tech, count in tech_dict.items():
-                    coalesced_by_type[month][type] += count
-                    if split_technology:
-                        results.append(GraphQLSequencingGroupsByDate(date=month, type=type, technology=tech, count=count))
-
-        if split_technology:
-            return results
-        
-        for month, type_dict in coalesced_by_type.items():
-            for type, count in type_dict.items():
-                results.append(GraphQLSequencingGroupsByDate(date=month, type=type, technology='', count=count))
-
-        return results
+        return GraphQLSequencingGroupsByDate.from_dict(counts)
 
 
 @strawberry.type
@@ -1340,20 +1314,12 @@ class GraphQLSequencingGroupsByDate:
     count: int
 
     @staticmethod
-    def from_dict(
-        date_type_count_map: dict[datetime.date, dict[str, int]], split_technology: bool
-    ):
+    def from_dict(date_type_count_map: dict[datetime.date, dict[str, int]]):
         entries: list[GraphQLSequencingGroupsByDate] = []
-        for month, type_counts in sorted(
-            date_type_count_map.items(), key=lambda x: x[0]
-        ):
+        for month, type_counts in sorted(date_type_count_map.items(), key=lambda x: x[0]):
             for key, count in type_counts.items():
-                type, tech = key.split(':') if split_technology else (key, '')
-                entries.append(
-                    GraphQLSequencingGroupsByDate(
-                        date=month, type=type, technology=tech, count=count
-                    )
-                )
+                type, tech = key.split(':')
+                entries.append(GraphQLSequencingGroupsByDate(date=month, type=type, technology=tech, count=count))
 
         return entries
 

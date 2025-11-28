@@ -300,7 +300,9 @@ async def load_sequencing_groups_for_samples(
 
 
 @connected_data_loader(LoaderKeys.SEQUENCING_GROUPS_COUNTS_FOR_PROJECT)
-async def load_sequencing_group_counts_by_month(ids: list[ProjectId], connection: Connection) -> list[dict[date, dict[str, dict[str, int]]]]:
+async def load_sequencing_group_counts_by_month(
+    ids: list[ProjectId], connection: Connection
+) -> list[dict[date, dict[str, int]]]:
     """
     DataLoader: get_sequencing_group_counts_by_month
     """
