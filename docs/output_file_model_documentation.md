@@ -406,12 +406,13 @@ query GetAnalysis($analysisId: Int!) {
     id
     type
     status
-    outputs
+    outputs  # JSON scalar - returns entire outputs structure
   }
 }
 ```
 
-The `outputs` field returns the full OutputFile objects with all metadata populated.
+> [!NOTE]
+> **GraphQL `outputs` field**: The `outputs` field is a `JSON` scalar type, which means you receive the entire JSON structure as a blob. You cannot select individual OutputFile fields within the GraphQL query - you get the complete nested structure with all OutputFile objects and their metadata.
 
 ### Output Structures Comparison
 
