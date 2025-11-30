@@ -38,6 +38,20 @@ function calcTranslate(data: IDonutChartPreparadData, move = 4) {
     })`
 }
 
+function createViewBox(legSize: number | undefined, w: number) {
+    // calculate the viewbox of Legend
+    const minX = 0
+    const minY = 0
+    let width = 200
+    let height = 200
+    if (legSize) {
+        width = legSize * w
+        height = legSize * w
+    }
+
+    return `${minX} ${minY} ${width} ${height}`
+}
+
 export const DonutChart: React.FC<IDonutChartProps> = ({
     id,
     data,
@@ -69,85 +83,83 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
         }
     }, [])
 
-    if (isLoading) {
-        return (
-            <div>
-                <LoadingDucks />
-            </div>
-        )
-    }
+    const onHoverOver = React.useCallback(
+        (tg: HTMLElement, v: IDonutChartPreparadData) => {
+            select(`#${chartId}-lbl${v.index}`).select('tspan').attr('font-weight', 'bold')
+            select(`#${chartId}-legend${v.index}`).attr('font-weight', 'bold')
+            select(`#${chartId}-lgd${v.index}`).attr('font-weight', 'bold')
+            select(`#${chartId}-lgd${v.index}`).attr('style', 'font-weight: bold')
+            select(tg).transition().duration(duration).attr('transform', calcTranslate(v, 6))
+            select(tg)
+                .select('path')
+                .transition()
+                .duration(duration)
+                .attr('stroke', 'rgba(100, 100, 100, 0.2)')
+                .attr('stroke-width', 4)
+            select(tg)
+        },
+        [chartId, duration]
+    )
 
-    if (!data || data.length === 0) {
-        return <>No Data</>
-    }
+    const onHoverOut = React.useCallback(
+        (tg: HTMLElement, v: IDonutChartPreparadData) => {
+            select(`#${chartId}-lbl${v.index}`).select('tspan').attr('font-weight', 'normal')
+            select(`#${chartId}-legend${v.index}`).attr('font-weight', 'normal')
+            select(`#${chartId}-lgd${v.index}`).attr('font-weight', 'normal')
+            select(`#${chartId}-lgd${v.index}`).attr('style', 'font-weight: normal')
+            select(tg).transition().duration(duration).attr('transform', 'translate(0, 0)')
+            select(tg)
+                .select('path')
+                .transition()
+                .duration(duration)
+                .attr('stroke', 'white')
+                .attr('stroke-width', 1)
+        },
+        [chartId, duration]
+    )
 
-    const onHoverOver = (tg: HTMLElement, v: IDonutChartPreparadData) => {
-        select(`#${chartId}-lbl${v.index}`).select('tspan').attr('font-weight', 'bold')
-        select(`#${chartId}-legend${v.index}`).attr('font-weight', 'bold')
-        select(`#${chartId}-lgd${v.index}`).attr('font-weight', 'bold')
-        select(`#${chartId}-lgd${v.index}`).attr('style', 'font-weight: bold')
-        select(tg).transition().duration(duration).attr('transform', calcTranslate(v, 6))
-        select(tg)
-            .select('path')
-            .transition()
-            .duration(duration)
-            .attr('stroke', 'rgba(100, 100, 100, 0.2)')
-            .attr('stroke-width', 4)
-        select(tg)
-    }
-
-    const onHoverOut = (tg: HTMLElement, v: IDonutChartPreparadData) => {
-        select(`#${chartId}-lbl${v.index}`).select('tspan').attr('font-weight', 'normal')
-        select(`#${chartId}-legend${v.index}`).attr('font-weight', 'normal')
-        select(`#${chartId}-lgd${v.index}`).attr('font-weight', 'normal')
-        select(`#${chartId}-lgd${v.index}`).attr('style', 'font-weight: normal')
-        select(tg).transition().duration(duration).attr('transform', 'translate(0, 0)')
-        select(tg)
-            .select('path')
-            .transition()
-            .duration(duration)
-            .attr('stroke', 'white')
-            .attr('stroke-width', 1)
-    }
-
-    function createViewBox(legSize: number | undefined, w: number) {
-        // calculate the viewbox of Legend
-        const minX = 0
-        const minY = 0
-        let width = 200
-        let height = 200
-        if (legSize) {
-            width = legSize * w
-            height = legSize * w
+    React.useEffect(() => {
+        if (isLoading || !data || data.length === 0 || graphWidth === 0) {
+            return
         }
 
-        return `${minX} ${minY} ${width} ${height}`
-    }
+        // Filter out negative or zero values for pie chart display
+        const filteredData = data.filter((d) => d.value > 0)
 
-    const width = graphWidth
-    const height = width
-    const margin = 15
-    const radius = Math.min(width, height) / 2 - margin
+        if (filteredData.length === 0) {
+            return
+        }
 
-    // keep order of the slices, declare custom sort function to keep order of slices as passed in
-    // by default pie function starts from index 1 and sorts by value
-    const pieFnc = pie<DataItem>()
-        .value((d) => d.value)
-        .sort((a) => {
-            if (typeof a === 'object' && a.type === 'inc') {
-                return 1
-            }
-            return 0 // works both on Safari and Firefox, any other value will break one of them
-        })
-    const data_ready = pieFnc(data)
-    const innerRadius = radius / 1.75 // inner radius of pie, in pixels (non-zero for donut)
-    const outerRadius = radius // outer radius of pie, in pixels
-    const labelRadius = outerRadius * 0.8 // center radius of labels
-    const arcData = arc().innerRadius(innerRadius).outerRadius(outerRadius)
-    const arcLabel = arc().innerRadius(labelRadius).outerRadius(labelRadius)
+        const contDiv = containerDivRef.current
+        if (!contDiv) {
+            return
+        }
 
-    const contDiv = containerDivRef.current
-    if (contDiv) {
+        const width = graphWidth
+        const height = width
+        const margin = 15
+        const radius = Math.min(width, height) / 2 - margin
+
+        // keep order of the slices, declare custom sort function to keep order of slices as passed in
+        // by default pie function starts from index 1 and sorts by value
+        const pieFnc = pie<DataItem>()
+            .value((d) => d.value)
+            .sort((a) => {
+                if (typeof a === 'object' && a.type === 'inc') {
+                    return 1
+                }
+                return 0 // works both on Safari and Firefox, any other value will break one of them
+            })
+        const data_ready = pieFnc(filteredData)
+        const innerRadius = radius / 1.75 // inner radius of pie, in pixels (non-zero for donut)
+        const outerRadius = radius // outer radius of pie, in pixels
+        const labelRadius = outerRadius * 0.8 // center radius of labels
+        const arcData = arc().innerRadius(innerRadius).outerRadius(outerRadius)
+        const arcLabel = arc().innerRadius(labelRadius).outerRadius(labelRadius)
+
+        // Calculate total for percentage calculations using filtered data
+        const total = filteredData.reduce((sum, d) => sum + d.value, 0)
+
         // reset svg
         contDiv.innerHTML = ''
 
@@ -182,7 +194,10 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
                 onHoverOut(event.currentTarget, v)
             })
             .append('title')
-            .text((d) => `${d.data.label} ${d.data.value}`)
+            .text((d) => {
+                const percentage = total > 0 ? ((d.data.value / total) * 100).toFixed(1) : '0.0'
+                return `${d.data.label}: ${formatMoney(d.data.value)} (${percentage}%)`
+            })
             .style('text-anchor', 'middle')
             .style('font-size', 17)
 
@@ -201,13 +216,15 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
             .attr('id', (d) => `${chartId}-lbl${d.index}`)
             .selectAll('tspan')
             .data((d) => {
-                const lines = `${formatMoney(d.data.value)}`.split(/\n/)
+                const percentage = total > 0 ? ((d.data.value / total) * 100).toFixed(1) : '0.0'
+                const lines = `${formatMoney(d.data.value)}\n${percentage}%`.split(/\n/)
                 return d.endAngle - d.startAngle > 0.25 ? lines : lines.slice(0, 1)
             })
             .join('tspan')
             .attr('x', 0)
-            .attr('y', (_, i) => `${i * 2.1}em`)
+            .attr('y', (_, i) => `${i * 1.2}em`)
             .attr('font-weight', (_, i) => (i ? null : 'normal'))
+            .attr('font-size', (_, i) => (i ? '0.8em' : '1em'))
             .text((d) => d)
 
         // add legend
@@ -229,6 +246,7 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
                         .append('circle')
                         .attr('r', 8)
                         .attr('fill', colorFunc(d.index / maxSlices) ?? 'black')
+                    const percentage = total > 0 ? ((d.data.value / total) * 100).toFixed(1) : '0.0'
                     select(this)
                         .append('text')
                         .attr('text-anchor', 'start')
@@ -236,7 +254,7 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
                         .attr('y', 0)
                         .attr('dy', '0.35em')
                         .attr('id', `${chartId}-legend${d.index}`)
-                        .text(d.data.label)
+                        .text(`${d.data.label} (${percentage}%)`)
                         .attr('font-size', '0.9em')
                     select(this)
                         .on('mouseover', () => {
@@ -249,6 +267,30 @@ export const DonutChart: React.FC<IDonutChartProps> = ({
                         })
                 })
         }
+    }, [
+        data,
+        graphWidth,
+        isLoading,
+        maxSlices,
+        colorFunc,
+        chartId,
+        onHoverOver,
+        onHoverOut,
+        showLegend,
+        legendSize,
+    ])
+
+    if (isLoading) {
+        return (
+            <div>
+                <LoadingDucks />
+            </div>
+        )
     }
+
+    if (!data || data.length === 0) {
+        return <>No Data</>
+    }
+
     return <div ref={containerDivRef} style={{ maxWidth: maxWidth }}></div>
 }

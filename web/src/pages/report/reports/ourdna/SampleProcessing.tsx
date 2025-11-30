@@ -4,7 +4,6 @@ import { ReportItemPlot, ReportItemTable } from '../../components/ReportItem'
 import ReportRow from '../../components/ReportRow'
 
 const ROW_HEIGHT = 450
-const PROJECT = 'ourdna'
 
 const PROCESS_DURATION_QUERY = `
     with times as (
@@ -15,6 +14,8 @@ const PROCESS_DURATION_QUERY = `
             coalesce(s.meta_processing_site, 'unknown') as processing_site,
             coalesce(s.meta_collection_event_type, 'unknown') as event_type,
             try_strptime(meta_collection_datetime, '%Y-%m-%dT%H:%M:%S') as collection_time,
+            dayname(try_strptime(meta_collection_datetime, '%Y-%m-%dT%H:%M:%S')) as day,
+            meta_ancestry_participant_ancestry as ancestry,
             s.external_id as sample_agd_id,
             -- The most important sample derivative to track the processing time of is PBMC
             try_strptime((
@@ -39,7 +40,160 @@ const PROCESS_DURATION_QUERY = `
     from times
 `
 
-export default function ProcessingTimes() {
+function ProcessingTimesByCollectionDay(props: {
+    eventType: string
+    eventTypeTitle: string
+    project: string
+}) {
+    return (
+        <ReportItemPlot
+            height={ROW_HEIGHT}
+            flexBasis={480}
+            flexGrow={1}
+            title={`${props.eventTypeTitle} processing times by collection day`}
+            description="Processing time by the day the sample was collected"
+            project={props.project}
+            query={[
+                {
+                    name: 'durations',
+                    query: PROCESS_DURATION_QUERY,
+                },
+                {
+                    name: 'result',
+                    query: `
+                        select
+                            count(distinct participant_id) as count,
+                            day,
+                            CASE
+                                WHEN duration < 24 THEN '0-24 hours'
+                                WHEN duration >= 24 AND duration < 36 THEN '24-36 hours'
+                                WHEN duration >= 36 AND duration < 48 THEN '36-48 hours'
+                                WHEN duration >= 48 AND duration < 72 THEN '48-72 hours'
+                                ELSE '72+ hours'
+                            END AS duration,
+                            event_type
+                        from durations
+                        where event_type = '${props.eventType}'
+                        and duration is not null
+                        group by 2, 3, 4 order by 3, 2, 4
+                    `,
+                },
+            ]}
+            plot={(data) => ({
+                marginTop: 20,
+                marginRight: 0,
+                marginBottom: 40,
+                marginLeft: 0,
+                color: {
+                    scheme: 'RdYlGn',
+                    legend: true,
+                    reverse: true,
+                },
+                x: {
+                    axis: null,
+                },
+                y: {
+                    axis: null,
+                },
+                fx: {
+                    domain: [
+                        'Monday',
+                        'Tuesday',
+                        'Wednesday',
+                        'Thursday',
+                        'Friday',
+                        'Saturday',
+                        'Sunday',
+                    ],
+                },
+                marks: [
+                    Plot.frame({ stroke: '#ccc' }),
+                    Plot.barY(data, {
+                        x: 'duration',
+                        y: 'count',
+                        fill: 'duration',
+                        tip: true,
+                        fx: 'day',
+                    }),
+                ],
+            })}
+        />
+    )
+}
+
+function ProcessingTimesByAncestry(props: { project: string }) {
+    return (
+        <ReportItemPlot
+            height={ROW_HEIGHT}
+            flexBasis={480}
+            flexGrow={1}
+            title={`Processing times by ancestry`}
+            description="Processing time by the ancestry of the participant"
+            project={props.project}
+            query={[
+                {
+                    name: 'durations',
+                    query: PROCESS_DURATION_QUERY,
+                },
+                {
+                    name: 'result',
+                    query: `
+                        select
+                            count(distinct participant_id) as count,
+                            CASE
+                                WHEN 'Vietnamese' IN durations.ancestry THEN 'Vietnamese'
+                                WHEN 'Filipino' IN durations.ancestry THEN 'Filipino'
+                                WHEN 'Lebanese' IN durations.ancestry THEN 'Lebanese'
+                                ELSE 'Other'
+                            END AS ancestry,
+                            CASE
+                                WHEN duration < 24 THEN '0-24 hours'
+                                WHEN duration >= 24 AND duration < 36 THEN '24-36 hours'
+                                WHEN duration >= 36 AND duration < 48 THEN '36-48 hours'
+                                WHEN duration >= 48 AND duration < 72 THEN '48-72 hours'
+                                ELSE '72+ hours'
+                            END AS duration,
+                        from durations
+                        where duration is not null
+                        group by 2, 3 order by 2, 3
+                    `,
+                },
+            ]}
+            plot={(data) => ({
+                marginTop: 20,
+                marginRight: 100,
+                marginBottom: 40,
+                marginLeft: 100,
+                color: {
+                    scheme: 'RdYlGn',
+                    legend: true,
+                    reverse: true,
+                },
+                x: {
+                    axis: null,
+                },
+                y: {
+                    axis: null,
+                },
+                fx: {
+                    domain: ['Vietnamese', 'Filipino', 'Lebanese', 'Other'],
+                },
+                marks: [
+                    Plot.frame({ stroke: '#ccc' }),
+                    Plot.barY(data, {
+                        x: 'duration',
+                        y: 'count',
+                        fill: 'duration',
+                        tip: true,
+                        fx: 'ancestry',
+                    }),
+                ],
+            })}
+        />
+    )
+}
+
+export default function ProcessingTimes({ project }: { project: string }) {
     return (
         <Report>
             <ReportRow>
@@ -48,7 +202,7 @@ export default function ProcessingTimes() {
                     flexGrow={1}
                     title="Processing times for all samples by processing site"
                     description="Time from collection to completion of PBMC processing. This excludes any samples with > 100 hour processing times, and any that have missing or malformed collection or processing times"
-                    project={PROJECT}
+                    project={project}
                     query={[
                         {
                             name: 'durations',
@@ -97,7 +251,7 @@ export default function ProcessingTimes() {
                     flexGrow={1}
                     title="Processing times for all samples by event type"
                     description="Time from collection to completion of PBMC processing. This excludes any samples with > 100 hour processing times, and any that have missing or malformed collection or processing times"
-                    project={PROJECT}
+                    project={project}
                     query={[
                         {
                             name: 'durations',
@@ -140,13 +294,26 @@ export default function ProcessingTimes() {
                     })}
                 />
             </ReportRow>
+
+            <ReportRow>
+                <ProcessingTimesByCollectionDay
+                    eventType="walk-in"
+                    eventTypeTitle="Walk in"
+                    project={project}
+                />
+                <ProcessingTimesByCollectionDay
+                    eventType="one-stop-shop"
+                    eventTypeTitle="One stop shop"
+                    project={project}
+                />
+            </ReportRow>
             <ReportRow>
                 <ReportItemPlot
                     height={ROW_HEIGHT}
                     flexGrow={1}
                     title="Processing time buckets"
                     description="Count of participants with their samples processed in each bucket"
-                    project={PROJECT}
+                    project={project}
                     query={[
                         { name: 'durations', query: PROCESS_DURATION_QUERY },
                         {
@@ -188,7 +355,7 @@ export default function ProcessingTimes() {
                     flexGrow={1}
                     title="Processing time by site"
                     description="Count of participants processed in each time bucket by processing site"
-                    project={PROJECT}
+                    project={project}
                     query={[
                         { name: 'durations', query: PROCESS_DURATION_QUERY },
                         {
@@ -230,12 +397,15 @@ export default function ProcessingTimes() {
                 />
             </ReportRow>
             <ReportRow>
+                <ProcessingTimesByAncestry project={project} />
+            </ReportRow>
+            <ReportRow>
                 <ReportItemTable
-                    height={ROW_HEIGHT}
+                    height={ROW_HEIGHT + 200}
                     flexGrow={1}
                     flexBasis={300}
                     title="All sample processing times"
-                    project={PROJECT}
+                    project={project}
                     showToolbar={true}
                     query={[
                         { name: 'durations', query: PROCESS_DURATION_QUERY },
@@ -249,9 +419,11 @@ export default function ProcessingTimes() {
                                     participant_portal_id,
                                     processing_site,
                                     event_type,
+                                    day as collection_day,
                                     strftime(collection_time, '%Y-%m-%d %H:%M:%S') as collection_time,
                                     strftime(process_end_time, '%Y-%m-%d %H:%M:%S') as process_end_time,
-                                    duration
+                                    duration,
+                                    array_to_string(ancestry, ', ') as ancestry
                                 from durations
                                 order by duration desc nulls last
                             `,
@@ -266,7 +438,7 @@ export default function ProcessingTimes() {
                     flexBasis={400}
                     title="Sample types"
                     description="Count of participants for each sample type"
-                    project={PROJECT}
+                    project={project}
                     query={[
                         {
                             name: 'result',

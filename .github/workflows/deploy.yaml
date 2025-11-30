@@ -66,7 +66,6 @@ jobs:
       - name: Setup build env
         run: |
           pip install --no-deps -r requirements-dev.txt
-          wget https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/5.3.0/openapi-generator-cli-5.3.0.jar -O openapi-generator-cli.jar
 
       - name: prepare-deployment
         run: |
@@ -80,12 +79,11 @@ jobs:
             # add
             bump2version patch \
               --no-commit --allow-dirty \
-              --new-version $(cat deploy/python/version.txt)dev$(echo $(git rev-parse HEAD) | cut -c1-7)
+              --new-version $(cat deploy/python/version.txt).dev+$(echo $(git rev-parse HEAD) | cut -c1-7)
           fi
 
       - name: "build deployable API"
         run: |
-          export OPENAPI_COMMAND="java -jar openapi-generator-cli.jar"
           python regenerate_api.py
           ls -lGh metamist
 

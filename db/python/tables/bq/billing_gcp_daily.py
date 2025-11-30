@@ -37,21 +37,29 @@ class BillingGcpDailyTable(BillingBaseTable):
 
         # initial partition filter
         billing_filter.part_time = GenericBQFilter[datetime](
-            gte=datetime.strptime(query.start_date, '%Y-%m-%d')
-            if query.start_date
-            else None,
-            lte=(datetime.strptime(query.end_date, '%Y-%m-%d') + timedelta(days=7))
-            if query.end_date
-            else None,
+            gte=(
+                datetime.strptime(query.start_date, '%Y-%m-%d')
+                if query.start_date
+                else None
+            ),
+            lte=(
+                (datetime.strptime(query.end_date, '%Y-%m-%d') + timedelta(days=7))
+                if query.end_date
+                else None
+            ),
         )
         # add day filter after partition filter is applied
         billing_filter.day = GenericBQFilter[datetime](
-            gte=datetime.strptime(query.start_date, '%Y-%m-%d')
-            if query.start_date
-            else None,
-            lte=datetime.strptime(query.end_date, '%Y-%m-%d')
-            if query.end_date
-            else None,
+            gte=(
+                datetime.strptime(query.start_date, '%Y-%m-%d')
+                if query.start_date
+                else None
+            ),
+            lte=(
+                datetime.strptime(query.end_date, '%Y-%m-%d')
+                if query.end_date
+                else None
+            ),
         )
         return billing_filter
 

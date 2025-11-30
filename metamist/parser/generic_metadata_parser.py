@@ -101,6 +101,7 @@ class GenericMetadataParser(GenericParser):
         read_end_type_column: str | None = None,
         read_length_column: str | None = None,
         reference_assembly_location_column: str | None = None,
+        ora_reference_assembly_location_column: str | None = None,
         # GVCF columns
         gvcf_column: str | None = None,
         # Meta field key maps
@@ -110,6 +111,7 @@ class GenericMetadataParser(GenericParser):
         qc_meta_map: dict[str, str] | None = None,
         # Default values
         default_reference_assembly_location: str | None = None,
+        ora_reference_assembly_location: str | None = None,
         default_sample_type: str | None = None,
         default_sequencing=DefaultSequencing(
             seq_type='genome', technology='short-read', platform='illumina'
@@ -244,6 +246,9 @@ class GenericMetadataParser(GenericParser):
         self.read_end_type_column = read_end_type_column
         self.read_length_column = read_length_column
         self.reference_assembly_location_column = reference_assembly_location_column
+        self.ora_reference_assembly_location_column = (
+            ora_reference_assembly_location_column
+        )
 
         # Meta field key maps
         self.participant_meta_map = participant_meta_map or {}
@@ -257,6 +262,7 @@ class GenericMetadataParser(GenericParser):
         # Default values
         self.batch_number = batch_number
         self.default_reference_assembly_location = default_reference_assembly_location
+        self.ora_reference_assembly_location = ora_reference_assembly_location
         self.allow_extra_files_in_search_path = allow_extra_files_in_search_path
 
     def get_primary_sample_id(self, row: SingleRow) -> str:
@@ -451,7 +457,16 @@ class GenericMetadataParser(GenericParser):
 
         files_from_rows: list[str] = sum(await asyncio.gather(*filename_promises), [])
         filenames_from_rows = set(f.strip() for f in files_from_rows if f and f.strip())
-        relevant_extensions = ('.cram', '.fastq.gz', '.fastq', 'fq.gz', '.fq', '.bam')
+        relevant_extensions = (
+            '.cram',
+            '.fastq.gz',
+            '.fastq',
+            '.fq.gz',
+            '.fq',
+            '.bam',
+            '.fastq.ora',
+            '.fq.ora',
+        )
 
         # we need to explicitly filter filenames from rows not to include absolute
         # paths, otherwise the below check will flag it as missing
@@ -765,6 +780,7 @@ class GenericMetadataParser(GenericParser):
         read_filenames: list[str] = []
         read_checksums: list[str] = []
         reference_assemblies: set[str] = set()
+        ora_references: set[str] = set()
         for r in rows:
             _rfilenames = await self.get_read_filenames(sample_id=sample_id, row=r)
             read_filenames.extend(_rfilenames)
@@ -777,7 +793,13 @@ class GenericMetadataParser(GenericParser):
                 ref = r.get(self.reference_assembly_location_column)
                 if ref:
                     reference_assemblies.add(ref)
-        return read_filenames, read_checksums, reference_assemblies
+            if self.ora_reference_assembly_location:
+                ora_references.add(self.ora_reference_assembly_location)
+            elif self.ora_reference_assembly_location_column:
+                ora_ref = r.get(self.ora_reference_assembly_location_column)
+                if ora_ref:
+                    ora_references.add(ora_ref)
+        return read_filenames, read_checksums, reference_assemblies, ora_references
 
     async def parse_cram_assays(
         self, sample: ParsedSample, reference_assemblies: set[str]
@@ -808,6 +830,21 @@ class GenericMetadataParser(GenericParser):
         )
         return {'reference_assembly': cram_reference}
 
+    async def parse_fastq_ora_assays(
+        self, sample: ParsedSample, ora_references: set[str]
+    ) -> dict[str, Any]:
+        """Parse FASTQ ORA assays"""
+        if len(ora_references) > 1:
+            # sorted for consistent testing
+            str_ora_references = ', '.join(sorted(ora_references))
+            raise ValueError(
+                f'Multiple ORA references were defined for {sample.primary_external_id}: {str_ora_references}'
+            )
+        ora_ref = next(iter(ora_references))
+
+        ora_reference = await self.create_file_object(self.file_path(ora_ref))
+        return {'reads_type': 'fastq_ora', 'ora_reference': ora_reference}
+
     async def get_assays_from_group(
         self, sequencing_group: ParsedSequencingGroup
     ) -> list[ParsedAssay]:
@@ -823,6 +860,7 @@ class GenericMetadataParser(GenericParser):
             read_filenames,
             read_checksums,
             reference_assemblies,
+            ora_references,
         ) = await self.get_read_and_ref_files_and_checksums(
             sample.primary_external_id, rows
         )
@@ -851,6 +889,13 @@ class GenericMetadataParser(GenericParser):
         reads_type = keys[0]
         collapsed_assay_meta['reads_type'] = reads_type
         # collapsed_assay_meta['reads'] = reads[reads_type]
+
+        if reads_type == 'fastq_ora':
+            if not ora_references:
+                raise ValueError('Missing ORA reference for fastq_ora')
+            collapsed_assay_meta.update(
+                await self.parse_fastq_ora_assays(sample, ora_references)
+            )
 
         if reads_type == 'cram':
             collapsed_assay_meta.update(

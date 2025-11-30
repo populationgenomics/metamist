@@ -9,10 +9,12 @@ import {
     BillingCostByAnalysis,
     BillingCostByCategory,
     BillingCostByMonth,
+    BillingCostBySample,
     BillingCostByTime,
     BillingHome,
     BillingInvoiceMonthCost,
     BillingSeqrProp,
+    SequencingGroupsByMonth,
 } from './pages/billing'
 import DocumentationArticle from './pages/docs/Documentation'
 import { FamilyPage } from './pages/family/FamilyView'
@@ -109,12 +111,24 @@ const Routes: React.FunctionComponent = () => (
             }
         />
         <Route
+            path="/billing/costBySample"
+            element={
+                <ErrorBoundary>
+                    <BillingCostBySample />
+                </ErrorBoundary>
+            }
+        />
+        <Route
             path="/billing/seqrPropMap"
             element={
                 <ErrorBoundary>
                     <BillingSeqrProp />
                 </ErrorBoundary>
             }
+        />
+        <Route
+            path="/billing/sequencingGroupsByMonth/:projectName?"
+            element={<SequencingGroupsByMonth />}
         />
 
         <Route path="/swagger" element={<SwaggerUI url="/openapi.json" tryItOutEnabled={true} />} />

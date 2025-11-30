@@ -265,7 +265,7 @@ class OutputFileInternal(SMBase):
             # If the file variable is a tuple, we assume it is a tuple of (file_obj, json_structure)
             if isinstance(file, tuple):
                 file_obj, json_structure = file
-                file_obj = file_obj.dict()
+                file_obj = file_obj.model_dump()
                 fields = OutputFileInternal.model_fields.keys()  # type:ignore[attr-defined]
 
                 # Populate the file_root dictionary with the fields from the file_obj.

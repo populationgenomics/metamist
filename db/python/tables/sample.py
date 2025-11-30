@@ -1,6 +1,9 @@
 import asyncio
+from collections import defaultdict
 from datetime import date
 from typing import Any, Iterable
+
+from dateutil.relativedelta import relativedelta
 
 from db.python.filters import GenericFilter
 from db.python.filters.sample import SampleFilter
@@ -247,12 +250,16 @@ class SampleTable(DbBase):
                 'participant_id': row['participant_id'],
                 'type': row['type'],
                 'active': parse_sql_bool(row['active']),
-                'sample_root_id': sample_id_format(row['sample_root_id'])
-                if row['sample_root_id']
-                else None,
-                'sample_parent_id': sample_id_format(row['sample_parent_id'])
-                if row['sample_parent_id']
-                else None,
+                'sample_root_id': (
+                    sample_id_format(row['sample_root_id'])
+                    if row['sample_root_id']
+                    else None
+                ),
+                'sample_parent_id': (
+                    sample_id_format(row['sample_parent_id'])
+                    if row['sample_parent_id']
+                    else None
+                ),
             },
             has_external_ids=True,
             has_meta=True,
@@ -687,3 +694,108 @@ class SampleTable(DbBase):
             )
         )
         return samples
+
+    async def get_monthly_samples_count_per_project(
+        self, project_ids: list[int] | None = None
+    ) -> dict[int, dict[date, int]]:
+        """
+        Get a map of {project_id: {month:count} for list of project_ids
+        If project_ids is empty, return all projects
+        """
+
+        where_str = 'WHERE project in :project_ids' if project_ids else ''
+        values = {'project_ids': project_ids} if project_ids else {}
+
+        _query = f"""
+        WITH t AS(
+            SELECT project, id, min(row_start) as sample_first_date
+            FROM sample FOR SYSTEM_TIME ALL
+            {where_str}
+            GROUP BY project, id
+        )
+        SELECT project,
+        CAST(EXTRACT(YEAR FROM sample_first_date) AS INTEGER) AS year,
+        CAST(EXTRACT(MONTH FROM sample_first_date) AS INTEGER) AS month,
+        COUNT(*) AS count
+        FROM t
+        GROUP BY project, year, month
+        ORDER BY project, year, month
+        """
+
+        rows = await self.connection.fetch_all(_query, values)
+        result: dict[int, dict[date, int]] = defaultdict(lambda: defaultdict(int))
+        accumulated_sample_count: dict[int, int] = {}
+
+        # results are sorted by project, year, month
+        # accumulate projects previous months into the processed month
+        for r in rows:
+            proj = r['project']
+            # append previous months count to currently processed month
+            accumulated_sample_count[proj] = (
+                accumulated_sample_count.get(proj, 0) + r['count']
+            )
+            result[proj][date.fromisoformat(f"{r['year']}-{r['month']:02d}-01")] = (
+                accumulated_sample_count[proj]
+            )
+
+        # append all the months up to the current month
+        this_month = date.today().replace(day=1)
+        for proj, month_counts in result.items():
+            # in case there is no previous months available, then skip
+            if not month_counts:
+                continue
+
+            # Fill in missing months between recorded dates.
+            current_month = min(month_counts.keys())
+            current_count = month_counts[current_month]
+            while current_month <= this_month:
+                if current_month in month_counts:
+                    current_count = month_counts[current_month]
+
+                month_counts[current_month] = current_count
+                current_month = (current_month + relativedelta(months=1)).replace(day=1)
+
+        return result
+
+    async def _get_sample_count_per_project_by_seq_group(
+        self, sequencing_group_ids: list[int]
+    ) -> dict[int, int]:
+        """Get the count of samples per project based on provided seq groups"""
+        # if no sequencing groups, return empty dict
+        if not sequencing_group_ids:
+            return {}
+
+        _query = """
+            SELECT s.project, COUNT(DISTINCT s.id) AS sample_count
+            FROM sequencing_group sg
+            INNER JOIN sample s ON s.id = sg.sample_id
+            WHERE sg.id in :sequencing_group_ids
+            GROUP BY s.project
+        """
+        rows = await self.connection.fetch_all(
+            _query, {'sequencing_group_ids': sequencing_group_ids}
+        )
+        return {r['project']: r['sample_count'] for r in rows}
+
+    async def get_sample_count_per_project_per_month(
+        self, sg_compute_per_month: dict[date, list[int]] | None
+    ) -> dict[int, dict[date, int]]:
+        """
+        Match passed month->list of sequencing groups to sample counts per project
+        used in compute for those sequencing groups
+        Return a map of {metamist project_id: {month: count of samples used in compute}}
+        """
+        # Map to hold the results
+        result: dict[int, dict[date, int]] = defaultdict(lambda: defaultdict(int))
+
+        if not sg_compute_per_month:
+            return result
+
+        for month, seq_groups in sg_compute_per_month.items():
+            project_sample_count = (
+                await self._get_sample_count_per_project_by_seq_group(seq_groups)
+            )
+            for project_id, sample_count in project_sample_count.items():
+                result[project_id][month] += sample_count
+
+        return result
