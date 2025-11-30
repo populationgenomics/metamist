@@ -68,7 +68,7 @@ The system will automatically:
 
 ### Upload a VCF with Index
 
-Bioinformatics files often come with companion files (like index files). Use the `secondary_files` field to link them together.
+Use the `secondary_files` field to link companion files such as index files with the VCF:
 
 ```json
 {
@@ -88,7 +88,7 @@ Bioinformatics files often come with companion files (like index files). Use the
 }
 ```
 
-The index file will be tracked as a child of the VCF file, with a parent-child relationship maintained in the database.
+The index file is tracked as a child via the `parent_id` foreign key.
 
 ### Understanding the Response
 
@@ -619,7 +619,7 @@ Files may fail validation for several reasons:
 
 ### Secondary Files
 
-Secondary files can be nested multiple levels deep and can have their own secondary files (though this is rare in practice).
+Secondary files can be nested multiple levels deep and can have their own secondary files.
 
 **Common Secondary File Patterns:**
 
