@@ -12,5 +12,6 @@
             }
         }
     },
-    "ignoreNoDocuments": true
+    "ignoreNoDocuments": false,
+    "noSilentErrors": true
 }

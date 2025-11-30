@@ -1,255 +1,79 @@
 # Installation
 
-This document provides detailed instructions on how to install the project. Follow these steps to set up the project on your local system.
+This document will walk you through the steps required for setting up a local installation of Metamist.
 
-## Prerequisites
-
-[Homebrew](https://brew.sh) is the simplest way to install system dependencies needed for this project.
-
-[Chocolatey](https://community.chocolatey.org/) is a good equivalent to Homebrew for package management in Windows.
-
-## System Requirements
+**Note** this is a Metamist Developer guide, not a Metamist user guide. These steps are only required if you need to test a script on a local version of Metamist or work on contributions to the Metamist code base. If you just need to access and work with Metamist data see [the instructions here](/README.md#usage)
 
 
-- **Node/NPM** (recommend using [pnpm](https://pnpm.io/motivation) for this, but you can also use [nvm](https://github.com/nvm-sh/nvm))
-- **MariaDB** (using MariaDB in docker is also good)
-- **Java** (for Liquibase / OpenAPI  Generator)
-- **Liquibase**
-- **OpenAPI Generator**
-- **pyenv**
-- **wget** *(optional)*
-
-### Mac
+## Clone the codebase
 
 ```bash
-brew install pnpm # recommended over nvm
-# OR
-brew install nvm
+# Clone the repo
+git clone git@github.com:populationgenomics/metamist.git
 
-brew install java
-brew install liquibase
-brew install pyenv
-brew install wget
-
-# skip if you wish to install via docker
-brew install mariadb@11.7.2
-
+# enter the metamist repo directory
+cd metamist
 ```
 
-### Windows
+## API setup
 
-Instructions for Windows should theoretically work but we have only tested this project to work on -nix systems. As such, we are unable to verify any discrepancies on Windows, and there could be slight variations in your setup.
+### Install python requirements
+
+It is recommended to use [pyenv](https://github.com/pyenv/pyenv) and [virtualenv](https://virtualenv.pypa.io/en/latest/installation.html) to manage the Python version and virtual environment for Metamist. Since Metamist currently is deployed with python 3.11, you should also use 3.11 locally to ensure that any changes you make are compatible with the deployed version of Metamist.
+
 
 ```bash
-# Assuming you have Chocolatey
-choco install pnpm # Recommended
-# OR
-choco install nvm
+# install python 3.11
+pyenv install 3.11
 
-choco install jdk8
-choco install liquibase
-choco install pyenv-win
-choco install wget
+# select python 3.11 for your current shell
+pyenv shell 3.11
 
-# skip if you wish to install via docker
-choco install mariadb --version=11.7.2
+# set up virtualenv with python 3.11
+virtualenv .venv -p 3.11
+
+# activate virtualenv
+source .venv/bin/activate
+
+# install requirements
+pip install --no-deps -r requirements-dev.txt
 ```
 
-## Installation Steps
+### Database setup
 
-### Creating the environment
+#### Running MariaDB
 
-- Python dependencies for the `metamist` API package are listed in `setup.py`.
-- Additional dev requirements are listed in `requirements-dev.txt`.
-- Packages for the sever-side code are listed in `requirements.txt`.
+Metamist uses a MariaDB 11 database. Docker is the easiest way to run the Metamist MariaDB database locally.
 
-We *STRONGLY* encourage the use of `pyenv` for managing Python versions. Debugging and the server will run on a minimum python version of 3.11. Refer to the [team-docs](https://github.com/populationgenomics/team-docs/blob/main/python.md) for more instructions on how to set this up.
+We have found that [OrbStack](https://orbstack.dev/) is faster and easier to use than [Docker Desktop](https://docs.docker.com/desktop/) but either should work fine.
 
-Use of a virtual environment to contain all requirements is highly recommended:
+If you would prefer to not use Docker, you could also install MariaDB standalone using [homebrew](brew.sh) or another package manager.
 
-```bash
-virtualenv venv
-source venv/bin/activate
-pip install -r requirements.txt -r requirements-dev.txt
-
-# Installs metamist as a package
-pip install --editable .
-```
-
-You will also need to set the following environment variables. Adjust the paths if you installed the dependencies using an alternate means:
-
-```bash
-# homebrew should export this on an M1 Mac
-# the intel default is /usr/local
-export HB_PREFIX=${HOMEBREW_PREFIX-/usr/local}
-
-# installing Java through brew recommendation
-export CPPFLAGS="-I$HB_PREFIX/opt/openjdk/include"
-export PATH="$HB_PREFIX/bin:$PATH:$HB_PREFIX/opt/openjdk/bin"
-
-# installing liquibase through brew recommendation
-export LIQUIBASE_HOME=$(brew --prefix)/opt/liquibase/libexec
-
-# mariadb
-export PATH="$HB_PREFIX/opt/mariadb@11.7.2/bin:$PATH"
-
-# metamist config
-export SM_ENVIRONMENT=LOCAL # good default to have
-export SM_DEV_DB_USER=sm_api # makes it easier to copy liquibase update command
-
-```
-
-You can also add these to your shell config file e.g `.zshrc` or `.bashrc` for persistence to new sessions.
-
-#### PNPM/NVM Config
-
-Depending on your choice for using `pnpm` or `nvm` you will have to configure your shell for it.
-
-If you installed `pnpm`, you should have a similar snippet from the brew installation output:
-
-```shell
-export PNPM_HOME="/Users/$(whoami)/Library/pnpm"
-case ":$PATH:" in
-  *":$PNPM_HOME:"*) ;;
-  *) export PATH="$PNPM_HOME:$PATH" ;;
-esac
-```
-
-Add this to your `.zshrc` to auto-load on next shell session.
-
-If you installed `nvm`, you will need to add lazy load since `nvm` has high load penalties.
-
-- For Oh-My-Zsh users, you can just add the `nvm` plugin to your `.zshrc` via these [instructions](https://github.com/ohmyzsh/ohmyzsh/blob/master/plugins/nvm/README.md)
-
-- If you do NOT have Oh-My-Zsh, you can use this [plugin](https://github.com/undg/zsh-nvm-lazy-load):
-
-```shell
-git clone https://github.com/undg/zsh-nvm-lazy-load $ZSH/custom/plugins/zsh-nvm
-
-#Add this to your plugins variable in the `.zshrc` file and then source the file.
-plugins=(... zsh-nvm-lazy-load)
-```
-
-Once set up, install the OpenAPI Generator:
-
-- For `pnpm`:
-
-```shell
-# Install npm via pnpm
-# This also activates the env for you, replace `use` with `add` to only install it.
-pnpm env use --global lts
-pnpm install @openapitools/openapi-generator-cli -g
-```
-
-Add this to your `.zshrc`:
-
-```shell
-# openapi
-export OPENAPI_COMMAND="pnpm dlx @openapitools/openapi-generator-cli"
-alias openapi-generator="pnpm dlx @openapitools/openapi-generator-cli"
-```
-
-- For `nvm`:
-
-```shell
-# Install npm via nvm
-nvm install --lts
-npm install @openapitools/openapi-generator-cli -g
-```
-
-Add this to your `.zshrc`:
-
-```shell
-# openapi
-export OPENAPI_COMMAND="npx @openapitools/openapi-generator-cli"
-alias openapi-generator="npx @openapitools/openapi-generator-cli"
-```
-
-Finally, set the version:
-
-```shell
-openapi-generator-cli version-manager set 5.3.0
-```
-
-### Database Setup - Native Installation
-
-Set the following environment variables:
-
-```bash
-export SM_DEV_DB_USER=sm_api
-export SM_DEV_DB_PASSWORD= # empty password
-export SM_DEV_DB_HOST=127.0.0.1
-export SM_DEV_DB_PORT=3306 # default mariadb port
-export SM_DEV_DB_NAME=sm_dev;
-```
-
-Next, create the database `sm_dev` in MariaDB.
-
-> In newer versions of MariaDB, the root user is protected.
-
-Create a new user `sm_api` and provide permissions:
-
-```bash
-sudo mysql -u root --execute "
-  CREATE DATABASE sm_dev;
-  CREATE USER sm_api@'%';
-  CREATE USER sm_api@localhost;
-  CREATE ROLE sm_api_role;
-  GRANT sm_api_role TO sm_api@'%';
-  GRANT sm_api_role TO sm_api@localhost;
-  SET DEFAULT ROLE sm_api_role FOR sm_api@'%';
-  SET DEFAULT ROLE sm_api_role FOR sm_api@localhost;
-  GRANT ALL PRIVILEGES ON sm_dev.* TO sm_api_role;
-"
-```
-
-Using `liquibase` we can now set up the tables as per the schema in `db/project.xml`:
-
-```bash
-pushd db/
-wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.0.3/mariadb-java-client-3.0.3.jar
-liquibase \
-    --changeLogFile project.xml \
-    --url jdbc:mariadb://localhost/sm_dev \
-    --driver org.mariadb.jdbc.Driver \
-    --classpath mariadb-java-client-3.0.3.jar \
-    --username ${SM_DEV_DB_USER:-root} \
-    update
-popd
-```
-
-### Database Setup - Docker Installation
-
-Ensure you have Docker installed or follow [this guide](https://docs.docker.com/engine/install/) to setup.
-
-Pull the image:
-
-```bash
-docker pull mariadb:11.7.2
-```
-
-Run the container on port 3306:
+To start the database, run:
 
 ```bash
 docker run --name mariadb-p3306 -e MYSQL_ALLOW_EMPTY_PASSWORD=1 -p 3306:3306 -d docker.io/library/mariadb:11.7.2
 ```
 
-If you have a local MySQL instance already running on port 3306, you can map the docker container to run on 3307:
+If port 3306 is already in use, you can specify a different port in the mapping. For example:
 
 ```bash
 docker run --name mariadb-p3307 -e MYSQL_ALLOW_EMPTY_PASSWORD=1 -p 3307:3306 -d docker.io/library/mariadb:11.7.2
 ```
 
-You can now execute bash commands inside a shell:
+
+#### Setting up the database and permissions
+
+1. Connect to the running container:
 
 ```bash
 docker exec -it mariadb-p3306 bash
 ```
 
-Set up the database with the `sm_api` user and appropriate permissions:
+2. In the container shell, run the MariaDB CLI to create the database, user, and roles:
 
 ```bash
-mysql -u root --execute "
+mariadb -u root --execute "
   CREATE DATABASE sm_dev;
   CREATE USER sm_api@'%';
   CREATE USER sm_api@localhost;
@@ -262,53 +86,96 @@ mysql -u root --execute "
 "
 ```
 
-Exit the container bash shell once done and on the host, run liquibase with the correct port mapping to set up the tables:
+Once that is done you can disconnect from the container.
+
+
+#### Running database migrations
+
+Metamist uses liquibase to manage database migrations. To create the Metamist database tables you will need to run the migrations.
+
+Start by installing liquibase:
 
 ```bash
-pushd db/
-wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.0.3/mariadb-java-client-3.0.3.jar
+brew install liquibase
+```
+
+Then in the `db` folder, run the migrations:
+
+```bash
+cd db
+
 liquibase \
     --changeLogFile project.xml \
     --url jdbc:mariadb://127.0.0.1:3306/sm_dev \
     --driver org.mariadb.jdbc.Driver \
-    --classpath mariadb-java-client-3.0.3.jar \
     --username root \
     update
-popd
 ```
 
-Ensure the database port environment variable matches the mapping above:
+This should create all the necessary tables.
+
+
+### Setting environment variables
+
+To run the API you'll need to set some environment variables. You can either add these to your bash/zsh profile, or if you use vscode you can set up a `.vscode/launch.json` file to make it easy to run and debug the API in vscode. Make sure to choose a username for the `SM_LOCALONLY_DEFAULTUSER` variable, this is the username that will be used for all local operations, it can take any format that you like.
+
+
+in `.bashrc` or `.zshrc`
 
 ```bash
-export SM_DEV_DB_PORT=3306 # or 3307
+export SM_LOCALONLY_DEFAULTUSER="<localusername>"
+export SM_URL="http://localhost:8000"
+export SM_ENVIRONMENT="local"
+
+export SM_DEV_DB_USER="sm_api"
+export SM_DEV_DB_PORT="3306"
 ```
 
-## Running the server
 
-You'll want to set the following environment variables (permanently) in your local development environment.
+If you do go down the route of setting the variables in your project's vscode `launch.json`, it is still a good idea to set the first 3 environment variables above in your bash/zsh profile. These variables are used by some of the scripts below, for example to generate the Metamist API. If they aren't set then your generated API will point to the production Metamist.
 
-The `SM_ENVIRONMENT` and `SM_LOCALONLY_DEFAULTUSER` environment variables allow access to a local metamist server without providing a bearer token.
+in `.vscode/launch.json`
 
-This will allow you to test the front-end components that access data. This happens automatically on the production instance through the Google identity-aware-proxy.
+```json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run API",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "api.server",
+            "justMyCode": false,
+            "env": {
+                "SM_URL": "http://localhost:8000",
+                "SM_LOCALONLY_DEFAULTUSER": "<localusername>",
+                "SM_ENVIRONMENT": "local",
+                "SM_DEV_DB_USER": "sm_api",
+                "SM_DEV_DB_PORT": "3306"
 
-```bash
-# ensures the SWAGGER page points to your local: (localhost:8000/docs)
-# and ensures if you use the PythonAPI, it also points to your local
-export SM_ENVIRONMENT=LOCAL
-# uses your username as the "author" in requests
-export SM_LOCALONLY_DEFAULTUSER=$(whoami)
+            }
+        }
+    ]
+}
 ```
 
-First start up your mysql server if it's not already running.
+
+
+### Giving yourself project creator permissions
+
+To bootstrap the database with some data, your local user will need permissions. To provide these you will need to connect to the database again.
+
+
+Start a shell in the container:
 
 ```bash
-mysql.server start
+docker exec -it mariadb-p3306 bash
 ```
 
-Enter the mysql command prompt
+Enter the mariadb command prompt
 
 ```bash
-mysql
+mariadb
 ```
 
 Switch your database to sm_dev
@@ -317,131 +184,110 @@ Switch your database to sm_dev
 USE sm_dev;
 ```
 
-To allow the system to be bootstrapped and create the initial project, you'll need to add yourself to the two admin groups that allow creating projects and updating project members:
+Add your local username to the `project-creators` and `members-admin` groups:
 
 ```sql
 INSERT INTO group_member(group_id, member)
-SELECT id, '<your local username>'
-FROM `group` WHERE name IN('project-creators', 'members-admin')
+SELECT id, '<localusername>'
+FROM `group` WHERE name IN('project-creators', 'members-admin');
 
 ```
 
-With those variables set, it is a good time to populate some test data if this is your first time running this server:
+You can now exit the mariadb prompt and the container.
+
+
+### Building and installing the local python client
+
+Next up, we need to run the API generator to create the python client, which will then be used to load some test data into the database.
+
+This is handled by the `regenerate_api.py` script.
+
+This script requires [openapi-generator](https://openapi-generator.tech/docs/installation/) to be installed, this is included as part of Metamist's python dev requirements, so make sure that you have your virtual env activated before running:
+
+```bash
+python regenerate_api.py
+```
+
+If you have installed openapi generator using a different method you can set the `OPENAPI_COMMAND` environment variable to configure the command to use.
+
+
+Once the API is generated, you can install it by running:
+
+```bash
+pip install --editable .
+```
+
+
+### Starting the API
+
+Now that everything is set up, you can start the api server. If you are using vscode you can do this with the debugger, by first setting up the `launch.json` as described [above](#setting-environment-variables), and then running the API with "Run API" under the *Run and Debug* tab (⌘⇧D) or (Ctrl+Shift+D). F5 is the default shortcut to run the current launch config.
+
+![Run and Debug](../resources/debug-api.png)
+
+If you are not using vscode, you can run the API with uvicorn.
+
+```bash
+uvicorn --port 8000 --host 0.0.0.0 api.server:app
+```
+
+
+### Generating some data
+
+To add some data to your database, you can run the `test/data/generate_data.py` script. Make sure you have your virtualenv activated and the `SM_ENVIRONMENT` and `SM_LOCALONLY_DEFAULTUSER` environment variables set before running this, otherwise the Metamist python client will try to add the data to production Metamist.
+
 
 ```bash
 python3 test/data/generate_data.py
 ```
 
-You can now run the server:
+
+### Conclusion
+
+At this point, your API should be fully functional. You can test scripts by setting the `SM_ENVIRONMENT` variable to `local` so that the Metamist python client points to your local installation. You can also work on developing backend features.
+
+- The GraphiQL explorer is accessible at: [http://localhost:8000/graphql](http://localhost:8000/graphql)
+- The swagger http api documentation is accessible at: [http://localhost:8000/docs](http://localhost:8000/docs)
+
+To set up the Metamist web client, read on.
+
+
+
+## Web Client Setup
+
+The Metamist web client is a React single page application that calls the Metamist apis and displays metadata in a user interface.
+
+To get up and running you will need [nodejs](https://nodejs.org/en) installed, there are a few options for managing node versions but we recommend [fnm](https://github.com/Schniz/fnm) as it is lightweight, simple and provides a similar api to `nvm` while being much much faster.
+
+Other installation options are outlined on the [nodejs download page](https://nodejs.org/en/download).
+
+The Metamist client should work with a variety of node versions but for the purposes of this setup we'll install 22 which is the LTS version at the time of writing.
+
 
 ```bash
-# start the server
-python3 -m api.server
-# OR
-# uvicorn --port 8000 --host 0.0.0.0 api.server:app
+fnm use 22
 ```
 
-
-## Running Locally for Dev
-
-### Running and Debugging in VS Code
-
-The following `launch.json` is a good base to debug the web server in VS Code:
-
-```json
-{
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Run API",
-            "type": "python",
-            "request": "launch",
-            "module": "api.server",
-            "justMyCode": false,
-            "env": {
-                "SM_LOCALONLY_DEFAULTUSER": "<user>-local",
-                "SM_ENVIRONMENT": "local",
-                "SM_DEV_DB_USER": "sm_api",
-            }
-        }
-    ]
-}
-```
-
-You can now place breakpoints anywhere and debug the API with "Run API" under the *Run and Debug* tab (⌘⇧D) or (Ctrl+Shift+D):
-
-![Run and Debug](../resources/debug-api.png)
-
-### Generate and install the python installable API
-
-After making any changes to the logic, it is worth regenerating the API with the OpenAPI Generator.
-
-Generating the installable APIs (Python + Typescript) involves running the server, getting the `/openapi.json`, and running `openapi-generator`.
-
-The `regenerate_api.py` script does this for us in a few ways:
-
-1. Uses a running server on `localhost:8000`
-2. Runs a docker container from the `SM_DOCKER` environment variable.
-3. Spins up the server itself.
-
-You can simply run:
+Then we can install the web client npm dependencies
 
 ```bash
-# this will start the api.server, so make sure you have the dependencies installed,
-python regenerate_api.py \
-    && pip install .
-```
-
-or if you prefer the Docker approach (eg: for CI), this command will build the docker container and supply it to `regenerate_api.py`:
-
-```bash
-# SM_DOCKER is a known env variable to regenerate_api.py
-export SM_DOCKER="cpg/metamist-server:dev"
-docker build --build-arg SM_ENVIRONMENT=local -t $SM_DOCKER -f deploy/api/Dockerfile .
-python regenerate_api.py
-```
-
-### Developing the UI
-
-```bash
-# Ensure you have started metamist server locally on your computer already, then in another tab open the UI.
-# This will automatically proxy request to the server.
 cd web
 npm install
-npm run compile
+npm run compile # generate the graphql api integration
 npm start
 ```
 
-This will start a web server using Vite, running on `localhost:5173`.
 
-### OpenAPI and Swagger
+The web client should now be running at [http://localhost:5173](http://localhost:5173)
 
-The Web API uses `apispec` with OpenAPI3 annotations on each route to describe interactions with the server. We can generate a swagger UI and an installable
-python module based on these annotations.
 
-Some handy links:
 
-- [OpenAPI specification](https://swagger.io/specification/)
-- [Describing parameters](https://swagger.io/docs/specification/describing-parameters/)
-- [Describing request body](https://swagger.io/docs/specification/describing-request-body/)
-- [Media types](https://swagger.io/docs/specification/media-types/)
-
-The web API exposes this schema in two ways:
-
-- Swagger UI: `http://localhost:8000/docs`
-  - You can use this to construct requests to the server
-  - Make sure you fill in the Bearer token (at the top right )
-- OpenAPI schema: `http://localhost:8000/schema.json`
-  - Returns a JSON with the full OpenAPI 3 compliant schema.
-  - You could put this into the [Swagger editor](https://editor.swagger.io/) to see the same "Swagger UI" that `/api/docs` exposes.
-  - We generate the metamist installable Python API based on this schema.
 
 ## Deployment
 
 The CPG deploy is managed through Cloud Run on the Google Cloud Platform.
 The deploy github action builds the container, and is deployed.
 
-Additionally you can access metamist through the identity-aware proxy (IAP),
+Additionally you can access Metamist through the identity-aware proxy (IAP),
 which handles the authentication through OAuth, allowing you to access the
 front-end.
 

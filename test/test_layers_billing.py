@@ -1,7 +1,5 @@
 # pylint: disable=protected-access
 import datetime
-from test.testbase import run_as_sync
-from test.testbqbase import BqTest
 from unittest import mock
 
 import google.cloud.bigquery as bq
@@ -9,6 +7,8 @@ import google.cloud.bigquery as bq
 from db.python.layers.billing import BillingLayer
 from models.enums import BillingSource
 from models.models import BillingColumn, BillingTotalCostQueryModel
+from test.testbase import run_as_sync
+from test.testbqbase import BqTest
 
 
 class TestBillingLayer(BqTest):
@@ -311,7 +311,7 @@ class TestBillingLayer(BqTest):
         query = BillingTotalCostQueryModel(fields=[], start_date='', end_date='')
 
         with self.assertRaises(ValueError) as context:
-            await layer.get_total_cost(query)
+            await layer.get_total_cost(query, connection=None)
 
         self.assertTrue('Date and Fields are required' in str(context.exception))
 
@@ -319,7 +319,7 @@ class TestBillingLayer(BqTest):
         query = BillingTotalCostQueryModel(
             fields=[BillingColumn.TOPIC], start_date='2024-01-01', end_date='2024-01-03'
         )
-        records = await layer.get_total_cost(query)
+        records = await layer.get_total_cost(query, connection=None)
         self.assertEqual([], records)
 
         # get_total_cost with mockup data is tested in test/test_bq_billing_base.py

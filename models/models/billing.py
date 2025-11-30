@@ -1,6 +1,6 @@
 import datetime
 from enum import Enum
-
+from pydantic import Field
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
 from models.base import SMBase
@@ -84,6 +84,7 @@ class BillingColumn(str, Enum):
     GOOG_PIPELINES_WORKER = 'goog_pipelines_worker'
     WDL_TASK_NAME = 'wdl_task_name'
     NAMESPACE = 'namespace'
+    SAMPLE = 'sample'
 
     @classmethod
     def can_group_by(cls, value: 'BillingColumn') -> bool:
@@ -104,6 +105,7 @@ class BillingColumn(str, Enum):
             BillingColumn.CREDITS,
             BillingColumn.INVOICE,
             BillingColumn.ADJUSTMENT_INFO,
+            BillingColumn.SAMPLE,
         )
 
     @classmethod
@@ -218,6 +220,9 @@ class BillingTotalCostQueryModel(SMBase):
     # optional, show the min cost, e.g. 0.01, if not set, will show all
     min_cost: float | None = None
 
+    # optional, show average sample cost if True
+    include_average_sample_cost: bool = False
+
     def __hash__(self):
         """Create hash for this object to use in caching"""
         return hash(self.model_dump_json())
@@ -267,6 +272,8 @@ class BillingTotalCostRecord(SMBase):
     cost: float
     currency: str | None
 
+    sample: str | None = None
+
     @staticmethod
     def from_json(record):
         """Create BillingTopicCostCategoryRecord from json"""
@@ -291,6 +298,7 @@ class BillingTotalCostRecord(SMBase):
             namespace=record.get('namespace'),
             cost=record.get('cost'),
             currency=record.get('currency'),
+            sample=record.get('sample'),
         )
 
 
@@ -538,3 +546,77 @@ class AnalysisCostRecord(SMBase):
             ],
             dataproc=d.get('dataproc'),
         )
+
+
+class BillingSampleQueryModel(SMBase):
+    """
+    Used to query for billing total cost per sample or seq group
+    """
+
+    # required
+    fields: list[BillingColumn]
+    start_date: str
+    end_date: str
+    # sample ids or seq group ids
+    search_ids: list[str] | None = None
+
+    def __hash__(self):
+        """Create hash for this object to use in caching"""
+        return hash(self.model_dump_json())
+
+
+class BillingRunningCostQueryModel(SMBase):
+    """
+    Used to query for billing running cost with filtering support
+    """
+
+    field: BillingColumn
+    invoice_month: str | None = None
+    source: BillingSource | None = None
+    filters: dict[BillingColumn, str | list | dict] | None = None
+
+    def __hash__(self):
+        """Create hash for this object to use in caching"""
+        return hash(self.model_dump_json())
+
+    def to_filter(self) -> BillingFilter:
+        """
+        Convert to internal analysis filter
+        """
+        billing_filter = BillingFilter()
+        if self.filters:
+            # add filters as attributes
+            for fk, fv in self.filters.items():
+                # fk is BillColumn, fv is value
+                # if fv is a list, then use IN filter
+                if isinstance(fv, list):
+                    setattr(billing_filter, fk.value, GenericBQFilter(in_=fv))
+                else:
+                    setattr(billing_filter, fk.value, GenericBQFilter(eq=fv))
+
+        return billing_filter
+
+
+class BillingProjectGroup(SMBase):
+    """Return class for the Billing Project Group"""
+
+    name: str
+    group_by: str = Field(validation_alias='groupBy')
+    gcp_projects: str = Field(validation_alias='gcpProjects')
+
+
+class BillingTopicGroup(SMBase):
+    """Return class for the Billing Topic Group"""
+
+    name: str
+    group_by: str = Field(validation_alias='groupBy')
+    topics: str
+
+
+class BillingTeamRecord(SMBase):
+    """Return class for the Billing groups information of CPG teams"""
+
+    team_name: str = Field(validation_alias='teamName')
+    billing_groups: list[BillingTopicGroup | BillingProjectGroup] = Field(
+        validation_alias='billingGroups'
+    )

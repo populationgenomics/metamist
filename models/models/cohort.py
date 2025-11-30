@@ -1,4 +1,5 @@
 from models.base import SMBase, parse_sql_dict
+from models.enums.cohort import CohortStatus, CohortUpdateStatus
 from models.models.project import ProjectId
 from models.utils.cohort_id_format import cohort_id_format
 from models.utils.sequencing_group_id_format import (
@@ -16,18 +17,19 @@ class CohortInternal(SMBase):
     project: ProjectId
     description: str
     template_id: int
+    status: CohortStatus | None
 
     @staticmethod
-    def from_db(d: dict):
+    def from_db(d: dict, cohort_status: CohortStatus | None = None):
         """
         Convert from db keys, mainly converting id to id_
         """
-        _id = d.pop('id', None)
-        project = d.pop('project', None)
-        description = d.pop('description', None)
-        name = d.pop('name', None)
-        author = d.pop('author', None)
-        template_id = d.pop('template_id', None)
+        _id = d.pop('c_id', None)
+        project = d.pop('c_project', None)
+        description = d.pop('c_description', None)
+        name = d.pop('c_name', None)
+        author = d.pop('c_author', None)
+        template_id = d.pop('c_template_id', None)
 
         return CohortInternal(
             id=_id,
@@ -36,7 +38,16 @@ class CohortInternal(SMBase):
             project=project,
             description=description,
             template_id=template_id,
+            status=cohort_status,
         )
+
+
+class CohortUpdateBody(SMBase):
+    """Represents the expected JSON body of the update cohort request"""
+
+    name: str | None = None
+    description: str | None = None
+    status: CohortUpdateStatus | None = None
 
 
 class CohortCriteriaInternal(SMBase):
@@ -191,6 +202,8 @@ class NewCohortInternal(SMBase):
         """
         Convert to external model
         """
+
+        # status field is not returned here as it could break any consumers
         return NewCohort(
             dry_run=self.dry_run,
             cohort_id=(

@@ -4,9 +4,8 @@ import { ReportItemPlot } from '../../components/ReportItem'
 import ReportRow from '../../components/ReportRow'
 
 const ROW_HEIGHT = 400
-const PROJECT = 'ourdna'
 
-export default function Recruitment() {
+export default function Recruitment({ project }: { project: string }) {
     return (
         <Report>
             <ReportRow>
@@ -15,7 +14,7 @@ export default function Recruitment() {
                     flexGrow={1}
                     title="Recruitment funnel"
                     description="The number of participants at each stage of recruitment"
-                    project={PROJECT}
+                    project={project}
                     query={`
                         with funnel as (
                             select
@@ -50,7 +49,7 @@ export default function Recruitment() {
                     flexGrow={1}
                     title="Recruitment types"
                     description="How the participant was recruited"
-                    project={PROJECT}
+                    project={project}
                     query={`
                         select
                             count(distinct participant_id) as count,
@@ -81,7 +80,7 @@ export default function Recruitment() {
                     flexGrow={1}
                     title="Recruitment type by processing site"
                     description="How the participant was recruited, broken down by processing site"
-                    project={PROJECT}
+                    project={project}
                     query={`
                         select
                             count(distinct participant_id) as count,
@@ -103,6 +102,7 @@ export default function Recruitment() {
                                     fill: 'collection_type',
                                     inset: 0.5,
                                     tip: true,
+                                    order: '-sum',
                                 })
                             ),
                         ],

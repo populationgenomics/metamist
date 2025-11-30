@@ -35,16 +35,16 @@ interface IBillingCostByMonthTableProps {
     isLoading: boolean
     data: DataDict
     months: string[]
-    visibleColumns: Set<string>
+    orderedTopics: string[]
 }
 
-const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
+const BillingCostByMonthTable: React.FunctionComponent<IBillingCostByMonthTableProps> = ({
     start,
     end,
     isLoading,
     data,
     months,
-    visibleColumns,
+    orderedTopics,
 }) => {
     if (isLoading) {
         return (
@@ -53,43 +53,45 @@ const BillingCostByMonthTable: React.FC<IBillingCostByMonthTableProps> = ({
             </div>
         )
     }
-    const compTypes = ['Compute Cost', 'Storage Cost']
+    const compTypes = [
+        'Compute Cost',
+        'Storage Cost',
+        'Avg. Sample Storage Cost (Est.)',
+        'Avg. Sample Compute Cost (Est.)',
+    ]
 
-    // Helper function to check if a column is visible
-    const isColumnVisible = (category: string): boolean => {
-        if (category === 'compute_type') {
-            return true // Always show required columns
-        }
-        return visibleColumns.has(category)
-    }
-
-    // Get only visible topics
-    const getVisibleTopics = () => {
-        return Object.keys(data)
-            .filter((topic) => isColumnVisible(topic))
-            .sort((a, b) => a.localeCompare(b))
+    // Get all topics in the order they were provided
+    const getAllTopics = () => {
+        return orderedTopics
     }
 
     const dataToBody = (data: DataDict) => {
-        const visibleTopics = getVisibleTopics()
+        const allTopics = getAllTopics()
 
-        return visibleTopics.map((key) => (
+        return allTopics.map((key) => (
             <>
-                {compTypes.map((compType, index) => (
-                    <SUITable.Row key={`${key}-${index}-row`}>
-                        <SUITable.Cell key={`${key}-${index}-topic`}>
-                            {index === 0 && <b>{key}</b>}
-                        </SUITable.Cell>
-                        <SUITable.Cell key={`${key}-${index}-compType`}>{compType}</SUITable.Cell>
-                        {months.map((month) => (
-                            <SUITable.Cell key={`${key}-${index}-${month}`}>
-                                {data[key] && data[key][month] && data[key][month][compType]
-                                    ? formatMoney(data[key][month][compType])
-                                    : null}
+                {compTypes.map((compType, index) =>
+                    // if All Topics, skip the Average Sample Cost row
+                    key === 'All Topics' &&
+                    (compType === 'Avg. Sample Storage Cost (Est.)' ||
+                        compType === 'Avg. Sample Compute Cost (Est.)') ? null : (
+                        <SUITable.Row key={`${key}-${index}-row`}>
+                            <SUITable.Cell key={`${key}-${index}-topic`}>
+                                {index === 0 && <b>{key}</b>}
                             </SUITable.Cell>
-                        ))}
-                    </SUITable.Row>
-                ))}
+                            <SUITable.Cell key={`${key}-${index}-compType`}>
+                                {compType}
+                            </SUITable.Cell>
+                            {months.map((month) => (
+                                <SUITable.Cell key={`${key}-${index}-${month}`}>
+                                    {data[key] && data[key][month] && data[key][month][compType]
+                                        ? formatMoney(data[key][month][compType])
+                                        : null}
+                                </SUITable.Cell>
+                            ))}
+                        </SUITable.Row>
+                    )
+                )}
             </>
         ))
     }
