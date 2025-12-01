@@ -594,7 +594,7 @@ GROUP BY sg.type
             sg_tech = row['technology']
             num_sg = row['num_sg']
 
-            project_histories[project][month_created][sg_type + '|||' + sg_tech] = num_sg
+            project_histories[project][month_created][f'{sg_type}|||{sg_tech}'] = num_sg
 
         # We want the total number of each sg type over time, so we need to accumulate and
         # fill in the missing months.

@@ -458,24 +458,24 @@ class TestSequencingGroup(DbIsolatedTest):
             {
                 0: {
                     date(2025, 10, 1): {
-                        'genome:short-read': 2,
+                        'genome|||short-read': 2,
                     },
                     date(2025, 11, 1): {
-                        'genome:short-read': 6,
+                        'genome|||short-read': 6,
                     },
                     date(2025, 12, 1): {
-                        'genome:short-read': 6,
+                        'genome|||short-read': 6,
                     },
                 },
                 1: {
                     date(2025, 10, 1): {
-                        'genome:short-read': 3,
+                        'genome|||short-read': 3,
                     },
                     date(2025, 11, 1): {
-                        'genome:short-read': 8,
+                        'genome|||short-read': 8,
                     },
                     date(2025, 12, 1): {
-                        'genome:short-read': 8,
+                        'genome|||short-read': 8,
                     },
                 },
             },
@@ -530,20 +530,20 @@ class TestSequencingGroup(DbIsolatedTest):
             {
                 0: {
                     date(2025, 10, 1): {
-                        'genome:short-read': 2,
-                        'chip:short-read': 4,
+                        'genome|||short-read': 2,
+                        'chip|||short-read': 4,
                     },
                     date(2025, 11, 1): {
-                        'genome:short-read': 2,
-                        'genome:long-read': 3,
-                        'chip:short-read': 4,
-                        'chip:long-read': 5,
+                        'genome|||short-read': 2,
+                        'genome|||long-read': 3,
+                        'chip|||short-read': 4,
+                        'chip|||long-read': 5,
                     },
                     date(2025, 12, 1): {
-                        'genome:short-read': 2,
-                        'genome:long-read': 3,
-                        'chip:short-read': 4,
-                        'chip:long-read': 5,
+                        'genome|||short-read': 2,
+                        'genome|||long-read': 3,
+                        'chip|||short-read': 4,
+                        'chip|||long-read': 5,
                     },
                 }
             },
