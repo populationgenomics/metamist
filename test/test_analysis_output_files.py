@@ -235,7 +235,6 @@ class TestOutputFiles(DbIsolatedTest):
 
         output_file_data = {
             'cram': {
-                'parent_id': None,
                 'path': 'gs://fakegcs/file2.cram',
                 'basename': 'file2.cram',
                 'dirname': 'gs://fakegcs/',

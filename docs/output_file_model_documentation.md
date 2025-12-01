@@ -12,11 +12,10 @@ The OutputFile model in Metamist represents and tracks file outputs from bioinfo
   - [Understanding the Response](#understanding-the-response)
 - [Understanding the Model](#understanding-the-model)
   - [What is an OutputFile?](#what-is-an-outputfile)
-  - [Data Flow Overview](#data-flow-overview)
+  - [How OutputFiles Work](#how-outputfiles-work)
   - [File Validation](#file-validation)
   - [Parent-Child Relationships](#parent-child-relationships)
 - [API Usage Guide](#api-usage-guide)
-  - [REST API](#rest-api)
   - [GraphQL API](#graphql-api)
   - [Output Structures Comparison](#output-structures-comparison)
   - [Response Format Examples](#response-format-examples)
@@ -38,19 +37,16 @@ This section gets you started with the most common use cases for OutputFiles in 
 
 ### Upload a Single File
 
-The simplest way to add an output file to an analysis is to include it in the `outputs` field when creating or updating an analysis.
+To add an output file to an analysis, include it in the `outputs` field when creating an analysis via GraphQL.
 
-**REST API Example:**
-
-```bash
-POST /analysis/{project}/
-```
+**Example variables:**
 
 ```json
 {
-  "sequencing_group_ids": ["CPGABC123"],
+  "project": "my-project",
+  "sequencingGroupIds": ["CPGABC123"],
   "type": "alignment",
-  "status": "completed",
+  "status": "COMPLETED",
   "outputs": {
     "bam": {
       "basename": "gs://my-bucket/results/sample.bam"
@@ -66,15 +62,20 @@ The system will automatically:
 - Validate that the file exists
 - Create an OutputFile record linked to your analysis
 
+See [GraphQL API](#graphql-api) for the full mutation details.
+
 ### Upload a VCF with Index
 
-Use the `secondary_files` field to link companion files such as index files with the VCF:
+Use the `secondary_files` field to link companion files:
+
+**Variables:**
 
 ```json
 {
-  "sequencing_group_ids": ["CPGABC123"],
+  "project": "my-project",
+  "sequencingGroupIds": ["CPGABC123"],
   "type": "joint-calling",
-  "status": "completed",
+  "status": "COMPLETED",
   "outputs": {
     "vcf": {
       "basename": "gs://my-bucket/results/cohort.vcf.gz",
@@ -113,7 +114,6 @@ When you query an analysis, the OutputFile data is returned with full metadata e
   "outputs": {
     "vcf": {
       "id": 456,
-      "parent_id": null,
       "path": "gs://my-bucket/results/cohort.vcf.gz",
       "basename": "cohort.vcf.gz",
       "dirname": "gs://my-bucket/results",
@@ -129,76 +129,26 @@ When you query an analysis, the OutputFile data is returned with full metadata e
 }
 ```
 
-**Field notes:**
-
-- `id`: Database identifier for the OutputFile record
-- `parent_id`: Always `null` for primary files; secondary files omit this field entirely
-- `secondary_files`: Always included, even if empty (`{}`)
-- `meta`: Custom metadata field, `null` if not set
-- `valid`: `true` if file exists in GCS, `false` otherwise
-
 > [!TIP]
-> The `valid` field tells you if the file exists in GCS. Files that don't exist will fall back to simple string values in the response.
+> Files that don't exist in GCS won't have OutputFile records created - they'll be returned as simple string values instead.
 
 ---
 
 ## Understanding the Model
 
-This section explains the conceptual model behind OutputFiles and how they work.
-
 ### What is an OutputFile?
 
-An OutputFile represents a single file in Google Cloud Storage that was produced by a bioinformatics analysis. The system tracks:
+An OutputFile represents a file in Google Cloud Storage produced by a bioinformatics analysis. Each OutputFile record contains:
 
 - **File location**: Full GCS path (`gs://bucket/path/file.ext`)
-- **File metadata**: Size, checksum (CRC32C), validity
-- **File structure**: Path components for easy querying (basename, directory, extension)
-- **Relationships**: Links to parent files (for secondary files like indices)
+- **File metadata**: Size, CRC32C checksum, validation status
+- **File structure**: Path components (basename, directory, extension)
+- **Relationships**: Links to secondary files (indices, checksums, etc.)
 - **Custom metadata**: Optional JSON field for additional information
 
-Metamist provides two model variants that serve different purposes in the system:
+### How OutputFiles Work
 
-#### Model Comparison
-
-| Aspect | `OutputFile` (Pydantic) | `OutputFileInternal` (SMBase) |
-|--------|-------------------------|-------------------------------|
-| **Primary Use** | External API interactions | Internal database operations |
-| **Base Class** | `BaseModel` (Pydantic) | `SMBase` (Metamist base class) |
-| **Where Used** | REST/GraphQL responses, user input | Database queries, business logic, GCS validation |
-| **Validation** | Pydantic type validation | Database-level constraints |
-| **Serialization** | Automatic JSON serialization | Manual conversion via `to_external()` |
-| **Special Methods** | `to_internal()` - converts to internal model | `from_db()` - creates from DB rows; `to_external()` - converts to API model |
-| **Default Values** | `valid=False`, `secondary_files={}` | `valid=False`, `secondary_files={}` (Note: in practice, all DB records have `valid=True` since invalid files don't create records) |
-
-**When to use each:**
-
-- **Use `OutputFile`** when:
-  - Returning data to API users (REST/GraphQL responses)
-  - Accepting user input and need Pydantic validation
-  - Serializing to JSON for external consumption
-
-- **Use `OutputFileInternal`** when:
-  - Querying the database
-  - Performing GCS validation and metadata extraction
-  - Implementing business logic that doesn't directly interface with users
-  - Need access to database-specific methods like `from_db()`
-
-**Example conversion:**
-
-```python
-# API receives Pydantic model, converts to internal for DB operations
-external_model = OutputFile(path="gs://bucket/file.vcf", ...)
-internal_model = external_model.to_internal()
-
-# Database returns internal model, converts to external for API response
-db_row = await fetch_from_db(...)
-internal_model = OutputFileInternal.from_db(db_row)
-external_model = internal_model.to_external()
-```
-
-### Data Flow Overview
-
-The following diagram shows how OutputFile data flows through the system when you create an analysis with outputs:
+When you create an analysis with outputs, the system validates files against GCS, extracts metadata, and builds parent-child relationships for secondary files. The following diagram illustrates this flow:
 
 ```mermaid
 graph TD
@@ -214,9 +164,9 @@ graph TD
     I --> J
     J --> K[Return enriched response<br/>to user]
 
-    style F fill:#90EE90
-    style G fill:#FFB6C1
-    style K fill:#87CEEB
+    style F fill:#90EE90,color:black
+    style G fill:#FFB6C1,color:black
+    style K fill:#87CEEB,color:black
 ```
 
 ### File Validation
@@ -229,7 +179,7 @@ Every OutputFile is automatically validated against Google Cloud Storage when cr
 2. **Metadata Extraction**: If the file exists, GCS metadata is retrieved:
    - **CRC32C Checksum**: For data integrity verification
    - **File Size**: In bytes
-3. **Validity Flag**: The `valid` field is set to `true` if the file is accessible, `false` otherwise
+3. **Validity Flag**: If the file is accessible, an OutputFile record is created with `valid: true`. If the file is not accessible, no OutputFile record is created and the path falls back to a simple string
 
 **Validation Results:**
 
@@ -239,11 +189,9 @@ Every OutputFile is automatically validated against Google Cloud Storage when cr
 | ❌ File not found or inaccessible | Simple string (no OutputFile created) | Planned outputs, missing files, permission issues |
 
 > [!NOTE]
->
-> **All OutputFiles have `valid: true`**: Because the code returns `None` for any file that fails validation (see `create_or_update_output_file()`), all OutputFile records in the database have `valid: true`. Files that can't be validated simply don't get OutputFile records.
->
+> See [Handling Invalid Files](#handling-invalid-files) for details on how the system processes files that fail validation.
 > [!CAUTION]
-> **Matrix Table (.mt) files** are currently not supported. These Hail-specific files are treated as directories in GCS and cannot be validated using the standard file validation process.
+> **Matrix Table (.mt) files** are currently not supported. Because they are directories in GCS, they cannot be validated by the system. Consequently, they are treated as invalid files: no `OutputFile` record is created, and the path is stored as a simple string.
 
 ### Parent-Child Relationships
 
@@ -254,19 +202,16 @@ graph LR
     A[Primary File<br/>cohort.vcf.gz<br/>parent_id: null] --> B[Secondary File<br/>cohort.vcf.gz.tbi<br/>parent_id: 456]
     A --> C[Secondary File<br/>cohort.vcf.gz.md5<br/>parent_id: 456]
 
-    style A fill:#87CEEB
-    style B fill:#90EE90
-    style C fill:#90EE90
+    style A fill:#87CEEB,color:black
+    style B fill:#90EE90,color:black
+    style C fill:#90EE90,color:black
 ```
 
 **How it works:**
 
-- **Primary files** have `parent_id = null`
-- **Secondary files** reference their primary file via `parent_id`
+- **Primary files** have `parent_id = null` (internal database field)
+- **Secondary files** reference their primary file via `parent_id` (internal database field)
 - In API responses, secondary files are nested under `secondary_files` in their parent's object
-
-> [!NOTE]
-> **`parent_id` in API Responses**: The `parent_id` field only appears in **primary files** (where it's set to `null`). Secondary files do **not** include the `parent_id` field in API responses, even though the relationship is tracked in the database via the `parent_id` foreign key.
 
 **Example structure:**
 
@@ -307,49 +252,11 @@ graph LR
 
 ## API Usage Guide
 
-This section covers how to interact with OutputFiles via REST and GraphQL APIs.
-
-### REST API
-
-OutputFiles are managed indirectly through analysis endpoints. You don't create OutputFiles directly; instead, you include them in the `outputs` field when creating or updating analyses.
-
-**Available Endpoints:**
-
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/analysis/{project}/` | `POST` | Create analysis with outputs |
-| `/analysis/{analysis_id}/` | `PATCH` | Update analysis outputs |
-| `/analysis/{analysis_id}/` | `GET` | Retrieve analysis with outputs |
-
-**Creating an Analysis with Outputs:**
-
-```bash
-POST /analysis/{project}/
-Content-Type: application/json
-```
-
-```json
-{
-  "sequencing_group_ids": ["CPGABC123"],
-  "type": "joint-calling",
-  "status": "completed",
-  "outputs": {
-    "vcf": {
-      "basename": "gs://bucket/results/joint.vcf.gz",
-      "secondary_files": {
-        "index": {"basename": "gs://bucket/results/joint.vcf.gz.tbi"}
-      }
-    },
-    "stats": {
-      "basename": "gs://bucket/results/stats.json"
-    }
-  }
-}
-```
+This section covers how to interact with OutputFiles via the GraphQL API.
 
 ### GraphQL API
 
-OutputFiles can also be created and queried through GraphQL. The `outputs` field uses a JSON scalar type, accepting the same structure as the REST API.
+OutputFiles can also be created and queried through GraphQL. The `outputs` field uses a JSON scalar type, accepting a JSON structure as input.
 
 **Creating an Analysis:**
 
@@ -442,7 +349,6 @@ When files exist in GCS and are successfully validated:
   "outputs": {
     "vcf": {
       "id": 456,
-      "parent_id": null,
       "path": "gs://bucket/results/joint.vcf.gz",
       "basename": "joint.vcf.gz",
       "dirname": "gs://bucket/results",
@@ -652,7 +558,7 @@ Some file types require special handling or have limitations.
 #### Matrix Table (.mt) Files
 
 > [!WARNING]
-> **Not Currently Supported**: Matrix Table (`.mt`) files used by Hail are stored as directories in GCS, not individual files. The current validation system cannot handle directory-based file formats and will fail validation for `.mt` files.
+> **Not Currently Supported**: Matrix Table (`.mt`) files used by Hail are stored as directories in GCS, not individual files. The current validation system cannot handle directory-based file formats and will fail validation for `.mt` files. Consequently, they are treated as invalid files: no `OutputFile` record is created, and the path is stored as a simple string.
 
 **Workaround**: Store the `.mt` directory path as a string in the analysis `meta` field rather than in `outputs`:
 
@@ -788,14 +694,13 @@ class OutputFileInternal(SMBase):
 
 #### OutputFile (Pydantic)
 
-Used for external API interactions (REST and GraphQL).
+Used for external API interactions (GraphQL).
 
 ```python
 class OutputFile(BaseModel):
     """External Pydantic model for API responses"""
 
     id: int | None
-    parent_id: int | None
     path: str
     basename: str
     dirname: str
