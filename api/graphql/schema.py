@@ -1326,7 +1326,7 @@ class GraphQLSequencingGroupsByDate:
             date_type_count_map.items(), key=lambda x: x[0]
         ):
             for key, count in type_counts.items():
-                type, tech = key.split(':')
+                type, tech = key.split('|||')
                 entries.append(
                     GraphQLSequencingGroupsByDate(
                         date=month, type=type, technology=tech, count=count
