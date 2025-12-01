@@ -105,15 +105,15 @@ class CohortTable(DbBase):
         cohorts_list = []
         for row in rows:
             row_dict = dict(row)
-            is_active = row_dict['c_status'].lower() == CohortStatus.ACTIVE.value
+            is_active = row_dict['c_status'] == CohortStatus.active.value
             is_invalid = parse_sql_bool(row_dict['is_invalid'])
 
             if is_active:
                 cohort_status = (
-                    CohortStatus.INVALID if is_invalid else CohortStatus.ACTIVE
+                    CohortStatus.invalid if is_invalid else CohortStatus.active
                 )
             else:
-                cohort_status = CohortStatus.ARCHIVED
+                cohort_status = CohortStatus.archived
 
             if _custom_matches_filter(cohort_status, filter_status):
                 cohorts_list.append(CohortInternal.from_db(row_dict, cohort_status))
@@ -227,7 +227,7 @@ class CohortTable(DbBase):
                     'project': project,
                     'name': cohort_name,
                     'timestamp': datetime.datetime.now(),
-                    'status': CohortStatus.ACTIVE.value.upper(),
+                    'status': CohortStatus.active.value,
                     'audit_log_id': audit_log_id,
                 },
             )
@@ -288,7 +288,7 @@ class CohortTable(DbBase):
         cohort_fields = {
             'name': name,
             'description': description,
-            'status': status.value.upper() if status else None,
+            'status': status.value if status else None,
         }
 
         query_params: dict[str, Any] = {
