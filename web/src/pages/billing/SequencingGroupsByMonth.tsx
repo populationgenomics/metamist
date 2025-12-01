@@ -51,6 +51,63 @@ interface ITypeData {
     count: number
 }
 
+// Merges counts, grouped by either type or technology.
+const mergeTypeOrTechCount = (gqlData: ISequencingGroupQueryData[], groupBy: string) => {
+    if (groupBy != 'type' && groupBy != 'technology') {
+        return []
+    }
+
+    const intermediateData = gqlData.reduce(
+        (acc, item) => {
+            const dateKey: string = item.date
+            const groupKey: string = item[groupBy]
+
+            if (!acc[dateKey]) acc[dateKey] = {}
+            if (!acc[dateKey][groupKey]) acc[dateKey][groupKey] = 0
+
+            acc[dateKey][groupKey] += item.count
+
+            return acc
+        },
+        {} as Record<string, Record<string, number>>
+    )
+
+    // Convert back into an array.
+    const result: ITypeData[] = []
+    Object.entries(intermediateData).forEach(([dateStr, typeMap]) => {
+        const date = new Date(dateStr)
+
+        Object.entries(typeMap).forEach(([groupKey, count]) => {
+            result.push({ date, type: groupKey, grouping: groupKey, count })
+        })
+    })
+    return result
+}
+
+// Merges all counts, grouped by date.
+const mergeAllCounts = (gqlData: ISequencingGroupQueryData[]) => {
+    const intermediateData = gqlData.reduce(
+        (acc, item) => {
+            const dateKey: string = item.date
+
+            if (!acc[dateKey]) acc[dateKey] = 0
+
+            acc[dateKey] += item.count
+            return acc
+        },
+        {} as Record<string, number>
+    )
+
+    // Convert back into an array.
+    const result: ITypeData[] = []
+    Object.entries(intermediateData).forEach(([dateStr, count]) => {
+        const date = new Date(dateStr)
+        result.push({ date, type: 'Sequencing Groups', grouping: 'Sequencing Groups', count })
+    })
+
+    return result
+}
+
 const SequencingGroupsByMonth: React.FunctionComponent = () => {
     // Use navigate and update url params
     const navigate = useNavigate()
@@ -150,66 +207,6 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
     const containerRef = useRef<HTMLDivElement>(null)
     const [measureRef, { width, height }] = useMeasure<HTMLDivElement>()
 
-    // Merges counts, grouped by either type or technology.
-    const mergeTypeOrTechCount = React.useCallback(
-        (gqlData: ISequencingGroupQueryData[], groupBy: string) => {
-            if (groupBy != 'type' && groupBy != 'technology') {
-                return []
-            }
-
-            const intermediateData = gqlData.reduce(
-                (acc, item) => {
-                    const dateKey: string = item.date
-                    const groupKey: string = item[groupBy]
-
-                    if (!acc[dateKey]) acc[dateKey] = {}
-                    if (!acc[dateKey][groupKey]) acc[dateKey][groupKey] = 0
-
-                    acc[dateKey][groupKey] += item.count
-
-                    return acc
-                },
-                {} as Record<string, Record<string, number>>
-            )
-
-            // Convert back into an array.
-            const result: ITypeData[] = []
-            Object.entries(intermediateData).forEach(([dateStr, typeMap]) => {
-                const date = new Date(dateStr)
-
-                Object.entries(typeMap).forEach(([groupKey, count]) => {
-                    result.push({ date, type: groupKey, grouping: groupKey, count })
-                })
-            })
-            return result
-        },
-        []
-    )
-
-    // Merges all counts, grouped by date.
-    const mergeAllCounts = React.useCallback((gqlData: ISequencingGroupQueryData[]) => {
-        const intermediateData = gqlData.reduce(
-            (acc, item) => {
-                const dateKey: string = item.date
-
-                if (!acc[dateKey]) acc[dateKey] = 0
-
-                acc[dateKey] += item.count
-                return acc
-            },
-            {} as Record<string, number>
-        )
-
-        // Convert back into an array.
-        const result: ITypeData[] = []
-        Object.entries(intermediateData).forEach(([dateStr, count]) => {
-            const date = new Date(dateStr)
-            result.push({ date, type: 'Sequencing Groups', grouping: 'Sequencing Groups', count })
-        })
-
-        return result
-    }, [])
-
     // Converting the date that GraphQL gives from a string to a Date type.
     const plotData = React.useMemo(() => {
         if (loading || error || !data) return []
@@ -219,7 +216,7 @@ const SequencingGroupsByMonthDisplay: React.FunctionComponent<ISGByMonthDisplayP
             return data.project.sequencingGroupHistory.map((item) => {
                 return {
                     date: new Date(item.date),
-                    type: item.type + ': ' + item.technology,
+                    type: `${item.type} / ${item.technology}`,
                     grouping: item.type,
                     count: item.count,
                 } as ITypeData
