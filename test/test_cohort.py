@@ -1,4 +1,5 @@
 import datetime
+from random import random, randint
 
 from pymysql.err import IntegrityError
 
@@ -259,6 +260,21 @@ class TestCohortData(DbIsolatedTest):
         self.assertEqual(external.cohort_id, cohort_id_format(result.cohort_id))
         self.assertEqual([self.sgB], external.sequencing_group_ids)
         self.assertEqual(False, external.dry_run)
+
+    @run_as_sync
+    async def test_create_cohort_by_sgs_fails_when_invalid_sg(self):
+        """Create cohort by selecting sequencing groups"""
+        random_sg_id = max(self.sgA_raw, self.sgB_raw, self.sgC_raw) + randint(1, 100)
+        with self.assertRaises(ValueError):
+            await self.cohortl.create_cohort_from_criteria(
+                project_to_write=self.project_id,
+                description='Cohort with 1 SG',
+                cohort_name='SG cohort 1',
+                dry_run=False,
+                cohort_criteria=CohortCriteriaInternal(
+                    sg_ids_internal_raw=[random_sg_id, self.sgB_raw],
+                ),
+            )
 
     @run_as_sync
     async def test_create_cohort_by_excluded_sgs(self):

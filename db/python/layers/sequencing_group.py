@@ -379,7 +379,7 @@ class SequencingGroupLayer(BaseLayer):
         self, sequencing_group_ids: list[int]
     ) -> set[int]:
         """
-        Retrieve a list of projects given a sequencing group id.
+        Retrieve project ids given sequencing group ids.
         """
         filter_ = SequencingGroupFilter(
             id=GenericFilter(in_=sequencing_group_ids),
@@ -390,10 +390,6 @@ class SequencingGroupLayer(BaseLayer):
             raise ValueError(
                 'Could not find any projects for the given sequencing groups'
             )
-
-        for sg in sequencing_groups:
-            if sg.project is None:
-                raise ValueError('Sequencing group does not belong to a valid project')
 
         self.connection.check_access_to_projects_for_ids(
             projects, allowed_roles=ReadAccessRoles
