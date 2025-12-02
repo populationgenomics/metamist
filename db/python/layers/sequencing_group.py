@@ -374,3 +374,29 @@ class SequencingGroupLayer(BaseLayer):
         return sequencing_groups
 
     # endregion
+
+    async def get_projects_given_sg_ids(
+        self, sequencing_group_ids: list[int]
+    ) -> set[int]:
+        """
+        Retrieve a list of projects given a sequencing group id.
+        """
+        filter_ = SequencingGroupFilter(
+            id=GenericFilter(in_=sequencing_group_ids),
+            active_only=None,  # consider both active/inactive SGs
+        )
+        projects, sequencing_groups = await self.seqgt.query(filter_)
+        if not projects:
+            raise ValueError(
+                'Could not find any projects for the given sequencing groups'
+            )
+
+        for sg in sequencing_groups:
+            if sg.project is None:
+                raise ValueError('Sequencing group does not belong to a valid project')
+
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=ReadAccessRoles
+        )
+
+        return projects

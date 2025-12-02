@@ -133,8 +133,16 @@ class CohortLayer(BaseLayer):
         """
         Create new cohort template
         """
-
-        assert cohort_template.criteria.projects, 'Projects must be set in criteria'
+        if cohort_template.criteria.sg_ids_internal_raw:
+            for name, value in vars(cohort_template.criteria).items():
+                if name != 'sg_ids_internal_raw' and (
+                    value is not None and value != []
+                ):
+                    raise ValueError(
+                        'Other criteria not supported with sg_ids_internal'
+                    )
+        if not cohort_template.criteria.sg_ids_internal_raw:
+            assert cohort_template.criteria.projects, 'Projects must be set in criteria'
         assert cohort_template.id is None, 'Cohort template ID must be None'
 
         template_id = await self.ct.create_cohort_template(
@@ -166,6 +174,15 @@ class CohortLayer(BaseLayer):
             raise ValueError(
                 'A cohort must have either criteria or be derived from a template'
             )
+
+        if cohort_criteria and cohort_criteria.sg_ids_internal_raw:
+            for name, value in vars(cohort_criteria).items():
+                if name != 'sg_ids_internal_raw' and (
+                    value is not None and value != []
+                ):
+                    raise ValueError(
+                        'Other criteria not supported with sg_ids_internal'
+                    )
 
         template: CohortTemplateInternal | None = None
         # Get template from ID
@@ -203,8 +220,17 @@ class CohortLayer(BaseLayer):
             _, samples = await self.sampt.query(sample_filter)
             sample_ids = [s.id for s in samples]
 
+        if cohort_criteria.sg_ids_internal_raw:
+            projects = list(
+                await self.sglayer.get_projects_given_sg_ids(
+                    cohort_criteria.sg_ids_internal_raw
+                )
+            )
+        else:
+            projects = cohort_criteria.projects
+
         sg_filter = get_sg_filter(
-            projects=cohort_criteria.projects,
+            projects=projects,
             sg_ids_internal_raw=cohort_criteria.sg_ids_internal_raw,
             excluded_sgs_internal_raw=cohort_criteria.excluded_sgs_internal_raw,
             sg_technology=cohort_criteria.sg_technology,
@@ -217,6 +243,11 @@ class CohortLayer(BaseLayer):
         if not sgs:
             raise ValueError(
                 'Cohort creation criteria resulted in no sequencing groups being selected. Please check the criteria and try again'
+            )
+
+        if any(sg.archived for sg in sgs):
+            raise ValueError(
+                'SG list includes archived sequencing groups. Please check and try again'
             )
 
         if dry_run:

@@ -23,6 +23,7 @@ from db.python.layers.assay import AssayLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
+from graphql.error import GraphQLError
 from models.enums import AnalysisStatus
 from api.graphql.mutations.analysis import AnalysisStatusType
 
@@ -646,7 +647,6 @@ class TestMutations(DbIsolatedTest):
                     },
                     'cohortCriteria': {
                         'projects': [self.project_name],
-                        'sgIdsInternal': [self.genome_sequencing_group_id_external],
                         'excludedSgsInternal': [
                             self.exome_sequencing_group_id_external
                         ],
@@ -665,7 +665,6 @@ class TestMutations(DbIsolatedTest):
             dry_run=False,
             cohort_criteria=CohortCriteriaInternal(
                 projects=[self.project_id],
-                sg_ids_internal_raw=[self.genome_sequencing_group_id],  # type: ignore [arg-type]
                 excluded_sgs_internal_raw=[self.exome_sequencing_group_id],  # type: ignore [arg-type]
                 sg_technology=['short-read'],
                 sg_platform=['illumina'],
@@ -693,7 +692,6 @@ class TestMutations(DbIsolatedTest):
                         'description': 'TestCohortTemplateDescription',
                         'criteria': {
                             'projects': [self.project_name],
-                            'sgIdsInternal': [self.genome_sequencing_group_id_external],
                             'excludedSgsInternal': [
                                 self.exome_sequencing_group_id_external
                             ],
@@ -715,7 +713,6 @@ class TestMutations(DbIsolatedTest):
                 project=self.project_id,
                 criteria=CohortCriteriaInternal(
                     projects=[self.project_id],
-                    sg_ids_internal_raw=[self.genome_sequencing_group_id],  # type: ignore [arg-type]
                     excluded_sgs_internal_raw=[self.exome_sequencing_group_id],  # type: ignore [arg-type]
                     sg_technology=['short-read'],
                     sg_platform=['illumina'],
@@ -1260,3 +1257,108 @@ class TestMutations(DbIsolatedTest):
         )
 
     # endregion SEQUENCING GROUP TESTS
+
+    @run_as_sync
+    async def test_create_cohort_from_sequencing_group_list(self):
+        """Test creating a cohort from sequencing group criteria using the mutation and the API"""
+
+        mutation_result = (
+            await self.run_graphql_query_async(
+                CREATE_COHORT_FROM_CRITERIA_MUTATION,
+                variables={
+                    'project': self.project_name,
+                    'cohortSpec': {
+                        'name': 'TestCohort1',
+                        'description': 'TestCohortDescription',
+                    },
+                    'cohortCriteria': {
+                        'sgIdsInternal': [self.genome_sequencing_group_id_external],
+                    },
+                },
+            )
+        )['cohort']['createCohortFromCriteria']
+
+        cohort = await self.cl.create_cohort_from_criteria(
+            project_to_write=self.project_id,
+            description='TestCohortDescription',
+            cohort_name='TestCohort2',
+            dry_run=False,
+            cohort_criteria=CohortCriteriaInternal(
+                sg_ids_internal_raw=[self.genome_sequencing_group_id],
+            ),
+        )
+        api_result = (
+            await self.cl.query(CohortFilter(id=GenericFilter(eq=cohort.cohort_id)))
+        )[0]
+        self.assertEqual(api_result.description, mutation_result['description'])
+        self.assertEqual(api_result.author, mutation_result['author'])
+
+    @run_as_sync
+    async def test_create_cohort_from_sequencing_group_list_fail_with_other_criteria(
+        self,
+    ):
+        """Test creating a cohort from sequencing group criteria using the mutation and the API fails when other criteria are provided"""
+
+        with self.assertRaises(GraphQLError):
+            await self.run_graphql_query_async(
+                CREATE_COHORT_FROM_CRITERIA_MUTATION,
+                variables={
+                    'project': self.project_name,
+                    'cohortSpec': {
+                        'name': 'TestCohort1',
+                        'description': 'TestCohortDescription',
+                    },
+                    'cohortCriteria': {
+                        'sgIdsInternal': [self.genome_sequencing_group_id_external],
+                        'projects': [self.project_name],
+                    },
+                },
+            )
+
+        with self.assertRaises(ValueError):
+            await self.cl.create_cohort_from_criteria(
+                project_to_write=self.project_id,
+                description='TestCohortDescription',
+                cohort_name='TestCohort2',
+                dry_run=False,
+                cohort_criteria=CohortCriteriaInternal(
+                    sg_ids_internal_raw=[self.genome_sequencing_group_id],
+                    projects=[self.project_id],
+                ),
+            )
+
+    @run_as_sync
+    async def test_create_cohort_from_sequencing_group_list_fail_when_sg_archived(self):
+        """Test creating a cohort from sequencing group criteria using the mutation and the API fails if sgs are archived"""
+
+        await self.sgl.archive_sequencing_group(
+            sequencing_group_id_transform_to_raw(
+                self.genome_sequencing_group_id_external
+            )
+        )
+
+        with self.assertRaises(GraphQLError):
+            await self.run_graphql_query_async(
+                CREATE_COHORT_FROM_CRITERIA_MUTATION,
+                variables={
+                    'project': self.project_name,
+                    'cohortSpec': {
+                        'name': 'TestCohort1',
+                        'description': 'TestCohortDescription',
+                    },
+                    'cohortCriteria': {
+                        'sgIdsInternal': [self.genome_sequencing_group_id_external],
+                    },
+                },
+            )
+
+        with self.assertRaises(ValueError):
+            await self.cl.create_cohort_from_criteria(
+                project_to_write=self.project_id,
+                description='TestCohortDescription',
+                cohort_name='TestCohort2',
+                dry_run=False,
+                cohort_criteria=CohortCriteriaInternal(
+                    sg_ids_internal_raw=[self.genome_sequencing_group_id]
+                ),
+            )

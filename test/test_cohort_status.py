@@ -164,7 +164,6 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
             cohort_name='Sample cohort 2',
             dry_run=False,
             cohort_criteria=CohortCriteriaInternal(
-                projects=[self.project_id],
                 sg_ids_internal_raw=[self.sgA_raw[0], sg_b_raw[0]],
             ),
         )
