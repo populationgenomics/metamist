@@ -45,6 +45,11 @@ def get_sample_model(eid, s_type='blood', sg_type='genome', plat='illumina'):
     )
 
 
+ACTIVE = 'active'
+INVALID = 'invalid'
+ARCHIVED = 'archived'
+
+
 class TestStatusInCohortDBLayer(DbIsolatedTest):
     """Test cohort status related functions implemented in the DB layer"""
 
@@ -89,7 +94,7 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
         self.assertEqual(created_cohort.id, self.cohort.cohort_id)
         self.assertEqual(created_cohort.description, self.cohort_description)
         self.assertEqual(created_cohort.name, self.cohort_name)
-        self.assertEqual(created_cohort.status, CohortStatus.ACTIVE)
+        self.assertEqual(created_cohort.status, CohortStatus.active)
 
     @run_as_sync
     async def test_query_cohort_with_inactive_sample(self):
@@ -103,7 +108,7 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
                 CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
             )
         )[0]
-        self.assertEqual(cohort.status, CohortStatus.INVALID)
+        self.assertEqual(cohort.status, CohortStatus.invalid)
 
     @run_as_sync
     async def test_query_cohort_with_archived_sg(self):
@@ -117,7 +122,7 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
                 CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
             )
         )[0]
-        self.assertEqual(cohort.status, CohortStatus.INVALID)
+        self.assertEqual(cohort.status, CohortStatus.invalid)
 
     @run_as_sync
     async def test_query_cohort_status_with_all_active(self):
@@ -140,16 +145,14 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
             'SELECT status FROM cohort where id = :cohort_id',
             {'cohort_id': self.cohort.cohort_id},
         )
-        self.assertEqual(
-            dict(cohort_raw_entry)['status'].lower(), CohortStatus.ACTIVE.value
-        )
+        self.assertEqual(dict(cohort_raw_entry)['status'], CohortStatus.active.value)
 
         cohort = (
             await self.cohort_layer.query(
                 CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
             )
         )[0]
-        self.assertEqual(cohort.status, CohortStatus.ACTIVE)
+        self.assertEqual(cohort.status, CohortStatus.active)
 
     @run_as_sync
     async def test_query_cohort_with_at_least_one_inactive_sample(self):
@@ -176,7 +179,7 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
                 CohortFilter(id=GenericFilter(eq=new_cohort.cohort_id))
             )
         )[0]
-        self.assertEqual(cohort.status, CohortStatus.INVALID)
+        self.assertEqual(cohort.status, CohortStatus.invalid)
 
     @run_as_sync
     async def test_query_cohort_with_archived_db_status(self):
@@ -187,7 +190,7 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
             'UPDATE cohort SET status = :status WHERE id = :cohort_id',
             {
                 'cohort_id': self.cohort.cohort_id,
-                'status': CohortUpdateStatus.ARCHIVED.value.upper(),
+                'status': CohortUpdateStatus.archived.value,
             },
         )
 
@@ -196,7 +199,7 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
                 CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
             )
         )[0]
-        self.assertEqual(cohort.status, CohortStatus.ARCHIVED)
+        self.assertEqual(cohort.status, CohortStatus.archived)
 
     @run_as_sync
     async def test_query_cohort_in_get_template_by_cohort_id(self):
@@ -269,7 +272,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                 },
             )
         )['cohort']['createCohortFromCriteria']
-        self.assertEqual(mutation_result['status'], 'ACTIVE')
+        self.assertEqual(mutation_result['status'], ACTIVE)
 
     @run_as_sync
     async def test_query_cohort_with_filter_by_id(self):
@@ -310,7 +313,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
             queried_cohort['sequencingGroups'][1]['sample']['project']['name'],
             self.project_name,
         )
-        self.assertEqual(queried_cohort['status'], 'ACTIVE')
+        self.assertEqual(queried_cohort['status'], ACTIVE)
 
     @run_as_sync
     async def test_query_cohort_with_filter_status_eq(self):
@@ -327,22 +330,22 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
 
         query_cohort_status_eq = await self.run_graphql_query_async(
             query_cohort_filter_status_eq,
-            {'cohort_status': 'ACTIVE'},
+            {'cohort_status': ACTIVE},
         )
 
         self.assertTrue(query_cohort_status_eq['cohorts'])
         queried_cohort = query_cohort_status_eq['cohorts'][0]
 
         self.assertEqual(queried_cohort['name'], self.cohort_name)
-        self.assertEqual(queried_cohort['status'], 'ACTIVE')
+        self.assertEqual(queried_cohort['status'], ACTIVE)
 
         # update cohort status and retrieve
         await self.cohort_layer.update_cohort(
-            CohortUpdateBody(status=CohortUpdateStatus.ARCHIVED), self.cohort.cohort_id
+            CohortUpdateBody(status=CohortUpdateStatus.archived), self.cohort.cohort_id
         )
         query_cohort_status_eq = await self.run_graphql_query_async(
             query_cohort_filter_status_eq,
-            {'cohort_status': 'ACTIVE'},
+            {'cohort_status': ACTIVE},
         )
         self.assertFalse(query_cohort_status_eq['cohorts'])
 
@@ -377,20 +380,20 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
 
         query_cohort_status_in = await self.run_graphql_query_async(
             query_cohort_filter_status_in,
-            {'cohort_status_list': ['ACTIVE']},
+            {'cohort_status_list': [ACTIVE]},
         )
         self.assertTrue(len(query_cohort_status_in['cohorts']) == 2)
         for cohort in query_cohort_status_in['cohorts']:
-            self.assertEqual(cohort['status'], 'ACTIVE')
+            self.assertEqual(cohort['status'], ACTIVE)
 
         # update cohort status and retrieve
         await self.cohort_layer.update_cohort(
-            CohortUpdateBody(status=CohortUpdateStatus.ARCHIVED), self.cohort.cohort_id
+            CohortUpdateBody(status=CohortUpdateStatus.archived), self.cohort.cohort_id
         )
 
         query_cohort_status_in = await self.run_graphql_query_async(
             query_cohort_filter_status_in,
-            {'cohort_status_list': ['ACTIVE']},
+            {'cohort_status_list': [ACTIVE]},
         )
         self.assertTrue(len(query_cohort_status_in['cohorts']) == 1)
 
@@ -406,7 +409,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                 }
             }
         """,
-            {'cohort_status_list': ['ACTIVE']},
+            {'cohort_status_list': [ACTIVE]},
         )
         self.assertFalse(query_cohort_status_nin['cohorts'])
 
@@ -422,7 +425,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                 }
             }
         """,
-            {'cohort_status': 'ACTIVE'},
+            {'cohort_status': ACTIVE},
         )
         self.assertTrue(query_cohorts['cohorts'])
 
@@ -462,7 +465,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
         """Test GraphQL mutation for updating cohort fields"""
 
         new_name = 'Updated Llama'
-        new_status = 'ARCHIVED'
+        new_status = ARCHIVED
         new_description = 'Updated description'
 
         queried_cohort = (
@@ -482,7 +485,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
         )['cohorts'][0]
 
         self.assertNotEqual(queried_cohort['name'], new_name)
-        self.assertNotEqual(queried_cohort['status'], 'ARCHIVED')
+        self.assertNotEqual(queried_cohort['status'], ARCHIVED)
         self.assertNotEqual(queried_cohort['description'], new_description)
 
         updated_cohort = (
@@ -513,7 +516,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
         )['cohort']['updateCohort']
 
         self.assertEqual(updated_cohort['name'], new_name)
-        self.assertEqual(updated_cohort['status'], 'ARCHIVED')
+        self.assertEqual(updated_cohort['status'], ARCHIVED)
         self.assertEqual(updated_cohort['description'], new_description)
 
     @run_as_sync
@@ -599,7 +602,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                 CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
             )
         )[0]
-        self.assertEqual(cohort.status, CohortStatus.INVALID)
+        self.assertEqual(cohort.status, CohortStatus.invalid)
 
         updated_cohort = (
             await self.run_graphql_query_async(
@@ -615,12 +618,12 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
             """,
                 {
                     'id': cohort_id_format(self.cohort.cohort_id),
-                    'cohort': {'status': 'ACTIVE'},
+                    'cohort': {'status': ACTIVE},
                 },
             )
         )['cohort']['updateCohort']
 
-        self.assertEqual(updated_cohort['status'], 'INVALID')
+        self.assertEqual(updated_cohort['status'], INVALID)
 
     @run_as_sync
     async def test_update_status_of_archived_cohort_with_archived_samples(self):
@@ -631,7 +634,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
             'UPDATE cohort SET status = :status WHERE id = :cohort_id',
             {
                 'cohort_id': self.cohort.cohort_id,
-                'status': CohortUpdateStatus.ARCHIVED.value.upper(),
+                'status': CohortUpdateStatus.archived.value,
             },
         )
         await SampleLayer(self.connection).upsert_sample(
@@ -642,7 +645,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                 CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
             )
         )[0]
-        self.assertEqual(cohort.status, CohortStatus.ARCHIVED)
+        self.assertEqual(cohort.status, CohortStatus.archived)
 
         with self.assertRaises(GraphQLError):
             _ = await self.run_graphql_query_async(
@@ -658,7 +661,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
             """,
                 {
                     'id': cohort_id_format(self.cohort.cohort_id),
-                    'cohort': {'status': 'ACTIVE'},
+                    'cohort': {'status': ACTIVE},
                 },
             )
 
@@ -671,7 +674,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
             'UPDATE cohort SET status = :status WHERE id = :cohort_id',
             {
                 'cohort_id': self.cohort.cohort_id,
-                'status': CohortUpdateStatus.ARCHIVED.value.upper(),
+                'status': CohortUpdateStatus.archived,
             },
         )
 
@@ -689,9 +692,9 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
             """,
                 {
                     'id': cohort_id_format(self.cohort.cohort_id),
-                    'cohort': {'status': 'ACTIVE'},
+                    'cohort': {'status': ACTIVE},
                 },
             )
         )['cohort']['updateCohort']
 
-        self.assertEqual(updated_cohort['status'], 'ACTIVE')
+        self.assertEqual(updated_cohort['status'], ACTIVE)

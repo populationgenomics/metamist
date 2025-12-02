@@ -73,7 +73,6 @@ class OutputFileInternal(SMBase):
         """
         return OutputFile(
             id=self.id,
-            parent_id=self.parent_id,
             path=self.path,
             basename=self.basename,
             dirname=self.dirname,
@@ -298,7 +297,6 @@ class OutputFile(BaseModel):
     """File model for external use"""
 
     id: int | None = None
-    parent_id: int | None = None
     path: str
     basename: str
     dirname: str
@@ -316,7 +314,7 @@ class OutputFile(BaseModel):
         """
         return OutputFileInternal(
             id=self.id,
-            parent_id=self.parent_id,
+            parent_id=None,  # parent_id is not exposed in external model
             path=self.path,
             basename=self.basename,
             dirname=self.dirname,

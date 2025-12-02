@@ -302,12 +302,12 @@ class CohortLayer(BaseLayer):
             raise ValueError(f'Cohort ID not found')
 
         # raise error if reactivating a cohort with archived samples or sgs
-        if cohort_update_body.status == CohortUpdateStatus.ACTIVE:
+        if cohort_update_body.status == CohortUpdateStatus.active:
             cohort = cohorts[0]
             current_status = cohort.status
 
             if (
-                current_status == CohortStatus.ARCHIVED
+                current_status == CohortStatus.archived
                 and await self.ct.is_cohort_sample_sg_invalid(
                     cohort.id
                 )  # check if samples or sgs are archived

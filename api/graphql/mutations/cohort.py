@@ -133,7 +133,7 @@ class CohortMutations:
                 description=cohort_spec.description,
                 author=connection.author,
                 project_id=target_project.id,
-                status=CohortStatus.ACTIVE,
+                status=CohortStatus.active,
             )
 
         created_cohort = (
