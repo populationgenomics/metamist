@@ -385,7 +385,7 @@ class SequencingGroupLayer(BaseLayer):
             id=GenericFilter(in_=sequencing_group_ids),
             active_only=None,  # consider both active/inactive SGs
         )
-        projects, sequencing_groups = await self.seqgt.query(filter_)
+        projects, _ = await self.seqgt.query(filter_)
         if not projects:
             raise ValueError(
                 'Could not find any projects for the given sequencing groups'

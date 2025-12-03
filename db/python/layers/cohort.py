@@ -133,7 +133,10 @@ class CohortLayer(BaseLayer):
         """
         Create new cohort template
         """
-        if cohort_template.criteria.sg_ids_internal_raw:
+
+        if not cohort_template.criteria.sg_ids_internal_raw:
+            assert cohort_template.criteria.projects, 'Projects must be set in criteria'
+        else:
             for name, value in vars(cohort_template.criteria).items():
                 if name != 'sg_ids_internal_raw' and (
                     value is not None and value != []
@@ -141,8 +144,6 @@ class CohortLayer(BaseLayer):
                     raise ValueError(
                         'Other criteria not supported with sequencing group ids provided as criteria'
                     )
-        if not cohort_template.criteria.sg_ids_internal_raw:
-            assert cohort_template.criteria.projects, 'Projects must be set in criteria'
         assert cohort_template.id is None, 'Cohort template ID must be None'
 
         template_id = await self.ct.create_cohort_template(
@@ -247,12 +248,12 @@ class CohortLayer(BaseLayer):
 
         if any(sg.archived for sg in sgs):
             raise ValueError(
-                'SG list includes archived sequencing groups. Please check and try again'
+                'Includes archived sequencing groups. Please check input sequencing groups and try again'
             )
 
         if sg_ids_internal_raw and len(sgs) != len(sg_ids_internal_raw):
             raise ValueError(
-                'Contains invalid sequencing groups. Please check and try again'
+                'Includes invalid sequencing groups. Please check input sequencing groups and try again'
             )
 
         if dry_run:

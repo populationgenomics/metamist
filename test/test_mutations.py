@@ -329,30 +329,10 @@ UPDATE_SEQUENCING_GROUP_MUTATION = """
 """
 # endregion SEQUENCING GROUP MUTATIONS
 
+def get_test_sample() -> SampleUpsertInternal:
+    """Util function to create sample data"""
 
-class TestMutations(DbIsolatedTest):
-    """Test sample class"""
-
-    # pylint: disable=too-many-instance-attributes
-
-    @run_as_sync
-    async def setUp(self) -> None:
-        # don't need to await because it's tagged @run_as_sync
-        super().setUp()  # type: ignore [call-arg]
-        self.cl = CohortLayer(self.connection)
-        self.sl = SampleLayer(self.connection)
-        self.sgl = SequencingGroupLayer(self.connection)
-        self.asl = AssayLayer(self.connection)
-        self.al = AnalysisLayer(self.connection)
-        self.pl = ParticipantLayer(self.connection)
-        self.fl = FamilyLayer(self.connection)
-        self.ppt = ProjectPermissionsTable(self.connection)
-
-        self.family_id = await self.fl.create_family(external_ids={'forg': 'FAM01'})
-        self.family_id_2 = await self.fl.create_family(external_ids={'forg': 'FAM02'})
-
-        sample = await self.sl.upsert_sample(
-            SampleUpsertInternal(
+    return SampleUpsertInternal(
                 external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
                 type='blood',
                 meta={'meta': 'meta ;)'},
@@ -394,7 +374,29 @@ class TestMutations(DbIsolatedTest):
                     ),
                 ],
             )
-        )
+
+class TestMutations(DbIsolatedTest):
+    """Test sample class"""
+
+    # pylint: disable=too-many-instance-attributes
+
+    @run_as_sync
+    async def setUp(self) -> None:
+        # don't need to await because it's tagged @run_as_sync
+        super().setUp()  # type: ignore [call-arg]
+        self.cl = CohortLayer(self.connection)
+        self.sl = SampleLayer(self.connection)
+        self.sgl = SequencingGroupLayer(self.connection)
+        self.asl = AssayLayer(self.connection)
+        self.al = AnalysisLayer(self.connection)
+        self.pl = ParticipantLayer(self.connection)
+        self.fl = FamilyLayer(self.connection)
+        self.ppt = ProjectPermissionsTable(self.connection)
+
+        self.family_id = await self.fl.create_family(external_ids={'forg': 'FAM01'})
+        self.family_id_2 = await self.fl.create_family(external_ids={'forg': 'FAM02'})
+
+        sample = await self.sl.upsert_sample(get_test_sample())
         self.sample_id = sample.id
         self.external_sample_id = sample.to_external().id
         self.genome_sequencing_group_id = sample.sequencing_groups[0].id  # type: ignore [arg-type]
@@ -1257,6 +1259,21 @@ class TestMutations(DbIsolatedTest):
         )
 
     # endregion SEQUENCING GROUP TESTS
+
+class TestCohortMutations(DbIsolatedTest):
+    """Test class for new cohort mutations"""
+    @run_as_sync
+    async def setUp(self) -> None:
+        super().setUp()
+
+        self.sl = SampleLayer(self.connection)
+        self.cl = CohortLayer(self.connection)
+        self.sgl = SequencingGroupLayer(self.connection)
+        sample = await self.sl.upsert_sample(get_test_sample())
+        self.genome_sequencing_group_id = sample.sequencing_groups[0].id
+        self.genome_sequencing_group_id_external = (
+            sample.sequencing_groups[0].to_external().id
+        )
 
     @run_as_sync
     async def test_create_cohort_from_sequencing_group_list(self):

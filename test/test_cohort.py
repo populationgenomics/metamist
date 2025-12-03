@@ -1,5 +1,5 @@
 import datetime
-from random import random, randint
+from random import randint
 
 from pymysql.err import IntegrityError
 
@@ -263,7 +263,7 @@ class TestCohortData(DbIsolatedTest):
 
     @run_as_sync
     async def test_create_cohort_by_sgs_fails_when_invalid_sg(self):
-        """Create cohort by selecting sequencing groups"""
+        """Create cohort by selecting sequencing groups with an invalid sg in the list"""
         random_sg_id = max(self.sgA_raw, self.sgB_raw, self.sgC_raw) + randint(1, 100)
         with self.assertRaises(ValueError):
             await self.cohortl.create_cohort_from_criteria(
@@ -273,6 +273,21 @@ class TestCohortData(DbIsolatedTest):
                 dry_run=False,
                 cohort_criteria=CohortCriteriaInternal(
                     sg_ids_internal_raw=[random_sg_id, self.sgB_raw],
+                ),
+            )
+
+    @run_as_sync
+    async def test_create_cohort_by_sgs_fails_when_no_projects(self):
+        """Create cohort with invalid list of sequencing group ids"""
+        random_sg_id = max(self.sgA_raw, self.sgB_raw, self.sgC_raw) + randint(1, 100)
+        with self.assertRaises(ValueError):
+            await self.cohortl.create_cohort_from_criteria(
+                project_to_write=self.project_id,
+                description='Cohort with 1 SG',
+                cohort_name='SG cohort 1',
+                dry_run=False,
+                cohort_criteria=CohortCriteriaInternal(
+                    sg_ids_internal_raw=[random_sg_id],
                 ),
             )
 
