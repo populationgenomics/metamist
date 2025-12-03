@@ -240,20 +240,16 @@ class CohortLayer(BaseLayer):
             sample_ids=sample_ids,
         )
 
-        sgs = await self.sglayer.query(sg_filter)
+        sgs = await self.sglayer.query(sg_filter)  # retrieves active sgs
         if not sgs:
             raise ValueError(
                 'Cohort creation criteria resulted in no sequencing groups being selected. Please check the criteria and try again'
             )
 
-        if any(sg.archived for sg in sgs):
-            raise ValueError(
-                'Includes archived sequencing groups. Please check input sequencing groups and try again'
-            )
-
         if sg_ids_internal_raw and len(sgs) != len(sg_ids_internal_raw):
+            # if any sgs are archived or any sgs are invalid (if by-pass previous checks)
             raise ValueError(
-                'Includes invalid sequencing groups. Please check input sequencing groups and try again'
+                'Includes archived/invalid sequencing groups. Please check input sequencing groups and try again'
             )
 
         if dry_run:
