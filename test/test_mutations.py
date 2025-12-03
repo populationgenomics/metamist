@@ -329,51 +329,53 @@ UPDATE_SEQUENCING_GROUP_MUTATION = """
 """
 # endregion SEQUENCING GROUP MUTATIONS
 
+
 def get_test_sample() -> SampleUpsertInternal:
     """Util function to create sample data"""
 
     return SampleUpsertInternal(
-                external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
-                type='blood',
-                meta={'meta': 'meta ;)'},
-                active=True,
-                sequencing_groups=[
-                    SequencingGroupUpsertInternal(
-                        type='genome',
-                        technology='short-read',
-                        platform='illumina',
-                        meta={},
-                        sample_id=None,
-                        assays=[
-                            AssayUpsertInternal(
-                                type='sequencing',
-                                meta={
-                                    'sequencing_type': 'genome',
-                                    'sequencing_technology': 'short-read',
-                                    'sequencing_platform': 'illumina',
-                                },
-                            )
-                        ],
-                    ),
-                    SequencingGroupUpsertInternal(
-                        type='exome',
-                        technology='short-read',
-                        platform='illumina',
-                        meta={},
-                        sample_id=None,
-                        assays=[
-                            AssayUpsertInternal(
-                                type='sequencing',
-                                meta={
-                                    'sequencing_type': 'exome',
-                                    'sequencing_technology': 'short-read',
-                                    'sequencing_platform': 'illumina',
-                                },
-                            )
-                        ],
-                    ),
+        external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
+        type='blood',
+        meta={'meta': 'meta ;)'},
+        active=True,
+        sequencing_groups=[
+            SequencingGroupUpsertInternal(
+                type='genome',
+                technology='short-read',
+                platform='illumina',
+                meta={},
+                sample_id=None,
+                assays=[
+                    AssayUpsertInternal(
+                        type='sequencing',
+                        meta={
+                            'sequencing_type': 'genome',
+                            'sequencing_technology': 'short-read',
+                            'sequencing_platform': 'illumina',
+                        },
+                    )
                 ],
-            )
+            ),
+            SequencingGroupUpsertInternal(
+                type='exome',
+                technology='short-read',
+                platform='illumina',
+                meta={},
+                sample_id=None,
+                assays=[
+                    AssayUpsertInternal(
+                        type='sequencing',
+                        meta={
+                            'sequencing_type': 'exome',
+                            'sequencing_technology': 'short-read',
+                            'sequencing_platform': 'illumina',
+                        },
+                    )
+                ],
+            ),
+        ],
+    )
+
 
 class TestMutations(DbIsolatedTest):
     """Test sample class"""
@@ -1260,8 +1262,10 @@ class TestMutations(DbIsolatedTest):
 
     # endregion SEQUENCING GROUP TESTS
 
+
 class TestCohortMutations(DbIsolatedTest):
     """Test class for new cohort mutations"""
+
     @run_as_sync
     async def setUp(self) -> None:
         super().setUp()
