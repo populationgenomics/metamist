@@ -39,6 +39,11 @@ class Project(SMBase):
     roles: set[ProjectMemberRole]
     """The roles that the current user has within the project"""
 
+    @property
+    def is_test_project(self):
+        """Returns whether this is a main or a test project"""
+        return self.name.endswith('-test')
+
     @staticmethod
     def from_db(kwargs):
         """From DB row, with db keys"""
