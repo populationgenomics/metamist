@@ -115,15 +115,14 @@ async def delete_project_data(
     Can optionally delete the project itself.
     Requires READ access + project-creator permissions
     """
+    if delete_project:
+        # stop allowing delete project with analysis-runner entries
+        raise ValueError('2024-03-08: delete_project is no longer allowed')
+
     ptable = ProjectPermissionsTable(connection)
 
     assert connection.project
-
-    success = await ptable.delete_project_data(
-        project_id=connection.project.id,
-        delete_project=delete_project,
-    )
-
+    success = await ptable.delete_project_data(project=connection.project)
     return {'success': success}
 
 
