@@ -90,7 +90,7 @@ jobs:
 
       - name: "build deployable API"
         run: |
-          python regenerate_api.py
+          uv run python regenerate_api.py
           ls -lGh metamist
 
         # also copies build artifacts to api/public

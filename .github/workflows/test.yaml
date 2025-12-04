@@ -72,7 +72,7 @@ jobs:
 
       - name: 'build deployable API'
         run: |
-          python regenerate_api.py
+          uv run regenerate_api.py
           uv pip install .
 
       - name: 'Run unit tests'

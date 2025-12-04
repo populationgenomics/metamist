@@ -65,7 +65,7 @@ jobs:
       - name: Build + install packages
         run: |
           uv sync --group dev
-          python regenerate_api.py
+          uv run regenerate_api.py
           uv pip install .
           mkdir .mypy_cache
 
