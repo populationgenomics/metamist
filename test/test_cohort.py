@@ -1,4 +1,5 @@
 import datetime
+from random import randint
 
 from pymysql.err import IntegrityError
 
@@ -246,7 +247,6 @@ class TestCohortData(DbIsolatedTest):
             cohort_name='SG cohort 1',
             dry_run=False,
             cohort_criteria=CohortCriteriaInternal(
-                projects=[self.project_id],
                 sg_ids_internal_raw=[self.sgB_raw],
             ),
         )
@@ -260,6 +260,36 @@ class TestCohortData(DbIsolatedTest):
         self.assertEqual(external.cohort_id, cohort_id_format(result.cohort_id))
         self.assertEqual([self.sgB], external.sequencing_group_ids)
         self.assertEqual(False, external.dry_run)
+
+    @run_as_sync
+    async def test_create_cohort_by_sgs_fails_when_invalid_sg(self):
+        """Create cohort by selecting sequencing groups with an invalid sg in the list"""
+        random_sg_id = max(self.sgA_raw, self.sgB_raw, self.sgC_raw) + randint(1, 100)
+        with self.assertRaises(ValueError):
+            await self.cohortl.create_cohort_from_criteria(
+                project_to_write=self.project_id,
+                description='Cohort with 1 SG',
+                cohort_name='SG cohort 1',
+                dry_run=False,
+                cohort_criteria=CohortCriteriaInternal(
+                    sg_ids_internal_raw=[random_sg_id, self.sgB_raw],
+                ),
+            )
+
+    @run_as_sync
+    async def test_create_cohort_by_sgs_fails_when_no_projects(self):
+        """Create cohort with invalid list of sequencing group ids"""
+        random_sg_id = max(self.sgA_raw, self.sgB_raw, self.sgC_raw) + randint(1, 100)
+        with self.assertRaises(ValueError):
+            await self.cohortl.create_cohort_from_criteria(
+                project_to_write=self.project_id,
+                description='Cohort with 1 SG',
+                cohort_name='SG cohort 1',
+                dry_run=False,
+                cohort_criteria=CohortCriteriaInternal(
+                    sg_ids_internal_raw=[random_sg_id],
+                ),
+            )
 
     @run_as_sync
     async def test_create_cohort_by_excluded_sgs(self):
@@ -357,7 +387,6 @@ class TestCohortData(DbIsolatedTest):
             dry_run=False,
             cohort_criteria=CohortCriteriaInternal(
                 projects=[self.project_id],
-                sg_ids_internal_raw=[self.sgB_raw, self.sgC_raw],
                 excluded_sgs_internal_raw=[self.sgA_raw],
                 sg_technology=['short-read'],
                 sg_platform=['illumina'],
@@ -474,6 +503,39 @@ class TestCohortData(DbIsolatedTest):
         self.assertIn(sgD_raw, coh2.sequencing_group_ids)
 
     @run_as_sync
+    async def test_create_template_fail_when_other_criteria_with_sg_list(self):
+        """Test with template creation fails when other criteria with sg list"""
+
+        with self.assertRaises(ValueError):
+            await self.cohortl.create_cohort_template(
+                project=self.project_id,
+                cohort_template=CohortTemplateInternal(
+                    id=None,
+                    name='Test template',
+                    description='A template from which cohorts are created',
+                    criteria=CohortCriteriaInternal(
+                        projects=[self.project_id], sg_ids_internal_raw=[self.sgB_raw]
+                    ),
+                    project=self.project_id,
+                ),
+            )
+
+    @run_as_sync
+    async def test_create_template_with_sg_list(self):
+        """Test with template creation when sg list provided as criteria"""
+        new_template = await self.cohortl.create_cohort_template(
+            project=self.project_id,
+            cohort_template=CohortTemplateInternal(
+                id=None,
+                name='Test template',
+                description='A template from which cohorts are created',
+                criteria=CohortCriteriaInternal(sg_ids_internal_raw=[self.sgB_raw]),
+                project=self.project_id,
+            ),
+        )
+        self.assertTrue(new_template)
+
+    @run_as_sync
     async def test_query_cohort(self):
         """Create a cohort and test that it is populated when queried"""
         created = await self.cohortl.create_cohort_from_criteria(
@@ -482,7 +544,6 @@ class TestCohortData(DbIsolatedTest):
             cohort_name='Duo cohort',
             dry_run=False,
             cohort_criteria=CohortCriteriaInternal(
-                projects=[self.project_id],
                 sg_ids_internal_raw=[self.sgA_raw, self.sgB_raw],
             ),
         )
