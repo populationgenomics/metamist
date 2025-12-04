@@ -239,3 +239,20 @@ class TestProjectAccess(DbIsolatedTest):
         self.assertEqual(len(project_id_map), len(project_name_map))
         self.assertEqual(len(my_projects), 1)
         self.assertEqual(pid, my_projects[0].id)
+
+    @run_as_sync
+    async def test_delete_project_data(self):
+        """
+        Test deleting all project data
+        """
+        await self._add_group_member_direct(GROUP_NAME_PROJECT_CREATORS)
+
+        main_pid = await self.pttable.create_project('foo', 'foo_data', self.author)
+        test_pid = await self.pttable.create_project('a-test', 'a_data', self.author)
+
+        pid_map, _ = await self.pttable.get_projects_accessible_by_user(self.author)
+
+        with self.assertRaises(ValueError):  # deleting non-test project not supported
+            await self.pttable.delete_project_data(pid_map[main_pid])
+
+        self.assertTrue(await self.pttable.delete_project_data(pid_map[test_pid]))
