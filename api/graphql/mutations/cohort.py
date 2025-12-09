@@ -8,17 +8,22 @@ from db.python.connect import Connection
 from db.python.filters.generic import GenericFilter
 from db.python.layers.cohort import CohortLayer
 from db.python.tables.cohort import CohortFilter, CohortTemplateFilter
+from models.enums.cohort import CohortStatus, CohortUpdateStatus
 from models.models.cohort import (
     CohortCriteria,
     CohortTemplate,
+    CohortUpdateBody,
 )
 from models.models.project import ProjectId, ProjectMemberRole, ReadAccessRoles
+from models.utils.cohort_id_format import cohort_id_transform_to_raw
 from models.utils.cohort_template_id_format import (
     cohort_template_id_transform_to_raw,
 )
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLCohort, GraphQLCohortTemplate
+
+GraphQLCohortUpdateStatus: type = strawberry.enum(CohortUpdateStatus)
 
 
 @strawberry.input
@@ -51,6 +56,15 @@ class CohortTemplateInput:
     name: str
     description: str
     criteria: CohortCriteriaInput
+
+
+@strawberry.input
+class CohortUpdateBodyInput:
+    """Cohort body"""
+
+    name: str | None = None
+    description: str | None = None
+    status: GraphQLCohortUpdateStatus | None = None
 
 
 @strawberry.type
@@ -119,6 +133,7 @@ class CohortMutations:
                 description=cohort_spec.description,
                 author=connection.author,
                 project_id=target_project.id,
+                status=CohortStatus.active,
             )
 
         created_cohort = (
@@ -186,3 +201,30 @@ class CohortMutations:
         return GraphQLCohortTemplate.from_internal(
             created_cohort_template, project_names=template_project_names
         )
+
+    @strawberry.mutation
+    async def update_cohort(
+        self,
+        id: str,
+        cohort: CohortUpdateBodyInput,
+        info: Info,
+    ) -> Annotated['GraphQLCohort', strawberry.lazy('api.graphql.schema')]:
+        """Support updating name, description and status of a Cohort"""
+
+        from api.graphql.schema import GraphQLCohort
+
+        connection: Connection = info.context['connection']
+        clayer = CohortLayer(connection)
+        cohort_id_raw = cohort_id_transform_to_raw(id)
+
+        await clayer.update_cohort(
+            CohortUpdateBody(
+                name=cohort.name, description=cohort.description, status=cohort.status
+            ),
+            cohort_id_raw,
+        )
+
+        updated_cohort = (
+            await clayer.query(CohortFilter(id=GenericFilter(eq=cohort_id_raw)))
+        )[0]
+        return GraphQLCohort.from_internal(updated_cohort)

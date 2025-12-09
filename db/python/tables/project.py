@@ -226,13 +226,12 @@ class ProjectPermissionsTable:
 
         await self.connection.execute(_query, fields)
 
-    async def delete_project_data(self, project_id: int, delete_project: bool) -> bool:
+    async def delete_project_data(self, project: Project) -> bool:
         """
         Delete data in metamist project, requires project_creator_permissions
         """
-        if delete_project:
-            # stop allowing delete project with analysis-runner entries
-            raise ValueError('2024-03-08: delete_project is no longer allowed')
+        if not project.is_test_project:
+            raise ValueError('2025-12-04: refusing to delete non-test project')
 
         async with self.connection.transaction():
             _query = """
@@ -277,7 +276,7 @@ DELETE FROM participant WHERE project = :project;
 DELETE FROM analysis WHERE project = :project;
             """
 
-            await self.connection.execute(_query, {'project': project_id})
+            await self.connection.execute(_query, {'project': project.id})
 
         return True
 

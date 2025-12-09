@@ -1889,4 +1889,23 @@
 			columnName="write_group_name"
 		/>
 	</changeSet>
+	<changeSet author="piyumi.amarasinghe" id="2025-10-29_add_status_column_cohort_table">
+        <sql>SET @@system_versioning_alter_history = 1;</sql>
+		<addColumn tableName="cohort">
+        <column name="status" type="ENUM('ACTIVE','ARCHIVED')" defaultValue="ACTIVE"  remarks="Cohort status">
+           <constraints nullable="false"/>
+        </column>
+		</addColumn>
+	</changeSet>
+    <!--START - update cohort status enum to lower case - https://cpg-populationanalysis.atlassian.net/browse/SET-856-->
+    <changeSet author="piyumi.amarasinghe" id="2025-11-28_change_cohort_status_to_lower_case">
+        <sql>
+            SET @@system_versioning_alter_history = 1;
+            UPDATE cohort SET status='active' WHERE status='ACTIVE';
+            UPDATE cohort SET status='archived' WHERE status='ARCHIVED';
+            ALTER TABLE cohort MODIFY COLUMN status ENUM('active','archived') NOT NULL default 'active' COMMENT 'Cohort status';
+        </sql>
+    </changeSet>
+    <!--END-->
+
 </databaseChangeLog>

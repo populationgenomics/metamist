@@ -46,6 +46,7 @@ from db.python.tables.participant import ParticipantFilter
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
 from models.enums import AnalysisStatus
+from models.enums.cohort import CohortStatus
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
     AnalysisInternal,
@@ -107,6 +108,7 @@ for enum in enum_tables.__dict__.values():
 GraphQLEnum = strawberry.type(type('GraphQLEnum', (object,), enum_methods))
 
 GraphQLAnalysisStatus = strawberry.enum(AnalysisStatus)  # type: ignore
+GraphQLCohortStatus: type = strawberry.enum(CohortStatus)
 
 
 # Create cohort GraphQL model
@@ -118,6 +120,7 @@ class GraphQLCohort:
     name: str
     description: str
     author: str
+    status: GraphQLCohortStatus
 
     project_id: strawberry.Private[int]
 
@@ -129,6 +132,7 @@ class GraphQLCohort:
             description=internal.description,
             author=internal.author,
             project_id=internal.project,
+            status=internal.status,
         )
 
     @strawberry.field()
@@ -584,6 +588,7 @@ class GraphQLProject:
         author: GraphQLFilter[str] | None = None,
         template_id: GraphQLFilter[str] | None = None,
         timestamp: GraphQLFilter[datetime.datetime] | None = None,
+        status: GraphQLFilter[GraphQLCohortStatus] | None = None,
     ) -> list['GraphQLCohort']:
         connection = info.context['connection']
 
@@ -600,6 +605,7 @@ class GraphQLProject:
             ),
             timestamp=timestamp.to_internal_filter() if timestamp else None,
             project=GenericFilter(eq=root.id),
+            status=status.to_internal_filter() if status else None,
         )
 
         cohorts = await CohortLayer(connection).query(c_filter)
@@ -616,14 +622,14 @@ class GraphQLProject:
     @strawberry.field()
     async def sequencing_group_history(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLProject'
-    ) -> list['GraphQLSequencingGroupTypeByDate']:
+    ) -> list['GraphQLSequencingGroupsByDate']:
         loader = info.context['loaders'][
             LoaderKeys.SEQUENCING_GROUPS_COUNTS_FOR_PROJECT
         ]
 
         counts = await loader.load(root.id)
 
-        return GraphQLSequencingGroupTypeByDate.from_dict(counts)
+        return GraphQLSequencingGroupsByDate.from_dict(counts)
 
 
 @strawberry.type
@@ -1303,24 +1309,31 @@ class GraphQLViewer:
 
 
 @strawberry.type
-class GraphQLSequencingGroupTypeByDate:
+class GraphQLSequencingGroupsByDate:
     """
     GraphQL representation of the number of Sequencing Groups of a given type that exist at a given date.
     """
 
     date: datetime.date
     type: str
+    technology: str
     count: int
 
     @staticmethod
     def from_dict(date_type_count_map: dict[datetime.date, dict[str, int]]):
-        return [
-            GraphQLSequencingGroupTypeByDate(date=month, type=type, count=count)
-            for (month, type_counts) in sorted(
-                date_type_count_map.items(), key=lambda x: x[0]
-            )
-            for (type, count) in type_counts.items()
-        ]
+        entries: list[GraphQLSequencingGroupsByDate] = []
+        for month, type_counts in sorted(
+            date_type_count_map.items(), key=lambda x: x[0]
+        ):
+            for key, count in type_counts.items():
+                type, tech = key.split('|||')
+                entries.append(
+                    GraphQLSequencingGroupsByDate(
+                        date=month, type=type, technology=tech, count=count
+                    )
+                )
+
+        return entries
 
 
 @strawberry.type
@@ -1409,6 +1422,7 @@ class Query:  # entry point to graphql.
         name: GraphQLFilter[str] | None = None,
         author: GraphQLFilter[str] | None = None,
         template_id: GraphQLFilter[str] | None = None,
+        status: GraphQLFilter[GraphQLCohortStatus] | None = None,
     ) -> list[GraphQLCohort]:
         connection = info.context['connection']
         cohort_layer = CohortLayer(connection)
@@ -1437,6 +1451,7 @@ class Query:  # entry point to graphql.
                 if template_id
                 else None
             ),
+            status=status.to_internal_filter() if status else None,
         )
 
         cohorts = await cohort_layer.query(filter_)
