@@ -28,7 +28,7 @@ from db.python.tables.project import ProjectPermissionsTable
 from models.models.project import Project, ProjectId, ProjectMemberUpdate
 from test.testdb_container import TestDatabaseContainer
 
-TEST_PROJECT_NAME = 'test'
+TEST_PROJECT_NAME = 'test-test'
 
 # use this to determine where the db directory is relatively,
 # as pycharm runs in "test/" folder, and GH runs them in git root
@@ -194,7 +194,7 @@ class DbTest(unittest.TestCase):
                 cls.project_name = TEST_PROJECT_NAME
                 cls.project_id = await ppt.create_project(
                     project_name=cls.project_name,
-                    dataset_name=cls.project_name,
+                    dataset_name='test',
                     author=cls.author,
                 )
 
