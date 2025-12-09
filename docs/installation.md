@@ -27,10 +27,7 @@ Make sure [uv](https://docs.astral.sh/uv/getting-started/installation/) is local
 uv python install 3.11
 
 uv venv --seed
-uv sync --frozen --group dev
-
-# activate virtualenv
-source .venv/bin/activate
+uv sync
 ```
 
 ### Database setup
@@ -203,13 +200,6 @@ uv run regenerate_api.py
 ```
 
 If you have installed openapi generator using a different method you can set the `OPENAPI_COMMAND` environment variable to configure the command to use.
-
-
-Once the API is generated, you can install it by running:
-
-```bash
-uv pip install -e .
-```
 
 
 ### Starting the API

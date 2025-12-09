@@ -71,7 +71,7 @@ jobs:
           version: 0.8.22 #uv version
 
       - name: Setup build env
-        run: uv sync --group dev
+        run: uv sync
 
       - name: prepare-deployment
         run: |
