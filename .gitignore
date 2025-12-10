@@ -16,6 +16,7 @@ tmp/
 sample_metadata/*
 !metamist/
 metamist/*
+!metamist/pyproject.toml
 
 # We don't want to ignore the parser sub folder
 # since we do have sample_metadata/parsers that are not generated

@@ -1,7 +1,7 @@
 [project]
 name = "metamist"
 version = "7.11.2"
-requires-python = ">=3.10, <3.12" #for compatibility with cpg-flow
+requires-python = "==3.11.*"
 dependencies = [
     "backoff>=2.2.1",
     "cpg-utils>=5.1.0",
@@ -33,29 +33,6 @@ dependencies = [
     "strawberry-graphql[fastapi]==0.268.1",
     "uvicorn~=0.34.2"
 ]
-
-description = "Python API for interacting with the Sample API system"
-readme = "README.md"
-license-files = ["LICENSE"]
-keywords = ["bioinformatics"]
-classifiers = [
-    "Environment :: Console",
-    "Intended Audience :: Science/Research",
-    "Natural Language :: English",
-    "Operating System :: MacOS :: MacOS X",
-    "Operating System :: POSIX",
-    "Operating System :: Unix",
-    "Programming Language :: Python",
-    "Topic :: Scientific/Engineering",
-    "Topic :: Scientific/Engineering :: Bio-Informatics",
-]
-
-[project.urls]
-Homepage = "https://github.com/populationgenomics/metamist"
-
-[project.entry-points.metamist_parser]
-GenericMetadataParser = "metamist.parser.generic_metadata_parser:GenericMetadataParser"
-SampleFileMapParser = "metamist.parser.sample_file_map_parser:SampleFileMapParser"
 
 [tool.ruff]
 line-length = 88
@@ -141,17 +118,12 @@ dev = [
     "types-pymysql>=1.1.0.20241103",
     "pip-audit>=2.7.3",
     "strawberry-graphql[debug-server]==0.268.1",
-    "greenlet==3.1.1"
+    "greenlet==3.1.1",
+    "metamist"
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 
-
-[build-system]
-requires = ["setuptools>=42"]
-build-backend = "setuptools.build_meta"
-
-
-[tool.setuptools]
-packages = { find = { include = ["metamist", "metamist.*"] } }
+[tool.uv.sources]
+metamist = { workspace = true }

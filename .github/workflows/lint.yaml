@@ -40,7 +40,7 @@ jobs:
         run: |
           set -euxo pipefail
 
-          uv sync --only-dev
+          uv sync
 
       - name: 'install frontend deps'
         working-directory: ./web
@@ -66,7 +66,7 @@ jobs:
         run: |
           uv sync
           uv run regenerate_api.py
-          uv pip install .
+          cd metamist && uv pip install .
           mkdir .mypy_cache
 
       - name: pre-commit

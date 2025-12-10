@@ -112,7 +112,7 @@ jobs:
             .
 
       - name: Build python package
-        run: uv build --sdist
+        run: cd metamist && uv build --sdist
 
       - name: "push server image"
         run: |
@@ -134,5 +134,5 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: dist/
+          packages-dir: metamist/dist/
           skip-existing: true

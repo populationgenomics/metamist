@@ -73,7 +73,7 @@ jobs:
       - name: 'build deployable API'
         run: |
           uv run regenerate_api.py
-          uv pip install .
+          cd metamist && uv pip install .
 
       - name: 'Run unit tests'
         id: runtests
