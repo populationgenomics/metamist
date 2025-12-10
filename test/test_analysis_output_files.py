@@ -8,6 +8,7 @@ from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.assay import AssayLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
+from db.python.tables.project import ProjectPermissionsTable
 from models.enums import AnalysisStatus
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
@@ -305,3 +306,37 @@ class TestOutputFiles(DbIsolatedTest):
             analysis.outputs['cram']['secondary_files']['ext'],
             output_file_data['cram']['secondary_files']['ext'],  # type: ignore [index]
         )
+
+    @run_as_sync
+    async def test_project_deletion(self):
+        """Test ProjectPermissionsTable.delete_project_data's effect on analysis outputs and files"""
+
+        outputs = {
+            'cram': {
+                'basename': 'gs://fakegcs/file3.cram',
+                'secondary_files': {
+                    'meta': {'basename': 'gs://fakegcs/file3.cram.meta'},
+                    'ext': {'basename': 'gs://fakegcs/file3.cram.ext'},
+                },
+            },
+        }
+
+        await self.al.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[self.genome_sequencing_group_id],
+                meta={'sequencing_type': 'genome', 'size': 1024},
+                outputs=outputs,
+            )
+        )
+
+        self.assertEqual(await self.row_count('analysis_outputs'), 3)
+        self.assertEqual(await self.row_count('output_file'), 3)
+
+        pttable = ProjectPermissionsTable(self.connection)
+        project = self.project_id_map[self.project_id]
+        self.assertTrue(await pttable.delete_project_data(project))
+
+        self.assertEqual(await self.row_count('analysis_outputs'), 0)
+        self.assertEqual(await self.row_count('output_file'), 0)

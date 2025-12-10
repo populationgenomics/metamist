@@ -42,7 +42,7 @@ from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
     sequencing_group_id_transform_to_raw,
 )
-from test.testbase import DbIsolatedTest, run_as_sync
+from test.testbase import TEST_PROJECT_NAME, DbIsolatedTest, run_as_sync
 
 default_assay_meta = {
     'sequencing_type': 'genome',
@@ -339,7 +339,7 @@ def get_test_participant_2():
 
 
 SINGLE_PARTICIPANT_SUMMARY_RESULT = ProjectSummaryInternal(
-    project=WebProject(id=1, name='test', meta={}, dataset='test'),
+    project=WebProject(id=1, name=TEST_PROJECT_NAME, meta={}, dataset='test'),
     total_samples=1,
     total_participants=1,
     total_sequencing_groups=1,
@@ -407,7 +407,7 @@ class TestWeb(DbIsolatedTest):
 
         # Expect an empty project
         expected = ProjectSummaryInternal(
-            project=WebProject(id=1, name='test', meta={}, dataset='test'),
+            project=WebProject(id=1, name=self.project_name, meta={}, dataset='test'),
             total_samples=0,
             total_participants=0,
             total_sequencing_groups=0,
@@ -548,7 +548,7 @@ class TestWeb(DbIsolatedTest):
         )
 
         expected_summary = ProjectSummaryInternal(
-            project=WebProject(id=1, name='test', meta={}, dataset='test'),
+            project=WebProject(id=1, name=self.project_name, meta={}, dataset='test'),
             total_samples=2,
             total_participants=2,
             total_sequencing_groups=2,
