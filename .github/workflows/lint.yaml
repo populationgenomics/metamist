@@ -66,7 +66,11 @@ jobs:
         run: |
           uv sync
           uv run regenerate_api.py
-          cd metamist && uv pip install .
+          # test package installation
+          cd metamist
+          uv venv .test-venv
+          source .test-venv/bin/activate
+          uv pip install .
           mkdir .mypy_cache
 
       - name: pre-commit
