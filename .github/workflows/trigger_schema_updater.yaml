@@ -43,7 +43,7 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
       - id: 'invoke-cloud-run'
-        name: 'Invoke Cloud Run'
+        name: 'Invoke Cloud Run for ${{ github.event.inputs.environment }}'
         env:
           ENVIRONMENT: ${{ github.event.inputs.environment }}
         run: |
