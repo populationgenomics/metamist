@@ -1,6 +1,6 @@
 [project]
 name = "metamist"
-version = "7.11.2"
+version = "7.13.3"
 requires-python = ">=3.10, <3.12" #for compatibility with cpg-flow
 dependencies = [
     "backoff>=2.2.1",

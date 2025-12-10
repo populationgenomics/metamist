@@ -1,6 +1,6 @@
 [project]
-name = "metamist"
-version = "7.11.2"
+name = "metamist-root"
+version = "7.13.3"
 requires-python = "==3.11.*"
 dependencies = [
     "backoff>=2.2.1",
@@ -125,6 +125,11 @@ dev = [
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 
+[tool.uv]
+package = false
+
 [tool.uv.sources]
 metamist = { workspace = true }
 
+[tool.uv.workspace]
+members = ["metamist"]

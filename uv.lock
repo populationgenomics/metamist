@@ -2,6 +2,12 @@ version = 1
 revision = 3
 requires-python = "==3.11.*"
 
+[manifest]
+members = [
+    "metamist",
+    "metamist-root",
+]
+
 [[package]]
 name = "aiohappyeyeballs"
 version = "2.6.1"
@@ -1301,7 +1307,38 @@ wheels = [
 
 [[package]]
 name = "metamist"
-version = "7.11.2"
+version = "7.13.3"
+source = { editable = "metamist" }
+dependencies = [
+    { name = "backoff" },
+    { name = "click" },
+    { name = "cpg-utils" },
+    { name = "google-api-core", extra = ["grpc"] },
+    { name = "google-auth" },
+    { name = "gql", extra = ["aiohttp", "requests"] },
+    { name = "python-dateutil" },
+    { name = "requests" },
+    { name = "tabulate" },
+    { name = "urllib3" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "backoff", specifier = ">=2.2.1" },
+    { name = "click", specifier = ">=8.1.8" },
+    { name = "cpg-utils", specifier = ">=5.1.0" },
+    { name = "google-api-core", extras = ["grpc"], specifier = "==2.24.0" },
+    { name = "google-auth", specifier = ">=2.19.0" },
+    { name = "gql", extras = ["aiohttp", "requests"], specifier = "~=3.5" },
+    { name = "python-dateutil", specifier = "==2.8.2" },
+    { name = "requests", specifier = "~=2.32.4" },
+    { name = "tabulate", specifier = ">=0.9.0" },
+    { name = "urllib3", specifier = ">=1.25.3" },
+]
+
+[[package]]
+name = "metamist-root"
+version = "7.13.3"
 source = { virtual = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -1401,7 +1438,7 @@ dev = [
     { name = "flake8-bugbear", specifier = ">=24.12.12" },
     { name = "functions-framework", specifier = ">=3.8.2" },
     { name = "greenlet", specifier = "==3.1.1" },
-    { name = "metamist", virtual = "." },
+    { name = "metamist", editable = "metamist" },
     { name = "nest-asyncio", specifier = ">=1.6.0" },
     { name = "openapi-generator-cli", specifier = "==5.3.0" },
     { name = "pip-audit", specifier = ">=2.7.3" },
