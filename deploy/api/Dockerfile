@@ -18,11 +18,10 @@ RUN groupadd -r appuser && useradd -r -g appuser -d /home/appuser -m -s /bin/bas
 # Set the working directory
 WORKDIR /app/sample_metadata/
 
-# Copy toml file and uv lock
-COPY pyproject.toml uv.lock ./
-
 RUN --mount=type=cache,target=/root/.cache/uv \
-uv sync --frozen --no-dev --no-install-project
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-dev --no-install-project
 
 # Copy the application code
 COPY api api
