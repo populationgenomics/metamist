@@ -25,7 +25,6 @@ from google.cloud import storage
 
 from cpg_utils.config import image_path
 from cpg_utils.hail_batch import get_batch
-
 from metamist.apis import AnalysisApi, FamilyApi, ParticipantApi, SampleApi
 from metamist.graphql import gql, query
 from metamist.models import (
@@ -908,7 +907,7 @@ def transfer_participants(
     external_to_internal_participant_id_map: dict[str, int] = {}
 
     for participant in upserted_participants:
-        for external_id in participant['externalIds'].values():
+        for external_id in participant['external_ids'].values():
             external_to_internal_participant_id_map[external_id] = participant['id']
 
     return external_to_internal_participant_id_map
