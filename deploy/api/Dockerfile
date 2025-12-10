@@ -8,16 +8,21 @@ ENV SM_ENVIRONMENT=${SM_ENVIRONMENT}
 # Allow statements and log messages to immediately appear in the Knative logs.
 ENV PYTHONUNBUFFERED=1
 
+ENV UV_COMPILE_BYTECODE=1
+
+ENV UV_LINK_MODE=copy
+
 # Create a non-root user and group
 RUN groupadd -r appuser && useradd -r -g appuser -d /home/appuser -m -s /bin/bash appuser
 
 # Set the working directory
 WORKDIR /app/sample_metadata/
 
-# Copy requirements file and install dependencies
-COPY pyproject.toml uv.lock /app/sample_metadata/
+# Copy toml file and uv lock
+COPY pyproject.toml uv.lock ./
 
-RUN uv sync --frozen --no-dev --no-install-project
+RUN --mount=type=cache,target=/root/.cache/uv \
+uv sync --frozen --no-dev --no-install-project
 
 # Copy the application code
 COPY api api
