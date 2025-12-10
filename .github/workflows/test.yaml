@@ -26,15 +26,15 @@ jobs:
       run:
         shell: bash -eo pipefail -l {0}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: 'temurin' # See 'Supported distributions' for available options
           java-version: '17'
@@ -84,13 +84,13 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: 'Save coverage report as an Artifact'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-report
           path: ./coverage.xml
 
       - name: 'Save execution report as an Artifact'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: execution-report
           path: ./test-execution.xml
@@ -111,7 +111,7 @@ jobs:
 
       - name: Fail if unit tests are not passing
         if: ${{ steps.runtests.outputs.rc != 0}}
-        uses: actions/github-script@v6
+        uses: actions/github-script@v8
         env:
           rc: ${{ steps.runtests.outputs.rc }}
         with:
@@ -120,7 +120,7 @@ jobs:
 
       - name: Fail if web build fails
         if: ${{ steps.buildweb.outputs.web_rc != 0}}
-        uses: actions/github-script@v6
+        uses: actions/github-script@v8
         env:
           web_rc: ${{ steps.buildweb.outputs.web_rc }}
         with:
@@ -134,14 +134,14 @@ jobs:
     environment: production
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
           persist-credentials: false
 
       # Download the coverage report artifact
       - name: 'Download coverage and execution report'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           pattern: '*-report'
 
