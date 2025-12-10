@@ -20,7 +20,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
 
@@ -33,14 +33,14 @@ jobs:
 
       - id: 'google-cloud-auth'
         name: 'Authenticate to Google Cloud'
-        uses: 'google-github-actions/auth@v2'
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: 'projects/774248915715/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
           service_account: 'sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com'
 
       - id: 'google-cloud-sdk-setup'
         name: 'Set up Cloud SDK'
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v3
 
       - id: 'invoke-cloud-run'
         name: 'Invoke Cloud Run for ${{ github.event.inputs.environment }}'
