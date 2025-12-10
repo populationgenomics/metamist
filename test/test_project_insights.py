@@ -96,7 +96,7 @@ class TestProjectInsights(DbIsolatedTest):
         expected = [
             ProjectInsightsSummaryInternal(
                 project=self.project_id,
-                dataset='test',
+                dataset=self.project_name,  # for ProjectInsights, dataset is project.name
                 sequencing_type='genome',
                 sequencing_technology='short-read',
                 total_families=0,
