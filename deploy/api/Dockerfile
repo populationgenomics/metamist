@@ -17,7 +17,7 @@ WORKDIR /app/sample_metadata/
 # Copy requirements file and install dependencies
 COPY pyproject.toml uv.lock /app/sample_metadata/
 
-RUN uv sync --frozen --no-install-project
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy the application code
 COPY api api
