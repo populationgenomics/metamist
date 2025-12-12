@@ -67,7 +67,7 @@ jobs:
           uv sync
           uv run regenerate_api.py
           # test package installation
-          pushd pushd packages/metamist
+          pushd packages/metamist
           uv venv .test-venv
           source .test-venv/bin/activate
           uv pip install .
