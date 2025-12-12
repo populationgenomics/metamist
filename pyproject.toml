@@ -132,4 +132,4 @@ package = false
 metamist = { workspace = true }
 
 [tool.uv.workspace]
-members = ["metamist"]
+members = ["packages/metamist"]

@@ -19,7 +19,7 @@ cd metamist
 
 ### Install python requirements
 
-Make sure [uv](https://docs.astral.sh/uv/getting-started/installation/) is locally installed. Since Metamist currently is deployed with python 3.11, you should also use 3.11 locally to ensure that any changes you make are compatible with the deployed version of Metamist.
+Make sure [uv](https://docs.astral.sh/uv/getting-started/installation/) is locally installed.
 
 
 ```bash

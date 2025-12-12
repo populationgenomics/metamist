@@ -74,10 +74,11 @@ jobs:
         run: |
           uv run regenerate_api.py
           # test package installation
-          cd metamist
+          pushd packages/metamist
           uv venv .test-venv
           source .test-venv/bin/activate
           uv pip install .
+          popd
 
       - name: 'Run unit tests'
         id: runtests

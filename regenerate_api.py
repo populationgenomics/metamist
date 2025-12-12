@@ -15,13 +15,15 @@ from api.utils.openapi import get_openapi_3_0_schema
 
 OPENAPI_COMMAND = os.getenv('OPENAPI_COMMAND', 'openapi-generator-cli').split(' ')
 MODULE_NAME = 'metamist'
+MODULE_REL_PATH = 'packages/metamist/src/metamist'
+MODULE_PARENT_REL_PATH = 'packages/metamist/'
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = 'web/src/static'
 OUTPUT_DOCS_DIR = os.path.join(STATIC_DIR, 'sm_docs')
-MODULE_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), MODULE_NAME)
+MODULE_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), MODULE_REL_PATH)
 
 
 def _get_openapi_version():
@@ -288,6 +290,15 @@ def main():
     shutil.copy(
         'README.md',
         os.path.join(OUTPUT_DOCS_DIR, 'index.md'),
+    )
+
+    shutil.copy(
+        'LICENSE',
+        os.path.join(MODULE_PARENT_REL_PATH, 'LICENSE'),
+    )
+    shutil.copy(
+        'README.md',
+        os.path.join(MODULE_PARENT_REL_PATH, 'README.md'),
     )
 
 
