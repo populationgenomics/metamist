@@ -199,6 +199,7 @@ uv run regenerate_api.py
 
 If you have installed openapi generator using a different method you can set the `OPENAPI_COMMAND` environment variable to configure the command to use.
 
+The API will be generated in the directory `packages/metamist/src/metamist` and you can build the API for packaging using the `pyproject.toml` file in the `packages/metamist/` directory.
 
 ### Starting the API
 

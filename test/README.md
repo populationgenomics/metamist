@@ -12,7 +12,7 @@ wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.0.3/m
 If you have these installed, you can run the tests on the terminal with:
 
 ```shell
-uv run python -m unittest discover -s test/
+uv run -m unittest discover -s test/
 ```
 
 Otherwise, in VSCode:
