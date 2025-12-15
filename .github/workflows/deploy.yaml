@@ -35,30 +35,30 @@ jobs:
       run:
         shell: bash -eo pipefail -l {0}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
 
       - id: "google-cloud-auth"
         name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@v2"
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: "projects/774248915715/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
           service_account: "sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com"
 
       - id: "google-cloud-sdk-setup"
         name: "Set up Cloud SDK"
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v3
 
       - name: "gcloud docker auth"
         run: |
           gcloud auth configure-docker australia-southeast1-docker.pkg.dev
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: "temurin" # See 'Supported distributions' for available options
           java-version: "17"
