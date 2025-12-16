@@ -226,16 +226,48 @@ class ProjectPermissionsTable:
 
         await self.connection.execute(_query, fields)
 
-    async def delete_project_data(self, project_id: int, delete_project: bool) -> bool:
+    async def delete_project_data(self, project: Project) -> bool:
         """
         Delete data in metamist project, requires project_creator_permissions
         """
-        if delete_project:
-            # stop allowing delete project with analysis-runner entries
-            raise ValueError('2024-03-08: delete_project is no longer allowed')
+        if not project.is_test_project:
+            raise ValueError('2025-12-04: refusing to delete non-test project')
 
         async with self.connection.transaction():
             _query = """
+DELETE FROM comment WHERE id IN (
+    SELECT ac.comment_id FROM assay_comment ac
+    INNER JOIN assay a ON ac.assay_id = a.id
+    INNER JOIN sample s ON a.sample_id = s.id
+    WHERE s.project = :project
+
+    UNION
+    SELECT fc.comment_id FROM family_comment fc
+    INNER JOIN family f ON fc.family_id = f.id
+    WHERE f.project = :project
+
+    UNION
+    SELECT pc.comment_id FROM participant_comment pc
+    INNER JOIN participant p ON pc.participant_id = p.id
+    WHERE p.project = :project
+
+    UNION
+    SELECT comment_id FROM project_comment
+    WHERE project_id = :project
+
+    UNION
+    SELECT sc.comment_id FROM sample_comment sc
+    INNER JOIN sample s ON sc.sample_id = s.id
+    WHERE s.project = :project
+
+    UNION
+    SELECT sgc.comment_id FROM sequencing_group_comment sgc
+    INNER JOIN sequencing_group sg ON sgc.sequencing_group_id = sg.id
+    INNER JOIN sample s ON sg.sample_id = s.id
+    WHERE s.project = :project
+);
+-- Deletion from `comment` cascades to the various `*_comment` tables
+DELETE FROM project_member WHERE project_id = :project;
 DELETE FROM participant_phenotypes where participant_id IN (
     SELECT id FROM participant WHERE project = :project
 );
@@ -262,12 +294,26 @@ DELETE FROM analysis_sample WHERE sample_id in (
     SELECT s.id FROM sample s
     WHERE s.project = :project
 );
+DELETE FROM output_file WHERE id IN (
+    SELECT file_id FROM analysis_outputs ao
+    INNER JOIN analysis a ON ao.analysis_id = a.id
+    WHERE a.project = :project
+);
+-- Deletion from `output_file` cascades to `analysis_outputs`
 DELETE FROM analysis_sequencing_group WHERE analysis_id in (
     SELECT id FROM analysis WHERE project = :project
 );
 DELETE FROM analysis_sample WHERE analysis_id in (
     SELECT id FROM analysis WHERE project = :project
 );
+DELETE FROM analysis_cohort WHERE cohort_id IN (
+    SELECT id FROM cohort WHERE project = :project
+);
+DELETE FROM cohort_sequencing_group WHERE cohort_id IN (
+    SELECT id FROM cohort WHERE project = :project
+);
+DELETE FROM cohort_template WHERE project = :project;
+DELETE FROM cohort WHERE project = :project;
 DELETE FROM assay WHERE sample_id in (SELECT id FROM sample WHERE project = :project);
 DELETE FROM sequencing_group WHERE sample_id IN (
     SELECT id FROM sample WHERE project = :project
@@ -277,7 +323,7 @@ DELETE FROM participant WHERE project = :project;
 DELETE FROM analysis WHERE project = :project;
             """
 
-            await self.connection.execute(_query, {'project': project_id})
+            await self.connection.execute(_query, {'project': project.id})
 
         return True
 

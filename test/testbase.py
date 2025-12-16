@@ -28,7 +28,7 @@ from db.python.tables.project import ProjectPermissionsTable
 from models.models.project import Project, ProjectId, ProjectMemberUpdate
 from test.testdb_container import TestDatabaseContainer
 
-TEST_PROJECT_NAME = 'test'
+TEST_PROJECT_NAME = 'test-test'
 
 # use this to determine where the db directory is relatively,
 # as pycharm runs in "test/" folder, and GH runs them in git root
@@ -194,7 +194,7 @@ class DbTest(unittest.TestCase):
                 cls.project_name = TEST_PROJECT_NAME
                 cls.project_id = await ppt.create_project(
                     project_name=cls.project_name,
-                    dataset_name=cls.project_name,
+                    dataset_name='test',
                     author=cls.author,
                 )
 
@@ -285,6 +285,11 @@ class DbTest(unittest.TestCase):
             project='test',
             client_options={'api_endpoint': 'http://localhost:4443'},
         )
+
+    async def row_count(self, table: str) -> int:
+        """Return the number of rows in the specified table (via raw SQL)"""
+        query = f'SELECT COUNT(*) FROM {table}'
+        return await self.connection.connection.fetch_val(query)
 
     @run_as_sync
     async def run_graphql_query(self, query, variables=None):
