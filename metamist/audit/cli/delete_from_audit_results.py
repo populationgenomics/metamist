@@ -32,8 +32,8 @@ def main(
 
     Deleting files will create or update an analysis record of type 'audit_deletions'.
     """
-    delete_orchestrator = AuditDeleteOrchestrator(dataset, results_folder, report_name)
-    delete_orchestrator.delete_from_audit_results(dry_run=dry_run)
+    orchestrator = AuditDeleteOrchestrator(dataset, results_folder, report_name)
+    orchestrator.delete_from_audit_results(dry_run=dry_run)
 
 
 if __name__ == '__main__':
