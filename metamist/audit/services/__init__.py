@@ -25,4 +25,7 @@ __all__ = [
     'AuditAnalyzer',
     'Reporter',
     'BucketAuditLogger',
+    'AuditOrchestrator',
+    'AuditReviewOrchestrator',
+    'AuditDeleteOrchestrator',
 ]
