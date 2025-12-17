@@ -1293,6 +1293,8 @@ class TestMutations(DbIsolatedTest):
 class TestCohortMutations(DbIsolatedTest):
     """Test class for new cohort mutations"""
 
+    # pylint: disable=too-many-instance-attributes
+
     @run_as_sync
     async def setUp(self) -> None:
         super().setUp()
@@ -1404,7 +1406,10 @@ class TestCohortMutations(DbIsolatedTest):
                         'description': 'Create cohort with an archived sequencing group',
                     },
                     'cohortCriteria': {
-                        'sgIdsInternal': [self.genome_sequencing_group_id_external_1],
+                        'sgIdsInternal': [
+                            self.genome_sequencing_group_id_external_1,
+                            self.genome_sequencing_group_id_external_2,
+                        ],
                     },
                 },
             )
@@ -1416,7 +1421,10 @@ class TestCohortMutations(DbIsolatedTest):
                 description='Create cohort with an archived sequencing group',
                 dry_run=False,
                 cohort_criteria=CohortCriteriaInternal(
-                    sg_ids_internal_raw=[self.genome_sequencing_group_id_1]
+                    sg_ids_internal_raw=[
+                        self.genome_sequencing_group_id_1,
+                        self.genome_sequencing_group_id_2,
+                    ]
                 ),
             )
 

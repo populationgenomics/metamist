@@ -63,6 +63,13 @@ def get_sg_filter(
     return sg_filter
 
 
+def _is_valid_cohort_criteria_combination(cohort_criteria):
+    for name, value in vars(cohort_criteria).items():
+        if name != 'sg_ids_internal_raw' and (value is not None and value != []):
+            return False
+    return True
+
+
 class CohortLayer(BaseLayer):
     """Layer for cohort logic"""
 
@@ -141,11 +148,8 @@ class CohortLayer(BaseLayer):
         if not cohort_template.criteria.sg_ids_internal_raw:
             assert cohort_template.criteria.projects, 'Projects must be set in criteria'
         else:
-            for name, value in vars(cohort_template.criteria).items():
-                if name != 'sg_ids_internal_raw' and (
-                    value is not None and value != []
-                ):
-                    raise ValueError(self.COHORT_SG_CRITERIA_ERROR_MSG)
+            if not _is_valid_cohort_criteria_combination(cohort_template.criteria):
+                raise ValueError(self.COHORT_SG_CRITERIA_ERROR_MSG)
         assert cohort_template.id is None, 'Cohort template ID must be None'
 
         template_id = await self.ct.create_cohort_template(
@@ -203,15 +207,12 @@ class CohortLayer(BaseLayer):
         sg_ids_internal_raw = cohort_criteria.sg_ids_internal_raw
 
         if sg_ids_internal_raw:
-            for name, value in vars(cohort_criteria).items():
-                if name != 'sg_ids_internal_raw' and (
-                    value is not None and value != []
-                ):
-                    if template_id:
-                        raise ValueError(
-                            f'Invalid template. {self.COHORT_SG_CRITERIA_ERROR_MSG}'
-                        )
-                    raise ValueError(self.COHORT_SG_CRITERIA_ERROR_MSG)
+            if not _is_valid_cohort_criteria_combination(cohort_criteria):
+                if template_id:
+                    raise ValueError(
+                        f'Invalid template. {self.COHORT_SG_CRITERIA_ERROR_MSG}'
+                    )
+                raise ValueError(self.COHORT_SG_CRITERIA_ERROR_MSG)
 
             projects = list(
                 await self.sglayer.get_projects_given_sg_ids(sg_ids_internal_raw)
@@ -259,9 +260,12 @@ class CohortLayer(BaseLayer):
                 )
 
             #  update cohort criteria with active sgs now
-            sg_ids = [sg.id for sg in sgs if sg.id] if sgs else []
+            sg_ids = (
+                [sg.id for sg in sgs if sg.id] if sgs else []
+            )  #  cohort template will contain active SGs
             cohort_criteria.sg_ids_internal_raw = sg_ids
-            create_cohort_template = True  #  create a new template with active sgs if the template contains inactive sgs
+            #  if create cohort given template_id, this creates a new template
+            create_cohort_template = True
 
         if dry_run:
             sg_ids = [sg.id for sg in sgs if sg.id] if sgs else []
