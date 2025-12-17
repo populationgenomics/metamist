@@ -7,6 +7,7 @@ from db.python.filters import GenericFilter
 from db.python.layers import CohortLayer, SampleLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.cohort import CohortFilter
+from db.python.utils import to_db_json
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
     SampleUpsertInternal,
@@ -534,6 +535,41 @@ class TestCohortData(DbIsolatedTest):
             ),
         )
         self.assertTrue(new_template)
+
+    @run_as_sync
+    async def test_create_cohort_from_template_with_sg_list_and_other_criteria(self):
+        """Test cohort creation from an invalid template having sg list with other criteria"""
+
+        _query = """
+            INSERT INTO cohort_template (name, description, criteria, project, audit_log_id)
+            VALUES (:name, :description, :criteria, :project, :audit_log_id) RETURNING id;
+            """
+        cohort_template_id = await self.connection.connection.fetch_val(
+            _query,
+            {
+                'name': 'Test template',
+                'description': 'Test description',
+                'criteria': to_db_json(
+                    dict(
+                        CohortCriteriaInternal(
+                            sg_ids_internal_raw=[self.sgA_raw],
+                            projects=[self.project_id],
+                        )
+                    )
+                ),
+                'project': self.project_id,
+                'audit_log_id': await self.audit_log_id(),
+            },
+        )
+
+        with self.assertRaises(ValueError):
+            await self.cohortl.create_cohort_from_criteria(
+                project_to_write=self.project_id,
+                description='Test description',
+                cohort_name='Test cohort',
+                dry_run=False,
+                template_id=cohort_template_id,
+            )
 
     @run_as_sync
     async def test_query_cohort(self):

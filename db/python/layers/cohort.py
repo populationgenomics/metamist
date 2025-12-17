@@ -142,7 +142,7 @@ class CohortLayer(BaseLayer):
                     value is not None and value != []
                 ):
                     raise ValueError(
-                        'Other criteria not supported with sequencing group ids provided as criteria'
+                        'Other criteria not supported if sequencing group ids provided as a criterion'
                     )
         assert cohort_template.id is None, 'Cohort template ID must be None'
 
@@ -163,6 +163,7 @@ class CohortLayer(BaseLayer):
         dry_run: bool,
         cohort_criteria: CohortCriteriaInternal | None = None,
         template_id: int | None = None,
+        exclude_archived_sg_ids_internal: bool = False,
     ) -> NewCohortInternal:
         """
         Create a new cohort from the given parameters. Returns the newly created cohort_id.
@@ -204,9 +205,14 @@ class CohortLayer(BaseLayer):
                 if name != 'sg_ids_internal_raw' and (
                     value is not None and value != []
                 ):
-                    raise ValueError(
-                        'Other criteria not supported with sequencing group ids provided as criteria'
-                    )
+                    if template_id:
+                        raise ValueError(
+                            'Invalid template. Other criteria not supported if sequencing group ids provided as a criterion'
+                        )
+                    else:
+                        raise ValueError(
+                            'Other criteria not supported if sequencing group ids provided as a criterion'
+                        )
 
         sample_ids: list[int] = []
         if cohort_criteria.sample_type:
@@ -247,10 +253,17 @@ class CohortLayer(BaseLayer):
             )
 
         if sg_ids_internal_raw and len(sgs) != len(sg_ids_internal_raw):
-            # if any sgs are archived or any sgs are invalid (if by-pass previous checks)
-            raise ValueError(
-                'Includes archived/invalid sequencing groups. Please check input sequencing groups and try again'
-            )
+            # if any sgs in the criteria list archived and exclude_archived_sg_ids_internal not set
+            if not exclude_archived_sg_ids_internal:
+                raise ValueError(
+                    'Contains invalid sequencing groups. Please review the input sequencing groups, '
+                    'or set exclude_archived_sg_ids_internal=true to skip invalid entries and continue cohort creation'
+                )
+            else:
+                #  update cohort criteria with active sgs now
+                sg_ids = [sg.id for sg in sgs if sg.id] if sgs else []
+                cohort_criteria.sg_ids_internal_raw = sg_ids
+                create_cohort_template = True  #  create a new template with active sgs if the template contains inactive sgs
 
         if dry_run:
             sg_ids = [sg.id for sg in sgs if sg.id] if sgs else []
