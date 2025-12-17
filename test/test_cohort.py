@@ -264,13 +264,13 @@ class TestCohortData(DbIsolatedTest):
 
     @run_as_sync
     async def test_create_cohort_by_sgs_fails_when_invalid_sg(self):
-        """Create cohort by selecting sequencing groups with an invalid sg in the list"""
+        """Create cohort with an invalid sg in the list"""
         random_sg_id = max(self.sgA_raw, self.sgB_raw, self.sgC_raw) + randint(1, 100)
         with self.assertRaises(ValueError):
             await self.cohortl.create_cohort_from_criteria(
                 project_to_write=self.project_id,
-                description='Cohort with 1 SG',
-                cohort_name='SG cohort 1',
+                description='Cohort with invalid SG',
+                cohort_name='Test Cohort',
                 dry_run=False,
                 cohort_criteria=CohortCriteriaInternal(
                     sg_ids_internal_raw=[random_sg_id, self.sgB_raw],
@@ -278,9 +278,9 @@ class TestCohortData(DbIsolatedTest):
             )
 
     @run_as_sync
-    async def test_create_cohort_by_sgs_fails_when_no_projects(self):
-        """Create cohort with invalid list of sequencing group ids"""
-        random_sg_id = max(self.sgA_raw, self.sgB_raw, self.sgC_raw) + randint(1, 100)
+    async def test_create_cohort_from_sgs_fails_when_no_projects(self):
+        """Create cohort from a list of invalid sequencing group ids (without projects)"""
+        random_sg_id_1 = max(self.sgA_raw, self.sgB_raw, self.sgC_raw) + randint(1, 100)
         with self.assertRaises(ValueError):
             await self.cohortl.create_cohort_from_criteria(
                 project_to_write=self.project_id,
@@ -288,7 +288,7 @@ class TestCohortData(DbIsolatedTest):
                 cohort_name='SG cohort 1',
                 dry_run=False,
                 cohort_criteria=CohortCriteriaInternal(
-                    sg_ids_internal_raw=[random_sg_id],
+                    sg_ids_internal_raw=[random_sg_id_1, random_sg_id_1 + 1],
                 ),
             )
 
@@ -505,15 +505,14 @@ class TestCohortData(DbIsolatedTest):
 
     @run_as_sync
     async def test_create_template_fail_when_other_criteria_with_sg_list(self):
-        """Test with template creation fails when other criteria with sg list"""
-
+        """Test template creation fails when other criteria with sg list"""
         with self.assertRaises(ValueError):
             await self.cohortl.create_cohort_template(
                 project=self.project_id,
                 cohort_template=CohortTemplateInternal(
                     id=None,
                     name='Test template',
-                    description='A template from which cohorts are created',
+                    description='Template with sg criteria and other criteria',
                     criteria=CohortCriteriaInternal(
                         projects=[self.project_id], sg_ids_internal_raw=[self.sgB_raw]
                     ),
@@ -523,13 +522,13 @@ class TestCohortData(DbIsolatedTest):
 
     @run_as_sync
     async def test_create_template_with_sg_list(self):
-        """Test with template creation when sg list provided as criteria"""
+        """Test template creation when sg list provided as only criterion"""
         new_template = await self.cohortl.create_cohort_template(
             project=self.project_id,
             cohort_template=CohortTemplateInternal(
                 id=None,
                 name='Test template',
-                description='A template from which cohorts are created',
+                description='Template with sg criterion only',
                 criteria=CohortCriteriaInternal(sg_ids_internal_raw=[self.sgB_raw]),
                 project=self.project_id,
             ),
@@ -539,7 +538,7 @@ class TestCohortData(DbIsolatedTest):
     @run_as_sync
     async def test_create_cohort_from_template_with_sg_list_and_other_criteria(self):
         """Test cohort creation from an invalid template having sg list with other criteria"""
-
+        # create template directly in the db as this is not supported from API
         _query = """
             INSERT INTO cohort_template (name, description, criteria, project, audit_log_id)
             VALUES (:name, :description, :criteria, :project, :audit_log_id) RETURNING id;
@@ -550,12 +549,10 @@ class TestCohortData(DbIsolatedTest):
                 'name': 'Test template',
                 'description': 'Test description',
                 'criteria': to_db_json(
-                    dict(
-                        CohortCriteriaInternal(
-                            sg_ids_internal_raw=[self.sgA_raw],
-                            projects=[self.project_id],
-                        )
-                    )
+                    {
+                        'sg_ids_internal_raw': [self.sgA_raw],
+                        'projects': [self.project_id],
+                    }
                 ),
                 'project': self.project_id,
                 'audit_log_id': await self.audit_log_id(),

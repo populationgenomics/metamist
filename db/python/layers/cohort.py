@@ -66,6 +66,10 @@ def get_sg_filter(
 class CohortLayer(BaseLayer):
     """Layer for cohort logic"""
 
+    COHORT_SG_CRITERIA_ERROR_MSG = (
+        'Other criteria not supported if sequencing group ids provided as a criterion'
+    )
+
     def __init__(self, connection: Connection):
         super().__init__(connection)
 
@@ -141,9 +145,7 @@ class CohortLayer(BaseLayer):
                 if name != 'sg_ids_internal_raw' and (
                     value is not None and value != []
                 ):
-                    raise ValueError(
-                        'Other criteria not supported if sequencing group ids provided as a criterion'
-                    )
+                    raise ValueError(self.COHORT_SG_CRITERIA_ERROR_MSG)
         assert cohort_template.id is None, 'Cohort template ID must be None'
 
         template_id = await self.ct.create_cohort_template(
@@ -207,17 +209,21 @@ class CohortLayer(BaseLayer):
                 ):
                     if template_id:
                         raise ValueError(
-                            'Invalid template. Other criteria not supported if sequencing group ids provided as a criterion'
+                            f'Invalid template. {self.COHORT_SG_CRITERIA_ERROR_MSG}'
                         )
-                    raise ValueError(
-                        'Other criteria not supported if sequencing group ids provided as a criterion'
-                    )
+                    raise ValueError(self.COHORT_SG_CRITERIA_ERROR_MSG)
+
+            projects = list(
+                await self.sglayer.get_projects_given_sg_ids(sg_ids_internal_raw)
+            )
+        else:
+            projects = cohort_criteria.projects
 
         sample_ids: list[int] = []
         if cohort_criteria.sample_type:
             # Get sample IDs with sample type
             sample_filter = SampleFilter(
-                project=GenericFilter(in_=cohort_criteria.projects),
+                project=GenericFilter(in_=projects),
                 type=(
                     GenericFilter(in_=cohort_criteria.sample_type)
                     if cohort_criteria.sample_type
@@ -227,13 +233,6 @@ class CohortLayer(BaseLayer):
 
             _, samples = await self.sampt.query(sample_filter)
             sample_ids = [s.id for s in samples]
-
-        if sg_ids_internal_raw:
-            projects = list(
-                await self.sglayer.get_projects_given_sg_ids(sg_ids_internal_raw)
-            )
-        else:
-            projects = cohort_criteria.projects
 
         sg_filter = get_sg_filter(
             projects=projects,
@@ -256,7 +255,7 @@ class CohortLayer(BaseLayer):
             if not exclude_archived_sg_ids_internal:
                 raise ValueError(
                     'Contains invalid sequencing groups. Please review the input sequencing groups, '
-                    'or set exclude_archived_sg_ids_internal=true to skip invalid entries and continue cohort creation'
+                    'or exclude archived sg_ids to skip invalid entries and continue cohort creation'
                 )
 
             #  update cohort criteria with active sgs now
