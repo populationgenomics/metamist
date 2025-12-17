@@ -209,10 +209,9 @@ class CohortLayer(BaseLayer):
                         raise ValueError(
                             'Invalid template. Other criteria not supported if sequencing group ids provided as a criterion'
                         )
-                    else:
-                        raise ValueError(
-                            'Other criteria not supported if sequencing group ids provided as a criterion'
-                        )
+                    raise ValueError(
+                        'Other criteria not supported if sequencing group ids provided as a criterion'
+                    )
 
         sample_ids: list[int] = []
         if cohort_criteria.sample_type:
@@ -259,11 +258,11 @@ class CohortLayer(BaseLayer):
                     'Contains invalid sequencing groups. Please review the input sequencing groups, '
                     'or set exclude_archived_sg_ids_internal=true to skip invalid entries and continue cohort creation'
                 )
-            else:
-                #  update cohort criteria with active sgs now
-                sg_ids = [sg.id for sg in sgs if sg.id] if sgs else []
-                cohort_criteria.sg_ids_internal_raw = sg_ids
-                create_cohort_template = True  #  create a new template with active sgs if the template contains inactive sgs
+
+            #  update cohort criteria with active sgs now
+            sg_ids = [sg.id for sg in sgs if sg.id] if sgs else []
+            cohort_criteria.sg_ids_internal_raw = sg_ids
+            create_cohort_template = True  #  create a new template with active sgs if the template contains inactive sgs
 
         if dry_run:
             sg_ids = [sg.id for sg in sgs if sg.id] if sgs else []
