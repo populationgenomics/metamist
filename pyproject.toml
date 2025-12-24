@@ -133,10 +133,3 @@ metamist = { workspace = true }
 
 [tool.uv.workspace]
 members = ["packages/metamist"]
-
-[tool.bump-my-version]
-commit = true
-tag = false
-
-[tool.bump-my-version.hooks.post]
-command = "uv lock"
