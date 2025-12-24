@@ -113,7 +113,7 @@ jobs:
 
       - name: Build python package
         run: |
-          pushd packages/metamist/dist
+          pushd packages/metamist
           uv build --sdist --out-dir dist
           popd
 
