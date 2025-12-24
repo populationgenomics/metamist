@@ -81,9 +81,9 @@ jobs:
           else
             echo DEPLOYMENT_TYPE=dev >> $GITHUB_ENV
             echo SM_ENVIRONMENT=development >> $GITHUB_ENV
-            uv pip install bump2version
+            uv pip install bump-my-version
             # add
-            bump2version patch \
+            uv run bump-my-version bump patch \
               --no-commit --allow-dirty \
               --new-version $(cat deploy/python/version.txt).dev+$(echo $(git rev-parse HEAD) | cut -c1-7)
           fi
