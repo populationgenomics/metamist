@@ -1,0 +1,35 @@
+[tool.bumpversion]
+current_version = "7.13.3"
+commit = true
+tag = false
+parse = '(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)(?:[-_\.]?(?P<dev>dev\d*))?(?:\+(?P<local>[a-z0-9]+))?'
+serialize = [
+    "{major}.{minor}.{patch}.{dev}+{local}",
+    "{major}.{minor}.{patch}"
+]
+
+[[tool.bumpversion.files]]
+filename = "api/server.py"
+search = "_VERSION = '{current_version}'"
+replace = "_VERSION = '{new_version}'"
+
+[[tool.bumpversion.files]]
+filename = "deploy/python/version.txt"
+search = "{current_version}"
+replace = "{new_version}"
+
+[[tool.bumpversion.files]]
+filename = "web/package.json"
+search = '"version": "{current_version}",'
+replace = '"version": "{new_version}",'
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "packages/metamist/pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
