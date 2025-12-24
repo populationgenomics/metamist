@@ -8,6 +8,11 @@ serialize = [
     "{major}.{minor}.{patch}"
 ]
 
+post_setup_hooks = [
+    "uv lock",
+    "git add uv.lock"
+]
+
 [[tool.bumpversion.files]]
 filename = "api/server.py"
 search = "_VERSION = '{current_version}'"
