@@ -2,7 +2,7 @@
 current_version = "7.13.3"
 commit = true
 tag = false
-post_setup_hooks = [
+pre_commit_hooks = [
     "uv lock",
     "git add uv.lock"
 ]
