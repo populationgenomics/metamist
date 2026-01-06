@@ -17,7 +17,7 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: '${{ github.action_path }}/scripts/package.json'
+          cache-dependency-path: './.github/scripts/package.json'
           
       - name: Install dependencies
         run: |
@@ -26,4 +26,4 @@ jobs:
           
       - name: Run checklist bot
         id: run-bot
-        run: node ${{ github.action_path }}/scripts/create-checklist.js
+        run: node ./.github/scripts/create-checklist.js
