@@ -32,7 +32,8 @@ jobs:
               comment.user.login === 'github-actions[bot]'
             );
             
-            const checklist = `## PR Checklist
+            const checklist = `
+              ## PR Checklist ✅
               Have you checked the following?
               - [ ] Does not contain the names of any sensitive CPG projects
               - [ ] Version number is bumped appropriately if API is changed
