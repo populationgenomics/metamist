@@ -3,7 +3,7 @@ name: PR Checklist Bot
 on:
   pull_request:
     branches: 
-      - SET-800-Add-checklist-bot-to-metamist-PRs
+      - dev
 
 jobs:
   checklist:
