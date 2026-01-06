@@ -34,9 +34,9 @@ jobs:
             
             const checklist = `## PR Checklist
               Have you checked the following?
-              [ ] Does not contain the names of any sensitive CPG projects
-              [ ] Version number is bumped appropriately if API is changed
-              [ ] Tests cover any newly added code
+              - [ ] Does not contain the names of any sensitive CPG projects
+              - [ ] Version number is bumped appropriately if API is changed
+              - [ ] Tests cover any newly added code
 
               *Check all boxes before merging.*`;
 
