@@ -12,17 +12,13 @@ jobs:
       pull-requests: write
       contents: write
     steps:
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
         with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: './.github/scripts/package-lock.json'
-          
+          persist-credentials: false
+
       - name: Install dependencies
-        run: |
-          cd ./.github/scripts
-          npm ci --only=production
+        working-directory: ./.github/scripts
+        run: npm ci
           
       - name: Run checklist bot
         id: run-bot
