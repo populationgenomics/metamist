@@ -1,9 +1,10 @@
 name: PR Checklist Bot
 
 on:
-  pull_request:
-    branches: 
-      - dev
+  # pull_request:
+  #   branches: 
+  #     - dev
+  push
 
 jobs:
   checklist:
@@ -12,49 +13,18 @@ jobs:
       pull-requests: write
       contents: write
     steps:
-      - name: Post/Update Checklist
-        uses: actions/github-script@v6
-        id: checklist
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          script: |
-            const { owner, repo } = context.repo;
-            const prNumber = context.issue.number;
-            
-            // Look for existing checklist comment.
-            const comments = await github.rest.issues.listComments({
-              owner,
-              repo,
-              issue_number: prNumber
-            });
-            
-            const botComment = comments.data.find(comment => 
-              comment.body.includes('## PR Checklist') && 
-              comment.user.login === 'github-actions[bot]'
-            );
-            
-            const checklist = `
-              ## PR Checklist ✅
-              Have you checked the following?
-              - [ ] Does not contain the names of any sensitive CPG projects
-              - [ ] Version number is bumped appropriately if API is changed
-              - [ ] Tests cover any newly added code
-
-              *Check all boxes before merging.*`;
-
-            if (botComment) {
-              // Update existing comment.
-              await github.rest.issues.updateComment({
-                owner,
-                repo,
-                comment_id: botComment.id,
-                body: checklist
-              });
-            } else {
-              // Create new comment.
-              await github.rest.issues.createComment({
-                owner,
-                repo,
-                issue_number: prNumber,
-                body: checklist
-              });
-            }
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: '${{ github.action_path }}/scripts/package.json'
+          
+      - name: Install dependencies
+        run: |
+          cd ./.github/scripts
+          npm ci --only=production
+          
+      - name: Run checklist bot
+        id: run-bot
+        run: node ${{ github.action_path }}/scripts/create-checklist.js
