@@ -1,10 +1,9 @@
 name: PR Checklist Bot
 
 on:
-  # pull_request:
-  #   branches: 
-  #     - dev
-  push
+  push:
+    branches: 
+      - dev
 
 jobs:
   checklist:
