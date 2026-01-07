@@ -117,11 +117,13 @@ class AnalysisInternal(SMBase):
             if not basename_correct and 'path' in outputs:
                 basename_correct = re.match(OUTPUT_FILE_RE, outputs['path']) is not None
 
+            # Recursively search through secondary files if they are present.
             if basename_correct and 'secondary_files' in outputs:
                 return AnalysisInternal.recursive_search_protocol(outputs['secondary_files'])
             
             return basename_correct
         else:
+            # Recursively search through any multi-file or nested structures.
             correct_format = all([AnalysisInternal.recursive_search_protocol(nested) for nested in outputs.values()])
 
         return correct_format
