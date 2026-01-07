@@ -308,6 +308,38 @@ class TestOutputFiles(DbIsolatedTest):
         )
 
     @run_as_sync
+    async def test_outputs_format(self):
+        """Should test creating Analysis object with a dictionary as the outputs field"""
+
+        outputs = {
+            'cram': {
+                'filtered': {
+                    'basename': 'gs://fakegcs/file2.cram',
+                    'secondary_files': {
+                        'meta': {'basename': 'gs://fakegcs/file2.cram.meta'},
+                        'ext': {'basename': 'gs://fakegcs/file2.cram.ext'},
+                    },
+                },
+            },
+            'vcf': {
+                'basename': 'gs://fakegcs/file3.vcf',
+                'secondary_files': {
+                    'meta': {'basename': 'gs://fakegcs/file3.vcf.meta'},
+                    'ext': {'basename': 'gs://fakegcs/file3.vcf.ext'},
+                },
+            },
+        }
+
+        with self.assertRaises(ValueError):
+            new_analysis = AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[self.genome_sequencing_group_id],
+                meta={'sequencing_type': 'genome', 'size': 1024},
+                outputs=outputs,
+            )
+
+    @run_as_sync
     async def test_project_deletion(self):
         """Test ProjectPermissionsTable.delete_project_data's effect on analysis outputs and files"""
 
