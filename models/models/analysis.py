@@ -97,28 +97,30 @@ class AnalysisInternal(SMBase):
     
     @field_validator('outputs', mode='after')
     @classmethod
-    def check_outputs(cls, outputs: str | dict | None):
+    def check_outputs(cls, value: str | dict | None):
         """Checks that output file paths correctly contain a protocol"""
 
-        if isinstance(outputs, str) or outputs is None:
-            return outputs
+        if isinstance(value, str) or value is None:
+            return value
         
-        if not AnalysisInternal.recursive_search_protocol(outputs):
+        if not AnalysisInternal.recursive_search_protocol(value):
             raise ValueError('basenames in outputs must contain a protocol')
         
-        return outputs
+        return value
 
     @staticmethod
     def recursive_search_protocol(outputs: dict):
-        correct_format = False
-
         if 'basename' in outputs:
-            matched = re.match(OUTPUT_FILE_RE, outputs['basename']) is not None
+            basename_correct = re.match(OUTPUT_FILE_RE, outputs['basename']) is not None
+            # When creating from DB, the outputs field will be filly populated with file metadata,
+            # so the protocol will move to the 'path' key.
+            if not basename_correct and 'path' in outputs:
+                basename_correct = re.match(OUTPUT_FILE_RE, outputs['path']) is not None
 
-            if matched and 'secondary_files' in outputs:
+            if basename_correct and 'secondary_files' in outputs:
                 return AnalysisInternal.recursive_search_protocol(outputs['secondary_files'])
             
-            return matched
+            return basename_correct
         else:
             correct_format = all([AnalysisInternal.recursive_search_protocol(nested) for nested in outputs.values()])
 
