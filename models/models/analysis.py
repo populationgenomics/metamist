@@ -112,7 +112,7 @@ class AnalysisInternal(SMBase):
     def recursive_search_protocol(outputs: dict):
         if 'basename' in outputs:
             basename_correct = re.match(OUTPUT_FILE_RE, outputs['basename']) is not None
-            # When creating from DB with from_db, the outputs field will be filly populated with file metadata,
+            # When creating from DB with from_db, the outputs field will be fully populated with file metadata,
             # so the protocol will move to the 'path' key.
             if not basename_correct and 'path' in outputs:
                 basename_correct = re.match(OUTPUT_FILE_RE, outputs['path']) is not None
