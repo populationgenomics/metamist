@@ -308,8 +308,8 @@ class TestOutputFiles(DbIsolatedTest):
         )
 
     @run_as_sync
-    async def test_outputs_format(self):
-        """Should test creating Analysis object with a dictionary as the outputs field"""
+    async def test_outputs_contains_protocol(self):
+        """Tests validation of the outputs field so that file paths contain a protocol prefix"""
 
         outputs = {
             'cram': {
@@ -330,8 +330,22 @@ class TestOutputFiles(DbIsolatedTest):
             },
         }
 
+        # Check the base case of the validator passing a correctly formatted outputs field.
+        try:
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[self.genome_sequencing_group_id],
+                meta={'sequencing_type': 'genome', 'size': 1024},
+                outputs=outputs,
+            )
+        except ValueError:
+            self.fail()
+
+        # Make one of the file paths incorrectly formatted.
+        outputs['cram']['filtered']['secondary_files']['ext']['basename'] = 'fakegcs/file2.cram.ext'
         with self.assertRaises(ValueError):
-            new_analysis = AnalysisInternal(
+            AnalysisInternal(
                 type='cram',
                 status=AnalysisStatus.COMPLETED,
                 sequencing_group_ids=[self.genome_sequencing_group_id],
