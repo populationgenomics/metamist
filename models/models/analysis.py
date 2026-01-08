@@ -18,6 +18,7 @@ from models.utils.sequencing_group_id_format import (
 
 OUTPUT_FILE_RE = r'^(\w+:\/\/)'
 
+
 class AnalysisInternal(SMBase):
     """Model for Analysis"""
 
@@ -94,7 +95,7 @@ class AnalysisInternal(SMBase):
             meta=self.meta,
             author=self.author,
         )
-    
+
     @field_validator('outputs', mode='after')
     @classmethod
     def check_outputs(cls, value: str | dict | None):
@@ -102,10 +103,10 @@ class AnalysisInternal(SMBase):
 
         if isinstance(value, str) or value is None:
             return value
-        
+
         if not AnalysisInternal.recursive_search_protocol(value):
             raise ValueError('basenames in outputs must contain a protocol')
-        
+
         return value
 
     @staticmethod
@@ -119,12 +120,19 @@ class AnalysisInternal(SMBase):
 
             # Recursively search through secondary files if they are present.
             if basename_correct and 'secondary_files' in outputs:
-                return AnalysisInternal.recursive_search_protocol(outputs['secondary_files'])
-            
+                return AnalysisInternal.recursive_search_protocol(
+                    outputs['secondary_files']
+                )
+
             return basename_correct
         else:
             # Recursively search through any multi-file or nested structures.
-            correct_format = all([AnalysisInternal.recursive_search_protocol(nested) for nested in outputs.values()])
+            correct_format = all(
+                [
+                    AnalysisInternal.recursive_search_protocol(nested)
+                    for nested in outputs.values()
+                ]
+            )
 
         return correct_format
 

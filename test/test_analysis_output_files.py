@@ -1,6 +1,7 @@
 # pylint: disable=invalid-overridden-method
 import os
 from test.testbase import DbIsolatedTest, run_as_sync
+from typing import Any
 
 from testcontainers.core.container import DockerContainer
 
@@ -311,7 +312,7 @@ class TestOutputFiles(DbIsolatedTest):
     async def test_outputs_contains_protocol(self):
         """Tests validation of the outputs field so that file paths contain a protocol prefix"""
 
-        outputs = {
+        outputs: dict[str, Any] = {
             'cram': {
                 'filtered': {
                     'basename': 'gs://fakegcs/file2.cram',
@@ -343,7 +344,9 @@ class TestOutputFiles(DbIsolatedTest):
             self.fail()
 
         # Make one of the file paths incorrectly formatted.
-        outputs['cram']['filtered']['secondary_files']['ext']['basename'] = 'fakegcs/file2.cram.ext'
+        outputs['cram']['filtered']['secondary_files']['ext']['basename'] = (
+            'fakegcs/file2.cram.ext'  # type: ignore
+        )
         with self.assertRaises(ValueError):
             AnalysisInternal(
                 type='cram',
