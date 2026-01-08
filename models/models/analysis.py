@@ -1,5 +1,4 @@
 import enum
-import re
 from datetime import date, datetime
 from typing import Any
 
@@ -15,8 +14,6 @@ from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format_list,
     sequencing_group_id_transform_to_raw_list,
 )
-
-OUTPUT_FILE_RE = r'^(\w+:\/\/)'
 
 
 class AnalysisInternal(SMBase):
@@ -95,46 +92,6 @@ class AnalysisInternal(SMBase):
             meta=self.meta,
             author=self.author,
         )
-
-    @field_validator('outputs', mode='after')
-    @classmethod
-    def check_outputs(cls, value: str | dict | None):
-        """Checks that output file paths correctly contain a protocol"""
-
-        if isinstance(value, str) or value is None:
-            return value
-
-        if not AnalysisInternal.recursive_search_protocol(value):
-            raise ValueError('basenames in outputs must contain a protocol')
-
-        return value
-
-    @staticmethod
-    def recursive_search_protocol(outputs: dict):
-        """Recursively walks through the outputs dict to check that file paths contain a protocol"""
-        if 'basename' in outputs:
-            basename_correct = re.match(OUTPUT_FILE_RE, outputs['basename']) is not None
-            # When creating from DB with from_db, the outputs field will be fully populated with file metadata,
-            # so the protocol will move to the 'path' key.
-            if not basename_correct and 'path' in outputs:
-                basename_correct = re.match(OUTPUT_FILE_RE, outputs['path']) is not None
-
-            # Recursively search through secondary files if they are present.
-            if basename_correct and 'secondary_files' in outputs:
-                return AnalysisInternal.recursive_search_protocol(
-                    outputs['secondary_files']
-                )
-
-            return basename_correct
-
-        # Recursively search through any multi-file or nested structures.
-        correct_format = all(
-            AnalysisInternal.recursive_search_protocol(nested)
-            for nested in outputs.values()
-        )
-
-        return correct_format
-
 
 class Analysis(BaseModel):
     """Model for Analysis"""
