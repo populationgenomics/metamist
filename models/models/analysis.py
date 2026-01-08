@@ -111,6 +111,7 @@ class AnalysisInternal(SMBase):
 
     @staticmethod
     def recursive_search_protocol(outputs: dict):
+        """Recursively walks through the outputs dict to check that file paths contain a protocol"""
         if 'basename' in outputs:
             basename_correct = re.match(OUTPUT_FILE_RE, outputs['basename']) is not None
             # When creating from DB with from_db, the outputs field will be fully populated with file metadata,
@@ -125,14 +126,12 @@ class AnalysisInternal(SMBase):
                 )
 
             return basename_correct
-        else:
-            # Recursively search through any multi-file or nested structures.
-            correct_format = all(
-                [
-                    AnalysisInternal.recursive_search_protocol(nested)
-                    for nested in outputs.values()
-                ]
-            )
+
+        # Recursively search through any multi-file or nested structures.
+        correct_format = all(
+            AnalysisInternal.recursive_search_protocol(nested)
+            for nested in outputs.values()
+        )
 
         return correct_format
 
