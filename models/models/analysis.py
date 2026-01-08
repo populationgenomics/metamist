@@ -93,6 +93,7 @@ class AnalysisInternal(SMBase):
             author=self.author,
         )
 
+
 class Analysis(BaseModel):
     """Model for Analysis"""
 
