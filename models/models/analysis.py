@@ -2,7 +2,7 @@ import enum
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 
 from models.base import SMBase, parse_sql_bool, parse_sql_dict
 from models.enums import AnalysisStatus
