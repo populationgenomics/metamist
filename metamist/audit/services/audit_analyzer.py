@@ -140,7 +140,11 @@ class AuditAnalyzer:
                     if str(read_file.filepath) not in bucket_paths:
                         continue
                     entry = self._create_report_entry(
-                        sg=sg, assay_id=assay.id, file_metadata=read_file
+                        sg=sg,
+                        assay_id=assay.id,
+                        file_metadata=read_file,
+                        action='DELETE',
+                        comment='Deleted due to audit determination',
                     )
                     entries.append(entry)
 
@@ -251,6 +255,8 @@ class AuditAnalyzer:
         sg: SequencingGroup,
         file_metadata: FileMetadata,
         assay_id: int | None = None,
+        action: str | None = None,
+        comment: str | None = None,
     ) -> AuditReportEntry:
         """Create a report entry from sequencing group and file data."""
         return AuditReportEntry(
@@ -267,4 +273,6 @@ class AuditAnalyzer:
             sample_external_ids=sg.sample.external_ids.ids,
             participant_id=sg.sample.participant.id,
             participant_external_ids=sg.sample.participant.external_ids.ids,
+            action=action,
+            review_comment=comment,
         )

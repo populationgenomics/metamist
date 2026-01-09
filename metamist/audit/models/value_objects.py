@@ -85,10 +85,11 @@ class AuditConfig:  # pylint: disable=too-many-instance-attributes
     analysis_types: tuple[str, ...]
     file_types: tuple[FileType, ...]
     excluded_prefixes: tuple[str, ...] = ()
+    audit_type: str | None = None
     results_folder: str | None = None
 
     @classmethod
-    def from_cli_args(cls, args) -> 'AuditConfig':
+    def from_cli_args(cls, args, audit_type: str | None = None) -> 'AuditConfig':
         """Factory method from CLI arguments."""
         file_types = []
         for ft in args.file_types:
@@ -118,6 +119,7 @@ class AuditConfig:  # pylint: disable=too-many-instance-attributes
             analysis_types=args.analysis_types or ('CRAM',),
             file_types=tuple(file_types),
             excluded_prefixes=args.excluded_prefixes or (),
+            audit_type=audit_type,
             results_folder=args.results_folder,
         )
 

@@ -107,3 +107,15 @@ class GCSDataAccess:
             blobs: List of blob names to delete
         """
         self.storage.delete_blobs(bucket_name, blobs)
+
+    def get_blob(self, bucket_name: str, blob_name: str):
+        """
+        Get a blob from a GCS bucket.
+
+        Args:
+            bucket_name: Name of the bucket
+            blob_name: Name of the blob
+        Returns:
+            The blob object
+        """
+        return self.storage.get_blob(bucket_name, blob_name)

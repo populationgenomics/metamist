@@ -5,15 +5,15 @@ import unittest
 import unittest.mock
 from io import StringIO
 from metamist.audit.adapters import StorageClient
-from metamist.audit.cli.upload_bucket_audit import AuditOrchestrator
-from metamist.audit.cli.review_audit_results import review_rows
-from metamist.audit.cli.delete_from_audit_results import delete_files_from_report
 from metamist.audit.data_access import MetamistDataAccess, GCSDataAccess
 from metamist.audit.services import (
     AuditAnalyzer,
     FileMatchingService,
     Reporter,
     BucketAuditLogger,
+    AuditOrchestrator,
+    AuditReviewOrchestrator,
+    AuditDeleteOrchestrator,
 )
 from metamist.audit.models import (
     SequencingGroup,
@@ -69,8 +69,8 @@ class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attribu
         self.gcs_data_access = GCSDataAccess('dataset', 'test')
         self.file_matcher = FileMatchingService()
         self.audit_analyzer = AuditAnalyzer()
-        self.audit_logs = BucketAuditLogger('dataset', 'test')
-        self.reporter = Reporter(self.gcs_data_access, self.audit_logs)
+        self.audit_logger = BucketAuditLogger('dataset', 'test')
+        self.reporter = Reporter(self.gcs_data_access, self.audit_logger)
 
         self.sample_csv_content = """File Path,File Size,SG ID,SG Type,SG Technology,SG Platform,Assay ID,Sample ID,Sample External ID,Participant ID,Participant External ID,CRAM Analysis ID,CRAM Path,Action,Review Comment
 gs://cpg-dataset-main-upload/file1.bam,2048000000,SG01,exome,short-read,illumina,1,S01,EXT001,1,"P001",1,cram,delete,File is old and replaced by newer upload
@@ -114,6 +114,7 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             sequencing_platforms=('illumina', 'pacbio', 'ont'),
             analysis_types=('cram', 'vcf'),
             file_types=tuple(list(FileType)),
+            excluded_prefixes=('excluded/prefix1/', 'excluded/prefix2/'),
         )
         result = await self.metamist_data_access.validate_metamist_enums(config=config)
         self.assertEqual(config, result)
@@ -136,6 +137,7 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
                     sequencing_platforms=('illumina', 'pacbio', 'ont'),
                     analysis_types=('cram', 'vcf'),
                     file_types=tuple(list(FileType)),
+                    excluded_prefixes=(),
                 )
             )
 
@@ -558,15 +560,7 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
         ]
         mock_list_files.return_value = UPLOAD_BUCKET_FILES
 
-        orchestrator = AuditOrchestrator(
-            self.metamist_data_access,
-            self.gcs_data_access,
-            self.audit_analyzer,
-            Reporter(self.gcs_data_access, BucketAuditLogger('dataset', 'test')),
-            BucketAuditLogger('dataset', 'test'),
-        )
-
-        config = AuditConfig(
+        config = SimpleNamespace(
             dataset='dataset',
             sequencing_types=('genome', 'exome'),
             sequencing_technologies=('short-read', 'long-read'),
@@ -576,17 +570,19 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             excluded_prefixes=('<EXCLUDED_PREFIX>',),
         )
 
+        orchestrator = AuditOrchestrator(config)
+
         # This would normally write files, so mock that too
         with unittest.mock.patch.object(
             Reporter, 'write_audit_reports'
         ) as mock_write_reports:
-            await orchestrator.run_audit(config)
+            await orchestrator.run_audit()
             self.assertTrue(mock_write_reports.called)
 
     # ===== REPORTER SERVICE TESTS =====
     # These test the report writing and reading logic
     def test_audit_report_entry_to_and_from_dict(self):
-        """Test AuditReportEntry.from_dict"""
+        """Test AuditReportEntry.from_report_dict"""
         data = {
             'filepath': 'gs://cpg-dataset-main-upload/file1.bam',
             'filesize': 2048000000,
@@ -656,7 +652,7 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
         mock_path = unittest.mock.MagicMock()
         mock_path.exists.return_value = False
 
-        with unittest.mock.patch.object(self.audit_logs, 'error') as mock_error:
+        with unittest.mock.patch.object(self.audit_logger, 'error') as mock_error:
             mock_error.return_value = None  # No-op for logging
             rows = self.reporter.get_report_rows(mock_path)
 
@@ -809,7 +805,7 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
             Reporter, '_write_csv_report'
         ) as mock_write_csv_report:
             self.reporter.write_audit_reports(audit_result, config)
-            stats = self.reporter.generate_summary_statistics(audit_result)
+            stats = self.audit_logger.log_result_summary(audit_result)
             self.assertIsInstance(stats, dict)
             self.assertEqual(stats['files_to_delete'], 2)
             self.assertEqual(stats['files_to_delete_size_gb'], 3072000000 / (1024**3))
@@ -829,8 +825,8 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
             'filesize > 1000 and sg_tech == "short-read"',
             'filepath contains ".bam"',
         ]
-        parsed = self.reporter.filter_rows(
-            [expressions[0]],
+        review_orchestrator = AuditReviewOrchestrator('dataset', 'results_folder')
+        parsed = review_orchestrator.filter_rows_and_update(
             rows=[
                 AuditReportEntry(
                     filepath='gs://cpg-dataset-main-upload/file1.bam',
@@ -848,11 +844,13 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                     sg_platform='pacbio',
                 ),
             ],
+            action='DELETE',
+            comment='',
+            filters=[expressions[0]],
         )
         self.assertEqual(len(parsed), 1)
         self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
-        parsed = self.reporter.filter_rows(
-            [expressions[1]],
+        parsed = review_orchestrator.filter_rows_and_update(
             rows=[
                 AuditReportEntry(
                     filepath='gs://cpg-dataset-main-upload/file1.bam',
@@ -863,11 +861,13 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                     sample_id='S03',
                 ),
             ],
+            action='DELETE',
+            comment='',
+            filters=[expressions[1]],
         )
         self.assertEqual(len(parsed), 1)
         self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
-        parsed = self.reporter.filter_rows(
-            [expressions[2]],
+        parsed = review_orchestrator.filter_rows_and_update(
             rows=[
                 AuditReportEntry(
                     filepath='gs://cpg-dataset-main-upload/file1.bam',
@@ -878,11 +878,13 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                     participant_external_ids=['P002', 'P003'],
                 ),
             ],
+            action='DELETE',
+            comment='',
+            filters=[expressions[2]],
         )
         self.assertEqual(len(parsed), 1)
         self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
-        parsed = self.reporter.filter_rows(
-            [expressions[3]],
+        parsed = review_orchestrator.filter_rows_and_update(
             rows=[
                 AuditReportEntry(
                     filepath='gs://cpg-dataset-main-upload/file1.bam',
@@ -900,13 +902,15 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                     sg_tech='long-read',
                 ),
             ],
+            action='DELETE',
+            comment='',
+            filters=[expressions[3]],
         )
         self.assertEqual(len(parsed), 1)
         self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
 
         # Now a compound expression
-        parsed = self.reporter.filter_rows(
-            [expressions[4], 'filesize >= 1500'],
+        parsed = review_orchestrator.filter_rows_and_update(
             rows=[
                 AuditReportEntry(
                     filepath='gs://cpg-dataset-main-upload/file1.bam',
@@ -921,15 +925,15 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                     filesize=500,
                 ),
             ],
+            action='DELETE',
+            comment='',
+            filters=[expressions[4], 'filesize >= 1500'],
         )
         self.assertEqual(len(parsed), 1)
         self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
 
         # Compound with 'or'
-        parsed = self.reporter.filter_rows(
-            [
-                'filesize >= 1500 or filepath contains ".cram" or sample_id == "S03" or sg_type == "genome"'
-            ],
+        parsed = review_orchestrator.filter_rows_and_update(
             rows=[
                 AuditReportEntry(
                     filepath='gs://cpg-dataset-main-upload/file1.bam',
@@ -953,6 +957,11 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                     filesize=1000,
                 ),
             ],
+            action='DELETE',
+            comment='',
+            filters=[
+                'filesize >= 1500 or filepath contains ".cram" or sample_id == "S03" or sg_type == "genome"'
+            ],
         )
         self.assertEqual(len(parsed), 4)
         self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
@@ -960,8 +969,7 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
         self.assertEqual(parsed[2].filepath, 'gs://cpg-dataset-main-upload/file3.bam')
         self.assertEqual(parsed[3].filepath, 'gs://cpg-dataset-main-upload/file4.bam')
 
-        parsed = self.reporter.filter_rows(
-            ['sample_id != "S03"'],
+        parsed = review_orchestrator.filter_rows_and_update(
             rows=[
                 AuditReportEntry(
                     filepath='gs://cpg-dataset-main-upload/file1.bam',
@@ -972,6 +980,9 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                     sample_id='S03',
                 ),
             ],
+            action='DELETE',
+            comment='',
+            filters=['sample_id != "S03"'],
         )
         self.assertEqual(len(parsed), 1)
         self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
@@ -990,17 +1001,21 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                 review_comment='',
             ),
         ]
+        review_orchestrator = AuditReviewOrchestrator(
+            dataset='dataset',
+            results_folder='results_folder',
+        )
         # Mock to_path to return a mock object with exists() method
         mock_path = unittest.mock.MagicMock()
         mock_path.exists.return_value = True
         with unittest.mock.patch(
-            'metamist.audit.cli.review_audit_results.to_path', return_value=mock_path
+            'metamist.audit.services.review_orchestrator.to_path',
+            return_value=mock_path,
         ):
-            review_result = review_rows(
+            review_result = review_orchestrator.review_rows(
                 rows,
                 action='INGEST',
                 comment='Reviewed and marked for ingestion',
-                audit_logs=self.audit_logs,
             )
             self.assertEqual(len(review_result.reviewed_files), 2)
             for row in review_result.reviewed_files:
@@ -1021,11 +1036,10 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                     review_comment='',
                 ),
             ]
-            review_result = review_rows(
+            review_result = review_orchestrator.review_rows(
                 rows,
                 action='REVIEW',
                 comment='No changes made',
-                audit_logs=self.audit_logs,
             )
             self.assertEqual(len(review_result.reviewed_files), 2)
             for row in review_result.reviewed_files:
@@ -1033,11 +1047,10 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                 self.assertEqual(row.review_comment, 'No changes made')
 
             with self.assertRaises(ValueError):
-                review_rows(
+                review_orchestrator.review_rows(
                     rows,
                     action='INVALID_ACTION',
                     comment='This should fail',
-                    audit_logs=self.audit_logs,
                 )
 
     def test_delete_files_from_report(self):
@@ -1062,11 +1075,17 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                 review_comment='Marked for deletion',
             ),
         ]
+
+        delete_orchestrator = AuditDeleteOrchestrator(
+            dataset='dataset',
+            results_folder='results_folder',
+            report='files_to_review',
+        )
         # Mock to_path to return a mock object with exists() method
         mock_path = unittest.mock.MagicMock()
         mock_path.exists.return_value = True
         with unittest.mock.patch(
-            'metamist.audit.cli.delete_from_audit_results.to_path',
+            'metamist.audit.services.delete_orchestrator.to_path',
             return_value=mock_path,
         ):
             # Mock MetamistDataAccess methods
@@ -1081,11 +1100,8 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                 mock_create_analysis.return_value = 1
                 mock_update_analysis.return_value = 1
 
-                deletion_result = delete_files_from_report(
-                    self.gcs_data_access,
-                    report_name='files_to_review',
+                deletion_result = delete_orchestrator.delete_files_from_report(
                     rows=rows,
-                    audit_logs=self.audit_logs,
                     dry_run=False,
                 )
 
