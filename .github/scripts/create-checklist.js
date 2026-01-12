@@ -6,7 +6,7 @@ const checklistItems = [
 ]
 const commentTitle = '## PR Checklist ✅'
 
-const itemRegex = /- \[(x| )\] ([\w ]+)/g
+const checklistItemRegex = /- \[(x| )\] ([\w ]+)/g
 
 /**
  * Builds a new checklist as an array of strings based on an existing comment and an
@@ -18,7 +18,8 @@ const itemRegex = /- \[(x| )\] ([\w ]+)/g
  * @returns {string[]}
  */
 const coverItemsFromComment = (items, checklistStr) => {
-    const matches = [...checklistStr.matchAll(itemRegex)].reduce((listContents, [_, checked, itemString]) => {
+    // Construct a map of existing checklist items and their checked states.
+    const matches = [...checklistStr.matchAll(checklistItemRegex)].reduce((listContents, [_, checked, itemString]) => {
         listContents.set(itemString, checked)
         return listContents
     }, new Map())
@@ -70,23 +71,23 @@ module.exports = async ({ github, context, core }) => {
         const checklist = buildCommentFromChecklist(commentTitle, checklistBody)
 
         if (botComment) {
-        // Update existing comment.
-        await github.rest.issues.updateComment({
-            owner,
-            repo,
-            comment_id: botComment.id,
-            body: checklist
-        });
+            // Update existing comment.
+            await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: botComment.id,
+                body: checklist
+            })
         } else {
-        // Create new comment.
-        await github.rest.issues.createComment({
-            owner,
-            repo,
-            issue_number: prNumber,
-            body: checklist
-        });
+            // Create new comment.
+            await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: checklist
+            })
         }
     } catch (error) {
-        core.setFailed(`Failed to manage checklist comment: ${error.message}`);
+        core.setFailed(`Failed to create/update checklist comment: ${error.message}`)
     }
 }
