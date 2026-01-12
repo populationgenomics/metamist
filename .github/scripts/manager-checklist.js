@@ -23,7 +23,6 @@ const coverItemsFromComment = (items, checklistStr) => {
         listContents.set(itemString, checked)
         return listContents
     }, new Map())
-    console.log(matches)
 
     const newListBody = items.map((item) => {
         const checked = matches.get(item) || ' '
