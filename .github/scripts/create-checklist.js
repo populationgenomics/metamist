@@ -1,7 +1,8 @@
 const checklistItems = [
     'Does not contain the names of any sensitive CPG projects',
     'Version number is bumped appropriately if API is changed',
-    'Tests cover any newly added code'
+    'Tests cover any newly added code',
+    'Some new item'
 ]
 const commentTitle = '## PR Checklist ✅'
 
