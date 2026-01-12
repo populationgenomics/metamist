@@ -7,8 +7,6 @@ on:
       - reopened
     branches: 
       - dev
-    paths:
-      - ".github/scripts/create-checklist.js"
 
 jobs:
   checklist:
