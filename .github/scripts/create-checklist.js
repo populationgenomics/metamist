@@ -65,7 +65,7 @@ module.exports = async ({ github, context, core }) => {
         ) || ''
         
         const checklistBody = coverItemsFromComment(checklistItems, botComment).join('\n')
-        const checklist = buildCommentFromChecklist(checklistTitle, checklistBody)
+        const checklist = buildCommentFromChecklist(commentTitle, checklistBody)
 
         if (botComment) {
         // Update existing comment.
