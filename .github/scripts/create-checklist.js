@@ -63,9 +63,10 @@ module.exports = async ({ github, context, core }) => {
         const botComment = comments.data.find(comment => 
             comment.body.includes(commentTitle) && 
             comment.user.login === 'github-actions[bot]'
-        ) || ''
+        )
         
-        const checklistBody = coverItemsFromComment(checklistItems, botComment).join('\n')
+        const existingComment = botComment?.body || ''
+        const checklistBody = coverItemsFromComment(checklistItems, existingComment).join('\n')
         const checklist = buildCommentFromChecklist(commentTitle, checklistBody)
 
         if (botComment) {
