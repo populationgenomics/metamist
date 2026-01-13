@@ -46,15 +46,18 @@ module.exports = async ({ github, context, core, config }) => {
     try {
         const { owner, repo } = context.repo
         const prNumber = context.issue.number
-        const targetBranch = context.payload.pull_request.base.ref;
+        const targetBranch = context.payload.pull_request.base.ref
 
         // Get checklist for target branch
-        let checklistItems = [];
+        let checklistItems = []
         if (config[targetBranch]) {
-            checklistItems = config[targetBranch];
+            checklistItems = config[targetBranch]
+        } else if (config['default']) {
+            checklistItems = config['default']
+            core.info(`No config found for target branch '${targetBranch}', using default checklist instead`)
         } else {
-            core.setFailed(`No checklist configured for target branch '${targetBranch}'`);
-            return;
+            core.setFailed(`No checklist configured for target branch '${targetBranch}'`)
+            return
         }
 
         // Look for existing checklist review.
@@ -62,12 +65,12 @@ module.exports = async ({ github, context, core, config }) => {
             owner,
             repo,
             pull_number: prNumber
-        });
+        })
 
         const botReview = reviews.data.find(review => 
             review.body?.includes(commentTitle) && 
             review.user?.login === 'github-actions[bot]'
-        );
+        )
         
         const existingComment = botReview?.body || ''
         const checklistBody = coverItemsFromComment(checklistItems, existingComment).join('\n')
@@ -81,7 +84,7 @@ module.exports = async ({ github, context, core, config }) => {
                 pull_number: prNumber,
                 review_id: botReview.id,
                 body: checklist
-            });
+            })
         } else {
             // Create new review.
             await github.rest.pulls.createReview({
@@ -90,7 +93,7 @@ module.exports = async ({ github, context, core, config }) => {
                 pull_number: prNumber,
                 body: checklist,
                 event: 'COMMENT'
-            });
+            })
         }
     } catch (error) {
         core.setFailed(`Failed to create/update checklist comment: ${error.message}`)

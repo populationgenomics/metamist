@@ -1,4 +1,4 @@
-dev:
+default:
   - Changes do not contain the names of any sensitive CPG projects
   - Version number is bumped appropriately if API is changed
   - Tests cover any newly added code
