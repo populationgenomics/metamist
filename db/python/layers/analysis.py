@@ -1,7 +1,6 @@
 import datetime
 from collections import defaultdict
 from typing import Any
-from urllib.parse import urlparse
 
 from api.utils import group_by
 from db.python.connect import Connection
@@ -49,25 +48,6 @@ def check_or_parse_date(
     if isinstance(date_, str):
         return datetime.datetime.strptime(date_, '%Y-%m-%d').date()
     raise ValueError(f'Invalid datetime.date {date_!r}')
-
-
-def validate_outputs_protocol(outputs: dict) -> bool:
-    """Recursively walks through the outputs dict to check that file paths contain a protocol"""
-    if 'basename' in outputs:
-        basename_correct = urlparse(outputs['basename']).scheme != ''
-
-        # Recursively search through secondary files if they are present.
-        if basename_correct and 'secondary_files' in outputs:
-            return validate_outputs_protocol(outputs['secondary_files'])
-
-        return basename_correct
-
-    # Recursively search through any multi-file or nested structures.
-    correct_format = all(
-        validate_outputs_protocol(nested) for nested in outputs.values()
-    )
-
-    return correct_format
 
 
 class AnalysisLayer(BaseLayer):
@@ -576,13 +556,6 @@ class AnalysisLayer(BaseLayer):
                     'Cohort sequencing groups do not match analysis sequencing groups'
                 )
 
-        # Validate file paths in the analysis outputs
-        if analysis.outputs and isinstance(analysis.outputs, dict):
-            if not validate_outputs_protocol(analysis.outputs):
-                raise ValueError(
-                    'Analysis outputs file paths must contain a protocol prefix'
-                )
-
         new_analysis_id = await self.at.create_analysis(
             analysis_type=analysis.type,
             status=analysis.status,
@@ -627,12 +600,6 @@ class AnalysisLayer(BaseLayer):
         """
         Update the status of an analysis, set timestamp_completed if relevant
         """
-        # Validate file paths in the analysis outputs
-        if outputs and isinstance(outputs, dict):
-            if not validate_outputs_protocol(outputs):
-                raise ValueError(
-                    'Analysis outputs file paths must contain a protocol prefix'
-                )
 
         project_ids = await self.at.get_project_ids_for_analysis_ids([analysis_id])
         self.connection.check_access_to_projects_for_ids(
