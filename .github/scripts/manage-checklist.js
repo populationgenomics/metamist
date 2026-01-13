@@ -13,7 +13,7 @@ const checklistItemRegex = /- \[(x| )\] ([\w ]+)/g
  */
 const coverItemsFromComment = (items, checklistStr) => {
     // Construct a map of existing checklist items and their checked states.
-    const matches = checklistStr.matchAll(checklistItemRegex).reduce((listContents, [_, checked, itemString]) => {
+    const matches = [...checklistStr.matchAll(checklistItemRegex)].reduce((listContents, [_, checked, itemString]) => {
         listContents.set(itemString, checked)
         return listContents
     }, new Map())
