@@ -53,17 +53,17 @@ module.exports = async ({ github, context, core }) => {
         const { owner, repo } = context.repo
         const prNumber = context.issue.number
 
-        // Look for existing checklist comment.
-        const comments = await github.rest.pulls.listReviews({
+        // Look for existing checklist review.
+        const reviews = await github.rest.pulls.listReviews({
             owner,
             repo,
-            issue_number: prNumber
-        })
+            pull_number: prNumber
+        });
 
-        const botReview = comments.find(comment => 
-            comment.body?.includes(commentTitle) && 
-            comment.user?.login === 'github-actions[bot]'
-        )
+        const botReview = reviews.data.find(review => 
+            review.body?.includes(commentTitle) && 
+            review.user?.login === 'github-actions[bot]'
+        );
         
         const existingComment = botReview?.body || ''
         const checklistBody = coverItemsFromComment(checklistItems, existingComment).join('\n')
