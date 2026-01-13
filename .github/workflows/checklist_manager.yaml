@@ -28,9 +28,11 @@ jobs:
 
       - name: Run checklist manager
         uses: actions/github-script@v7
+        env:
+          config: ${{ steps.load-config.outputs.config }}
         with:
           script: |
             const script = require('./.github/scripts/manage-checklist.js');
 
-            const config = ${{ fromJSON(steps.load-config.outputs.config) }};
+            const config = fromJSON(process.env.config);
             await script({ github, context, core, config });
