@@ -1,9 +1,3 @@
-const checklistItems = [
-    'Does not contain the names of any sensitive CPG projects',
-    'Version number is bumped appropriately if API is changed',
-    'Tests cover any newly added code',
-    'Some new item'
-]
 const commentTitle = '## PR Checklist ✅'
 
 const checklistItemRegex = /- \[(x| )\] ([\w ]+)/g
@@ -48,10 +42,20 @@ ${checklist}
 `
 }
 
-module.exports = async ({ github, context, core }) => {
+module.exports = async ({ github, context, core, config }) => {
     try {
         const { owner, repo } = context.repo
         const prNumber = context.issue.number
+        const targetBranch = context.payload.pull_request.base.ref;
+
+        // Get checklist for target branch
+        let checklistItems = [];
+        if (config[targetBranch]) {
+            checklistItems = config[targetBranch];
+        } else {
+            core.setFailed(`No checklist configured for target branch '${targetBranch}'`);
+            return;
+        }
 
         // Look for existing checklist review.
         const reviews = await github.rest.pulls.listReviews({
