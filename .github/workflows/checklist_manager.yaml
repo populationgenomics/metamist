@@ -15,9 +15,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run checklist manager
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const script = require('./.github/scripts/manage-checklist.js');
-            await script({ github, context, core });
+      - name: Your workflow steps
+        run: echo "Running because PR review was edited"
+
+      # - name: Run checklist manager
+      #   uses: actions/github-script@v7
+      #   with:
+      #     script: |
+      #       const script = require('./.github/scripts/manage-checklist.js');
+      #       await script({ github, context, core });

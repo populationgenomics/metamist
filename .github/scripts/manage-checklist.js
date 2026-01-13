@@ -54,37 +54,39 @@ module.exports = async ({ github, context, core }) => {
         const prNumber = context.issue.number
 
         // Look for existing checklist comment.
-        const comments = await github.rest.issues.listComments({
+        const comments = await github.rest.pulls.listReviews({
             owner,
             repo,
             issue_number: prNumber
         })
 
-        const botComment = comments.data.find(comment => 
-            comment.body.includes(commentTitle) && 
-            comment.user.login === 'github-actions[bot]'
+        const botReview = comments.find(comment => 
+            comment.body?.includes(commentTitle) && 
+            comment.user?.login === 'github-actions[bot]'
         )
         
-        const existingComment = botComment?.body || ''
+        const existingComment = botReview?.body || ''
         const checklistBody = coverItemsFromComment(checklistItems, existingComment).join('\n')
         const checklist = buildCommentFromChecklist(commentTitle, checklistBody)
 
-        if (botComment) {
-            // Update existing comment.
-            await github.rest.issues.updateComment({
+        if (botReview) {
+            // Update existing review.
+            await github.rest.pulls.updateReview({
                 owner,
                 repo,
-                comment_id: botComment.id,
+                pull_number: prNumber,
+                review_id: botReview.id,
                 body: checklist
-            })
+            });
         } else {
-            // Create new comment.
-            await github.rest.issues.createComment({
+            // Create new review.
+            await github.rest.pulls.createReview({
                 owner,
                 repo,
-                issue_number: prNumber,
-                body: checklist
-            })
+                pull_number: prNumber,
+                body: checklist,
+                event: 'COMMENT'
+            });
         }
     } catch (error) {
         core.setFailed(`Failed to create/update checklist comment: ${error.message}`)
