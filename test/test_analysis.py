@@ -374,6 +374,14 @@ class TestAnalysis(DbIsolatedTest):
         # be sure the now is different than before
         time.sleep(2)
 
+        # test that updating with an incorrect output string raises an exception.
+        with self.assertRaises(ValueError):
+            await self.al.update_analysis(
+                a_id,
+                meta={'sequencing_type': 'genome', 'size': 1024},
+                output='test_output',
+            )
+
         # update the analysis with some new data
         await self.al.update_analysis(
             a_id,
