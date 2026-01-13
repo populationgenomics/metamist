@@ -20,7 +20,9 @@ jobs:
       - name: Load checklist configuration
         id: load-config
         run: |
-          echo "config=$CONFIG_JSON" >> $GITHUB_OUTPUT
+          CONFIG_JSON=$(yq -o json .github/branch_checklist.yaml)
+          ESCAPED_JSON=$(echo "$CONFIG_JSON" | jq -aRs .)
+          echo "config=$ESCAPED_JSON" >> $GITHUB_OUTPUT
         env:
           YQ_VERSION: latest
 
