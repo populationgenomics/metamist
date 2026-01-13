@@ -6,7 +6,6 @@ on:
 
 jobs:
   verify-checklist:
-    if: github.event.workflow_run.conclusion == 'success'
     permissions:
       contents: read
     runs-on: ubuntu-latest
