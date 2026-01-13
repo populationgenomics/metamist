@@ -6,8 +6,8 @@ const checklistItemRegex = /- \[(x| )\] ([\w ]+)/g
  * Builds a new checklist as an array of strings based on an existing comment and an
  * array of checklist items. Any items that are already represented in the body
  * will maintain their checked status, and any new items will be added.
- * 
- * @param {string[]} items 
+ *
+ * @param {string[]} items
  * @param {string} checklistStr
  * @returns {string[]}
  */
@@ -28,8 +28,8 @@ const coverItemsFromComment = (items, checklistStr) => {
 
 /**
  * Constructs a new comment from title and checklist body strings.
- * @param {string} title 
- * @param {string} checklist 
+ * @param {string} title
+ * @param {string} checklist
  * @returns {string}
  */
 const buildCommentFromChecklist = (title, checklist) => {
@@ -67,11 +67,11 @@ module.exports = async ({ github, context, core, config }) => {
             issue_number: prNumber
         })
 
-        const botComment = comments.data.find(comment => 
-            comment.body.includes(commentTitle) && 
+        const botComment = comments.data.find(comment =>
+            comment.body.includes(commentTitle) &&
             comment.user.login === 'github-actions[bot]'
         )
-        
+
         const existingComment = botComment?.body || ''
         const checklistBody = coverItemsFromComment(checklistItems, existingComment).join('\n')
         const checklist = buildCommentFromChecklist(commentTitle, checklistBody)

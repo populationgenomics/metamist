@@ -2,7 +2,7 @@ name: PR Checklist Manager Bot
 
 on:
   pull_request:
-    branches: 
+    branches:
       - dev
       - main
 
@@ -13,13 +13,14 @@ jobs:
       pull-requests: write
       contents: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Load checklist configuration
         id: load-config
         run: |
-          CONFIG_JSON=$(yq -o json .github/workflows/branch_checklist.yaml)
+          CONFIG_JSON=$(yq -o json .github/branch_checklist.yaml)
           ESCAPED_JSON=$(echo "$CONFIG_JSON" | jq -aRs .)
           echo "config=$ESCAPED_JSON" >> $GITHUB_OUTPUT
         env:
