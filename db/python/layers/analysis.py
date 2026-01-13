@@ -600,7 +600,6 @@ class AnalysisLayer(BaseLayer):
         """
         Update the status of an analysis, set timestamp_completed if relevant
         """
-
         project_ids = await self.at.get_project_ids_for_analysis_ids([analysis_id])
         self.connection.check_access_to_projects_for_ids(
             project_ids, allowed_roles=FullWriteAccessRoles
