@@ -29,7 +29,6 @@ jobs:
       - name: Run checklist manager
         uses: actions/github-script@v7
         with:
-          github-token: ghp_fake1234567890
           script: |
             const script = require('./.github/scripts/manage-checklist.js');
 
