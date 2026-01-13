@@ -60,39 +60,37 @@ module.exports = async ({ github, context, core, config }) => {
             return
         }
 
-        // Look for existing checklist review.
-        const reviews = await github.rest.pulls.listReviews({
+        // Look for existing checklist comment.
+        const comments = await github.rest.issues.listComments({
             owner,
             repo,
-            pull_number: prNumber
+            issue_number: prNumber
         })
 
-        const botReview = reviews.data.find(review => 
-            review.body?.includes(commentTitle) && 
-            review.user?.login === 'github-actions[bot]'
+        const botComment = comments.data.find(comment => 
+            comment.body.includes(commentTitle) && 
+            comment.user.login === 'github-actions[bot]'
         )
         
-        const existingComment = botReview?.body || ''
+        const existingComment = botComment?.body || ''
         const checklistBody = coverItemsFromComment(checklistItems, existingComment).join('\n')
         const checklist = buildCommentFromChecklist(commentTitle, checklistBody)
 
-        if (botReview) {
+        if (botComment) {
             // Update existing review.
-            await github.rest.pulls.updateReview({
+            await github.rest.issues.updateComment({
                 owner,
                 repo,
-                pull_number: prNumber,
-                review_id: botReview.id,
+                comment_id: botComment.id,
                 body: checklist
             })
         } else {
             // Create new review.
-            await github.rest.pulls.createReview({
+            await github.rest.issues.createComment({
                 owner,
                 repo,
-                pull_number: prNumber,
-                body: checklist,
-                event: 'COMMENT'
+                issue_number: prNumber,
+                body: checklist
             })
         }
     } catch (error) {
