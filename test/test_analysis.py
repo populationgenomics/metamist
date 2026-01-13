@@ -378,7 +378,7 @@ class TestAnalysis(DbIsolatedTest):
         await self.al.update_analysis(
             a_id,
             meta={'sequencing_type': 'genome', 'size': 1024},
-            output='test_output',
+            output='test://test_output',
         )
 
         # check the analysis after update
@@ -396,8 +396,8 @@ class TestAnalysis(DbIsolatedTest):
                 status=AnalysisStatus.COMPLETED,
                 sequencing_group_ids=[],
                 cohort_ids=[],
-                output='test_output',
-                outputs='test_output',
+                output='test://test_output',
+                outputs='test://test_output',
                 timestamp_completed=init_timestamp_completed,
                 project=1,
                 meta={'sequencing_type': 'genome', 'size': 1024},
