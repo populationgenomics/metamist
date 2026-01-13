@@ -34,5 +34,5 @@ jobs:
           script: |
             const script = require('./.github/scripts/manage-checklist.js');
 
-            const config = JSON.parse(process.env.config);
+            const config = ${{ fromJSON(env.config) }};
             await script({ github, context, core, config });

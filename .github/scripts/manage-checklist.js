@@ -56,7 +56,7 @@ module.exports = async ({ github, context, core, config }) => {
             checklistItems = config['default']
             core.info(`No config found for target branch '${targetBranch}', using default checklist instead`)
         } else {
-            core.setFailed(`No checklist configured for target branch '${targetBranch}'`)
+            core.setFailed(`No checklist configured for target branch '${targetBranch}' or default`)
             return
         }
 
