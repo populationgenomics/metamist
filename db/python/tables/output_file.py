@@ -1,6 +1,7 @@
 # pylint: disable=too-many-nested-blocks
 import logging
 from textwrap import dedent
+from urllib.parse import urlparse
 
 from fastapi.concurrency import run_in_threadpool
 from google.cloud.storage import Blob
@@ -69,6 +70,9 @@ class OutputFileTable(DbBase):
 
         if not path:
             raise ValueError('Invalid cloud file path')
+
+        if urlparse(path).scheme == '':
+            raise ValueError('Output file path must contain a protocol prefix')
 
         file_obj = await run_in_threadpool(
             OutputFileInternal.get_file_info,

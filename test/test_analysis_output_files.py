@@ -1,6 +1,7 @@
 # pylint: disable=invalid-overridden-method
 import os
 from test.testbase import DbIsolatedTest, run_as_sync
+from typing import Any
 
 from testcontainers.core.container import DockerContainer
 
@@ -306,6 +307,68 @@ class TestOutputFiles(DbIsolatedTest):
             analysis.outputs['cram']['secondary_files']['ext'],
             output_file_data['cram']['secondary_files']['ext'],  # type: ignore [index]
         )
+
+    @run_as_sync
+    async def test_outputs_contains_protocol(self):
+        """Tests validation of the outputs field so that file paths contain a protocol prefix"""
+
+        outputs_valid: dict[str, Any] = {
+            'cram': {
+                'filtered': {
+                    'basename': 'gs://fakegcs/file2.cram',
+                    'secondary_files': {
+                        'meta': {'basename': 'gs://fakegcs/file2.cram.meta'},
+                        'ext': {'basename': 'gs://fakegcs/file2.cram.ext'},
+                    },
+                },
+            },
+            'vcf': {
+                'basename': 'gs://fakegcs/file3.vcf',
+                'secondary_files': {
+                    'meta': {'basename': 'gs://fakegcs/file3.vcf.meta'},
+                    'ext': {'basename': 'gs://fakegcs/file3.vcf.ext'},
+                },
+            },
+        }
+
+        analysis_id = None
+        # Check the base case of the validator passing a correctly formatted outputs field.
+        try:
+            analysis_id = await self.al.create_analysis(
+                AnalysisInternal(
+                    type='cram',
+                    status=AnalysisStatus.COMPLETED,
+                    sequencing_group_ids=[self.genome_sequencing_group_id],
+                    meta={'sequencing_type': 'genome', 'size': 1024},
+                    outputs=outputs_valid,
+                )
+            )
+        except ValueError:
+            self.fail()
+
+        # Setup the invalid outputs.
+        outputs_invalid = outputs_valid.copy()
+        outputs_invalid['cram']['filtered']['secondary_files']['ext']['basename'] = (
+            '://fakegcs/file2.cram.ext'
+        )
+
+        # Check the case of a file path being incorrectly formatted.
+        with self.assertRaises(ValueError):
+            await self.al.create_analysis(
+                AnalysisInternal(
+                    type='cram',
+                    status=AnalysisStatus.COMPLETED,
+                    sequencing_group_ids=[self.genome_sequencing_group_id],
+                    meta={'sequencing_type': 'genome', 'size': 1024},
+                    outputs=outputs_invalid,
+                )
+            )
+
+        # Check the case of updating an Analysis with a file path being incorrectly formatted.
+        with self.assertRaises(ValueError):
+            await self.al.update_analysis(
+                analysis_id=analysis_id, outputs=outputs_invalid
+            )
 
     @run_as_sync
     async def test_project_deletion(self):
