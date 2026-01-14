@@ -31,17 +31,17 @@ dependencies = [
     "pyarrow~=18.1",
     "slack-sdk==3.20.2",
     "strawberry-graphql[fastapi]==0.268.1",
-    "uvicorn~=0.34.2"
+    "uvicorn~=0.34.2",
 ]
 
 [tool.ruff]
 line-length = 88
 
 exclude = [
-    "metamist/api/*",
-    "metamist/apis/*",
-    "metamist/model/*",
-    "metamist/models/*",
+    "packages/metamist/src/metamist/api/*",
+    "packages/metamist/src/metamist/apis/*",
+    "packages/metamist/src/metamist/model/*",
+    "packages/metamist/src/metamist/models/*",
 
 ]
 
