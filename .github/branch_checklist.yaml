@@ -3,3 +3,4 @@ default:
   - Version number is bumped appropriately if API is changed
   - Tests cover any newly added code
   - There aren't any unnecessary autoformatting changes
+  - Pull request description is appropriate for use as a commit message for squash commit

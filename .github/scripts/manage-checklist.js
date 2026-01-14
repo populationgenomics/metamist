@@ -3,8 +3,8 @@ const commentTitle = '## PR Checklist ✅'
 const checklistItemRegex = /- \[(x| )\] ([\w ]+)/g
 
 /**
- * Builds a new checklist as an array of strings based on an existing comment and an
- * array of checklist items. Any items that are already represented in the body
+ * Builds a new checklist as an array of strings, based on an existing comment and an
+ * array of checklist items. Any items that are already represented in the comment
  * will maintain their checked status, and any new items will be added.
  *
  * @param {string[]} items
