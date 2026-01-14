@@ -1,6 +1,7 @@
 default:
   - Changes do not contain the names of any sensitive CPG projects
-  - Version number is bumped appropriately if API is changed
   - Tests cover any newly added code
   - There aren't any unnecessary autoformatting changes
   - Pull request description is appropriate for use as a commit message for squash commit
+main:
+  - Version number is bumped appropriately if API is changed
