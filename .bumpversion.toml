@@ -37,4 +37,3 @@ replace = 'version = "{new_version}"'
 filename = "packages/metamist/pyproject.toml"
 search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
-
