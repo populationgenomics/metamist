@@ -129,7 +129,4 @@ dev = [
 package = false
 
 [tool.uv.sources]
-metamist = { workspace = true }
-
-[tool.uv.workspace]
-members = ["packages/metamist"]
+metamist = { path = "packages/metamist", editable = true }
