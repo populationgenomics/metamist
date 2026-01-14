@@ -81,7 +81,6 @@ jobs:
           else
             echo DEPLOYMENT_TYPE=dev >> $GITHUB_ENV
             echo SM_ENVIRONMENT=development >> $GITHUB_ENV
-            uv pip install bump-my-version
             # add
             uv run bump-my-version bump patch \
               --no-commit --allow-dirty \
