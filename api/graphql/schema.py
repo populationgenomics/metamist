@@ -571,7 +571,9 @@ class GraphQLProject:
                         if active
                         else GenericFilter(eq=True)
                     ),
-                    timestamp_completed=timestamp_completed.to_internal_filter() if timestamp_completed else None,
+                    timestamp_completed=timestamp_completed.to_internal_filter()
+                    if timestamp_completed
+                    else None,
                 ),
             }
         )
