@@ -468,8 +468,7 @@ async def load_analyses_for_projects(
     connection: Connection,
 ) -> dict[int, list[AnalysisInternal]]:
     """
-    Type: (sequencing_group_id: int, status?: AnalysisStatus, type?: str)
-        -> list[list[AnalysisInternal]]
+    Data loader for loading analyses from projects.
     """
     alayer = AnalysisLayer(connection)
     filter_.project = GenericFilter(in_=ids)
