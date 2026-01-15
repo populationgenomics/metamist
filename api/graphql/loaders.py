@@ -60,6 +60,7 @@ class LoaderKeys(enum.Enum):
     AUDIT_LOGS_BY_IDS = 'audit_logs_by_ids'
     AUDIT_LOGS_BY_ANALYSIS_IDS = 'audit_logs_by_analysis_ids'
 
+    ANALYSES_FOR_PROJECTS = 'analyses_for_projects'
     ANALYSES_FOR_SEQUENCING_GROUPS = 'analyses_for_sequencing_groups'
 
     ASSAYS_FOR_IDS = 'assays_for_ids'
@@ -456,6 +457,28 @@ async def load_participants_for_projects(
 
     pmap = group_by(participants, lambda p: p.project)
     return pmap
+
+
+@connected_data_loader_with_params(
+    LoaderKeys.ANALYSES_FOR_PROJECTS, default_factory=list
+)
+async def load_analyses_for_projects(
+    ids: list[int],
+    filter_: AnalysisFilter,
+    connection: Connection,
+) -> dict[int, list[AnalysisInternal]]:
+    """
+    Type: (sequencing_group_id: int, status?: AnalysisStatus, type?: str)
+        -> list[list[AnalysisInternal]]
+    """
+    alayer = AnalysisLayer(connection)
+    filter_.project = GenericFilter(in_=ids)
+    analyses = await alayer.query(filter_)
+    by_project_id: dict[int, list[AnalysisInternal]] = defaultdict(list)
+    for a in analyses:
+        by_project_id[a.project].append(a)
+
+    return by_project_id
 
 
 @connected_data_loader_with_params(
