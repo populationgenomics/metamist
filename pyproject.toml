@@ -31,17 +31,17 @@ dependencies = [
     "pyarrow~=18.1",
     "slack-sdk==3.20.2",
     "strawberry-graphql[fastapi]==0.268.1",
-    "uvicorn~=0.34.2"
+    "uvicorn~=0.34.2",
 ]
 
 [tool.ruff]
 line-length = 88
 
 exclude = [
-    "metamist/api/*",
-    "metamist/apis/*",
-    "metamist/model/*",
-    "metamist/models/*",
+    "packages/metamist/src/metamist/api/*",
+    "packages/metamist/src/metamist/apis/*",
+    "packages/metamist/src/metamist/model/*",
+    "packages/metamist/src/metamist/models/*",
 
 ]
 
@@ -101,7 +101,7 @@ known_cpg = [
 [dependency-groups]
 dev = [
     "black>=22.3.0",
-    "bump2version>=1.0.1",
+    "bump-my-version>=0.30.0",
     "coverage>=7.6.10",
     "flake8>=7.1.1",
     "flake8-bugbear>=24.12.12",
@@ -129,7 +129,4 @@ dev = [
 package = false
 
 [tool.uv.sources]
-metamist = { workspace = true }
-
-[tool.uv.workspace]
-members = ["packages/metamist"]
+metamist = { path = "packages/metamist", editable = true }

@@ -81,9 +81,8 @@ jobs:
           else
             echo DEPLOYMENT_TYPE=dev >> $GITHUB_ENV
             echo SM_ENVIRONMENT=development >> $GITHUB_ENV
-            uv pip install bump2version
             # add
-            bump2version patch \
+            uv run bump-my-version bump patch \
               --no-commit --allow-dirty \
               --new-version $(cat deploy/python/version.txt).dev+$(echo $(git rev-parse HEAD) | cut -c1-7)
           fi
@@ -116,6 +115,14 @@ jobs:
           pushd packages/metamist
           uv build --sdist --out-dir dist
           popd
+
+      - name: Smoke test python package
+        run: |
+          uv run \
+            --with packages/metamist/dist/metamist-$(cat deploy/python/version.txt).tar.gz \
+            --no-project \
+            --isolated \
+            -- python -c "import metamist;"
 
       - name: "push server image"
         run: |

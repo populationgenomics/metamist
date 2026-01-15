@@ -1,6 +1,7 @@
 [project]
 name = "metamist"
 version = "7.13.3"
+requires-python = ">=3.10"
 dependencies = [
     "backoff>=2.2.1",
     "click",
@@ -44,7 +45,6 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 package-dir = {"" = "src"}
 include-package-data = true
-zip-safe = false
 
 [tool.setuptools.packages.find]
 where = ["src"]

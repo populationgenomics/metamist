@@ -17,6 +17,7 @@ sample_metadata/*
 
 packages/metamist/*
 !packages/metamist/pyproject.toml
+!packages/metamist/uv.lock
 !packages/metamist/MANIFEST.in
 !packages/metamist/src/
 packages/metamist/src/*
