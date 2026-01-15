@@ -191,7 +191,7 @@ Next up, we need to run the API generator to create the python client, which wil
 
 This is handled by the `regenerate_api.py` script.
 
-This script requires [openapi-generator](https://openapi-generator.tech/docs/installation/) to be installed, this is included as part of Metamist's python dev requirements, so make sure that you have your virtual env activated before running:
+This script requires [openapi-generator](https://openapi-generator.tech/docs/installation/) to be installed, this is included as part of Metamist's python dev requirements, so you shouldn't need to install anything additional.
 
 ```bash
 uv run regenerate_api.py
