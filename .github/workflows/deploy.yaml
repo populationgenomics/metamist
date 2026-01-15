@@ -116,6 +116,14 @@ jobs:
           uv build --sdist --out-dir dist
           popd
 
+      - name: Smoke test python package
+        run: |
+          uv run \
+            --with packages/metamist/dist/metamist-$(cat deploy/python/version.txt).tar.gz \
+            --no-project \
+            --isolated \
+            -- python -c "import metamist;"
+
       - name: "push server image"
         run: |
           docker push $SM_DOCKER
