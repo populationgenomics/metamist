@@ -245,7 +245,7 @@ query MyQuery($project: String!) {
                 type='cram',
                 status=AnalysisStatus.COMPLETED,
                 meta={},
-                output='some-output',
+                output='test://some-output',
             )
         )
 
@@ -411,7 +411,7 @@ query MyQuery($project: String!) {
                 type='cram',
                 status=AnalysisStatus.COMPLETED,
                 meta={},
-                output='some-output',
+                output='test://some-output',
             )
         )
 
