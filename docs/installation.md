@@ -19,24 +19,13 @@ cd metamist
 
 ### Install python requirements
 
-It is recommended to use [pyenv](https://github.com/pyenv/pyenv) and [virtualenv](https://virtualenv.pypa.io/en/latest/installation.html) to manage the Python version and virtual environment for Metamist. Since Metamist currently is deployed with python 3.11, you should also use 3.11 locally to ensure that any changes you make are compatible with the deployed version of Metamist.
+Make sure [uv](https://docs.astral.sh/uv/getting-started/installation/) is locally installed.
 
 
 ```bash
-# install python 3.11
-pyenv install 3.11
-
-# select python 3.11 for your current shell
-pyenv shell 3.11
-
-# set up virtualenv with python 3.11
-virtualenv .venv -p 3.11
-
-# activate virtualenv
-source .venv/bin/activate
-
-# install requirements
-pip install --no-deps -r requirements-dev.txt
+# creates virtual env, install python version (3.11 as specified in pyproject.toml) and install dependencies
+uv venv --seed
+uv sync
 ```
 
 ### Database setup
@@ -202,21 +191,15 @@ Next up, we need to run the API generator to create the python client, which wil
 
 This is handled by the `regenerate_api.py` script.
 
-This script requires [openapi-generator](https://openapi-generator.tech/docs/installation/) to be installed, this is included as part of Metamist's python dev requirements, so make sure that you have your virtual env activated before running:
+This script requires [openapi-generator](https://openapi-generator.tech/docs/installation/) to be installed, this is included as part of Metamist's python dev requirements, so you shouldn't need to install anything additional.
 
 ```bash
-python regenerate_api.py
+uv run regenerate_api.py
 ```
 
 If you have installed openapi generator using a different method you can set the `OPENAPI_COMMAND` environment variable to configure the command to use.
 
-
-Once the API is generated, you can install it by running:
-
-```bash
-pip install --editable .
-```
-
+The API will be generated in the directory `packages/metamist/src/metamist` and you can build the API for packaging using the `pyproject.toml` file in the `packages/metamist/` directory.
 
 ### Starting the API
 
@@ -227,7 +210,7 @@ Now that everything is set up, you can start the api server. If you are using vs
 If you are not using vscode, you can run the API with uvicorn.
 
 ```bash
-uvicorn --port 8000 --host 0.0.0.0 api.server:app
+uv run uvicorn --port 8000 --host 0.0.0.0 api.server:app
 ```
 
 
@@ -237,7 +220,7 @@ To add some data to your database, you can run the `test/data/generate_data.py` 
 
 
 ```bash
-python3 test/data/generate_data.py
+uv run test/data/generate_data.py
 ```
 
 

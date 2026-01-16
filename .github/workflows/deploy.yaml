@@ -63,9 +63,15 @@ jobs:
           distribution: "temurin" # See 'Supported distributions' for available options
           java-version: "17"
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e #v6.8.0
+        with:
+          activate-environment: true
+          enable-cache: false
+          version: 0.8.22 #uv version
+
       - name: Setup build env
-        run: |
-          pip install --no-deps -r requirements-dev.txt
+        run: uv sync
 
       - name: prepare-deployment
         run: |
@@ -75,16 +81,15 @@ jobs:
           else
             echo DEPLOYMENT_TYPE=dev >> $GITHUB_ENV
             echo SM_ENVIRONMENT=development >> $GITHUB_ENV
-            pip install bump2version
             # add
-            bump2version patch \
+            uv run bump-my-version bump patch \
               --no-commit --allow-dirty \
               --new-version $(cat deploy/python/version.txt).dev+$(echo $(git rev-parse HEAD) | cut -c1-7)
           fi
 
       - name: "build deployable API"
         run: |
-          python regenerate_api.py
+          uv run regenerate_api.py
           ls -lGh metamist
 
         # also copies build artifacts to api/public
@@ -106,7 +111,18 @@ jobs:
             .
 
       - name: Build python package
-        run: python setup.py sdist
+        run: |
+          pushd packages/metamist
+          uv build --sdist --out-dir dist
+          popd
+
+      - name: Smoke test python package
+        run: |
+          uv run \
+            --with packages/metamist/dist/metamist-$(cat deploy/python/version.txt).tar.gz \
+            --no-project \
+            --isolated \
+            -- python -c "import metamist;"
 
       - name: "push server image"
         run: |
@@ -128,5 +144,5 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: dist/
+          packages-dir: packages/metamist/dist
           skip-existing: true

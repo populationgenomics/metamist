@@ -1,0 +1,50 @@
+[project]
+name = "metamist"
+version = "7.13.3"
+requires-python = ">=3.10"
+dependencies = [
+    "backoff>=2.2.1",
+    "click",
+    "google-auth",
+    "google-api-core",
+    "urllib3 >= 1.25.3",
+    "python-dateutil",
+    "requests",
+    "cpg-utils>=5.0.5",
+    "gql[aiohttp,requests]~=3.5",
+    "tabulate >= 0.9.0",
+]
+
+description = "Python API for interacting with the Sample API system"
+readme = "README.md"
+license-files = ["LICENSE"]
+keywords = ["bioinformatics"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Natural Language :: English",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX",
+    "Operating System :: Unix",
+    "Programming Language :: Python",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+license = "MIT"
+[project.urls]
+Homepage = "https://github.com/populationgenomics/metamist"
+
+[project.entry-points.metamist_parser]
+GenericMetadataParser = "metamist.parser.generic_metadata_parser:GenericMetadataParser"
+SampleFileMapParser = "metamist.parser.sample_file_map_parser:SampleFileMapParser"
+
+[build-system]
+requires = ["setuptools>=42"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
