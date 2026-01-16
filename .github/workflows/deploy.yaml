@@ -90,7 +90,7 @@ jobs:
       - name: "build deployable API"
         run: |
           uv run regenerate_api.py
-          ls -lGh metamist
+          ls -lGh packages/metamist/src/metamist/
 
         # also copies build artifacts to api/public
       - name: "build web front-end"
