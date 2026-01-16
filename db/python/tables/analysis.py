@@ -63,6 +63,7 @@ class AnalysisTable(DbBase):
         cohort_ids: List[int] | None = None,
         meta: Optional[Dict[str, Any]] = None,
         active: bool | None = True,
+        timestamp_completed: datetime.datetime | None = None,
         project: ProjectId | None = None,
     ) -> int:
         """
@@ -80,7 +81,13 @@ class AnalysisTable(DbBase):
             ]
 
             if status == AnalysisStatus.COMPLETED:
-                kv_pairs.append(('timestamp_completed', datetime.datetime.utcnow()))
+                kv_pairs.append(
+                    (
+                        'timestamp_completed',
+                        timestamp_completed
+                        or datetime.datetime.now(datetime.timezone.utc),
+                    )
+                )
 
             kv_pairs = [(k, v) for k, v in kv_pairs if v is not None]
             keys = [k for k, _ in kv_pairs]
