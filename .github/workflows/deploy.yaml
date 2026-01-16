@@ -84,7 +84,7 @@ jobs:
             # add
             uv run bump-my-version bump patch \
               --no-commit --allow-dirty \
-              --new-version $(cat deploy/python/version.txt).dev+$(echo $(git rev-parse HEAD) | cut -c1-7)
+              --new-version $(cat deploy/python/version.txt).dev0+$(echo $(git rev-parse HEAD) | cut -c1-7)
           fi
 
       - name: "build deployable API"
@@ -118,11 +118,16 @@ jobs:
 
       - name: Smoke test python package
         run: |
-          uv run \
-            --with packages/metamist/dist/metamist-$(cat deploy/python/version.txt).tar.gz \
-            --no-project \
-            --isolated \
-            -- python -c "import metamist;"
+          # There should only be one tarball here but a loop means
+          # we don't need to work out what the filename ended up being
+          for tarball in packages/metamist/dist/*.tar.gz; do
+            echo "Testing package dist $tarball"
+            uv run \
+              --with "$tarball" \
+              --no-project \
+              --isolated \
+              -- python -c "import metamist;"
+          done
 
       - name: "push server image"
         run: |
