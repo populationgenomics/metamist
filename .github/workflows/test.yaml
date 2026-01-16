@@ -39,11 +39,18 @@ jobs:
           distribution: 'temurin' # See 'Supported distributions' for available options
           java-version: '17'
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e #v6.8.0
+        with:
+          activate-environment: true
+          enable-cache: false
+          version: 0.8.22 #uv version
+
       - name: Setup build env
         run: |
           set -euxo pipefail
 
-          pip install --no-deps -r requirements-dev.txt
+          uv sync
 
           # liquibase connector
           pushd db/
@@ -65,15 +72,14 @@ jobs:
 
       - name: 'build deployable API'
         run: |
-          python regenerate_api.py
-          pip install .
+          uv run regenerate_api.py
 
       - name: 'Run unit tests'
         id: runtests
         run: |
           rc=0
-          coverage run -m pytest --doctest-modules --doctest-continue-on-failure test/ --junitxml=test-execution.xml || rc=$?
-          coverage xml
+          uv run coverage run -m pytest --doctest-modules --doctest-continue-on-failure test/ --junitxml=test-execution.xml || rc=$?
+          uv run coverage xml
 
           echo "rc=$rc" >> $GITHUB_OUTPUT
 
