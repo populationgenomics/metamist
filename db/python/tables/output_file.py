@@ -161,25 +161,23 @@ class OutputFileTable(DbBase):
             if 'main_files' in files:
                 for primary_file in files['main_files']:
                     parent_file_id = await self.create_or_update_output_file(
-                        path=primary_file['basename'],
+                        path=primary_file['path'],
                         blobs=blobs,
                     )
                     await self.add_output_file_to_analysis(
                         analysis_id,
                         parent_file_id,
                         json_structure=primary_file['json_path'],
-                        # If the file couldnt be created, we just pass the basename as the output
-                        output=(None if parent_file_id else primary_file['basename']),
+                        # If the file couldn't be created, we just pass the path as the output
+                        output=(None if parent_file_id else primary_file['path']),
                     )
                     secondary_files = files.get('secondary_files_grouped')
                     if secondary_files:
-                        if primary_file['basename'] in secondary_files:
-                            for secondary_file in secondary_files[
-                                primary_file['basename']
-                            ]:
+                        if primary_file['path'] in secondary_files:
+                            for secondary_file in secondary_files[primary_file['path']]:
                                 secondary_file_id = (
                                     await self.create_or_update_output_file(
-                                        path=secondary_file['basename'],
+                                        path=secondary_file['path'],
                                         parent_id=parent_file_id,
                                         blobs=blobs,
                                     )
@@ -188,21 +186,21 @@ class OutputFileTable(DbBase):
                                     analysis_id,
                                     secondary_file_id,
                                     json_structure=secondary_file['json_path'],
-                                    # If the file couldnt be created, we just pass the basename as the output
+                                    # If the file couldn't be created, we just pass the path as the output
                                     output=(
                                         None
                                         if secondary_file_id
-                                        else secondary_file['basename']
+                                        else secondary_file['path']
                                     ),
                                 )
                                 if secondary_file_id:
                                     file_ids.append(secondary_file_id)
                                 else:
-                                    outputs.append(secondary_file['basename'])
+                                    outputs.append(secondary_file['path'])
                     if parent_file_id:
                         file_ids.append(parent_file_id)
                     else:
-                        outputs.append(primary_file['basename'])
+                        outputs.append(primary_file['path'])
 
             # check that only the files in this json_dict should be in the analysis. Remove what isn't in this dict.
             if not file_ids and not outputs:
@@ -255,37 +253,37 @@ class OutputFileTable(DbBase):
             json_path = []  # Initialize path for tracking key path
 
         if isinstance(json_dict, str):
-            # If the data is a plain string, return it as the basename with None as its keypath
-            collected['main_files'].append({'json_path': None, 'basename': json_dict})
+            # If the data is a plain string, return it as the path and None as its keypath
+            collected['main_files'].append({'json_path': None, 'path': json_dict})
             return collected
 
         if isinstance(json_dict, dict):
-            # Check if current dict contains 'basename'
-            if 'basename' in json_dict:
+            # Check if current dict contains 'path'
+            if 'path' in json_dict:
                 # Add current item to main_files
                 collected['main_files'].append(
                     {
                         'json_path': '.'.join(json_path),
-                        'basename': json_dict['basename'],
+                        'path': json_dict['path'],
                     }
                 )
-                current_basename = json_dict[
-                    'basename'
-                ]  # Keep track of current basename for secondary files
+                current_path = json_dict[
+                    'path'
+                ]  # Keep track of current path for secondary files
 
                 # Handle secondary files if present
                 if 'secondary_files' in json_dict:
                     secondary = json_dict['secondary_files']
-                    if current_basename not in collected['secondary_files_grouped']:
-                        collected['secondary_files_grouped'][current_basename] = []
+                    if current_path not in collected['secondary_files_grouped']:
+                        collected['secondary_files_grouped'][current_path] = []
                     for key, value in secondary.items():
-                        # Append each secondary file to the list in secondary_files under its parent basename
-                        collected['secondary_files_grouped'][current_basename].append(
+                        # Append each secondary file to the list in secondary_files under its parent path
+                        collected['secondary_files_grouped'][current_path].append(
                             {
                                 'json_path': '.'.join(
                                     json_path + ['secondary_files', key]
                                 ),
-                                'basename': value['basename'],
+                                'path': value['path'],
                             }
                         )
 
