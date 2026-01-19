@@ -35,37 +35,43 @@ jobs:
       run:
         shell: bash -eo pipefail -l {0}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
 
       - id: "google-cloud-auth"
         name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@v2"
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: "projects/774248915715/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
           service_account: "sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com"
 
       - id: "google-cloud-sdk-setup"
         name: "Set up Cloud SDK"
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v3
 
       - name: "gcloud docker auth"
         run: |
           gcloud auth configure-docker australia-southeast1-docker.pkg.dev
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: "temurin" # See 'Supported distributions' for available options
           java-version: "17"
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e #v6.8.0
+        with:
+          activate-environment: true
+          enable-cache: false
+          version: 0.8.22 #uv version
+
       - name: Setup build env
-        run: |
-          pip install --no-deps -r requirements-dev.txt
+        run: uv sync
 
       - name: prepare-deployment
         run: |
@@ -75,17 +81,16 @@ jobs:
           else
             echo DEPLOYMENT_TYPE=dev >> $GITHUB_ENV
             echo SM_ENVIRONMENT=development >> $GITHUB_ENV
-            pip install bump2version
             # add
-            bump2version patch \
+            uv run bump-my-version bump patch \
               --no-commit --allow-dirty \
-              --new-version $(cat deploy/python/version.txt).dev+$(echo $(git rev-parse HEAD) | cut -c1-7)
+              --new-version $(cat deploy/python/version.txt).dev0+$(echo $(git rev-parse HEAD) | cut -c1-7)
           fi
 
       - name: "build deployable API"
         run: |
-          python regenerate_api.py
-          ls -lGh metamist
+          uv run regenerate_api.py
+          ls -lGh packages/metamist/src/metamist/
 
         # also copies build artifacts to api/public
       - name: "build web front-end"
@@ -106,7 +111,23 @@ jobs:
             .
 
       - name: Build python package
-        run: python setup.py sdist
+        run: |
+          pushd packages/metamist
+          uv build --sdist --out-dir dist
+          popd
+
+      - name: Smoke test python package
+        run: |
+          # There should only be one tarball here but a loop means
+          # we don't need to work out what the filename ended up being
+          for tarball in packages/metamist/dist/*.tar.gz; do
+            echo "Testing package dist $tarball"
+            uv run \
+              --with "$tarball" \
+              --no-project \
+              --isolated \
+              -- python -c "import metamist;"
+          done
 
       - name: "push server image"
         run: |
@@ -128,5 +149,5 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: dist/
+          packages-dir: packages/metamist/dist
           skip-existing: true
