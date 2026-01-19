@@ -24,8 +24,8 @@ from api.utils.openapi import get_openapi_schema_func
 from db.python.connect import SMConnections
 from db.python.utils import get_logger
 
-# This tag is automatically updated by bump2version
-_VERSION = '7.13.3'
+# This tag is automatically updated by bump-my-version
+_VERSION = '7.13.4'
 
 
 logger = get_logger()

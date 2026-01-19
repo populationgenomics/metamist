@@ -29,12 +29,18 @@ jobs:
           distribution: 'temurin' # See 'Supported distributions' for available options
           java-version: '17'
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e #v6.8.0
+        with:
+          activate-environment: true
+          enable-cache: false
+          version: 0.8.22 #uv version
+
       - name: Setup build env
         run: |
           set -euxo pipefail
 
-          pip install --no-deps -r requirements-dev.txt
-
+          uv sync
 
       - name: 'install frontend deps'
         working-directory: ./web
@@ -58,10 +64,9 @@ jobs:
 
       - name: Build + install packages
         run: |
-          python regenerate_api.py
-          pip install --no-deps -r requirements-dev.txt
-          pip install .
+          uv sync
+          uv run regenerate_api.py
           mkdir .mypy_cache
 
       - name: pre-commit
-        run: pre-commit run --all-files
+        run: uv run pre-commit run --all-files

@@ -7,18 +7,10 @@
     "prConcurrentLimit": 10,
     "prHourlyLimit": 5,
     "semanticCommits": "enabled",
-    "enabledManagers": ["pip-compile"],
-    "constraints": {
-      "python": "==3.11"
-    },
+    "enabledManagers": ["pep621"],
     "platformCommit": "enabled",
-    "pip-compile": {
-      "fileMatch": ["^requirements\\.txt$", "^requirements-dev\\.txt$"],
-      "lockFileMaintenance": {
-        "enabled": true,
-        "branchTopic": "pip-compile-refresh",
-        "commitMessageAction": "Refresh pip-compile outputs"
-      }
+    "lockFileMaintenance": {
+      "enabled": true
     },
     "packageRules": [
       {
