@@ -165,6 +165,33 @@ class TestFamilyImportEndpoint(DbIsolatedTest):
             self.assertEqual(fam.meta, {'key1': 'value1'})
 
     @run_as_sync
+    async def test_import_families_fails_on_invalid_meta(self):
+        """
+        Test importing families with valid file contents.
+        """
+        data = [
+            ['familyid', 'description', 'phenotype', 'meta'],
+            ['Smith', 'Blacksmiths', 'burnt', '{"key1": "...'],
+        ]
+        fileContent = '\n'.join(['\t'.join(row) for row in data]).encode(
+            encoding='utf-8-sig'
+        )
+
+        with TemporaryFile(mode='wb+', prefix='test', suffix='.tsv') as f:
+            f.write(fileContent)
+            f.seek(0)
+            testFile = UploadFile(f)
+
+            # expect to raise ValueError due to invalid JSON in meta
+            with self.assertRaises(ValueError):
+                await family.import_families(
+                    testFile,
+                    has_header=True,
+                    delimiter='\t',
+                    connection=self.connection,
+                )
+
+    @run_as_sync
     async def test_create_family_with_meta(self):
         """
         Test creating a family with meta
