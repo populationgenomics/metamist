@@ -430,6 +430,7 @@ class GraphQLProject:
         root: 'GraphQLProject',
         id: GraphQLFilter[int] | None = None,
         external_id: GraphQLFilter[str] | None = None,
+        meta: GraphQLMetaFilter | None = None,
     ) -> list['GraphQLFamily']:
         # don't need a data loader here as we're presuming we're not often running
         # the "families" method for many projects at once. If so, we might need to fix that
@@ -439,6 +440,7 @@ class GraphQLProject:
                 project=GenericFilter(eq=root.id),
                 id=id.to_internal_filter() if id else None,
                 external_id=external_id.to_internal_filter() if external_id else None,
+                meta=graphql_meta_filter_to_internal_filter(meta),
             )
         )
         return [GraphQLFamily.from_internal(f) for f in families]
@@ -721,6 +723,7 @@ class GraphQLFamily:
 
     description: str | None
     coded_phenotype: str | None
+    meta: strawberry.scalars.JSON
 
     # internal
     project_id: strawberry.Private[int]
@@ -733,6 +736,7 @@ class GraphQLFamily:
             external_ids=internal.external_ids or {},
             description=internal.description,
             coded_phenotype=internal.coded_phenotype,
+            meta=internal.meta or {},
             project_id=internal.project,
         )
 
