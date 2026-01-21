@@ -789,6 +789,7 @@ dependencies = [
     { name = "proto-plus" },
     { name = "protobuf" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/f3/a1/992092b4fe263f644886b271f3ed3ebc2d941edfb97399ffc8108561c775/google_cloud_artifact_registry-1.19.0.tar.gz", hash = "sha256:415032dbd0733ddf443b84432a8de4899aa4b6ea641960c98ddf2feb1d749a91", size = 313457, upload-time = "2026-01-15T13:15:48.939Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b5/f1/5233af8b664d8a67586e4f89123fa64ff9806dae6eac54386315120d8edc/google_cloud_artifact_registry-1.19.0-py3-none-any.whl", hash = "sha256:1136294fad38d01285bbd4dd104fe4f2ba4b6bbcfef5c6dcc7a072ebe9d48842", size = 248884, upload-time = "2026-01-09T14:53:01.591Z" },
 ]
@@ -1055,7 +1056,7 @@ wheels = [
 
 [[package]]
 name = "metamist"
-version = "7.13.3"
+version = "7.13.4"
 source = { editable = "." }
 dependencies = [
     { name = "backoff" },
