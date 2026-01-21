@@ -169,7 +169,7 @@ class CohortLayer(BaseLayer):
         dry_run: bool,
         cohort_criteria: CohortCriteriaInternal | None = None,
         template_id: int | None = None,
-        exclude_archived_sg_ids_internal: bool = False,
+        exclude_ineligible_sg_ids_internal: bool = False,
     ) -> NewCohortInternal:
         """
         Create a new cohort from the given parameters. Returns the newly created cohort_id.
@@ -252,8 +252,8 @@ class CohortLayer(BaseLayer):
             )
 
         if sg_ids_internal_raw and len(sgs) != len(sg_ids_internal_raw):
-            # if any sgs in the criteria list archived and exclude_archived_sg_ids_internal not set
-            if not exclude_archived_sg_ids_internal:
+            # if any sgs in the criteria list archived and exclude_ineligible_sg_ids_internal not set
+            if not exclude_ineligible_sg_ids_internal:
                 raise ValueError(
                     'Contains invalid sequencing groups. Please review the input sequencing groups, '
                     'or exclude archived sg_ids to skip invalid entries and continue cohort creation'

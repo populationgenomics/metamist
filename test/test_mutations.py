@@ -1374,7 +1374,7 @@ class TestCohortMutations(DbIsolatedTest):
 
         api_cohort = await self.cl.create_cohort_from_criteria(
             project_to_write=self.project_id,
-            exclude_archived_sg_ids_internal=True,
+            exclude_ineligible_sg_ids_internal=True,
             cohort_name='TestCohort2',
             description='Create cohort with an archived sequencing group',
             dry_run=False,
@@ -1505,7 +1505,7 @@ class TestCohortMutations(DbIsolatedTest):
             cohort_name='TestCohort2',
             description='Create cohort with an archived sequencing group',
             template_id=cohort_template_id_transform_to_raw(template_id),
-            exclude_archived_sg_ids_internal=True,
+            exclude_ineligible_sg_ids_internal=True,
             dry_run=False,
         )
 

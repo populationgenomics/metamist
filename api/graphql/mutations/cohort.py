@@ -79,7 +79,7 @@ class CohortMutations:
         cohort_spec: CohortBodyInput,
         cohort_criteria: CohortCriteriaInput | None = None,
         dry_run: bool = False,
-        exclude_archived_sg_ids_internal: bool = False,
+        exclude_ineligible_sg_ids_internal: bool = False,
     ) -> Annotated['GraphQLCohort', strawberry.lazy('api.graphql.schema')]:
         """
         Create a cohort with the given name and sample/sequencing group IDs.
@@ -126,7 +126,7 @@ class CohortMutations:
                 else None
             ),
             template_id=template_id_raw,
-            exclude_archived_sg_ids_internal=exclude_archived_sg_ids_internal,
+            exclude_ineligible_sg_ids_internal=exclude_ineligible_sg_ids_internal,
         )
         if dry_run:
             return GraphQLCohort(

@@ -34,7 +34,7 @@ async def create_cohort_from_criteria(
         {ProjectMemberRole.writer, ProjectMemberRole.contributor}
     ),
     dry_run: bool = False,
-    exclude_archived_sg_ids_internal: bool = False,
+    exclude_ineligible_sg_ids_internal: bool = False,
 ) -> NewCohort:
     """
     Create a cohort with the given name and sample/sequencing group IDs.
@@ -75,7 +75,7 @@ async def create_cohort_from_criteria(
             else None
         ),
         template_id=template_id_raw,
-        exclude_archived_sg_ids_internal=exclude_archived_sg_ids_internal,
+        exclude_ineligible_sg_ids_internal=exclude_ineligible_sg_ids_internal,
     )
 
     return cohort_output.to_external()
