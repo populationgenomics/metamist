@@ -124,14 +124,14 @@ UPDATE_ASSAY_MUTATION = """
 # region COHORT MUTATIONS
 
 CREATE_COHORT_FROM_CRITERIA_MUTATION = """
-    mutation CreateCohortFromCriteria($project: String!, $cohortSpec: CohortBodyInput!, $cohortCriteria: CohortCriteriaInput!, $dryRun: Boolean, $excludeArchivedSgIdsInternal: Boolean) {
+    mutation CreateCohortFromCriteria($project: String!, $cohortSpec: CohortBodyInput!, $cohortCriteria: CohortCriteriaInput!, $dryRun: Boolean, $excludeIneligibleSgIdsInternal: Boolean) {
         cohort{
             createCohortFromCriteria(
                 project: $project
                 cohortSpec: $cohortSpec
                 cohortCriteria: $cohortCriteria
                 dryRun: $dryRun
-                excludeArchivedSgIdsInternal: $excludeArchivedSgIdsInternal
+                excludeIneligibleSgIdsInternal: $excludeIneligibleSgIdsInternal
             ) {
                 id
                 name
@@ -163,13 +163,13 @@ CREATE_COHORT_TEMPLATE_MUTATION = """
 
 
 CREATE_COHORT_FROM_TEMPLATE_MUTATION = """
-      mutation CreateCohortFromTemplate($project: String!, $cohortSpec: CohortBodyInput!, $dryRun: Boolean, $excludeArchivedSgIdsInternal: Boolean) {
+      mutation CreateCohortFromTemplate($project: String!, $cohortSpec: CohortBodyInput!, $dryRun: Boolean, $excludeIneligibleSgIdsInternal: Boolean) {
       cohort {
         createCohortFromCriteria(
           project: $project
           cohortSpec: $cohortSpec
           dryRun: $dryRun
-          excludeArchivedSgIdsInternal: $excludeArchivedSgIdsInternal
+          excludeIneligibleSgIdsInternal: $excludeIneligibleSgIdsInternal
         ) {
           id
           template {
@@ -1357,7 +1357,7 @@ class TestCohortMutations(DbIsolatedTest):
                 CREATE_COHORT_FROM_CRITERIA_MUTATION,
                 variables={
                     'project': self.project_name,
-                    'excludeArchivedSgIdsInternal': True,
+                    'excludeIneligibleSgIdsInternal': True,
                     'cohortSpec': {
                         'name': 'TestCohort1',
                         'description': 'Create cohort with an archived sequencing group',
@@ -1463,7 +1463,7 @@ class TestCohortMutations(DbIsolatedTest):
 
     @run_as_sync
     async def test_create_cohort_from_template_with_archived_sg_and_exclude_set(self):
-        """Test mutation and API to create a cohort from a template with archived sg and excludeArchivedSgIdsInternal set to True"""
+        """Test mutation and API to create a cohort from a template with archived sg and excludeIneligibleSgIdsInternal set to True"""
         await self.sgl.archive_sequencing_group(self.genome_sequencing_group_id_1)
 
         template_id = (
@@ -1490,7 +1490,7 @@ class TestCohortMutations(DbIsolatedTest):
                 CREATE_COHORT_FROM_TEMPLATE_MUTATION,
                 variables={
                     'project': self.project_name,
-                    'excludeArchivedSgIdsInternal': True,
+                    'excludeIneligibleSgIdsInternal': True,
                     'cohortSpec': {
                         'name': 'TestCohort1',
                         'description': 'Create cohort with an archived sequencing group',
@@ -1522,7 +1522,7 @@ class TestCohortMutations(DbIsolatedTest):
     async def test_create_cohort_from_template_with_archived_sg_and_exclude_not_set(
         self,
     ):
-        """Test mutation and API to create a cohort from a template with archived sg and excludeArchivedSgIdsInternal not set"""
+        """Test mutation and API to create a cohort from a template with archived sg and excludeIneligibleSgIdsInternal not set"""
         await self.sgl.archive_sequencing_group(self.genome_sequencing_group_id_1)
 
         template_id = (
