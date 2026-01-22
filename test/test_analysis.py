@@ -1,5 +1,6 @@
 # pylint: disable=invalid-overridden-method
 import time
+from datetime import datetime
 
 from api.routes.analysis import AnalysisUpdateModel, update_analysis
 from db.python.filters import GenericFilter
@@ -343,6 +344,26 @@ class TestAnalysis(DbIsolatedTest):
 
         self.assertEqual(sgs[0].id, genome_id)
         self.assertEqual(sgs[1].id, exome_id)
+
+    @run_as_sync
+    async def test_create_analysis_with_timestamp(self):
+        """Tests that analyses can be backdated by suppling timestamp_completed"""
+        # Test creation with a manually-set timestamp
+        test_timestamp = datetime(year=2013, month=2, day=22)
+        a_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='analysis-runner',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[],
+                timestamp_completed=test_timestamp,
+                meta={},
+            ),
+        )
+
+        # get the timestamp_completed of the analysis from the db
+        init_analysis = await self.al.query(AnalysisFilter(id=GenericFilter(eq=a_id)))
+
+        self.assertEqual(init_analysis[0].timestamp_completed, test_timestamp)
 
     @run_as_sync
     async def test_update_analysis(self):

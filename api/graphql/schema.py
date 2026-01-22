@@ -584,34 +584,36 @@ class GraphQLProject:
         self,
         info: Info[GraphQLContext, 'Query'],
         root: 'Project',
-        type: GraphQLFilter[str] | None = None,
         status: GraphQLFilter[GraphQLAnalysisStatus] | None = None,
-        active: GraphQLFilter[bool] | None = None,
+        type: GraphQLFilter[str] | None = None,
         meta: GraphQLMetaFilter | None = None,
+        active: GraphQLFilter[bool] | None = None,
         timestamp_completed: GraphQLFilter[datetime.datetime] | None = None,
         ids: GraphQLFilter[int] | None = None,
     ) -> list['GraphQLAnalysis']:
-        connection = info.context['connection']
-        internal_analysis = await AnalysisLayer(connection).query(
-            AnalysisFilter(
-                id=ids.to_internal_filter() if ids else None,
-                type=type.to_internal_filter() if type else None,
-                status=(
-                    status.to_internal_filter()
-                    if status
-                    else GenericFilter(eq=AnalysisStatus.COMPLETED)
-                ),
-                active=active.to_internal_filter() if active else None,
-                project=GenericFilter(eq=root.id),
-                meta=meta,
-                timestamp_completed=(
-                    timestamp_completed.to_internal_filter()
+        loader = info.context['loaders'][LoaderKeys.ANALYSES_FOR_PROJECTS]
+
+        analyses = await loader.load(
+            {
+                'id': root.id,
+                'filter_': AnalysisFilter(
+                    id=ids.to_internal_filter() if ids else None,
+                    status=status.to_internal_filter() if status else None,
+                    type=type.to_internal_filter() if type else None,
+                    meta=graphql_meta_filter_to_internal_filter(meta),
+                    active=(
+                        active.to_internal_filter()
+                        if active
+                        else GenericFilter(eq=True)
+                    ),
+                    timestamp_completed=timestamp_completed.to_internal_filter()
                     if timestamp_completed
-                    else None
+                    else None,
                 ),
-            )
+            }
         )
-        return [GraphQLAnalysis.from_internal(a) for a in internal_analysis]
+
+        return [GraphQLAnalysis.from_internal(a) for a in analyses]
 
     @strawberry.field()
     async def cohorts(
