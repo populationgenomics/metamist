@@ -26,7 +26,11 @@ from models.utils.cohort_template_id_format import (
 router = APIRouter(prefix='/cohort', tags=['cohort'])
 
 
-@router.post('/{project}/cohort', operation_id='createCohortFromCriteria')
+@router.post(
+    '/{project}/cohort',
+    operation_id='createCohortFromCriteria',
+    response_model_exclude=None,
+)
 async def create_cohort_from_criteria(
     cohort_spec: CohortBody,
     cohort_criteria: CohortCriteria | None = None,

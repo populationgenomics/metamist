@@ -21,7 +21,11 @@ from models.utils.cohort_template_id_format import (
 )
 
 if TYPE_CHECKING:
-    from api.graphql.schema import GraphQLCohort, GraphQLCohortTemplate
+    from api.graphql.schema import (
+        CreatedGraphQLCohort,
+        GraphQLCohort,
+        GraphQLCohortTemplate,
+    )
 
 GraphQLCohortUpdateStatus: type = strawberry.enum(CohortUpdateStatus)
 
@@ -80,10 +84,11 @@ class CohortMutations:
         cohort_criteria: CohortCriteriaInput | None = None,
         dry_run: bool = False,
         exclude_ineligible_sg_ids_internal: bool = False,
-    ) -> Annotated['GraphQLCohort', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated['CreatedGraphQLCohort', strawberry.lazy('api.graphql.schema')]:
         """
         Create a cohort with the given name and sample/sequencing group IDs.
         """
+        from api.graphql.schema import CreatedGraphQLCohort
         from api.graphql.schema import GraphQLCohort
 
         connection: Connection = info.context['connection']
@@ -129,13 +134,16 @@ class CohortMutations:
             exclude_ineligible_sg_ids_internal=exclude_ineligible_sg_ids_internal,
         )
         if dry_run:
-            return GraphQLCohort(
-                id='CREATE NEW',
-                name=cohort_spec.name,
-                description=cohort_spec.description,
-                author=connection.author,
-                project_id=target_project.id,
-                status=CohortStatus.active,
+            return CreatedGraphQLCohort.from_internal_to_dry_run(
+                graphql_cohort=GraphQLCohort(
+                    id='CREATE NEW',
+                    name=cohort_spec.name,
+                    description=cohort_spec.description,
+                    author=connection.author,
+                    project_id=target_project.id,
+                    status=CohortStatus.active,
+                ),
+                excluded_sg_ids_internal=cohort_output.excluded_sg_ids_internal,
             )
 
         created_cohort = (
@@ -144,7 +152,9 @@ class CohortMutations:
             )
         )[0]
 
-        return GraphQLCohort.from_internal(created_cohort)
+        return CreatedGraphQLCohort.from_internal(
+            created_cohort, cohort_output.excluded_sg_ids_internal
+        )
 
     @strawberry.mutation
     async def create_cohort_template(

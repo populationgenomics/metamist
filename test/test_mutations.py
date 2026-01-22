@@ -133,6 +133,7 @@ CREATE_COHORT_FROM_CRITERIA_MUTATION = """
                 dryRun: $dryRun
                 excludeIneligibleSgIdsInternal: $excludeIneligibleSgIdsInternal
             ) {
+             createdCohort {
                 id
                 name
                 description
@@ -140,6 +141,7 @@ CREATE_COHORT_FROM_CRITERIA_MUTATION = """
                 sequencingGroups {
                     id
                 }
+             }
             }
         }
     }
@@ -171,13 +173,15 @@ CREATE_COHORT_FROM_TEMPLATE_MUTATION = """
           dryRun: $dryRun
           excludeIneligibleSgIdsInternal: $excludeIneligibleSgIdsInternal
         ) {
-          id
+        createdCohort{
+                  id
           template {
             id
           }
           sequencingGroups {
             id
           }
+        }
         }
       }
     }
@@ -688,7 +692,7 @@ class TestMutations(DbIsolatedTest):
                     },
                 },
             )
-        )['cohort']['createCohortFromCriteria']
+        )['cohort']['createCohortFromCriteria']['createdCohort']
         cohort = await self.cl.create_cohort_from_criteria(
             project_to_write=self.project_id,
             description='TestCohortDescription',
@@ -1328,7 +1332,7 @@ class TestCohortMutations(DbIsolatedTest):
                     },
                 },
             )
-        )['cohort']['createCohortFromCriteria']
+        )['cohort']['createCohortFromCriteria']['createdCohort']
 
         api_cohort = await self.cl.create_cohort_from_criteria(
             project_to_write=self.project_id,
@@ -1370,7 +1374,7 @@ class TestCohortMutations(DbIsolatedTest):
                     },
                 },
             )
-        )['cohort']['createCohortFromCriteria']
+        )['cohort']['createCohortFromCriteria']['createdCohort']
 
         api_cohort = await self.cl.create_cohort_from_criteria(
             project_to_write=self.project_id,
@@ -1498,7 +1502,7 @@ class TestCohortMutations(DbIsolatedTest):
                     },
                 },
             )
-        )['cohort']['createCohortFromCriteria']
+        )['cohort']['createCohortFromCriteria']['createdCohort']
 
         api_cohort = await self.cl.create_cohort_from_criteria(
             project_to_write=self.project_id,

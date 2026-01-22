@@ -219,7 +219,10 @@ CREATE_COHORT_MUTATION = """
           cohortCriteria: $cohortCriteria
           dryRun: $dryRun
         ) {
-          status
+         createdCohort
+         {
+            status
+         }
         }
       }
     }
@@ -271,7 +274,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                     },
                 },
             )
-        )['cohort']['createCohortFromCriteria']
+        )['cohort']['createCohortFromCriteria']['createdCohort']
         self.assertEqual(mutation_result['status'], ACTIVE)
 
     @run_as_sync
@@ -368,7 +371,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                     },
                 },
             )
-        )['cohort']['createCohortFromCriteria']
+        )['cohort']['createCohortFromCriteria']['createdCohort']
 
         query_cohort_filter_status_in = """
             query CohortQuery($cohort_status_list: [CohortStatus!]!) {

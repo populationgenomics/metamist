@@ -251,29 +251,31 @@ class CohortLayer(BaseLayer):
                 'Cohort creation criteria resulted in no sequencing groups being selected. Please check the criteria and try again'
             )
 
-        if sg_ids_internal_raw and len(sgs) != len(sg_ids_internal_raw):
-            # if any sgs in the criteria list archived and exclude_ineligible_sg_ids_internal not set
-            if not exclude_ineligible_sg_ids_internal:
-                raise ValueError(
-                    'Contains invalid sequencing groups. Please review the input sequencing groups, '
-                    'or exclude archived sg_ids to skip invalid entries and continue cohort creation'
-                )
+        sg_ids = [sg.id for sg in sgs if sg.id] if sgs else []
+        excluded_sg_ids_internal = None
 
-            #  update cohort criteria with active sgs now
-            sg_ids = (
-                [sg.id for sg in sgs if sg.id] if sgs else []
-            )  #  cohort template will contain active SGs
-            cohort_criteria.sg_ids_internal_raw = sg_ids
-            #  if create cohort given template_id, this creates a new template
-            create_cohort_template = True
+        if sg_ids_internal_raw:
+            sg_ids_internal_raw_set = set(sg_ids_internal_raw)
+            if len(sg_ids_internal_raw_set) != len(sg_ids):
+                # if any sgs in the criteria list not active and exclude_ineligible_sg_ids_internal not set
+                if not exclude_ineligible_sg_ids_internal:
+                    raise ValueError(
+                        'Contains invalid sequencing groups. Please review the input sequencing groups, '
+                        'or set exclude_ineligible_sg_ids_internal to skip invalid entries and continue cohort creation'
+                    )
+
+                #  update cohort criteria with active sgs now
+                cohort_criteria.sg_ids_internal_raw = sg_ids
+                #  if create cohort given template_id, this creates a new template
+                create_cohort_template = True
+                excluded_sg_ids_internal = list(sg_ids_internal_raw_set - set(sg_ids))
 
         if dry_run:
-            sg_ids = [sg.id for sg in sgs if sg.id] if sgs else []
-
             return NewCohortInternal(
                 dry_run=True,
                 cohort_id=None,
                 sequencing_group_ids=sg_ids,
+                excluded_sg_ids_internal=excluded_sg_ids_internal,
             )
         # 2. Create cohort template, if required.
         if create_cohort_template:
@@ -292,13 +294,16 @@ class CohortLayer(BaseLayer):
             raise ValueError('Template ID must be set')
 
         # 3. Create Cohort
-        return await self.ct.create_cohort(
+        new_cohort = await self.ct.create_cohort(
             project=project_to_write,
             cohort_name=cohort_name,
-            sequencing_group_ids=[sg.id for sg in sgs if sg.id],
+            sequencing_group_ids=sg_ids,
             description=description,
             template_id=template_id,
         )
+
+        new_cohort.excluded_sg_ids_internal = excluded_sg_ids_internal
+        return new_cohort
 
     async def update_cohort(self, cohort_update_body: CohortUpdateBody, cohort_id: int):
         """update Cohort given id"""
