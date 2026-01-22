@@ -563,6 +563,7 @@ class AnalysisLayer(BaseLayer):
             cohort_ids=analysis.cohort_ids,
             meta=analysis.meta,
             active=analysis.active,
+            timestamp_completed=analysis.timestamp_completed,
             project=project,
         )
 
