@@ -167,7 +167,6 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
             cohort_name='Sample cohort 2',
             dry_run=False,
             cohort_criteria=CohortCriteriaInternal(
-                projects=[self.project_id],
                 sg_ids_internal_raw=[self.sgA_raw[0], sg_b_raw[0]],
             ),
         )
@@ -220,7 +219,10 @@ CREATE_COHORT_MUTATION = """
           cohortCriteria: $cohortCriteria
           dryRun: $dryRun
         ) {
-          status
+         createdCohort
+         {
+            status
+         }
         }
       }
     }
@@ -272,7 +274,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                     },
                 },
             )
-        )['cohort']['createCohortFromCriteria']
+        )['cohort']['createCohortFromCriteria']['createdCohort']
         self.assertEqual(mutation_result['status'], ACTIVE)
 
     @run_as_sync
@@ -369,7 +371,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                     },
                 },
             )
-        )['cohort']['createCohortFromCriteria']
+        )['cohort']['createCohortFromCriteria']['createdCohort']
 
         query_cohort_filter_status_in = """
             query CohortQuery($cohort_status_list: [CohortStatus!]!) {

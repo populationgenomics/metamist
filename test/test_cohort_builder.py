@@ -166,8 +166,7 @@ class TestCohortBuilderData(DbIsolatedTest):
                 name='Epic cohort', description='Every criterion'
             ),
             projects=[self.project_name],
-            sg_ids_internal=[self.sgA],
-            excluded_sg_ids=[self.sgB],
+            excluded_sg_ids=[self.sgB, self.sgC],
             sg_technologies=['short-read'],
             sg_platforms=['illumina'],
             sg_types=['genome'],
@@ -185,8 +184,7 @@ class TestCohortBuilderData(DbIsolatedTest):
         criteria = body['cohort_criteria']
         self.assertIsInstance(criteria, metamist.models.CohortCriteria)
         self.assertListEqual(criteria.projects, [self.project_name])
-        self.assertListEqual(criteria.sg_ids_internal, [self.sgA])
-        self.assertListEqual(criteria.excluded_sgs_internal, [self.sgB])
+        self.assertListEqual(criteria.excluded_sgs_internal, [self.sgB, self.sgC])
         self.assertListEqual(criteria.sg_technology, ['short-read'])
         self.assertListEqual(criteria.sg_platform, ['illumina'])
         self.assertListEqual(criteria.sg_type, ['genome'])
