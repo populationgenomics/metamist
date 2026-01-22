@@ -29,7 +29,7 @@ router = APIRouter(prefix='/cohort', tags=['cohort'])
 @router.post(
     '/{project}/cohort',
     operation_id='createCohortFromCriteria',
-    response_model_exclude=None,
+    response_model_exclude_none=True,  # used to conditionally return excluded_sg_ids_internal attribute
 )
 async def create_cohort_from_criteria(
     cohort_spec: CohortBody,

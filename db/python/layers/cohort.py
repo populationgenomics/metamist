@@ -208,7 +208,7 @@ class CohortLayer(BaseLayer):
 
         if sg_ids_internal_raw:
             if not _is_valid_cohort_criteria_combination(cohort_criteria):
-                if template_id:
+                if template_id:  # invoking a cohort creation from a deprecated template
                     raise ValueError(
                         f'Invalid template. {self.COHORT_SG_CRITERIA_ERROR_MSG}'
                     )
@@ -260,7 +260,7 @@ class CohortLayer(BaseLayer):
                 # if any sgs in the criteria list not active and exclude_ineligible_sg_ids_internal not set
                 if not exclude_ineligible_sg_ids_internal:
                     raise ValueError(
-                        'Contains invalid sequencing groups. Please review the input sequencing groups, '
+                        'Contains sequencing groups which are not active. Please review the input sequencing groups, '
                         'or set exclude_ineligible_sg_ids_internal to skip invalid entries and continue cohort creation'
                     )
 

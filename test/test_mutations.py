@@ -147,6 +147,28 @@ CREATE_COHORT_FROM_CRITERIA_MUTATION = """
     }
 """
 
+CREATE_COHORT_FROM_CRITERIA_MUTATION_WITH_EXCLUDE = """
+    mutation CreateCohortFromCriteria($project: String!, $cohortSpec: CohortBodyInput!, $cohortCriteria: CohortCriteriaInput!, $dryRun: Boolean, $excludeIneligibleSgIdsInternal: Boolean) {
+        cohort{
+            createCohortFromCriteria(
+                project: $project
+                cohortSpec: $cohortSpec
+                cohortCriteria: $cohortCriteria
+                dryRun: $dryRun
+                excludeIneligibleSgIdsInternal: $excludeIneligibleSgIdsInternal
+            ) {
+             createdCohort {
+                id
+                sequencingGroups {
+                    id
+                }
+             }
+             excludedSgIdsInternal
+            }
+        }
+    }
+"""
+
 CREATE_COHORT_TEMPLATE_MUTATION = """
     mutation createCohortTemplate($project: String!, $template: CohortTemplateInput!) {
         cohort {
@@ -1356,9 +1378,9 @@ class TestCohortMutations(DbIsolatedTest):
         """Test mutation and API to create a cohort from sequencing group criteria with archived sgs and exclude archived sgs set to true"""
         await self.sgl.archive_sequencing_group(self.genome_sequencing_group_id_1)
 
-        mutation_cohort = (
+        graphql_response = (
             await self.run_graphql_query_async(
-                CREATE_COHORT_FROM_CRITERIA_MUTATION,
+                CREATE_COHORT_FROM_CRITERIA_MUTATION_WITH_EXCLUDE,
                 variables={
                     'project': self.project_name,
                     'excludeIneligibleSgIdsInternal': True,
@@ -1374,7 +1396,10 @@ class TestCohortMutations(DbIsolatedTest):
                     },
                 },
             )
-        )['cohort']['createCohortFromCriteria']['createdCohort']
+        )['cohort']['createCohortFromCriteria']
+
+        mutation_cohort = graphql_response['createdCohort']
+        excluded_sg_ids_internal = graphql_response['excludedSgIdsInternal']
 
         api_cohort = await self.cl.create_cohort_from_criteria(
             project_to_write=self.project_id,
@@ -1391,6 +1416,10 @@ class TestCohortMutations(DbIsolatedTest):
         )
         self.assertTrue(mutation_cohort['sequencingGroups'])
         self.assertTrue(api_cohort.sequencing_group_ids)
+        self.assertTrue(excluded_sg_ids_internal)
+        self.assertTrue(
+            excluded_sg_ids_internal[0] == self.genome_sequencing_group_id_external_1
+        )
 
     @run_as_sync
     async def test_create_cohort_from_criteria_fail_when_sg_archived_and_exclude_not_set(

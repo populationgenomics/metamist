@@ -189,7 +189,7 @@ class NewCohort(SMBase):
     dry_run: bool = False
     cohort_id: str
     sequencing_group_ids: list[str]
-    excluded_sg_ids_internal: list[str] | None = None
+    excluded_sg_ids_internal: list[str] | None = None  # will be returned conditionally
 
 
 class NewCohortInternal(SMBase):
