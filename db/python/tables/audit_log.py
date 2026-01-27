@@ -56,19 +56,23 @@ class AuditLogTable(DbBase):
         INSERT INTO audit_log
             (author, on_behalf_of, ar_guid, comment, auth_project, meta)
         VALUES
-            (:author, :on_behalf_of, :ar_guid, :comment, :project, :meta)
+            (%(author)s, %(on_behalf_of)s, %(ar_guid)s, %(comment)s, %(project)s, %(meta)s)
         RETURNING id
         """
-        audit_log_id = await self.connection.fetch_val(
-            _query,
-            {
-                'author': author,
-                'on_behalf_of': on_behalf_of,
-                'ar_guid': ar_guid,
-                'comment': comment,
-                'project': project,
-                'meta': to_db_json(meta or {}),
-            },
-        )
 
-        return audit_log_id
+        async with self.connection.db_connection() as conn:
+            res = await conn.execute(
+                _query,
+                {
+                    'author': author,
+                    'on_behalf_of': on_behalf_of,
+                    'ar_guid': ar_guid,
+                    'comment': comment,
+                    'project': project,
+                    'meta': to_db_json(meta or {}),
+                },
+            )
+
+            row: dict[str, int] | None = await res.fetchone()
+            assert row
+            return row['id']

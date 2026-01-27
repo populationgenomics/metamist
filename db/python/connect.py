@@ -4,16 +4,16 @@
 Code for connecting to Postgres database
 """
 
-import abc
 import asyncio
 import json
 import logging
 import os
 from typing import Iterable
+from contextlib import asynccontextmanager
 
-import databases
-
-from api.settings import LOG_DATABASE_QUERIES
+from psycopg import AsyncConnection
+from psycopg_pool import AsyncConnectionPool
+from psycopg.rows import DictRow, dict_row
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.utils import (
     InternalError,
@@ -26,50 +26,17 @@ from models.models.project import Project, ProjectId, ProjectMemberRole
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
-TABLES_ORDERED_BY_FK_DEPS = [
-    'project',
-    'group',
-    'analysis',
-    'participant',
-    'sample',
-    'sequencing_group',
-    'assay',
-    'sequencing_group_assay',
-    'analysis_sequencing_group',
-    'analysis_sample',
-    'assay_external_id',
-    'participant_external_id',
-    'sample_external_id',
-    'sequencing_group_external_id',
-    'family',
-    'family_external_id',
-    'family_participant',
-    'participant_phenotypes',
-    'project_member',
-    'group_member',
-    'cohort_template',
-    'cohort',
-    'cohort_sequencing_group',
-    'analysis_cohort',
-    'analysis_runner',
-    'output_file',
-    'analysis_outputs',
-    'comment',
-    'sample_comment',
-    'project_comment',
-    'assay_comment',
-    'sequencing_group_comment',
-    'participant_comment',
-    'family_comment',
-][::-1]
+
+MAIN_SCHEMA = 'main'
+HISTORY_SCHEMA = 'history'
 
 
 class Connection:
-    """Stores a DB connection, project and author"""
+    """Stores a DB connection config, project and author"""
 
     def __init__(
         self,
-        connection: databases.Database,
+        postgres_pool: AsyncConnectionPool[AsyncConnection[DictRow]],
         project: Project | None,
         project_id_map: dict[ProjectId, Project],
         project_name_map: dict[str, Project],
@@ -78,7 +45,7 @@ class Connection:
         ar_guid: str | None,
         meta: dict[str, str] | None = None,
     ):
-        self.__connection: databases.Database = connection
+        self.__postgres_pool = postgres_pool
         self.__project: Project | None = project
         self.__project_id_map = project_id_map
         self.__project_name_map = project_name_map
@@ -90,10 +57,10 @@ class Connection:
         self._audit_log_id: int | None = None
         self._audit_log_lock = asyncio.Lock()
 
-    @property
-    def connection(self):
-        """Public getter for private project class variable"""
-        return self.__connection
+    @asynccontextmanager
+    async def db_connection(self):
+        async with self.__postgres_pool.connection() as conn:
+            yield conn
 
     @property
     def project(self):
@@ -246,7 +213,7 @@ class Connection:
                     AuditLogTable,
                 )
 
-                at = AuditLogTable(self)
+                at = AuditLogTable(connection=self)
                 self._audit_log_id = await at.create_audit_log(
                     author=self.author,
                     on_behalf_of=self.on_behalf_of,
@@ -258,6 +225,13 @@ class Connection:
 
         return self._audit_log_id
 
+    def update_project(self, project_name: str):
+        """Update the project attached to the connection to the specified project name"""
+        if project_name not in self.project_name_map:
+            raise ProjectDoesNotExist(project_name)
+
+        self.__project = self.project_name_map[project_name]
+
     async def refresh_projects(self):
         """
         Re-fetch the projects for the current user and update the connection.
@@ -265,8 +239,7 @@ class Connection:
         creation, and really only for tests. The API fetches projects on each request
         so subsequent requests after updates will already have up-to-date data
         """
-        conn = self.connection
-        pt = ProjectPermissionsTable(connection=None, database_connection=conn)
+        pt = ProjectPermissionsTable(connection=self)
 
         project_id_map, project_name_map = await pt.get_projects_accessible_by_user(
             user=self.author
@@ -278,26 +251,7 @@ class Connection:
             self.__project = self.project_id_map.get(self.project_id)
 
 
-class DatabaseConfiguration(abc.ABC):
-    """Base class for DatabaseConfiguration"""
-
-    @abc.abstractmethod
-    def get_connection_string(self) -> str:
-        """Get connection string"""
-        raise NotImplementedError
-
-
-class ConnectionStringDatabaseConfiguration(DatabaseConfiguration):
-    """Database Configuration that takes a literal DatabaseConfiguration"""
-
-    def __init__(self, connection_string: str):
-        self.connection_string = connection_string
-
-    def get_connection_string(self):
-        return self.connection_string
-
-
-class CredentialedDatabaseConfiguration(DatabaseConfiguration):
+class CredentialedDatabaseConfiguration:
     """Class to hold information about a MySqlConfiguration"""
 
     def __init__(
@@ -339,20 +293,23 @@ class CredentialedDatabaseConfiguration(DatabaseConfiguration):
         if self.port:
             _host += f':{self.port}'
 
-        options: dict[
-            str, str | int
-        ] = {}  # {'min_size': self.min_pool_size, 'max_size': self.max_pool_size}
-        _options = '&'.join(f'{k}={v}' for k, v in options.items())
-
-        url = f'mysql://{u_p}@{_host}/{self.dbname}?{_options}'
+        url = f'postgresql://{u_p}@{_host}/{self.dbname}'
 
         return url
+
+
+# Set the main and history schemas so that queries use them by default
+async def configure_pg_connection(connection: AsyncConnection):
+    """Configure a new connection"""
+    async with connection:
+        await connection.execute(f'SET search_path TO {MAIN_SCHEMA}, {HISTORY_SCHEMA};')
 
 
 class SMConnections:
     """Contains useful functions for connecting to the database"""
 
     _credentials: CredentialedDatabaseConfiguration | None = None
+    _postgres_pool: AsyncConnectionPool[AsyncConnection[DictRow]] | None = None
 
     @staticmethod
     def _get_config():
@@ -370,48 +327,26 @@ class SMConnections:
         return SMConnections._credentials
 
     @staticmethod
-    def make_connection(
-        config: DatabaseConfiguration, log_database_queries: bool | None = None
-    ):
-        """Create connection from dbname"""
-        # the connection string will prepare pooling automatically
-        _should_log = (
-            log_database_queries
-            if log_database_queries is not None
-            else LOG_DATABASE_QUERIES
-        )
-        return databases.Database(config.get_connection_string(), echo=_should_log)
+    def get_postgres_pool() -> AsyncConnectionPool[AsyncConnection[DictRow]]:
+        """Get the global Postgres connection pool"""
 
-    @staticmethod
-    async def connect():
-        """Create connections to database"""
+        if SMConnections._postgres_pool:
+            return SMConnections._postgres_pool
 
-        # this will now not connect, new connection will be made on every request
-        return False
-
-    @staticmethod
-    async def disconnect():
-        """Disconnect from database"""
-
-        return False
-
-    @staticmethod
-    async def get_made_connection():
-        """
-        Makes a new connection to the database on each call
-        """
         credentials = SMConnections._get_config()
 
-        if credentials is None:
-            raise InternalError(
-                'The server has been misconfigured, please '
-                'contact your system administrator'
-            )
-
-        conn = SMConnections.make_connection(credentials)
-        await conn.connect()
-
-        return conn
+        pool: AsyncConnectionPool[AsyncConnection[DictRow]] = AsyncConnectionPool(
+            conninfo=credentials.get_connection_string(),
+            # pool is opened/closed by api server lifespan event
+            open=False,
+            min_size=1,
+            max_size=10,
+            check=AsyncConnectionPool.check_connection,
+            configure=configure_pg_connection,
+            kwargs={'row_factory': dict_row},
+        )  # type: ignore (psycopg can't infer the row factory type here and thinks rows will be tuples not dicts)
+        SMConnections._postgres_pool = pool
+        return pool
 
     @staticmethod
     async def get_connection_with_project(
@@ -427,26 +362,20 @@ class SMConnections:
         # maybe it makes sense to perform permission checks here too
         logger.debug(f'Authenticate connection to {project_name} with {author!r}')
 
-        conn = await SMConnections.get_made_connection()
-        pt = ProjectPermissionsTable(connection=None, database_connection=conn)
-
-        project_id_map, project_name_map = await pt.get_projects_accessible_by_user(
-            user=author
-        )
-
-        if project_name not in project_name_map:
-            raise ProjectDoesNotExist(project_name)
-
+        # Instantiate connection with some bits missing so that we can check access
         connection = Connection(
-            connection=conn,
+            postgres_pool=SMConnections.get_postgres_pool(),
             author=author,
-            project=project_name_map[project_name],
-            project_id_map=project_id_map,
-            project_name_map=project_name_map,
+            project=None,
+            project_id_map={},
+            project_name_map={},
             on_behalf_of=on_behalf_of,
             ar_guid=ar_guid,
             meta=meta,
         )
+
+        await connection.refresh_projects()
+        connection.update_project(project_name)
 
         connection.check_access(allowed_roles)
 
@@ -460,20 +389,16 @@ class SMConnections:
         # maybe it makes sense to perform permission checks here too
         logger.debug(f'Authenticate no-project connection with {author!r}')
 
-        conn = await SMConnections.get_made_connection()
-
-        pt = ProjectPermissionsTable(connection=None, database_connection=conn)
-        project_id_map, project_name_map = await pt.get_projects_accessible_by_user(
-            user=author
-        )
-
-        return Connection(
-            connection=conn,
+        connection = Connection(
+            postgres_pool=SMConnections.get_postgres_pool(),
             author=author,
             project=None,
             on_behalf_of=on_behalf_of,
             ar_guid=ar_guid,
             meta=meta,
-            project_id_map=project_id_map,
-            project_name_map=project_name_map,
+            project_id_map={},
+            project_name_map={},
         )
+
+        await connection.refresh_projects()
+        return connection
