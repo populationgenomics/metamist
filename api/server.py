@@ -42,13 +42,15 @@ async def app_lifespan(_: FastAPI):
     code before and after the app is started. This is used by the
     `run` command.
     """
+    postgres_pool = SMConnections.get_postgres_pool()
+
     try:
         if not SKIP_DATABASE_CONNECTION:
-            await SMConnections.connect()
+            await postgres_pool.open()
         yield
     finally:
         if not SKIP_DATABASE_CONNECTION:
-            await SMConnections.disconnect()
+            await postgres_pool.close()
 
 
 app = FastAPI(lifespan=app_lifespan)

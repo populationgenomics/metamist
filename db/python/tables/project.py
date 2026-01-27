@@ -1,11 +1,13 @@
 # pylint: disable=global-statement
 from typing import TYPE_CHECKING, Any, Tuple
 
-from databases import Database
+from psycopg.rows import class_row
+from psycopg.types.enum import EnumInfo, register_enum
 
 from db.python.utils import Forbidden, get_logger, to_db_json
 from models.models.project import (
     Project,
+    ProjectMemberRole,
     ProjectMemberUpdate,
     project_member_role_names,
 )
@@ -29,31 +31,14 @@ class ProjectPermissionsTable:
 
     table_name = 'project'
 
-    def __init__(
-        self,
-        connection: Connection | None,
-        database_connection: Database | None = None,
-    ):
-        self._connection = connection
-        if not database_connection:
-            if not connection:
-                raise ValueError(
-                    'Must call project permissions table with either a direct '
-                    'database_connection or a fully formed connection'
-                )
-            self.connection = connection.connection
-        else:
-            self.connection = database_connection
+    def __init__(self, connection: Connection):
+        self.connection = connection
 
     async def audit_log_id(self):
         """
         Generate (or return) a audit_log_id by inserting a row into the database
         """
-        if not self._connection:
-            raise ValueError(
-                'Cannot call audit_log_id without a fully formed connection'
-            )
-        return await self._connection.audit_log_id()
+        return await self.connection.audit_log_id()
 
     # region AUTH
     async def get_projects_accessible_by_user(
@@ -76,48 +61,57 @@ class ProjectPermissionsTable:
             WITH admin_roles AS (
                 SELECT
                     CASE (g.name)
-                        WHEN :project_creators_group_name THEN 'project_admin'
-                        WHEN :members_admin_group_name THEN 'project_member_admin'
+                        WHEN %(project_creators_group_name)s THEN 'project_admin'
+                        WHEN %(members_admin_group_name)s THEN 'project_member_admin'
                     END
                 as role
-                FROM `group` g
+                FROM "group" g
                 JOIN group_member gm
                 ON gm.group_id = g.id
-                WHERE gm.member = :user
-                AND g.name in (:project_creators_group_name, :members_admin_group_name)
+                WHERE gm.member = %(user)s
+                AND g.name in (%(project_creators_group_name)s, %(members_admin_group_name)s)
             ),
             -- Combine together the project roles and the admin roles
             project_roles AS (
                 SELECT pm.project_id, pm.member, pm.role
                 FROM project_member pm
-                WHERE pm.member = :user
+                WHERE pm.member = %(user)s
                 UNION ALL
-                SELECT p.id as project_id, :user as member, ar.role
+                SELECT p.id as project_id, %(user)s as member, ar.role::project_member_role
                 FROM project p
                 JOIN admin_roles ar ON TRUE
             )
             SELECT
                 p.id,
                 p.name,
-                p.meta,
+                coalesce(p.meta, '{}') as meta,
                 p.dataset,
-                GROUP_CONCAT(pr.role) as roles
+                array_agg(pr.role) as roles
             FROM project p
             JOIN project_roles pr
             ON p.id = pr.project_id
             GROUP BY p.id
         """
 
-        user_projects = await self.connection.fetch_all(_query, parameters)
-
         project_id_map: dict[int, Project] = {}
         project_name_map: dict[str, Project] = {}
 
-        for row in user_projects:
-            project = Project.from_db(dict(row))
-            project_id_map[row['id']] = project
-            project_name_map[row['name']] = project
+        async with self.connection.db_connection() as conn:
+            async with conn.cursor(row_factory=class_row(Project)) as acur:
+                info = await EnumInfo.fetch(conn, 'project_member_role')
+                if info is None:
+                    raise ValueError(
+                        "Enum type 'project_member_role' not found in database"
+                    )
+                register_enum(info, acur, ProjectMemberRole)
 
+                await acur.execute(_query, parameters)
+
+                projects = await acur.fetchall()
+
+            for project in projects:
+                project_id_map[project.id] = project
+                project_name_map[project.name] = project
         return project_id_map, project_name_map
 
     async def get_seqr_project_ids(self) -> list[int]:
