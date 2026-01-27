@@ -1,7 +1,7 @@
 from enum import StrEnum
 from typing import Any, Optional
 
-from models.base import SMBase, parse_sql_dict
+from models.base import SMBase
 
 ProjectId = int
 
@@ -43,19 +43,6 @@ class Project(SMBase):
     def is_test_project(self):
         """Returns whether this is a main or a test project"""
         return self.name.endswith('-test')
-
-    @staticmethod
-    def from_db(kwargs):
-        """From DB row, with db keys"""
-        kwargs = dict(kwargs)
-        kwargs['meta'] = parse_sql_dict(kwargs.get('meta')) or {}
-
-        # Sanitise role names and convert to enum members
-        role_list: list[str] = kwargs['roles'].split(',') if kwargs.get('roles') else []
-        kwargs['roles'] = {
-            ProjectMemberRole[r] for r in role_list if r in project_member_role_names
-        }
-        return Project(**kwargs)
 
 
 class ProjectMemberUpdate(SMBase):

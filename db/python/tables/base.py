@@ -1,7 +1,5 @@
 from collections import defaultdict
 
-import databases
-
 from db.python.connect import Connection
 from db.python.utils import InternalError
 from models.models.audit_log import AuditLogInternal
@@ -9,6 +7,8 @@ from models.models.audit_log import AuditLogInternal
 
 class DbBase:
     """Base class for table subclasses"""
+
+    connection: Connection
 
     def __init__(self, connection: Connection):
         if connection is None:
@@ -21,8 +21,7 @@ class DbBase:
                 f'did you mean to call self._connection?'
             )
 
-        self._connection = connection
-        self.connection: databases.Database = connection.connection
+        self.connection = connection
         self.author = connection.author
         self.project = connection.project
         self.project_id = connection.project_id
@@ -34,7 +33,7 @@ class DbBase:
         """
         Get audit_log ID (or fail otherwise)
         """
-        return await self._connection.audit_log_id()
+        return await self.connection.audit_log_id()
 
     # piped from the connection
 
