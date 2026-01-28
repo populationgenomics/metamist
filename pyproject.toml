@@ -129,6 +129,9 @@ dev = [
 
 [tool.uv]
 package = false
+constraint-dependencies = [
+    "azure-core>=1.38.0"
+]
 
 [tool.uv.sources]
 metamist = { path = "packages/metamist", editable = true }
