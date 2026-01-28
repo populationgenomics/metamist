@@ -1,0 +1,18 @@
+[pytest]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["test"]
+python_files = [
+    "test_project_connection.py",
+    "test_project_graphql.py"
+]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+collect_imported_tests = false # only include tests in test files
+addopts = [
+    "-v",
+    "--tb=short"
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]

@@ -60,7 +60,7 @@ class AuditLogTable(DbBase):
         RETURNING id
         """
 
-        async with self.connection.db_connection() as conn:
+        async with self.connection.pool.connection() as conn:
             res = await conn.execute(
                 _query,
                 {
