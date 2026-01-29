@@ -9,7 +9,6 @@ import json
 import logging
 import os
 from typing import Iterable
-from contextlib import asynccontextmanager
 
 from psycopg import AsyncConnection
 from psycopg_pool import AsyncConnectionPool
@@ -57,10 +56,9 @@ class Connection:
         self._audit_log_id: int | None = None
         self._audit_log_lock = asyncio.Lock()
 
-    @asynccontextmanager
-    async def db_connection(self):
-        async with self.__postgres_pool.connection() as conn:
-            yield conn
+    @property
+    def pool(self):
+        return self.__postgres_pool
 
     @property
     def project(self):
@@ -298,10 +296,17 @@ class CredentialedDatabaseConfiguration:
         return url
 
 
-# Set the main and history schemas so that queries use them by default
 async def configure_pg_connection(connection: AsyncConnection):
-    """Configure a new connection"""
+    """Configure a new connection
+
+    - set the search path to include the main and history schemas
+    - set autocommit to True for more predictable behavious
+        this avoids creating transactions for queries that don't need them, and requires
+        us to explictly create transactions when we need them
+
+    """
     async with connection:
+        await connection.set_autocommit(True)
         await connection.execute(f'SET search_path TO {MAIN_SCHEMA}, {HISTORY_SCHEMA};')
 
 

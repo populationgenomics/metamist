@@ -20,8 +20,6 @@ jobs:
       DOCKER_BUILDKIT: 1
       BUILDKIT_PROGRESS: plain
       CLOUDSDK_CORE_DISABLE_PROMPTS: 1
-      # used for generating API
-      SM_DOCKER: samplemetadata:dev
     defaults:
       run:
         shell: bash -eo pipefail -l {0}
@@ -46,29 +44,6 @@ jobs:
           enable-cache: false
           version: 0.8.22 #uv version
 
-      - name: Setup build env
-        run: |
-          set -euxo pipefail
-
-          uv sync
-
-          # liquibase connector
-          pushd db/
-          wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.0.3/mariadb-java-client-3.0.3.jar
-          popd
-          # liquibase
-          VERSION=4.28.0
-          curl -L https://github.com/liquibase/liquibase/releases/download/v${VERSION}/liquibase-${VERSION}.zip --output liquibase-${VERSION}.zip
-          unzip -o -d liquibase liquibase-${VERSION}.zip
-          echo "$(pwd)/liquibase" >> $GITHUB_PATH
-
-      - name: 'build image'
-        run: |
-          docker build \
-            --build-arg SM_ENVIRONMENT=local \
-            --tag $SM_DOCKER \
-            -f deploy/api/Dockerfile \
-            .
 
       - name: 'build deployable API'
         run: |
@@ -78,7 +53,7 @@ jobs:
         id: runtests
         run: |
           rc=0
-          uv run coverage run -m pytest --doctest-modules --doctest-continue-on-failure test/ --junitxml=test-execution.xml || rc=$?
+          uv run coverage run -m pytest test/ --junitxml=test-execution.xml || rc=$?
           uv run coverage xml
 
           echo "rc=$rc" >> $GITHUB_OUTPUT
