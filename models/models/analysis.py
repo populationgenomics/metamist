@@ -124,6 +124,10 @@ class Analysis(BaseModel):
         if self.cohort_ids:
             cohort_ids = cohort_id_transform_to_raw_list(self.cohort_ids)
 
+        timestamp_completed = None
+        if self.timestamp_completed:
+            timestamp_completed = datetime.fromisoformat(self.timestamp_completed)
+
         return AnalysisInternal(
             id=self.id,
             type=self.type,
@@ -132,8 +136,7 @@ class Analysis(BaseModel):
             cohort_ids=cohort_ids,
             output=self.output,
             outputs=self.outputs,
-            # don't allow this to be set
-            timestamp_completed=None,
+            timestamp_completed=timestamp_completed,
             project=self.project,
             active=self.active,
             meta=self.meta,

@@ -274,6 +274,50 @@ query MyQuery($sg_id: String!, $project: String!) {
         self.assertIn('output', analyses[0])
 
     @run_as_sync
+    async def test_project_analyses_query_with_meta(self):
+        """Tests filtering analyses with the meta field when querying through a project"""
+        alayer = AnalysisLayer(self.connection)
+
+        test_meta_key = 'test_meta_key'
+        test_meta_val = 'test_meta_value'
+        a_id = await alayer.create_analysis(
+            AnalysisInternal(
+                status=AnalysisStatus.COMPLETED,
+                type='cram',
+                meta={test_meta_key: test_meta_val},
+            )
+        )
+
+        q = f"""
+query MyQuery($project: String!) {{
+    project(name: $project) {{
+        analyses(meta: {{{test_meta_key}: {{eq: "{test_meta_val}"}}}}) {{
+            id
+            meta
+        }}
+    }}
+}}
+        """
+        # Use double curly braces {{ escape to a single { string literal.
+        resp = await self.run_graphql_query_async(
+            q,
+            {
+                'project': self.project_name,
+                'meta_key': test_meta_key,
+                'meta_value': test_meta_val,
+            },
+        )
+        self.assertIn('project', resp)
+        self.assertIn('analyses', resp['project'])
+        self.assertEqual(1, len(resp['project']['analyses']))
+
+        analysis_resp = resp['project']['analyses'][0]
+        self.assertIn('id', analysis_resp)
+        self.assertIn('meta', analysis_resp)
+        self.assertEqual(a_id, analysis_resp['id'])
+        self.assertDictEqual(analysis_resp['meta'], {test_meta_key: test_meta_val})
+
+    @run_as_sync
     async def test_participant_phenotypes(self):
         """
         Test getting participant phentypes in graphql
