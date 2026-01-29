@@ -1999,6 +1999,7 @@
 	</changeSet>
 
 	<changeSet id="2026-01-20-add-meta-to-family" author="dan.coates">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
 		<addColumn tableName="family">
 			<column name="meta" type="JSON">
 				<constraints nullable="true" />
