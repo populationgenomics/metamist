@@ -4,7 +4,8 @@ asyncio_default_fixture_loop_scope = "function"
 testpaths = ["test"]
 python_files = [
     "test_project_connection.py",
-    "test_project_graphql.py"
+    "test_project_graphql.py",
+    "test_json_merge_patch.py"
 ]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
