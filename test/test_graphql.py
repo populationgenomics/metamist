@@ -1,11 +1,10 @@
-from test.testbase import DbIsolatedTest, run_as_sync
-
 from graphql.error import GraphQLError, GraphQLSyntaxError
+
+from metamist.graphql import configure_sync_client, gql, validate
 
 import api.graphql.schema
 from db.python.layers import AnalysisLayer, ParticipantLayer
 from db.python.layers.family import FamilyLayer
-from metamist.graphql import configure_sync_client, gql, validate
 from models.enums import AnalysisStatus
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
@@ -16,6 +15,7 @@ from models.models import (
     SequencingGroupUpsertInternal,
 )
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
+from test.testbase import DbIsolatedTest, run_as_sync
 
 default_assay_meta = {
     'sequencing_type': 'genome',
@@ -441,6 +441,66 @@ query MyQuery($project: String!) {
                 },
             ],
         )
+
+    @run_as_sync
+    async def test_query_family_by_meta(self):
+        """Test querying families by meta field"""
+        family_layer = FamilyLayer(self.connection)
+
+        # Create two families with different meta
+        fid1 = await family_layer.create_family(
+            external_ids={PRIMARY_EXTERNAL_ORG: 'family_with_meta'},
+            description='Test family 1',
+            coded_phenotype='phenotype1',
+            meta={'study': 'study_a', 'priority': 'high'},
+        )
+        fid2 = await family_layer.create_family(
+            external_ids={PRIMARY_EXTERNAL_ORG: 'family_other_meta'},
+            description='Test family 2',
+            coded_phenotype='phenotype2',
+            meta={'study': 'study_b', 'priority': 'low'},
+        )
+
+        # Query for families with specific meta
+        q = """
+        query MyQuery($project: String!, $meta: JSON!) {
+            project(name: $project) {
+                families(meta: $meta) {
+                    id
+                    externalId
+                    meta
+                }
+            }
+        }"""
+        # Filter by study=study_a - should return only family 1
+        values = await self.run_graphql_query_async(
+            q, {'project': self.project_name, 'meta': {'study': 'study_a'}}
+        )
+        assert values
+
+        families = values['project']['families']
+        self.assertEqual(1, len(families))
+        self.assertEqual(fid1, families[0]['id'])
+        self.assertEqual('family_with_meta', families[0]['externalId'])
+        self.assertEqual('study_a', families[0]['meta']['study'])
+
+        # Filter by priority=low - should return only family 2
+        values2 = await self.run_graphql_query_async(
+            q, {'project': self.project_name, 'meta': {'priority': 'low'}}
+        )
+        assert values2
+
+        families2 = values2['project']['families']
+        self.assertEqual(1, len(families2))
+        self.assertEqual(fid2, families2[0]['id'])
+
+        # Filter by non-existent meta - should return empty
+        values3 = await self.run_graphql_query_async(
+            q, {'project': self.project_name, 'meta': {'nonexistent': 'value'}}
+        )
+        assert values3
+
+        self.assertEqual(0, len(values3['project']['families']))
 
     @run_as_sync
     async def test_get_project_name_from_analysis(self):

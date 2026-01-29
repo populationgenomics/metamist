@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 from models.base import SMBase, parse_sql_dict
 
@@ -8,12 +9,14 @@ class FamilySimpleInternal(SMBase):
 
     id: int
     external_ids: dict[str, str]
+    meta: dict[str, Any] | None = None
 
     def to_external(self):
         """Convert to external model"""
         return FamilySimple(
             id=self.id,
             external_ids=self.external_ids,
+            meta=self.meta,
         )
 
 
@@ -25,12 +28,14 @@ class FamilyInternal(SMBase):
     project: int
     description: str | None = None
     coded_phenotype: str | None = None
+    meta: dict[str, Any] | None = None
 
     @staticmethod
     def from_db(d):
         """From DB fields"""
         external_ids = parse_sql_dict(d.pop('external_ids', {}))
-        return FamilyInternal(**d, external_ids=external_ids)
+        meta = parse_sql_dict(d.pop('meta', {}))
+        return FamilyInternal(**d, external_ids=external_ids, meta=meta)
 
     def to_external(self):
         """Convert to external model"""
@@ -40,6 +45,7 @@ class FamilyInternal(SMBase):
             project=self.project,
             description=self.description,
             coded_phenotype=self.coded_phenotype,
+            meta=self.meta,
         )
 
 
@@ -48,6 +54,7 @@ class FamilySimple(SMBase):
 
     id: int
     external_ids: dict[str, str]
+    meta: dict[str, Any] | None = None
 
 
 class Family(SMBase):
@@ -58,6 +65,7 @@ class Family(SMBase):
     project: int
     description: str | None = None
     coded_phenotype: str | None = None
+    meta: dict[str, Any] | None = None
 
     def to_internal(self):
         """Convert to internal model"""
@@ -67,6 +75,7 @@ class Family(SMBase):
             project=self.project,
             description=self.description,
             coded_phenotype=self.coded_phenotype,
+            meta=self.meta,
         )
 
 

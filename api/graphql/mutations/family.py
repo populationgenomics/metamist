@@ -23,6 +23,7 @@ class FamilyUpdateInput:
     external_ids: JSON | None = None
     description: str | None = None
     coded_phenotype: str | None = None
+    meta: JSON | None = None
 
 
 @strawberry.type
@@ -63,6 +64,7 @@ class FamilyMutations:
             external_ids=family.external_ids,  # type: ignore [arg-type]
             description=family.description,  # type: ignore [arg-type]
             coded_phenotype=family.coded_phenotype,  # type: ignore [arg-type]
+            meta=family.meta,  # type: ignore [arg-type]
         )
         updated_family = await flayer.get_family_by_internal_id(family.id)  # type: ignore [arg-type]
 
