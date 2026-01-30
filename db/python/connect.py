@@ -14,6 +14,7 @@ from psycopg import AsyncConnection
 from psycopg_pool import AsyncConnectionPool
 from psycopg.rows import DictRow, dict_row
 from db.python.tables.project import ProjectPermissionsTable
+from api.settings import DB_POOL_MAX_SIZE, DB_POOL_MIN_SIZE
 from db.python.utils import (
     InternalError,
     NoProjectAccess,
@@ -250,7 +251,7 @@ class Connection:
 
 
 class CredentialedDatabaseConfiguration:
-    """Class to hold information about a MySqlConfiguration"""
+    """Class to hold information about a SQLConfiguration"""
 
     def __init__(
         self,
@@ -344,8 +345,8 @@ class SMConnections:
             conninfo=credentials.get_connection_string(),
             # pool is opened/closed by api server lifespan event
             open=False,
-            min_size=1,
-            max_size=10,
+            min_size=DB_POOL_MIN_SIZE,
+            max_size=DB_POOL_MAX_SIZE,
             check=AsyncConnectionPool.check_connection,
             configure=configure_pg_connection,
             kwargs={'row_factory': dict_row},
