@@ -163,7 +163,7 @@ CREATE_COHORT_FROM_CRITERIA_MUTATION_WITH_EXCLUDE = """
                     id
                 }
              }
-             excludedSgIdsInternal
+             excludedIneligibleSgIdsInternal
             }
         }
     }
@@ -1399,7 +1399,9 @@ class TestCohortMutations(DbIsolatedTest):
         )['cohort']['createCohortFromCriteria']
 
         mutation_cohort = graphql_response['createdCohort']
-        excluded_sg_ids_internal = graphql_response['excludedSgIdsInternal']
+        excluded_ineligible_sg_ids_internal = graphql_response[
+            'excludedIneligibleSgIdsInternal'
+        ]
 
         api_cohort = await self.cl.create_cohort_from_criteria(
             project_to_write=self.project_id,
@@ -1416,9 +1418,10 @@ class TestCohortMutations(DbIsolatedTest):
         )
         self.assertTrue(mutation_cohort['sequencingGroups'])
         self.assertTrue(api_cohort.sequencing_group_ids)
-        self.assertTrue(excluded_sg_ids_internal)
+        self.assertTrue(excluded_ineligible_sg_ids_internal)
         self.assertTrue(
-            excluded_sg_ids_internal[0] == self.genome_sequencing_group_id_external_1
+            excluded_ineligible_sg_ids_internal[0]
+            == self.genome_sequencing_group_id_external_1
         )
 
     @run_as_sync

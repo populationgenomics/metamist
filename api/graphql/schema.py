@@ -205,30 +205,32 @@ class CreatedGraphQLCohort:
     """Custom Cohort GraphQL model for cohort creation"""
 
     createdCohort: GraphQLCohort
-    excludedSgIdsInternal: list[str] | None = None
+    excludedIneligibleSgIdsInternal: list[str] | None = None
 
     @staticmethod
     def from_internal(
-        internal: CohortInternal, excluded_sg_ids_internal: list[int] | None = None
+        internal: CohortInternal,
+        excluded_ineligible_sg_ids_internal: list[int] | None = None,
     ) -> 'CreatedGraphQLCohort':
         return CreatedGraphQLCohort(
             createdCohort=GraphQLCohort.from_internal(internal),
-            excludedSgIdsInternal=(
-                sequencing_group_id_format_list(excluded_sg_ids_internal)
-                if excluded_sg_ids_internal
+            excludedIneligibleSgIdsInternal=(
+                sequencing_group_id_format_list(excluded_ineligible_sg_ids_internal)
+                if excluded_ineligible_sg_ids_internal
                 else None
             ),
         )
 
     @staticmethod
     def from_internal_to_dry_run(
-        graphql_cohort: GraphQLCohort, excluded_sg_ids_internal: list[int] | None = None
+        graphql_cohort: GraphQLCohort,
+        excluded_ineligible_sg_ids_internal: list[int] | None = None,
     ) -> 'CreatedGraphQLCohort':
         return CreatedGraphQLCohort(
             createdCohort=graphql_cohort,
-            excludedSgIdsInternal=(
-                sequencing_group_id_format_list(excluded_sg_ids_internal)
-                if excluded_sg_ids_internal
+            excludedIneligibleSgIdsInternal=(
+                sequencing_group_id_format_list(excluded_ineligible_sg_ids_internal)
+                if excluded_ineligible_sg_ids_internal
                 else None
             ),
         )

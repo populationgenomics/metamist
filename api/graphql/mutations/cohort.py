@@ -143,7 +143,7 @@ class CohortMutations:
                     project_id=target_project.id,
                     status=CohortStatus.active,
                 ),
-                excluded_sg_ids_internal=cohort_output.excluded_sg_ids_internal,
+                excluded_ineligible_sg_ids_internal=cohort_output.excluded_ineligible_sg_ids_internal,
             )
 
         created_cohort = (
@@ -153,7 +153,7 @@ class CohortMutations:
         )[0]
 
         return CreatedGraphQLCohort.from_internal(
-            created_cohort, cohort_output.excluded_sg_ids_internal
+            created_cohort, cohort_output.excluded_ineligible_sg_ids_internal
         )
 
     @strawberry.mutation

@@ -252,7 +252,7 @@ class CohortLayer(BaseLayer):
             )
 
         sg_ids = [sg.id for sg in sgs if sg.id] if sgs else []
-        excluded_sg_ids_internal = None
+        excluded_ineligible_sg_ids_internal = None
 
         if sg_ids_internal_raw:
             sg_ids_internal_raw_set = set(sg_ids_internal_raw)
@@ -268,14 +268,16 @@ class CohortLayer(BaseLayer):
                 cohort_criteria.sg_ids_internal_raw = sg_ids
                 #  if create cohort given template_id, this creates a new template
                 create_cohort_template = True
-                excluded_sg_ids_internal = list(sg_ids_internal_raw_set - set(sg_ids))
+                excluded_ineligible_sg_ids_internal = list(
+                    sg_ids_internal_raw_set - set(sg_ids)
+                )
 
         if dry_run:
             return NewCohortInternal(
                 dry_run=True,
                 cohort_id=None,
                 sequencing_group_ids=sg_ids,
-                excluded_sg_ids_internal=excluded_sg_ids_internal,
+                excluded_ineligible_sg_ids_internal=excluded_ineligible_sg_ids_internal,
             )
         # 2. Create cohort template, if required.
         if create_cohort_template:
@@ -302,7 +304,9 @@ class CohortLayer(BaseLayer):
             template_id=template_id,
         )
 
-        new_cohort.excluded_sg_ids_internal = excluded_sg_ids_internal
+        new_cohort.excluded_ineligible_sg_ids_internal = (
+            excluded_ineligible_sg_ids_internal
+        )
         return new_cohort
 
     async def update_cohort(self, cohort_update_body: CohortUpdateBody, cohort_id: int):
