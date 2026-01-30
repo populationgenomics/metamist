@@ -1,5 +1,8 @@
 # pylint: disable=used-before-assignment
 
+import json
+from typing import Any
+
 from api.utils import group_by
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
@@ -33,12 +36,14 @@ class FamilyLayer(BaseLayer):
         external_ids: dict[str, str],
         description: str | None = None,
         coded_phenotype: str | None = None,
+        meta: dict[str, Any] | None = None,
     ):
         """Create a family"""
         return await self.ftable.create_family(
             external_ids=external_ids,
             description=description,
             coded_phenotype=coded_phenotype,
+            meta=meta,
         )
 
     async def get_family_by_internal_id(self, family_id: int) -> FamilyInternal:
@@ -55,21 +60,6 @@ class FamilyLayer(BaseLayer):
         )
 
         return family
-
-    async def get_family_by_external_id(
-        self, external_id: str, project: ProjectId | None = None
-    ):
-        """Get family by external ID, requires project scope"""
-        families = await self.ftable.query(
-            FamilyFilter(
-                external_id=GenericFilter(eq=external_id),
-                project=GenericFilter(eq=project or self.connection.project_id),
-            )
-        )
-        if not families:
-            raise NotFoundError(f'Family with external ID {external_id} not found')
-
-        return families[0]
 
     async def query(
         self,
@@ -133,6 +123,7 @@ class FamilyLayer(BaseLayer):
         external_ids: dict[str, str] | None = None,
         description: str = None,
         coded_phenotype: str = None,
+        meta: dict[str, Any] | None = None,
     ) -> bool:
         """Update fields on some family"""
         project_ids = await self.ftable.get_projects_by_family_ids([id_])
@@ -146,6 +137,7 @@ class FamilyLayer(BaseLayer):
             external_ids=external_ids,
             description=description,
             coded_phenotype=coded_phenotype,
+            meta=meta,
         )
 
     async def get_pedigree(
@@ -348,6 +340,7 @@ class FamilyLayer(BaseLayer):
             'Display Name',
             'Description',
             'Coded Phenotype',
+            'Meta',
         ]
         _headers = headers or ordered_headers[: len(rows[0])]
         lheaders = [k.lower() for k in _headers]
@@ -361,6 +354,7 @@ class FamilyLayer(BaseLayer):
                 'codedphenotype',
                 'coded_phenotype',
             },
+            'meta': {'meta', 'metadata', 'meta data'},
         }
 
         def get_idx_for_header(header) -> int | None:
@@ -373,6 +367,7 @@ class FamilyLayer(BaseLayer):
         display_name_idx = get_idx_for_header('displayName')
         description_idx = get_idx_for_header('description')
         phenotype_idx = get_idx_for_header('phenotype')
+        meta_idx = get_idx_for_header('meta')
 
         # replace empty strings with None
         def replace_empty_string_with_none(val):
@@ -404,10 +399,26 @@ class FamilyLayer(BaseLayer):
             assert col1 is not None and col2 is not None
             return [r[col1] if r[col1] is not None else r[col2] for r in _fixed_rows]
 
+        def parse_meta(meta_strings: list[str | None]) -> list[dict[str, Any] | None]:
+            """Parse JSON strings from CSV into dicts"""
+            result: list[dict[str, Any] | None] = []
+            for idx, m in enumerate(meta_strings):
+                if m is None:
+                    result.append(None)
+                else:
+                    try:
+                        result.append(json.loads(m))
+                    except json.JSONDecodeError as e:
+                        raise ValueError(
+                            f'Invalid JSON in meta field for row {idx + 1}: {e}'
+                        ) from e
+            return result
+
         await self.ftable.insert_or_update_multiple_families(
             external_ids=select_columns(external_identifier_idx, display_name_idx),
             descriptions=select_columns(description_idx),
             coded_phenotypes=select_columns(phenotype_idx),
+            meta=parse_meta(select_columns(meta_idx)),
         )
         return True
 
