@@ -9,10 +9,11 @@ import os
 from collections.abc import Iterable
 
 from psycopg import AsyncConnection
-from psycopg_pool import AsyncConnectionPool
 from psycopg.rows import DictRow, dict_row
-from db.python.tables.project import ProjectPermissionsTable
+from psycopg_pool import AsyncConnectionPool
+
 from api.settings import DB_POOL_MAX_SIZE, DB_POOL_MIN_SIZE
+from db.python.tables.project import ProjectPermissionsTable
 from db.python.utils import (
     InternalError,
     NoProjectAccess,
@@ -299,7 +300,8 @@ class CredentialedDatabaseConfiguration:
 
 
 async def configure_pg_connection(connection: AsyncConnection):
-    """Configure a new connection
+    """
+    Configure a new connection
 
     - set the search path to include the main and history schemas
     - set autocommit to True for more predictable behavious
