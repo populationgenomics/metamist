@@ -32,6 +32,8 @@ dependencies = [
     "slack-sdk==3.20.2",
     "strawberry-graphql[fastapi]==0.268.1",
     "uvicorn~=0.34.2",
+    "psycopg[binary]>=3.3.2",
+    "psycopg-pool>=3.3.0",
 ]
 
 [tool.ruff]
