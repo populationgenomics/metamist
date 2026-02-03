@@ -1,4 +1,4 @@
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 
 import pytest
 import pytest_asyncio
@@ -14,17 +14,16 @@ async def json_merge_patch(
     """Helper fixture to call the json_merge_patch function."""
 
     async def _merge(target: str, patch: str) -> str:
-        async with db_pool.connection() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(
-                    'SELECT json_merge_patch(%s::jsonb, %s::jsonb)::text AS result',
-                    (target, patch),
-                )
-                row = await cur.fetchone()
-                assert row is not None
-                result = row.get('result')
-                assert result is not None
-                return result
+        async with db_pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                'SELECT json_merge_patch(%s::jsonb, %s::jsonb)::text AS result',
+                (target, patch),
+            )
+            row = await cur.fetchone()
+            assert row is not None
+            result = row.get('result')
+            assert result is not None
+            return result
 
     return _merge
 
