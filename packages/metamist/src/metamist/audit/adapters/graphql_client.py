@@ -105,7 +105,10 @@ class GraphQLClient:
               project: $dataset
               cohortCriteria: {projects: [$dataset]}
             ) {
-              id
+             createdCohort
+             {
+                id
+             }
             }
           }
         }
@@ -280,7 +283,7 @@ class GraphQLClient:
                 'name': name,
             },
         )
-        return result['cohort']['createCohortFromCriteria']['id']
+        return result['cohort']['createCohortFromCriteria']['createdCohort']['id']
 
     def create_audit_deletion_analysis(
         self, dataset: str, cohort_ids: list[str], output: str, meta: dict

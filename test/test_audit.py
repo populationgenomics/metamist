@@ -217,7 +217,9 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             },
             {  # Query 2 - a mutation query to create a new cohort
                 'cohort': {
-                    'createCohortFromCriteria': {'id': 'C01', 'name': 'Cohort 1'}
+                    'createCohortFromCriteria': {
+                        'createdCohort': {'id': 'C01', 'name': 'Cohort 1'}
+                    }
                 }
             },
         ]
