@@ -65,7 +65,9 @@ def get_sg_filter(
 
 def _is_valid_cohort_criteria_combination(cohort_criteria):
     for name, value in vars(cohort_criteria).items():
-        if name != 'sg_ids_internal_raw' and (value is not None and value != []):
+        if name != 'sg_ids_internal_raw' and (
+            value is not None and value != []
+        ):  # allows empty lists, as they represent empty criteria
             return False
     return True
 

@@ -205,7 +205,7 @@ class CreatedGraphQLCohort:
     """Custom Cohort GraphQL model for cohort creation"""
 
     createdCohort: GraphQLCohort
-    excludedIneligibleSgIdsInternal: list[str] | None = None
+    excludedIneligibleSgIdsInternal: list[str] | None = None  # returns only SG ids
 
     @staticmethod
     def from_internal(
