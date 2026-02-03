@@ -1,6 +1,8 @@
 import uuid
-from test.testbase import DbIsolatedTest, run_as_sync
 
+import pytest
+
+from db.python.connect import Connection
 from db.python.tables.project import (
     GROUP_NAME_MEMBERS_ADMIN,
     GROUP_NAME_PROJECT_CREATORS,
@@ -13,246 +15,223 @@ from models.models.project import (
     ProjectMemberUpdate,
     ReadAccessRoles,
 )
+from test.conftest import TEST_USER
 
 
-class TestGroupAccess(DbIsolatedTest):
+class TestGroupAccess:
     """
     Test project access permissions + newish internal group implementation
     """
 
-    @run_as_sync
-    async def setUp(self):
-        """Setup tests"""
-        super().setUp()
-
-        # specifically required to test permissions
-        self.pttable = ProjectPermissionsTable(self.connection)
-
-    async def _add_group_member_direct(self, group_name: str):
-        """
-        Helper method to directly add members to group with name
-        """
-        members_admin_group = await self.connection.connection.fetch_val(
-            'SELECT id FROM `group` WHERE name = :name',
-            {'name': group_name},
-        )
-        await self.connection.connection.execute(
-            """
-            INSERT INTO group_member (group_id, member, audit_log_id)
-            VALUES (:group_id, :member, :audit_log_id);
-            """,
-            {
-                'group_id': members_admin_group,
-                'member': self.author,
-                'audit_log_id': await self.audit_log_id(),
-            },
-        )
-
-    @run_as_sync
-    async def test_project_creators_failed(self):
+    @pytest.mark.asyncio
+    async def test_project_creators_failed(
+        self,
+        connection: Connection,
+    ) -> None:
         """
         Test that a user without permission cannot create a project
         """
-        with self.assertRaises(Forbidden):
-            await self.pttable.create_project(
-                'another-test-project', 'another-test-project', self.author
+        pttable = ProjectPermissionsTable(connection)
+
+        with pytest.raises(Forbidden):
+            await pttable.create_project(
+                'another-test-project', 'another-test-project', TEST_USER
             )
 
-    @run_as_sync
-    async def test_project_create_succeed(self):
+    @pytest.mark.asyncio
+    @pytest.mark.admin_groups([GROUP_NAME_PROJECT_CREATORS])
+    async def test_project_create_succeed(
+        self,
+        connection: Connection,
+    ) -> None:
         """
         Test that a user with permission can create a project,
         and that read/write groups are created
         """
-        await self._add_group_member_direct(GROUP_NAME_PROJECT_CREATORS)
+        pttable = ProjectPermissionsTable(connection)
         g = str(uuid.uuid4())
 
-        project_id = await self.pttable.create_project(g, g, self.author)
+        project_id = await pttable.create_project(g, g, TEST_USER)
 
-        # pylint: disable=protected-access
-        project_id_map, _ = await self.pttable.get_projects_accessible_by_user(
-            user=self.author
+        project_id_map, _ = await pttable.get_projects_accessible_by_user(
+            user=TEST_USER
         )
 
         project = project_id_map.get(project_id)
-        assert project
-        self.assertEqual(project.name, g)
+        assert project is not None
+        assert project.name == g
 
 
-class TestProjectAccess(DbIsolatedTest):
+class TestProjectAccess:
     """Test project access methods directly"""
 
-    @run_as_sync
-    async def setUp(self):
-        """Setup tests"""
-        super().setUp()
-
-        # specifically required to test permissions
-        self.pttable = ProjectPermissionsTable(self.connection)
-
-    async def _add_group_member_direct(
+    @pytest.mark.asyncio
+    @pytest.mark.admin_groups([GROUP_NAME_PROJECT_CREATORS])
+    async def test_no_project_access(
         self,
-        group_name: str,
-    ):
-        """
-        Helper method to directly add members to group with name
-        """
-        members_admin_group = await self.connection.connection.fetch_val(
-            'SELECT id FROM `group` WHERE name = :name',
-            {'name': group_name},
-        )
-        await self.connection.connection.execute(
-            """
-            INSERT INTO group_member (group_id, member, audit_log_id)
-            VALUES (:group_id, :member, :audit_log_id);
-            """,
-            {
-                'group_id': members_admin_group,
-                'member': self.author,
-                'audit_log_id': await self.audit_log_id(),
-            },
-        )
-
-    @run_as_sync
-    async def test_no_project_access(self):
+        connection: Connection,
+    ) -> None:
         """
         Test that a user without permission cannot access a project
         """
-        await self._add_group_member_direct(GROUP_NAME_PROJECT_CREATORS)
+        pttable = ProjectPermissionsTable(connection)
         g = str(uuid.uuid4())
 
-        project_id = await self.pttable.create_project(g, g, self.author)
-        with self.assertRaises(Forbidden):
-            self.connection.check_access_to_projects_for_ids(
+        project_id = await pttable.create_project(g, g, TEST_USER)
+
+        # Need to refresh projects to see the new project
+        await connection.refresh_projects()
+
+        with pytest.raises(Forbidden):
+            connection.check_access_to_projects_for_ids(
                 project_ids=[project_id], allowed_roles=ReadAccessRoles
             )
 
-        with self.assertRaises(Forbidden):
-            self.connection.get_and_check_access_to_projects_for_names(
+        with pytest.raises(Forbidden):
+            connection.get_and_check_access_to_projects_for_names(
                 project_names=[g], allowed_roles=ReadAccessRoles
             )
 
-    @run_as_sync
-    async def test_project_access_success(self):
+    @pytest.mark.asyncio
+    @pytest.mark.admin_groups([GROUP_NAME_PROJECT_CREATORS, GROUP_NAME_MEMBERS_ADMIN])
+    async def test_project_access_success(
+        self,
+        connection: Connection,
+    ) -> None:
         """
         Test that a user with permission CAN access a project
         """
-        await self._add_group_member_direct(GROUP_NAME_PROJECT_CREATORS)
-        await self._add_group_member_direct(GROUP_NAME_MEMBERS_ADMIN)
-
+        pttable = ProjectPermissionsTable(connection)
         g = str(uuid.uuid4())
 
-        pid = await self.pttable.create_project(g, g, self.author)
+        pid = await pttable.create_project(g, g, TEST_USER)
 
-        project_id_map, _ = await self.pttable.get_projects_accessible_by_user(
-            user=self.author
+        project_id_map, _ = await pttable.get_projects_accessible_by_user(
+            user=TEST_USER
         )
         project = project_id_map.get(pid)
-        assert project
-        await self.pttable.set_project_members(
+        assert project is not None
+
+        await pttable.set_project_members(
             project=project,
-            members=[ProjectMemberUpdate(member=self.author, roles=['reader'])],
+            members=[ProjectMemberUpdate(member=TEST_USER, roles=['reader'])],
         )
 
-        project_for_id = self.connection.get_and_check_access_to_projects_for_ids(
+        # Need to refresh projects to see updated permissions
+        await connection.refresh_projects()
+
+        project_for_id = connection.get_and_check_access_to_projects_for_ids(
             project_ids=[pid], allowed_roles=ReadAccessRoles
         )
         user_project_for_id = next(p for p in project_for_id)
-        self.assertEqual(pid, user_project_for_id.id)
+        assert pid == user_project_for_id.id
 
-        project_for_name = self.connection.get_and_check_access_to_projects_for_names(
+        project_for_name = connection.get_and_check_access_to_projects_for_names(
             project_names=[g], allowed_roles=ReadAccessRoles
         )
         user_project_for_name = next(p for p in project_for_name)
-        self.assertEqual(g, user_project_for_name.name)
+        assert g == user_project_for_name.name
 
-    @run_as_sync
-    async def test_project_access_insufficient(self):
+    @pytest.mark.asyncio
+    @pytest.mark.admin_groups([GROUP_NAME_PROJECT_CREATORS, GROUP_NAME_MEMBERS_ADMIN])
+    async def test_project_access_insufficient(
+        self,
+        connection: Connection,
+    ) -> None:
         """
         Test that a user with access to a project will be disallowed if their access is
         not sufficient
         """
-        await self._add_group_member_direct(GROUP_NAME_PROJECT_CREATORS)
-        await self._add_group_member_direct(GROUP_NAME_MEMBERS_ADMIN)
-
+        pttable = ProjectPermissionsTable(connection)
         g = str(uuid.uuid4())
 
-        pid = await self.pttable.create_project(g, g, self.author)
+        pid = await pttable.create_project(g, g, TEST_USER)
 
-        project_id_map, _ = await self.pttable.get_projects_accessible_by_user(
-            user=self.author
+        project_id_map, _ = await pttable.get_projects_accessible_by_user(
+            user=TEST_USER
         )
         project = project_id_map.get(pid)
-        assert project
+        assert project is not None
+
         # Give the user read access to the project
-        await self.pttable.set_project_members(
+        await pttable.set_project_members(
             project=project,
-            members=[ProjectMemberUpdate(member=self.author, roles=['reader'])],
+            members=[ProjectMemberUpdate(member=TEST_USER, roles=['reader'])],
         )
 
-        # But require Write access
+        # Need to refresh projects to see updated permissions
+        await connection.refresh_projects()
 
-        with self.assertRaises(Forbidden):
-            self.connection.check_access_to_projects_for_ids(
+        # But require Write access
+        with pytest.raises(Forbidden):
+            connection.check_access_to_projects_for_ids(
                 project_ids=[project.id], allowed_roles=FullWriteAccessRoles
             )
 
-        with self.assertRaises(Forbidden):
-            self.connection.get_and_check_access_to_projects_for_names(
+        with pytest.raises(Forbidden):
+            connection.get_and_check_access_to_projects_for_names(
                 project_names=[g], allowed_roles=FullWriteAccessRoles
             )
 
-    @run_as_sync
-    async def test_get_my_projects(self):
+    @pytest.mark.asyncio
+    @pytest.mark.admin_groups([GROUP_NAME_PROJECT_CREATORS, GROUP_NAME_MEMBERS_ADMIN])
+    async def test_get_my_projects(
+        self,
+        connection: Connection,
+    ) -> None:
         """
         Test that a user with permission only has MY projects
         """
-        await self._add_group_member_direct(GROUP_NAME_PROJECT_CREATORS)
-        await self._add_group_member_direct(GROUP_NAME_MEMBERS_ADMIN)
 
+        pttable = ProjectPermissionsTable(connection)
         g = str(uuid.uuid4())
 
-        pid = await self.pttable.create_project(g, g, self.author)
+        pid = await pttable.create_project(g, g, TEST_USER)
 
-        project_id_map, _ = await self.pttable.get_projects_accessible_by_user(
-            user=self.author
+        project_id_map, _ = await pttable.get_projects_accessible_by_user(
+            user=TEST_USER
         )
         project = project_id_map.get(pid)
-        assert project
-        # Give the user read access to the project
-        await self.pttable.set_project_members(
+        assert project is not None
+
+        # Give the user contributor access to the project
+        await pttable.set_project_members(
             project=project,
-            members=[ProjectMemberUpdate(member=self.author, roles=['contributor'])],
+            members=[ProjectMemberUpdate(member=TEST_USER, roles=['contributor'])],
         )
+
+        # Need to refresh projects to see updated permissions
+        await connection.refresh_projects()
 
         (
             project_id_map,
             project_name_map,
-        ) = await self.pttable.get_projects_accessible_by_user(user=self.author)
+        ) = await pttable.get_projects_accessible_by_user(user=TEST_USER)
 
-        # Get projects with at least a read access role
-        my_projects = self.connection.projects_with_role(
-            {ProjectMemberRole.contributor}
-        )
-        print(my_projects)
+        # Get projects with at least contributor access role
+        my_projects = connection.projects_with_role({ProjectMemberRole.contributor})
 
-        self.assertEqual(len(project_id_map), len(project_name_map))
-        self.assertEqual(len(my_projects), 1)
-        self.assertEqual(pid, my_projects[0].id)
+        assert len(project_id_map) == len(project_name_map)
+        assert len(my_projects) == 1
+        assert pid == my_projects[0].id
 
-    @run_as_sync
-    async def test_delete_project_data(self):
+    @pytest.mark.asyncio
+    @pytest.mark.admin_groups([GROUP_NAME_PROJECT_CREATORS])
+    async def test_delete_project_data(
+        self,
+        connection: Connection,
+    ) -> None:
         """
         Test deleting all project data
         """
-        await self._add_group_member_direct(GROUP_NAME_PROJECT_CREATORS)
+        pttable = ProjectPermissionsTable(connection)
 
-        main_pid = await self.pttable.create_project('foo', 'foo_data', self.author)
-        test_pid = await self.pttable.create_project('a-test', 'a_data', self.author)
+        main_pid = await pttable.create_project('foo', 'foo_data', TEST_USER)
+        test_pid = await pttable.create_project('a-test', 'a_data', TEST_USER)
 
-        pid_map, _ = await self.pttable.get_projects_accessible_by_user(self.author)
+        pid_map, _ = await pttable.get_projects_accessible_by_user(TEST_USER)
 
-        with self.assertRaises(ValueError):  # deleting non-test project not supported
-            await self.pttable.delete_project_data(pid_map[main_pid])
+        with pytest.raises(ValueError):  # deleting non-test project not supported
+            await pttable.delete_project_data(pid_map[main_pid])
 
-        self.assertTrue(await self.pttable.delete_project_data(pid_map[test_pid]))
+        assert await pttable.delete_project_data(pid_map[test_pid]) is True
