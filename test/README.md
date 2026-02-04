@@ -18,9 +18,12 @@ uv run -m unittest discover -s test/
 Otherwise, in VSCode:
 
 - Make sure your VSCode knows your python virtual environment version (`which python`)
-- Then from the "Testing" tab, you can "Configure Python Tests" with:
+- Then from the using the command palette (cmd+shift+P), you can "Python: Configure Tests" with:
     - `unittest`
     - `test/` folder
     - `test_*.py` format
+- If that doesn't work, try using `pytest`. Again use the command palette and "Python: Configure Tests"
+    - `pytest`
+    - `test/` folder
 
 This should display a full list of Python tests which you run all, or debug individual tests.
