@@ -474,9 +474,7 @@ class TestFamily:
         self.flayer = FamilyLayer(connection_with_project)
 
     @pytest.mark.asyncio
-    async def test_create_update(
-        self
-    ) -> None:
+    async def test_create_update(self) -> None:
         """Exercise create_family() and update_family() methods"""
         family_id = await self.flayer.create_family(
             external_ids={PRIMARY_EXTERNAL_ORG: 'Smith'},
@@ -523,8 +521,8 @@ class TestFamily:
         result = await self.flayer.get_families_by_participants([])
         assert result == {}
 
-    @run_as_sync
-    async def test_import_families(self):
+    @pytest.mark.asyncio
+    async def test_import_families(self, connection_with_project: Connection):
         """Exercise import_families() method"""
         await self.flayer.import_families(
             ['familyid', 'description', 'phenotype'],
@@ -536,7 +534,7 @@ class TestFamily:
         )
 
         result = await self.flayer.query(
-            FamilyFilter(project=GenericFilter(eq=self.project_id))
+            FamilyFilter(project=GenericFilter(eq=connection_with_project.project_id))
         )
         assert len(result) == 3
         family = {f.external_ids[PRIMARY_EXTERNAL_ORG]: f for f in result}
@@ -556,7 +554,7 @@ class TestFamily:
         )
 
         result = await self.flayer.query(
-            FamilyFilter(project=GenericFilter(eq=self.project_id))
+            FamilyFilter(project=GenericFilter(eq=connection_with_project.project_id))
         )
         assert len(result) == 4
         family = {f.external_ids[PRIMARY_EXTERNAL_ORG]: f for f in result}
@@ -569,10 +567,10 @@ class TestFamily:
         assert family['Taylor'].description == 'Post Norman'
         assert family['Taylor'].coded_phenotype == 'sews'
 
-    @run_as_sync
-    async def test_direct_get_id_map(self):
+    @pytest.mark.asyncio
+    async def test_direct_get_id_map(self, connection_with_project: Connection):
         """Exercise the table's get_id_map_by_internal_ids() method"""
-        ftable = FamilyTable(self.connection)
+        ftable = FamilyTable(connection_with_project)
 
         result = await ftable.get_id_map_by_internal_ids([])
         assert result == {}

@@ -2,6 +2,8 @@ import dataclasses
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set
 
+from psycopg.rows import scalar_row, dict_row
+
 from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
 from db.python.utils import NotFoundError, escape_like_term
@@ -40,16 +42,21 @@ class FamilyTable(DbBase):
         """
         if len(family_ids) == 0:
             raise ValueError('Received no family IDs to get project ids for')
-        await self.connection.execute(_query, {'family_ids': family_ids})
-        rows = await self.connection.fetchall()
-        projects = set(r['project'] for r in rows)
-        if not projects:
-            raise ValueError(
-                'No projects were found for given families, this is likely an error'
-            )
+
+        async with self.connection.pool.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as curr:
+                await curr.execute(_query, {'family_ids': family_ids})
+                rows = await curr.fetchall()
+
+            projects = set(r['project'] for r in rows)
+
+            if not projects:
+                raise ValueError(
+                    'No projects were found for given families, this is likely an error'
+                )
         return projects
 
-    #TODO, evaluate json_object_agg
+    # TODO, evaluate json_object_agg
     async def query(
         self, filter_: FamilyFilter
     ) -> tuple[set[ProjectId], list[FamilyInternal]]:
@@ -111,7 +118,7 @@ class FamilyTable(DbBase):
 
         return projects, families
 
-    #TODO piyumi complicated
+    # TODO piyumi complicated
     async def get_families_by_participants(
         self, participant_ids: list[int]
     ) -> tuple[set[ProjectId], dict[int, list[FamilyInternal]]]:
@@ -146,23 +153,24 @@ class FamilyTable(DbBase):
         """
         Search by some term, return [ProjectId, FamilyId, ExternalId]
         """
-        #TODO:piyumi ILIKE for case insensitive matches
+        # TODO:piyumi ILIKE for case insensitive matches
         _query = """
             SELECT project, family_id, external_id
             FROM family_external_id
             WHERE project = ANY(%(project_ids)s) AND external_id ILIKE %(search_pattern)s
             LIMIT %(limit)s
         """
-
-        await self.connection.execute(
-            _query,
-            {
-                'project_ids': project_ids,
-                'search_pattern': escape_like_term(query) + '%',
-                'limit': limit,
-            },
-        )
-        rows = self.connection.fetchall()
+        async with self.connection.pool.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as curr:
+                await curr.execute(
+                    _query,
+                    {
+                        'project_ids': project_ids,
+                        'search_pattern': escape_like_term(query) + '%',
+                        'limit': limit,
+                    },
+                )
+                rows = await curr.fetchall()
 
         return [(r['project'], r['family_id'], r['external_id']) for r in rows]
 
@@ -177,15 +185,17 @@ class FamilyTable(DbBase):
         SELECT feid.external_id, fp.participant_id
         FROM family_participant fp
         INNER JOIN family_external_id feid ON fp.family_id = feid.family_id
-        WHERE fp.participant_id in %(pids)s
+        WHERE fp.participant_id = ANY(%(pids)s)
         """
 
-        await self.connection.execute(_query, {'pids': participant_ids})
-        rows = await self.connection.fetchall()
+        async with self.connection.pool.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as curr:
+                await curr.execute(_query, {'pids': participant_ids})
+                rows = await curr.fetchall()
+
         result = defaultdict(list)
         for r in rows:
             result[r['participant_id']].append(r['external_id'])
-
         return result
 
     async def update_family(
@@ -204,63 +214,74 @@ class FamilyTable(DbBase):
         if coded_phenotype:
             values['coded_phenotype'] = coded_phenotype
 
-        async with self.connection.transaction():
-            if external_ids is None:
-                external_ids = {}
+        async with self.connection.pool.connection() as conn:
+            async with conn.transaction():
+                async with conn.cursor(row_factory=scalar_row) as curr:
+                    if external_ids is None:
+                        external_ids = {}
 
-            to_delete = [k.lower() for k, v in external_ids.items() if v is None]
-            to_update = {k.lower(): v for k, v in external_ids.items() if v is not None}
-
-            if to_delete:
-                await self.connection.execute(
-                    """
-                    -- Set audit_log_id to this transaction before deleting the rows
-                    UPDATE family_external_id
-                    SET audit_log_id = %(audit_log_id)s
-                    WHERE family_id = %(id)s AND name = ANY(%(names)s);
-
-                    DELETE FROM family_external_id
-                    WHERE family_id = %(id)s AND name = ANY(%(names)s)
-                    """,
-                    {'id': id_, 'names': to_delete, 'audit_log_id': audit_log_id},
-                )
-
-            if to_update:
-                project = await self.connection.fetch_val(
-                    'SELECT project FROM family WHERE id = %(id)s',
-                    {'id': id_},
-                )
-
-                #TODO:piyumi ON CONFLICT with primary key
-                _update_query = """
-                    INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
-                    VALUES (%(project)s, %(id)s, %(name)s, %(external_id)s, %(audit_log_id)s)
-                    ON CONFLICT (family_id, name) 
-                    DO UPDATE SET 
-                        external_id = EXCLUDED.external_id, 
-                        audit_log_id = EXCLUDED.audit_log_id;
-                    """
-                _update_values = [
-                    {
-                        'project': project,
-                        'id': id_,
-                        'name': name,
-                        'external_id': eid,
-                        'audit_log_id': audit_log_id,
+                    to_delete = [
+                        k.lower() for k, v in external_ids.items() if v is None
+                    ]
+                    to_update = {
+                        k.lower(): v for k, v in external_ids.items() if v is not None
                     }
-                    for name, eid in to_update.items()
-                ]
-                await self.connection.execute_many(_update_query, _update_values)
 
-            setters = ', '.join(f'{field} = :{field}' for field in values)
-            await self.connection.execute(
-                f"""
-                UPDATE family
-                SET {setters}
-                WHERE id = :id
-                """,
-                {**values, 'id': id_},
-            )
+                    if to_delete:
+                        await curr.execute(
+                            """
+                            -- Set audit_log_id to this transaction before deleting the rows
+                            UPDATE family_external_id
+                            SET audit_log_id = %(audit_log_id)s
+                            WHERE family_id = %(id)s AND name = ANY(%(names)s);
+
+                            DELETE FROM family_external_id
+                            WHERE family_id = %(id)s AND name = ANY(%(names)s)
+                            """,
+                            {
+                                'id': id_,
+                                'names': to_delete,
+                                'audit_log_id': audit_log_id,
+                            },
+                        )
+
+                    if to_update:
+                        await curr.execute(
+                            'SELECT project FROM family WHERE id = %(id)s',
+                            {'id': id_},
+                        )
+                        project = await curr.fetchone()
+
+                        # TODO:piyumi ON CONFLICT with primary key
+                        _update_query = """
+                            INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
+                            VALUES (%(project)s, %(id)s, %(name)s, %(external_id)s, %(audit_log_id)s)
+                            ON CONFLICT (family_id, name)
+                            DO UPDATE SET
+                                external_id = EXCLUDED.external_id,
+                                audit_log_id = EXCLUDED.audit_log_id;
+                            """
+                        _update_values = [
+                            {
+                                'project': project,
+                                'id': id_,
+                                'name': name,
+                                'external_id': eid,
+                                'audit_log_id': audit_log_id,
+                            }
+                            for name, eid in to_update.items()
+                        ]
+                        await curr.executemany(_update_query, _update_values)
+
+                    setters = ', '.join(f'{field} = :{field}' for field in values)
+                    await curr.execute(
+                        f"""
+                        UPDATE family
+                        SET {setters}
+                        WHERE id = %(id)s
+                        """,
+                        {**values, 'id': id_},
+                    )
 
         return True
 
@@ -276,37 +297,42 @@ class FamilyTable(DbBase):
         """
         audit_log_id = await self.audit_log_id()
 
-        async with self.connection.transaction():
-            new_id = await self.connection.fetch_val(
-                """
-                INSERT INTO family (project, description, coded_phenotype, audit_log_id)
-                VALUES (:project, :description, :coded_phenotype, :audit_log_id)
-                RETURNING id
-                """,
-                {
-                    'project': project or self.project_id,
-                    'description': description,
-                    'coded_phenotype': coded_phenotype,
-                    'audit_log_id': audit_log_id,
-                },
-            )
+        async with self.connection.pool.connection() as conn:
+            async with conn.transaction():
+                async with conn.cursor(row_factory=scalar_row) as curr:
+                    await curr.execute(
+                        """
+                        INSERT INTO family (project, description, coded_phenotype, audit_log_id)
+                        VALUES (%(project)s, %(description)s, %(coded_phenotype)s, %(audit_log_id)s)
+                        RETURNING id
+                        """,
+                        {
+                            'project': project or self.project_id,
+                            'description': description,
+                            'coded_phenotype': coded_phenotype,
+                            'audit_log_id': audit_log_id,
+                        },
+                    )
 
-            await self.connection.execute_many(
-                """
-                INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
-                VALUES (:project, :family_id, :name, :external_id, :audit_log_id)
-                """,
-                [
-                    {
-                        'project': project or self.project_id,
-                        'family_id': new_id,
-                        'name': name,
-                        'external_id': eid,
-                        'audit_log_id': audit_log_id,
-                    }
-                    for name, eid in external_ids.items()
-                ],
-            )
+                    new_id = await curr.fetchone()
+
+                    # reset the cursor row_factory if fetch called for this query
+                    curr.executemany(
+                        """
+                        INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
+                        VALUES (%(project)s, %(family_id)s, %(name)s, %(external_id)s, %(audit_log_id)s)
+                        """,
+                        [
+                            {
+                                'project': project or self.project_id,
+                                'family_id': new_id,
+                                'name': name,
+                                'external_id': eid,
+                                'audit_log_id': audit_log_id,
+                            }
+                            for name, eid in external_ids.items()
+                        ],
+                    )
 
         return new_id
 
@@ -323,58 +349,67 @@ class FamilyTable(DbBase):
         """
         audit_log_id = await self.audit_log_id()
 
-        for eid, descr, cph in zip(external_ids, descriptions, coded_phenotypes):
-            existing_id = await self.connection.fetch_val(
-                """
-                SELECT family_id FROM family_external_id
-                WHERE project = :project AND external_id = :external_id
-                """,
-                {'project': project or self.project_id, 'external_id': eid},
-            )
+        # TODO piyumi ensure, the whole block is not a transaction
+        async with self.connection.pool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as curr:
+                for eid, descr, cph in zip(
+                    external_ids, descriptions, coded_phenotypes
+                ):
+                    await curr.execute(
+                        """
+                        SELECT family_id FROM family_external_id
+                        WHERE project = %(project)s AND external_id = %(external_id)s
+                        """,
+                        {'project': project or self.project_id, 'external_id': eid},
+                    )
+                    existing_id = await curr.fetchone()
 
-            if existing_id is None:
-                new_id = await self.connection.fetch_val(
-                    """
-                    INSERT INTO family (project, description, coded_phenotype, audit_log_id)
-                    VALUES (:project, :description, :coded_phenotype, :audit_log_id)
-                    RETURNING id
-                    """,
-                    {
-                        'project': project or self.project_id,
-                        'description': descr,
-                        'coded_phenotype': cph,
-                        'audit_log_id': audit_log_id,
-                    },
-                )
-                await self.connection.execute(
-                    """
-                    INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
-                    VALUES (:project, :family_id, :name, :external_id, :audit_log_id)
-                    """,
-                    {
-                        'project': project or self.project_id,
-                        'family_id': new_id,
-                        'name': PRIMARY_EXTERNAL_ORG,
-                        'external_id': eid,
-                        'audit_log_id': audit_log_id,
-                    },
-                )
+                    if existing_id is None:
+                        await curr.execute(
+                            """
+                            INSERT INTO family (project, description, coded_phenotype, audit_log_id)
+                            VALUES (%(project)s, %(description)s, %(coded_phenotype)s, %(audit_log_id)s)
+                            RETURNING id
+                            """,
+                            {
+                                'project': project or self.project_id,
+                                'description': descr,
+                                'coded_phenotype': cph,
+                                'audit_log_id': audit_log_id,
+                            },
+                        )
+                        new_id = await curr.fetchone()
 
-            else:
-                await self.connection.execute(
-                    """
-                    UPDATE family
-                    SET description = :description, coded_phenotype = :coded_phenotype,
-                        audit_log_id = :audit_log_id
-                    WHERE id = :id
-                    """,
-                    {
-                        'id': existing_id,
-                        'description': descr,
-                        'coded_phenotype': cph,
-                        'audit_log_id': audit_log_id,
-                    },
-                )
+                        await curr.execute(
+                            """
+                            INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
+                            VALUES (%(project)s, %(family_id)s, %(name)s, %(external_id)s, %(audit_log_id)s)
+                            """,
+                            {
+                                'project': project or self.project_id,
+                                'family_id': new_id,
+                                'name': PRIMARY_EXTERNAL_ORG,
+                                'external_id': eid,
+                                'audit_log_id': audit_log_id,
+                            },
+                        )
+
+                    else:
+                        await curr.execute(
+                            """
+                            UPDATE family
+                                SET description = %(description)s,
+                                    coded_phenotype = %(coded_phenotype)s,
+                                    audit_log_id = %(audit_log_id)s
+                                WHERE id = %(id)s
+                            """,
+                            {
+                                'id': existing_id,
+                                'description': descr,
+                                'coded_phenotype': cph,
+                                'audit_log_id': audit_log_id,
+                            },
+                        )
 
         return True
 
@@ -386,13 +421,20 @@ class FamilyTable(DbBase):
         if not family_ids:
             return {}
 
-        results = await self.connection.fetch_all(
-            """
-            SELECT external_id, family_id AS id FROM family_external_id
-            WHERE external_id in :external_ids AND project = :project
-            """,
-            {'external_ids': family_ids, 'project': project or self.project_id},
-        )
+        async with self.connection.pool.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as curr:
+                await curr.execute(
+                    """
+                    SELECT external_id, family_id AS id
+                        FROM family_external_id
+                        WHERE external_id = ANY(%(external_ids)s)
+                          AND project = %(project)s
+                """,
+                    {'external_ids': family_ids, 'project': project or self.project_id},
+                )
+
+                results = await curr.fetchall()
+
         id_map = {r['external_id']: r['id'] for r in results}
 
         if not allow_missing and len(id_map) != len(family_ids):
@@ -416,14 +458,18 @@ class FamilyTable(DbBase):
         if len(family_ids) == 0:
             return {}
 
-        results = await self.connection.fetch_all(
-            """
-            SELECT family_id, external_id
-            FROM family_external_id
-            WHERE family_id in :ids AND name = :PRIMARY_EXTERNAL_ORG
-            """,
-            {'ids': family_ids, 'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG},
-        )
+        async with self.connection.pool.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as curr:
+                await curr.execute(
+                    """
+                        SELECT family_id, external_id
+                        FROM family_external_id
+                        WHERE family_id = ANY(%(ids)s) AND name = %(PRIMARY_EXTERNAL_ORG)s
+                    """,
+                    {'ids': family_ids, 'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG},
+                )
+                results = await curr.fetchall()
+
         id_map = {r['family_id']: r['external_id'] for r in results}
         if not allow_missing and len(id_map) != len(family_ids):
             provided_internal_ids = set(family_ids)

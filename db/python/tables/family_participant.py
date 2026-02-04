@@ -47,7 +47,7 @@ class FamilyParticipantTable(DbBase):
         }
         keys = list(updater.keys())
         str_keys = ', '.join(keys)
-        placeholder_keys = ', '.join(f':{k}' for k in keys)
+        placeholder_keys = ', '.join(f'%({k})s' for k in keys)
         _query = f"""
 INSERT INTO family_participant
     ({str_keys})
@@ -55,7 +55,9 @@ VALUES
     ({placeholder_keys})
         """
 
-        await self.connection.execute(_query, updater)
+        async with self.connection.pool.connection() as conn:
+            async with conn.cursor() as curr:
+                await curr.execute(_query, updater)
 
         return family_id, participant_id
 
@@ -93,19 +95,26 @@ VALUES
 
         for d_keys, remapped_ds in remapped_ds_by_keys.items():
             str_keys = ', '.join(d_keys)
-            placeholder_keys = ', '.join(f':{k}' for k in d_keys)
+            placeholder_keys = ', '.join(f'%({k})s' for k in d_keys)
             update_keys = ', '.join(
-                f'{k}=:{k}' for k in d_keys if k not in ignore_keys_during_update
+                f'{k}=EXCLUDED.{k}'
+                for k in d_keys
+                if k not in ignore_keys_during_update
             )
+
+            # TODO:piyumi ON CONFLICT(participant_id), for primary key
             _query = f"""
 INSERT INTO family_participant
     ({str_keys})
 VALUES
     ({placeholder_keys})
-ON DUPLICATE KEY UPDATE
+ON CONFLICT(participant_id)
+DO UPDATE SET
     {update_keys}
     """
-            await self.connection.execute_many(_query, remapped_ds)
+            async with self.connection.pool.connection() as conn:
+                async with conn.cursor() as curr:
+                    await curr.execute(_query, remapped_ds)
 
         return True
 
@@ -199,27 +208,31 @@ WHERE fp.participant_id in :participant_ids
 
         _update_before_delete = """
         UPDATE family_participant
-        SET audit_log_id = :audit_log_id
-        WHERE family_id = :family_id AND participant_id = :participant_id
+        SET audit_log_id = %(audit_log_id)s
+        WHERE family_id = %(family_id)s AND participant_id = %(participant_id)s
         """
 
         _query = """
         DELETE FROM family_participant
-        WHERE participant_id = :participant_id
-        AND family_id = :family_id
+        WHERE participant_id = %(participant_id)s AND family_id = %(family_id)s
         """
 
-        await self.connection.execute(
-            _update_before_delete,
-            {
-                'family_id': family_id,
-                'participant_id': participant_id,
-                'audit_log_id': await self.audit_log_id(),
-            },
-        )
+        async with self.connection.pool.connection() as conn:
+            async with conn.cursor() as cur:
+                cur.execute(
+                    _update_before_delete,
+                    {
+                        'family_id': family_id,
+                        'participant_id': participant_id,
+                        'audit_log_id': await self.audit_log_id(),
+                    },
+                )
 
-        await self.connection.execute(
-            _query, {'family_id': family_id, 'participant_id': participant_id}
-        )
+        # executed separately, even though autocommit = True is set
+        async with self.connection.pool.connection() as conn:
+            async with conn.cursor() as cur:
+                cur.execute(
+                    _query, {'family_id': family_id, 'participant_id': participant_id}
+                )
 
         return True
