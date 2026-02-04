@@ -18,7 +18,7 @@ uv run -m unittest discover -s test/
 Otherwise, in VSCode:
 
 - Make sure your VSCode knows your python virtual environment version (`which python`)
-- Then from the using the command palette (cmd+shift+P), you can "Python: Configure Tests" with:
+- Then using the command palette (cmd+shift+P), you can "Python: Configure Tests" with:
     - `pytest`
     - `test/` folder
 
