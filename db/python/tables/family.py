@@ -35,12 +35,13 @@ class FamilyTable(DbBase):
         """Get project IDs for sampleIds (mostly for checking auth)"""
         _query = """
             SELECT project FROM family
-            WHERE id in :family_ids
+            WHERE id in %(family_ids)s
             GROUP BY project
         """
         if len(family_ids) == 0:
             raise ValueError('Received no family IDs to get project ids for')
-        rows = await self.connection.fetch_all(_query, {'family_ids': family_ids})
+        await self.connection.execute(_query, {'family_ids': family_ids})
+        rows = await self.connection.fetchall()
         projects = set(r['project'] for r in rows)
         if not projects:
             raise ValueError(
@@ -48,6 +49,7 @@ class FamilyTable(DbBase):
             )
         return projects
 
+    #TODO, evaluate json_object_agg
     async def query(
         self, filter_: FamilyFilter
     ) -> tuple[set[ProjectId], list[FamilyInternal]]:
@@ -96,7 +98,8 @@ class FamilyTable(DbBase):
             GROUP BY f.id, f.description, f.coded_phenotype, f.project
         """
 
-        rows = await self.connection.fetch_all(_query, values)
+        await self.connection.execute(_query, values)
+        rows = await self.connection.fetchall()
         seen = set()
         families = []
         projects: set[ProjectId] = set()
@@ -108,6 +111,7 @@ class FamilyTable(DbBase):
 
         return projects, families
 
+    #TODO piyumi complicated
     async def get_families_by_participants(
         self, participant_ids: list[int]
     ) -> tuple[set[ProjectId], dict[int, list[FamilyInternal]]]:
@@ -121,12 +125,14 @@ class FamilyTable(DbBase):
             FROM family f
             INNER JOIN family_external_id feid ON f.id = feid.family_id
             INNER JOIN family_participant fp ON f.id = fp.family_id
-            WHERE fp.participant_id in :pids
+            WHERE fp.participant_id in %(pids)s
             GROUP BY f.id, f.description, f.coded_phenotype, f.project, fp.participant_id
         """
         ret_map = defaultdict(list)
         projects: set[ProjectId] = set()
-        for row in await self.connection.fetch_all(_query, {'pids': participant_ids}):
+
+        await self.connection.execute(_query, {'pids': participant_ids})
+        for row in await self.connection.fetch_all():
             drow = dict(row)
             pid = drow.pop('participant_id')
             projects.add(drow.get('project'))
@@ -140,13 +146,15 @@ class FamilyTable(DbBase):
         """
         Search by some term, return [ProjectId, FamilyId, ExternalId]
         """
+        #TODO:piyumi ILIKE for case insensitive matches
         _query = """
-        SELECT project, family_id, external_id
-        FROM family_external_id
-        WHERE project in :project_ids AND external_id LIKE :search_pattern
-        LIMIT :limit
+            SELECT project, family_id, external_id
+            FROM family_external_id
+            WHERE project = ANY(%(project_ids)s) AND external_id ILIKE %(search_pattern)s
+            LIMIT %(limit)s
         """
-        rows = await self.connection.fetch_all(
+
+        await self.connection.execute(
             _query,
             {
                 'project_ids': project_ids,
@@ -154,6 +162,8 @@ class FamilyTable(DbBase):
                 'limit': limit,
             },
         )
+        rows = self.connection.fetchall()
+
         return [(r['project'], r['family_id'], r['external_id']) for r in rows]
 
     async def get_family_external_ids_by_participant_ids(
@@ -167,9 +177,11 @@ class FamilyTable(DbBase):
         SELECT feid.external_id, fp.participant_id
         FROM family_participant fp
         INNER JOIN family_external_id feid ON fp.family_id = feid.family_id
-        WHERE fp.participant_id in :pids
+        WHERE fp.participant_id in %(pids)s
         """
-        rows = await self.connection.fetch_all(_query, {'pids': participant_ids})
+
+        await self.connection.execute(_query, {'pids': participant_ids})
+        rows = await self.connection.fetchall()
         result = defaultdict(list)
         for r in rows:
             result[r['participant_id']].append(r['external_id'])
@@ -204,25 +216,29 @@ class FamilyTable(DbBase):
                     """
                     -- Set audit_log_id to this transaction before deleting the rows
                     UPDATE family_external_id
-                    SET audit_log_id = :audit_log_id
-                    WHERE family_id = :id AND name IN :names;
+                    SET audit_log_id = %(audit_log_id)s
+                    WHERE family_id = %(id)s AND name = ANY(%(names)s);
 
                     DELETE FROM family_external_id
-                    WHERE family_id = :id AND name in :names
+                    WHERE family_id = %(id)s AND name = ANY(%(names)s)
                     """,
                     {'id': id_, 'names': to_delete, 'audit_log_id': audit_log_id},
                 )
 
             if to_update:
                 project = await self.connection.fetch_val(
-                    'SELECT project FROM family WHERE id = :id',
+                    'SELECT project FROM family WHERE id = %(id)s',
                     {'id': id_},
                 )
 
+                #TODO:piyumi ON CONFLICT with primary key
                 _update_query = """
                     INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
-                    VALUES (:project, :id, :name, :external_id, :audit_log_id)
-                    ON DUPLICATE KEY UPDATE external_id = :external_id, audit_log_id = :audit_log_id
+                    VALUES (%(project)s, %(id)s, %(name)s, %(external_id)s, %(audit_log_id)s)
+                    ON CONFLICT (family_id, name) 
+                    DO UPDATE SET 
+                        external_id = EXCLUDED.external_id, 
+                        audit_log_id = EXCLUDED.audit_log_id;
                     """
                 _update_values = [
                     {

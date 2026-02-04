@@ -1,5 +1,7 @@
 from test.testbase import DbIsolatedTest, run_as_sync
+import pytest
 
+from db.python.connect import Connection
 from pymysql.err import IntegrityError
 
 from db.python.filters import GenericFilter
@@ -14,7 +16,7 @@ from models.models import (
 )
 
 
-class TestParticipant(DbIsolatedTest):
+class TestParticipant:
     """Test participant external ids"""
 
     @run_as_sync
@@ -58,20 +60,20 @@ class TestParticipant(DbIsolatedTest):
     async def test_constraints(self):
         """Verify that database constraints prevent duplicate external_ids"""
         # Can't have two primary eids
-        with self.assertRaises(IntegrityError):
+        with pytest.raises(IntegrityError):
             await self.insert(self.p1.id, PRIMARY_EXTERNAL_ORG, 'P86')
 
         # Can't have two eids in the same external organisation
-        with self.assertRaises(IntegrityError):
+        with pytest.raises(IntegrityError):
             await self.insert(self.p1.id, 'CONTROL', 'Maxwell')
 
         # Can have eids in lots of organisations, but not if the eid duplicates one in a different org
         await self.insert(self.p1.id, 'OTHER1', 'Maxwell')
-        with self.assertRaises(IntegrityError):
+        with pytest.raises(IntegrityError):
             await self.insert(self.p1.id, 'OTHER2', '86')
 
         # Another participant can't have the same eid
-        with self.assertRaises(IntegrityError):
+        with pytest.raises(IntegrityError):
             await self.insert(self.p2.id, 'CONTROL', '86')
 
         # But it can have its own eid
@@ -80,14 +82,14 @@ class TestParticipant(DbIsolatedTest):
     @run_as_sync
     async def test_insert(self):
         """Test inserting new participants with various external_id combinations"""
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             _ = await self.player.upsert_participant(
                 ParticipantUpsertInternal(
                     external_ids={PRIMARY_EXTERNAL_ORG: None},
                 )
             )
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             _ = await self.player.upsert_participant(
                 ParticipantUpsertInternal(external_ids={'OTHER': 'P1'})
             )
@@ -103,15 +105,16 @@ class TestParticipant(DbIsolatedTest):
             )
         )
         participants = await self.player.get_participants_by_ids([result.id])
-        self.assertDictEqual(
-            participants[0].external_ids,
-            {PRIMARY_EXTERNAL_ORG: 'P10', 'a': 'A1', 'c': 'C1'},
-        )
+        assert participants[0].external_ids == {
+            PRIMARY_EXTERNAL_ORG: 'P10',
+            'a': 'A1',
+            'c': 'C1',
+        }
 
     @run_as_sync
     async def test_update(self):
         """Test updating existing participants with various external_id combinations"""
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             _ = await self.player.upsert_participant(
                 ParticipantUpsertInternal(
                     id=self.p1.id,
@@ -132,10 +135,11 @@ class TestParticipant(DbIsolatedTest):
             )
         )
         participants = await self.player.get_participants_by_ids([result.id])
-        self.assertDictEqual(
-            participants[0].external_ids,
-            {PRIMARY_EXTERNAL_ORG: 'P1B', 'control': '86B', 'c': 'A1'},
-        )
+        assert participants[0].external_ids == {
+            PRIMARY_EXTERNAL_ORG: 'P1B',
+            'control': '86B',
+            'c': 'A1',
+        }
 
     @run_as_sync
     async def test_fill_in_missing(self):
@@ -155,7 +159,7 @@ class TestParticipant(DbIsolatedTest):
         )
 
         result = await self.player.fill_in_missing_participants()
-        self.assertEqual(result, 'Updated 2 records')
+        assert result == 'Updated 2 records'
 
         samples = await slayer.get_samples_by(sample_ids=[s1.id, sa.id, sb.id])
 
@@ -166,7 +170,7 @@ class TestParticipant(DbIsolatedTest):
 
         for s in samples:
             expected_eids = self.p1_external_ids if s.id == s1.id else s.external_ids
-            self.assertEqual(p_map[s.participant_id].external_ids, expected_eids)
+            assert p_map[s.participant_id].external_ids == expected_eids
 
     @run_as_sync
     async def test_get_by_families(self):
@@ -189,11 +193,9 @@ class TestParticipant(DbIsolatedTest):
         )
 
         result = await self.player.get_participants_by_families([fid])
-        self.assertEqual(len(result), 1)
-        self.assertEqual(len(result[fid]), 1)
-        self.assertDictEqual(
-            result[fid][0].external_ids, {PRIMARY_EXTERNAL_ORG: 'P20', 'd': 'D20'}
-        )
+        assert len(result) == 1
+        assert len(result[fid]) == 1
+        assert result[fid][0].external_ids == {PRIMARY_EXTERNAL_ORG: 'P20', 'd': 'D20'}
 
     @run_as_sync
     async def test_get_families_by_participants(self):
@@ -220,9 +222,9 @@ class TestParticipant(DbIsolatedTest):
         )
 
         result = await flayer.get_families_by_participants([child.id, self.p1.id])
-        self.assertEqual(len(result), 1)
-        self.assertEqual(len(result[child.id]), 1)
-        self.assertEqual(result[child.id][0].description, 'Blacksmiths')
+        assert len(result) == 1
+        assert len(result[child.id]) == 1
+        assert result[child.id][0].description == 'Blacksmiths'
 
     @run_as_sync
     async def test_update_many(self):
@@ -230,7 +232,7 @@ class TestParticipant(DbIsolatedTest):
         result = await self.player.update_many_participant_external_ids(
             {self.p1.id: 'P1B', self.p2.id: 'P2B'}
         )
-        self.assertTrue(result)
+        assert result
 
         participants = await self.player.get_participants_by_ids(
             [self.p1.id, self.p2.id]
@@ -238,11 +240,12 @@ class TestParticipant(DbIsolatedTest):
         p_map = {p.id: p for p in participants}
         outp1 = p_map[self.p1.id]
         outp2 = p_map[self.p2.id]
-        self.assertDictEqual(
-            outp1.external_ids,
-            {PRIMARY_EXTERNAL_ORG: 'P1B', 'control': '86', 'kaos': 'shoe'},
-        )
-        self.assertDictEqual(outp2.external_ids, {PRIMARY_EXTERNAL_ORG: 'P2B'})
+        assert outp1.external_ids == {
+            PRIMARY_EXTERNAL_ORG: 'P1B',
+            'control': '86',
+            'kaos': 'shoe',
+        }
+        assert outp2.external_ids == {PRIMARY_EXTERNAL_ORG: 'P2B'}
 
     @run_as_sync
     async def test_get_etoi_map(self):
@@ -273,10 +276,10 @@ class TestParticipant(DbIsolatedTest):
         result = await self.player.get_external_participant_id_to_internal_sequencing_group_id_map(
             self.project_id
         )
-        self.assertEqual(len(result), 3)
+        assert len(result) == 3
         for eid, sgid in result:
-            self.assertIn(eid, self.p1.external_ids.values())
-            self.assertEqual(sgid, s2.sequencing_groups[0].id)
+            assert eid == self.p1.external_ids.values()
+            assert sgid == s2.sequencing_groups[0].id
 
 
 class TestSample(DbIsolatedTest):
@@ -322,20 +325,20 @@ class TestSample(DbIsolatedTest):
     async def test_constraints(self):
         """Verify that database constraints prevent duplicate external_ids"""
         # Can't have two primary eids
-        with self.assertRaises(IntegrityError):
+        with pytest.raises(IntegrityError):
             await self.insert(self.s1.id, PRIMARY_EXTERNAL_ORG, 'S86')
 
         # Can't have two eids in the same external organisation
-        with self.assertRaises(IntegrityError):
+        with pytest.raises(IntegrityError):
             await self.insert(self.s1.id, 'CONTROL', 'Maxwell')
 
         # Can have eids in lots of organisations, but not if the eid duplicates one in a different org
         await self.insert(self.s1.id, 'OTHER1', 'Maxwell')
-        with self.assertRaises(IntegrityError):
+        with pytest.raises(IntegrityError):
             await self.insert(self.s1.id, 'OTHER2', '86')
 
         # Another sample can't have the same eid
-        with self.assertRaises(IntegrityError):
+        with pytest.raises(IntegrityError):
             await self.insert(self.s2.id, 'CONTROL', '86')
 
         # But it can have its own eid
@@ -344,14 +347,14 @@ class TestSample(DbIsolatedTest):
     @run_as_sync
     async def test_insert(self):
         """Test inserting new samples with various external_id combinations"""
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             _ = await self.slayer.upsert_sample(
                 SampleUpsertInternal(
                     external_ids={PRIMARY_EXTERNAL_ORG: None},
                 )
             )
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             _ = await self.slayer.upsert_sample(
                 SampleUpsertInternal(external_ids={'OTHER': 'S1'})
             )
@@ -367,14 +370,16 @@ class TestSample(DbIsolatedTest):
             )
         )
         sample = await self.slayer.get_sample_by_id(result.id)
-        self.assertDictEqual(
-            sample.external_ids, {PRIMARY_EXTERNAL_ORG: 'S10', 'a': 'A1', 'c': 'C1'}
-        )
+        assert sample.external_ids == {
+            PRIMARY_EXTERNAL_ORG: 'S10',
+            'a': 'A1',
+            'c': 'C1',
+        }
 
     @run_as_sync
     async def test_update(self):
         """Test updating existing samples with various external_id combinations"""
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             _ = await self.slayer.upsert_sample(
                 SampleUpsertInternal(
                     id=self.s1.id,
@@ -395,24 +400,25 @@ class TestSample(DbIsolatedTest):
             )
         )
         sample = await self.slayer.get_sample_by_id(result.id)
-        self.assertDictEqual(
-            sample.external_ids,
-            {PRIMARY_EXTERNAL_ORG: 'S1B', 'control': '86B', 'c': 'A1'},
-        )
+        assert sample.external_ids == {
+            PRIMARY_EXTERNAL_ORG: 'S1B',
+            'control': '86B',
+            'c': 'A1',
+        }
 
     @run_as_sync
     async def test_get_single(self):
         """Exercise get_single_by_external_id() method"""
-        with self.assertRaises(NotFoundError):
+        with pytest.raises(NotFoundError):
             _ = await self.slayer.get_single_by_external_id(
                 'non-existent', self.project_id
             )
 
         result = await self.slayer.get_single_by_external_id('86', self.project_id)
-        self.assertEqual(result.id, self.s1.id)
+        assert result.id == self.s1.id
 
         result = await self.slayer.get_single_by_external_id('S2', self.project_id)
-        self.assertEqual(result.id, self.s2.id)
+        assert result.id == self.s2.id
 
     @run_as_sync
     async def test_get_internal_to_external(self):
@@ -420,7 +426,7 @@ class TestSample(DbIsolatedTest):
         result = await self.slayer.get_internal_to_external_sample_id_map(
             [self.s1.id, self.s2.id]
         )
-        self.assertDictEqual(result, {self.s1.id: 'S1', self.s2.id: 'S2'})
+        assert result == {self.s1.id: 'S1', self.s2.id: 'S2'}
 
     @run_as_sync
     async def test_get_all(self):
@@ -428,7 +434,7 @@ class TestSample(DbIsolatedTest):
         result = await self.slayer.get_all_sample_id_map_by_internal_ids(
             self.project_id
         )
-        self.assertDictEqual(result, {self.s1.id: 'S1', self.s2.id: 'S2'})
+        assert result == {self.s1.id: 'S1', self.s2.id: 'S2'}
 
     @run_as_sync
     async def test_get_history(self):
@@ -449,23 +455,28 @@ class TestSample(DbIsolatedTest):
         sample = await self.slayer.get_sample_by_id(self.s1.id)
 
         result = await self.slayer.get_history_of_sample(self.s1.id)
-        self.assertEqual(len(result), 3)
-        self.assertDictEqual(result[0].meta, {})
-        self.assertDictEqual(result[1].meta, {'foo': 'bar'})
-        self.assertDictEqual(result[2].meta, {'foo': 'bar', 'fruit': 'banana'})
-        self.assertDictEqual(result[2].meta, sample.meta)
+        assert len(result) == 3
+        assert result[0].meta == {}
+        assert result[1].meta == {'foo': 'bar'}
+        assert result[2].meta == {'foo': 'bar', 'fruit': 'banana'}
+        assert result[2].meta == sample.meta
 
 
-class TestFamily(DbIsolatedTest):
+class TestFamily:
     """Test family external ids"""
 
-    @run_as_sync
-    async def setUp(self):
-        super().setUp()
-        self.flayer = FamilyLayer(self.connection)
+    @pytest.mark.asyncio
+    @pytest.fixture(autouse=True)
+    async def set_up(
+        self,
+        connection_with_project: Connection,
+    ):
+        self.flayer = FamilyLayer(connection_with_project)
 
-    @run_as_sync
-    async def test_create_update(self):
+    @pytest.mark.asyncio
+    async def test_create_update(
+        self
+    ) -> None:
         """Exercise create_family() and update_family() methods"""
         family_id = await self.flayer.create_family(
             external_ids={PRIMARY_EXTERNAL_ORG: 'Smith'},
@@ -474,43 +485,43 @@ class TestFamily(DbIsolatedTest):
         )
 
         family = await self.flayer.get_family_by_internal_id(family_id)
-        self.assertDictEqual(family.external_ids, {PRIMARY_EXTERNAL_ORG: 'Smith'})
-        self.assertEqual(family.description, 'Blacksmiths')
-        self.assertEqual(family.coded_phenotype, 'burnt')
+        assert family.external_ids == {PRIMARY_EXTERNAL_ORG: 'Smith'}
+        assert family.description == 'Blacksmiths'
+        assert family.coded_phenotype == 'burnt'
 
         await self.flayer.update_family(family_id, external_ids={'foo': 'bar'})
         family = await self.flayer.get_family_by_internal_id(family_id)
-        self.assertEqual(family.external_ids['foo'], 'bar')
+        assert family.external_ids['foo'] == 'bar'
 
         await self.flayer.update_family(family_id, external_ids={'foo': 'baz'})
         family = await self.flayer.get_family_by_internal_id(family_id)
-        self.assertEqual(family.external_ids['foo'], 'baz')
+        assert family.external_ids['foo'] == 'baz'
 
         await self.flayer.update_family(family_id, external_ids={'foo': None})
         family = await self.flayer.get_family_by_internal_id(family_id)
-        self.assertDictEqual(family.external_ids, {PRIMARY_EXTERNAL_ORG: 'Smith'})
+        assert family.external_ids == {PRIMARY_EXTERNAL_ORG: 'Smith'}
 
         await self.flayer.update_family(family_id, description='Goldsmiths')
         family = await self.flayer.get_family_by_internal_id(family_id)
-        self.assertEqual(family.description, 'Goldsmiths')
-        self.assertEqual(family.coded_phenotype, 'burnt')
+        assert family.description == 'Goldsmiths'
+        assert family.coded_phenotype == 'burnt'
 
         await self.flayer.update_family(family_id, coded_phenotype='gilt')
         family = await self.flayer.get_family_by_internal_id(family_id)
-        self.assertEqual(family.description, 'Goldsmiths')
-        self.assertEqual(family.coded_phenotype, 'gilt')
+        assert family.description == 'Goldsmiths'
+        assert family.coded_phenotype == 'gilt'
 
     @run_as_sync
     async def test_bad_query(self):
         """Exercise invalid query() usage"""
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             await self.flayer.query(FamilyFilter())
 
     @run_as_sync
     async def test_none_by_participants(self):
         """Exercise get_families_by_participants() method"""
         result = await self.flayer.get_families_by_participants([])
-        self.assertDictEqual(result, {})
+        assert result == {}
 
     @run_as_sync
     async def test_import_families(self):
@@ -527,14 +538,14 @@ class TestFamily(DbIsolatedTest):
         result = await self.flayer.query(
             FamilyFilter(project=GenericFilter(eq=self.project_id))
         )
-        self.assertEqual(len(result), 3)
+        assert len(result) == 3
         family = {f.external_ids[PRIMARY_EXTERNAL_ORG]: f for f in result}
-        self.assertEqual(family['Smith'].description, 'Blacksmiths')
-        self.assertEqual(family['Smith'].coded_phenotype, 'burnt')
-        self.assertEqual(family['Jones'].description, 'From Wales')
-        self.assertEqual(family['Jones'].coded_phenotype, 'sings well')
-        self.assertEqual(family['Taylor'].description, 'Post Norman')
-        self.assertEqual(family['Taylor'].coded_phenotype, 'sews')
+        assert family['Smith'].description == 'Blacksmiths'
+        assert family['Smith'].coded_phenotype == 'burnt'
+        assert family['Jones'].description == 'From Wales'
+        assert family['Jones'].coded_phenotype == 'sings well'
+        assert family['Taylor'].description == 'Post Norman'
+        assert family['Taylor'].coded_phenotype == 'sews'
 
         await self.flayer.import_families(
             ['familyid', 'description', 'phenotype'],
@@ -547,16 +558,16 @@ class TestFamily(DbIsolatedTest):
         result = await self.flayer.query(
             FamilyFilter(project=GenericFilter(eq=self.project_id))
         )
-        self.assertEqual(len(result), 4)
+        assert len(result) == 4
         family = {f.external_ids[PRIMARY_EXTERNAL_ORG]: f for f in result}
-        self.assertEqual(family['Smith'].description, 'Goldsmiths actually')
-        self.assertEqual(family['Smith'].coded_phenotype, 'gilt')
-        self.assertEqual(family['Brown'].description, 'From Jamaica')
-        self.assertEqual(family['Brown'].coded_phenotype, 'brunette')
-        self.assertEqual(family['Jones'].description, 'From Wales')
-        self.assertEqual(family['Jones'].coded_phenotype, 'sings well')
-        self.assertEqual(family['Taylor'].description, 'Post Norman')
-        self.assertEqual(family['Taylor'].coded_phenotype, 'sews')
+        assert family['Smith'].description == 'Goldsmiths actually'
+        assert family['Smith'].coded_phenotype == 'gilt'
+        assert family['Brown'].description == 'From Jamaica'
+        assert family['Brown'].coded_phenotype == 'brunette'
+        assert family['Jones'].description == 'From Wales'
+        assert family['Jones'].coded_phenotype == 'sings well'
+        assert family['Taylor'].description == 'Post Norman'
+        assert family['Taylor'].coded_phenotype == 'sews'
 
     @run_as_sync
     async def test_direct_get_id_map(self):
@@ -564,10 +575,10 @@ class TestFamily(DbIsolatedTest):
         ftable = FamilyTable(self.connection)
 
         result = await ftable.get_id_map_by_internal_ids([])
-        self.assertDictEqual(result, {})
+        assert result == {}
 
         result = await ftable.get_id_map_by_internal_ids([42], allow_missing=True)
-        self.assertDictEqual(result, {})
+        assert result == {}
 
-        with self.assertRaises(NotFoundError):
+        with pytest.raises(NotFoundError):
             _ = await ftable.get_id_map_by_internal_ids([42])
