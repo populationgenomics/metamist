@@ -11,7 +11,6 @@ from db.python.tables.family_participant import (
     FamilyParticipantTable,
 )
 from db.python.tables.participant import ParticipantTable
-from db.python.tables.sample import SampleTable
 from db.python.utils import NotFoundError
 from models.models import PRIMARY_EXTERNAL_ORG
 from models.models.family import FamilyInternal, PedRow, PedRowInternal
@@ -24,7 +23,6 @@ class FamilyLayer(BaseLayer):
 
     def __init__(self, connection: Connection):
         super().__init__(connection)
-        self.stable = SampleTable(connection)
         self.ftable = FamilyTable(connection)
         self.fptable = FamilyParticipantTable(self.connection)
 
@@ -287,57 +285,63 @@ class FamilyLayer(BaseLayer):
             )
         )
 
-        async with self.connection.connection.transaction():
-            if create_missing_participants:
-                missing_participant_ids = set(external_participant_ids) - set(
-                    external_participant_ids_map
-                )
-                for row in pedrows:
-                    if row.individual_id not in missing_participant_ids:
-                        continue
-                    upserted_participant = await participant_table.upsert_participant(
-                        ParticipantUpsertInternal(
-                            external_ids={PRIMARY_EXTERNAL_ORG: row.individual_id},
-                            reported_sex=row.sex,
-                        )
+        async with self.connection.pool.connection() as conn:
+            async with conn.transaction():
+                if create_missing_participants:
+                    missing_participant_ids = set(external_participant_ids) - set(
+                        external_participant_ids_map
                     )
-                    pid = upserted_participant.id
-                    external_participant_ids_map[row.individual_id] = pid
+                    for row in pedrows:
+                        if row.individual_id not in missing_participant_ids:
+                            continue
+                        upserted_participant = (
+                            await participant_table.upsert_participant(
+                                ParticipantUpsertInternal(
+                                    external_ids={
+                                        PRIMARY_EXTERNAL_ORG: row.individual_id
+                                    },
+                                    reported_sex=row.sex,
+                                )
+                            )
+                        )
+                        pid = upserted_participant.id
+                        external_participant_ids_map[row.individual_id] = pid
 
-            for external_family_id in missing_external_family_ids:
-                internal_family_id = await self.ftable.create_family(
-                    external_ids={PRIMARY_EXTERNAL_ORG: external_family_id},
-                    description=None,
-                    coded_phenotype=None,
-                )
-                external_family_id_map[external_family_id] = internal_family_id
+                for external_family_id in missing_external_family_ids:
+                    internal_family_id = await self.ftable.create_family(
+                        external_ids={PRIMARY_EXTERNAL_ORG: external_family_id},
+                        description=None,
+                        coded_phenotype=None,
+                        async_connection_oj=conn,
+                    )
+                    external_family_id_map[external_family_id] = internal_family_id
 
-            # now let's map participants back
+                # now let's map participants back
 
-            insertable_rows = [
-                PedRowInternal(
-                    family_id=external_family_id_map[row.family_id],
-                    individual_id=external_participant_ids_map[row.individual_id],
-                    paternal_id=external_participant_ids_map.get(row.paternal_id),
-                    maternal_id=external_participant_ids_map.get(row.maternal_id),
-                    affected=row.affected,
-                    notes=row.notes,
-                    sex=row.sex,
-                )
-                for row in pedrows
-            ]
-
-            await participant_table.upsert_participants(
-                [
-                    ParticipantUpsertInternal(
-                        id=external_participant_ids_map[row.individual_id],
-                        external_ids={PRIMARY_EXTERNAL_ORG: row.individual_id},
-                        reported_sex=row.sex,
+                insertable_rows = [
+                    PedRowInternal(
+                        family_id=external_family_id_map[row.family_id],
+                        individual_id=external_participant_ids_map[row.individual_id],
+                        paternal_id=external_participant_ids_map.get(row.paternal_id),
+                        maternal_id=external_participant_ids_map.get(row.maternal_id),
+                        affected=row.affected,
+                        notes=row.notes,
+                        sex=row.sex,
                     )
                     for row in pedrows
                 ]
-            )
-            await self.fptable.create_rows(insertable_rows)
+
+                await participant_table.upsert_participants(
+                    [
+                        ParticipantUpsertInternal(
+                            id=external_participant_ids_map[row.individual_id],
+                            external_ids={PRIMARY_EXTERNAL_ORG: row.individual_id},
+                            reported_sex=row.sex,
+                        )
+                        for row in pedrows
+                    ]
+                )
+                await self.fptable.create_rows(insertable_rows)
 
         return True
 

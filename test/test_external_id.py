@@ -19,10 +19,10 @@ from models.models import (
 class TestParticipant:
     """Test participant external ids"""
 
-    @run_as_sync
-    async def setUp(self):
-        super().setUp()
-        self.player = ParticipantLayer(self.connection)
+    @pytest.mark.asyncio
+    @pytest.fixture(autouse=True)
+    async def set_up(self, connection: Connection):
+        self.player = ParticipantLayer(connection)
 
         self.p1 = await self.player.upsert_participant(
             ParticipantUpsertInternal(
@@ -172,10 +172,10 @@ class TestParticipant:
             expected_eids = self.p1_external_ids if s.id == s1.id else s.external_ids
             assert p_map[s.participant_id].external_ids == expected_eids
 
-    @run_as_sync
-    async def test_get_by_families(self):
+    @pytest.mark.asyncio
+    async def test_get_by_families(self, connection: Connection):
         """Exercise get_participants_by_families() method"""
-        flayer = FamilyLayer(self.connection)
+        flayer = FamilyLayer(connection)
         fid = await flayer.create_family(external_ids={'org': 'Jones'})
 
         child = await self.player.upsert_participant(
@@ -197,10 +197,10 @@ class TestParticipant:
         assert len(result[fid]) == 1
         assert result[fid][0].external_ids == {PRIMARY_EXTERNAL_ORG: 'P20', 'd': 'D20'}
 
-    @run_as_sync
-    async def test_get_families_by_participants(self):
+    @pytest.mark.asyncio
+    async def test_get_families_by_participants(self, connection: Connection):
         """Exercise FamilyLayer's get_families_by_participants() method"""
-        flayer = FamilyLayer(self.connection)
+        flayer = FamilyLayer(connection)
         fid = await flayer.create_family(
             external_ids={PRIMARY_EXTERNAL_ORG: 'Smith'},
             description='Blacksmiths',
@@ -247,10 +247,10 @@ class TestParticipant:
         }
         assert outp2.external_ids == {PRIMARY_EXTERNAL_ORG: 'P2B'}
 
-    @run_as_sync
-    async def test_get_etoi_map(self):
+    @pytest.mark.asyncio
+    async def test_get_etoi_map(self, connection: Connection):
         """Exercise get_external_participant_id_to_internal_sequencing_group_id_map() method"""
-        slayer = SampleLayer(self.connection)
+        slayer = SampleLayer(connection)
 
         _ = await slayer.upsert_sample(
             SampleUpsertInternal(
@@ -285,10 +285,10 @@ class TestParticipant:
 class TestSample(DbIsolatedTest):
     """Test sample external ids"""
 
-    @run_as_sync
-    async def setUp(self):
-        super().setUp()
-        self.slayer = SampleLayer(self.connection)
+    @pytest.mark.asyncio
+    @pytest.fixture(autouse=True)
+    async def set_up(self, connection: Connection):
+        self.slayer = SampleLayer(connection)
 
         self.s1 = await self.slayer.upsert_sample(
             SampleUpsertInternal(
@@ -306,6 +306,7 @@ class TestSample(DbIsolatedTest):
             )
         )
 
+    @pytest.mark.asyncio
     async def insert(self, sample_id, org, external_id):
         """Directly insert into sample_external_id table"""
         query = """
@@ -321,7 +322,7 @@ class TestSample(DbIsolatedTest):
         }
         await self.connection.connection.execute(query, values)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_constraints(self):
         """Verify that database constraints prevent duplicate external_ids"""
         # Can't have two primary eids
@@ -344,7 +345,7 @@ class TestSample(DbIsolatedTest):
         # But it can have its own eid
         await self.insert(self.s2.id, 'CONTROL', '99')
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_insert(self):
         """Test inserting new samples with various external_id combinations"""
         with pytest.raises(ValueError):
@@ -376,7 +377,7 @@ class TestSample(DbIsolatedTest):
             'c': 'C1',
         }
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_update(self):
         """Test updating existing samples with various external_id combinations"""
         with pytest.raises(ValueError):
@@ -406,7 +407,7 @@ class TestSample(DbIsolatedTest):
             'c': 'A1',
         }
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_get_single(self):
         """Exercise get_single_by_external_id() method"""
         with pytest.raises(NotFoundError):
@@ -420,7 +421,7 @@ class TestSample(DbIsolatedTest):
         result = await self.slayer.get_single_by_external_id('S2', self.project_id)
         assert result.id == self.s2.id
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_get_internal_to_external(self):
         """Exercise get_internal_to_external_sample_id_map() method"""
         result = await self.slayer.get_internal_to_external_sample_id_map(
@@ -428,7 +429,7 @@ class TestSample(DbIsolatedTest):
         )
         assert result == {self.s1.id: 'S1', self.s2.id: 'S2'}
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_get_all(self):
         """Exercise get_all_sample_id_map_by_internal_ids() method"""
         result = await self.slayer.get_all_sample_id_map_by_internal_ids(
@@ -436,7 +437,7 @@ class TestSample(DbIsolatedTest):
         )
         assert result == {self.s1.id: 'S1', self.s2.id: 'S2'}
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_get_history(self):
         """Exercise get_history_of_sample() method"""
         # First create some history
@@ -509,13 +510,13 @@ class TestFamily:
         assert family.description == 'Goldsmiths'
         assert family.coded_phenotype == 'gilt'
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_bad_query(self):
         """Exercise invalid query() usage"""
         with pytest.raises(ValueError):
             await self.flayer.query(FamilyFilter())
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_none_by_participants(self):
         """Exercise get_families_by_participants() method"""
         result = await self.flayer.get_families_by_participants([])
@@ -568,9 +569,9 @@ class TestFamily:
         assert family['Taylor'].coded_phenotype == 'sews'
 
     @pytest.mark.asyncio
-    async def test_direct_get_id_map(self, connection_with_project: Connection):
+    async def test_direct_get_id_map(self, connection: Connection):
         """Exercise the table's get_id_map_by_internal_ids() method"""
-        ftable = FamilyTable(connection_with_project)
+        ftable = FamilyTable(connection)
 
         result = await ftable.get_id_map_by_internal_ids([])
         assert result == {}

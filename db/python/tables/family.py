@@ -2,7 +2,8 @@ import dataclasses
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set
 
-from psycopg.rows import scalar_row, dict_row, class_row
+from psycopg import AsyncConnection
+from psycopg.rows import scalar_row, class_row
 
 from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
@@ -44,9 +45,12 @@ class FamilyTable(DbBase):
             raise ValueError('Received no family IDs to get project ids for')
 
         async with self.connection.pool.connection() as conn:
-            async with conn.cursor(row_factory=dict_row) as curr:
+            async with conn.cursor() as curr:
                 await curr.execute(_query, {'family_ids': family_ids})
                 rows = await curr.fetchall()
+
+        # async with self._execute(_query, {'family_ids': family_ids}) as curr:
+        #     rows = await curr.fetchall()
 
         projects = set(r['project'] for r in rows)
 
@@ -170,7 +174,7 @@ class FamilyTable(DbBase):
             LIMIT %(limit)s
         """
         async with self.connection.pool.connection() as conn:
-            async with conn.cursor(row_factory=dict_row) as curr:
+            async with conn.cursor() as curr:
                 await curr.execute(
                     _query,
                     {
@@ -198,7 +202,7 @@ class FamilyTable(DbBase):
         """
 
         async with self.connection.pool.connection() as conn:
-            async with conn.cursor(row_factory=dict_row) as curr:
+            async with conn.cursor() as curr:
                 await curr.execute(_query, {'pids': participant_ids})
                 rows = await curr.fetchall()
 
@@ -311,13 +315,14 @@ class FamilyTable(DbBase):
         description: Optional[str],
         coded_phenotype: Optional[str],
         project: ProjectId | None = None,
+        async_connection_oj: AsyncConnection = None,
     ) -> int:
         """
         Create a new sample, and add it to database
         """
         audit_log_id = await self.audit_log_id()
 
-        async with self.connection.pool.connection() as conn:
+        async with self._get_connection(async_connection_oj) as conn:
             async with conn.transaction():
                 async with conn.cursor(row_factory=scalar_row) as curr:
                     await curr.execute(
@@ -441,7 +446,7 @@ class FamilyTable(DbBase):
             return {}
 
         async with self.connection.pool.connection() as conn:
-            async with conn.cursor(row_factory=dict_row) as curr:
+            async with conn.cursor() as curr:
                 await curr.execute(
                     """
                     SELECT external_id, family_id AS id
@@ -477,7 +482,7 @@ class FamilyTable(DbBase):
             return {}
 
         async with self.connection.pool.connection() as conn:
-            async with conn.cursor(row_factory=dict_row) as curr:
+            async with conn.cursor() as curr:
                 await curr.execute(
                     """
                         SELECT family_id, external_id

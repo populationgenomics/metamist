@@ -1,4 +1,7 @@
-from test.testbase import DbIsolatedTest, run_as_sync
+import pytest
+
+from db.python.connect import Connection
+from test.testbase import run_as_sync
 
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
@@ -23,19 +26,18 @@ from models.models.sample import sample_id_format
 from models.models.sequencing_group import sequencing_group_id_format
 
 
-class TestSample(DbIsolatedTest):
+class TestSample:
     """Test sample class"""
 
     # tests run in 'sorted by ascii' order
-    @run_as_sync
-    async def setUp(self) -> None:
-        super().setUp()
-
-        self.schlay = SearchLayer(self.connection)
-        self.slayer = SampleLayer(self.connection)
-        self.player = ParticipantLayer(self.connection)
-        self.flayer = FamilyLayer(self.connection)
-        self.sglayer = SequencingGroupLayer(self.connection)
+    @pytest.mark.asyncio
+    @pytest.fixture(autouse=True)
+    async def set_up(self, connection_with_project: Connection) -> None:
+        self.schlay = SearchLayer(connection_with_project)
+        self.slayer = SampleLayer(connection_with_project)
+        self.player = ParticipantLayer(connection_with_project)
+        self.flayer = FamilyLayer(connection_with_project)
+        self.sglayer = SequencingGroupLayer(connection_with_project)
 
     @run_as_sync
     async def test_search_non_existent_sample_by_internal_id(self):
@@ -182,23 +184,23 @@ class TestSample(DbIsolatedTest):
         self.assertListEqual(['PART01'], result_data.participant_external_ids)
         self.assertListEqual([], result_data.family_external_ids)
 
-    @run_as_sync
-    async def test_search_family(self):
+    @pytest.mark.asyncio
+    async def test_search_family(self, connection_with_project: Connection):
         """
         Search family by External ID
         should only return one result
         """
         f_id = await self.flayer.create_family(external_ids={'forg': 'FAMXX01'})
         results = await self.schlay.search(
-            query='FAMXX01', project_ids=[self.project_id]
+            query='FAMXX01', project_ids=[connection_with_project.project_id]
         )
-        self.assertEqual(1, len(results))
+        assert 1 == len(results)
         result = results[0]
-        self.assertEqual('FAMXX01', result.title)
+        assert 'FAMXX01' == result.title
         result_data = result.data
         assert isinstance(result_data, FamilySearchResponseData)
-        self.assertEqual(f_id, result_data.id)
-        self.assertListEqual(['FAMXX01'], result_data.family_external_ids)
+        assert f_id == result_data.id
+        assert ['FAMXX01'] == result_data.family_external_ids
 
     @run_as_sync
     async def test_search_mixed(self):

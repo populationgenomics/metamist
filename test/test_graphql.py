@@ -1,4 +1,8 @@
-from test.testbase import DbIsolatedTest, run_as_sync
+import pytest
+
+from db.python.connect import Connection
+from test.conftest import GraphQLQueryFunction
+from test.testbase import run_as_sync
 
 from graphql.error import GraphQLError, GraphQLSyntaxError
 
@@ -92,14 +96,14 @@ query MyQuery($project: String!) {
 )
 
 
-class TestGraphQL(DbIsolatedTest):
+class TestGraphQL:
     """Test graphql functionality"""
 
-    @run_as_sync
-    async def setUp(self) -> None:
+    @pytest.mark.asyncio
+    @pytest.fixture(autouse=True)
+    async def set_up(self, connection: Connection) -> None:
         """Setup the tests"""
-        super().setUp()
-        self.player = ParticipantLayer(self.connection)
+        self.player = ParticipantLayer(connection)
 
     def test_validate_local_schema(self):
         """
@@ -346,10 +350,12 @@ query MyQuery($pid: Int!) {
         self.assertIn('phenotypes', resp['participant'])
         self.assertDictEqual(phenotypes, resp['participant']['phenotypes'])
 
-    @run_as_sync
-    async def test_family_participants(self):
+    @pytest.mark.asyncio
+    async def test_family_participants(
+        self, graphql_query: GraphQLQueryFunction, connection_with_project: Connection
+    ):
         """Test inserting + querying family participants from different directions"""
-        family_layer = FamilyLayer(self.connection)
+        family_layer = FamilyLayer(connection_with_project)
 
         family_eid = 'family1'
 
@@ -391,7 +397,7 @@ query MyQuery($project: String!) {
 }
 """
 
-        resp = await self.run_graphql_query_async(q, {'project': self.project_name})
+        resp = await graphql_query(q, {'project': self.project_name})
         assert resp is not None
 
         family_simple_obj = {'family': {'externalId': family_eid}}
@@ -400,47 +406,42 @@ query MyQuery($project: String!) {
         families = resp['project']['families']
 
         participants_by_eid = {p['externalId']: p for p in participants}
-        self.assertEqual(3, len(participants))
+        assert 3 == len(participants)
 
-        self.assertDictEqual(
-            {
-                'externalId': 'individual1',
-                'families': [{'externalId': family_eid}],
-                'familyParticipants': [
-                    {'affected': 1, 'notes': 'note1', **family_simple_obj}
-                ],
-            },
-            participants_by_eid['individual1'],
-        )
-        self.assertEqual(1, len(participants_by_eid['individual1']['families']))
+        assert {
+            'externalId': 'individual1',
+            'families': [{'externalId': family_eid}],
+            'familyParticipants': [
+                {'affected': 1, 'notes': 'note1', **family_simple_obj}
+            ],
+        } == participants_by_eid['individual1']
 
-        self.assertEqual(1, len(families))
-        self.assertEqual(family_eid, families[0]['externalId'])
+        assert 1 == len(participants_by_eid['individual1']['families'])
+
+        assert 1 == len(families)
+        assert family_eid == families[0]['externalId']
 
         sorted_fps = sorted(
             families[0]['familyParticipants'],
             key=lambda x: x['participant']['externalId'],
         )
-        self.assertListEqual(
-            sorted_fps,
-            [
-                {
-                    'affected': 1,
-                    'notes': 'note1',
-                    'participant': {'externalId': 'individual1'},
-                },
-                {
-                    'affected': 1,
-                    'notes': 'note3',
-                    'participant': {'externalId': 'maternal1'},
-                },
-                {
-                    'affected': 0,
-                    'notes': 'note2',
-                    'participant': {'externalId': 'paternal1'},
-                },
-            ],
-        )
+        assert sorted_fps == [
+            {
+                'affected': 1,
+                'notes': 'note1',
+                'participant': {'externalId': 'individual1'},
+            },
+            {
+                'affected': 1,
+                'notes': 'note3',
+                'participant': {'externalId': 'maternal1'},
+            },
+            {
+                'affected': 0,
+                'notes': 'note2',
+                'participant': {'externalId': 'paternal1'},
+            },
+        ]
 
     @run_as_sync
     async def test_get_project_name_from_analysis(self):

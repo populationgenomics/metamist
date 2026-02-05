@@ -1,4 +1,7 @@
-from test.testbase import DbIsolatedTest, run_as_sync
+import pytest
+
+from db.python.connect import Connection
+from test.testbase import run_as_sync
 
 from pymysql.err import IntegrityError
 
@@ -7,21 +10,20 @@ from db.python.layers.participant import ParticipantLayer
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantUpsertInternal
 
 
-class TestParticipantFamily(DbIsolatedTest):
+class TestParticipantFamily:
     """Test moving a participant from one family to another and then back"""
 
-    @run_as_sync
-    async def setUp(self) -> None:
-        super().setUp()
-
-        fl = FamilyLayer(self.connection)
+    @pytest.mark.asyncio
+    @pytest.fixture(autouse=True)
+    async def set_up(self, connection_with_project: Connection) -> None:
+        fl = FamilyLayer(connection_with_project)
 
         self.fid_1 = await fl.create_family(external_ids={'forg': 'FAM01'})
         self.fid_2 = await fl.create_family(external_ids={'forg': 'FAM02'})
         # Also exercise update_family()
         await fl.update_family(self.fid_2, external_ids={'otherorg': 'OFAM02'})
 
-        pl = ParticipantLayer(self.connection)
+        pl = ParticipantLayer(connection_with_project)
         self.pid = (
             await pl.upsert_participant(
                 ParticipantUpsertInternal(

@@ -525,15 +525,20 @@ RETURNING id
         _query = """
         SELECT external_id, participant_id AS id
         FROM participant_external_id
-        WHERE external_id IN :external_ids AND project = :project
+        WHERE external_id = ANY(%(external_ids)s) AND project = %(project)s
         """
-        results = await self.connection.fetch_all(
-            _query,
-            {
-                'external_ids': external_participant_ids,
-                'project': project,
-            },
-        )
+
+        async with self.connection.pool.connection() as conn:
+            async with conn.cursor() as curr:
+                await curr.execute(
+                    _query,
+                    {
+                        'external_ids': external_participant_ids,
+                        'project': project,
+                    },
+                )
+                results = await curr.fetchall()
+
         id_map = {r['external_id']: r['id'] for r in results}
 
         return id_map
@@ -548,15 +553,20 @@ RETURNING id
         _query = """
         SELECT participant_id AS id, external_id
         FROM participant_external_id
-        WHERE participant_id IN :ids AND name = :PRIMARY_EXTERNAL_ORG
+        WHERE participant_id = ANY(%(ids)s) AND name = %(PRIMARY_EXTERNAL_ORG)s
         """
-        results = await self.connection.fetch_all(
-            _query,
-            {
-                'ids': internal_participant_ids,
-                'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG,
-            },
-        )
+
+        async with self.connection.pool.connection() as conn:
+            async with conn.cursor() as curr:
+                await curr.execute(
+                    _query,
+                    {
+                        'ids': internal_participant_ids,
+                        'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG,
+                    },
+                )
+                results = await curr.fetchall()
+
         id_map: dict[int, str] = {r['id']: r['external_id'] for r in results}
 
         if not allow_missing and len(id_map) != len(internal_participant_ids):

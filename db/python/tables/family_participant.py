@@ -2,7 +2,7 @@ import dataclasses
 from collections import defaultdict
 from typing import Any
 
-from psycopg.rows import class_row, dict_row
+from psycopg.rows import class_row
 
 from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
@@ -180,7 +180,7 @@ INNER JOIN participant p ON p.id = fp.participant_id
 WHERE fp.participant_id in :participant_ids
 """
         async with self.connection.pool.connection() as conn:
-            async with conn.cursor(row_factory=dict_row) as curr:
+            async with conn.cursor() as curr:
                 await curr.execute(_query, {'participant_ids': participant_ids})
                 rows = await curr.fetchall()
 
