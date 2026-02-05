@@ -2,6 +2,8 @@ import dataclasses
 from collections import defaultdict
 from typing import Any
 
+from psycopg.rows import class_row, dict_row
+
 from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
 from models.models.family import PedRowInternal
@@ -127,7 +129,7 @@ DO UPDATE SET
         Query the family_participant table
         """
 
-        wheres, values = filter_.to_sql()
+        wheres, values = filter_.to_sql()  # TODO: fix this util function
         if not wheres:
             raise ValueError('No filter provided')
 
@@ -147,13 +149,16 @@ DO UPDATE SET
         WHERE {wheres}
         """
 
-        rows = await self.connection.fetch_all(query, values)
+        async with self.connection.pool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(PedRowInternal)) as curr:
+                await curr.execute(query, values)
+                ped_row_internal_list = await curr.fetchall()
+
         projects: set[ProjectId] = set()
         pedrows: list[PedRowInternal] = []
-        for row in rows:
-            r = dict(row)
-            projects.add(r.pop('project'))
-            pedrows.append(PedRowInternal(**r))
+        for ped_row_internal in ped_row_internal_list:
+            projects.add(ped_row_internal.project)
+            pedrows.append(ped_row_internal)
 
         return projects, pedrows
 
@@ -174,9 +179,10 @@ FROM family_participant fp
 INNER JOIN participant p ON p.id = fp.participant_id
 WHERE fp.participant_id in :participant_ids
 """
-        rows = await self.connection.fetch_all(
-            _query, {'participant_ids': participant_ids}
-        )
+        async with self.connection.pool.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as curr:
+                await curr.execute(_query, {'participant_ids': participant_ids})
+                rows = await curr.fetchall()
 
         projects = set(r['project'] for r in rows)
         conflicts: dict[int, list[int]] = {}
@@ -219,6 +225,7 @@ WHERE fp.participant_id in :participant_ids
 
         async with self.connection.pool.connection() as conn:
             async with conn.cursor() as cur:
+                # committed separately as autocommit = True
                 cur.execute(
                     _update_before_delete,
                     {
@@ -228,9 +235,6 @@ WHERE fp.participant_id in :participant_ids
                     },
                 )
 
-        # executed separately, even though autocommit = True is set
-        async with self.connection.pool.connection() as conn:
-            async with conn.cursor() as cur:
                 cur.execute(
                     _query, {'family_id': family_id, 'participant_id': participant_id}
                 )
