@@ -9,8 +9,6 @@ Requirements:
     pip install sample-metadata google-cloud-storage click
 """
 
-# pylint: disable=W0703
-
 import asyncio
 import logging
 import os
@@ -22,6 +20,7 @@ from google.cloud import storage
 
 from metamist.apis import ProjectApi
 from metamist.graphql import query_async
+
 
 # Global vars
 EXTENSIONS = ['.fastq.gz', '.fastq', '.bam', '.cram', '.fq', 'fq.gz']
@@ -43,7 +42,7 @@ def get_bucket_name_from_path(path_input):
     """
     >>> get_bucket_name_from_path('gs://my-bucket/path')
     'my-bucket'
-    """
+    """  # noqa: D402
 
     path = str(path_input)
 
@@ -141,7 +140,7 @@ query GetSgIdsQuery($project: String!) {
 
         return filenames_to_remove
 
-    except Exception as err:
+    except Exception as err:  # noqa: BLE001
         logging.error(f'{cpg_project} :: Cannot get assays {repr(err)}')
 
     return set()
@@ -167,9 +166,9 @@ def find_existing_files_in_bucket(
         bl = blob.name.lower()
         if not any(bl.endswith(ext) for ext in EXTENSIONS):
             continue
-        files_in_bucket[os.path.basename(blob.name)] = f'gs://{bucket_name}/{blob.name}'
+        files_in_bucket[os.path.basename(blob.name)] = f'gs://{bucket_name}/{blob.name}'  # noqa: PTH119
 
-    fns = set(os.path.basename(f) for f in filenames)
+    fns = set(os.path.basename(f) for f in filenames)  # noqa: PTH119
     files_in_sm = set(files_in_bucket.keys()).intersection(fns)
 
     return {name: files_in_bucket[name] for name in files_in_sm}
@@ -234,7 +233,7 @@ async def find_files_to_delete(
 
     logging.error(f'Found {len(missing)} sequencing files to delete')
 
-    with open(output_path, 'w+', encoding='utf-8') as fout:
+    with open(output_path, 'w+', encoding='utf-8') as fout:  # noqa: PTH123
         fout.write('\n'.join(sorted(missing.values())))
 
     return list(missing.values())
@@ -262,5 +261,4 @@ def main(sequencing_type: list[str], project_to_ignore: list[str], output_path: 
 
 
 if __name__ == '__main__':
-    # pylint: disable=no-value-for-parameter
     main()

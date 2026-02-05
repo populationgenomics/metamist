@@ -1,8 +1,7 @@
-# pylint: disable=too-many-instance-attributes
 import dataclasses
 import datetime
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 from db.python.filters import (
     GenericFilter,
@@ -34,20 +33,18 @@ class AnalysisFilter(GenericFilterModel):
     active: GenericFilter[bool] | None = None
     timestamp_completed: GenericFilter[datetime.datetime] | None = None
 
-    def __hash__(self):  # pylint: disable=useless-parent-delegation
+    def __hash__(self):
         return super().__hash__()
 
 
 class AnalysisTable(DbBase):
-    """
-    Capture Analysis table operations and queries
-    """
+    """Capture Analysis table operations and queries"""
 
     table_name = 'analysis'
 
     async def get_project_ids_for_analysis_ids(
-        self, analysis_ids: List[int]
-    ) -> Set[ProjectId]:
+        self, analysis_ids: list[int]
+    ) -> set[ProjectId]:
         """Get project IDs for sampleIds (mostly for checking auth)"""
         _query = (
             'SELECT project FROM analysis WHERE id in :analysis_ids GROUP BY project'
@@ -59,17 +56,14 @@ class AnalysisTable(DbBase):
         self,
         analysis_type: str,
         status: AnalysisStatus,
-        sequencing_group_ids: List[int] | None = None,
-        cohort_ids: List[int] | None = None,
-        meta: Optional[Dict[str, Any]] = None,
+        sequencing_group_ids: list[int] | None = None,
+        cohort_ids: list[int] | None = None,
+        meta: dict[str, Any] | None = None,
         active: bool | None = True,
         timestamp_completed: datetime.datetime | None = None,
         project: ProjectId | None = None,
     ) -> int:
-        """
-        Create a new sample, and add it to database
-        """
-
+        """Create a new sample, and add it to database"""
         async with self.connection.transaction():
             kv_pairs = [
                 ('type', analysis_type),
@@ -114,7 +108,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         return id_of_new_analysis
 
     async def add_sequencing_groups_to_analysis(
-        self, analysis_id: int, sequencing_group_ids: List[int]
+        self, analysis_id: int, sequencing_group_ids: list[int]
     ):
         """Add samples to an analysis (through the linked table)"""
         _query = """
@@ -124,7 +118,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         """
 
         audit_log_id = await self.audit_log_id()
-        values = map(
+        values = map(  # noqa: C417
             lambda sid: {
                 'aid': analysis_id,
                 'sid': sid,
@@ -143,7 +137,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         """
 
         audit_log_id = await self.audit_log_id()
-        values = map(
+        values = map(  # noqa: C417
             lambda cid: {
                 'aid': analysis_id,
                 'cid': cid,
@@ -173,14 +167,11 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         self,
         analysis_id: int,
         status: AnalysisStatus | None = None,
-        meta: Dict[str, Any] = None,
+        meta: dict[str, Any] = None,
         active: bool | None = None,
     ):
-        """
-        Update the status of an analysis, set timestamp_completed if relevant
-        """
-
-        fields: Dict[str, Any] = {
+        """Update the status of an analysis, set timestamp_completed if relevant"""
+        fields: dict[str, Any] = {
             'analysis_id': analysis_id,
             'on_behalf_of': self.author,
             'audit_log_id': await self.audit_log_id(),
@@ -213,11 +204,8 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
         await self.connection.execute(_query, fields)
 
-    async def query(self, filter_: AnalysisFilter) -> List[AnalysisInternal]:
-        """
-        Get analysis by various (AND'd) criteria
-        """
-
+    async def query(self, filter_: AnalysisFilter) -> list[AnalysisInternal]:
+        """Get analysis by various (AND'd) criteria"""
         required_fields = [
             filter_.id,
             filter_.sequencing_group_id,
@@ -300,7 +288,6 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         self, analysis_ids: list[int]
     ) -> dict[int, dict[str, RecursiveDict]]:
         """Fetches all output files for a list of analysis IDs"""
-
         _query = """
         SELECT DISTINCT ao.analysis_id, f.*, ao.json_structure, ao.output
         FROM analysis_outputs ao
@@ -311,7 +298,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
         # Preparing to accumulate analysis files
         analysis_files: dict[
-            int, dict[str, list[Tuple[OutputFileInternal, str] | str] | str]
+            int, dict[str, list[tuple[OutputFileInternal, str] | str] | str]
         ] = defaultdict(lambda: defaultdict(list))
 
         for row in rows:
@@ -354,10 +341,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         self,
         project: ProjectId,
         analysis_type: str,
-        meta: Dict[str, Any] = None,
+        meta: dict[str, Any] = None,
     ):
         """Find the most recent completed analysis for some analysis type"""
-
         values = {'project': project, 'type': analysis_type}
 
         meta_str = ''
@@ -367,7 +353,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 meta_str += f" AND json_extract(meta, '$.{k}') = :{k_replacer}"
                 if v is None:
                     # mariadb does a bad cast for NULL
-                    v = 'null'
+                    v = 'null'  # noqa: PLW2901
                 values[k_replacer] = v
 
         _query = f"""
@@ -411,9 +397,7 @@ WHERE a.id = (
     async def get_all_sequencing_group_ids_without_analysis_type(
         self, analysis_type: str, project: ProjectId
     ) -> list[int]:
-        """
-        Find all the samples in the sample_id list that a
-        """
+        """Find all the samples in the sample_id list that a"""
         _query = """
 SELECT sg.id FROM sequencing_group sg
 WHERE s.project = :project AND
@@ -434,8 +418,8 @@ WHERE s.project = :project AND
         return [row[0] for row in rows]
 
     async def get_latest_complete_analysis_for_sequencing_group_ids_by_type(
-        self, analysis_type: str, sequencing_group_ids: List[int]
-    ) -> List[AnalysisInternal]:
+        self, analysis_type: str, sequencing_group_ids: list[int]
+    ) -> list[AnalysisInternal]:
         """Get the latest complete analysis for samples (one per sample)"""
         _query = """
 SELECT
@@ -464,7 +448,7 @@ ORDER BY a.timestamp_completed DESC
         }
         rows = await self.connection.fetch_all(_query, values)
         seen_sequencing_group_ids = set()
-        analyses: List[AnalysisInternal] = []
+        analyses: list[AnalysisInternal] = []
         analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(
             [r['id'] for r in rows]
         )
@@ -491,7 +475,7 @@ ORDER BY a.timestamp_completed DESC
 
     async def get_analysis_by_id(
         self, analysis_id: int
-    ) -> Tuple[ProjectId, AnalysisInternal]:
+    ) -> tuple[ProjectId, AnalysisInternal]:
         """Get analysis object by analysis_id"""
         _query = """
 SELECT
@@ -531,9 +515,8 @@ WHERE a.id = :analysis_id
         project: ProjectId,
         sequencing_types: list[str],
         participant_ids: list[int] = None,
-    ) -> List[dict[str, str]]:
+    ) -> list[dict[str, str]]:
         """Get (ext_sample_id, cram_path, internal_id) map"""
-
         values: dict[str, Any] = {
             'project': project,
             'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG,
@@ -599,10 +582,7 @@ ORDER BY a.timestamp_completed DESC;
     async def get_number_of_crams_by_sequencing_type(
         self, project: ProjectId
     ) -> dict[str, int]:
-        """
-        Get number of crams, grouped by sequence type (one per sample per sequence type)
-        """
-
+        """Get number of crams, grouped by sequence type (one per sample per sequence type)"""
         # Only count crams for ACTIVE sequencing groups
         _query = """
 SELECT sg.type as seq_type, COUNT(*) as number_of_crams
@@ -630,9 +610,7 @@ GROUP BY seq_type
     async def get_seqr_stats_by_sequencing_type(
         self, project: ProjectId
     ) -> dict[str, int]:
-        """
-        Get number of samples in seqr (in latest es-index), grouped by sequence type
-        """
+        """Get number of samples in seqr (in latest es-index), grouped by sequence type"""
         _query = """
 SELECT sg.type as seq_type, COUNT(*) as n
 FROM analysis a
@@ -655,9 +633,7 @@ GROUP BY seq_type
     async def get_sg_add_to_project_es_index(
         self, sg_ids: list[int]
     ) -> dict[int, datetime.date]:
-        """
-        Get all the sequencing groups that should be added to seqr joint calls
-        """
+        """Get all the sequencing groups that should be added to seqr joint calls"""
         _query = """
         SELECT
             a_sg.sequencing_group_id as sg_id,
@@ -677,7 +653,5 @@ GROUP BY seq_type
     async def get_audit_log_for_analysis_ids(
         self, analysis_ids: list[int]
     ) -> dict[int, list[AuditLogInternal]]:
-        """
-        Get audit logs for analysis IDs
-        """
+        """Get audit logs for analysis IDs"""
         return await self.get_all_audit_logs_for_table('analysis', analysis_ids)

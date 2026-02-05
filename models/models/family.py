@@ -269,7 +269,7 @@ class PedRow:
         - There are no circular dependencies
         - All maternal / paternal IDs are found in the pedigree
         """
-        rows_to_order: list['PedRow'] = [*rows]
+        rows_to_order: list[PedRow] = [*rows]
         ordered = []
         seen_individuals = set()
         remaining_iterations_in_round = len(rows_to_order)
@@ -288,7 +288,6 @@ class PedRow:
             # makes more sense to keep this comparison separate:
             #   - If remaining iterations is or AND we still have rows
             #   - Then raise an Exception
-            # pylint: disable=chained-comparison
             if remaining_iterations_in_round <= 0 and len(rows_to_order) > 0:
                 participant_ids = ', '.join(
                     f'{r.individual_id} ({r.paternal_id} | {r.maternal_id})'

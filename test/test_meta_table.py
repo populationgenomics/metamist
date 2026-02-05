@@ -1,5 +1,3 @@
-# pylint: disable=invalid-overridden-method
-
 import tempfile
 from io import BytesIO
 from typing import Any
@@ -27,7 +25,7 @@ def query_parquet(tables: dict[str, BytesIO], query: str) -> list[dict[str, Any]
     with tempfile.TemporaryDirectory() as td:
         for table_name, table_bytes in tables.items():
             filename = f'{td}/{table_name}.parquet'
-            with open(filename, 'wb') as f:
+            with open(filename, 'wb') as f:  # noqa: PTH123
                 table_bytes.seek(0)
                 file_val = table_bytes.getvalue()
                 f.write(file_val)
@@ -40,8 +38,6 @@ def query_parquet(tables: dict[str, BytesIO], query: str) -> list[dict[str, Any]
 
 class TestMetaTable(DbIsolatedTest):
     """Test meta table operations"""
-
-    # pylint: disable=too-many-instance-attributes
 
     @run_as_sync
     async def setUp(self) -> None:

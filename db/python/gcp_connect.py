@@ -10,6 +10,7 @@ from google.cloud import pubsub_v1
 
 from db.python.utils import InternalError
 
+
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 

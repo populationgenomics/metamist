@@ -1,5 +1,3 @@
-from test.testbase import DbIsolatedTest, run_as_sync
-
 from pymysql.err import IntegrityError
 
 from db.python.filters import GenericFilter
@@ -12,6 +10,7 @@ from models.models import (
     SampleUpsertInternal,
     SequencingGroupUpsertInternal,
 )
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 class TestParticipant(DbIsolatedTest):

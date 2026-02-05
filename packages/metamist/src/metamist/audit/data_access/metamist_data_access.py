@@ -1,19 +1,19 @@
 """Repository for Metamist data access."""
 
 from datetime import datetime
-from cpg_utils import to_path
 
+from cpg_utils import to_path
+from metamist.audit.adapters import GraphQLClient
 from metamist.audit.models import (
-    SequencingGroup,
     Analysis,
     Assay,
-    Sample,
-    Participant,
-    FileMetadata,
-    ExternalIds,
     AuditConfig,
+    ExternalIds,
+    FileMetadata,
+    Participant,
+    Sample,
+    SequencingGroup,
 )
-from metamist.audit.adapters import GraphQLClient
 
 
 class MetamistDataAccess:
@@ -193,8 +193,8 @@ class MetamistDataAccess:
                 return valid_values
             if any(value.lower() not in valid_values for value in input_values):
                 raise ValueError(
-                    f"Invalid {enum_type} values: {', '.join(input_values)}. "
-                    f"Valid values are: {', '.join(valid_values)}."
+                    f'Invalid {enum_type} values: {", ".join(input_values)}. '
+                    f'Valid values are: {", ".join(valid_values)}.'
                 )
             return tuple(input_values)
 

@@ -6,10 +6,11 @@ from google.cloud import bigquery
 
 from db.python.filters import GenericFilter
 
+
 T = TypeVar('T')
 
 
-class GenericBQFilter(GenericFilter[T]):
+class GenericBQFilter(GenericFilter[T]):  # noqa: PLW1641
     """
     Generic BigQuery filter is BQ specific filter class, based on GenericFilter
     """
@@ -20,7 +21,7 @@ class GenericBQFilter(GenericFilter[T]):
             return False
 
         keys = ['eq', 'in_', 'nin', 'gt', 'gte', 'lt', 'lte']
-        for att in keys:
+        for att in keys:  # noqa: SIM110
             if getattr(self, att) != getattr(other, att):
                 return False
 
@@ -97,7 +98,7 @@ class GenericBQFilter(GenericFilter[T]):
         return f'@{key}'
 
     @staticmethod
-    def _sql_value_prep(key, value):
+    def _sql_value_prep(key, value):  # noqa: PLR0911
         """
         Overrides the default _sql_value_prep to handle BQ parameters
         """

@@ -122,8 +122,8 @@ class TestFunctionBQFilter(unittest.TestCase):
         )
 
         # no params are present, should return empty SQL and Param list
-        NYC = pytz.timezone('America/New_York')
-        SYD = pytz.timezone('Australia/Sydney')
+        NYC = pytz.timezone('America/New_York')  # noqa: N806
+        SYD = pytz.timezone('Australia/Sydney')  # noqa: N806
         filter_.to_sql(
             BillingColumn.LABELS,
             {

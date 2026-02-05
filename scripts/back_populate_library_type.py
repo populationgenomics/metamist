@@ -17,6 +17,7 @@ from metamist.apis import AssayApi, SequencingGroupApi
 from metamist.graphql import gql, query
 from metamist.models import AssayUpsert, SequencingGroupMetaUpdateModel
 
+
 logger = logging.getLogger(__file__)
 logging.basicConfig(
     format='%(levelname)s (%(name)s %(lineno)s): %(message)s', level=logging.INFO
@@ -96,12 +97,9 @@ def check_assay_meta_fields(assays: list[dict], update_sequencing_groups: bool):
                 continue
 
         # Match VCGS standard fastq pattern
-        if match := re.match(vcgs_fastq_regex, fastq_filename):
-            assay_meta_fields_to_update['facility'] = 'vcgs'
-            assay_meta_fields_to_update['library_type'] = match.group('library_type')
-
-        # Match VCGS pre2018 fastq pattern
-        elif match := re.match(vcgs_fastq_pre2018_regex, fastq_filename):
+        if match := re.match(vcgs_fastq_regex, fastq_filename) or (
+            match := re.match(vcgs_fastq_pre2018_regex, fastq_filename)
+        ):
             assay_meta_fields_to_update['facility'] = 'vcgs'
             assay_meta_fields_to_update['library_type'] = match.group('library_type')
 
@@ -206,7 +204,7 @@ def main(
         _sg_assays_query,
         variables={'project': project, 'sequencingType': sequencing_type},
     )
-    for sequencing_group in project_sg_assays['project']['sequencingGroups']:  # pylint: disable=unsubscriptable-object
+    for sequencing_group in project_sg_assays['project']['sequencingGroups']:
         sg_id = sequencing_group['id']
         sg_meta[sg_id] = sequencing_group['meta']
         assays = sequencing_group['assays']
@@ -263,5 +261,4 @@ def main(
 
 
 if __name__ == '__main__':
-    # pylint: disable=no-value-for-parameter
     main()

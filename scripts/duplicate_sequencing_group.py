@@ -23,14 +23,13 @@ import argparse
 import asyncio
 import logging
 import sys
-from typing import Any, Tuple
+from typing import Any
 
 from google.cloud import storage
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, image_path
 from cpg_utils.hail_batch import get_batch
-
 from metamist.apis import AnalysisApi, SampleApi, SequencingGroupApi
 from metamist.graphql import gql, query_async
 from metamist.models import (
@@ -40,6 +39,7 @@ from metamist.models import (
     SampleUpsert,
     SequencingGroupUpsert,
 )
+
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(
@@ -155,7 +155,7 @@ async def get_participant_sample(
     new_participant_id: str | None,
     new_sample_id: str | None,
     new_sample_external_id: str,
-) -> Tuple[int, str | None]:
+) -> tuple[int, str | None]:
     """
     Fetch a participant and sample from the specified dataset and validate their existence.
     """
@@ -173,7 +173,7 @@ def validate_ids(
     new_sample_id: str | None,
     new_sample_external_id: str,
     participants: Any,
-) -> Tuple[int, str | None]:
+) -> tuple[int, str | None]:
     """
     Validate that the provided sample ID and participant ID exist and are consistent.
 
@@ -378,11 +378,10 @@ def get_unrecorded_analysis_files(
                 prefix=source_path.removeprefix(f'gs://{source_bucket.name}/'),
             )
             file_paths = [blob.path for blob in blobs]
+        elif to_path(source_path).exists():
+            file_paths = [source_path]  # Single file
         else:
-            if to_path(source_path).exists():
-                file_paths = [source_path]  # Single file
-            else:
-                file_paths = []  # File does not exist
+            file_paths = []  # File does not exist
 
         for source_path in file_paths:  # Rename and add to move list
             new_path = source_path.replace(source_dataset, new_dataset).replace(
@@ -609,7 +608,7 @@ def somalier_file_commands(old_path: str, new_path: str, sid: tuple[str, str]):
     logger.info(f'Reheadering somalier file for {old_path}, writing to {new_path}')
     data = to_path(old_path).read_bytes()
     # Extract the old length and sample ID
-    sample_L_old = int.from_bytes(data[1:2], byteorder='little')
+    sample_L_old = int.from_bytes(data[1:2], byteorder='little')  # noqa: N806
     sample_id_start_idx = 2
     sample_id_end_idx = sample_id_start_idx + sample_L_old
     current_sample_id = data[sample_id_start_idx:sample_id_end_idx].decode()
@@ -622,7 +621,7 @@ def somalier_file_commands(old_path: str, new_path: str, sid: tuple[str, str]):
 
     # Create the new sample ID bytes
     new_sample_bytes = sid[1].encode()
-    sample_L_new = len(new_sample_bytes)
+    sample_L_new = len(new_sample_bytes)  # noqa: N806
 
     # The file is built by concatenating four parts:
     # 1. Fixed header: Version byte (1 byte)
@@ -687,7 +686,7 @@ def text_file_commands(batch, job, old_path: str, new_path: str, sid: tuple[str,
     batch.write_output(job.new_file, new_path)
 
 
-async def main(
+async def main(  # noqa: D417
     original_sg_id: str,
     source_dataset: str,
     new_dataset: str,

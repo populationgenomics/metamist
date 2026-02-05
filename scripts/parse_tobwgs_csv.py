@@ -1,6 +1,4 @@
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order
 import logging
-from typing import List, Optional
 
 import click
 
@@ -12,6 +10,7 @@ from metamist.parser.generic_metadata_parser import (
     ParsedSequencingGroup,
     run_as_sync,
 )
+
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -42,7 +41,7 @@ class TobWgsParser(GenericMetadataParser):
     def __init__(
         self,
         project: str,
-        search_locations: List[str],
+        search_locations: list[str],
         default_sequencing_type='wgs',
         default_sample_type='blood',
     ):
@@ -58,9 +57,7 @@ class TobWgsParser(GenericMetadataParser):
             qc_meta_map={},
         )
 
-    async def find_gvcf(
-        self, sample_id: str, cpg_id: Optional[str] = None
-    ) -> Optional[str]:
+    async def find_gvcf(self, sample_id: str, cpg_id: str | None = None) -> str | None:
         """
         Find GVCF for the sample.
         """
@@ -86,9 +83,7 @@ class TobWgsParser(GenericMetadataParser):
 
         return None
 
-    async def find_cram(
-        self, sample_id: str, cpg_id: Optional[str] = None
-    ) -> Optional[str]:
+    async def find_cram(self, sample_id: str, cpg_id: str | None = None) -> str | None:
         """
         Find CRAM for the sample.
         """
@@ -208,5 +203,4 @@ async def main(
 
 
 if __name__ == '__main__':
-    # pylint: disable=no-value-for-parameter
     main()

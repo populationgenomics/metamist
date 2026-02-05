@@ -1,8 +1,7 @@
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order
 import logging
 import os
 import re
-from typing import Any, Dict, List
+from typing import Any
 
 import click
 
@@ -11,6 +10,7 @@ from metamist.parser.generic_metadata_parser import (
     SingleRow,
     run_as_sync,
 )
+
 
 rmatch = re.compile(r'_[Rr]\d')
 
@@ -76,7 +76,7 @@ class VcgsManifestParser(GenericMetadataParser):
     def __init__(
         self,
         project: str,
-        search_locations: List[str],
+        search_locations: list[str],
         default_sequencing_type='wgs',
         default_sample_type='blood',
         allow_extra_files_in_search_path=False,
@@ -95,7 +95,7 @@ class VcgsManifestParser(GenericMetadataParser):
             allow_extra_files_in_search_path=allow_extra_files_in_search_path,
         )
 
-    def get_primary_sample_id(self, row: Dict[str, Any]) -> str:
+    def get_primary_sample_id(self, row: dict[str, Any]) -> str:
         """Get external sample ID from row"""
         external_id = row[self.sample_primary_eid_column]
         if '-' in external_id:
@@ -163,11 +163,11 @@ async def main(
     default_sample_type='blood',
     default_sequencing_type='wgs',
     confirm=False,
-    search_path: List[str] = None,
+    search_path: list[str] = None,
     allow_extra_files_in_search_path=False,
 ):
     """Run script from CLI arguments"""
-    _search_locations = search_path or list(set(os.path.basename(s) for s in manifests))
+    _search_locations = search_path or list(set(os.path.basename(s) for s in manifests))  # noqa: PTH119
     parser = VcgsManifestParser(
         default_sample_type=default_sample_type,
         default_sequencing_type=default_sequencing_type,
@@ -186,5 +186,4 @@ async def main(
 
 
 if __name__ == '__main__':
-    # pylint: disable=no-value-for-parameter
     main()

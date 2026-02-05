@@ -1,9 +1,6 @@
 # 2023-06-22 mfranklin: Commenting out to refactor at a later date:
 #   https://centrepopgen.slack.com/archives/C03FZL2EF24/p1681950456122339?thread_ts=1681943273.815139&cid=C03FZL2EF24
 # """A Cloud Function to update the status of genomic samples."""
-# # type: ignore
-# # flake8: noqa
-# # pylint: disable
 # import json
 # import os
 # import logging
@@ -118,7 +115,7 @@
 #     return ('', 204)
 #
 #
-# def update_sample_status(request):  # pylint: disable=R1710
+# def update_sample_status(request):
 #     """Main entry point for the Cloud Function."""
 #
 #     if request.method != 'PUT':

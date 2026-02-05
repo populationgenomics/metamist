@@ -1,4 +1,3 @@
-# pylint: disable=protected-access too-many-public-methods
 from datetime import datetime
 from typing import Any
 from unittest import mock

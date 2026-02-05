@@ -1,7 +1,4 @@
-# pylint: disable=protected-access
 import datetime
-from test.testbase import run_as_sync
-from test.testbqbase import BqTest
 from textwrap import dedent
 from typing import Any
 from unittest import mock
@@ -13,6 +10,8 @@ from db.python.tables.bq.billing_gcp_daily import BillingGcpDailyTable
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
 from db.python.utils import InternalError
 from models.models import BillingColumn, BillingTotalCostQueryModel
+from test.testbase import run_as_sync
+from test.testbqbase import BqTest
 
 
 class TestBillingGcpDailyTable(BqTest):

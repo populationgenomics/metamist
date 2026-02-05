@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta
 
+
 INVOICE_DAY_DIFF = 3
 
 
@@ -25,7 +26,7 @@ def get_invoice_month_range(convert_month: date) -> tuple[date, date]:
     # Grab the first day of invoice month then subtract INVOICE_DAY_DIFF days
     start_day = first_day + timedelta(days=-INVOICE_DAY_DIFF)
 
-    if convert_month.month == 12:
+    if convert_month.month == 12:  # noqa: PLR2004
         next_month = first_day.replace(month=1, year=convert_month.year + 1)
     else:
         next_month = first_day.replace(month=convert_month.month + 1)

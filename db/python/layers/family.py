@@ -1,5 +1,3 @@
-# pylint: disable=used-before-assignment
-
 import json
 from typing import Any
 
@@ -66,7 +64,6 @@ class FamilyLayer(BaseLayer):
         filter_: FamilyFilter,
     ) -> list[FamilyInternal]:
         """Get all families for a project"""
-
         # don't need a project check, as we're being provided an explicit filter
 
         projects, families = await self.ftable.query(filter_)
@@ -102,9 +99,7 @@ class FamilyLayer(BaseLayer):
     async def get_families_by_participants(
         self, participant_ids: list[int]
     ) -> dict[int, list[FamilyInternal]]:
-        """
-        Get families keyed by participant_ids, this will duplicate families
-        """
+        """Get families keyed by participant_ids, this will duplicate families"""
         projects, participant_map = await self.ftable.get_families_by_participants(
             participant_ids=participant_ids
         )
@@ -144,9 +139,7 @@ class FamilyLayer(BaseLayer):
         self,
         project: ProjectId,
         family_ids: list[int] | None = None,
-        # pylint: disable=invalid-name
         replace_with_participant_external_ids: bool = False,
-        # pylint: disable=invalid-name
         replace_with_family_external_ids: bool = False,
         empty_participant_value: str | None = None,
         include_participants_not_in_families: bool = False,
@@ -157,7 +150,6 @@ class FamilyLayer(BaseLayer):
 
         Use internal IDs unless specific options are specified.
         """
-
         _, rows = await self.fptable.query(
             FamilyParticipantFilter(
                 project=GenericFilter(eq=project),
@@ -204,7 +196,6 @@ class FamilyLayer(BaseLayer):
 
     async def get_participant_family_map(self, participant_ids: list[int]):
         """Get participant family map"""
-
         fptable = FamilyParticipantTable(self.connection)
         projects, family_map = await fptable.get_participant_family_map(
             participant_ids=participant_ids
@@ -223,9 +214,7 @@ class FamilyLayer(BaseLayer):
         create_missing_participants=False,
         perform_sex_check=True,
     ):
-        """
-        Import pedigree file
-        """
+        """Import pedigree file"""
         if header is None:
             _header = PedRow.default_header()
         else:

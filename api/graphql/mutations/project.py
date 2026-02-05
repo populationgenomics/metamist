@@ -1,22 +1,21 @@
-# pylint: disable=redefined-builtin, import-outside-toplevel, ungrouped-imports
-
 from typing import TYPE_CHECKING, Annotated
 
-from graphql import GraphQLError
 import strawberry
-from strawberry.types import Info
+from graphql import GraphQLError
 from strawberry.scalars import JSON
+from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
 from db.python.connect import Connection
 from db.python.layers.comment import CommentLayer
 from db.python.tables.project import ProjectPermissionsTable
+from models.models.comment import CommentEntityType
 from models.models.project import (
     ProjectMemberRole,
     ProjectMemberUpdate,
     project_member_role_names,
 )
-from models.models.comment import CommentEntityType
+
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLComment, GraphQLProject
@@ -43,7 +42,7 @@ class ProjectMutations:
     ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
         """Add a comment to a project"""
         # Import needed here to avoid circular import
-        from api.graphql.schema import GraphQLComment
+        from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
         connection = info.context['connection']
         cl = CommentLayer(connection)
@@ -63,7 +62,7 @@ class ProjectMutations:
         """
         Create a new project
         """
-        from api.graphql.schema import GraphQLProject
+        from api.graphql.schema import GraphQLProject  # noqa: PLC0415
 
         connection: Connection = info.context['connection']
         ptable = ProjectPermissionsTable(connection)
@@ -95,7 +94,7 @@ class ProjectMutations:
         info: Info,
     ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.schema')]:
         """Update a project by project name"""
-        from api.graphql.schema import GraphQLProject
+        from api.graphql.schema import GraphQLProject  # noqa: PLC0415
 
         connection: Connection = info.context['connection']
         (p,) = connection.get_and_check_access_to_projects_for_names(
@@ -127,7 +126,7 @@ class ProjectMutations:
         Update project members for specific read / write group.
         Not that this is protected by access to a specific access group
         """
-        from api.graphql.schema import GraphQLProject
+        from api.graphql.schema import GraphQLProject  # noqa: PLC0415
 
         connection: Connection = info.context['connection']
         (target_project,) = connection.get_and_check_access_to_projects_for_names(
