@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 
-from .value_objects import FileMetadata, ExternalIds
+from .value_objects import ExternalIds, FileMetadata
 
 
 @dataclass
@@ -153,7 +153,7 @@ class SequencingGroup:
 
 
 @dataclass
-class AuditReportEntry:  # pylint: disable=too-many-instance-attributes
+class AuditReportEntry:
     """Entry for audit reports."""
 
     filepath: str | None = None

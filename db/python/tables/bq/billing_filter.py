@@ -1,5 +1,3 @@
-# pylint: disable=unused-import,too-many-instance-attributes
-
 import dataclasses
 import datetime
 from typing import Any
@@ -9,7 +7,7 @@ from db.python.tables.bq.generic_bq_filter_model import GenericBQFilterModel
 
 
 @dataclasses.dataclass
-class BillingFilter(GenericBQFilterModel):
+class BillingFilter(GenericBQFilterModel):  # noqa: PLW1641
     """
     Filter for billing, contains all possible attributes to filter on
     """
@@ -55,7 +53,7 @@ class BillingFilter(GenericBQFilterModel):
             return False
 
         # compare all attributes
-        for att in self.__dict__:
+        for att in self.__dict__:  # noqa: SIM110
             if getattr(self, att) != getattr(other, att):
                 return False
 

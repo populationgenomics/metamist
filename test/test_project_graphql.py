@@ -52,7 +52,7 @@ class TestProjectListing:
             json={'query': query},
         )
 
-        assert response.status_code == 200
+        assert response.status_code == 200  # noqa: PLR2004
         data = response.json()
         assert 'errors' not in data
 

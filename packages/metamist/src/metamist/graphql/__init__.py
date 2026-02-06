@@ -1,4 +1,3 @@
-# pylint: disable=global-statement,import-self
 """
 GraphQL utilities for Metamist, allows you to:
     - construct queries using the `gql` function (which validates graphql syntax)
@@ -7,7 +6,7 @@ GraphQL utilities for Metamist, allows you to:
 
 import os
 from json.decoder import JSONDecodeError
-from typing import Any, Dict
+from typing import Any, Dict  # noqa: UP035
 
 import backoff
 from gql import Client
@@ -22,9 +21,9 @@ from gql.transport.requests import log as requests_logger
 from graphql import DocumentNode  # type: ignore
 from requests.exceptions import HTTPError
 
+import metamist.configuration
 from cpg_utils.cloud import get_google_identity_token
 
-import metamist.configuration
 
 _sync_client: Client | None = None
 _async_client: Client | None = None
@@ -32,7 +31,7 @@ _async_client: Client | None = None
 
 def get_local_schema() -> str:
     """Get the local schema"""
-    with open(os.path.join(os.path.dirname(__file__), 'schema.graphql')) as f:
+    with open(os.path.join(os.path.dirname(__file__), 'schema.graphql')) as f:  # noqa: PTH118, PTH120, PTH123
         contents = f.read()
 
     return contents
@@ -40,7 +39,7 @@ def get_local_schema() -> str:
 
 def get_sm_url():
     """Get the URL for the Metamist GraphQL API"""
-    return os.path.join(metamist.configuration.sm_url, 'graphql')
+    return os.path.join(metamist.configuration.sm_url, 'graphql')  # noqa: PTH118
 
 
 def configure_sync_client(
@@ -51,7 +50,7 @@ def configure_sync_client(
     use_local_schema: bool = False,
 ):
     """Get sync gql Client"""
-    global _sync_client
+    global _sync_client  # noqa: PLW0603
 
     if use_local_schema:
         # for local schema, we basically don't allow requests
@@ -85,7 +84,7 @@ async def configure_async_client(
     url: str = None, schema: str = None, auth_token: str = None, force_recreate=False
 ) -> Client:
     """Configure an async client for use with the Metamist GraphQL API"""
-    global _async_client
+    global _async_client  # noqa: PLW0603
 
     if _async_client and not force_recreate:
         return _async_client
@@ -152,10 +151,10 @@ def validate(doc: DocumentNode, client=None, use_local_schema=False):
 )
 def query(
     _query: str | DocumentNode,
-    variables: Dict | None = None,
+    variables: dict | None = None,
     client: Client | None = None,
     log_response: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Query the metamist GraphQL API"""
     if variables is None:
         variables = {}
@@ -185,10 +184,10 @@ def query(
 )
 async def query_async(
     _query: str | DocumentNode,
-    variables: Dict | None = None,
+    variables: dict | None = None,
     client: Client | None = None,
     log_response: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Asynchronously query the Metamist GraphQL API"""
     if variables is None:
         variables = {}

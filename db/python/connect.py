@@ -1,5 +1,3 @@
-# pylint: disable=unused-import,too-many-instance-attributes
-# flake8: noqa
 """
 Code for connecting to Postgres database
 """
@@ -8,13 +6,14 @@ import asyncio
 import json
 import logging
 import os
-from typing import Iterable
+from collections.abc import Iterable
 
 from psycopg import AsyncConnection
-from psycopg_pool import AsyncConnectionPool
 from psycopg.rows import DictRow, dict_row
-from db.python.tables.project import ProjectPermissionsTable
+from psycopg_pool import AsyncConnectionPool
+
 from api.settings import DB_POOL_MAX_SIZE, DB_POOL_MIN_SIZE
+from db.python.tables.project import ProjectPermissionsTable
 from db.python.utils import (
     InternalError,
     NoProjectAccess,
@@ -22,6 +21,7 @@ from db.python.utils import (
     ProjectDoesNotExist,
 )
 from models.models.project import Project, ProjectId, ProjectMemberRole
+
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -118,7 +118,9 @@ class Connection:
         current user has no access to it. Return the matching projects
         """
         projects = [
-            self.project_id_map[id] for id in project_ids if id in self.project_id_map
+            self.project_id_map[_id]
+            for _id in project_ids
+            if _id in self.project_id_map
         ]
 
         # Check if any of the provided ids aren't valid project ids, or the user has
@@ -208,7 +210,7 @@ class Connection:
         async with self._audit_log_lock:
             if not self._audit_log_id:
                 # make this import here, otherwise we'd have a circular import
-                from db.python.tables.audit_log import (  # pylint: disable=import-outside-toplevel,R0401
+                from db.python.tables.audit_log import (  # noqa: PLC0415
                     AuditLogTable,
                 )
 
@@ -298,7 +300,8 @@ class CredentialedDatabaseConfiguration:
 
 
 async def configure_pg_connection(connection: AsyncConnection):
-    """Configure a new connection
+    """
+    Configure a new connection
 
     - set the search path to include the main and history schemas
     - set autocommit to True for more predictable behavious

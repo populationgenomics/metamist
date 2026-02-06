@@ -1,13 +1,8 @@
-# pylint: disable=too-many-lines
-
 import unittest
 from datetime import datetime
 from io import StringIO
-from test.testbase import DbIsolatedTest, run_as_sync
 from unittest.mock import patch
 
-import api.graphql.schema
-from db.python.layers import ParticipantLayer
 from metamist.graphql import configure_sync_client, validate
 from metamist.parser.generic_metadata_parser import (
     DefaultSequencing,
@@ -22,6 +17,9 @@ from metamist.parser.generic_parser import (
     ParsedSample,
     ParsedSequencingGroup,
 )
+
+import api.graphql.schema
+from db.python.layers import ParticipantLayer
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
     AssayUpsertInternal,
@@ -31,6 +29,7 @@ from models.models import (
 )
 from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 def _get_basic_participant_to_upsert():
@@ -384,8 +383,6 @@ class TestParseGenericMetadata(DbIsolatedTest):
         self.assertEqual(len(participants[0].samples), 1)
         self.assertEqual(len(participants[0].samples[0].sequencing_groups), 2)
 
-        return
-
     @run_as_sync
     @patch('metamist.parser.generic_parser.query_async')
     async def test_rows_with_valid_participant_meta(self, mock_graphql_query):
@@ -447,7 +444,6 @@ class TestParseGenericMetadata(DbIsolatedTest):
         self.assertIsNone(athena.karyotype)
         self.assertEqual(dionysus.reported_gender, 'Male')
         self.assertEqual(dionysus.karyotype, 'XX')
-        return
 
     @run_as_sync
     @patch('metamist.parser.generic_parser.query_async')
@@ -485,7 +481,6 @@ class TestParseGenericMetadata(DbIsolatedTest):
             await parser.parse_manifest(
                 StringIO(file_contents), delimiter='\t', dry_run=True
             )
-        return
 
     @run_as_sync
     @patch('metamist.parser.generic_parser.query_async')
@@ -601,7 +596,6 @@ class TestParseGenericMetadata(DbIsolatedTest):
         self.assertDictEqual(expected_assay_1_dict, assay_1.meta)
         self.assertDictEqual(expected_assay_2_dict, assay_2.meta)
         self.assertDictEqual(expected_sg_dict, sg.meta)
-        return
 
     @run_as_sync
     @patch('metamist.parser.generic_parser.query_async')
@@ -1034,7 +1028,6 @@ class TestParseGenericMetadata(DbIsolatedTest):
         participants_: list[ParsedParticipant] = prows
         assay = participants_[0].samples[0].sequencing_groups[0].assays[0]
         self.assertDictEqual(expected_assay_dict, assay.meta)
-        return
 
     @run_as_sync
     @patch('metamist.parser.generic_parser.query_async')

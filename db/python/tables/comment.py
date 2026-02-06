@@ -9,6 +9,7 @@ from models.models.comment import (
     DiscussionInternal,
 )
 
+
 # These comment queries look a bit scary but aren't actually too bad
 #
 # As a bit of background – because metamist has a very relational structure with
@@ -287,7 +288,7 @@ class CommentTable(DbBase):
         Get all the comments for a list of entities, will return flat list of comments
         """
 
-        queries_for_entity = comment_queries.get(entity, None)
+        queries_for_entity = comment_queries.get(entity)
         if queries_for_entity is None:
             raise InternalError(f'Unknown comment entity {entity}')
 
@@ -334,10 +335,10 @@ class CommentTable(DbBase):
             ON c.id = tc.comment_id OR c.parent_id = tc.comment_id
             LEFT JOIN audit_log al
             ON al.id = c.audit_log_id
-            {'WHERE c.id = :comment_id or c.parent_id = :comment_id'  if comment_id else ''}
+            {'WHERE c.id = :comment_id or c.parent_id = :comment_id' if comment_id else ''}
             ORDER BY c.id, al.timestamp
         """
-        values: dict['str', int | list[int]] = {'entity_ids': entity_ids}
+        values: dict[str, int | list[int]] = {'entity_ids': entity_ids}
 
         if comment_id:
             values['comment_id'] = comment_id
@@ -346,14 +347,14 @@ class CommentTable(DbBase):
 
         # Group comments by their ids so that versions get included within a comment
         comment_map: dict[int, CommentInternal] = {
-            id: CommentInternal.from_db_versions(list(dict(v) for v in g))
-            for id, g in groupby(comment_versions, key=lambda k: k['comment_id'])
+            id: CommentInternal.from_db_versions(list(dict(v) for v in g))  # noqa: C400
+            for id, g in groupby(comment_versions, key=lambda k: k['comment_id'])  # noqa: A001
         }
 
         # Organize threaded comments under their parents
         for _, comment in comment_map.items():
             if comment.parent_id is not None:
-                parent = comment_map.get(comment.parent_id, None)
+                parent = comment_map.get(comment.parent_id)
                 if parent is not None:
                     parent.add_comment_to_thread(comment)
 
@@ -384,10 +385,10 @@ class CommentTable(DbBase):
             id: DiscussionInternal.from_flat_comments(
                 list(g), requested_entity_id=id, requested_entity_type=entity
             )
-            for id, g in groupby(comments, key=lambda k: k.requested_entity_id)
+            for id, g in groupby(comments, key=lambda k: k.requested_entity_id)  # noqa: A001
         }
 
-        return [comments_by_entity_id_map.get(eid, None) for eid in entity_ids]
+        return [comments_by_entity_id_map.get(eid) for eid in entity_ids]
 
     async def get_comment_by_id(self, comment_id: int):
         """

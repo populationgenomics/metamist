@@ -7,11 +7,13 @@ from fastapi import APIRouter
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from google.cloud import secretmanager_v1
+from pydantic import TypeAdapter
+
 from api.settings import (
     BILLING_CACHE_RESPONSE_TTL,
+    BILLING_GROUP_INFO,
     BQ_AGGREG_VIEW,
     METAMIST_GCP_PROJECT,
-    BILLING_GROUP_INFO,
 )
 from api.utils.db import (
     BqConnection,
@@ -29,7 +31,7 @@ from models.models import (
     BillingTotalCostRecord,
 )
 from models.models.billing import BillingTeamRecord
-from pydantic import TypeAdapter
+
 
 router = APIRouter(prefix='/billing', tags=['billing'])
 
@@ -333,7 +335,8 @@ async def get_total_cost(
     author: str = get_author,
     connection: Connection = get_projectless_db_connection,
 ) -> list[BillingTotalCostRecord]:
-    """Get Total cost of selected fields for requested time interval
+    """
+    Get Total cost of selected fields for requested time interval
 
     Here are few examples of requests:
 
@@ -577,7 +580,8 @@ async def get_cost_by_sample(
     author: str = get_author,
     connection: Connection = get_projectless_db_connection,
 ) -> list[BillingTotalCostRecord]:
-    """Get Total cost of selected fields for requested sample or sequencing group
+    """
+    Get Total cost of selected fields for requested sample or sequencing group
 
     Here are few examples of requests:
 

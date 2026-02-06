@@ -1,5 +1,4 @@
 import asyncio
-from typing import List, Optional
 
 from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.family import FamilyTable
@@ -30,7 +29,7 @@ class SearchLayer(BaseLayer):
         self.connection = connection
 
     @staticmethod
-    def try_get_sample_id_from_query(query: str) -> Optional[int]:
+    def try_get_sample_id_from_query(query: str) -> int | None:
         """
         Try to get internal CPG sample Identifier from string,
         otherwise return None (helper to catch exception)"""
@@ -40,7 +39,7 @@ class SearchLayer(BaseLayer):
             return None
 
     @staticmethod
-    def try_get_sg_id_from_query(query: str) -> Optional[int]:
+    def try_get_sg_id_from_query(query: str) -> int | None:
         """
         Try to get internal CPG SG Identifier from string,
         otherwise return None (helper to catch exception)"""
@@ -133,7 +132,7 @@ class SearchLayer(BaseLayer):
             ),
         )
 
-    async def search(self, query: str, project_ids: list[int]) -> List[SearchResponse]:
+    async def search(self, query: str, project_ids: list[int]) -> list[SearchResponse]:
         """
         Search metamist for some string, get some set of SearchResponses
         """

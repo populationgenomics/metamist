@@ -1,5 +1,4 @@
 from inspect import isclass
-from typing import Type
 
 from fastapi import APIRouter
 
@@ -7,10 +6,11 @@ from api.utils.db import get_projectless_db_connection
 from db.python import enum_tables
 from db.python.enum_tables.enums import EnumTable
 
+
 router = APIRouter(prefix='/enums', tags=['enums'])
 
 
-def _create_route(e: Type[EnumTable]):
+def _create_route(e: type[EnumTable]):
     hyphenated_name = e.get_enum_name().replace('_', '-')
     camel_case_name = ''.join([x.capitalize() for x in hyphenated_name.split('-')])
 

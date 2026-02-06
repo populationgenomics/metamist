@@ -59,8 +59,8 @@ class BillingArBatchTable(BillingBaseTable):
         query_job_result = self._execute_query(_query, query_parameters)
 
         if query_job_result:
-            start_day = min((row.start_day for row in query_job_result))
-            end_day = max((row.end_day for row in query_job_result)) + timedelta(days=1)
+            start_day = min(row.start_day for row in query_job_result)
+            end_day = max(row.end_day for row in query_job_result) + timedelta(days=1)
             return start_day, end_day, [row.batch_id for row in query_job_result]
 
         # return empty list if no record found
@@ -218,7 +218,7 @@ class BillingArBatchTable(BillingBaseTable):
             },
         )
         sg_storage_cost: list[dict] = []
-        cram_sizes = dict(
+        cram_sizes = dict(  # noqa: C402
             (row['id'], float(row['crams_size'] if row['crams_size'] else 0))
             for row in records
         )
@@ -301,7 +301,7 @@ class BillingArBatchTable(BillingBaseTable):
                 connection, sample_ids
             )
             # append to sequencing_groups_as_ids
-            for sample_id, seq_groups in sample_id_to_seq_grp.items():
+            for sample_id, seq_groups in sample_id_to_seq_grp.items():  # noqa: B007
                 sequencing_groups_as_ids.extend(seq_groups)
                 for seq_id in seq_groups:
                     r = sequencing_group_id_format(seq_id)
@@ -378,7 +378,7 @@ class BillingArBatchTable(BillingBaseTable):
 
         # get the project dataset (GCP project names)
         project_names: dict[int, str] = {}
-        for project_id in projects.keys():
+        for project_id in projects:
             project_names[project_id] = connection.project_id_map[project_id].dataset
         return (projects, project_names)
 
@@ -433,7 +433,7 @@ class BillingArBatchTable(BillingBaseTable):
                 )
                 grouped.setdefault(key, []).append(r)
 
-            for sample_id, seq_groups in sample_to_seq_grp.items():
+            for sample_id, seq_groups in sample_to_seq_grp.items():  # noqa: PLW2901
                 included_seq_groups.extend(seq_groups)
                 for key, records in grouped.items():
                     # Filter records for this sample's seq_groups
@@ -475,7 +475,7 @@ class BillingArBatchTable(BillingBaseTable):
         storage_cost = {}
         number_of_seq_groups = {}
         total_crams_size = {}
-        for project_id in projects.keys():
+        for project_id in projects:
             # adjust Query dates filter
             # overrides time specific fields with relevant time column name
             start_date, end_date = project_dates[project_id]

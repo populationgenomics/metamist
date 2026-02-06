@@ -20,7 +20,7 @@ class ExportType(Enum):
         }[self]
 
     def get_delimiter(self):
-        """Get delimiter (eg: ',' OR '\t')"""
+        """Get delimiter (eg: ',' OR '\t')"""  # noqa: D301
         return {ExportType.CSV: ',', ExportType.TSV: '\t', ExportType.JSON: None}[self]
 
     def get_mime_type(self):

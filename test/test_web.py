@@ -44,6 +44,7 @@ from models.utils.sequencing_group_id_format import (
 )
 from test.testbase import TEST_PROJECT_NAME, DbIsolatedTest, run_as_sync
 
+
 default_assay_meta = {
     'sequencing_type': 'genome',
     'sequencing_technology': 'short-read',

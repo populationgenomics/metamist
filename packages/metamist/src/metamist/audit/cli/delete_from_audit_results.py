@@ -2,11 +2,10 @@
 
 import click
 
+from cpg_utils import Path, to_path
 from metamist.audit.data_access import GCSDataAccess, MetamistDataAccess
 from metamist.audit.models import AuditReportEntry, DeletionResult
 from metamist.audit.services import BucketAuditLogger, Reporter
-
-from cpg_utils import Path, to_path
 
 
 def delete_from_audit_results(
@@ -174,4 +173,4 @@ def main(
 
 
 if __name__ == '__main__':
-    main()  # pylint: disable=no-value-for-parameter
+    main()

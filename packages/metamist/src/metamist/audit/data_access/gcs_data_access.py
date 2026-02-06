@@ -2,15 +2,14 @@
 
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, dataset_path
-
-from metamist.audit.models import FileMetadata, FileType
 from metamist.audit.adapters import StorageClient
+from metamist.audit.models import FileMetadata, FileType
 
 
 class GCSDataAccess:
     """Layer for accessing Google Cloud Storage."""
 
-    def __init__(self, dataset: str, gcp_project: str | None = None):
+    def __init__(self, dataset: str, gcp_project: str | None = None):  # noqa: D417
         """
         Initialize the data access layer.
 
@@ -88,9 +87,9 @@ class GCSDataAccess:
         Returns:
             Lists of found CRAM paths and missing CRAM paths
         """
-        assert all(
-            p.bucket == self.main_bucket for p in cram_paths
-        ), 'All CRAM paths must be in the main(|test) bucket'
+        assert all(p.bucket == self.main_bucket for p in cram_paths), (
+            'All CRAM paths must be in the main(|test) bucket'
+        )
         crams_in_bucket = self.storage.check_blobs(self.main_bucket, cram_paths)
         # Check that all cram_paths were found
         if not all(p in crams_in_bucket for p in cram_paths):

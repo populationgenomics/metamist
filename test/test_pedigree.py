@@ -1,9 +1,8 @@
+from db.python.layers.family import FamilyLayer
 import pytest
 
 from db.python.connect import Connection
-from test.testbase import DbIsolatedTest, run_as_sync
 
-from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantUpsertInternal
 

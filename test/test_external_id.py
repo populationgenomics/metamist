@@ -1,7 +1,7 @@
+from pymysql.err import IntegrityError
 import pytest
 
 from db.python.connect import Connection
-from pymysql.err import IntegrityError
 
 from db.python.filters import GenericFilter
 from db.python.layers import FamilyLayer, ParticipantLayer, SampleLayer
@@ -13,6 +13,7 @@ from models.models import (
     SampleUpsertInternal,
     SequencingGroupUpsertInternal,
 )
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 class TestParticipant:

@@ -1,4 +1,3 @@
-# pylint: disable=kwarg-superseded-by-positional-arg
 """
 Web routes
 """
@@ -6,7 +5,8 @@ Web routes
 import asyncio
 import csv
 import io
-from typing import Any, Generator
+from collections.abc import Generator
+from typing import Any
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
@@ -257,7 +257,7 @@ async def search_by_keyword(
     projects = connection.all_projects()
     pmap = {p.id: p for p in projects}
     responses = await SearchLayer(connection).search(
-        keyword, project_ids=[p for p in pmap.keys() if p]
+        keyword, project_ids=[p for p in pmap if p]
     )
 
     for res in responses:

@@ -1,9 +1,9 @@
+from cpg_utils import to_path
 from metamist.audit.models import (
     Assay,
     FileMetadata,
 )
 
-from cpg_utils import to_path
 
 READ_FILES_BY_ASSAY_ID = {
     # One read file (BAM) (in bucket)

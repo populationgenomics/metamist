@@ -1,19 +1,21 @@
 import dataclasses
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
+from db.python.filters import GenericFilter, GenericFilterModel, GenericMetaFilter
 from psycopg import AsyncConnection
 from psycopg.rows import scalar_row, class_row
 
 from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
-from db.python.utils import NotFoundError, escape_like_term
+from db.python.utils import NotFoundError, escape_like_term, to_db_json
 from models.models import PRIMARY_EXTERNAL_ORG, FamilyInternal, ProjectId
 
 
 @dataclasses.dataclass
 class FamilyFilter(GenericFilterModel):
-    """Filter mode for querying Families
+    """
+    Filter mode for querying Families
 
     Args:
         GenericFilterModel (_type_): _description_
@@ -21,6 +23,7 @@ class FamilyFilter(GenericFilterModel):
 
     id: GenericFilter[int] | None = None
     external_id: GenericFilter[str] | None = None
+    meta: GenericMetaFilter | None = None
 
     project: GenericFilter[ProjectId] | None = None
     participant_id: GenericFilter[int] | None = None
@@ -34,7 +37,7 @@ class FamilyTable(DbBase):
 
     table_name = 'family'
 
-    async def get_projects_by_family_ids(self, family_ids: List[int]) -> Set[ProjectId]:
+    async def get_projects_by_family_ids(self, family_ids: list[int]) -> set[ProjectId]:
         """Get project IDs for sampleIds (mostly for checking auth)"""
         _query = """
             SELECT project FROM family
@@ -76,6 +79,7 @@ class FamilyTable(DbBase):
             'id': 'f.id',
             'external_id': 'feid.external_id',
             'project': 'f.project',
+            'meta': 'f.meta',
         }
 
         has_participant_join = False
@@ -102,7 +106,7 @@ class FamilyTable(DbBase):
             _query += f'WHERE {wheres}'
 
         _query += """
-            GROUP BY f.id, f.description, f.coded_phenotype, f.project
+            GROUP BY f.id, f.description, f.coded_phenotype, f.meta, f.project
         """
 
         async with self.connection.pool.connection() as conn:
@@ -130,12 +134,12 @@ class FamilyTable(DbBase):
 
         _query = """
             SELECT f.id, jsonb_object_agg(feid.name, feid.external_id) AS external_ids,
-                f.description, f.coded_phenotype, f.project, fp.participant_id
+                f.description, f.coded_phenotype, f.meta, f.project, fp.participant_id
             FROM family f
             INNER JOIN family_external_id feid ON f.id = feid.family_id
             INNER JOIN family_participant fp ON f.id = fp.family_id
             WHERE fp.participant_id = ANY(%(pids)s)
-            GROUP BY f.id, f.description, f.coded_phenotype, f.project, fp.participant_id
+            GROUP BY f.id, f.description, f.coded_phenotype, f.meta, f.project, fp.participant_id
         """
         ret_map = defaultdict(list)
         projects: set[ProjectId] = set()
@@ -208,15 +212,22 @@ class FamilyTable(DbBase):
         external_ids: dict[str, str | None] | None = None,
         description: str | None = None,
         coded_phenotype: str | None = None,
+        meta: dict[str, Any] | None = None,
     ) -> bool:
         """Update values for a family"""
         audit_log_id = await self.audit_log_id() # TODO piyumi: check how this works
 
-        values: Dict[str, Any] = {'audit_log_id': audit_log_id}
+        values: dict[str, Any] = {'audit_log_id': audit_log_id}
+        updaters = ['audit_log_id = :audit_log_id']
         if description:
             values['description'] = description
+            updaters.append('description = :description')
         if coded_phenotype:
             values['coded_phenotype'] = coded_phenotype
+            updaters.append('coded_phenotype = :coded_phenotype')
+        if meta is not None:
+            values['meta'] = to_db_json(meta)
+            updaters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
 
         async with self.connection.pool.connection() as conn:
             async with conn.transaction():
@@ -224,12 +235,8 @@ class FamilyTable(DbBase):
                     if external_ids is None:
                         external_ids = {}
 
-                    to_delete = [
-                        k.lower() for k, v in external_ids.items() if v is None
-                    ]
-                    to_update = {
-                        k.lower(): v for k, v in external_ids.items() if v is not None
-                    }
+            to_delete = [k.lower() for k, v in external_ids.items() if v is None]
+            to_update = {k.lower(): v for k, v in external_ids.items() if v is not None}
 
                     if to_delete:
                         # psycopg does no support executing multiple parameterized statements in a single execution
@@ -287,19 +294,25 @@ class FamilyTable(DbBase):
                         ]
                         await curr.executemany(_update_query, _update_values)
 
-                    setters = ', '.join(f'{field} = %({field})s' for field in values)
-                    await curr.execute(
-                        f"""UPDATE family SET {setters} WHERE id = %(id)s""",
-                        {**values, 'id': id_},
-                    )
+            # Only update if more than just audit_log_id has changed
+            if len(updaters) > 1:
+                await curr.execute(
+                    f"""
+                    UPDATE family
+                    SET {', '.join(updaters)}
+                    WHERE id = %(id)s
+                    """,
+                    {**values, 'id': id_},
+                )
 
         return True
 
     async def create_family(
         self,
         external_ids: dict[str, str],
-        description: Optional[str],
-        coded_phenotype: Optional[str],
+        description: str | None,
+        coded_phenotype: str | None,
+        meta: dict[str, Any] | None = None,
         project: ProjectId | None = None,
         async_connection_oj: AsyncConnection = None,
     ) -> int:
@@ -313,14 +326,15 @@ class FamilyTable(DbBase):
                 async with conn.cursor(row_factory=scalar_row) as curr:
                     await curr.execute(
                         """
-                        INSERT INTO family (project, description, coded_phenotype, audit_log_id)
-                        VALUES (%(project)s, %(description)s, %(coded_phenotype)s, %(audit_log_id)s)
+                        INSERT INTO family (project, description, coded_phenotype, meta, audit_log_id)
+                        VALUES (%(project)s, %(description)s, %(coded_phenotype)s, %(meta)s, %(audit_log_id)s)
                         RETURNING id
                         """,
                         {
                             'project': project or self.project_id,
                             'description': description,
                             'coded_phenotype': coded_phenotype,
+                            'meta': to_db_json(meta or {}),
                             'audit_log_id': audit_log_id,
                         },
                     )
@@ -348,10 +362,11 @@ class FamilyTable(DbBase):
 
     async def insert_or_update_multiple_families(
         self,
-        external_ids: List[str],
-        descriptions: List[str],
-        coded_phenotypes: List[Optional[str]],
+        external_ids: list[str],
+        descriptions: list[str],
+        coded_phenotypes: list[str | None],
         project: ProjectId | None = None,
+        meta: list[dict[str, Any] | None] | None = None,
     ):
         """
         Upsert several families.
@@ -359,11 +374,14 @@ class FamilyTable(DbBase):
         """
         audit_log_id = await self.audit_log_id()
 
+        # Default to list of None if meta not provided
+        meta_list = meta if meta is not None else [None] * len(external_ids)
+
         # each query executes independently
         async with self.connection.pool.connection() as conn:
             async with conn.cursor(row_factory=scalar_row) as curr:
-                for eid, descr, cph in zip(
-                    external_ids, descriptions, coded_phenotypes
+                for eid, descr, cph, mt in zip(
+                    external_ids, descriptions, coded_phenotypes, meta_list, strict=False
                 ):
                     await curr.execute(
                         """
@@ -378,13 +396,14 @@ class FamilyTable(DbBase):
                         await curr.execute(
                             """
                             INSERT INTO family (project, description, coded_phenotype, audit_log_id)
-                            VALUES (%(project)s, %(description)s, %(coded_phenotype)s, %(audit_log_id)s)
+                            VALUES (%(project)s, %(description)s, %(coded_phenotype)s, %(meta)s, %(audit_log_id)s)
                             RETURNING id
                             """,
                             {
                                 'project': project or self.project_id,
                                 'description': descr,
                                 'coded_phenotype': cph,
+                                'meta': to_db_json(mt or {}),
                                 'audit_log_id': audit_log_id,
                             },
                         )
@@ -408,13 +427,16 @@ class FamilyTable(DbBase):
                         await curr.execute(
                             """
                             UPDATE family
-                                SET description = %(description)s, coded_phenotype = %(coded_phenotype)s, audit_log_id = %(audit_log_id)s
+                                SET description = %(description)s, coded_phenotype = %(coded_phenotype)s,
+                                meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), %(meta)s), 
+                                audit_log_id = %(audit_log_id)s
                                 WHERE id = %(id)s
                             """,
                             {
                                 'id': existing_id,
                                 'description': descr,
                                 'coded_phenotype': cph,
+                                'meta': to_db_json(mt or {}),
                                 'audit_log_id': audit_log_id,
                             },
                         )
@@ -422,8 +444,8 @@ class FamilyTable(DbBase):
         return True
 
     async def get_id_map_by_external_ids(
-        self, family_ids: List[str], allow_missing=False, project: Optional[int] = None
-    ) -> Dict:
+        self, family_ids: list[str], allow_missing=False, project: int | None = None
+    ) -> dict:
         """Get map of {external_id: internal_id} for a family"""
 
         if not family_ids:
@@ -458,7 +480,7 @@ class FamilyTable(DbBase):
         return id_map
 
     async def get_id_map_by_internal_ids(
-        self, family_ids: List[int], allow_missing=False
+        self, family_ids: list[int], allow_missing=False
     ):
         """Get map of {internal_id: primary_external_id} for a family"""
         if len(family_ids) == 0:

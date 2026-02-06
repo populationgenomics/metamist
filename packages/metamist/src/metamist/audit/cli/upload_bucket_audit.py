@@ -1,11 +1,12 @@
 """CLI entry point for upload bucket audit."""
 
 import asyncio
-import click
 from collections import defaultdict
 from types import SimpleNamespace
 
-from metamist.audit.data_access import MetamistDataAccess, GCSDataAccess
+import click
+
+from metamist.audit.data_access import GCSDataAccess, MetamistDataAccess
 from metamist.audit.models import AuditConfig, SequencingGroup
 from metamist.audit.services import AuditAnalyzer, BucketAuditLogger, Reporter
 
@@ -278,4 +279,4 @@ def main(
 
 
 if __name__ == '__main__':
-    main()  # pylint: disable=no-value-for-parameter
+    main()

@@ -6,10 +6,13 @@ Uses PostgreSQL template database pattern for fast test database creation.
 Runs dbmate migrations inside the container for schema setup.
 """
 
+import json
+import os
+import tempfile
 import uuid
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, Awaitable, Generator
 from pathlib import Path
-from typing import Any, Awaitable, Protocol
+from typing import Any, Protocol
 
 import psycopg
 import pytest
@@ -34,6 +37,7 @@ from db.python.tables.project import (
     GROUP_NAME_PROJECT_CREATORS,
 )
 from models.models.project import ProjectMemberRole
+
 
 # Path to the db directory containing Dockerfile and migrations
 DB_DIR = Path(__file__).parent.parent / 'db'
@@ -138,7 +142,33 @@ def _drop_database(connection_url: str, db_name: str) -> None:
 
 
 @pytest.fixture(scope='session')
-def postgres_container() -> Generator[PostgresContainer, None, None]:
+def janky_patch_for_docker_config() -> None:
+    """
+    This is a really weird workaround. After updating to python 3.14 we found that
+    tests were suddenly between 4x and 10x slower than previously. After some
+    investigation it was narrowed down to calls to the gcloud docker credential helper
+    `docker-credential-gcloud` which was spawning python 3.12 processes. These cred
+    helpers seem to get called even if the container you're using isn't on gcr.
+
+    So the workaround is to create a empty config with no cred helpers specified
+    and point DOCKER_CONFIG to it.
+    This should only affect running the tests locally, but also shouldn't break
+    anything on CI.
+
+    We should check periodically if this is still a problem and remove it if not.
+    """
+
+    test_docker_config_dir = tempfile.mkdtemp(prefix='docker-config-test-')
+    test_docker_config_path = Path(test_docker_config_dir) / 'config.json'
+    with test_docker_config_path.open('w') as f:
+        json.dump({'auths': {}}, f)
+    os.environ['DOCKER_CONFIG'] = test_docker_config_dir
+
+
+@pytest.fixture(scope='session')
+def postgres_container(
+    janky_patch_for_docker_config: None,  # noqa: ARG001
+) -> Generator[PostgresContainer, None, None]:
     """
     Pytest fixture to provide a postgres container to tests. This will run db migrations
     so that all the necessary tables exist in the database that will be used as a template
@@ -313,7 +343,7 @@ async def seeded_db(
 @pytest.fixture
 async def app_client(
     configured_app: FastAPI,
-    seeded_db: None,  # Fixture dependency - ensures database is seeded first
+    seeded_db: None,  # Fixture dependency - ensures database is seeded first  # noqa: ARG001
 ) -> AsyncGenerator[AsyncClient, None]:
     """
     Httpx client for making requests to the metamist app.
@@ -325,6 +355,8 @@ async def app_client(
 
 # Type def for graphql query function
 class GraphQLQueryFunction(Protocol):
+    """Callable type for the graphql_query fixture."""
+
     def __call__(
         self, query: str, variables: dict[str, Any] | None = None
     ) -> Awaitable[dict[str, Any]]: ...
@@ -354,7 +386,7 @@ async def graphql_query(
 @pytest.fixture
 async def connection(
     db_pool: AsyncConnectionPool[AsyncConnection[DictRow]],
-    seeded_db: None,  # Fixture dependency - ensures database is seeded first
+    seeded_db: None,  # Fixture dependency - ensures database is seeded first  # noqa: ARG001
     monkeypatch: pytest.MonkeyPatch,
 ) -> AsyncGenerator[Connection, None]:
     """
@@ -390,7 +422,7 @@ async def connection(
 @pytest.fixture
 async def connection_with_project(
     db_pool: AsyncConnectionPool[AsyncConnection[DictRow]],
-    seeded_db: None,  # Fixture dependency - ensures database is seeded first
+    seeded_db: None,  # Fixture dependency - ensures database is seeded first  # noqa: ARG001
     monkeypatch: pytest.MonkeyPatch,
 ) -> AsyncGenerator[Connection, None]:
     """

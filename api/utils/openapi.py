@@ -5,6 +5,7 @@ from fastapi.openapi.utils import get_openapi
 
 from api.settings import SM_ENVIRONMENT
 
+
 Json = dict[str | Literal['anyOf', 'type'], 'Json'] | list['Json'] | str | bool
 
 
@@ -47,7 +48,7 @@ def convert_3_dot_1_to_3_dot_0_inplace(json: dict[str, Json]):
 
     def inner(yaml_dict: Json):
         if isinstance(yaml_dict, dict):
-            if 'anyOf' in yaml_dict and isinstance((anyOf := yaml_dict['anyOf']), list):
+            if 'anyOf' in yaml_dict and isinstance((anyOf := yaml_dict['anyOf']), list):  # noqa: N806
                 for i, item in enumerate(anyOf):
                     if isinstance(item, dict) and item.get('type') == 'null':
                         anyOf.pop(i)

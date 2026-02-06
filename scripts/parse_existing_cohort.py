@@ -1,4 +1,3 @@
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order
 """
 Parser for existing-cohort metadata.
 
@@ -39,7 +38,6 @@ This allows the script to proceed even if some data is missing.
 
 import csv
 import logging
-from typing import List, Optional
 
 import click
 
@@ -50,6 +48,7 @@ from metamist.parser.generic_metadata_parser import (
     run_as_sync,
 )
 from metamist.parser.generic_parser import READS_EXTENSIONS, DefaultSequencing
+
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -147,9 +146,9 @@ class ExistingCohortParser(GenericMetadataParser):
 
     async def get_read_filenames(
         self,
-        sample_id: Optional[str],
+        sample_id: str | None,
         row: SingleRow,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         We don't have fastq urls in a manifest, so overriding this method to take
         urls from a bucket listing.
@@ -170,7 +169,7 @@ class ExistingCohortParser(GenericMetadataParser):
 
         return read_filenames
 
-    def get_assay_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
+    def get_assay_id(self, row: GroupedRow) -> dict[str, str] | None:
         """Get external sequence ID from sequence file name"""
 
         for filename, _path in self.filename_map.items():
@@ -238,10 +237,10 @@ class ExistingCohortParser(GenericMetadataParser):
 @click.argument('manifests', nargs=-1)
 @run_as_sync
 async def main(
-    manifests: List[str],
+    manifests: list[str],
     project: str,
-    search_locations: List[str],
-    batch_number: Optional[str],
+    search_locations: list[str],
+    batch_number: str | None,
     sequencing_type: str,
     confirm=True,
     dry_run=False,
@@ -270,5 +269,4 @@ async def main(
 
 
 if __name__ == '__main__':
-    # pylint: disable=no-value-for-parameter
     main()

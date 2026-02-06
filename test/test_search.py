@@ -1,9 +1,8 @@
+from db.python.layers.family import FamilyLayer
 import pytest
 
 from db.python.connect import Connection
-from test.testbase import run_as_sync
 
-from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.search import SearchLayer
@@ -24,6 +23,7 @@ from models.models import (
 )
 from models.models.sample import sample_id_format
 from models.models.sequencing_group import sequencing_group_id_format
+from test.testbase import run_as_sync
 
 
 class TestSample:

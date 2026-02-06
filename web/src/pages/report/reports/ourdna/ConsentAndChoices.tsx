@@ -1,13 +1,61 @@
-import { Box, FormControlLabel, Switch } from '@mui/material'
+import {
+    Box,
+    Checkbox,
+    FormControl,
+    FormControlLabel,
+    InputLabel,
+    ListItemText,
+    MenuItem,
+    OutlinedInput,
+    Select,
+    Switch,
+} from '@mui/material'
 import * as Plot from '@observablehq/plot'
 import { useState } from 'react'
 import Report from '../../components/Report'
 import { ReportItemPlot } from '../../components/ReportItem'
 import ReportRow from '../../components/ReportRow'
+import { useProjectDbQuery } from '../../data/projectDatabase'
+
+const DEFAULT_ANCESTRIES = ['Vietnamese', 'Filipino', 'Lebanese', 'Fijian', 'Tongan', 'Samoan']
+const CHOICES = [
+    'Informed consent',
+    'Blood consent',
+    'Receive general updates',
+    'Recontact for future research',
+    'Receive genetic info',
+    'Family receive genetic info',
+    'Use of cells in future research consent',
+    'Use of cells in future research understanding',
+    'Data linkage',
+    'Have previously donated blood or plasma',
+]
 
 export default function ConsentAndChoices({ project }: { project: string }) {
     const [normalize, setNormalize] = useState(true)
     const [onlySamples, setOnlySamples] = useState(false)
+    const [ancestryBreakdown, setAncestryBreakdown] = useState(true)
+    const [selectedAncestries, setSelectedAncestries] = useState<string[]>(DEFAULT_ANCESTRIES)
+
+    const ancestryTableQuery = useProjectDbQuery(
+        project,
+        `
+        with ancestries as (
+            select unnest(meta_ancestry_participant_ancestry) as ancestry
+            from participant
+            where meta_ancestry_participant_ancestry is not null
+        )
+        select ancestry, count(*) as count
+        from ancestries
+        group by ancestry
+        order by count desc
+    `
+    )
+
+    const ancestryTableData: string[] =
+        ancestryTableQuery?.status === 'success' && ancestryTableQuery?.data
+            ? ancestryTableQuery.data.toArray().map((row) => row.ancestry)
+            : []
 
     return (
         <Report>
@@ -31,11 +79,52 @@ export default function ConsentAndChoices({ project }: { project: string }) {
                         }
                         label="Only include participants with samples"
                     />
+
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={ancestryBreakdown}
+                                onChange={(event) => setAncestryBreakdown(event.target.checked)}
+                            />
+                        }
+                        label="Break down by Ancestry"
+                    />
+                </Box>
+            </ReportRow>
+            <ReportRow>
+                <Box>
+                    <FormControl sx={{ minWidth: 300, marginTop: 2 }}>
+                        <InputLabel id="ancestry-select-label">Select Ancestries</InputLabel>
+                        <Select
+                            labelId="ancestry-select-label"
+                            id="ancestry-select"
+                            multiple
+                            value={selectedAncestries}
+                            onChange={(event) => {
+                                const value = event.target.value
+                                setSelectedAncestries(
+                                    typeof value === 'string' ? value.split(',') : value
+                                )
+                            }}
+                            input={<OutlinedInput label="Select Ancestries" />}
+                            renderValue={(selected) => selected.join(', ')}
+                        >
+                            {ancestryTableData.map((ancestry) => (
+                                <MenuItem key={ancestry} value={ancestry}>
+                                    <Checkbox checked={selectedAncestries.indexOf(ancestry) > -1} />
+                                    <ListItemText primary={ancestry} />
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
                 </Box>
             </ReportRow>
             <ReportRow>
                 <ReportItemPlot
-                    height={1200}
+                    height={
+                        /* roughly calculate height so that selecting lots of ancestries doesn't squish things */
+                        selectedAncestries.length * CHOICES.length * 10 + CHOICES.length * 50
+                    }
                     flexGrow={1}
                     title={'Participant Choices'}
                     description={`
@@ -74,7 +163,12 @@ export default function ConsentAndChoices({ project }: { project: string }) {
                             UNPIVOT answers
                             ON COLUMNS(* EXCLUDE (ancestry, participant_id))
                             INTO NAME question VALUE answer
-                        ) select * from unpivoted where ancestry in ('Vietnamese', 'Filipino', 'Lebanese')
+                        ) select
+                            ${ancestryBreakdown ? 'ancestry' : "'All' as ancestry"},
+                            question,
+                            answer
+                        from unpivoted
+                        where ancestry in (${selectedAncestries.map((a) => `'${a}'`).join(', ')})
                     `}
                     plot={(data) => ({
                         marginLeft: 70,
@@ -91,18 +185,7 @@ export default function ConsentAndChoices({ project }: { project: string }) {
                                     .split(' ')
                                     .map((val, i) => (i % 2 === 0 ? `${val} ` : `${val}\n`))
                                     .join(''),
-                            domain: [
-                                'Informed consent',
-                                'Blood consent',
-                                'Receive general updates',
-                                'Recontact for future research',
-                                'Receive genetic info',
-                                'Family receive genetic info',
-                                'Use of cells in future research consent',
-                                'Use of cells in future research understanding',
-                                'Data linkage',
-                                'Have previously donated blood or plasma',
-                            ],
+                            domain: CHOICES,
                         },
 
                         color: {

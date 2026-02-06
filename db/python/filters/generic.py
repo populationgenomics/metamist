@@ -1,10 +1,12 @@
 import dataclasses
 import re
+from collections.abc import Callable, Sequence
 from enum import Enum
-from typing import Any, Callable, Generic, Sequence, TypeVar
+from typing import Any, Generic, TypeVar
 
 from db.python.utils import escape_like_term
 from models.base import SMBase
+
 
 NONFIELD_CHARS_REGEX = re.compile(r'[^a-zA-Z0-9_]')
 
@@ -13,7 +15,7 @@ T = TypeVar('T')
 X = TypeVar('X')
 
 
-def get_hashable_value(value):
+def get_hashable_value(value):  # noqa: PLR0911
     """Prepare a value that can be hashed, for use in a dict or set"""
     if value is None:
         return None
@@ -37,7 +39,6 @@ def get_hashable_value(value):
     return hash(value)
 
 
-# pylint: disable=too-many-instance-attributes
 class GenericFilter(SMBase, Generic[T]):
     """
     Generic filter for eq, in_ (in) and nin (not in)
@@ -111,7 +112,7 @@ class GenericFilter(SMBase, Generic[T]):
         'foo_bar'
         >>> GenericFilter.generate_field_name('$foo bar:>baz')
         '_foo_bar__baz'
-        """
+        """  # noqa: D301
         return NONFIELD_CHARS_REGEX.sub('_', name)
 
     def is_false(self) -> bool:
@@ -123,7 +124,8 @@ class GenericFilter(SMBase, Generic[T]):
     def to_sql(
         self, column: str, column_name: str | None = None
     ) -> tuple[str, dict[str, T | list[T]]]:
-        """Convert to SQL, and avoid SQL injection
+        """
+        Convert to SQL, and avoid SQL injection
 
         Args:
             column (str): The expression, or column name that derives the values
@@ -240,7 +242,6 @@ class GenericFilter(SMBase, Generic[T]):
         )
 
 
-# pylint: disable=missing-class-docstring
 GenericMetaFilter = dict[str, GenericFilter[Any]]
 
 
@@ -267,7 +268,7 @@ class GenericFilterModel:
             if isinstance(value, GenericFilter) and value.is_false():
                 return True
 
-            if isinstance(value, dict):
+            if isinstance(value, dict):  # noqa: SIM102
                 if any(f.is_false() for f in value.values()):
                     return True
 

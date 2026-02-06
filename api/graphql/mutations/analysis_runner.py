@@ -1,8 +1,8 @@
 import datetime
 
 import strawberry
-from strawberry.types import Info
 from strawberry.scalars import JSON
+from strawberry.types import Info
 
 from db.python.connect import Connection
 from db.python.layers.analysis_runner import AnalysisRunnerLayer

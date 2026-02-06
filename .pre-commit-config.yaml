@@ -1,5 +1,5 @@
 default_language_version:
-    python: python3.11
+    python: python3.14
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -36,26 +36,17 @@ repos:
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
-    rev: v0.5.2
+    rev: v0.15.0
     hooks:
       # Run the linter.
-      # - id: ruff
-      #   args: [ --fix ]
+      - id: ruff-check
+        args: [ --fix ]
       # Run the formatter.
       - id: ruff-format
 
-  # Using system installation of pylint to support checking python module imports
-  - repo: local
-    hooks:
-      - id: pylint
-        name: pylint
-        entry: pylint
-        language: system
-        types: [python]
-
   # mypy
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.8.0
+    rev: v1.19.1
     hooks:
       - id: mypy
         args: [
@@ -72,7 +63,7 @@ repos:
             operator,
           ]
         additional_dependencies:
-          - strawberry-graphql[fastapi]==0.268.1
+          - strawberry-graphql[fastapi]==0.291.0
           - types-PyMySQL==1.1.0.1
 
   - repo: https://github.com/woodruffw/zizmor-pre-commit

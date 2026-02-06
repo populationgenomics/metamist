@@ -1,4 +1,3 @@
-# pylint: disable=too-many-locals, too-many-instance-attributes
 import asyncio
 from collections import defaultdict
 from datetime import date

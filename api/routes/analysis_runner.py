@@ -9,11 +9,12 @@ from db.python.tables.analysis_runner import AnalysisRunnerFilter
 from models.models.analysis_runner import AnalysisRunner, AnalysisRunnerInternal
 from models.models.project import FullWriteAccessRoles, ReadAccessRoles
 
+
 router = APIRouter(prefix='/analysis-runner', tags=['analysis-runner'])
 
 
 @router.put('/{project}/', operation_id='createAnalysisRunnerLog')
-async def create_analysis_runner_log(  # pylint: disable=too-many-arguments
+async def create_analysis_runner_log(  # noqa: PLR0913
     ar_guid: str,
     access_level: str,
     repository: str,

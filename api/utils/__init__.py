@@ -1,7 +1,9 @@
 """Importing GCP libraries"""
 
 from collections import defaultdict
-from typing import Callable, Iterable, TypeVar
+from collections.abc import Callable, Iterable
+from typing import TypeVar
+
 
 T = TypeVar('T')
 X = TypeVar('X')

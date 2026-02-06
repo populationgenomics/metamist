@@ -45,7 +45,8 @@ class BillingDailyTable(BillingBaseTable):
         return []
 
     async def get_invoice_months(self):
-        """Get all invoice months in database
+        """
+        Get all invoice months in database
         Aggregated views contain invoice_month field
         """
 

@@ -1,6 +1,5 @@
-# pylint: disable=redefined-builtin, import-outside-toplevel, ungrouped-imports
-
 from typing import TYPE_CHECKING, Annotated
+
 import strawberry
 from strawberry.types import Info
 
@@ -19,6 +18,7 @@ from models.utils.cohort_id_format import cohort_id_transform_to_raw
 from models.utils.cohort_template_id_format import (
     cohort_template_id_transform_to_raw,
 )
+
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLCohort, GraphQLCohortTemplate
@@ -83,7 +83,7 @@ class CohortMutations:
         """
         Create a cohort with the given name and sample/sequencing group IDs.
         """
-        from api.graphql.schema import GraphQLCohort
+        from api.graphql.schema import GraphQLCohort  # noqa: PLC0415
 
         connection: Connection = info.context['connection']
         (target_project,) = connection.get_and_check_access_to_projects_for_names(
@@ -154,7 +154,7 @@ class CohortMutations:
         """
         Create a cohort template with the given name and sample/sequencing group IDs.
         """
-        from api.graphql.schema import GraphQLCohortTemplate
+        from api.graphql.schema import GraphQLCohortTemplate  # noqa: PLC0415
 
         connection: Connection = info.context['connection']
         (target_project,) = connection.get_and_check_access_to_projects_for_names(
@@ -211,7 +211,7 @@ class CohortMutations:
     ) -> Annotated['GraphQLCohort', strawberry.lazy('api.graphql.schema')]:
         """Support updating name, description and status of a Cohort"""
 
-        from api.graphql.schema import GraphQLCohort
+        from api.graphql.schema import GraphQLCohort  # noqa: PLC0415
 
         connection: Connection = info.context['connection']
         clayer = CohortLayer(connection)

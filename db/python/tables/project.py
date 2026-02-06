@@ -1,16 +1,17 @@
-# pylint: disable=global-statement
-from typing import TYPE_CHECKING, Any, Tuple
+from typing import TYPE_CHECKING, Any
 
+from psycopg import sql
 from psycopg.rows import class_row
 from psycopg.types.enum import EnumInfo, register_enum
 
-from db.python.utils import Forbidden, get_logger, to_db_json
+from db.python.utils import Forbidden, get_logger
 from models.models.project import (
     Project,
     ProjectMemberRole,
     ProjectMemberUpdate,
     project_member_role_names,
 )
+
 
 # Avoid circular import for type definition
 if TYPE_CHECKING:
@@ -118,31 +119,32 @@ class ProjectPermissionsTable:
         """
         Get all projects with meta.is_seqr = true
         """
-        rows = await self.connection.fetch_all(
-            "SELECT id FROM project WHERE JSON_VALUE(meta, '$.is_seqr') = 1"
-        )
+        _query = "SELECT id FROM project WHERE (meta->>'is_seqr')::boolean"
+
+        async with self.connection.pool.connection() as conn:
+            cur = await conn.execute(_query)
+            rows = await cur.fetchall()
         return [r['id'] for r in rows]
 
     async def check_if_member_in_group_by_name(self, group_name: str, member: str):
         """Check if a user exists in the group"""
 
         _query = """
-            SELECT COUNT(*) > 0
-            FROM group_member gm
-            INNER JOIN `group` g ON g.id = gm.group_id
-            WHERE g.name = :group_name
-            AND gm.member = :member
+            SELECT gm.member, g.name
+            FROM "group" g
+            JOIN group_member gm ON g.id = gm.group_id
+            WHERE g.name = %(group_name)s
+            AND gm.member = %(member)s
+            LIMIT 1
         """
-        value = await self.connection.fetch_val(
-            _query, {'group_name': group_name, 'member': member}
-        )
-        if value not in (0, 1):
-            raise ValueError(
-                f'Unexpected value {value!r} when determining access to {group_name} '
-                f'for {member}'
-            )
 
-        return bool(value)
+        async with self.connection.pool.connection() as conn:
+            cur = await conn.execute(
+                _query, {'group_name': group_name, 'member': member}
+            )
+            row = await cur.fetchone()
+
+        return row is not None
 
     async def check_project_creator_permissions(self, author: str):
         """Check author has project_creator permissions"""
@@ -179,25 +181,30 @@ class ProjectPermissionsTable:
         """Create project row"""
         await self.check_project_creator_permissions(author)
 
-        async with self.connection.transaction():
-            _query = """\
-    INSERT INTO project (name, dataset, audit_log_id)
-    VALUES (:name, :dataset, :audit_log_id)
-    RETURNING ID"""
-            values = {
-                'name': project_name,
-                'dataset': dataset_name,
-                'audit_log_id': await self.audit_log_id(),
-            }
+        _query = """
+            INSERT INTO project (name, dataset, audit_log_id)
+            VALUES (%(name)s, %(dataset)s, %(audit_log_id)s)
+            RETURNING id
+        """
+        values: dict[str, Any] = {
+            'name': project_name,
+            'dataset': dataset_name,
+            'audit_log_id': await self.audit_log_id(),
+        }
 
-            project_id = await self.connection.fetch_val(_query, values)
+        async with self.connection.pool.connection() as conn:
+            cur = await conn.execute(_query, values)
+            row = await cur.fetchone()
+            assert row
+            project_id = row['id']
 
-        if self._connection:
-            await self._connection.refresh_projects()
+        await self.connection.refresh_projects()
 
         return project_id
 
-    async def update_project(self, project_name: str, update: dict, author: str):
+    async def update_project(
+        self, project_name: str, update: dict[str, Any], author: str
+    ):
         """Update a metamist project"""
         await self.check_project_creator_permissions(author)
 
@@ -208,17 +215,23 @@ class ProjectPermissionsTable:
             'name': project_name,
         }
 
-        setters = ['audit_log_id = :audit_log_id']
+        setters = [sql.SQL('audit_log_id = %(audit_log_id)s')]
 
         if meta is not None and len(meta) > 0:
-            fields['meta'] = to_db_json(meta)
-            setters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
+            fields['meta'] = meta
+            setters.append(
+                sql.SQL(
+                    "meta = json_merge_patch(COALESCE(meta, '{}'::jsonb),  %(meta)s)"
+                )
+            )
+        fields_str = sql.SQL(',').join(setters)
 
-        fields_str = ', '.join(setters)
+        _query = sql.SQL(
+            'UPDATE project SET {fields_str} WHERE name = %(name)s'
+        ).format(fields_str=fields_str)
 
-        _query = f'UPDATE project SET {fields_str} WHERE name = :name'
-
-        await self.connection.execute(_query, fields)
+        async with self.connection.pool.connection() as conn:
+            await conn.execute(_query, fields)
 
     async def delete_project_data(self, project: Project) -> bool:
         """
@@ -227,97 +240,115 @@ class ProjectPermissionsTable:
         if not project.is_test_project:
             raise ValueError('2025-12-04: refusing to delete non-test project')
 
-        async with self.connection.transaction():
-            _query = """
-DELETE FROM comment WHERE id IN (
-    SELECT ac.comment_id FROM assay_comment ac
-    INNER JOIN assay a ON ac.assay_id = a.id
-    INNER JOIN sample s ON a.sample_id = s.id
-    WHERE s.project = :project
+        delete_queries: list[sql.SQL] = [
+            sql.SQL("""
+            DELETE FROM comment WHERE id IN (
+                SELECT ac.comment_id FROM assay_comment ac
+                INNER JOIN assay a ON ac.assay_id = a.id
+                INNER JOIN sample s ON a.sample_id = s.id
+                WHERE s.project = %(project)s
 
-    UNION
-    SELECT fc.comment_id FROM family_comment fc
-    INNER JOIN family f ON fc.family_id = f.id
-    WHERE f.project = :project
+                UNION
+                SELECT fc.comment_id FROM family_comment fc
+                INNER JOIN family f ON fc.family_id = f.id
+                WHERE f.project = %(project)s
 
-    UNION
-    SELECT pc.comment_id FROM participant_comment pc
-    INNER JOIN participant p ON pc.participant_id = p.id
-    WHERE p.project = :project
+                UNION
+                SELECT pc.comment_id FROM participant_comment pc
+                INNER JOIN participant p ON pc.participant_id = p.id
+                WHERE p.project = %(project)s
 
-    UNION
-    SELECT comment_id FROM project_comment
-    WHERE project_id = :project
+                UNION
+                SELECT comment_id FROM project_comment
+                WHERE project_id = %(project)s
 
-    UNION
-    SELECT sc.comment_id FROM sample_comment sc
-    INNER JOIN sample s ON sc.sample_id = s.id
-    WHERE s.project = :project
+                UNION
+                SELECT sc.comment_id FROM sample_comment sc
+                INNER JOIN sample s ON sc.sample_id = s.id
+                WHERE s.project = %(project)s
 
-    UNION
-    SELECT sgc.comment_id FROM sequencing_group_comment sgc
-    INNER JOIN sequencing_group sg ON sgc.sequencing_group_id = sg.id
-    INNER JOIN sample s ON sg.sample_id = s.id
-    WHERE s.project = :project
-);
--- Deletion from `comment` cascades to the various `*_comment` tables
-DELETE FROM project_member WHERE project_id = :project;
-DELETE FROM participant_phenotypes where participant_id IN (
-    SELECT id FROM participant WHERE project = :project
-);
-DELETE FROM family_participant WHERE family_id IN (
-    SELECT id FROM family where project = :project
-);
-DELETE FROM family_external_id WHERE project = :project;
-DELETE FROM family WHERE project = :project;
-DELETE FROM sequencing_group_external_id WHERE project = :project;
-DELETE FROM sample_external_id WHERE project = :project;
-DELETE FROM participant_external_id WHERE project = :project;
-DELETE FROM assay_external_id WHERE project = :project;
-DELETE FROM sequencing_group_assay WHERE sequencing_group_id IN (
-    SELECT sg.id FROM sequencing_group sg
-    INNER JOIN sample ON sample.id = sg.sample_id
-    WHERE sample.project = :project
-);
-DELETE FROM analysis_sequencing_group WHERE sequencing_group_id in (
-    SELECT sg.id FROM sequencing_group sg
-    INNER JOIN sample ON sample.id = sg.sample_id
-    WHERE sample.project = :project
-);
-DELETE FROM analysis_sample WHERE sample_id in (
-    SELECT s.id FROM sample s
-    WHERE s.project = :project
-);
-DELETE FROM output_file WHERE id IN (
-    SELECT file_id FROM analysis_outputs ao
-    INNER JOIN analysis a ON ao.analysis_id = a.id
-    WHERE a.project = :project
-);
--- Deletion from `output_file` cascades to `analysis_outputs`
-DELETE FROM analysis_sequencing_group WHERE analysis_id in (
-    SELECT id FROM analysis WHERE project = :project
-);
-DELETE FROM analysis_sample WHERE analysis_id in (
-    SELECT id FROM analysis WHERE project = :project
-);
-DELETE FROM analysis_cohort WHERE cohort_id IN (
-    SELECT id FROM cohort WHERE project = :project
-);
-DELETE FROM cohort_sequencing_group WHERE cohort_id IN (
-    SELECT id FROM cohort WHERE project = :project
-);
-DELETE FROM cohort_template WHERE project = :project;
-DELETE FROM cohort WHERE project = :project;
-DELETE FROM assay WHERE sample_id in (SELECT id FROM sample WHERE project = :project);
-DELETE FROM sequencing_group WHERE sample_id IN (
-    SELECT id FROM sample WHERE project = :project
-);
-DELETE FROM sample WHERE project = :project;
-DELETE FROM participant WHERE project = :project;
-DELETE FROM analysis WHERE project = :project;
-            """
+                UNION
+                SELECT sgc.comment_id FROM sequencing_group_comment sgc
+                INNER JOIN sequencing_group sg ON sgc.sequencing_group_id = sg.id
+                INNER JOIN sample s ON sg.sample_id = s.id
+                WHERE s.project = %(project)s
+            )
+            """),
+            sql.SQL('DELETE FROM project_member WHERE project_id = %(project)s'),
+            sql.SQL("""
+            DELETE FROM participant_phenotypes WHERE participant_id IN (
+                SELECT id FROM participant WHERE project = %(project)s
+            )
+            """),
+            sql.SQL("""
+            DELETE FROM family_participant WHERE family_id IN (
+                SELECT id FROM family WHERE project = %(project)s
+            )
+            """),
+            sql.SQL('DELETE FROM family_external_id WHERE project = %(project)s'),
+            sql.SQL('DELETE FROM family WHERE project = %(project)s'),
+            sql.SQL(
+                'DELETE FROM sequencing_group_external_id WHERE project = %(project)s'
+            ),
+            sql.SQL('DELETE FROM sample_external_id WHERE project = %(project)s'),
+            sql.SQL('DELETE FROM participant_external_id WHERE project = %(project)s'),
+            sql.SQL('DELETE FROM assay_external_id WHERE project = %(project)s'),
+            sql.SQL("""
+            DELETE FROM sequencing_group_assay WHERE sequencing_group_id IN (
+                SELECT sg.id FROM sequencing_group sg
+                INNER JOIN sample ON sample.id = sg.sample_id
+                WHERE sample.project = %(project)s
+            )
+            """),
+            sql.SQL("""
+            DELETE FROM analysis_sequencing_group WHERE sequencing_group_id IN (
+                SELECT sg.id FROM sequencing_group sg
+                INNER JOIN sample ON sample.id = sg.sample_id
+                WHERE sample.project = %(project)s
+            )
+            """),
+            sql.SQL("""
+            DELETE FROM output_file WHERE id IN (
+                SELECT file_id FROM analysis_outputs ao
+                INNER JOIN analysis a ON ao.analysis_id = a.id
+                WHERE a.project = %(project)s
+            )
+            """),
+            sql.SQL("""
+            DELETE FROM analysis_sequencing_group WHERE analysis_id IN (
+                SELECT id FROM analysis WHERE project = %(project)s
+            )
+            """),
+            sql.SQL("""
+            DELETE FROM analysis_cohort WHERE cohort_id IN (
+                SELECT id FROM cohort WHERE project = %(project)s
+            )
+            """),
+            sql.SQL("""
+            DELETE FROM cohort_sequencing_group WHERE cohort_id IN (
+                SELECT id FROM cohort WHERE project = %(project)s
+            )
+            """),
+            sql.SQL('DELETE FROM cohort_template WHERE project = %(project)s'),
+            sql.SQL('DELETE FROM cohort WHERE project = %(project)s'),
+            sql.SQL("""
+            DELETE FROM assay WHERE sample_id IN (
+                SELECT id FROM sample WHERE project = %(project)s
+            )
+            """),
+            sql.SQL("""
+            DELETE FROM sequencing_group WHERE sample_id IN (
+                SELECT id FROM sample WHERE project = %(project)s
+            )
+            """),
+            sql.SQL('DELETE FROM sample WHERE project = %(project)s'),
+            sql.SQL('DELETE FROM participant WHERE project = %(project)s'),
+            sql.SQL('DELETE FROM analysis WHERE project = %(project)s'),
+        ]
 
-            await self.connection.execute(_query, {'project': project.id})
+        async with self.connection.pool.connection() as conn, conn.transaction():
+            for query in delete_queries:
+                await conn.execute(query, {'project': project.id})
 
         return True
 
@@ -328,27 +359,32 @@ DELETE FROM analysis WHERE project = :project;
         Set group members for a group (by name)
         """
 
-        async with self.connection.transaction():
+        async with (
+            self.connection.pool.connection() as conn,
+            conn.transaction(),
+            conn.cursor() as cur,
+        ):
             # Get existing rows so that we can keep the existing audit log ids
-            existing_rows = await self.connection.fetch_all(
+            await cur.execute(
                 """
                 SELECT project_id, member, role, audit_log_id
                 FROM project_member
-                WHERE project_id = :project_id
-            """,
+                WHERE project_id = %(project_id)s
+                """,
                 {'project_id': project.id},
             )
+            existing_rows = await cur.fetchall()
 
-            audit_log_id_map: dict[Tuple[str, str], int | None] = {
+            audit_log_id_map: dict[tuple[str, str], int | None] = {
                 (r['member'], r['role']): r['audit_log_id'] for r in existing_rows
             }
 
             # delete existing rows for project
-            await self.connection.execute(
+            await cur.execute(
                 """
                 DELETE FROM project_member
-                WHERE project_id = :project_id
-            """,
+                WHERE project_id = %(project_id)s
+                """,
                 {'project_id': project.id},
             )
 
@@ -359,11 +395,11 @@ DELETE FROM analysis WHERE project = :project;
             for m in members:
                 db_members.extend([{'member': m.member, 'role': r} for r in m.roles])
 
-            await self.connection.execute_many(
+            await cur.executemany(
                 """
-                    INSERT INTO project_member
-                        (project_id, member, role, audit_log_id)
-                    VALUES (:project_id, :member, :role, :audit_log_id);
+                INSERT INTO project_member
+                    (project_id, member, role, audit_log_id)
+                VALUES (%(project_id)s, %(member)s, %(role)s, %(audit_log_id)s)
                 """,
                 [
                     {
@@ -379,7 +415,6 @@ DELETE FROM analysis WHERE project = :project;
                 ],
             )
 
-        if self._connection:
-            await self._connection.refresh_projects()
+        await self.connection.refresh_projects()
 
     # endregion CREATE / UPDATE
