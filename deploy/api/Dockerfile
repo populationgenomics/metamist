@@ -1,4 +1,4 @@
-FROM python:3.11
+FROM python:3.14
 COPY --from=ghcr.io/astral-sh/uv:0.8.22 /uv /uvx /bin/
 
 ARG SM_ENVIRONMENT
