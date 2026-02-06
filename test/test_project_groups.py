@@ -1,5 +1,4 @@
 import uuid
-from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.tables.project import (
     GROUP_NAME_MEMBERS_ADMIN,
@@ -13,6 +12,7 @@ from models.models.project import (
     ProjectMemberUpdate,
     ReadAccessRoles,
 )
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 class TestGroupAccess(DbIsolatedTest):
@@ -69,7 +69,6 @@ class TestGroupAccess(DbIsolatedTest):
 
         project_id = await self.pttable.create_project(g, g, self.author)
 
-        # pylint: disable=protected-access
         project_id_map, _ = await self.pttable.get_projects_accessible_by_user(
             user=self.author
         )

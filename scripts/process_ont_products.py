@@ -1,4 +1,3 @@
-# pylint: disable=too-many-instance-attributes
 import asyncio
 import logging
 import os
@@ -13,6 +12,7 @@ from metamist.model.analysis_status import AnalysisStatus
 from metamist.parser.cloudhelper import CloudHelper
 from metamist.parser.generic_metadata_parser import GenericMetadataParser, run_as_sync
 from metamist.parser.generic_parser import CustomDictReader, chunk
+
 
 OntAnalysesPreparer = namedtuple(
     'OntAnalysesPreparer',
@@ -57,7 +57,6 @@ class Columns:
         }
 
 
-# pylint: disable=too-many-public-methods,too-many-arguments
 class OntProductParser(CloudHelper):
     """Parser for ONT products (BAMS / GVCFs)"""
 
@@ -178,7 +177,7 @@ class OntProductParser(CloudHelper):
 
             output_bucket = f'gs://cpg-{self.project}-main/{preparer.output_path}'
 
-            dest = os.path.join(output_bucket, fn)
+            dest = os.path.join(output_bucket, fn)  # noqa: PTH118
             if not src:
                 logging.info(
                     f'File for key {preparer.fn_column!r} at source {src!r} '
@@ -293,4 +292,4 @@ async def main(
 
 
 if __name__ == '__main__':
-    main()  # pylint: disable=no-value-for-parameter
+    main()

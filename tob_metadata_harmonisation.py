@@ -8,11 +8,10 @@ If the field is in the dictionary and the value is not None, the field is added 
 If there are multiple mappings to the same field, the value is compared to the value already in the new_assay_data dictionary. If the values are different, the field is printed to the console.
 """
 
-from typing import Dict
-
 from metamist.apis import AssayApi
 from metamist.graphql import gql, query
 from metamist.models import AssayUpsert
+
 
 SG_QUERY = gql(
     """
@@ -109,7 +108,7 @@ class AssayHarmoniser:
     def __init__(self):
         self.api_instance = AssayApi()
 
-    def perform_upsert(self, new_assay_id: str, assay_data: Dict):
+    def perform_upsert(self, new_assay_id: str, assay_data: dict):
         """
         Creates an upsert function for the given assay data.
 
@@ -131,7 +130,7 @@ class AssayHarmoniser:
 
         return upsert
 
-    def get_active_assay_data(self, active_sgs: Dict, sample_id: str) -> str | None:
+    def get_active_assay_data(self, active_sgs: dict, sample_id: str) -> str | None:
         """
         Retrieves the active assay ID for a given sample ID.
 
@@ -151,7 +150,7 @@ class AssayHarmoniser:
 
         return None
 
-    def harmonise_assay_data(self, assay: Dict) -> Dict:
+    def harmonise_assay_data(self, assay: dict) -> dict:
         """
         Harmonises the assay data based on a predefined field mapping.
 
@@ -163,7 +162,7 @@ class AssayHarmoniser:
         harmonised_data = {}
 
         # check if multiple fields map to the same harmonised field
-        new_assay_data: Dict[str, Dict] = {}
+        new_assay_data: dict[str, dict] = {}
         for old_field, new_field in FIELD_MAPPING.items():
             if old_value := assay['meta'].get(old_field):
                 existing_value = new_assay_data.get(new_field)
@@ -191,9 +190,8 @@ class AssayHarmoniser:
         operations. It first creates a list of upsert functions without calling them. After all upsert functions have
         been created, it iterates over the list and calls each function to perform the upsert operation.
         """
-        # pylint: disable=unsubscriptable-object
-        active_response: Dict = query(SG_QUERY, variables={'active_status': True})
-        inactive_response: Dict = query(SG_QUERY, variables={'active_status': False})
+        active_response: dict = query(SG_QUERY, variables={'active_status': True})
+        inactive_response: dict = query(SG_QUERY, variables={'active_status': False})
 
         api_calls = []
         for sample in inactive_response['sample']:

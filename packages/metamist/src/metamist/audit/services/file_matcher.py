@@ -22,7 +22,6 @@ class FileMatcher(ABC):
         Returns:
             Matched file or None
         """
-        pass  # pylint: disable=unnecessary-pass
 
 
 class ChecksumMatcher(FileMatcher):

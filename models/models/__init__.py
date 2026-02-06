@@ -17,8 +17,8 @@ from models.models.billing import (
     BillingCostBudgetRecord,
     BillingCostDetailsRecord,
     BillingInternal,
-    BillingSampleQueryModel,
     BillingRunningCostQueryModel,
+    BillingSampleQueryModel,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 )

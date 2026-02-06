@@ -75,7 +75,7 @@ class ExternalIds:
 
 
 @dataclass(frozen=True)
-class AuditConfig:  # pylint: disable=too-many-instance-attributes
+class AuditConfig:
     """Immutable configuration for audit runs."""
 
     dataset: str

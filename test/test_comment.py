@@ -1,4 +1,3 @@
-# pylint: disable=missing-function-docstring, too-many-public-methods, too-many-locals, too-many-lines
 from typing import Any
 
 from db.python.layers.assay import AssayLayer
@@ -13,6 +12,7 @@ from models.models.participant import ParticipantUpsertInternal
 from models.models.sequencing_group import SequencingGroupUpsertInternal
 from test.test_participant import get_participant_to_insert
 from test.testbase import DbIsolatedTest, run_as_sync
+
 
 # @TODO would be good to add permissions testing to this, but first need a better
 # way of mocking the test user and their permissions to make that possible
@@ -330,7 +330,7 @@ default_sequencing_meta = {
 }
 
 
-def comment_uniq(comment: dict[str, Any]):
+def comment_uniq(comment: dict[str, Any]):  # noqa: D103
     return (comment['id'], comment['entity']['__typename'])
 
 

@@ -1,6 +1,6 @@
 import json
 from collections import defaultdict
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from db.python.tables.base import DbBase
 
@@ -12,7 +12,7 @@ class ParticipantPhenotypeTable(DbBase):
 
     table_name = 'participant_phenotype'
 
-    async def add_key_value_rows(self, rows: List[Tuple[int, str, Any]]) -> None:
+    async def add_key_value_rows(self, rows: list[tuple[int, str, Any]]) -> None:
         """
         Create a new sample, and add it to database
         """
@@ -44,8 +44,8 @@ ON DUPLICATE KEY UPDATE
         )
 
     async def get_key_value_rows_for_participant_ids(
-        self, participant_ids: List[int]
-    ) -> Dict[int, Dict[str, Any]]:
+        self, participant_ids: list[int]
+    ) -> dict[int, dict[str, Any]]:
         """
         Get (participant_id, description, value),
         for individual level metadata template,
@@ -62,7 +62,7 @@ WHERE participant_id in :participant_ids AND value IS NOT NULL
         rows = await self.connection.fetch_all(
             _query, {'participant_ids': participant_ids}
         )
-        formed_key_value_pairs: Dict[int, Dict[str, Any]] = defaultdict(dict)
+        formed_key_value_pairs: dict[int, dict[str, Any]] = defaultdict(dict)
         for row in rows:
             pid = row['participant_id']
             key = row['description']
@@ -73,7 +73,7 @@ WHERE participant_id in :participant_ids AND value IS NOT NULL
 
     async def get_key_value_rows_for_all_participants(
         self, project: int
-    ) -> Dict[int, Dict[str, Any]]:
+    ) -> dict[int, dict[str, Any]]:
         """
         Get (participant_id, description, value),
         for individual level metadata template,
@@ -86,7 +86,7 @@ INNER JOIN participant p ON p.id = pp.participant_id
 WHERE p.project = :project AND pp.value IS NOT NULL
 """
         rows = await self.connection.fetch_all(_query, {'project': project})
-        formed_key_value_pairs: Dict[int, Dict[str, Any]] = defaultdict(dict)
+        formed_key_value_pairs: dict[int, dict[str, Any]] = defaultdict(dict)
         for row in rows:
             pid = row['participant_id']
             key = row['description']

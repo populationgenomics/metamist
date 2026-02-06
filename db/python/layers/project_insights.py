@@ -1,5 +1,4 @@
 # mypy: disable-error-code="attr-defined,arg-type,index,call-overload"
-# pylint: disable=too-many-arguments,too-many-locals,missing-class-docstring,too-many-lines
 import asyncio
 import itertools
 import json
@@ -21,6 +20,7 @@ from models.models.project import Project, ProjectId, ReadAccessRoles
 from models.models.sequencing_group import SequencingGroupInternalId
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
 
+
 AnalysisId = int
 SequencingType = str
 SequencingTechnology = str
@@ -28,43 +28,43 @@ SequencingPlatform = str
 
 
 # This layer has a lot of different queries, so we'll define some namedtuples to help us keep track of the keys
-class ProjectSeqTypeKey(NamedTuple):
+class ProjectSeqTypeKey(NamedTuple):  # noqa: D101
     project: ProjectId
     sequencing_type: SequencingType
 
 
-class ProjectSeqTypeTechnologyKey(NamedTuple):
+class ProjectSeqTypeTechnologyKey(NamedTuple):  # noqa: D101
     project: ProjectId
     sequencing_type: SequencingType
     sequencing_technology: SequencingTechnology
 
 
-class ProjectSeqTypeTechnologyPlatformKey(NamedTuple):
+class ProjectSeqTypeTechnologyPlatformKey(NamedTuple):  # noqa: D101
     project: ProjectId
     sequencing_type: SequencingType
     sequencing_technology: SequencingTechnology
     sequencing_platform: SequencingPlatform
 
 
-class ProjectSeqTypeStageKey(NamedTuple):
+class ProjectSeqTypeStageKey(NamedTuple):  # noqa: D101
     project: ProjectId
     sequencing_type: SequencingType
     stage: str
 
 
-class ProjectSeqGroupKey(NamedTuple):
+class ProjectSeqGroupKey(NamedTuple):  # noqa: D101
     project: ProjectId
     sequencing_group_id: SequencingGroupInternalId
 
 
 # Namedtuples for the rows returned by the queries
-class AnalysisRow(NamedTuple):
+class AnalysisRow(NamedTuple):  # noqa: D101
     id: AnalysisId
     output: str
     timestamp_completed: datetime
 
 
-class SequencingGroupDetailRow(NamedTuple):
+class SequencingGroupDetailRow(NamedTuple):  # noqa: D101
     family_id: int
     family_external_id: str
     participant_id: int
@@ -75,7 +75,7 @@ class SequencingGroupDetailRow(NamedTuple):
     sequencing_group_id: SequencingGroupInternalId
 
 
-class StripyReportRow(NamedTuple):
+class StripyReportRow(NamedTuple):  # noqa: D101
     id: AnalysisId
     output: str
     outliers_detected: bool
@@ -306,7 +306,7 @@ GROUP BY analysis_id;
             timestamp=analysis_row.timestamp_completed,
         )
 
-    def get_insights_summary_internal_row(
+    def get_insights_summary_internal_row(  # noqa: PLR0913
         self,
         summary_row_key: ProjectSeqTypeTechnologyKey,
         project: Project,
@@ -346,7 +346,7 @@ GROUP BY analysis_id;
             latest_sv_es_index=latest_sv_es_index,
         )
 
-    def get_insights_details_internal_row(
+    def get_insights_details_internal_row(  # noqa: PLR0913
         self,
         project: Project,
         sequencing_type: SequencingType,
@@ -987,10 +987,8 @@ INNER JOIN (
 
         # Get the sequencing groups for each of the analyses in the grouped analyses rows
         analysis_sequencing_groups = await self.get_analysis_sequencing_groups(
-            (
-                list(latest_annotate_dataset_by_project_id_and_seq_type.values())
-                + list(latest_es_indices_by_project_id_and_seq_type_and_stage.values())
-            )
+            list(latest_annotate_dataset_by_project_id_and_seq_type.values())
+            + list(latest_es_indices_by_project_id_and_seq_type_and_stage.values())
         )
 
         sequencing_technologies = await SeqTechTable(self._connection).get()
@@ -1080,10 +1078,8 @@ INNER JOIN (
         )
         # Get the sequencing groups for each of the analyses in the grouped analyses rows
         analysis_sequencing_groups = await self.get_analysis_sequencing_groups(
-            (
-                list(latest_annotate_dataset_by_project_id_and_seq_type.values())
-                + list(latest_es_indices_by_project_id_and_seq_type_and_stage.values())
-            )
+            list(latest_annotate_dataset_by_project_id_and_seq_type.values())
+            + list(latest_es_indices_by_project_id_and_seq_type_and_stage.values())
         )
 
         sequencing_platforms = await SeqPlatformTable(self._connection).get()

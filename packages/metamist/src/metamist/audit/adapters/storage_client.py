@@ -2,9 +2,10 @@
 
 from io import StringIO
 from typing import cast
-from google.cloud import storage
-from cpg_utils import Path, to_path
 
+from google.cloud import storage
+
+from cpg_utils import Path, to_path
 from metamist.audit.models import FileMetadata
 
 
@@ -47,7 +48,7 @@ class StorageClient:
             blob.reload()
         return blob
 
-    def check_blobs(
+    def check_blobs(  # noqa: D417
         self,
         bucket_name: str,
         paths: list[Path],

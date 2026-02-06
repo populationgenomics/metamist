@@ -11,18 +11,19 @@ This script assumes that the project field for all the sequencing group and
 analysis records has been updated in the database with the new project id.
 """
 
+import asyncio
 import logging
 from typing import Any
 
-import asyncio
 import click
+from google.cloud import storage
 
 from cpg_utils.config import config_retrieve
-from google.cloud import storage
 from metamist.apis import AnalysisApi
-from metamist.models import AnalysisUpdateModel, AnalysisStatus
 from metamist.graphql import gql, query
+from metamist.models import AnalysisStatus, AnalysisUpdateModel
 from metamist.parser.generic_metadata_parser import run_as_sync
+
 
 handler = logging.StreamHandler()
 formatter = logging.Formatter(
@@ -283,7 +284,7 @@ def move_files(
             logger.info(
                 f'Moved {old_path} ({convert_size(blob_copy.size)}) to {new_path} successfully\n'
             )
-        except Exception as e:  # pylint: disable=broad-except
+        except Exception as e:  # noqa: BLE001
             logger.error(f'{e}: Blob {source_blob.name} failed to copy.')
 
     logger.info(f'{len(files_to_move)} files, total size: ({convert_size(total_size)})')
@@ -399,4 +400,4 @@ async def main(
 
 
 if __name__ == '__main__':
-    asyncio.run(main())  # pylint: disable=no-value-for-parameter
+    asyncio.run(main())

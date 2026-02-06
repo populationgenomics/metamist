@@ -20,7 +20,7 @@ def main(participant_id_json: str, project: str, force: bool = False):
     if participant_id_json.startswith('{'):
         pid_map = json.loads(participant_id_json)
     else:
-        with open(participant_id_json) as f:
+        with open(participant_id_json) as f:  # noqa: PTH123
             pid_map = json.load(f)
 
     papi = ParticipantApi()
@@ -45,4 +45,4 @@ def main(participant_id_json: str, project: str, force: bool = False):
 
 
 if __name__ == '__main__':
-    main()  # pylint: disable=no-value-for-parameter
+    main()

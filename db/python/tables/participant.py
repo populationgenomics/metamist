@@ -1,4 +1,3 @@
-# pylint: disable=too-many-instance-attributes,too-many-locals,too-many-branches
 import json
 from collections import defaultdict
 from typing import Any
@@ -44,7 +43,7 @@ class ParticipantTable(DbBase):
         return set(r['project'] for r in rows)
 
     @staticmethod
-    async def _construct_participant_query(
+    async def _construct_participant_query(  # noqa: C901, PLR0912, RUF100
         filter_: ParticipantFilter,
         keys: list[str],
         skip: int | None = None,
@@ -212,18 +211,19 @@ class ParticipantTable(DbBase):
             INNER JOIN (
             {query}
             ) as inner_query ON inner_query.id = p.id
-            {"GROUP BY p.id" if group_result_by_id else ""}
+            {'GROUP BY p.id' if group_result_by_id else ''}
         """
 
         return outer_query, values
 
-    async def query(
+    async def query(  # noqa: D417
         self,
         filter_: ParticipantFilter,
         limit: int | None = None,
         skip: int | None = None,
     ) -> tuple[set[ProjectId], list[ParticipantInternal]]:
-        """Query for participants
+        """
+        Query for participants
 
         Args:
             filter_ (ParticipantFilter): _description_
@@ -331,7 +331,7 @@ class ParticipantTable(DbBase):
         if not (project or self.project_id):
             raise ValueError('Must provide project to create participant')
 
-        if not external_ids or external_ids.get(PRIMARY_EXTERNAL_ORG, None) is None:
+        if not external_ids or external_ids.get(PRIMARY_EXTERNAL_ORG) is None:
             raise ValueError('Participant must have primary external_id')
 
         audit_log_id = await self.audit_log_id()

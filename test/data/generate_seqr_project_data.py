@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# pylint: disable=too-many-locals,unsubscriptable-object
 import asyncio
 import csv
 import datetime
@@ -8,7 +7,6 @@ import os
 import random
 import sys
 import tempfile
-from typing import List, Set
 
 from metamist.apis import AnalysisApi, FamilyApi, ParticipantApi, ProjectApi, SampleApi
 from metamist.graphql import gql, query_async
@@ -20,6 +18,7 @@ from metamist.models import (
     SequencingGroupUpsert,
 )
 from metamist.parser.generic_parser import chunk
+
 
 PRIMARY_EXTERNAL_ORG = ''
 
@@ -111,7 +110,7 @@ QUERY_ENUMS = gql(
 )
 
 
-class ped_row:
+class ped_row:  # noqa: N801
     """The pedigree row class"""
 
     def __init__(self, values):
@@ -142,18 +141,20 @@ def generate_random_id(used_ids: set):
     return random_id
 
 
-def generate_pedigree_rows(num_families=1):
+def generate_pedigree_rows(num_families=1):  # noqa: D417
     """
     Generate rows for a pedigree file with random data.
 
-    Parameters:
+    Parameters
+    ----------
     - num_families: The number of families to generate.
 
-    Returns:
+    Returns
+    -------
     A list of ped_row objects representing a project's pedigree.
     """
-    used_ids: Set[str] = set()
-    rows: List[ped_row] = []
+    used_ids: set[str] = set()
+    rows: list[ped_row] = []
     for _ in range(num_families):
         num_individuals_in_family = random.randint(1, 5)
         family_id = generate_random_id(used_ids)
@@ -166,7 +167,7 @@ def generate_pedigree_rows(num_families=1):
             )
             continue
 
-        if num_individuals_in_family == 2:  # Duo
+        if num_individuals_in_family == 2:  # Duo  # noqa: PLR2004
             parent_id = generate_random_id(used_ids)
             parent_sex = random.choice([1, 2])
             parent_affected = random.choices([0, 1, 2], weights=[0.05, 0.8, 0.15], k=1)[
@@ -285,13 +286,13 @@ async def generate_project_pedigree(project: str):
     project_pedigree = generate_pedigree_rows(num_families=random.randint(1, 100))
     participant_eids = [row.individual_id for row in project_pedigree]
 
-    pedfile = tempfile.NamedTemporaryFile(mode='w')  # pylint: disable=consider-using-with
+    pedfile = tempfile.NamedTemporaryFile(mode='w')  # noqa: SIM115
     ped_writer = csv.writer(pedfile, delimiter='\t')
     for row in project_pedigree:
         ped_writer.writerow(row)
     pedfile.flush()
 
-    with open(pedfile.name) as f:
+    with open(pedfile.name) as f:  # noqa: PTH123
         await FamilyApi().import_pedigree_async(
             project=project, file=f, has_header=False, create_missing_participants=True
         )
@@ -336,7 +337,7 @@ async def generate_sample_entries(
         )
         for i in range(nsamples):
             sample = SampleUpsert(
-                external_ids={PRIMARY_EXTERNAL_ORG: f'{participant_eid}_{i+1}'},
+                external_ids={PRIMARY_EXTERNAL_ORG: f'{participant_eid}_{i + 1}'},
                 type=random.choice(sample_types),
                 meta={
                     'collection_date': datetime.datetime.now()

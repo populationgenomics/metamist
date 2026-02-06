@@ -20,6 +20,7 @@ from models.models import (
     BillingTotalCostQueryModel,
 )
 
+
 # constants to abbrevate (S)tores and (C)ompute
 STORAGE = 'S'
 COMPUTE = 'C'
@@ -111,7 +112,8 @@ async def append_sample_cost_record(
     include_cost_category: str | None = None,
     exclude_cost_category: str | None = None,
 ):
-    """Add a sample cost record to the results.
+    """
+    Add a sample cost record to the results.
 
     Args:
         results (list[dict]): The list of result records.
@@ -122,6 +124,7 @@ async def append_sample_cost_record(
         project_id (int): The project ID to filter by.
         include_cost_category (str | None): The cost category to include.
         exclude_cost_category (str | None): The cost category to exclude.
+
     Returns:
         list[dict]: The updated list of result records.
     """
@@ -233,13 +236,13 @@ async def append_detailed_cost_records(
     """
     # add rows by field
     for key, details in field_details.items():
-        compute_daily = total_daily[COMPUTE][key] if key in total_daily[COMPUTE] else 0
-        storage_daily = total_daily[STORAGE][key] if key in total_daily[STORAGE] else 0
+        compute_daily = total_daily[COMPUTE][key] if key in total_daily[COMPUTE] else 0  # noqa: SIM401
+        storage_daily = total_daily[STORAGE][key] if key in total_daily[STORAGE] else 0  # noqa: SIM401
         compute_monthly = (
-            total_monthly[COMPUTE][key] if key in total_monthly[COMPUTE] else 0
+            total_monthly[COMPUTE][key] if key in total_monthly[COMPUTE] else 0  # noqa: SIM401
         )
         storage_monthly = (
-            total_monthly[STORAGE][key] if key in total_monthly[STORAGE] else 0
+            total_monthly[STORAGE][key] if key in total_monthly[STORAGE] else 0  # noqa: SIM401
         )
         monthly = compute_monthly + storage_monthly
         budget_monthly = budgets_per_gcp_project.get(key)
@@ -300,7 +303,7 @@ def prepare_aggregation(query: BillingTotalCostQueryModel) -> tuple[str, str]:
         grp_columns.append(col_name)
 
     fields_selected = ','.join(
-        (field.value for field in query.fields if field != BillingColumn.COST)
+        field.value for field in query.fields if field != BillingColumn.COST
     )
 
     grp_selected = ','.join(grp_columns)

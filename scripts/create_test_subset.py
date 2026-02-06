@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-# pylint: disable=too-many-instance-attributes,too-many-locals
-# pylint: disable=C0302
 
-""" Example Invocation
+"""
+Example Invocation
 
 analysis-runner \
 --dataset acute-care --description "populate acute care test subset" --output-dir "acute-care-test" \
@@ -19,7 +18,7 @@ import random
 import subprocess
 from argparse import ArgumentParser, BooleanOptionalAction
 from collections import Counter
-from typing import Any, Tuple
+from typing import Any
 
 from google.cloud import storage
 
@@ -35,6 +34,7 @@ from metamist.models import (
     SampleUpsert,
     SequencingGroupUpsert,
 )
+
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -391,8 +391,8 @@ def transfer_samples_sgs_assays(
     sequencing groups (sample_to_sg_attribute_map).
     """
     logger.info(f'Transferring {len(samples)} samples')
-    SequencingGroupAttributes = dict[Tuple[str, str, str], str]
-    sample_to_sg_attribute_map: dict[Tuple[str, str], SequencingGroupAttributes] = {}
+    SequencingGroupAttributes = dict[tuple[str, str, str], str]  # noqa: N806
+    sample_to_sg_attribute_map: dict[tuple[str, str], SequencingGroupAttributes] = {}
     old_sid_to_new_sid: dict[str, str] = {}
     for s in samples:
         exid_old_sid = (s['externalId'], s['id'])
@@ -496,6 +496,7 @@ def get_new_sg_id(
 ):
     """
     Returns the new sequencing group id for a given sample id and sequencing group attributes.
+
     Args:
         old_sid (str): The sample id to search for.
         new_sg_attributes (tuple[str, str, str]): The attributes of the sequencing group to search for.
@@ -504,7 +505,7 @@ def get_new_sg_id(
         new_sg_data (dict[dict, Any]): The data containing the new samples and their sequencing groups.
 
 
-        Example:
+    Example:
         old_sid = 'XPGAAAAA'
         old_sid_to_new_sid = {'XPGAAAAA': 'XPGBBBBB',
                               'XPGCCCCC': 'XPGDDDDD',
@@ -582,9 +583,9 @@ def transfer_analyses(
                 sample_to_sg_attribute_map,
                 new_sg_data,
             )
-            assert (
-                len(new_sequencing_group_id) == 1
-            ), f'Expected 1 new sequencing group id, got {len(new_sequencing_group_id)}'
+            assert len(new_sequencing_group_id) == 1, (
+                f'Expected 1 new sequencing group id, got {len(new_sequencing_group_id)}'
+            )
             existing_sg = get_existing_sg(
                 existing_data, s.get('externalId'), sg.get('type')
             )
@@ -656,6 +657,7 @@ def get_existing_sg(
     """
     Find a SG ID in the main data based on a sample ID
     Match either on CPG ID or type (exome/genome)
+
     Returns:
         The SG Data, or None if no match is found
     """
@@ -814,7 +816,7 @@ def transfer_families(
     # TODO: this doesn't match the default ordering in fapi.import_families, and is not passed as a list of headers
     family_tsv_headers = ['Family ID', 'Description', 'Coded Phenotype', 'Display Name']
     # Work-around as import_families takes a file.
-    with open(tmp_family_tsv, 'wt') as tmp_families:
+    with open(tmp_family_tsv, 'w') as tmp_families:  # noqa: PTH123
         tsv_writer = csv.writer(tmp_families, delimiter='\t')
         tsv_writer.writerow(family_tsv_headers)
         for family in families.values():
@@ -828,7 +830,7 @@ def transfer_families(
                 ]
             )
 
-    with open(tmp_family_tsv) as family_file:
+    with open(tmp_family_tsv) as family_file:  # noqa: PTH123
         fapi.import_families(file=family_file, project=target_project)
 
     return family_ids
@@ -845,10 +847,10 @@ def transfer_ped(
     )
     tmp_ped_tsv = 'tmp_ped.tsv'
     # Work-around as import_pedigree takes a file.
-    with open(tmp_ped_tsv, 'w') as tmp_ped:
+    with open(tmp_ped_tsv, 'w') as tmp_ped:  # noqa: PTH123
         tmp_ped.write(ped_tsv)
 
-    with open(tmp_ped_tsv) as ped_file:
+    with open(tmp_ped_tsv) as ped_file:  # noqa: PTH123
         fapi.import_pedigree(
             file=ped_file,
             has_header=True,
@@ -918,7 +920,8 @@ def get_random_families(
     families_n: int,
     include_single_person_families: bool = False,
 ) -> list[str]:
-    """Obtains a subset of families, that are a little less random.
+    """
+    Obtains a subset of families, that are a little less random.
     By default single-person families are discarded.
     The function aims to evenly distribute the families chosen by size.
     For example, if the composition of families inputted is as follows
@@ -1094,7 +1097,7 @@ def file_exists(path: str) -> bool:
         path = path.replace('gs://', '').split('/', maxsplit=1)[1]
         gs = storage.Client()
         return gs.get_bucket(bucket).get_blob(path)
-    return os.path.exists(path)
+    return os.path.exists(path)  # noqa: PTH110
 
 
 def file_size(path: str) -> int:
@@ -1103,7 +1106,7 @@ def file_size(path: str) -> int:
         (bucket, path) = path.removeprefix('gs://').split('/', maxsplit=1)
         return storage.Client().get_bucket(bucket).get_blob(path).size
 
-    return os.path.getsize(path)
+    return os.path.getsize(path)  # noqa: PTH202
 
 
 if __name__ == '__main__':

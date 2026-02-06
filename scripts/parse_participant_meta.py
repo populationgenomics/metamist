@@ -14,8 +14,8 @@ import traceback
 import click
 from google.cloud import storage
 
-from metamist.exceptions import ApiException
 from metamist.apis import ParticipantApi
+from metamist.exceptions import ApiException
 from metamist.model.participant_upsert import ParticipantUpsert
 
 
@@ -67,7 +67,7 @@ def parse_csv(csv_string: str, project: str):
     meta_reader = csv.DictReader(io.StringIO(csv_string))
 
     for row in meta_reader:
-        row = {k.lower(): v for k, v in row.items()}
+        row = {k.lower(): v for k, v in row.items()}  # noqa: PLW2901
         sample_id = row.pop('sampleid')
 
         updated_participant = ParticipantUpsert()
@@ -97,5 +97,4 @@ def main(project: str, full_file_path: str):
 
 
 if __name__ == '__main__':
-    # pylint: disable=no-value-for-parameter
     main()

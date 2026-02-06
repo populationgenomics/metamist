@@ -1,5 +1,5 @@
 import functools
-from typing import Iterable
+from collections.abc import Iterable
 
 from api.settings import SEQUENCING_GROUP_CHECKSUM_OFFSET, SEQUENCING_GROUP_PREFIX
 from models.utils.luhn import luhn_compute, luhn_is_valid

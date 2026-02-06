@@ -1,4 +1,4 @@
-from typing import Iterable
+from collections.abc import Iterable
 
 from api.settings import COHORT_CHECKSUM_OFFSET, COHORT_PREFIX
 from models.utils.luhn import luhn_compute, luhn_is_valid

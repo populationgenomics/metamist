@@ -3,10 +3,11 @@ import json
 import os
 import subprocess
 import tempfile
-from typing import Dict, Literal
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from google.cloud import logging, secretmanager
+
 
 app = FastAPI()
 
@@ -24,7 +25,7 @@ changelog_file = 'project.xml'
 
 def read_db_credentials(
     env: Literal['prod', 'dev'],
-) -> Dict[Literal['dbname', 'username', 'password', 'host'], str]:
+) -> dict[Literal['dbname', 'username', 'password', 'host'], str]:
     """Get database credentials from Secret Manager."""
     try:
         secret_path = SECRET_CLIENT.secret_version_path(
@@ -54,13 +55,13 @@ async def execute_liquibase(
     db_name = credentials['dbname']
 
     # Temporary file creation with XML content
-    with tempfile.TemporaryDirectory() as tempdir:
+    with tempfile.TemporaryDirectory() as tempdir:  # noqa: SIM117
         # Specify the file path within the temporary directory
-        with contextlib.chdir(tempdir):  # pylint: disable=E1101
-            with open(changelog_file, 'wb') as temp_file:
+        with contextlib.chdir(tempdir):
+            with open(changelog_file, 'wb') as temp_file:  # noqa: PTH123
                 temp_file.write(xml_content)
                 temp_file_path = temp_file.name  # Store file path to use later
-                remote_file_path = os.path.basename(temp_file_path)
+                remote_file_path = os.path.basename(temp_file_path)  # noqa: PTH119
 
             # The actual command to run on the VM
             liquibase_command = [
@@ -88,7 +89,7 @@ async def execute_liquibase(
                 logger.log_text(
                     f'Liquibase update successful: {result.stdout}', severity='INFO'
                 )
-                os.remove(temp_file_path)
+                os.remove(temp_file_path)  # noqa: PTH107
                 return {
                     'message': 'Liquibase update executed successfully',
                     'output': result.stdout,
@@ -102,4 +103,4 @@ async def execute_liquibase(
 if __name__ == '__main__':
     import uvicorn
 
-    uvicorn.run(app, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+    uvicorn.run(app, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))  # noqa: PLW1508

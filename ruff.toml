@@ -1,40 +1,3 @@
-[project]
-name = "metamist-root"
-version = "7.13.4"
-requires-python = "==3.11.*"
-dependencies = [
-    "backoff>=2.2.1",
-    "cpg-utils>=5.1.0",
-    "google-auth>=2.19.0",
-    "click>=8.1.8",
-    "google-api-core[grpc]==2.24.0",
-    "gql[aiohttp,requests]~=3.5",
-    "python-dateutil==2.8.2",
-    "requests~=2.32.4",
-    "tabulate >= 0.9.0",
-    "urllib3>=2.6.3",
-    "setuptools>=80.9.0",
-    "aiohttp~=3.13.3",
-    "async-lru>=2.0.5",
-    "boto3>=1.35.12",
-    "botocore>=1.35.12",
-    "cloudpathlib>=0.22.0",
-    "cryptography>=41.0.0",
-    "databases[mysql]==0.9.0",
-    "duckdb~=1.1.3",
-    "fastapi[all]~=0.120.1",
-    "fsspec~=2024.10.0",
-    "google-cloud-bigquery==3.11.4",
-    "google-cloud-logging==2.7.0",
-    "google-cloud-pubsub==2.18.3",
-    "google-cloud-storage==1.43.0",
-    "pyarrow~=18.1",
-    "slack-sdk==3.20.2",
-    "strawberry-graphql[fastapi]==0.268.1",
-    "uvicorn~=0.34.2",
-]
-
-[tool.ruff]
 line-length = 88
 # Make sure linting/formatting changes don't break compatibility with
 # python 3.10 which is the min supported version for the metamist python package
@@ -48,10 +11,10 @@ exclude = [
 
 ]
 
-[tool.ruff.format]
+[format]
 quote-style = "single"
 
-[tool.ruff.lint]
+[lint]
 select = [
     "E",        # pycodestyle errors - https://docs.astral.sh/ruff/rules/#error-e
     "D",        # pydocstyle - https://docs.astral.sh/ruff/rules/#pydocstyle-d
@@ -124,63 +87,26 @@ ignore = [
 ]
 
 
-[tool.ruff.lint.per-file-ignores]
+[lint.per-file-ignores]
 "__init__.py" = ["F401"]
 
 
-[tool.ruff.lint.pylint]
+[lint.pylint]
 max-args = 10
 max-branches = 20
 max-statements = 100
 max-locals = 25
 
-[tool.ruff.lint.flake8-quotes]
+[lint.flake8-quotes]
 inline-quotes = "single"
 multiline-quotes = "double"
 docstring-quotes = "double"
 
-[tool.ruff.lint.isort]
+[lint.isort]
 section-order = ["future", "standard-library", "third-party", "hail", "cpg", "first-party", "local-folder"]
 lines-after-imports = 2
 force-single-line = false
 
-[tool.ruff.lint.isort.sections]
+[lint.isort.sections]
 hail = ["hail", "hailtop"]
 cpg = ["analysis_runner", "cpg_infra", "cpg_utils", "cpg_workflows", "gnomad", "hail_scripts", "metamist"]
-
-[dependency-groups]
-dev = [
-    "bump-my-version>=0.30.0",
-    "coverage>=7.6.10",
-    "functions-framework>=3.8.2",
-    "nest-asyncio>=1.6.0",
-    "openapi-generator-cli==5.3.0",
-    "pre-commit>=4.0.1",
-    "pymysql==1.1.1",
-    "pytest>=8.3.4",
-    "pytest-cov>=6.0.0",
-    "pytz>=2024.2",
-    "testcontainers[mysql]>=4.8.1",
-    "types-pymysql>=1.1.0.20241103",
-    "pip-audit>=2.7.3",
-    "strawberry-graphql[debug-server]==0.268.1",
-    "greenlet==3.1.1",
-    "metamist",
-    "ruff>=0.15.0",
-]
-
-[tool.uv]
-package = false
-constraint-dependencies = [
-    "aiomysql~=0.3.0",
-    "azure-core>=1.38.0",
-    "filelock>=3.20.1",
-    "pyasn1>=0.6.2",
-    "python-multipart>=0.0.22",
-    "starlette>=0.49.1",
-    "virtualenv>=20.36.1",
-    "werkzeug>=3.1.5"
-]
-
-[tool.uv.sources]
-metamist = { path = "packages/metamist", editable = true }

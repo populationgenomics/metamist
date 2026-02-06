@@ -1,8 +1,8 @@
-# pylint: disable=global-statement
 import os
 from functools import lru_cache
 
 from cpg_utils.cloud import read_secret
+
 
 TRUTH_SET = ('1', 'y', 't', 'true')
 

@@ -19,6 +19,7 @@ from models.models.participant import ParticipantUpsert
 from models.models.project import FullWriteAccessRoles, ReadAccessRoles
 from models.models.sequencing_group import sequencing_group_id_format
 
+
 router = APIRouter(prefix='/participant', tags=['participant'])
 
 
@@ -46,7 +47,6 @@ async def get_individual_metadata_template_for_seqr(
     project: str,
     export_type: ExportType = ExportType.JSON,
     external_participant_ids: list[str] | None = Query(default=None),  # type: ignore[assignment]
-    # pylint: disable=invalid-name
     replace_with_participant_external_ids: bool = True,
     connection: Connection = get_project_db_connection(ReadAccessRoles),
 ):

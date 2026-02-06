@@ -1,14 +1,15 @@
 """Core audit analysis business logic."""
 
-from .file_matcher import FileMatchingService
 from metamist.audit.models import (
-    SequencingGroup,
     Analysis,
     AuditReportEntry,
     AuditResult,
     FileMetadata,
     MovedFile,
+    SequencingGroup,
 )
+
+from .file_matcher import FileMatchingService
 
 
 class AuditAnalyzer:

@@ -1,15 +1,16 @@
 from io import StringIO
-from test.testbase import DbIsolatedTest, run_as_sync
 from unittest.mock import patch
 
-from db.python.layers import ParticipantLayer
 from metamist.parser.generic_parser import ParsedParticipant
+
+from db.python.layers import ParticipantLayer
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
     ParticipantUpsertInternal,
     SampleUpsertInternal,
 )
 from scripts.parse_ont_sheet import OntParser
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 class TestOntSampleSheetParser(DbIsolatedTest):

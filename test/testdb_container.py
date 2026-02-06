@@ -1,4 +1,5 @@
 import socket
+
 from testcontainers.mysql import MySqlContainer
 
 
@@ -13,7 +14,7 @@ class TestDatabaseContainer:
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(TestDatabaseContainer, cls).__new__(cls)
+            cls._instance = super(TestDatabaseContainer, cls).__new__(cls)  # noqa: UP008
         return cls._instance
 
     def _find_free_port(self):

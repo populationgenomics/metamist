@@ -1,6 +1,5 @@
 import codecs
 import csv
-from typing import Optional
 
 from fastapi import APIRouter, File, UploadFile
 
@@ -12,6 +11,7 @@ from db.python.layers.participant import (
 )
 from models.models.project import FullWriteAccessRoles
 
+
 router = APIRouter(prefix='/import', tags=['import'])
 
 
@@ -22,7 +22,7 @@ router = APIRouter(prefix='/import', tags=['import'])
 )
 async def import_individual_metadata_manifest(
     file: UploadFile = File(...),
-    delimiter: Optional[str] = None,
+    delimiter: str | None = None,
     extra_participants_method: ExtraParticipantImporterHandler = ExtraParticipantImporterHandler.FAIL,
     connection: Connection = get_project_db_connection(FullWriteAccessRoles),
 ):

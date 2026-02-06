@@ -1,5 +1,3 @@
-# pylint: disable=redefined-builtin, import-outside-toplevel
-
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
@@ -7,6 +5,7 @@ from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
 from db.python.layers.comment import CommentLayer
+
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLComment
@@ -25,7 +24,7 @@ class CommentMutations:
     ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
         """Adds a comment to a thread on an existing comment"""
         # Import needed here to avoid circular import
-        from api.graphql.schema import GraphQLComment
+        from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
         connection = info.context['connection']
         comment_layer = CommentLayer(connection)
@@ -41,7 +40,7 @@ class CommentMutations:
     ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
         """Updates the content of an existing comment"""
         # Import needed here to avoid circular import
-        from api.graphql.schema import GraphQLComment
+        from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
         connection = info.context['connection']
         comment_layer = CommentLayer(connection)
@@ -55,7 +54,7 @@ class CommentMutations:
     ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
         """Soft-deletes an existing comment"""
         # Import needed here to avoid circular import
-        from api.graphql.schema import GraphQLComment
+        from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
         connection = info.context['connection']
         comment_layer = CommentLayer(connection)
@@ -68,7 +67,7 @@ class CommentMutations:
     ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
         """Restores a previously deleted comment"""
         # Import needed here to avoid circular import
-        from api.graphql.schema import GraphQLComment
+        from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
         connection = info.context['connection']
         comment_layer = CommentLayer(connection)

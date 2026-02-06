@@ -14,6 +14,7 @@ from db.python.connect import Connection, SMConnections
 from db.python.gcp_connect import BqConnection, PubSubConnection
 from models.models.project import ProjectMemberRole
 
+
 EXPECTED_AUDIENCE = getenv('SM_OAUTHAUDIENCE')
 
 

@@ -1,5 +1,5 @@
 import csv
-from typing import Optional
+
 
 EXTENSION_TO_DELIM_MAP = {
     '.csv': ',',
@@ -8,7 +8,7 @@ EXTENSION_TO_DELIM_MAP = {
 }
 
 
-def guess_delimiter_by_filename(filename: str, raise_exception=True) -> Optional[str]:
+def guess_delimiter_by_filename(filename: str, raise_exception=True) -> str | None:
     """
     Guess the delimiter from a filename
     """
@@ -28,8 +28,8 @@ def guess_delimiter_by_filename(filename: str, raise_exception=True) -> Optional
 
 
 def guess_delimiter_by_upload_file_obj(
-    file, default_delimiter: Optional[str] = None, raise_exception: bool = True
-) -> Optional[str]:
+    file, default_delimiter: str | None = None, raise_exception: bool = True
+) -> str | None:
     """
     Guess delimiter from uploaded file object, as a convenience, allow specifying
     a default_delimiter, and do transformations based on that (eg: un-escaping backslash)
@@ -37,7 +37,7 @@ def guess_delimiter_by_upload_file_obj(
     if default_delimiter:
         return default_delimiter.replace('\\t', '\t')
 
-    filename_delimiter: Optional[str] = guess_delimiter_by_filename(
+    filename_delimiter: str | None = guess_delimiter_by_filename(
         file.filename, raise_exception=False
     )
 

@@ -1,9 +1,8 @@
-# pylint: disable=too-many-instance-attributes
 from collections import defaultdict
 from datetime import date
-from dateutil.relativedelta import relativedelta
 from typing import Any
 
+from dateutil.relativedelta import relativedelta
 
 from db.python.filters.generic import GenericFilter
 from db.python.filters.sequencing_group import SequencingGroupFilter
@@ -152,7 +151,7 @@ class SequencingGroupTable(DbBase):
         )
         wheres.append(fwheres)
 
-        _query.append(f"WHERE {' AND '.join(wheres)}")
+        _query.append(f'WHERE {" AND ".join(wheres)}')
         query_values.update(values)
 
         if limit:
@@ -581,7 +580,7 @@ GROUP BY sg.type
         rows = await self.connection.fetch_all(_query, values)
 
         if not rows:
-            return defaultdict(lambda: {})
+            return defaultdict(dict)
 
         # Organise the data by month into a dictionary, grouping sequencing group types together by month.
         project_histories: dict[ProjectId, dict[date, dict[str, int]]] = defaultdict(

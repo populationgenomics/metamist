@@ -1,16 +1,17 @@
 from datetime import datetime
 from io import StringIO
-from test.testbase import DbIsolatedTest, run_as_sync
 from unittest.mock import patch
 
-from db.python.layers import ParticipantLayer
 from metamist.parser.generic_parser import ParsedParticipant
+
+from db.python.layers import ParticipantLayer
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
     ParticipantUpsertInternal,
     SampleUpsertInternal,
 )
 from scripts.parse_existing_cohort import Columns, ExistingCohortParser
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 class TestExistingCohortParser(DbIsolatedTest):
@@ -103,7 +104,6 @@ class TestExistingCohortParser(DbIsolatedTest):
         assay = sample_to_add.sequencing_groups[0].assays[0]
         self.maxDiff = None
         self.assertDictEqual(expected_sequence_dict, assay.meta)
-        return
 
     @run_as_sync
     async def test_no_header(self):
@@ -135,7 +135,6 @@ class TestExistingCohortParser(DbIsolatedTest):
             await parser.parse_manifest(
                 StringIO(file_contents), delimiter='\t', dry_run=True
             )
-        return
 
     # TODO mfranklin / vivbak: this test is failing because of change in the parsers
     #   to exclude absolute paths (as absolute paths are NOT in the file map).
@@ -240,8 +239,6 @@ class TestExistingCohortParser(DbIsolatedTest):
         self.assertEqual(1, summary.assays.insert)
         self.assertEqual(1, summary.samples.update)
         self.assertEqual(0, summary.assays.update)
-
-        return
 
     @run_as_sync
     async def test_get_read_filenames_no_reads_fail(self):
@@ -402,4 +399,3 @@ class TestExistingCohortParser(DbIsolatedTest):
                 assay = sample_to_add.sequencing_groups[0].assays[0]
                 self.maxDiff = None
                 self.assertDictEqual(expected_sequence_dict, assay.meta)
-        return
