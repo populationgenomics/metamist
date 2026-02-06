@@ -235,8 +235,8 @@ class FamilyTable(DbBase):
                     if external_ids is None:
                         external_ids = {}
 
-            to_delete = [k.lower() for k, v in external_ids.items() if v is None]
-            to_update = {k.lower(): v for k, v in external_ids.items() if v is not None}
+                    to_delete = [k.lower() for k, v in external_ids.items() if v is None]
+                    to_update = {k.lower(): v for k, v in external_ids.items() if v is not None}
 
                     if to_delete:
                         # psycopg does no support executing multiple parameterized statements in a single execution
