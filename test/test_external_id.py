@@ -323,7 +323,7 @@ class TestSample:
         }
 
         async with connection_with_project.pool.connection() as conn:
-            conn.execute(query, values)
+            await conn.execute(query, values)
 
     @pytest.mark.asyncio
     async def test_constraints(self):

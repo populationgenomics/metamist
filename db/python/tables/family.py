@@ -45,7 +45,9 @@ class FamilyTable(DbBase):
             raise ValueError('Received no family IDs to get project ids for')
 
         async with self.connection.pool.connection() as conn:
-            rows = await conn.execute(_query, {'family_ids': family_ids}).fetchall()
+            rows = await (
+                await conn.execute(_query, {'family_ids': family_ids})
+            ).fetchall()
 
         projects = set(r['project'] for r in rows)
 
@@ -163,13 +165,15 @@ class FamilyTable(DbBase):
             LIMIT %(limit)s
         """
         async with self.connection.pool.connection() as conn:
-            rows = await conn.execute(
-                _query,
-                {
-                    'project_ids': project_ids,
-                    'search_pattern': escape_like_term(query) + '%',
-                    'limit': limit,
-                },
+            rows = await (
+                await conn.execute(
+                    _query,
+                    {
+                        'project_ids': project_ids,
+                        'search_pattern': escape_like_term(query) + '%',
+                        'limit': limit,
+                    },
+                )
             ).fetchall()
 
         return [(r['project'], r['family_id'], r['external_id']) for r in rows]
@@ -189,7 +193,9 @@ class FamilyTable(DbBase):
         """
 
         async with self.connection.pool.connection() as conn:
-            rows = await conn.execute(_query, {'pids': participant_ids}).fetchall()
+            rows = await (
+                await conn.execute(_query, {'pids': participant_ids})
+            ).fetchall()
 
         result = defaultdict(list)
         for r in rows:
@@ -204,7 +210,7 @@ class FamilyTable(DbBase):
         coded_phenotype: str | None = None,
     ) -> bool:
         """Update values for a family"""
-        audit_log_id = await self.audit_log_id()
+        audit_log_id = await self.audit_log_id() # TODO piyumi: check how this works
 
         values: Dict[str, Any] = {'audit_log_id': audit_log_id}
         if description:
@@ -423,14 +429,17 @@ class FamilyTable(DbBase):
         if not family_ids:
             return {}
 
-        async with self.connection.pool.connection() as conn:
-            results = await conn.execute(
-                """
+        _query = """
                     SELECT external_id, family_id AS id FROM family_external_id
                     WHERE external_id = ANY(%(external_ids)s) AND project = %(project)s
-                """,
-                {'external_ids': family_ids, 'project': project or self.project_id},
-            ).fetchall()
+                """
+        _parameters = {
+            'external_ids': family_ids,
+            'project': project or self.project_id,
+        }
+
+        async with self.connection.pool.connection() as conn:
+            results = await (await conn.execute(_query, _parameters)).fetchall()
 
         id_map = {r['external_id']: r['id'] for r in results}
 
@@ -455,15 +464,14 @@ class FamilyTable(DbBase):
         if len(family_ids) == 0:
             return {}
 
-        async with self.connection.pool.connection() as conn:
-            results = await conn.execute(
-                """
+        _query = """
                         SELECT family_id, external_id
                         FROM family_external_id
                         WHERE family_id = ANY(%(ids)s) AND name = %(PRIMARY_EXTERNAL_ORG)s
-                    """,
-                {'ids': family_ids, 'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG},
-            ).fetchall()
+                """
+        _parameters = {'ids': family_ids, 'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG}
+        async with self.connection.pool.connection() as conn:
+            results = await (await conn.execute(_query, _parameters)).fetchall()
 
         id_map = {r['family_id']: r['external_id'] for r in results}
         if not allow_missing and len(id_map) != len(family_ids):

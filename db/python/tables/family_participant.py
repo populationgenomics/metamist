@@ -54,7 +54,7 @@ class FamilyParticipantTable(DbBase):
         _query = f"""INSERT INTO family_participant ({str_keys}) VALUES ({placeholder_keys})"""
 
         async with self.connection.pool.connection() as conn:
-            conn.execute(_query, updater)
+            await conn.execute(_query, updater)
 
         return family_id, participant_id
 
@@ -174,8 +174,8 @@ class FamilyParticipantTable(DbBase):
                     WHERE fp.participant_id = ANY(%(participant_ids)s)
                 """
         async with self.connection.pool.connection() as conn:
-            rows = await conn.execute(
-                _query, {'participant_ids': participant_ids}
+            rows = await (
+                await conn.execute(_query, {'participant_ids': participant_ids})
             ).fetchall()
 
         projects = set(r['project'] for r in rows)
