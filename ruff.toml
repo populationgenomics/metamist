@@ -13,6 +13,7 @@ exclude = [
 quote-style = "single"
 
 [lint]
+future-annotations = true
 select = [
     "E",        # pycodestyle errors - https://docs.astral.sh/ruff/rules/#error-e
     "D",        # pydocstyle - https://docs.astral.sh/ruff/rules/#pydocstyle-d
