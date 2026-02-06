@@ -2,12 +2,10 @@ from typing import TYPE_CHECKING, Any
 
 from psycopg import sql
 from psycopg.rows import class_row
-from psycopg.types.enum import EnumInfo, register_enum
 
 from db.python.utils import Forbidden, get_logger
 from models.models.project import (
     Project,
-    ProjectMemberRole,
     ProjectMemberUpdate,
     project_member_role_names,
 )
@@ -99,13 +97,6 @@ class ProjectPermissionsTable:
 
         async with self.connection.pool.connection() as conn:
             async with conn.cursor(row_factory=class_row(Project)) as acur:
-                info = await EnumInfo.fetch(conn, 'project_member_role')
-                if info is None:
-                    raise ValueError(
-                        "Enum type 'project_member_role' not found in database"
-                    )
-                register_enum(info, acur, ProjectMemberRole)
-
                 await acur.execute(_query, parameters)
 
                 projects = await acur.fetchall()

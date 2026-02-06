@@ -10,6 +10,7 @@ from collections.abc import Iterable
 
 from psycopg import AsyncConnection
 from psycopg.rows import DictRow, dict_row
+from psycopg.types.enum import EnumInfo, register_enum
 from psycopg_pool import AsyncConnectionPool
 
 from api.settings import DB_POOL_MAX_SIZE, DB_POOL_MIN_SIZE
@@ -20,6 +21,7 @@ from db.python.utils import (
     NotFoundError,
     ProjectDoesNotExist,
 )
+from models.enums.analysis import AnalysisStatus
 from models.models.project import Project, ProjectId, ProjectMemberRole
 
 
@@ -312,6 +314,24 @@ async def configure_pg_connection(connection: AsyncConnection):
     async with connection:
         await connection.set_autocommit(True)
         await connection.execute(f'SET search_path TO {MAIN_SCHEMA}, {HISTORY_SCHEMA};')
+
+        # register enums on the connection
+        project_member_role_info = await EnumInfo.fetch(
+            connection, 'project_member_role'
+        )
+        if project_member_role_info is None:
+            raise ValueError("Enum type 'project_member_role' not found in database")
+        register_enum(project_member_role_info, connection, ProjectMemberRole)
+
+        analysis_status_info = await EnumInfo.fetch(connection, 'analysis_status')
+        if analysis_status_info is None:
+            raise ValueError("Enum type 'analysis_status' not found in database")
+        register_enum(
+            analysis_status_info,
+            connection,
+            AnalysisStatus,
+            mapping={m: m.value for m in AnalysisStatus},
+        )
 
 
 class SMConnections:
