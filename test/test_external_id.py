@@ -1,4 +1,3 @@
-from test.testbase import DbIsolatedTest, run_as_sync
 import pytest
 
 from db.python.connect import Connection
@@ -21,8 +20,9 @@ class TestParticipant:
 
     @pytest.mark.asyncio
     @pytest.fixture(autouse=True)
-    async def set_up(self, connection: Connection):
-        self.player = ParticipantLayer(connection)
+    async def set_up(self, connection_with_project: Connection):
+        self.player = ParticipantLayer(connection_with_project)
+        self.project_id = connection_with_project.project_id
 
         self.p1 = await self.player.upsert_participant(
             ParticipantUpsertInternal(
@@ -56,7 +56,7 @@ class TestParticipant:
         }
         await self.connection.connection.execute(query, values)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_constraints(self):
         """Verify that database constraints prevent duplicate external_ids"""
         # Can't have two primary eids
@@ -79,7 +79,7 @@ class TestParticipant:
         # But it can have its own eid
         await self.insert(self.p2.id, 'CONTROL', '99')
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_insert(self):
         """Test inserting new participants with various external_id combinations"""
         with pytest.raises(ValueError):
@@ -111,7 +111,7 @@ class TestParticipant:
             'c': 'C1',
         }
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_update(self):
         """Test updating existing participants with various external_id combinations"""
         with pytest.raises(ValueError):
@@ -141,7 +141,7 @@ class TestParticipant:
             'c': 'A1',
         }
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_fill_in_missing(self):
         """Exercise fill_in_missing_participants() method"""
         slayer = SampleLayer(self.connection)
@@ -226,7 +226,7 @@ class TestParticipant:
         assert len(result[child.id]) == 1
         assert result[child.id][0].description == 'Blacksmiths'
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_update_many(self):
         """Exercise update_many_participant_external_ids() method"""
         result = await self.player.update_many_participant_external_ids(
@@ -282,13 +282,14 @@ class TestParticipant:
             assert sgid == s2.sequencing_groups[0].id
 
 
-class TestSample(DbIsolatedTest):
+class TestSample:
     """Test sample external ids"""
 
     @pytest.mark.asyncio
     @pytest.fixture(autouse=True)
-    async def set_up(self, connection: Connection):
-        self.slayer = SampleLayer(connection)
+    async def set_up(self, connection_with_project: Connection):
+        self.slayer = SampleLayer(connection_with_project)
+        self.project_id = connection_with_project.project_id
 
         self.s1 = await self.slayer.upsert_sample(
             SampleUpsertInternal(
@@ -307,20 +308,22 @@ class TestSample(DbIsolatedTest):
         )
 
     @pytest.mark.asyncio
-    async def insert(self, sample_id, org, external_id):
+    async def insert(self, sample_id, org, external_id, connection_with_project):
         """Directly insert into sample_external_id table"""
         query = """
         INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
-        VALUES (:project, :id, :org, :external_id, :audit_log_id)
+        VALUES (%(project)s, %(id)s, %(org)s, %(external_id)s, %(audit_log_id))
         """
         values = {
-            'project': self.project_id,
+            'project': connection_with_project.project_id,
             'id': sample_id,
             'org': org,
             'external_id': external_id,
-            'audit_log_id': await self.audit_log_id(),
+            'audit_log_id': await connection_with_project.audit_log_id(),
         }
-        await self.connection.connection.execute(query, values)
+
+        async with connection_with_project.pool.connection() as conn:
+            conn.execute(query, values)
 
     @pytest.mark.asyncio
     async def test_constraints(self):
@@ -473,6 +476,7 @@ class TestFamily:
         connection_with_project: Connection,
     ):
         self.flayer = FamilyLayer(connection_with_project)
+        self.project_id = connection_with_project.project_id
 
     @pytest.mark.asyncio
     async def test_create_update(self) -> None:
@@ -535,7 +539,7 @@ class TestFamily:
         )
 
         result = await self.flayer.query(
-            FamilyFilter(project=GenericFilter(eq=connection_with_project.project_id))
+            FamilyFilter(project=GenericFilter(eq=self.project_id))
         )
         assert len(result) == 3
         family = {f.external_ids[PRIMARY_EXTERNAL_ORG]: f for f in result}
@@ -555,7 +559,7 @@ class TestFamily:
         )
 
         result = await self.flayer.query(
-            FamilyFilter(project=GenericFilter(eq=connection_with_project.project_id))
+            FamilyFilter(project=GenericFilter(eq=self.project_id))
         )
         assert len(result) == 4
         family = {f.external_ids[PRIMARY_EXTERNAL_ORG]: f for f in result}

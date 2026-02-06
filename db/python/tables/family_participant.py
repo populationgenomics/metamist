@@ -50,16 +50,11 @@ class FamilyParticipantTable(DbBase):
         keys = list(updater.keys())
         str_keys = ', '.join(keys)
         placeholder_keys = ', '.join(f'%({k})s' for k in keys)
-        _query = f"""
-INSERT INTO family_participant
-    ({str_keys})
-VALUES
-    ({placeholder_keys})
-        """
+
+        _query = f"""INSERT INTO family_participant ({str_keys}) VALUES ({placeholder_keys})"""
 
         async with self.connection.pool.connection() as conn:
-            async with conn.cursor() as curr:
-                await curr.execute(_query, updater)
+            conn.execute(_query, updater)
 
         return family_id, participant_id
 
@@ -104,19 +99,18 @@ VALUES
                 if k not in ignore_keys_during_update
             )
 
-            # TODO:piyumi ON CONFLICT(participant_id), for primary key
+            # TODO:piyumi ON CONFLICT(participant_id) primary key
             _query = f"""
-INSERT INTO family_participant
-    ({str_keys})
-VALUES
-    ({placeholder_keys})
-ON CONFLICT(participant_id)
-DO UPDATE SET
-    {update_keys}
-    """
+                    INSERT INTO family_participant
+                        ({str_keys})
+                    VALUES
+                        ({placeholder_keys})
+                    ON CONFLICT(participant_id)
+                    DO UPDATE SET
+                        {update_keys}
+                    """
             async with self.connection.pool.connection() as conn:
-                async with conn.cursor() as curr:
-                    await curr.execute(_query, remapped_ds)
+                await conn.execute(_query, remapped_ds)
 
         return True
 
@@ -174,15 +168,15 @@ DO UPDATE SET
             return set(), {}
 
         _query = """
-SELECT p.project, p.id, fp.family_id
-FROM family_participant fp
-INNER JOIN participant p ON p.id = fp.participant_id
-WHERE fp.participant_id in :participant_ids
-"""
+                    SELECT p.project, p.id, fp.family_id
+                    FROM family_participant fp
+                    INNER JOIN participant p ON p.id = fp.participant_id
+                    WHERE fp.participant_id = ANY(%(participant_ids)s)
+                """
         async with self.connection.pool.connection() as conn:
-            async with conn.cursor() as curr:
-                await curr.execute(_query, {'participant_ids': participant_ids})
-                rows = await curr.fetchall()
+            rows = await conn.execute(
+                _query, {'participant_ids': participant_ids}
+            ).fetchall()
 
         projects = set(r['project'] for r in rows)
         conflicts: dict[int, list[int]] = {}
@@ -224,19 +218,17 @@ WHERE fp.participant_id in :participant_ids
         """
 
         async with self.connection.pool.connection() as conn:
-            async with conn.cursor() as cur:
-                # committed separately as autocommit = True
-                cur.execute(
-                    _update_before_delete,
-                    {
-                        'family_id': family_id,
-                        'participant_id': participant_id,
-                        'audit_log_id': await self.audit_log_id(),
-                    },
-                )
+            await conn.execute(
+                _update_before_delete,
+                {
+                    'family_id': family_id,
+                    'participant_id': participant_id,
+                    'audit_log_id': await self.audit_log_id(),
+                },
+            )
 
-                cur.execute(
-                    _query, {'family_id': family_id, 'participant_id': participant_id}
-                )
+            await conn.execute(
+                _query, {'family_id': family_id, 'participant_id': participant_id}
+            )
 
         return True

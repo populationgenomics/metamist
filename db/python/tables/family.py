@@ -38,19 +38,14 @@ class FamilyTable(DbBase):
         """Get project IDs for sampleIds (mostly for checking auth)"""
         _query = """
             SELECT project FROM family
-            WHERE id in %(family_ids)s
+            WHERE id = ANY(%(family_ids)s)
             GROUP BY project
         """
         if len(family_ids) == 0:
             raise ValueError('Received no family IDs to get project ids for')
 
         async with self.connection.pool.connection() as conn:
-            async with conn.cursor() as curr:
-                await curr.execute(_query, {'family_ids': family_ids})
-                rows = await curr.fetchall()
-
-        # async with self._execute(_query, {'family_ids': family_ids}) as curr:
-        #     rows = await curr.fetchall()
+            rows = await conn.execute(_query, {'family_ids': family_ids}).fetchall()
 
         projects = set(r['project'] for r in rows)
 
@@ -109,8 +104,6 @@ class FamilyTable(DbBase):
         """
 
         async with self.connection.pool.connection() as conn:
-            # TODO: remove comment later. INNER JOIN family_external_id with family.
-            #  feid.name, feid.external_id are NOT NULL  -> external_ids won't encounter NulL scenarios -> safe to remove from_db
             async with conn.cursor(row_factory=class_row(FamilyInternal)) as curr:
                 await curr.execute(_query, values)
                 family_internal_list = await curr.fetchall()
@@ -134,9 +127,7 @@ class FamilyTable(DbBase):
             return set(), {}
 
         _query = """
-            SELECT
-                f.id,
-                jsonb_object_agg(feid.name, feid.external_id) AS external_ids,
+            SELECT f.id, jsonb_object_agg(feid.name, feid.external_id) AS external_ids,
                 f.description, f.coded_phenotype, f.project, fp.participant_id
             FROM family f
             INNER JOIN family_external_id feid ON f.id = feid.family_id
@@ -148,8 +139,6 @@ class FamilyTable(DbBase):
         projects: set[ProjectId] = set()
 
         async with self.connection.pool.connection() as conn:
-            # TODO: remove comment later. INNER JOIN family_external_id with family.
-            #  feid.name, feid.external_id are NOT NULL  -> external_ids won't encounter NulL scenarios -> safe to remove from_db
             async with conn.cursor(row_factory=class_row(FamilyInternal)) as curr:
                 await curr.execute(_query, {'pids': participant_ids})
                 family_internal_list = await curr.fetchall()
@@ -166,7 +155,7 @@ class FamilyTable(DbBase):
         """
         Search by some term, return [ProjectId, FamilyId, ExternalId]
         """
-        # TODO:piyumi ILIKE for case insensitive matches
+        # TODO piyumi: remove comment later-ILIKE for case insensitive matches (mariadb:11.7.2 default collation utf8mb4_uca1400_ai_ci)
         _query = """
             SELECT project, family_id, external_id
             FROM family_external_id
@@ -174,16 +163,14 @@ class FamilyTable(DbBase):
             LIMIT %(limit)s
         """
         async with self.connection.pool.connection() as conn:
-            async with conn.cursor() as curr:
-                await curr.execute(
-                    _query,
-                    {
-                        'project_ids': project_ids,
-                        'search_pattern': escape_like_term(query) + '%',
-                        'limit': limit,
-                    },
-                )
-                rows = await curr.fetchall()
+            rows = await conn.execute(
+                _query,
+                {
+                    'project_ids': project_ids,
+                    'search_pattern': escape_like_term(query) + '%',
+                    'limit': limit,
+                },
+            ).fetchall()
 
         return [(r['project'], r['family_id'], r['external_id']) for r in rows]
 
@@ -202,9 +189,7 @@ class FamilyTable(DbBase):
         """
 
         async with self.connection.pool.connection() as conn:
-            async with conn.cursor() as curr:
-                await curr.execute(_query, {'pids': participant_ids})
-                rows = await curr.fetchall()
+            rows = await conn.execute(_query, {'pids': participant_ids}).fetchall()
 
         result = defaultdict(list)
         for r in rows:
@@ -271,12 +256,11 @@ class FamilyTable(DbBase):
 
                     if to_update:
                         await curr.execute(
-                            'SELECT project FROM family WHERE id = %(id)s',
-                            {'id': id_},
+                            'SELECT project FROM family WHERE id = %(id)s', {'id': id_}
                         )
                         project = await curr.fetchone()
 
-                        # TODO:piyumi ON CONFLICT with primary key
+                        # # TODO piyumi: remove comment later- ON CONFLICT set to primary key
                         _update_query = """
                             INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
                             VALUES (%(project)s, %(id)s, %(name)s, %(external_id)s, %(audit_log_id)s)
@@ -299,11 +283,7 @@ class FamilyTable(DbBase):
 
                     setters = ', '.join(f'{field} = %({field})s' for field in values)
                     await curr.execute(
-                        f"""
-                        UPDATE family
-                        SET {setters}
-                        WHERE id = %(id)s
-                        """,
+                        f"""UPDATE family SET {setters} WHERE id = %(id)s""",
                         {**values, 'id': id_},
                     )
 
@@ -373,7 +353,7 @@ class FamilyTable(DbBase):
         """
         audit_log_id = await self.audit_log_id()
 
-        # base level autocommit=true -> these individual executes will be committed independently
+        # each query executes independently
         async with self.connection.pool.connection() as conn:
             async with conn.cursor(row_factory=scalar_row) as curr:
                 for eid, descr, cph in zip(
@@ -422,9 +402,7 @@ class FamilyTable(DbBase):
                         await curr.execute(
                             """
                             UPDATE family
-                                SET description = %(description)s,
-                                    coded_phenotype = %(coded_phenotype)s,
-                                    audit_log_id = %(audit_log_id)s
+                                SET description = %(description)s, coded_phenotype = %(coded_phenotype)s, audit_log_id = %(audit_log_id)s
                                 WHERE id = %(id)s
                             """,
                             {
@@ -446,17 +424,13 @@ class FamilyTable(DbBase):
             return {}
 
         async with self.connection.pool.connection() as conn:
-            async with conn.cursor() as curr:
-                await curr.execute(
-                    """
-                    SELECT external_id, family_id AS id
-                        FROM family_external_id
-                        WHERE external_id = ANY(%(external_ids)s) AND project = %(project)s
+            results = await conn.execute(
+                """
+                    SELECT external_id, family_id AS id FROM family_external_id
+                    WHERE external_id = ANY(%(external_ids)s) AND project = %(project)s
                 """,
-                    {'external_ids': family_ids, 'project': project or self.project_id},
-                )
-
-                results = await curr.fetchall()
+                {'external_ids': family_ids, 'project': project or self.project_id},
+            ).fetchall()
 
         id_map = {r['external_id']: r['id'] for r in results}
 
@@ -482,16 +456,14 @@ class FamilyTable(DbBase):
             return {}
 
         async with self.connection.pool.connection() as conn:
-            async with conn.cursor() as curr:
-                await curr.execute(
-                    """
+            results = await conn.execute(
+                """
                         SELECT family_id, external_id
                         FROM family_external_id
                         WHERE family_id = ANY(%(ids)s) AND name = %(PRIMARY_EXTERNAL_ORG)s
                     """,
-                    {'ids': family_ids, 'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG},
-                )
-                results = await curr.fetchall()
+                {'ids': family_ids, 'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG},
+            ).fetchall()
 
         id_map = {r['family_id']: r['external_id'] for r in results}
         if not allow_missing and len(id_map) != len(family_ids):

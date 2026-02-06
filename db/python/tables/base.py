@@ -1,9 +1,7 @@
 from collections import defaultdict
 from contextlib import asynccontextmanager
-from typing import Dict, Any, AsyncGenerator
 
-from psycopg import AsyncCursor, AsyncConnection
-from psycopg.rows import dict_row, AsyncRowFactory
+from psycopg import AsyncConnection
 
 from db.python.connect import Connection
 from db.python.utils import InternalError
@@ -72,21 +70,6 @@ class DbBase:
             by_id[id_value].append(AuditLogInternal.from_db(row))
 
         return by_id
-
-    @asynccontextmanager
-    async def _execute(
-        self,
-        query: str,
-        params: Dict[Any, Any] | None = None,
-        row_factory: AsyncRowFactory[Any] | None = dict_row,
-    ) -> AsyncGenerator[AsyncCursor]:
-        """
-        A Not so rich function to remove redundant async code
-        """
-        async with self.connection.pool.connection() as conn:
-            async with conn.cursor(row_factory=row_factory) as cur:
-                await cur.execute(query=query, params=params)
-                yield cur
 
     @asynccontextmanager
     async def _get_connection(self, conn: AsyncConnection = None):
