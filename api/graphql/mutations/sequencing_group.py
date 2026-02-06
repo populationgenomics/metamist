@@ -50,8 +50,8 @@ class SequencingGroupMutations:
         self,
         content: str,
         id: str,
-        info: Info[GraphQLContext, 'SequencingGroupMutations'],
-    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+        info: Info[GraphQLContext, SequencingGroupMutations],
+    ) -> Annotated[GraphQLComment, strawberry.lazy('api.graphql.schema')]:
         """Add a comment to a sequencing group"""
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
@@ -71,7 +71,7 @@ class SequencingGroupMutations:
         project: str,
         sequencing_group: SequencingGroupMetaUpdateInput,
         info: Info,
-    ) -> Annotated['GraphQLSequencingGroup', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated[GraphQLSequencingGroup, strawberry.lazy('api.graphql.schema')]:
         """Update the meta fields of a sequencing group"""
         from api.graphql.schema import GraphQLSequencingGroup  # noqa: PLC0415
 
@@ -104,9 +104,7 @@ class SequencingGroupMutations:
         self,
         sequencing_group_ids: list[str],
         info: Info,
-    ) -> list[
-        Annotated['GraphQLSequencingGroup', strawberry.lazy('api.graphql.schema')]
-    ]:
+    ) -> list[Annotated[GraphQLSequencingGroup, strawberry.lazy('api.graphql.schema')]]:
         """Archive a list of sequencing groups"""
         from api.graphql.schema import GraphQLSequencingGroup  # noqa: PLC0415
 

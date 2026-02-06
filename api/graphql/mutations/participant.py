@@ -25,7 +25,7 @@ class UpdateParticipantFamilyType:
     participant_id: int
 
     @staticmethod
-    def from_tuple(t: tuple[int, int]) -> 'UpdateParticipantFamilyType':
+    def from_tuple(t: tuple[int, int]) -> UpdateParticipantFamilyType:
         """Returns graphql model from tuple"""
         return UpdateParticipantFamilyType(family_id=t[0], participant_id=t[1])
 
@@ -54,8 +54,8 @@ class ParticipantMutations:
         self,
         content: str,
         id: int,
-        info: Info[GraphQLContext, 'ParticipantMutations'],
-    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+        info: Info[GraphQLContext, ParticipantMutations],
+    ) -> Annotated[GraphQLComment, strawberry.lazy('api.graphql.schema')]:
         """Add a comment to a participant"""
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
@@ -73,7 +73,7 @@ class ParticipantMutations:
         participant_id: int,
         participant: ParticipantUpsertInput,
         info: Info,
-    ) -> Annotated['GraphQLParticipant', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated[GraphQLParticipant, strawberry.lazy('api.graphql.schema')]:
         """Update Participant Data"""
         from api.graphql.schema import GraphQLParticipant  # noqa: PLC0415
 
@@ -95,7 +95,7 @@ class ParticipantMutations:
         project: str,
         participants: list[ParticipantUpsertInput],
         info: Info,
-    ) -> list[Annotated['GraphQLParticipant', strawberry.lazy('api.graphql.schema')]]:
+    ) -> list[Annotated[GraphQLParticipant, strawberry.lazy('api.graphql.schema')]]:
         """
         Upserts a list of participants with samples and sequences
         Returns the list of internal sample IDs

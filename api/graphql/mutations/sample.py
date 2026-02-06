@@ -45,8 +45,8 @@ class SampleMutations:
         self,
         content: str,
         id: str,
-        info: Info[GraphQLContext, 'SampleMutations'],
-    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+        info: Info[GraphQLContext, SampleMutations],
+    ) -> Annotated[GraphQLComment, strawberry.lazy('api.graphql.schema')]:
         """Add a comment to a sample"""
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
@@ -66,8 +66,8 @@ class SampleMutations:
         self,
         project: str,
         sample: SampleUpsertInput,
-        info: Info[GraphQLContext, 'SampleMutations'],
-    ) -> Annotated['GraphQLSample', strawberry.lazy('api.graphql.schema')]:
+        info: Info[GraphQLContext, SampleMutations],
+    ) -> Annotated[GraphQLSample, strawberry.lazy('api.graphql.schema')]:
         """Creates a new sample, and returns the internal sample ID"""
         from api.graphql.schema import GraphQLSample  # noqa: PLC0415
 
@@ -90,8 +90,8 @@ class SampleMutations:
         self,
         project: str,
         samples: list[SampleUpsertInput],
-        info: Info[GraphQLContext, 'SampleMutations'],
-    ) -> list[Annotated['GraphQLSample', strawberry.lazy('api.graphql.schema')]] | None:
+        info: Info[GraphQLContext, SampleMutations],
+    ) -> list[Annotated[GraphQLSample, strawberry.lazy('api.graphql.schema')]] | None:
         """
         Upserts a list of samples with sequencing-groups,
         and returns the list of internal sample IDs
@@ -125,8 +125,8 @@ class SampleMutations:
     async def update_sample(
         self,
         sample: SampleUpsertInput,
-        info: Info[GraphQLContext, 'SampleMutations'],
-    ) -> Annotated['GraphQLSample', strawberry.lazy('api.graphql.schema')]:
+        info: Info[GraphQLContext, SampleMutations],
+    ) -> Annotated[GraphQLSample, strawberry.lazy('api.graphql.schema')]:
         """Update sample with id"""
         from api.graphql.schema import GraphQLSample  # noqa: PLC0415
 

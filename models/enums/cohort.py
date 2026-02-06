@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class CohortStatus(str, Enum):
+class CohortStatus(StrEnum):
     """
     Enum for cohort status.
     Based on the Active/Archived status of Sample, SG, CSG tables,
@@ -13,7 +13,7 @@ class CohortStatus(str, Enum):
     invalid = 'invalid'  # when sgs or samples marked archived
 
 
-class CohortUpdateStatus(str, Enum):
+class CohortUpdateStatus(StrEnum):
     """
     Enum for update cohort status.
     """

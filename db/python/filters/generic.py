@@ -2,7 +2,7 @@ import dataclasses
 import re
 from collections.abc import Callable, Sequence
 from enum import Enum
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from db.python.utils import escape_like_term
 from models.base import SMBase
@@ -39,7 +39,7 @@ def get_hashable_value(value):  # noqa: PLR0911
     return hash(value)
 
 
-class GenericFilter(SMBase, Generic[T]):
+class GenericFilter[T](SMBase):
     """
     Generic filter for eq, in_ (in) and nin (not in)
     """
@@ -222,7 +222,7 @@ class GenericFilter(SMBase, Generic[T]):
         # nothing else to do at this itme
         return value
 
-    def transform(self, func: Callable[[T], X]) -> 'GenericFilter[X]':
+    def transform(self, func: Callable[[T], X]) -> GenericFilter[X]:
         """
         Apply a function to each value in the filter
         """

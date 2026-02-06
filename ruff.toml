@@ -1,7 +1,5 @@
 line-length = 88
-# Make sure linting/formatting changes don't break compatibility with
-# python 3.10 which is the min supported version for the metamist python package
-target-version = "py310"
+target-version = "py314"
 
 exclude = [
     "packages/metamist/src/metamist/api/*",
