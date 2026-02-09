@@ -36,7 +36,7 @@ class Connection:
 
     def __init__(
         self,
-        postgres_pool: AsyncConnectionPool[AsyncConnection[DictRow]],
+        connection: AsyncConnection[DictRow],
         project: Project | None,
         project_id_map: dict[ProjectId, Project],
         project_name_map: dict[str, Project],
@@ -45,7 +45,7 @@ class Connection:
         ar_guid: str | None,
         meta: dict[str, str] | None = None,
     ):
-        self.__postgres_pool = postgres_pool
+        self.__connection: AsyncConnection[DictRow] = connection
         self.__project: Project | None = project
         self.__project_id_map = project_id_map
         self.__project_name_map = project_name_map
@@ -57,9 +57,12 @@ class Connection:
         self._audit_log_id: int | None = None
         self._audit_log_lock = asyncio.Lock()
 
+    def __del__(self):
+        self.__connection.pu
+
     @property
-    def pool(self):
-        return self.__postgres_pool
+    def connection(self):
+        return self.__connection
 
     @property
     def project(self):
@@ -360,6 +363,7 @@ class SMConnections:
     @staticmethod
     async def get_connection_with_project(
         *,
+        connection: AsyncConnection[DictRow],
         author: str,
         project_name: str,
         allowed_roles: set[ProjectMemberRole],
@@ -373,7 +377,7 @@ class SMConnections:
 
         # Instantiate connection with some bits missing so that we can check access
         connection = Connection(
-            postgres_pool=SMConnections.get_postgres_pool(),
+            connection=connection,
             author=author,
             project=None,
             project_id_map={},
@@ -392,14 +396,18 @@ class SMConnections:
 
     @staticmethod
     async def get_connection_no_project(
-        author: str, ar_guid: str, meta: dict[str, str], on_behalf_of: str | None
+        connection: AsyncConnection[DictRow],
+        author: str, 
+        ar_guid: str, 
+        meta: dict[str, str], 
+        on_behalf_of: str | None
     ):
         """Get a db connection from a project and user"""
         # maybe it makes sense to perform permission checks here too
         logger.debug(f'Authenticate no-project connection with {author!r}')
 
         connection = Connection(
-            postgres_pool=SMConnections.get_postgres_pool(),
+            connection=connection,
             author=author,
             project=None,
             on_behalf_of=on_behalf_of,
