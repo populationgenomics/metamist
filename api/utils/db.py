@@ -8,6 +8,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from google.auth.transport import requests
 from google.oauth2 import id_token
 
+from psycopg import AsyncConnection
+from psycopg.rows import DictRow
+
 from api.settings import get_default_user
 from api.utils.gcp import email_from_id_token
 from db.python.connect import Connection, SMConnections
@@ -99,14 +102,21 @@ def dependable_get_project_db_connection(allowed_roles: set[ProjectMemberRole]):
         if extra_values:
             meta.update(extra_values)
 
-        return await SMConnections.get_connection_with_project(
-            project_name=project,
-            author=author,
-            allowed_roles=allowed_roles,
-            on_behalf_of=on_behalf_of,
-            ar_guid=ar_guid,
-            meta=meta,
-        )
+        pool = SMConnections.get_postgres_pool()
+        connection: AsyncConnection[DictRow] = pool.getconn()
+
+        try:
+            yield await SMConnections.get_connection_with_project(
+                connection=connection,
+                project_name=project,
+                author=author,
+                allowed_roles=allowed_roles,
+                on_behalf_of=on_behalf_of,
+                ar_guid=ar_guid,
+                meta=meta,
+            )
+        finally:
+            pool.putconn(connection)
 
     return dependable_project_db_connection
 
@@ -126,9 +136,16 @@ async def dependable_get_connection(
     if extra_values:
         meta.update(extra_values)
 
-    return await SMConnections.get_connection_no_project(
-        author, ar_guid=ar_guid, meta=meta, on_behalf_of=on_behalf_of
-    )
+    pool = SMConnections.get_postgres_pool()
+    connection: AsyncConnection[DictRow] = pool.getconn()
+
+    try:
+        yield await SMConnections.get_connection_no_project(
+            connection, author, ar_guid=ar_guid, meta=meta, on_behalf_of=on_behalf_of
+        )
+    finally:
+        pool.putconn(connection)
+
 
 
 async def dependable_get_bq_connection(author: str = Depends(authenticate)):
