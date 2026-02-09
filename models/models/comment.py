@@ -22,7 +22,7 @@ def assume_utc(time: datetime.datetime | None):
     """Update timestamp to use UTC as timezone"""
     if time is None:
         return None
-    return time.replace(tzinfo=datetime.timezone.utc)
+    return time.replace(tzinfo=datetime.UTC)
 
 
 class CommentVersionInternal(SMBase):
@@ -47,10 +47,10 @@ class CommentInternal(SMBase):
     comment_entity_type: CommentEntityType
     comment_entity_id: int
     versions: list[CommentVersionInternal]
-    thread: list['CommentInternal']
+    thread: list[CommentInternal]
     status: CommentStatus
 
-    def add_comment_to_thread(self, comment: 'CommentInternal'):
+    def add_comment_to_thread(self, comment: CommentInternal):
         """Append the provided comment to this comment's thread"""
         self.thread.append(comment)
 

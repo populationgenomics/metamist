@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from models.base import SMBase
 from models.utils import sample_id_format, sequencing_group_id_format
@@ -15,7 +15,7 @@ class AnalysisStatsInternal:
     sg_count: int | None = None
     timestamp: str | datetime | None = None
 
-    def to_external(self) -> Optional['AnalysisStats']:
+    def to_external(self) -> AnalysisStats | None:
         """Convert to transport model"""
         if self.id is None:
             return None

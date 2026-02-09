@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
@@ -79,7 +81,7 @@ class CohortMutations:
         cohort_spec: CohortBodyInput,
         cohort_criteria: CohortCriteriaInput | None = None,
         dry_run: bool = False,
-    ) -> Annotated['GraphQLCohort', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated[GraphQLCohort, strawberry.lazy('api.graphql.schema')]:
         """
         Create a cohort with the given name and sample/sequencing group IDs.
         """
@@ -150,7 +152,7 @@ class CohortMutations:
         project: str,
         template: CohortTemplateInput,
         info: Info,
-    ) -> Annotated['GraphQLCohortTemplate', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated[GraphQLCohortTemplate, strawberry.lazy('api.graphql.schema')]:
         """
         Create a cohort template with the given name and sample/sequencing group IDs.
         """
@@ -208,7 +210,7 @@ class CohortMutations:
         id: str,
         cohort: CohortUpdateBodyInput,
         info: Info,
-    ) -> Annotated['GraphQLCohort', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated[GraphQLCohort, strawberry.lazy('api.graphql.schema')]:
         """Support updating name, description and status of a Cohort"""
 
         from api.graphql.schema import GraphQLCohort  # noqa: PLC0415

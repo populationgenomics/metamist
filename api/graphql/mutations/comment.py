@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
@@ -20,8 +22,8 @@ class CommentMutations:
         self,
         parent_id: int,
         content: str,
-        info: Info[GraphQLContext, 'CommentMutations'],
-    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+        info: Info[GraphQLContext, CommentMutations],
+    ) -> Annotated[GraphQLComment, strawberry.lazy('api.graphql.schema')]:
         """Adds a comment to a thread on an existing comment"""
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
@@ -36,8 +38,8 @@ class CommentMutations:
         self,
         id: int,
         content: str,
-        info: Info[GraphQLContext, 'CommentMutations'],
-    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+        info: Info[GraphQLContext, CommentMutations],
+    ) -> Annotated[GraphQLComment, strawberry.lazy('api.graphql.schema')]:
         """Updates the content of an existing comment"""
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
@@ -50,8 +52,8 @@ class CommentMutations:
 
     @strawberry.mutation
     async def delete_comment(
-        self, id: int, info: Info[GraphQLContext, 'CommentMutations']
-    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+        self, id: int, info: Info[GraphQLContext, CommentMutations]
+    ) -> Annotated[GraphQLComment, strawberry.lazy('api.graphql.schema')]:
         """Soft-deletes an existing comment"""
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
@@ -63,8 +65,8 @@ class CommentMutations:
 
     @strawberry.mutation
     async def restore_comment(
-        self, id: int, info: Info[GraphQLContext, 'CommentMutations']
-    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+        self, id: int, info: Info[GraphQLContext, CommentMutations]
+    ) -> Annotated[GraphQLComment, strawberry.lazy('api.graphql.schema')]:
         """Restores a previously deleted comment"""
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415

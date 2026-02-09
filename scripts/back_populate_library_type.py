@@ -84,7 +84,7 @@ def check_assay_meta_fields(assays: list[dict], update_sequencing_groups: bool):
         try:
             fastq_filename = assay.get('meta').get('reads')[0].get('basename')
 
-        except (TypeError, KeyError):
+        except TypeError, KeyError:
             # Check if this is a bam ingested with a manifest that includes design_description
             if design_description := assay.get('meta', {}).get('design_description'):
                 assay_meta_fields_to_update['library_type'] = design_description

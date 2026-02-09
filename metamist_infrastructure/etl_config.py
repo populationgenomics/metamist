@@ -14,7 +14,7 @@ class EtlConfig:
         default_parameters: dict[str, Any] | None
         users: list[str]
 
-    by_type: dict[str, 'EtlConfigType']
+    by_type: dict[str, EtlConfigType]
 
     def to_dict(self) -> dict[str, dict[str, Any]]:
         """

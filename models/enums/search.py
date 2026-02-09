@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class SearchResponseType(str, Enum):
+class SearchResponseType(StrEnum):
     """Define types of search results"""
 
     FAMILY = 'family'

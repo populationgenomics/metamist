@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
@@ -34,8 +36,8 @@ class AssayMutations:
         self,
         content: str,
         id: int,
-        info: Info[GraphQLContext, 'AssayMutations'],
-    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+        info: Info[GraphQLContext, AssayMutations],
+    ) -> Annotated[GraphQLComment, strawberry.lazy('api.graphql.schema')]:
         """Add a comment to a assay"""
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
@@ -50,7 +52,7 @@ class AssayMutations:
     @strawberry.mutation
     async def create_assay(
         self, assay: AssayUpsertInput, info: Info
-    ) -> Annotated['GraphQLAssay', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated[GraphQLAssay, strawberry.lazy('api.graphql.schema')]:
         """Create new assay, attached to a sample"""
         from api.graphql.schema import GraphQLAssay  # noqa: PLC0415
 
@@ -67,7 +69,7 @@ class AssayMutations:
         self,
         assay: AssayUpsertInput,
         info: Info,
-    ) -> Annotated['GraphQLAssay', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated[GraphQLAssay, strawberry.lazy('api.graphql.schema')]:
         """Update assay for ID"""
         from api.graphql.schema import GraphQLAssay  # noqa: PLC0415
 

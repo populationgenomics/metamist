@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class BillingSource(str, Enum):
+class BillingSource(StrEnum):
     """List of billing sources"""
 
     RAW = 'raw'
@@ -12,7 +12,7 @@ class BillingSource(str, Enum):
     BATCHES = 'batches'
 
 
-class BillingTimePeriods(str, Enum):
+class BillingTimePeriods(StrEnum):
     """List of billing grouping time periods"""
 
     # grouping time periods
@@ -22,7 +22,7 @@ class BillingTimePeriods(str, Enum):
     INVOICE_MONTH = 'invoice_month'
 
 
-class BillingTimeColumn(str, Enum):
+class BillingTimeColumn(StrEnum):
     """List of billing time columns"""
 
     DAY = 'day'

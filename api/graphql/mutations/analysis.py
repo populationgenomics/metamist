@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
@@ -53,8 +55,8 @@ class AnalysisMutations:
         self,
         project: str,
         analysis: AnalysisInput,
-        info: Info[GraphQLContext, 'AnalysisMutations'],
-    ) -> Annotated['GraphQLAnalysis', strawberry.lazy('api.graphql.schema')]:
+        info: Info[GraphQLContext, AnalysisMutations],
+    ) -> Annotated[GraphQLAnalysis, strawberry.lazy('api.graphql.schema')]:
         """Create a new analysis"""
         from api.graphql.schema import GraphQLAnalysis  # noqa: PLC0415
 
@@ -85,8 +87,8 @@ class AnalysisMutations:
         self,
         analysis_id: int,
         analysis: AnalysisUpdateInput,
-        info: Info[GraphQLContext, 'AnalysisMutations'],
-    ) -> Annotated['GraphQLAnalysis', strawberry.lazy('api.graphql.schema')]:
+        info: Info[GraphQLContext, AnalysisMutations],
+    ) -> Annotated[GraphQLAnalysis, strawberry.lazy('api.graphql.schema')]:
         """Update status of analysis"""
         from api.graphql.schema import GraphQLAnalysis  # noqa: PLC0415
 

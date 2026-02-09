@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
@@ -38,8 +40,8 @@ class ProjectMutations:
         self,
         content: str,
         id: int,
-        info: Info[GraphQLContext, 'ProjectMutations'],
-    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+        info: Info[GraphQLContext, ProjectMutations],
+    ) -> Annotated[GraphQLComment, strawberry.lazy('api.graphql.schema')]:
         """Add a comment to a project"""
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
@@ -58,7 +60,7 @@ class ProjectMutations:
         dataset: str,
         create_test_project: bool,
         info: Info,
-    ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated[GraphQLProject, strawberry.lazy('api.graphql.schema')]:
         """
         Create a new project
         """
@@ -92,7 +94,7 @@ class ProjectMutations:
         project: str,
         project_update_model: JSON,
         info: Info,
-    ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated[GraphQLProject, strawberry.lazy('api.graphql.schema')]:
         """Update a project by project name"""
         from api.graphql.schema import GraphQLProject  # noqa: PLC0415
 
@@ -121,7 +123,7 @@ class ProjectMutations:
         project: str,
         members: list[ProjectMemberUpdateInput],
         info: Info,
-    ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated[GraphQLProject, strawberry.lazy('api.graphql.schema')]:
         """
         Update project members for specific read / write group.
         Not that this is protected by access to a specific access group

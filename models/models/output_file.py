@@ -2,7 +2,6 @@ import os
 
 # from pathlib import Path
 import re
-from typing import TypeAlias
 
 from google.api_core.exceptions import NotFound
 from google.cloud.storage import Blob, Client
@@ -12,7 +11,7 @@ from api.settings import METAMIST_GCP_PROJECT
 from models.base import SMBase, parse_sql_bool
 
 
-RecursiveDict: TypeAlias = dict[str, 'str | RecursiveDict']
+type RecursiveDict = dict[str, 'str | RecursiveDict']
 
 GCS_CLIENT = None
 
@@ -158,7 +157,7 @@ class OutputFileInternal(SMBase):
         path: str,
         client: Client | None = None,
         blobs: list[Blob] | None = None,
-    ) -> 'OutputFileInternal | None':
+    ) -> OutputFileInternal | None:
         """Get file info for file at given path"""
         try:
             if not client:
@@ -204,7 +203,7 @@ class OutputFileInternal(SMBase):
                 valid=valid,
                 secondary_files=None,
             )
-        except (FileNotFoundError, ValueError):
+        except FileNotFoundError, ValueError:
             return None
 
     @staticmethod

@@ -66,7 +66,7 @@ _url_families_guid_map = '/api/project/sa/{projectGuid}/families/mapping'
 T = TypeVar('T')
 
 
-def chunk(iterable: Iterable[T], chunk_size=50) -> Iterator[list[T]]:
+def chunk[T](iterable: Iterable[T], chunk_size=50) -> Iterator[list[T]]:
     """Chunk a sequence by yielding lists of `chunk_size`"""
     chnk: list[T] = []
     for element in iterable:

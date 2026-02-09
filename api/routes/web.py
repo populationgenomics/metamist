@@ -175,7 +175,7 @@ def prepare_field_for_export(field_value: Any) -> str:
 
 def prepare_participants_for_export(
     participants: list[NestedParticipant], fields: ExportProjectParticipantFields | None
-) -> Generator[tuple[str, ...], None, None]:
+) -> Generator[tuple[str, ...]]:
     """Prepare participants for export"""
     _fields = fields.fields if fields else None
     if not _fields:

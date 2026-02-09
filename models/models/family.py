@@ -263,7 +263,7 @@ class PedRow:
         return f'PedRow: {self.individual_id} ({self.sex})'
 
     @staticmethod
-    def order(rows: list['PedRow']) -> list['PedRow']:
+    def order(rows: list[PedRow]) -> list[PedRow]:
         """
         Order a list of PedRows, but also validates:
         - There are no circular dependencies
@@ -303,7 +303,7 @@ class PedRow:
         return ordered
 
     @staticmethod
-    def validate_sexes(rows: list['PedRow'], throws=True) -> bool:
+    def validate_sexes(rows: list[PedRow], throws=True) -> bool:
         """
         Validate that individuals listed as mothers and fathers
         have either unknown sex, male if paternal, and female if maternal.
