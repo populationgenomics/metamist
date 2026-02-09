@@ -78,8 +78,7 @@ class AnalysisTable(DbBase):
                 kv_pairs.append(
                     (
                         'timestamp_completed',
-                        timestamp_completed
-                        or datetime.datetime.now(datetime.timezone.utc),
+                        timestamp_completed or datetime.datetime.now(datetime.UTC),
                     )
                 )
 

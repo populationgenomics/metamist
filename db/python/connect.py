@@ -270,7 +270,7 @@ class CredentialedDatabaseConfiguration:
         self.password = password
 
     @staticmethod
-    def dev_config() -> 'CredentialedDatabaseConfiguration':
+    def dev_config() -> CredentialedDatabaseConfiguration:
         """Dev config for local database with name 'sm_dev'"""
         # consider pulling from env variables
         return CredentialedDatabaseConfiguration(

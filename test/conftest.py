@@ -95,7 +95,7 @@ class PostgresContainer(DockerContainer):
         db = database or self.POSTGRES_DB
         return f'postgres://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@localhost:5432/{db}'
 
-    def start(self) -> 'PostgresContainer':
+    def start(self) -> PostgresContainer:
         """Start the container and wait for PostgreSQL to be ready."""
         super().start()
         # Wait for logs first (container startup)
@@ -168,7 +168,7 @@ def janky_patch_for_docker_config() -> None:
 @pytest.fixture(scope='session')
 def postgres_container(
     janky_patch_for_docker_config: None,  # noqa: ARG001
-) -> Generator[PostgresContainer, None, None]:
+) -> Generator[PostgresContainer]:
     """
     Pytest fixture to provide a postgres container to tests. This will run db migrations
     so that all the necessary tables exist in the database that will be used as a template
@@ -194,7 +194,7 @@ def postgres_container(
 
 
 @pytest.fixture
-def test_db_url(postgres_container: PostgresContainer) -> Generator[str, None, None]:
+def test_db_url(postgres_container: PostgresContainer) -> Generator[str]:
     """
     Fixture that creates a fresh database for each test.
 
@@ -224,7 +224,7 @@ def test_db_url(postgres_container: PostgresContainer) -> Generator[str, None, N
 @pytest.fixture
 async def db_pool(
     test_db_url: str,
-) -> AsyncGenerator[AsyncConnectionPool[AsyncConnection[DictRow]], None]:
+) -> AsyncGenerator[AsyncConnectionPool[AsyncConnection[DictRow]]]:
     """
     Async fixture that provides a connection pool for the test database.
     """
@@ -344,7 +344,7 @@ async def seeded_db(
 async def app_client(
     configured_app: FastAPI,
     seeded_db: None,  # Fixture dependency - ensures database is seeded first  # noqa: ARG001
-) -> AsyncGenerator[AsyncClient, None]:
+) -> AsyncGenerator[AsyncClient]:
     """
     Httpx client for making requests to the metamist app.
     """
@@ -365,7 +365,7 @@ class GraphQLQueryFunction(Protocol):
 @pytest.fixture
 async def graphql_query(
     app_client: AsyncClient,
-) -> AsyncGenerator[GraphQLQueryFunction, None]:
+) -> AsyncGenerator[GraphQLQueryFunction]:
     """
     Fixture that provides a function to make GraphQL queries.
     """
@@ -388,7 +388,7 @@ async def connection(
     db_pool: AsyncConnectionPool[AsyncConnection[DictRow]],
     seeded_db: None,  # Fixture dependency - ensures database is seeded first  # noqa: ARG001
     monkeypatch: pytest.MonkeyPatch,
-) -> AsyncGenerator[Connection, None]:
+) -> AsyncGenerator[Connection]:
     """
     Provides a Connection object for direct database layer/table testing.
 
@@ -424,7 +424,7 @@ async def connection_with_project(
     db_pool: AsyncConnectionPool[AsyncConnection[DictRow]],
     seeded_db: None,  # Fixture dependency - ensures database is seeded first  # noqa: ARG001
     monkeypatch: pytest.MonkeyPatch,
-) -> AsyncGenerator[Connection, None]:
+) -> AsyncGenerator[Connection]:
     """
     Provides a Connection object with an attached project for testing.
 

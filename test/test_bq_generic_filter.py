@@ -1,7 +1,7 @@
 import dataclasses
 import unittest
 from datetime import datetime
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Any
 
 from google.cloud import bigquery
@@ -23,7 +23,7 @@ class GenericBQFilterTest(GenericBQFilterModel):
     test_any: Any | None = None
 
 
-class BGFilterTestEnum(str, Enum):
+class BGFilterTestEnum(StrEnum):
     """Simple Enum classs"""
 
     ID = 'id'

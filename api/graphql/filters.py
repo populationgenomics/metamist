@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 import strawberry
 
@@ -11,7 +11,7 @@ Y = TypeVar('Y')
 
 
 @strawberry.input(description='Filter for GraphQL queries')
-class GraphQLFilter(Generic[T]):
+class GraphQLFilter[T]:
     """EXTERNAL Filter for GraphQL queries"""
 
     eq: T | None = None

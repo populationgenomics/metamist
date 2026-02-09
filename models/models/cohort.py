@@ -61,7 +61,7 @@ class CohortCriteriaInternal(SMBase):
     sg_type: list[str] | None = None
     sample_type: list[str] | None = None
 
-    def to_external(self, project_names: list[str]) -> 'CohortCriteria':
+    def to_external(self, project_names: list[str]) -> CohortCriteria:
         """
         Convert to external model
         """

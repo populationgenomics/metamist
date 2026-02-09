@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
@@ -34,8 +36,8 @@ class FamilyMutations:
         self,
         content: str,
         id: int,
-        info: Info[GraphQLContext, 'FamilyMutations'],
-    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+        info: Info[GraphQLContext, FamilyMutations],
+    ) -> Annotated[GraphQLComment, strawberry.lazy('api.graphql.schema')]:
         """Add a comment to a family"""
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
@@ -52,7 +54,7 @@ class FamilyMutations:
         self,
         family: FamilyUpdateInput,
         info: Info,
-    ) -> Annotated['GraphQLFamily', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated[GraphQLFamily, strawberry.lazy('api.graphql.schema')]:
         """Update information for a single family"""
         from api.graphql.schema import GraphQLFamily  # noqa: PLC0415
 
