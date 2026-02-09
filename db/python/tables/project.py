@@ -97,22 +97,22 @@ class ProjectPermissionsTable:
         project_id_map: dict[int, Project] = {}
         project_name_map: dict[str, Project] = {}
 
-        async with self.connection.pool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(Project)) as acur:
-                info = await EnumInfo.fetch(conn, 'project_member_role')
-                if info is None:
-                    raise ValueError(
-                        "Enum type 'project_member_role' not found in database"
-                    )
-                register_enum(info, acur, ProjectMemberRole)
+        conn = self.connection.connection
+        async with conn.cursor(row_factory=class_row(Project)) as acur:
+            info = await EnumInfo.fetch(conn, 'project_member_role')
+            if info is None:
+                raise ValueError(
+                    "Enum type 'project_member_role' not found in database"
+                )
+            register_enum(info, acur, ProjectMemberRole)
 
-                await acur.execute(_query, parameters)
+            await acur.execute(_query, parameters)
 
-                projects = await acur.fetchall()
+            projects = await acur.fetchall()
 
-            for project in projects:
-                project_id_map[project.id] = project
-                project_name_map[project.name] = project
+        for project in projects:
+            project_id_map[project.id] = project
+            project_name_map[project.name] = project
         return project_id_map, project_name_map
 
     async def get_seqr_project_ids(self) -> list[int]:
