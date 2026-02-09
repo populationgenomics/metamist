@@ -404,22 +404,20 @@ async def connection(
     # Patch the SMConnections class to use our test pool
     monkeypatch.setattr(SMConnections, '_postgres_pool', db_pool)
 
-    pool_conn = await db_pool.getconn()
-    # Create a connection with empty project maps (no project access yet)
-    conn = Connection(
-        pg_connection=pool_conn,
-        project=None,
-        project_id_map={},
-        project_name_map={},
-        author=TEST_USER,
-        on_behalf_of=None,
-        ar_guid=None,
-        meta={'test': 'true'},
-    )
+    async with db_pool.connection() as pool_conn:
+        # Create a connection with empty project maps (no project access yet)
+        conn = Connection(
+            pg_connection=pool_conn,
+            project=None,
+            project_id_map={},
+            project_name_map={},
+            author=TEST_USER,
+            on_behalf_of=None,
+            ar_guid=None,
+            meta={'test': 'true'},
+        )
 
-    yield conn
-
-    await db_pool.putconn(pool_conn)
+        yield conn
 
 
 @pytest.fixture

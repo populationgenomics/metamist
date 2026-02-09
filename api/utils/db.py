@@ -1,5 +1,6 @@
 import json
 import logging
+from collections.abc import AsyncGenerator
 from os import getenv
 from typing import Any
 
@@ -7,9 +8,6 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from google.auth.transport import requests
 from google.oauth2 import id_token
-
-from psycopg import AsyncConnection
-from psycopg.rows import DictRow
 
 from api.settings import get_default_user
 from api.utils.gcp import email_from_id_token
@@ -93,7 +91,7 @@ def dependable_get_project_db_connection(allowed_roles: set[ProjectMemberRole]):
         ar_guid: str = Depends(get_ar_guid),
         extra_values: dict[str, Any] | None = Depends(get_extra_audit_log_values),
         on_behalf_of: str | None = Depends(get_on_behalf_of),
-    ) -> Connection:
+    ) -> AsyncGenerator[Connection]:
         """FastAPI handler for getting connection WITH project"""
         meta = {'path': request.url.path}
         if request.client:
@@ -103,10 +101,9 @@ def dependable_get_project_db_connection(allowed_roles: set[ProjectMemberRole]):
             meta.update(extra_values)
 
         pool = SMConnections.get_postgres_pool()
-        connection: AsyncConnection[DictRow] = pool.getconn()
 
-        try:
-            yield await SMConnections.get_connection_with_project(
+        async with pool.connection() as connection:
+            conn = await SMConnections.get_connection_with_project(
                 pg_connection=connection,
                 project_name=project,
                 author=author,
@@ -115,8 +112,8 @@ def dependable_get_project_db_connection(allowed_roles: set[ProjectMemberRole]):
                 ar_guid=ar_guid,
                 meta=meta,
             )
-        finally:
-            pool.putconn(connection)
+
+            yield conn
 
     return dependable_project_db_connection
 
@@ -137,15 +134,11 @@ async def dependable_get_connection(
         meta.update(extra_values)
 
     pool = SMConnections.get_postgres_pool()
-    connection: AsyncConnection[DictRow] = await pool.getconn()
 
-    try:
+    async with pool.connection() as connection:
         yield await SMConnections.get_connection_no_project(
             connection, author, ar_guid=ar_guid, meta=meta, on_behalf_of=on_behalf_of
         )
-    finally:
-        await pool.putconn(connection)
-
 
 
 async def dependable_get_bq_connection(author: str = Depends(authenticate)):
