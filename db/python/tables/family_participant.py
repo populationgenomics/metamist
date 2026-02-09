@@ -167,16 +167,13 @@ class FamilyParticipantTable(DbBase):
         if len(participant_ids) == 0:
             return set(), {}
 
-        _query = """
-                    SELECT p.project, p.id, fp.family_id
-                    FROM family_participant fp
-                    INNER JOIN participant p ON p.id = fp.participant_id
-                    WHERE fp.participant_id = ANY(%(participant_ids)s)
-                """
+        _query = (
+            t'SELECT p.project, p.id, fp.family_id FROM family_participant fp '
+            t'INNER JOIN participant p ON p.id = fp.participant_id) '
+            t'WHERE fp.participant_id = ANY({participant_ids})'
+        )
         async with self.connection.pool.connection() as conn:
-            rows = await (
-                await conn.execute(_query, {'participant_ids': participant_ids})
-            ).fetchall()
+            rows = await (await conn.execute(_query)).fetchall()
 
         projects = set(r['project'] for r in rows)
         conflicts: dict[int, list[int]] = {}
@@ -206,29 +203,18 @@ class FamilyParticipantTable(DbBase):
         if not participant_id or not family_id:
             return False
 
-        _update_before_delete = """
-        UPDATE family_participant
-        SET audit_log_id = %(audit_log_id)s
-        WHERE family_id = %(family_id)s AND participant_id = %(participant_id)s
-        """
+        audit_log_id = await self.audit_log_id()
 
-        _query = """
-        DELETE FROM family_participant
-        WHERE participant_id = %(participant_id)s AND family_id = %(family_id)s
-        """
+        _update_before_delete = (
+            t'UPDATE family_participant SET audit_log_id = {audit_log_id} '
+            t'WHERE family_id = {family_id} AND participant_id = {participant_id})'
+        )
+
+        _query = t'DELETE FROM family_participant WHERE participant_id = {participant_id} AND family_id = {family_id}'
 
         async with self.connection.pool.connection() as conn:
-            await conn.execute(
-                _update_before_delete,
-                {
-                    'family_id': family_id,
-                    'participant_id': participant_id,
-                    'audit_log_id': await self.audit_log_id(),
-                },
-            )
+            await conn.execute(_update_before_delete)
 
-            await conn.execute(
-                _query, {'family_id': family_id, 'participant_id': participant_id}
-            )
+            await conn.execute(_query)
 
         return True
