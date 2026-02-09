@@ -268,7 +268,7 @@ class FacilityFastq:  # pylint: disable=too-many-instance-attributes
         
         # Sanity checks
         assert self.path.match('*.fastq.gz')
-        assert len(self.path.name.split('_')) == 5
+        assert len(self.path.name.split('_')) == 5, f'Unexpected number of fields in filename {self.path.name}'
 
         self.read_pair_prefix = self.path.name.rsplit('_', 1)[0]
         self.sample_id = self.read_pair_prefix.split('_')[0]
