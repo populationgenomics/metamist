@@ -137,14 +137,14 @@ async def dependable_get_connection(
         meta.update(extra_values)
 
     pool = SMConnections.get_postgres_pool()
-    connection: AsyncConnection[DictRow] = pool.getconn()
+    connection: AsyncConnection[DictRow] = await pool.getconn()
 
     try:
         yield await SMConnections.get_connection_no_project(
             connection, author, ar_guid=ar_guid, meta=meta, on_behalf_of=on_behalf_of
         )
     finally:
-        pool.putconn(connection)
+        await pool.putconn(connection)
 
 
 
