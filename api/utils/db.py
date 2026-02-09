@@ -152,7 +152,7 @@ async def dependable_get_connection_getter(
     extra_values: dict[str, Any] | None = Depends(get_extra_audit_log_values),
     on_behalf_of: str | None = Depends(get_on_behalf_of),
 ) -> GetConnection:
-    """FastAPI handler for getting connection withOUT project"""
+    """FastAPI handler for getting connection getter for connection withOUT project"""
     meta = {'path': request.url.path}
     if request.client:
         meta['ip'] = request.client.host
