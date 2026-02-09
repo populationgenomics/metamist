@@ -138,11 +138,10 @@ class ProjectPermissionsTable:
             LIMIT 1
         """
 
-        async with self.connection.pool.connection() as conn:
-            cur = await conn.execute(
-                _query, {'group_name': group_name, 'member': member}
-            )
-            row = await cur.fetchone()
+        cur = await self.connection.pg_connection.execute(
+            _query, {'group_name': group_name, 'member': member}
+        )
+        row = await cur.fetchone()
 
         return row is not None
 
@@ -192,11 +191,12 @@ class ProjectPermissionsTable:
             'audit_log_id': await self.audit_log_id(),
         }
 
-        async with self.connection.pool.connection() as conn:
-            cur = await conn.execute(_query, values)
-            row = await cur.fetchone()
-            assert row
-            project_id = row['id']
+        conn = self.connection.pg_connection
+
+        cur = await conn.execute(_query, values)
+        row = await cur.fetchone()
+        assert row
+        project_id = row['id']
 
         await self.connection.refresh_projects()
 
@@ -346,7 +346,8 @@ class ProjectPermissionsTable:
             sql.SQL('DELETE FROM analysis WHERE project = %(project)s'),
         ]
 
-        async with self.connection.pool.connection() as conn, conn.transaction():
+        conn = self.connection.pg_connection
+        async with conn.transaction():
             for query in delete_queries:
                 await conn.execute(query, {'project': project.id})
 
@@ -359,8 +360,8 @@ class ProjectPermissionsTable:
         Set group members for a group (by name)
         """
 
+        conn = self.connection.pg_connection
         async with (
-            self.connection.pool.connection() as conn,
             conn.transaction(),
             conn.cursor() as cur,
         ):

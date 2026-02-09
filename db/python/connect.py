@@ -375,7 +375,7 @@ class SMConnections:
 
         # Instantiate connection with some bits missing so that we can check access
         connection = Connection(
-            connection=connection,
+            pg_connection=connection,
             author=author,
             project=None,
             project_id_map={},
@@ -405,7 +405,7 @@ class SMConnections:
         logger.debug(f'Authenticate no-project connection with {author!r}')
 
         connection = Connection(
-            connection=connection,
+            pg_connection=connection,
             author=author,
             project=None,
             on_behalf_of=on_behalf_of,
