@@ -1,5 +1,3 @@
-# pylint: disable=too-many-arguments
-
 from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.assay import AssayFilter, AssayTable
 from db.python.tables.sample import SampleTable

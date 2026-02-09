@@ -167,8 +167,6 @@ def get_sample_model(
 class TestCohortData(DbIsolatedTest):
     """Test custom cohort endpoints that need some sequencing groups already set up"""
 
-    # pylint: disable=too-many-instance-attributes
-
     @run_as_sync
     async def setUp(self):
         super().setUp()
@@ -488,8 +486,8 @@ class TestCohortData(DbIsolatedTest):
         )
         self.assertEqual(2, len(coh1.sequencing_group_ids))
 
-        sD = await self.samplel.upsert_sample(get_sample_model('D'))
-        sgD_raw = sD.sequencing_groups[0].id
+        sD = await self.samplel.upsert_sample(get_sample_model('D'))  # noqa: N806
+        sgD_raw = sD.sequencing_groups[0].id  # noqa: N806
 
         coh2 = await self.cohortl.create_cohort_from_criteria(
             project_to_write=self.project_id,
@@ -595,8 +593,6 @@ class TestCohortData(DbIsolatedTest):
 
 class TestCohortGraphql(DbIsolatedTest):
     """Test custom cohort endpoints that need some sequencing groups already set up"""
-
-    # pylint: disable=too-many-instance-attributes
 
     @run_as_sync
     async def setUp(self):

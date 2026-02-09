@@ -2,11 +2,11 @@
 
 import click
 
+from cpg_utils import to_path
 from metamist.audit.data_access.gcs_data_access import GCSDataAccess
 from metamist.audit.models import AuditReportEntry, ReviewResult
 from metamist.audit.services import BucketAuditLogger, Reporter
 
-from cpg_utils import to_path
 
 ACTIONS = ['DELETE', 'INGEST', 'REVIEW']
 
@@ -100,4 +100,4 @@ def main(
 
 
 if __name__ == '__main__':
-    main()  # pylint: disable=no-value-for-parameter
+    main()

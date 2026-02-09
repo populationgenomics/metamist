@@ -1,10 +1,12 @@
-"""A script to restore the database instance to the latest
+"""
+A script to restore the database instance to the latest
 backup"""
 
 import os
 import subprocess
 
 from google.cloud import storage
+
 
 BACKUP_BUCKET = 'cpg-sm-backups'
 LOCAL_BACKUP_FOLDER = 'latest_backup'
@@ -41,7 +43,7 @@ def restore(backup_folder=None):
     # Stop the MariaDB server
     subprocess.run(['sudo', 'systemctl', 'stop', 'mariadb'], check=True)
 
-    if os.path.isdir('/var/lib/mysql/'):
+    if os.path.isdir('/var/lib/mysql/'):  # noqa: PTH112
         raise RuntimeError(
             'Restore cannot be performed unless /var/lib/mysql is empty.'
         )
@@ -74,8 +76,8 @@ def pull_latest_backup(backup_bucket):
     storage_client = storage.Client()
     blobs = [(blob, blob.updated) for blob in storage_client.list_blobs(backup_bucket)]
     latest = sorted(blobs, key=lambda tup: tup[1])[-1][0]
-    full_path = os.path.dirname(latest.name)
-    backup_folder = os.path.dirname(full_path)
+    full_path = os.path.dirname(latest.name)  # noqa: PTH120
+    backup_folder = os.path.dirname(full_path)  # noqa: PTH120
     return backup_folder
 
 

@@ -1,11 +1,15 @@
-# pylint: disable=ungrouped-imports, too-many-lines
-
+from api.graphql.mutations.analysis import AnalysisStatusType
 from db.python.filters.generic import GenericFilter
+from db.python.layers.analysis import AnalysisLayer
+from db.python.layers.assay import AssayLayer
 from db.python.layers.cohort import CohortLayer
 from db.python.layers.family import FamilyLayer
+from db.python.layers.participant import ParticipantLayer
+from db.python.layers.sample import SampleLayer
+from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.cohort import CohortFilter, CohortTemplateFilter
 from db.python.tables.project import ProjectPermissionsTable
-from models.models.project import ProjectMemberRole
+from models.enums import AnalysisStatus
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
     AnalysisInternal,
@@ -15,18 +19,12 @@ from models.models import (
 )
 from models.models.cohort import CohortCriteriaInternal, CohortTemplateInternal
 from models.models.participant import ParticipantUpsertInternal
+from models.models.project import ProjectMemberRole
 from models.utils.cohort_template_id_format import cohort_template_id_transform_to_raw
 from models.utils.sample_id_format import sample_id_transform_to_raw
 from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
 from test.testbase import DbIsolatedTest, run_as_sync
-from db.python.layers.analysis import AnalysisLayer
-from db.python.layers.assay import AssayLayer
-from db.python.layers.participant import ParticipantLayer
-from db.python.layers.sample import SampleLayer
-from db.python.layers.sequencing_group import SequencingGroupLayer
-from graphql.error import GraphQLError
-from models.enums import AnalysisStatus
-from api.graphql.mutations.analysis import AnalysisStatusType
+
 
 GROUP_NAME_PROJECT_CREATORS = 'project-creators'
 

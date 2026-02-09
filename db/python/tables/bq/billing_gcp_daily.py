@@ -64,7 +64,8 @@ class BillingGcpDailyTable(BillingBaseTable):
         return billing_filter
 
     async def _last_loaded_day(self):
-        """Get the most recent fully loaded day in db
+        """
+        Get the most recent fully loaded day in db
         Go 2 days back as the data is not always available for the current day
         1 day back is not enough
         """

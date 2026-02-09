@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# pylint: disable=no-member,consider-using-with
 """
 Run the metamist API through the analysis runner
 in a very generic, customisable way!
@@ -17,14 +16,13 @@ import json
 import logging
 import os.path
 import subprocess
-from typing import List
 
 from metamist import apis
 from metamist.model_utils import file_type
 
 
 def run_sm(
-    api_name: str, method_name: str, args: List[str] = None, kwargs: dict = None
+    api_name: str, method_name: str, args: list[str] = None, kwargs: dict = None
 ):
     """
     Use the sample metadata API based on:
@@ -49,9 +47,9 @@ def run_sm(
     modified_kwargs = {**kwargs}
     for k in params_to_open:
         potential_path = kwargs.get(k)
-        if potential_path and os.path.exists(potential_path):
+        if potential_path and os.path.exists(potential_path):  # noqa: PTH110
             logging.info(f'Opening {k!r}: {potential_path}')
-            files_to_close.append(open(potential_path))
+            files_to_close.append(open(potential_path))  # noqa: SIM115, PTH123
             modified_kwargs[k] = files_to_close[-1]
         else:
             logging.info(f'Skipping opening {k}')
@@ -68,7 +66,7 @@ def run_sm(
 
 def from_args(args):
     """Collect args from argparser, and call 'run_sm'"""
-    positional_args: List[str] = args.args
+    positional_args: list[str] = args.args
     kwargs = {}
 
     if args.file_to_localise:

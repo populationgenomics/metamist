@@ -1,4 +1,3 @@
-# pylint: disable=missing-function-docstring,too-many-locals
 """
 This script performs the major migration to using sequencing groups!
 Importantly, this upgrade changes the regular sample "CPG" IDs to be
@@ -22,16 +21,17 @@ This script will:
 
 Noting, this script WILL modify the database, it's not easy to generate
 a list of SQL statements to run, because the script requires inserted IDS.
-"""
+"""  # noqa: N999
 
 import asyncio
 import json
 from collections import defaultdict
 from textwrap import dedent
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import click
 from databases import Database
+
 
 SEQTYPE_ORDER = ('genome', 'exome', 'mtseq', 'transcriptome', 'chip')
 
@@ -43,14 +43,13 @@ SequenceType = str
 
 
 def _get_connection_string():
-    # pylint: disable=import-outside-toplevel
-    from db.python.connect import CredentialedDatabaseConfiguration
+    from db.python.connect import CredentialedDatabaseConfiguration  # noqa: PLC0415
 
     config = CredentialedDatabaseConfiguration(dbname='sm_dev', username='root')
     return config.get_connection_string()
 
 
-def check_number_of_renames(connection):
+def check_number_of_renames(connection):  # noqa: D103
     query = dedent(
         """
 SELECT p.name, s.id, ss.type
@@ -72,7 +71,7 @@ WHERE p.name NOT LIKE '%-test';
         print(f'  {row["name"]} - {row["id"]} - {row["type"]}')
 
 
-def get_platform_from_technology(technology: str) -> str:
+def get_platform_from_technology(technology: str) -> str:  # noqa: D103
     if technology == 'short-read':
         return 'illumina'
     if technology == 'long-read':
@@ -84,7 +83,7 @@ def get_platform_from_technology(technology: str) -> str:
     raise ValueError(f'Unknown technology: {technology}')
 
 
-async def check_assay_types_before_starting(connection: Database):
+async def check_assay_types_before_starting(connection: Database):  # noqa: D103
     query = 'SELECT DISTINCT(type) FROM sample_sequencing'
     rows = await connection.fetch_all(query)
     types = set(row['type'] for row in rows)
@@ -94,14 +93,14 @@ async def check_assay_types_before_starting(connection: Database):
     return True
 
 
-async def mutate_fetch_one(connection, query, values, dry_run):
+async def mutate_fetch_one(connection, query, values, dry_run):  # noqa: D103, RET503
     if dry_run:
         print(f'Running query: {query} with values: {values}')
     else:
         return await connection.fetch_one(query, values)
 
 
-async def execute_many(connection, query, inserts, dry_run):
+async def execute_many(connection, query, inserts, dry_run):  # noqa: D103
     if dry_run:
         print(f'Inserting {len(inserts)} assays with query: {query}')
     else:
@@ -176,9 +175,9 @@ async def migrate_sequences_to_assays(connection: Database, dry_run=True):
     await execute_many(connection, query, inserts, dry_run)
 
 
-async def get_sequencing_eids_by_sample_type(
+async def get_sequencing_eids_by_sample_type(  # noqa: D103
     connection: Database,
-) -> Dict[Tuple[str, str], List[Dict[str, Any]]]:
+) -> dict[tuple[str, str], list[dict[str, Any]]]:
     query = dedent(
         """
     SELECT seq_eid.project, seq.type, seq.sample_id, seq_eid.external_id, seq_eid.name
@@ -189,7 +188,7 @@ async def get_sequencing_eids_by_sample_type(
     )
     rows = await connection.fetch_all(query)
 
-    sequencing_eids_by_sample_type: Dict[Tuple[str, str], list] = defaultdict(list)
+    sequencing_eids_by_sample_type: dict[tuple[str, str], list] = defaultdict(list)
     for row in rows:
         sample_id = row['sample_id']
         seq_type = row['type']
@@ -204,13 +203,13 @@ async def get_sequencing_eids_by_sample_type(
     return sequencing_eids_by_sample_type
 
 
-async def create_sequencing_groups(connection: Database, author: str, dry_run=True):
+async def create_sequencing_groups(connection: Database, author: str, dry_run=True):  # noqa: D103
     assays = await connection.fetch_all('SELECT * FROM assay')
     # we can't safely put them on assays, so let's put it on the sequencing-group
     seq_eids = await get_sequencing_eids_by_sample_type(connection)
 
     # group assays by sample, then by sequencing type
-    grouped_assays: Dict[SampleId, Dict[SequenceType, List[dict]]] = defaultdict(
+    grouped_assays: dict[SampleId, dict[SequenceType, list[dict]]] = defaultdict(
         lambda: defaultdict(list)
     )
     for assay in assays:
@@ -219,11 +218,11 @@ async def create_sequencing_groups(connection: Database, author: str, dry_run=Tr
         seq_type: SequenceType = assay_meta['sequencing_type']
         grouped_assays[sample_id][seq_type].append(dict(assay))
 
-    seq_groups_to_insert: Dict[SequenceGroupId, Dict[str, Any]] = {}
-    seq_group_assays_to_insert: Dict[SequenceGroupId, List[AssayId]] = defaultdict(list)
+    seq_groups_to_insert: dict[SequenceGroupId, dict[str, Any]] = {}
+    seq_group_assays_to_insert: dict[SequenceGroupId, list[AssayId]] = defaultdict(list)
 
     # sequenceGroup, [assayIDs]
-    seq_groups_to_insert_later: List[Tuple[dict, List[AssayId]]] = []
+    seq_groups_to_insert_later: list[tuple[dict, list[AssayId]]] = []
     sample_seqtype_to_sg_id = {}
 
     for sample_id, sample_assays in grouped_assays.items():
@@ -356,14 +355,14 @@ ORDER BY sg.sample_id DESC;
     sequencing_group_ids_of_duplicate_samples = await connection.fetch_all(
         sequencing_group_ids_of_duplicate_samples_query
     )
-    duplicate_sg_id_map: Dict[SampleId, Dict[SequenceType, SequenceGroupId]] = (
+    duplicate_sg_id_map: dict[SampleId, dict[SequenceType, SequenceGroupId]] = (
         defaultdict(dict)
     )
     for row in sequencing_group_ids_of_duplicate_samples:
         duplicate_sg_id_map[row['sample_id']][row['type']] = row['id']
 
-    values_to_insert: List[Tuple[int, SequenceGroupId]] = []
-    potential_issues: List[Tuple[int, SequenceGroupId]] = []
+    values_to_insert: list[tuple[int, SequenceGroupId]] = []
+    potential_issues: list[tuple[int, SequenceGroupId]] = []
     for analysis in analysis_samples:
         analysis_id = analysis['id']
         sample_id = analysis['sample_id']
@@ -445,4 +444,4 @@ async def main(author, dry_run: bool = True, connection_string: str = None):
 
 
 if __name__ == '__main__':
-    main_sync()  # pylint: disable=no-value-for-parameter
+    main_sync()

@@ -72,8 +72,8 @@ class GenericBQFilterModel(GenericFilterModel):
     def to_sql(
         self,
         field_overrides: dict[str, str] = None,
-        only: list[str] | None = None,
-        exclude: list[str] | None = None,
+        only: list[str] | None = None,  # noqa: ARG002
+        exclude: list[str] | None = None,  # noqa: ARG002
     ) -> tuple[str, dict[str, Any]]:
         """Convert the model to SQL, and avoid SQL injection"""
         _foverrides = field_overrides or {}

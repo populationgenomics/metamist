@@ -1,8 +1,5 @@
-# pylint: disable=protected-access too-many-public-methods
 import datetime
 import json
-from test.testbase import run_as_sync
-from test.testbqbase import BqTest
 from unittest.mock import patch
 
 from api.routes import billing
@@ -10,10 +7,13 @@ from models.models import (
     AnalysisCostRecord,
     BillingColumn,
     BillingCostBudgetRecord,
+    BillingRunningCostQueryModel,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
-    BillingRunningCostQueryModel,
 )
+from test.testbase import run_as_sync
+from test.testbqbase import BqTest
+
 
 TEST_API_BILLING_USER = 'test_user'
 

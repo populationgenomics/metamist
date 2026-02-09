@@ -255,7 +255,7 @@ class GraphQLClient:
         )
         return result['project']['analyses']
 
-    def get_dataset_cohort(self, dataset: str, name: str) -> str:
+    def get_dataset_cohort(self, dataset: str, name: str) -> str:  # noqa: D417
         """
         Fetch or create the cohort associated with a dataset.
 

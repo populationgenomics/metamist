@@ -1,12 +1,13 @@
-# pylint: disable=no-member
 import logging
 import os
 from collections import defaultdict
+from collections.abc import Callable, Iterable
 from datetime import datetime
-from typing import Callable, Iterable, TypeVar
+from typing import TypeVar
 
 from cloudpathlib import AnyPath, GSPath
 from google.cloud import storage
+
 
 # type declarations for GroupBy
 T = TypeVar('T')
@@ -39,7 +40,6 @@ class CloudHelper:
         self.filename_map: dict[str, str] = self.populate_filename_map(
             self.search_paths
         )
-        # pylint: disable
 
     @staticmethod
     def guess_delimiter_from_filename(filename: str):
@@ -70,10 +70,10 @@ class CloudHelper:
         ):
             return filename
 
-        expanded_local_path = os.path.abspath(filename)
+        expanded_local_path = os.path.abspath(filename)  # noqa: PTH100
         if expanded_local_path.startswith('.'):
-            expanded_local_path = os.path.abspath(filename)
-        if os.path.exists(expanded_local_path):
+            expanded_local_path = os.path.abspath(filename)  # noqa: PTH100
+        if os.path.exists(expanded_local_path):  # noqa: PTH110
             return expanded_local_path
 
         if not self.filename_map:
@@ -101,7 +101,7 @@ class CloudHelper:
             return self._list_gcs_directory(path)
 
         if path.startswith('/'):
-            return [os.path.join(path, f) for f in os.listdir(path)]
+            return [os.path.join(path, f) for f in os.listdir(path)]  # noqa: PTH118, PTH208
 
         raise ValueError(f'Could not handle listing directory of {directory_name!r}')
 
@@ -151,8 +151,8 @@ class CloudHelper:
         for directory in search_locations:
             directory_list = self.list_directory(directory)
             for file in directory_list:
-                file = file.strip()
-                file_base = os.path.basename(file)
+                file = file.strip()  # noqa: PLW2901
+                file_base = os.path.basename(file)  # noqa: PTH119
                 if file_base in fn_map:
                     logging.warning(
                         f'File {file!r} from {directory!r} already exists in directory map: {fn_map[file_base]}'
@@ -197,7 +197,7 @@ class CloudHelper:
 
     def _list_gcs_directory(self, gcs_path) -> list[str]:
         path = GSPath(gcs_path)
-        if path.parts[2:]:
+        if path.parts[2:]:  # noqa: SIM108
             remaining_path = '/'.join(path.parts[2:]) + '/'  # has to end with "/"
         else:
             remaining_path = None

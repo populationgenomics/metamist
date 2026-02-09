@@ -1,5 +1,4 @@
 from collections import defaultdict
-from test.testbase import DbIsolatedTest, run_as_sync
 
 from pymysql.err import IntegrityError
 
@@ -15,6 +14,8 @@ from models.models import (
     SampleUpsertInternal,
 )
 from models.models.sequencing_group import SequencingGroupUpsertInternal
+from test.testbase import DbIsolatedTest, run_as_sync
+
 
 default_sequencing_meta = {
     'sequencing_type': 'genome',
@@ -25,8 +26,6 @@ default_sequencing_meta = {
 
 class TestAssay(DbIsolatedTest):
     """Test assay class"""
-
-    # pylint: disable=too-many-instance-attributes
 
     @run_as_sync
     async def setUp(self) -> None:

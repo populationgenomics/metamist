@@ -1,7 +1,7 @@
-# pylint: disable=too-many-instance-attributes,too-many-locals
 import dataclasses
+from collections.abc import Sequence
 from enum import Enum
-from typing import Any, Sequence
+from typing import Any
 
 from db.python.filters.web import ProjectParticipantGridFilter
 from models.base import SMBase
@@ -150,7 +150,7 @@ class ProjectParticipantGridResponse(SMBase):
         )
 
     @staticmethod
-    def get_entity_keys(
+    def get_entity_keys(  # noqa: C901, RUF100
         participants: Sequence[NestedParticipantInternal | NestedParticipant],
         # useful for showing fields that are not in the response, but in the filter
         filter_fields: ProjectParticipantGridFilter,
@@ -183,23 +183,27 @@ class ProjectParticipantGridResponse(SMBase):
         has_nested_samples = False
 
         if filter_fields.family and filter_fields.family.meta:
-            family_meta_keys.update({k: True for k in filter_fields.family.meta.keys()})
+            family_meta_keys.update(
+                dict.fromkeys(filter_fields.family.meta.keys(), True)
+            )
         if filter_fields.participant and filter_fields.participant.meta:
             participant_meta_keys.update(
-                {k: True for k in filter_fields.participant.meta.keys()}
+                dict.fromkeys(filter_fields.participant.meta.keys(), True)
             )
             hidden_participant_meta_keys -= set(filter_fields.participant.meta.keys())
         if filter_fields.sample and filter_fields.sample.meta:
-            sample_meta_keys.update({k: True for k in filter_fields.sample.meta.keys()})
+            sample_meta_keys.update(
+                dict.fromkeys(filter_fields.sample.meta.keys(), True)
+            )
             hidden_participant_meta_keys -= set(filter_fields.sample.meta.keys())
         if filter_fields.sequencing_group and filter_fields.sequencing_group.meta:
             # sg_meta_keys.update(filter_fields.sequencing_group.meta.keys())
             sg_meta_keys.update(
-                {k: True for k in filter_fields.sequencing_group.meta.keys()}
+                dict.fromkeys(filter_fields.sequencing_group.meta.keys(), True)
             )
             hidden_sg_meta_keys -= set(filter_fields.sequencing_group.meta.keys())
         if filter_fields.assay and filter_fields.assay.meta:
-            assay_meta_keys.update({k: True for k in filter_fields.assay.meta.keys()})
+            assay_meta_keys.update(dict.fromkeys(filter_fields.assay.meta.keys(), True))
             hidden_assay_meta_keys -= set(filter_fields.assay.meta.keys())
 
         def update_d_from_meta(d: dict[str, bool], meta: dict[str, Any]):
@@ -240,7 +244,7 @@ class ProjectParticipantGridResponse(SMBase):
         has_karyotype = any(p.karyotype is not None for p in participants)
 
         # dumb alias
-        Field = ProjectParticipantGridField
+        Field = ProjectParticipantGridField  # noqa: N806
 
         family_fields: list[ProjectParticipantGridField] = [
             Field(

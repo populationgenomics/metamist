@@ -1,4 +1,3 @@
-# pylint: disable=too-many-nested-blocks
 import logging
 from textwrap import dedent
 from urllib.parse import urlparse
@@ -8,6 +7,7 @@ from google.cloud.storage import Blob
 
 from db.python.tables.base import DbBase
 from models.models.output_file import OutputFileInternal, RecursiveDict
+
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -172,7 +172,7 @@ class OutputFileTable(DbBase):
                         output=(None if parent_file_id else primary_file['basename']),
                     )
                     secondary_files = files.get('secondary_files_grouped')
-                    if secondary_files:
+                    if secondary_files:  # noqa: SIM102
                         if primary_file['basename'] in secondary_files:
                             for secondary_file in secondary_files[
                                 primary_file['basename']

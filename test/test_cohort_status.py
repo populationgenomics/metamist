@@ -1,23 +1,22 @@
 import datetime
 from random import randint
 
+from graphql.error import GraphQLError
+
 from db.python.filters import GenericFilter
 from db.python.layers import CohortLayer, SampleLayer, SequencingGroupLayer
 from db.python.tables.cohort import CohortFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
-from graphql.error import GraphQLError
 from models.enums.cohort import CohortStatus, CohortUpdateStatus
-from models.models.cohort import CohortCriteriaInternal, CohortUpdateBody
-from models.utils.cohort_id_format import cohort_id_format
-from models.utils.cohort_template_id_format import cohort_template_id_format
-from test.testbase import DbIsolatedTest
-from test.testbase import run_as_sync
-
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
     SampleUpsertInternal,
     SequencingGroupUpsertInternal,
 )
+from models.models.cohort import CohortCriteriaInternal, CohortUpdateBody
+from models.utils.cohort_id_format import cohort_id_format
+from models.utils.cohort_template_id_format import cohort_template_id_format
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 def get_sample_model(eid, s_type='blood', sg_type='genome', plat='illumina'):
@@ -80,7 +79,8 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
 
     @run_as_sync
     async def test_create_custom_cohort_and_verify_status(self):
-        """Test to create a custom cohort and verify its status
+        """
+        Test to create a custom cohort and verify its status
         (Here the one created in the setup method is tested)
         """
 
@@ -126,7 +126,8 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
 
     @run_as_sync
     async def test_query_cohort_status_with_all_active(self):
-        """Test computed cohort status when sample/s active,
+        """
+        Test computed cohort status when sample/s active,
         sg/s not archived and cohort status is active in the DB"""
 
         queried_sample = await self.sample_layer.get_by_id(sample_id=self.sample_a.id)
@@ -385,7 +386,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
             query_cohort_filter_status_in,
             {'cohort_status_list': [ACTIVE]},
         )
-        self.assertTrue(len(query_cohort_status_in['cohorts']) == 2)
+        self.assertTrue(len(query_cohort_status_in['cohorts']) == 2)  # noqa: PLR2004
         for cohort in query_cohort_status_in['cohorts']:
             self.assertEqual(cohort['status'], ACTIVE)
 
@@ -482,7 +483,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                     description
                 }
             }
-        """,
+        """,  # noqa: E101
                 {'id': self.cohort_id_formatted},
             )
         )['cohorts'][0]

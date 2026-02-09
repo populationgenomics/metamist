@@ -16,6 +16,7 @@ from models.models.comment import (
 )
 from models.models.project import ProjectMemberRole
 
+
 COMMENT_WRITE_ROLES = {ProjectMemberRole.writer, ProjectMemberRole.contributor}
 
 

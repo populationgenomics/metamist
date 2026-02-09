@@ -1,5 +1,3 @@
-# pylint: disable=invalid-overridden-method,no-member
-
 import asyncio
 import dataclasses
 import logging
@@ -28,11 +26,12 @@ from db.python.tables.project import ProjectPermissionsTable
 from models.models.project import Project, ProjectId, ProjectMemberUpdate
 from test.testdb_container import TestDatabaseContainer
 
+
 TEST_PROJECT_NAME = 'test-test'
 
 # use this to determine where the db directory is relatively,
 # as pycharm runs in "test/" folder, and GH runs them in git root
-am_i_in_test_environment = os.getcwd().endswith('test')
+am_i_in_test_environment = os.getcwd().endswith('test')  # noqa: PTH109
 
 # This monkey patches the asyncio event loop and allows it to be re-entrant
 # (you can call run_until_complete while run_until_complete is already on the stack)
@@ -313,7 +312,7 @@ class DbTest(unittest.TestCase):
             variable_values=variables,
             context_value=await get_context(
                 connection=self.connection,
-                request=None,  # pylint: disable
+                request=None,
             ),
         )
         if value.errors:
@@ -328,7 +327,7 @@ class DbTest(unittest.TestCase):
         """Get audit_log_id for the test"""
         return await self.connection.audit_log_id()
 
-    def assertDataclassEqual(self, a, b):
+    def assertDataclassEqual(self, a, b):  # noqa: N802
         """Assert two dataclasses are equal"""
 
         def to_dict(obj):

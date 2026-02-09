@@ -1,4 +1,3 @@
-# pylint: disable=too-many-locals,too-many-arguments
 import dataclasses
 import re
 from collections import defaultdict
@@ -10,6 +9,7 @@ from db.python.utils import NoOpAenter, NotFoundError, to_db_json
 from models.models.assay import AssayId, AssayInternal
 from models.models.project import ProjectId
 from models.models.sequencing_group import SequencingGroupInternalId
+
 
 REPLACEMENT_KEY_INVALID_CHARS = re.compile(r'[^\w\d_]')
 
@@ -38,7 +38,7 @@ class AssayFilter(GenericFilterModel):
     project: GenericFilter[int] | None = None
     type: GenericFilter | None = None
 
-    def __hash__(self):  # pylint: disable=useless-super-delegation
+    def __hash__(self):
         return hash(
             (self.id, self.sample_id, self.external_id, self.project, self.type)
         )
@@ -416,7 +416,7 @@ class AssayTable(DbBase):
 
             _query = f"""
                 UPDATE assay
-                SET {", ".join(updaters)}
+                SET {', '.join(updaters)}
                 WHERE id = :assay_id
             """
             await self.connection.execute(_query, fields)

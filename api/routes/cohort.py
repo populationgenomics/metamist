@@ -17,11 +17,11 @@ from models.models.project import (
     ProjectMemberRole,
     ReadAccessRoles,
 )
-
 from models.utils.cohort_template_id_format import (
     cohort_template_id_format,
     cohort_template_id_transform_to_raw,
 )
+
 
 router = APIRouter(prefix='/cohort', tags=['cohort'])
 

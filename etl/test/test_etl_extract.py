@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import etl.extract.main
 
+
 ETL_SAMPLE_RECORD = """
 {"identifier": "AB0002", "name": "j smith", "age": 50, "measurement": "98.7", "observation": "B++", "receipt_date": "1/02/2023"}
 """

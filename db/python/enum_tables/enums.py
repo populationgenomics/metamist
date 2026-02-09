@@ -6,6 +6,7 @@ from async_lru import alru_cache
 
 from db.python.tables.base import DbBase
 
+
 table_name_matcher = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
 
 
@@ -67,5 +68,5 @@ class EnumTable(DbBase):
             _query, {'name': value.lower(), 'audit_log_id': await self.audit_log_id()}
         )
         # clear the cache so results are up-to-date
-        self.get.cache_clear()  # pylint: disable=no-member
+        self.get.cache_clear()
         return value

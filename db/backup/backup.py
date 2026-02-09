@@ -1,6 +1,6 @@
 #!/usr/bin/python3
-# pylint: disable=broad-exception-caught,broad-exception-raised
-"""Daily back up function for databases within a local
+"""
+Daily back up function for databases within a local
 MariaDB instance"""
 
 import json
@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Literal
 
 from google.cloud import logging, secretmanager, storage
+
 
 STORAGE_CLIENT = storage.Client()
 LOGGING_CLIENT = logging.Client()
@@ -34,7 +35,8 @@ def read_db_credentials() -> dict[Literal['username', 'password'], str]:
 
 
 def perform_backup():
-    """Completes a backup of the databases within a local mariadb instance
+    """
+    Completes a backup of the databases within a local mariadb instance
     and uploads this backup to GCS."""
 
     # Logging: Any log with `severity >= ERROR` get's logged to #software-alerts
@@ -78,7 +80,7 @@ def perform_backup():
         text = f'Failed to export backup {timestamp_str}: {e}\n {e.stderr}'
         logger.log_text(text, severity='ERROR')
         return
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         text = f'Failed to export backup {timestamp_str}: {e}'
         logger.log_text(text, severity='ERROR')
         return

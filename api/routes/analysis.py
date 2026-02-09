@@ -1,4 +1,3 @@
-# pylint: disable=dangerous-default-value
 import csv
 import io
 from datetime import date
@@ -30,6 +29,7 @@ from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format_list,
     sequencing_group_id_transform_to_raw_list,
 )
+
 
 router = APIRouter(prefix='/analysis', tags=['analysis'])
 
