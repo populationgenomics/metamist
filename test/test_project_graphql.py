@@ -1,6 +1,7 @@
 import pytest
 from httpx import AsyncClient
 
+from db.python.tables.project import GROUP_NAME_PROJECT_CREATORS
 from test.conftest import GraphQLQueryFunction
 
 
@@ -63,3 +64,40 @@ class TestProjectListing:
         assert project['name'] == 'test-project'
         assert project['dataset'] == 'test-dataset'
         assert 'reader' in project['roles']
+
+    @pytest.mark.asyncio
+    @pytest.mark.admin_groups([GROUP_NAME_PROJECT_CREATORS])
+    async def test_creating_projects_concurrently_works(
+        self,
+        app_client: AsyncClient,
+    ) -> None:
+        """Test that myProjects returns projects the user has access to."""
+        query = """
+            mutation CreateProject {
+                project {
+                    p1: createProject(name: "project-1", dataset: "project-1", createTestProject: false) {
+                        name
+                        dataset
+                    }
+                    p2: createProject(name: "project-2", dataset: "project-2", createTestProject: false) {
+                        name
+                        dataset
+                    }
+                }
+            }
+        """
+
+        response = await app_client.post(
+            '/graphql',
+            json={'query': query},
+        )
+
+        assert response.status_code == 200  # noqa: PLR2004
+        data = response.json()
+        assert 'errors' not in data
+
+        project1 = data['data']['project']['p1']
+        assert project1['name'] == 'project-1'
+
+        project2 = data['data']['project']['p2']
+        assert project2['name'] == 'project-2'
