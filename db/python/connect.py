@@ -36,7 +36,7 @@ class Connection:
 
     def __init__(
         self,
-        connection: AsyncConnection[DictRow],
+        pg_connection: AsyncConnection[DictRow],
         project: Project | None,
         project_id_map: dict[ProjectId, Project],
         project_name_map: dict[str, Project],
@@ -45,7 +45,7 @@ class Connection:
         ar_guid: str | None,
         meta: dict[str, str] | None = None,
     ):
-        self.__connection: AsyncConnection[DictRow] = connection
+        self.__pg_connection: AsyncConnection[DictRow] = pg_connection
         self.__project: Project | None = project
         self.__project_id_map = project_id_map
         self.__project_name_map = project_name_map
@@ -58,8 +58,9 @@ class Connection:
         self._audit_log_lock = asyncio.Lock()
 
     @property
-    def connection(self):
-        return self.__connection
+    def pg_connection(self):
+        """Public getter for private pg_connection class variable"""
+        return self.__pg_connection
 
     @property
     def project(self):

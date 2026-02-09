@@ -97,7 +97,7 @@ class ProjectPermissionsTable:
         project_id_map: dict[int, Project] = {}
         project_name_map: dict[str, Project] = {}
 
-        conn = self.connection.connection
+        conn = self.connection.pg_connection
         async with conn.cursor(row_factory=class_row(Project)) as acur:
             info = await EnumInfo.fetch(conn, 'project_member_role')
             if info is None:

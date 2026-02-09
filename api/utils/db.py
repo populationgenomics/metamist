@@ -107,7 +107,7 @@ def dependable_get_project_db_connection(allowed_roles: set[ProjectMemberRole]):
 
         try:
             yield await SMConnections.get_connection_with_project(
-                connection=connection,
+                pg_connection=connection,
                 project_name=project,
                 author=author,
                 allowed_roles=allowed_roles,
