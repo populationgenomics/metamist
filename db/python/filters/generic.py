@@ -1,5 +1,4 @@
 import dataclasses
-import re
 from collections.abc import Callable, Sequence
 from enum import Enum
 from string.templatelib import Template
@@ -9,9 +8,6 @@ from psycopg import sql
 
 from db.python.utils import escape_like_term
 from models.base import SMBase
-
-
-NONFIELD_CHARS_REGEX = re.compile(r'[^a-zA-Z0-9_]')
 
 
 T = TypeVar('T')
@@ -103,20 +99,6 @@ class GenericFilter[T](SMBase):
     def __hash__(self):
         """Override to ensure we can hash this object"""
         return hash(self.get_hashable_value())
-
-    @staticmethod
-    def generate_field_name(name):
-        """
-        Replace any non \\w characters with an underscore
-
-        >>> GenericFilter.generate_field_name('foo')
-        'foo'
-        >>> GenericFilter.generate_field_name('foo.bar')
-        'foo_bar'
-        >>> GenericFilter.generate_field_name('$foo bar:>baz')
-        '_foo_bar__baz'
-        """  # noqa: D301
-        return NONFIELD_CHARS_REGEX.sub('_', name)
 
     def to_sql(
         self, column: str, column_expression: Template | None = None
