@@ -361,7 +361,7 @@ class SMConnections:
     @staticmethod
     async def get_connection_with_project(
         *,
-        connection: AsyncConnection[DictRow],
+        pg_connection: AsyncConnection[DictRow],
         author: str,
         project_name: str,
         allowed_roles: set[ProjectMemberRole],
@@ -375,7 +375,7 @@ class SMConnections:
 
         # Instantiate connection with some bits missing so that we can check access
         connection = Connection(
-            pg_connection=connection,
+            pg_connection=pg_connection,
             author=author,
             project=None,
             project_id_map={},
@@ -394,18 +394,18 @@ class SMConnections:
 
     @staticmethod
     async def get_connection_no_project(
-        connection: AsyncConnection[DictRow],
-        author: str, 
-        ar_guid: str, 
-        meta: dict[str, str], 
-        on_behalf_of: str | None
+        pg_connection: AsyncConnection[DictRow],
+        author: str,
+        ar_guid: str,
+        meta: dict[str, str],
+        on_behalf_of: str | None,
     ):
         """Get a db connection from a project and user"""
         # maybe it makes sense to perform permission checks here too
         logger.debug(f'Authenticate no-project connection with {author!r}')
 
         connection = Connection(
-            pg_connection=connection,
+            pg_connection=pg_connection,
             author=author,
             project=None,
             on_behalf_of=on_behalf_of,

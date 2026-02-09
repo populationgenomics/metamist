@@ -140,9 +140,7 @@ class ProjectPermissionsTable:
         """
 
         conn = self.connection.pg_connection
-        cur = conn.execute(
-            _query, {'group_name': group_name, 'member': member}
-        )
+        cur = await conn.execute(_query, {'group_name': group_name, 'member': member})
         row = await cur.fetchone()
 
         return row is not None
