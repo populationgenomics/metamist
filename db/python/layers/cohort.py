@@ -63,7 +63,9 @@ def get_sg_filter(
     return sg_filter
 
 
-def _is_valid_cohort_criteria_combination(cohort_criteria):
+def _is_valid_cohort_criteria_combination(
+    cohort_criteria: CohortCriteriaInternal,
+) -> bool:
     for name, value in vars(cohort_criteria).items():
         if name != 'sg_ids_internal_raw' and (
             value is not None and value != []
