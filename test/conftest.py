@@ -407,7 +407,7 @@ async def connection(
     pool_conn = await db_pool.getconn()
     # Create a connection with empty project maps (no project access yet)
     conn = Connection(
-        connection=pool_conn,
+        pg_connection=pool_conn,
         project=None,
         project_id_map={},
         project_name_map={},
@@ -444,7 +444,7 @@ async def connection_with_project(
     pool_conn = await db_pool.getconn()
     # Create a connection
     conn = Connection(
-        connection=pool_conn,
+        pg_connection=pool_conn,
         project=None,
         project_id_map={},
         project_name_map={},
