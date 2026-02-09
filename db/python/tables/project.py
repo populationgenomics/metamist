@@ -121,9 +121,10 @@ class ProjectPermissionsTable:
         """
         _query = "SELECT id FROM project WHERE (meta->>'is_seqr')::boolean"
 
-        async with self.connection.pool.connection() as conn:
-            cur = await conn.execute(_query)
-            rows = await cur.fetchall()
+        conn = self.connection.pg_connection
+
+        cur = await conn.execute(_query)
+        rows = await cur.fetchall()
         return [r['id'] for r in rows]
 
     async def check_if_member_in_group_by_name(self, group_name: str, member: str):
@@ -138,7 +139,8 @@ class ProjectPermissionsTable:
             LIMIT 1
         """
 
-        cur = await self.connection.pg_connection.execute(
+        conn = self.connection.pg_connection
+        cur = conn.execute(
             _query, {'group_name': group_name, 'member': member}
         )
         row = await cur.fetchone()
@@ -230,8 +232,8 @@ class ProjectPermissionsTable:
             'UPDATE project SET {fields_str} WHERE name = %(name)s'
         ).format(fields_str=fields_str)
 
-        async with self.connection.pool.connection() as conn:
-            await conn.execute(_query, fields)
+        conn = self.connection.pg_connection
+        await conn.execute(_query, fields)
 
     async def delete_project_data(self, project: Project) -> bool:
         """
