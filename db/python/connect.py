@@ -57,9 +57,6 @@ class Connection:
         self._audit_log_id: int | None = None
         self._audit_log_lock = asyncio.Lock()
 
-    def __del__(self):
-        self.__connection.pu
-
     @property
     def connection(self):
         return self.__connection
