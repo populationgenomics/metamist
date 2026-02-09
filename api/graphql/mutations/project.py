@@ -6,7 +6,6 @@ from strawberry.scalars import JSON
 from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
-from db.python.connect import Connection
 from db.python.layers.comment import CommentLayer
 from db.python.tables.project import ProjectPermissionsTable
 from models.models.comment import CommentEntityType
@@ -44,12 +43,12 @@ class ProjectMutations:
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
-        connection = info.context['connection']
-        cl = CommentLayer(connection)
-        result = await cl.add_comment_to_entity(
-            entity=CommentEntityType.project, entity_id=id, content=content
-        )
-        return GraphQLComment.from_internal(result)
+        async with info.context['get_connection']() as connection:
+            cl = CommentLayer(connection)
+            result = await cl.add_comment_to_entity(
+                entity=CommentEntityType.project, entity_id=id, content=content
+            )
+            return GraphQLComment.from_internal(result)
 
     @strawberry.mutation
     async def create_project(
@@ -57,70 +56,70 @@ class ProjectMutations:
         name: str,
         dataset: str,
         create_test_project: bool,
-        info: Info,
+        info: Info[GraphQLContext, 'ProjectMutations'],
     ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.schema')]:
         """
         Create a new project
         """
         from api.graphql.schema import GraphQLProject  # noqa: PLC0415
 
-        connection: Connection = info.context['connection']
-        ptable = ProjectPermissionsTable(connection)
+        async with info.context['get_connection']() as connection:
+            ptable = ProjectPermissionsTable(connection)
 
-        pid = await ptable.create_project(
-            project_name=name,
-            dataset_name=dataset,
-            author=connection.author,
-        )
-
-        (project,) = connection.get_and_check_access_to_projects_for_ids(
-            [pid], {ProjectMemberRole.project_admin}
-        )
-
-        if create_test_project:
-            await ptable.create_project(
-                project_name=name + '-test',
+            pid = await ptable.create_project(
+                project_name=name,
                 dataset_name=dataset,
                 author=connection.author,
             )
 
-        return GraphQLProject.from_internal(project)
+            (project,) = connection.get_and_check_access_to_projects_for_ids(
+                [pid], {ProjectMemberRole.project_admin}
+            )
+
+            if create_test_project:
+                await ptable.create_project(
+                    project_name=name + '-test',
+                    dataset_name=dataset,
+                    author=connection.author,
+                )
+
+            return GraphQLProject.from_internal(project)
 
     @strawberry.mutation
     async def update_project(
         self,
         project: str,
         project_update_model: JSON,
-        info: Info,
+        info: Info[GraphQLContext, 'ProjectMutations'],
     ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.schema')]:
         """Update a project by project name"""
         from api.graphql.schema import GraphQLProject  # noqa: PLC0415
 
-        connection: Connection = info.context['connection']
-        (p,) = connection.get_and_check_access_to_projects_for_names(
-            [project], {ProjectMemberRole.project_admin}
-        )
+        async with info.context['get_connection']() as connection:
+            (p,) = connection.get_and_check_access_to_projects_for_names(
+                [project], {ProjectMemberRole.project_admin}
+            )
 
-        ptable = ProjectPermissionsTable(connection)
-        await ptable.update_project(
-            project_name=project,
-            update=project_update_model,  # type: ignore [arg-type]
-            author=connection.author,
-        )
+            ptable = ProjectPermissionsTable(connection)
+            await ptable.update_project(
+                project_name=project,
+                update=project_update_model,  # type: ignore [arg-type]
+                author=connection.author,
+            )
 
-        await connection.refresh_projects()
-        (p,) = connection.get_and_check_access_to_projects_for_names(
-            [project], {ProjectMemberRole.project_admin}
-        )
+            await connection.refresh_projects()
+            (p,) = connection.get_and_check_access_to_projects_for_names(
+                [project], {ProjectMemberRole.project_admin}
+            )
 
-        return GraphQLProject.from_internal(p)
+            return GraphQLProject.from_internal(p)
 
     @strawberry.mutation
     async def update_project_members(
         self,
         project: str,
         members: list[ProjectMemberUpdateInput],
-        info: Info,
+        info: Info[GraphQLContext, 'ProjectMutations'],
     ) -> Annotated['GraphQLProject', strawberry.lazy('api.graphql.schema')]:
         """
         Update project members for specific read / write group.
@@ -128,27 +127,29 @@ class ProjectMutations:
         """
         from api.graphql.schema import GraphQLProject  # noqa: PLC0415
 
-        connection: Connection = info.context['connection']
-        (target_project,) = connection.get_and_check_access_to_projects_for_names(
-            [project], {ProjectMemberRole.project_member_admin}
-        )
+        async with info.context['get_connection']() as connection:
+            (target_project,) = connection.get_and_check_access_to_projects_for_names(
+                [project], {ProjectMemberRole.project_member_admin}
+            )
 
-        ptable = ProjectPermissionsTable(connection)
+            ptable = ProjectPermissionsTable(connection)
 
-        for member in members:
-            for role in member.roles:
-                if role not in project_member_role_names:
-                    raise GraphQLError(
-                        f'Role {role} is not valid for member {member.member}'
-                    )
-        member_objs = [
-            ProjectMemberUpdate.from_dict(strawberry.asdict(member))
-            for member in members
-        ]
-        await ptable.set_project_members(project=target_project, members=member_objs)
-        await connection.refresh_projects()
+            for member in members:
+                for role in member.roles:
+                    if role not in project_member_role_names:
+                        raise GraphQLError(
+                            f'Role {role} is not valid for member {member.member}'
+                        )
+            member_objs = [
+                ProjectMemberUpdate.from_dict(strawberry.asdict(member))
+                for member in members
+            ]
+            await ptable.set_project_members(
+                project=target_project, members=member_objs
+            )
+            await connection.refresh_projects()
 
-        (target_project,) = connection.get_and_check_access_to_projects_for_names(
-            [project], {ProjectMemberRole.project_member_admin}
-        )
-        return GraphQLProject.from_internal(target_project)
+            (target_project,) = connection.get_and_check_access_to_projects_for_names(
+                [project], {ProjectMemberRole.project_member_admin}
+            )
+            return GraphQLProject.from_internal(target_project)

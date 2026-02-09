@@ -26,7 +26,6 @@ from models.models.project import Project, ProjectId, ProjectMemberRole
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
-
 MAIN_SCHEMA = 'main'
 HISTORY_SCHEMA = 'history'
 

@@ -5,7 +5,6 @@ from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
 from api.graphql.mutations.sample import SampleUpsertInput
-from db.python.connect import Connection
 from db.python.layers.comment import CommentLayer
 from db.python.layers.participant import ParticipantLayer
 from models.models.comment import CommentEntityType
@@ -60,41 +59,45 @@ class ParticipantMutations:
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
-        connection = info.context['connection']
-        cl = CommentLayer(connection)
-        result = await cl.add_comment_to_entity(
-            entity=CommentEntityType.participant, entity_id=id, content=content
-        )
-        return GraphQLComment.from_internal(result)
+        async with info.context['get_connection']() as connection:
+            cl = CommentLayer(connection)
+            result = await cl.add_comment_to_entity(
+                entity=CommentEntityType.participant, entity_id=id, content=content
+            )
+            return GraphQLComment.from_internal(result)
 
     @strawberry.mutation
     async def update_participant(
         self,
         participant_id: int,
         participant: ParticipantUpsertInput,
-        info: Info,
+        info: Info[GraphQLContext, 'ParticipantMutations'],
     ) -> Annotated['GraphQLParticipant', strawberry.lazy('api.graphql.schema')]:
         """Update Participant Data"""
         from api.graphql.schema import GraphQLParticipant  # noqa: PLC0415
 
-        connection = info.context['connection']
-        player = ParticipantLayer(connection)
+        async with info.context['get_connection']() as connection:
+            player = ParticipantLayer(connection)
 
-        participant.id = participant_id
+            participant.id = participant_id
 
-        upserted = await player.upsert_participant(
-            ParticipantUpsert.from_dict(strawberry.asdict(participant)).to_internal()
-        )
-        updated_participant = (await player.get_participants_by_ids([upserted.id]))[0]  # type: ignore [attr-defined]
+            upserted = await player.upsert_participant(
+                ParticipantUpsert.from_dict(
+                    strawberry.asdict(participant)
+                ).to_internal()
+            )
+            updated_participant = (await player.get_participants_by_ids([upserted.id]))[
+                0
+            ]  # type: ignore [attr-defined]
 
-        return GraphQLParticipant.from_internal(updated_participant)
+            return GraphQLParticipant.from_internal(updated_participant)
 
     @strawberry.mutation
     async def upsert_participants(
         self,
         project: str,
         participants: list[ParticipantUpsertInput],
-        info: Info,
+        info: Info[GraphQLContext, 'ParticipantMutations'],
     ) -> list[Annotated['GraphQLParticipant', strawberry.lazy('api.graphql.schema')]]:
         """
         Upserts a list of participants with samples and sequences
@@ -102,20 +105,22 @@ class ParticipantMutations:
         """
         from api.graphql.schema import GraphQLParticipant  # noqa: PLC0415
 
-        connection: Connection = info.context['connection']
-        connection.check_access_to_projects_for_names([project], FullWriteAccessRoles)
+        async with info.context['get_connection']() as connection:
+            connection.check_access_to_projects_for_names(
+                [project], FullWriteAccessRoles
+            )
 
-        pt = ParticipantLayer(connection)
-        results = await pt.upsert_participants(
-            [
-                ParticipantUpsert.from_dict(strawberry.asdict(p)).to_internal()
-                for p in participants
-            ]
-        )
-        updated_participants = await pt.get_participants_by_ids(
-            [p.id for p in results]  # type: ignore [arg-type]
-        )
-        return [GraphQLParticipant.from_internal(p) for p in updated_participants]
+            pt = ParticipantLayer(connection)
+            results = await pt.upsert_participants(
+                [
+                    ParticipantUpsert.from_dict(strawberry.asdict(p)).to_internal()
+                    for p in participants
+                ]
+            )
+            updated_participants = await pt.get_participants_by_ids(
+                [p.id for p in results]  # type: ignore [arg-type]
+            )
+            return [GraphQLParticipant.from_internal(p) for p in updated_participants]
 
     @strawberry.mutation
     async def update_participant_family(
@@ -123,20 +128,20 @@ class ParticipantMutations:
         participant_id: int,
         old_family_id: int,
         new_family_id: int,
-        info: Info,
+        info: Info[GraphQLContext, 'ParticipantMutations'],
     ) -> UpdateParticipantFamilyType:
         """
         Change a participants family from old_family_id
         to new_family_id, maintaining all other fields.
         The new_family_id must already exist.
         """
-        connection = info.context['connection']
-        player = ParticipantLayer(connection)
+        async with info.context['get_connection']() as connection:
+            player = ParticipantLayer(connection)
 
-        return UpdateParticipantFamilyType.from_tuple(
-            await player.update_participant_family(
-                participant_id=participant_id,
-                old_family_id=old_family_id,
-                new_family_id=new_family_id,
+            return UpdateParticipantFamilyType.from_tuple(
+                await player.update_participant_family(
+                    participant_id=participant_id,
+                    old_family_id=old_family_id,
+                    new_family_id=new_family_id,
+                )
             )
-        )

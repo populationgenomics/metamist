@@ -4,7 +4,6 @@ import strawberry
 from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
-from db.python.connect import Connection
 from db.python.layers.analysis import AnalysisLayer
 from models.enums.analysis import AnalysisStatus
 from models.models.analysis import Analysis
@@ -58,27 +57,26 @@ class AnalysisMutations:
         """Create a new analysis"""
         from api.graphql.schema import GraphQLAnalysis  # noqa: PLC0415
 
-        connection: Connection = info.context['connection']
+        async with info.context['get_connection']() as connection:
+            # Should be moved to the analysis layer
+            (target_project,) = connection.get_and_check_access_to_projects_for_names(
+                [project], FullWriteAccessRoles
+            )
+            alayer = AnalysisLayer(connection)
 
-        # Should be moved to the analysis layer
-        (target_project,) = connection.get_and_check_access_to_projects_for_names(
-            [project], FullWriteAccessRoles
-        )
-        alayer = AnalysisLayer(connection)
+            if analysis.author:
+                # special tracking here, if we can't catch it through the header
+                connection.on_behalf_of = analysis.author
 
-        if analysis.author:
-            # special tracking here, if we can't catch it through the header
-            connection.on_behalf_of = analysis.author
+            if not analysis.sequencing_group_ids and not analysis.cohort_ids:
+                raise ValueError('Must specify "sequencing_group_ids" or "cohort_ids"')
 
-        if not analysis.sequencing_group_ids and not analysis.cohort_ids:
-            raise ValueError('Must specify "sequencing_group_ids" or "cohort_ids"')
-
-        analysis_id = await alayer.create_analysis(
-            Analysis(**analysis.__dict__).to_internal(),
-            project=target_project.id,
-        )
-        created_analysis = await alayer.get_analysis_by_id(analysis_id)
-        return GraphQLAnalysis.from_internal(created_analysis)
+            analysis_id = await alayer.create_analysis(
+                Analysis(**analysis.__dict__).to_internal(),
+                project=target_project.id,
+            )
+            created_analysis = await alayer.get_analysis_by_id(analysis_id)
+            return GraphQLAnalysis.from_internal(created_analysis)
 
     @strawberry.mutation
     async def update_analysis(
@@ -90,15 +88,15 @@ class AnalysisMutations:
         """Update status of analysis"""
         from api.graphql.schema import GraphQLAnalysis  # noqa: PLC0415
 
-        connection = info.context['connection']
-        alayer = AnalysisLayer(connection)
-        await alayer.update_analysis(
-            analysis_id,
-            status=analysis.status,
-            output=analysis.output,
-            outputs=analysis.outputs,  # type: ignore [arg-type]
-            meta=analysis.meta,  # type: ignore [arg-type]
-            active=analysis.active,
-        )
-        updated_analysis = await alayer.get_analysis_by_id(analysis_id)
-        return GraphQLAnalysis.from_internal(updated_analysis)
+        async with info.context['get_connection']() as connection:
+            alayer = AnalysisLayer(connection)
+            await alayer.update_analysis(
+                analysis_id,
+                status=analysis.status,
+                output=analysis.output,
+                outputs=analysis.outputs,  # type: ignore [arg-type]
+                meta=analysis.meta,  # type: ignore [arg-type]
+                active=analysis.active,
+            )
+            updated_analysis = await alayer.get_analysis_by_id(analysis_id)
+            return GraphQLAnalysis.from_internal(updated_analysis)
