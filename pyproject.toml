@@ -152,6 +152,7 @@ dev = [
     "bump-my-version~=1.2",
     "coverage~=7.6",
     "functions-framework~=3.10",
+    "mistune~=3.0",
     "openapi-generator-cli==5.3.0",
     "pre-commit~=4.5.1",
     "pytest~=9.0",
