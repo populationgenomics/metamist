@@ -88,8 +88,10 @@ class CohortMutations:
         """
         Create a cohort with the given name and sample/sequencing group IDs.
         """
-        from api.graphql.schema import GraphQLCohort  # noqa: PLC0415
-        from api.graphql.schema import CreatedGraphQLCohort
+        from api.graphql.schema import (  # noqa: PLC0415
+            CreatedGraphQLCohort,
+            GraphQLCohort,
+        )
 
         connection: Connection = info.context['connection']
         (target_project,) = connection.get_and_check_access_to_projects_for_names(

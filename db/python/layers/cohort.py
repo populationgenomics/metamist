@@ -152,9 +152,8 @@ class CohortLayer(BaseLayer):
 
         if not cohort_template.criteria.sg_ids_internal_raw:
             assert cohort_template.criteria.projects, 'Projects must be set in criteria'
-        else:
-            if not _is_valid_cohort_criteria_combination(cohort_template.criteria):
-                raise ValueError(self.COHORT_SG_CRITERIA_ERROR_MSG)
+        elif not _is_valid_cohort_criteria_combination(cohort_template.criteria):
+            raise ValueError(self.COHORT_SG_CRITERIA_ERROR_MSG)
         assert cohort_template.id is None, 'Cohort template ID must be None'
 
         template_id = await self.ct.create_cohort_template(

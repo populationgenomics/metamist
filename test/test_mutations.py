@@ -1,3 +1,5 @@
+from graphql.error import GraphQLError
+
 from api.graphql.mutations.analysis import AnalysisStatusType
 from db.python.filters.generic import GenericFilter
 from db.python.layers.analysis import AnalysisLayer
@@ -1426,7 +1428,8 @@ class TestCohortMutations(DbIsolatedTest):
     async def test_create_cohort_from_criteria_fail_when_sg_archived_and_exclude_not_set(
         self,
     ):
-        """Test mutation and API to create a cohort from sequencing group criteria when sgs are archived
+        """
+        Test mutation and API to create a cohort from sequencing group criteria when sgs are archived
         (and exclude archived sgs not set)"""
         await self.sgl.archive_sequencing_group(self.genome_sequencing_group_id_1)
 
