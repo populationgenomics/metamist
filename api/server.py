@@ -26,7 +26,7 @@ from db.python.utils import get_logger
 
 
 # This tag is automatically updated by bump-my-version
-_VERSION = '7.13.4'
+_VERSION = '7.14.0'
 
 
 logger = get_logger()
