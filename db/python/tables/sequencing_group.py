@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import date
+from string.templatelib import Template
 from typing import Any
 
 from dateutil.relativedelta import relativedelta
@@ -45,13 +46,12 @@ class SequencingGroupTable(DbBase):
             'external_id': 'sgexid.external_id',
         }
 
-        _query: list[str] = []
-        query_values: dict[str, Any] = {}
-        wheres: list[str] = []
+        _query: list[Template] = []
+        where_templates: list[Template] = []
 
         # Base query
         _query.append(
-            """
+            t"""
             SELECT DISTINCT sg.id
             FROM sequencing_group AS sg
             LEFT JOIN sample s ON s.id = sg.sample_id
@@ -60,7 +60,7 @@ class SequencingGroupTable(DbBase):
         )
 
         if filter_.sample:
-            swheres, svalues = filter_.sample.to_sql(
+            sample_where_template = filter_.sample.to_sql(
                 {
                     'id': 's.id',
                     'meta': 's.meta',
@@ -69,12 +69,9 @@ class SequencingGroupTable(DbBase):
                 }
             )
             if filter_.sample.external_id:
-                _query.append(
-                    'LEFT JOIN sample_external_id sexid ON s.id = sexid.sample_id'
-                )
+                _query.append(t'LEFT JOIN sample_external_id sexid ON s.id = sexid.sample_id')
 
-            wheres.append(swheres)
-            query_values.update(svalues)
+            where_templates.append(sample_where_template)
 
         if filter_.assay is not None:
             a_overrides = {
@@ -83,63 +80,60 @@ class SequencingGroupTable(DbBase):
                 'type': 'a.type',
                 'external_id': 'aexid.external_id',
             }
-            awheres, avalues = filter_.assay.to_sql(a_overrides)
-            _query.extend(
-                [
-                    'INNER JOIN sequencing_group_assay sga ON sg.id = sga.sequencing_group_id',
-                    'INNER JOIN assay a ON sga.assay_id = a.id',
-                ]
+            assay_where_template = filter_.assay.to_sql(a_overrides)
+            _query.append(
+                t"""
+                INNER JOIN sequencing_group_assay sga ON sg.id = sga.sequencing_group_id'
+                INNER JOIN assay a ON sga.assay_id = a.id
+                """
             )
 
-            wheres.append(awheres)
-            query_values.update(avalues)
+            where_templates.append(assay_where_template)
 
         if filter_.created_on is not None:
-            created_on_condition, created_on_vals = filter_.to_sql(
+            created_on_condition = filter_.to_sql(
                 {'created_on': 'DATE(created_on)'}, only=['created_on']
             )
-            query_values.update(created_on_vals)
             _query.append(
-                f"""
-            INNER JOIN (
-                SELECT id, TIMESTAMP(min(row_start)) AS created_on
-                FROM sequencing_group FOR SYSTEM_TIME ALL
-                GROUP BY id
-                HAVING {created_on_condition}
-            ) AS sg_timequery ON sg.id = sg_timequery.id
-            """
+                t"""
+                INNER JOIN (
+                    SELECT id, TIMESTAMP(min(row_start)) AS created_on
+                    FROM sequencing_group FOR SYSTEM_TIME ALL
+                    GROUP BY id
+                    HAVING {created_on_condition:q}
+                ) AS sg_timequery ON sg.id = sg_timequery.id
+                """
             )
 
         if filter_.has_cram is not None or filter_.has_gvcf is not None:
-            cram_wheres, cram_values = filter_.to_sql(
+            cram_where_template = filter_.to_sql(
                 sql_overrides, only=['has_cram', 'has_gvcf']
             )
-            query_values.update(cram_values)
             _query.append(
                 f"""
-            INNER JOIN (
-                SELECT
-                    sequencing_group_id,
-                    FIND_IN_SET('cram', GROUP_CONCAT(LOWER(anlysis_query.type))) > 0 AS has_cram,
-                    FIND_IN_SET('gvcf', GROUP_CONCAT(LOWER(anlysis_query.type))) > 0 AS has_gvcf
-                FROM
-                    analysis_sequencing_group
-                    INNER JOIN (
-                        SELECT
-                            id, type
-                        FROM
-                            analysis
-                    ) AS anlysis_query ON analysis_sequencing_group.analysis_id = anlysis_query.id
-                GROUP BY
-                    sequencing_group_id
-                HAVING
-                    {cram_wheres}
-            ) AS sg_filequery ON sg.id = sg_filequery.sequencing_group_id
-            """
+                INNER JOIN (
+                    SELECT
+                        sequencing_group_id,
+                        FIND_IN_SET('cram', GROUP_CONCAT(LOWER(anlysis_query.type))) > 0 AS has_cram,
+                        FIND_IN_SET('gvcf', GROUP_CONCAT(LOWER(anlysis_query.type))) > 0 AS has_gvcf
+                    FROM
+                        analysis_sequencing_group
+                        INNER JOIN (
+                            SELECT
+                                id, type
+                            FROM
+                                analysis
+                        ) AS anlysis_query ON analysis_sequencing_group.analysis_id = anlysis_query.id
+                    GROUP BY
+                        sequencing_group_id
+                    HAVING
+                        {cram_where_template:q}
+                ) AS sg_filequery ON sg.id = sg_filequery.sequencing_group_id
+                """
             )
 
         # Add the rest of the filters
-        fwheres, values = filter_.to_sql(
+        filter_template = filter_.to_sql(
             sql_overrides,
             exclude=[
                 'assay',
@@ -149,44 +143,48 @@ class SequencingGroupTable(DbBase):
                 'sample',
             ],
         )
-        wheres.append(fwheres)
+        where_templates.append(filter_template)
 
-        _query.append(f'WHERE {" AND ".join(wheres)}')
-        query_values.update(values)
+        where = t'WHERE'
+        for i, tmp in enumerate(where_templates, 1):
+            where += tmp
+            if i != len(where_templates):
+                where += t' AND '
+
+        _query.append(where)
 
         if limit:
-            _query.append('LIMIT :limit')
-            values['limit'] = limit
+            _query.append(t'LIMIT {limit}')
 
         if skip:
-            _query.append('OFFSET :offset')
-            values['offset'] = skip
+            _query.append(t'OFFSET {skip}')
 
-        _query_str = '\n'.join(q.strip() for q in _query)
+        _query_str = t''
+        for q in _query:
+            _query_str += q + t'\n'
+        # _query_str = '\n'.join(q.strip() for q in _query)
 
         ex_id_join = ''
         if external_id_table_alias:
             ex_id_join = f'LEFT JOIN sequencing_group_external_id {external_id_table_alias} ON sg.id = {external_id_table_alias}.sequencing_group_id'
 
-        _outer_query = f"""
+        _outer_query = t"""
             SELECT {', '.join(keys)}
             FROM sequencing_group sg
             LEFT JOIN sample s ON s.id = sg.sample_id
             {ex_id_join or ''}
             INNER JOIN (
-                {_query_str}
+                {_query_str:q}
             ) AS sg_query ON sg.id = sg_query.id
             GROUP BY sg.id
         """
 
-        return _outer_query, query_values
+        return _outer_query
 
     async def query(
         self, filter_: SequencingGroupFilter, limit: int | None = None, skip: int = 0
     ) -> tuple[set[ProjectId], list[SequencingGroupInternal]]:
         """Query samples"""
-        if filter_.is_false():
-            return set(), []
 
         keys = [
             'sg.id',
@@ -200,7 +198,7 @@ class SequencingGroupTable(DbBase):
             'sg.archived',
         ]
 
-        query, query_values = SequencingGroupTable.construct_query(
+        query = SequencingGroupTable.construct_query(
             filter_,
             keys=keys,
             external_id_table_alias='sgexid',
@@ -208,7 +206,7 @@ class SequencingGroupTable(DbBase):
             skip=skip,
         )
 
-        rows = await self.connection.fetch_all(query, query_values)
+        rows = await self.connection.fetch_all(query)
         sgs = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
         projects = set(sg.project for sg in sgs if sg.project)
         return projects, sgs
