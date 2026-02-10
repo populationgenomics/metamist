@@ -1,5 +1,8 @@
 from typing import Any
 
+import pytest
+
+from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers.participant import ParticipantLayer
 from db.python.tables.participant import ParticipantFilter
@@ -8,7 +11,7 @@ from models.models.assay import AssayUpsertInternal
 from models.models.participant import ParticipantUpsertInternal
 from models.models.sample import SampleUpsertInternal
 from models.models.sequencing_group import SequencingGroupUpsertInternal
-from test.testbase import DbIsolatedTest, run_as_sync
+from test.conftest import GraphQLQueryFunction
 
 
 def get_participant_to_insert(id_suffix='1'):
@@ -50,31 +53,27 @@ def get_participant_to_insert(id_suffix='1'):
     )
 
 
-class TestParticipant(DbIsolatedTest):
+class TestParticipant:
     """Test participant related functionality"""
 
-    @run_as_sync
-    async def setUp(self) -> None:
-        super().setUp()  # type: ignore
-
-        self.player = ParticipantLayer(self.connection)
-
-    @run_as_sync
-    async def test_query_by_ids(self):
+    @pytest.mark.asyncio
+    async def test_query_by_ids(self, connection: Connection):
         """Test query"""
 
-        p = await self.player.upsert_participant(get_participant_to_insert())
+        player = ParticipantLayer(connection)
 
-        ps = await self.player.query(ParticipantFilter(id=GenericFilter(eq=p.id)))
+        p = await player.upsert_participant(get_participant_to_insert())
 
-        self.assertEqual(len(ps), 1)
-        self.assertEqual(ps[0].id, p.id)
+        ps = await player.query(ParticipantFilter(id=GenericFilter(eq=p.id)))
 
-        ps = await self.player.query(ParticipantFilter(id=GenericFilter(in_=[-1])))
-        self.assertEqual(len(ps), 0)
+        assert len(ps) == 1
+        assert ps[0].id == p.id
 
-    @run_as_sync
-    async def test_query_by_exids(self):
+        ps = await player.query(ParticipantFilter(id=GenericFilter(in_=[-1])))
+        assert len(ps) == 0
+
+    @pytest.mark.asyncio
+    async def test_query_by_exids(self, connection: Connection):
         """Test query"""
 
         p = get_participant_to_insert()
@@ -83,54 +82,60 @@ class TestParticipant(DbIsolatedTest):
             'external_org': 'ex01',
         }
 
-        p = await self.player.upsert_participant(p)
+        player = ParticipantLayer(connection)
 
-        ps = await self.player.query(
-            ParticipantFilter(external_id=GenericFilter(eq='P01'))
-        )
+        p = await player.upsert_participant(p)
 
-        self.assertEqual(len(ps), 1)
-        self.assertEqual(ps[0].id, p.id)
+        ps = await player.query(ParticipantFilter(external_id=GenericFilter(eq='P01')))
 
-        ps = await self.player.query(
+        assert len(ps) == 1
+        assert ps[0].id == p.id
+
+        ps = await player.query(
             ParticipantFilter(external_id=GenericFilter(in_=['ex01']))
         )
-        self.assertEqual(len(ps), 1)
-        self.assertEqual(ps[0].id, p.id)
+        assert len(ps) == 1
+        assert ps[0].id == p.id
 
-        ps = await self.player.query(
+        ps = await player.query(
             ParticipantFilter(external_id=GenericFilter(in_=['ex02']))
         )
-        self.assertEqual(len(ps), 0)
+        assert len(ps) == 0
 
-    @run_as_sync
-    async def test_graphql_query_by_id(self):
+    @pytest.mark.asyncio
+    async def test_graphql_query_by_id(
+        self, connection_with_project: Connection, graphql_query: GraphQLQueryFunction
+    ):
         """Test query by id using graphql"""
-        p = await self.player.upsert_participant(get_participant_to_insert())
+        player = ParticipantLayer(connection_with_project)
+
+        p = await player.upsert_participant(get_participant_to_insert())
 
         q = """
-query TestGraphqlQueryById($projectName: String!, $pid: Int!) {
-    project(name: $projectName) {
-        participants(id: { in_: [$pid] }) {
-            id
-        }
-    }
-}
-"""
-        resp = await self.run_graphql_query_async(
-            q, {'projectName': self.project_name, 'pid': p.id}
+            query TestGraphqlQueryById($projectName: String!, $pid: Int!) {
+                project(name: $projectName) {
+                    participants(id: { in_: [$pid] }) {
+                        id
+                    }
+                }
+            }
+        """
+        resp = await graphql_query(
+            q, {'projectName': connection_with_project.project, 'pid': p.id}
         )
         assert resp is not None
 
-        self.assertEqual(1, len(resp['project']['participants']))
+        assert len(resp['project']['participants']) == 1
 
-    @run_as_sync
-    async def test_query_by_sample(self):
+    @pytest.mark.asyncio
+    async def test_query_by_sample(self, connection: Connection):
         """Test query"""
 
-        p = await self.player.upsert_participant(get_participant_to_insert())
+        player = ParticipantLayer(connection)
 
-        ps = await self.player.query(
+        p = await player.upsert_participant(get_participant_to_insert())
+
+        ps = await player.query(
             ParticipantFilter(
                 sample=ParticipantFilter.ParticipantSampleFilter(
                     external_id=GenericFilter(in_=['S01'])
@@ -138,51 +143,59 @@ query TestGraphqlQueryById($projectName: String!, $pid: Int!) {
             )
         )
 
-        self.assertEqual(len(ps), 1)
-        self.assertEqual(ps[0].id, p.id)
+        assert len(ps) == 1
+        assert ps[0].id == p.id
 
-        ps = await self.player.query(
+        ps = await player.query(
             ParticipantFilter(
                 sample=ParticipantFilter.ParticipantSampleFilter(
                     external_id=GenericFilter(in_=['S01-NOT_PRESENT'])
                 )
             )
         )
-        self.assertEqual(len(ps), 0)
+        assert len(ps) == 0
 
-    @run_as_sync
-    async def test_query_with_offset(self):
+    @pytest.mark.asyncio
+    async def test_query_with_offset(self, connection_with_project: Connection):
         """Test query providing an offset and a limit"""
 
-        p1 = await self.player.upsert_participant(get_participant_to_insert('1'))
-        p2 = await self.player.upsert_participant(get_participant_to_insert('2'))
+        project_id = connection_with_project.project_id
 
-        participants = await self.player.query(
-            ParticipantFilter(project=GenericFilter(eq=self.project_id)),
+        player = ParticipantLayer(connection_with_project)
+
+        p1 = await player.upsert_participant(get_participant_to_insert('1'))
+        p2 = await player.upsert_participant(get_participant_to_insert('2'))
+
+        participants = await player.query(
+            ParticipantFilter(project=GenericFilter(eq=project_id)),
             limit=1,
         )
 
-        self.assertEqual(len(participants), 1)
-        self.assertEqual(participants[0].id, p1.id)
+        assert len(participants) == 1
+        assert participants[0].id == p1.id
 
-        participants = await self.player.query(
-            ParticipantFilter(project=GenericFilter(eq=self.project_id)),
+        participants = await player.query(
+            ParticipantFilter(project=GenericFilter(eq=project_id)),
             limit=1,
             skip=1,
         )
 
-        self.assertEqual(len(participants), 1)
-        self.assertEqual(participants[0].id, p2.id)
+        assert len(participants) == 1
+        assert participants[0].id == p2.id
 
-    @run_as_sync
-    async def test_upsert_participant_with_phenotypes(self):
+    @pytest.mark.asyncio
+    async def test_upsert_participant_with_phenotypes(
+        self, connection: Connection, graphql_query: GraphQLQueryFunction
+    ):
         """Test upserting participant with phenotypes"""
 
         phenotypes: dict[str, Any] = {
             'phenotype1': 'value1',
             'phenotype2': {'number': 123},
         }
-        p = await self.player.upsert_participant(
+        player = ParticipantLayer(connection)
+
+        p = await player.upsert_participant(
             ParticipantUpsertInternal(
                 external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'},
                 meta={},
@@ -199,16 +212,18 @@ query TestGraphqlQueryById($projectName: String!, $pid: Int!) {
             }
         }"""
 
-        resp = await self.run_graphql_query_async(q, {'pid': p.id})
+        resp = await graphql_query(q, {'pid': p.id})
 
         resp_participant = resp['participant']
 
-        self.assertEqual(resp_participant['id'], p.id)
+        assert resp_participant['id'] == p.id
 
-        self.assertDictEqual(resp_participant['phenotypes'], phenotypes)
+        assert resp_participant['phenotypes'] == phenotypes
 
-    @run_as_sync
-    async def test_upsert_participant_with_phenotypes_twice(self):
+    @pytest.mark.asyncio
+    async def test_upsert_participant_with_phenotypes_twice(
+        self, connection: Connection, graphql_query: GraphQLQueryFunction
+    ):
         """Test upserting and then updating participant with phenotypes"""
 
         phenotypes1: dict[str, Any] = {
@@ -222,7 +237,9 @@ query TestGraphqlQueryById($projectName: String!, $pid: Int!) {
             'phenotype3': {'number': 678},
         }
 
-        p1 = await self.player.upsert_participant(
+        player = ParticipantLayer(connection)
+
+        p1 = await player.upsert_participant(
             ParticipantUpsertInternal(
                 external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'},
                 meta={},
@@ -231,7 +248,7 @@ query TestGraphqlQueryById($projectName: String!, $pid: Int!) {
             )
         )
 
-        p2 = await self.player.upsert_participant(
+        p2 = await player.upsert_participant(
             ParticipantUpsertInternal(
                 id=p1.id,
                 meta={},
@@ -241,7 +258,7 @@ query TestGraphqlQueryById($projectName: String!, $pid: Int!) {
         )
 
         # ensure second upsert didn't create a new participant
-        self.assertEqual(p1.id, p2.id)
+        assert p1.id == p2.id
 
         q = """
         query GetParticipant($pid: Int!) {
@@ -251,17 +268,20 @@ query TestGraphqlQueryById($projectName: String!, $pid: Int!) {
             }
         }"""
 
-        resp = await self.run_graphql_query_async(q, {'pid': p1.id})
+        resp = await graphql_query(q, {'pid': p1.id})
 
         resp_participant = resp['participant']
 
-        self.assertEqual(resp_participant['id'], p2.id)
+        assert resp_participant['id'] == p2.id
 
-        self.assertDictEqual(resp_participant['phenotypes'], phenotypes2)
+        assert resp_participant['phenotypes'] == phenotypes2
 
-    @run_as_sync
-    async def test_graphql_upsert_participant_with_phenotypes(self):
+    @pytest.mark.asyncio
+    async def test_graphql_upsert_participant_with_phenotypes(
+        self, connection_with_project: Connection, graphql_query: GraphQLQueryFunction
+    ):
         """Test upserting and then updating participant with phenotypes, via graphql"""
+        project_name = connection_with_project.project
 
         phenotypes1: dict[str, Any] = {
             'phenotype1': 'value1',
@@ -285,10 +305,10 @@ query TestGraphqlQueryById($projectName: String!, $pid: Int!) {
         }
         """
 
-        p1_resp = await self.run_graphql_query_async(
+        p1_resp = await graphql_query(
             mutation,
             {
-                'project': self.project_name,
+                'project': project_name,
                 'participants': [
                     {
                         'externalIds': {PRIMARY_EXTERNAL_ORG: 'Demeter'},
@@ -300,10 +320,10 @@ query TestGraphqlQueryById($projectName: String!, $pid: Int!) {
 
         p1 = p1_resp['participant']['upsertParticipants'][0]
 
-        p1_resp = await self.run_graphql_query_async(
+        p1_resp = await graphql_query(
             mutation,
             {
-                'project': self.project_name,
+                'project': project_name,
                 'participants': [
                     {
                         'id': p1['id'],
@@ -316,7 +336,7 @@ query TestGraphqlQueryById($projectName: String!, $pid: Int!) {
         p2 = p1_resp['participant']['upsertParticipants'][0]
 
         # ensure second upsert didn't create a new participant
-        self.assertEqual(p1['id'], p2['id'])
+        assert p1['id'] == p2['id']
 
         q = """
         query GetParticipant($pid: Int!) {
@@ -326,10 +346,10 @@ query TestGraphqlQueryById($projectName: String!, $pid: Int!) {
             }
         }"""
 
-        resp = await self.run_graphql_query_async(q, {'pid': p1['id']})
+        resp = await graphql_query(q, {'pid': p1['id']})
 
         resp_participant = resp['participant']
 
-        self.assertEqual(resp_participant['id'], p2['id'])
+        assert resp_participant['id'] == p2['id']
 
-        self.assertDictEqual(resp_participant['phenotypes'], phenotypes2)
+        assert resp_participant['phenotypes'] == phenotypes2
