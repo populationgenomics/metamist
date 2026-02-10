@@ -60,19 +60,18 @@ class AuditLogTable(DbBase):
         RETURNING id
         """
 
-        async with self.connection.pool.connection() as conn:
-            res = await conn.execute(
-                _query,
-                {
-                    'author': author,
-                    'on_behalf_of': on_behalf_of,
-                    'ar_guid': ar_guid,
-                    'comment': comment,
-                    'project': project,
-                    'meta': to_db_json(meta or {}),
-                },
-            )
+        res = await self.connection.pg_connection.execute(
+            _query,
+            {
+                'author': author,
+                'on_behalf_of': on_behalf_of,
+                'ar_guid': ar_guid,
+                'comment': comment,
+                'project': project,
+                'meta': to_db_json(meta or {}),
+            },
+        )
 
-            row: dict[str, int] | None = await res.fetchone()
-            assert row
-            return row['id']
+        row: dict[str, int] | None = await res.fetchone()
+        assert row
+        return row['id']
