@@ -1,4 +1,3 @@
-# pylint: disable=too-many-lines, too-many-nested-blocks, too-many-branches
 import logging
 import re
 from abc import ABCMeta, abstractmethod
@@ -49,6 +48,7 @@ from models.utils.sequencing_group_id_format import (
     sequencing_group_id_transform_to_raw,
 )
 
+
 # Label added to each Billing Big Query request,
 # so we can track the cost of metamist-api BQ usage
 BQ_LABELS = {'source': 'metamist-api'}
@@ -59,7 +59,8 @@ logger.setLevel(logging.INFO)
 
 
 class BillingBaseTable(BqDbBase):
-    """Billing Base Table
+    """
+    Billing Base Table
     This is abstract class, it should not be instantiated
     """
 
@@ -137,7 +138,8 @@ class BillingBaseTable(BqDbBase):
         return {}
 
     async def _last_loaded_day(self):
-        """Get the most recent fully loaded day in db
+        """
+        Get the most recent fully loaded day in db
         Go 2 days back as the data is not always available for the current day
         1 day back is not enough
         """

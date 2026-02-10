@@ -1,12 +1,11 @@
-# pylint: disable=unnecessary-lambda-assignment,too-many-locals,broad-exception-caught
-
 import asyncio
 import os
 import re
 import traceback
 from collections import defaultdict
+from collections.abc import Iterable, Iterator
 from datetime import datetime
-from typing import Iterable, Iterator, TypeVar
+from typing import TypeVar
 
 import aiohttp
 import slack_sdk
@@ -44,6 +43,7 @@ from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format_list,
 )
 
+
 SEQUENCING_GROUPS_TO_IGNORE = {22735, 22739}
 
 # production-pipelines stage names for each dataset type
@@ -66,10 +66,8 @@ _url_families_guid_map = '/api/project/sa/{projectGuid}/families/mapping'
 T = TypeVar('T')
 
 
-def chunk(iterable: Iterable[T], chunk_size=50) -> Iterator[list[T]]:
-    """
-    Chunk a sequence by yielding lists of `chunk_size`
-    """
+def chunk[T](iterable: Iterable[T], chunk_size=50) -> Iterator[list[T]]:
+    """Chunk a sequence by yielding lists of `chunk_size`"""
     chnk: list[T] = []
     for element in iterable:
         chnk.append(element)
@@ -108,9 +106,7 @@ class SeqrLayer(BaseLayer):
         return f'seqr-project-{sequencing_type}'
 
     async def get_synchronisable_types(self, project: Project) -> list[str]:
-        """
-        Check the project meta to find out which sequencing_types are synchronisable
-        """
+        """Check the project meta to find out which sequencing_types are synchronisable"""
         sequencing_types = await SequencingTypeTable(connection=self.connection).get()
         sts = [
             st
@@ -187,7 +183,7 @@ class SeqrLayer(BaseLayer):
                     messages.extend(
                         await self.sync_pedigree(family_ids=family_ids, **params)
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     _errors = [
                         ''.join(traceback.format_exception(type(e), e, e.__traceback__))
                     ]
@@ -275,10 +271,7 @@ class SeqrLayer(BaseLayer):
         headers: dict[str, str],
         family_ids: set[int],
     ) -> list[str]:
-        """
-        Synchronise families template from SM -> seqr
-        """
-
+        """Synchronise families template from SM -> seqr"""
         fam_rows = await self.flayer.get_families_by_ids(family_ids=list(family_ids))
         if not fam_rows:
             return ['No families to synchronise']
@@ -316,7 +309,6 @@ class SeqrLayer(BaseLayer):
         2. Upload pedigree to seqr
         3. Confirm the upload
         """
-
         # 1. Get pedigree from SM
         pedigree_data = await self._get_pedigree_from_sm(family_ids=family_ids)
         if not pedigree_data:
@@ -342,7 +334,6 @@ class SeqrLayer(BaseLayer):
         Sync individual participant metadata (eg: phenotypes)
         for a dataset into a seqr project
         """
-
         processed_records = await self.get_individual_meta_objs_for_seqr(
             participant_ids
         )
@@ -356,7 +347,7 @@ class SeqrLayer(BaseLayer):
         )
         text_response = await resp.text()
         if (
-            resp.status == 400
+            resp.status == 400  # noqa: PLR2004
             and 'Unable to find individuals to update' in text_response
         ):
             return [
@@ -456,8 +447,7 @@ class SeqrLayer(BaseLayer):
         # remove any non-filename compliant filenames
         filename = re.sub(r'[/\\?%*:|\'<>\x7F\x00-\x1F]', '-', filename)
 
-        fn_path = os.path.join(SEQR_MAP_LOCATION, filename)
-        # pylint: disable=no-member
+        fn_path = os.path.join(SEQR_MAP_LOCATION, filename)  # noqa: PTH118
 
         # Only need to write this once, as the POST request will ignore extra samples not in each index synced
         with AnyPath(fn_path).open('w+') as f:  # type: ignore
@@ -541,7 +531,6 @@ class SeqrLayer(BaseLayer):
         headers,
     ):
         """Get map of participant EID to cram path"""
-
         alayer = AnalysisLayer(self.connection)
 
         assert self.connection.project_id
@@ -610,7 +599,7 @@ class SeqrLayer(BaseLayer):
             )
             exceptions.extend(
                 (update['sampleId'], e)
-                for update, e in zip(updates, responses)
+                for update, e in zip(updates, responses, strict=False)
                 if isinstance(e, Exception)
             )
 
@@ -838,7 +827,7 @@ class SeqrLayer(BaseLayer):
             )
         except slack_sdk.errors.SlackApiError as err:
             return [f'SlackAPI error: {err}']
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return [f'Error posting to slack: {e}']
 
         return []

@@ -3,10 +3,11 @@ from typing import Any
 from models.base import OpenApiGenNoneType, SMBase, parse_sql_dict
 from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
 
+
 AssayId = int
 
 
-class AssayInternal(SMBase):
+class AssayInternal(SMBase):  # noqa: PLW1641
     """Internal model for Assay"""
 
     id: AssayId

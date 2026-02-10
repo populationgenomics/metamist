@@ -1,15 +1,17 @@
-from typing import Callable, Generic, TypeVar
+from collections.abc import Callable
+from typing import TypeVar
 
 import strawberry
 
 from db.python.filters import GenericFilter, GenericMetaFilter
+
 
 T = TypeVar('T')
 Y = TypeVar('Y')
 
 
 @strawberry.input(description='Filter for GraphQL queries')
-class GraphQLFilter(Generic[T]):
+class GraphQLFilter[T]:
     """EXTERNAL Filter for GraphQL queries"""
 
     eq: T | None = None
@@ -94,7 +96,8 @@ GraphQLMetaFilter = strawberry.scalars.JSON
 def graphql_meta_filter_to_internal_filter(
     f: GraphQLMetaFilter | None,
 ) -> GenericMetaFilter | None:
-    """Convert from GraphQL to internal filter model
+    """
+    Convert from GraphQL to internal filter model
 
     Args:
         f (GraphQLMetaFilter | None): GraphQL filter

@@ -1,9 +1,7 @@
-# pylint: disable=global-statement
-from typing import TYPE_CHECKING, Any, Tuple
+from typing import TYPE_CHECKING, Any
 
 from psycopg import sql
 from psycopg.rows import class_row
-from psycopg.types.enum import EnumInfo, register_enum
 
 from db.python.utils import Forbidden, get_logger
 from models.models.project import (
@@ -12,6 +10,7 @@ from models.models.project import (
     ProjectMemberUpdate,
     project_member_role_names,
 )
+
 
 # Avoid circular import for type definition
 if TYPE_CHECKING:
@@ -97,22 +96,15 @@ class ProjectPermissionsTable:
         project_id_map: dict[int, Project] = {}
         project_name_map: dict[str, Project] = {}
 
-        async with self.connection.pool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(Project)) as acur:
-                info = await EnumInfo.fetch(conn, 'project_member_role')
-                if info is None:
-                    raise ValueError(
-                        "Enum type 'project_member_role' not found in database"
-                    )
-                register_enum(info, acur, ProjectMemberRole)
+        conn = self.connection.pg_connection
+        async with conn.cursor(row_factory=class_row(Project)) as acur:
+            await acur.execute(_query, parameters)
 
-                await acur.execute(_query, parameters)
+            projects = await acur.fetchall()
 
-                projects = await acur.fetchall()
-
-            for project in projects:
-                project_id_map[project.id] = project
-                project_name_map[project.name] = project
+        for project in projects:
+            project_id_map[project.id] = project
+            project_name_map[project.name] = project
         return project_id_map, project_name_map
 
     async def get_seqr_project_ids(self) -> list[int]:
@@ -121,9 +113,10 @@ class ProjectPermissionsTable:
         """
         _query = "SELECT id FROM project WHERE (meta->>'is_seqr')::boolean"
 
-        async with self.connection.pool.connection() as conn:
-            cur = await conn.execute(_query)
-            rows = await cur.fetchall()
+        conn = self.connection.pg_connection
+
+        cur = await conn.execute(_query)
+        rows = await cur.fetchall()
         return [r['id'] for r in rows]
 
     async def check_if_member_in_group_by_name(self, group_name: str, member: str):
@@ -138,16 +131,11 @@ class ProjectPermissionsTable:
             LIMIT 1
         """
 
-        async with self.connection.pool.connection() as conn:
-            cur = await conn.execute(
-                _query, {'group_name': group_name, 'member': member}
-            )
-            row = await cur.fetchone()
+        conn = self.connection.pg_connection
+        cur = await conn.execute(_query, {'group_name': group_name, 'member': member})
+        row = await cur.fetchone()
 
-        if row is None:
-            return False
-
-        return True
+        return row is not None
 
     async def check_project_creator_permissions(self, author: str):
         """Check author has project_creator permissions"""
@@ -195,11 +183,12 @@ class ProjectPermissionsTable:
             'audit_log_id': await self.audit_log_id(),
         }
 
-        async with self.connection.pool.connection() as conn:
-            cur = await conn.execute(_query, values)
-            row = await cur.fetchone()
-            assert row
-            project_id = row['id']
+        conn = self.connection.pg_connection
+
+        cur = await conn.execute(_query, values)
+        row = await cur.fetchone()
+        assert row
+        project_id = row['id']
 
         await self.connection.refresh_projects()
 
@@ -233,8 +222,8 @@ class ProjectPermissionsTable:
             'UPDATE project SET {fields_str} WHERE name = %(name)s'
         ).format(fields_str=fields_str)
 
-        async with self.connection.pool.connection() as conn:
-            await conn.execute(_query, fields)
+        conn = self.connection.pg_connection
+        await conn.execute(_query, fields)
 
     async def delete_project_data(self, project: Project) -> bool:
         """
@@ -349,7 +338,8 @@ class ProjectPermissionsTable:
             sql.SQL('DELETE FROM analysis WHERE project = %(project)s'),
         ]
 
-        async with self.connection.pool.connection() as conn, conn.transaction():
+        conn = self.connection.pg_connection
+        async with conn.transaction():
             for query in delete_queries:
                 await conn.execute(query, {'project': project.id})
 
@@ -362,8 +352,8 @@ class ProjectPermissionsTable:
         Set group members for a group (by name)
         """
 
+        conn = self.connection.pg_connection
         async with (
-            self.connection.pool.connection() as conn,
             conn.transaction(),
             conn.cursor() as cur,
         ):
@@ -378,7 +368,7 @@ class ProjectPermissionsTable:
             )
             existing_rows = await cur.fetchall()
 
-            audit_log_id_map: dict[Tuple[str, str], int | None] = {
+            audit_log_id_map: dict[tuple[str, str], int | None] = {
                 (r['member'], r['role']): r['audit_log_id'] for r in existing_rows
             }
 

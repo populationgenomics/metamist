@@ -1,4 +1,3 @@
-# pylint: disable=invalid-overridden-method
 import time
 from datetime import datetime
 
@@ -25,8 +24,6 @@ from test.testbase import DbIsolatedTest, run_as_sync
 
 class TestAnalysis(DbIsolatedTest):
     """Test sample class"""
-
-    # pylint: disable=too-many-instance-attributes
 
     @run_as_sync
     async def setUp(self) -> None:

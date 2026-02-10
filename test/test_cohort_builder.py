@@ -1,8 +1,8 @@
-from test.testbase import DbIsolatedTest, run_as_sync
 from unittest.mock import patch
 
-import api.routes.cohort
 import metamist.models
+
+import api.routes.cohort
 from db.python.layers import SampleLayer
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
@@ -13,6 +13,7 @@ from models.models.cohort import CohortBody, CohortCriteria, NewCohort
 from models.utils.cohort_template_id_format import cohort_template_id_format
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
 from scripts.create_custom_cohort import get_cohort_spec, main
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 class TestCohortBuilderBasic(DbIsolatedTest):

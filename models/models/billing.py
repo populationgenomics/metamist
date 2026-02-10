@@ -1,6 +1,8 @@
 import datetime
-from enum import Enum
+from enum import StrEnum
+
 from pydantic import Field
+
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
 from models.base import SMBase
@@ -36,7 +38,7 @@ class BillingInternal(SMBase):
         )
 
 
-class BillingColumn(str, Enum):
+class BillingColumn(StrEnum):
     """List of billing columns"""
 
     # raw view columns
@@ -87,7 +89,7 @@ class BillingColumn(str, Enum):
     SAMPLE = 'sample'
 
     @classmethod
-    def can_group_by(cls, value: 'BillingColumn') -> bool:
+    def can_group_by(cls, value: BillingColumn) -> bool:
         """
         Return True if column can be grouped by
         TODO: If any new columns are added above and cannot be in a group by, add them here
@@ -109,7 +111,7 @@ class BillingColumn(str, Enum):
         )
 
     @classmethod
-    def is_extended_column(cls, value: 'BillingColumn') -> bool:
+    def is_extended_column(cls, value: BillingColumn) -> bool:
         """Return True if column is extended"""
         return value in (
             BillingColumn.DATASET,
@@ -126,7 +128,7 @@ class BillingColumn(str, Enum):
         )
 
     @classmethod
-    def str_to_enum(cls, value: str) -> 'BillingColumn':
+    def str_to_enum(cls, value: str) -> BillingColumn:
         """Convert string to enum"""
         # all column names have underscore in SQL, but dash in UI / stored data
         adjusted_value = value.replace('-', '_')

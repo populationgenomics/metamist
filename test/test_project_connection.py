@@ -28,7 +28,7 @@ class TestConnectionNoProject:
         self, connection: Connection
     ) -> None:
         """Test that a user with project access gets their projects."""
-        from test.conftest import TEST_USER
+        from test.conftest import TEST_USER  # noqa: PLC0415
 
         table = ProjectPermissionsTable(connection)
 
@@ -66,7 +66,7 @@ class TestConnectionWithProject:
         connection_with_project: Connection,
     ) -> None:
         """Test that connection can check access to the attached project."""
-        from models.models.project import ReadAccessRoles
+        from models.models.project import ReadAccessRoles  # noqa: PLC0415
 
         # This should not raise - user has reader role
         connection_with_project.check_access(ReadAccessRoles)

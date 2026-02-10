@@ -26,7 +26,7 @@ const getRowClassName = (sequencingType: string) => {
 const getCellValue = (details: ProjectInsightsDetails, key: ColumnKey): React.ReactNode => {
     if (key === 'stripy' || key === 'mito') {
         const report = details.web_reports?.[key]
-        return report ? <a href={(report as { url: string }).url}>Link</a> : 'N/A'
+        return report ? <a href={(report as unknown as { url: string }).url}>Link</a> : 'N/A'
     }
     if (key === 'cram') {
         // Return the cram timestamp_completed string if it exists, otherwise return 'N/A'

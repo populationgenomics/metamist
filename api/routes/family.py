@@ -1,9 +1,8 @@
-# pylint: disable=invalid-name,dangerous-default-value
 import codecs
 import csv
 import io
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
@@ -23,6 +22,7 @@ from models.models.family import Family
 from models.models.project import FullWriteAccessRoles, ReadAccessRoles
 from models.utils.sample_id_format import sample_id_transform_to_raw_list
 
+
 router = APIRouter(prefix='/family', tags=['family'])
 
 
@@ -33,6 +33,7 @@ class FamilyUpdateModel(BaseModel):
     external_ids: dict[str, str] | None = None
     description: str | None = None
     coded_phenotype: str | None = None
+    meta: dict[str, Any] | None = None
 
 
 @router.post('/{project}/pedigree', operation_id='importPedigree', tags=['seqr'])
@@ -174,6 +175,7 @@ async def update_family(
             external_ids=family.external_ids,
             description=family.description,
             coded_phenotype=family.coded_phenotype,
+            meta=family.meta,
         )
     }
 

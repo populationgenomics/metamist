@@ -39,7 +39,7 @@ class BucketAuditLogger:
 
     def __init__(self, dataset: str, name: str):
         """Initialize the audit logger."""
-        self.log_file = tempfile.NamedTemporaryFile(  # pylint: disable=consider-using-with
+        self.log_file = tempfile.NamedTemporaryFile(  # noqa: SIM115
             delete=False
         ).name
         self.logger = setup_logger(dataset, name, log_file=self.log_file)

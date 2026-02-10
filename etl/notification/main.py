@@ -2,12 +2,13 @@ import base64
 import json
 import logging
 import os
-from typing import Any, Dict
+from typing import Any
 
 import flask
 import functions_framework
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
+
 
 SLACK_BOT_TOKEN = os.getenv('SLACK_BOT_TOKEN')
 SLACK_CHANNEL = os.getenv('SLACK_CHANNEL')
@@ -15,7 +16,8 @@ SLACK_CHANNEL = os.getenv('SLACK_CHANNEL')
 
 @functions_framework.http
 def etl_notify(request: flask.Request):
-    """HTTP Cloud Function for Sending notification to slack channel
+    """
+    HTTP Cloud Function for Sending notification to slack channel
 
     This cloud function is setup as subscriber to notification pub/sub topic
     Payload message is expected to be in json format and it is passed to slack channel as is
@@ -28,6 +30,7 @@ def etl_notify(request: flask.Request):
         The response text, or any set of values that can be turned into a
         Response object using `make_response`
         <https://flask.palletsprojects.com/en/1.1.x/api/#flask.make_response>.
+
     Note:
         For more information on how Flask integrates with Cloud
         Functions, see the `Writing HTTP functions` page.
@@ -54,7 +57,7 @@ def etl_notify(request: flask.Request):
     # format message to slack message
     try:
         message_blocks = format_slack(message)
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except Exception as e:  # noqa: BLE001
         logging.error(f'Failed to format message: {e}, message: {message}')
         return {
             'success': False,
@@ -78,7 +81,7 @@ def etl_notify(request: flask.Request):
     return {'success': False, 'message': 'Failed to send message'}, 500
 
 
-def format_slack(message: Dict[str, Any]) -> Any | None:
+def format_slack(message: dict[str, Any]) -> Any | None:
     """
     Basic Slack message formatting
     Message is json file, for time being we pass all the keys to the message
@@ -105,8 +108,9 @@ def format_slack(message: Dict[str, Any]) -> Any | None:
     return message_sections
 
 
-def decode_message(jbody: Dict[str, Any]) -> Any | None:
-    """Decode the message from payload
+def decode_message(jbody: dict[str, Any]) -> Any | None:
+    """
+    Decode the message from payload
 
     Args:
         jbody (Dict[str, Any]): Json body of payload
@@ -131,7 +135,7 @@ def decode_message(jbody: Dict[str, Any]) -> Any | None:
     try:
         data_decoded = base64.b64decode(data)
         data_json = json.loads(data_decoded)
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except Exception as e:  # noqa: BLE001
         logging.error(f'Failed to extract request_id from the payload {e}')
 
     return data_json

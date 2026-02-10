@@ -3,8 +3,9 @@ import json
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
-import etl.load.main
 from metamist.parser.generic_metadata_parser import GenericMetadataParser
+
+import etl.load.main
 
 
 class TestGetParserInstance(GenericMetadataParser):

@@ -1,4 +1,3 @@
-# pylint: disable=missing-function-docstring,import-error,no-member
 """
 Make metamist architecture available to production pulumi stack
 so it can be centrally deployed. Do this through a plugin, and submodule.
@@ -13,6 +12,7 @@ import pulumi_gcp as gcp
 
 from cpg_infra.utils import archive_folder
 from cpg_utils.cloud import read_secret
+
 
 # this gets moved around during the pip install
 ETL_FOLDER = Path(__file__).parent / 'etl'
@@ -340,7 +340,8 @@ class SlackNotification:
         )
 
     def setup_notification(self):
-        """Setup notification, send notification to slack channel
+        """
+        Setup notification, send notification to slack channel
         This notification has more details customising the message than the generic gcp alerts
         """
         self._setup_notification_permissions()
@@ -349,7 +350,8 @@ class SlackNotification:
         return self.notification_pubsub_push_subscription
 
     def setup_incident_alerts_channel(self):
-        """Setup monitoring alerts, monitor logs for errors, batch them and report to slack channel
+        """
+        Setup monitoring alerts, monitor logs for errors, batch them and report to slack channel
         Action has to be taken if there are errors in the logs
         """
         self._incident_setup_alerts_slack_notification()

@@ -9,10 +9,11 @@ import argparse
 import datetime
 import random
 import uuid
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from metamist.apis import EnumsApi, ParticipantApi
 from metamist.models import ParticipantUpsert, SampleUpsert
+
 
 PRIMARY_EXTERNAL_ORG = ''
 
@@ -91,7 +92,7 @@ def random_dates(
     start_between: tuple[datetime.datetime, datetime.datetime],
     rough_gaps: list[datetime.timedelta],
 ):
-    "Generate a list of random dates in order"
+    """Generate a list of random dates in order"""
     # random datetime between specificed datetimes
     start_date = start_between[0] + datetime.timedelta(
         seconds=random.randint(
@@ -110,10 +111,8 @@ def random_dates(
     return [date.strftime('%Y-%m-%dT%H:%M:%S') for date in dates]
 
 
-def random_choice(
-    choices: Sequence[Union[str, bool, int]], weight_by_index: bool = False
-):
-    "Pick a random choice from a list of choices"
+def random_choice(choices: Sequence[str | bool | int], weight_by_index: bool = False):
+    """Pick a random choice from a list of choices"""
     weighted_choices = list(choices)
     if weight_by_index:
         for i, choice in enumerate(choices):
@@ -122,13 +121,13 @@ def random_choice(
 
 
 def random_list(
-    choices: Sequence[Union[str, bool, int]],
+    choices: Sequence[str | bool | int],
     weight_by_index: bool = False,
     min_len: int = 1,
     max_len: int = 5,
 ):
-    "Generate a random list of choices"
-    result: list[Union[str, bool, int]] = []
+    """Generate a random list of choices"""
+    result: list[str | bool | int] = []
     desired_len = random.randint(min_len, max_len)
     if desired_len > len(choices):
         raise ValueError(
@@ -201,7 +200,7 @@ def create_samples():
                     'volume_unit': 'ul',
                     'processing_start_datetime': processing_start_time,
                     'processing_end_datetime': processing_end_time,
-                    'processing_sop_version': f'WIMR v.{random.randint(1,3)}.{random.randint(0,9)}',
+                    'processing_sop_version': f'WIMR v.{random.randint(1, 3)}.{random.randint(0, 9)}',
                     'processing_site': sm_processing_site,
                 },
             ),
@@ -212,7 +211,7 @@ def create_samples():
                 meta={
                     'processing_start_datetime': processing_start_time,
                     'processing_end_datetime': processing_end_time,
-                    'processing_sop_version': f'WIMR v.{random.randint(1,3)}.{random.randint(0,9)}',
+                    'processing_sop_version': f'WIMR v.{random.randint(1, 3)}.{random.randint(0, 9)}',
                     'processing_site': sm_processing_site,
                     'parent_inventory_code': f'{root_external_id}-whole-blood',
                     'spot_quantity': random.randint(20, 30),
@@ -232,7 +231,7 @@ def create_samples():
                     'volume_unit': 'ul',
                     'processing_start_datetime': processing_start_time,
                     'processing_end_datetime': processing_end_time,
-                    'processing_sop_version': f'WIMR v.{random.randint(1,3)}.{random.randint(0,9)}',
+                    'processing_sop_version': f'WIMR v.{random.randint(1, 3)}.{random.randint(0, 9)}',
                     'processing_site': sm_processing_site,
                 },
             ),
@@ -250,7 +249,7 @@ def create_samples():
                     'volume_unit': 'ul',
                     'processing_start_datetime': processing_start_time,
                     'processing_end_datetime': processing_end_time,
-                    'processing_sop_version': f'WIMR v.{random.randint(1,3)}.{random.randint(0,9)}',
+                    'processing_sop_version': f'WIMR v.{random.randint(1, 3)}.{random.randint(0, 9)}',
                     'processing_site': sm_processing_site,
                 },
             ),
@@ -268,7 +267,7 @@ def create_samples():
                     'volume_unit': 'ul',
                     'processing_start_datetime': processing_start_time,
                     'processing_end_datetime': processing_end_time,
-                    'processing_sop_version': f'WIMR v.{random.randint(1,3)}.{random.randint(0,9)}',
+                    'processing_sop_version': f'WIMR v.{random.randint(1, 3)}.{random.randint(0, 9)}',
                     'processing_site': sm_processing_site,
                     'percent_viability': random.uniform(80, 100),
                     'total_viable_cells': random.uniform(20, 60),
@@ -293,7 +292,7 @@ def create_participant():
         'weguide': f'weguide_{weguide_id}',
     }
 
-    if random.random() < 0.3:
+    if random.random() < 0.3:  # noqa: PLR2004
         external_ids['sano'] = f'sano_{str(uuid.uuid4())}'
 
     participant = ParticipantUpsert(

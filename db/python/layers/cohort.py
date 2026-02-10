@@ -14,10 +14,11 @@ from models.models.cohort import (
     CohortCriteriaInternal,
     CohortInternal,
     CohortTemplateInternal,
-    NewCohortInternal,
     CohortUpdateBody,
+    NewCohortInternal,
 )
-from models.models.project import ProjectId, ReadAccessRoles, FullWriteAccessRoles
+from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
+
 
 logger = get_logger()
 

@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 import google.cloud.bigquery as bq
 import pytz
@@ -9,7 +9,7 @@ from db.python.tables.bq.function_bq_filter import FunctionBQFilter
 from models.models import BillingColumn
 
 
-class BGFunFilterTestEnum(str, Enum):
+class BGFunFilterTestEnum(StrEnum):
     """Simple Enum classs"""
 
     ID = 'id'
@@ -122,8 +122,8 @@ class TestFunctionBQFilter(unittest.TestCase):
         )
 
         # no params are present, should return empty SQL and Param list
-        NYC = pytz.timezone('America/New_York')
-        SYD = pytz.timezone('Australia/Sydney')
+        NYC = pytz.timezone('America/New_York')  # noqa: N806
+        SYD = pytz.timezone('Australia/Sydney')  # noqa: N806
         filter_.to_sql(
             BillingColumn.LABELS,
             {

@@ -216,6 +216,7 @@ CREATE TABLE family (
     description TEXT,
     coded_phenotype TEXT,
     author TEXT,
+    meta JSONB DEFAULT '{}',
     audit_log_id INTEGER
 );
 

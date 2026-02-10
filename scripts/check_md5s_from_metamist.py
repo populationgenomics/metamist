@@ -9,9 +9,9 @@ import hailtop.batch as hb
 
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import remote_tmpdir
-
 from metamist.apis import AssayApi, SampleApi
 from metamist.model.assay_query_criteria import AssayQueryCriteria
+
 
 LocationTuple = namedtuple(
     'LocationTuple', ['cpg_sample_id', 'location', 'checksum', 'size']
@@ -58,7 +58,7 @@ def validate_samples(
 
     for obj in triples:
         job = b.new_job(
-            f'validate_{obj.cpg_sample_id}_{os.path.basename(obj.location)}'
+            f'validate_{obj.cpg_sample_id}_{os.path.basename(obj.location)}'  # noqa: PTH119
         )
         job.image(driver_image)
 
@@ -166,5 +166,4 @@ def main(cpg_sample_ids: list[str], dataset: list[str], copy_files: bool = False
 
 
 if __name__ == '__main__':
-    # pylint: disable=no-value-for-parameter
     main()

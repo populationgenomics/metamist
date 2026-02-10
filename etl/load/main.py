@@ -15,6 +15,7 @@ from google.cloud import pubsub_v1, secretmanager
 
 from metamist.parser.generic_parser import GenericParser  # type: ignore
 
+
 # strip whitespace, newlines and '/' for template matching
 STRIP_CHARS = '/ \n'
 BIGQUERY_TABLE = os.getenv('BIGQUERY_TABLE')
@@ -43,9 +44,7 @@ def _get_pubsub_client():
 
 
 class ParsingStatus:
-    """
-    Enum type to distinguish between sucess and failure of parsing
-    """
+    """Enum type to distinguish between sucess and failure of parsing"""
 
     SUCCESS = 'SUCCESS'
     FAILED = 'FAILED'
@@ -53,9 +52,7 @@ class ParsingStatus:
 
 @lru_cache
 def get_accessor_config() -> dict:
-    """
-    Read the secret from the full secret path: ETL_ACCESSOR_CONFIG_SECRET
-    """
+    """Read the secret from the full secret path: ETL_ACCESSOR_CONFIG_SECRET"""
     response = _get_secret_manager().access_secret_version(
         request={'name': ETL_ACCESSOR_CONFIG_SECRET}
     )
@@ -63,9 +60,7 @@ def get_accessor_config() -> dict:
 
 
 def call_parser(parser_obj, row_json) -> tuple[str, str]:
-    """
-    This function calls parser_obj.from_json and returns status and result
-    """
+    """This function calls parser_obj.from_json and returns status and result"""
     tmp_res: list[str] = []
     tmp_status: list[str] = []
 
@@ -77,7 +72,7 @@ def call_parser(parser_obj, row_json) -> tuple[str, str]:
             r = await parser_obj.from_json(row_data, confirm=False, dry_run=False)
             res.append(r)
             status.append(ParsingStatus.SUCCESS)
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        except Exception as e:  # noqa: BLE001
             logging.error(f'Failed to parse: {e}')
             # add to the output
             res.append(f'Failed to parse: {e}')
@@ -93,9 +88,7 @@ def process_rows(
     request_id: str,
     bq_client: bq.Client,
 ) -> tuple[str, Any, Any]:
-    """
-    Process BQ results rows, should be only one row
-    """
+    """Process BQ results rows, should be only one row"""
     source_type = bq_row.type
     # source_type should be in the format /ParserName/Version e.g.: /bbv/v1
 
@@ -177,7 +170,7 @@ def process_rows(
                     NOTIFICATION_PUBSUB_TOPIC,
                     json.dumps({'title': msg_title} | log_record).encode(),
                 )
-            except Exception as e:  # pylint: disable=broad-exception-caught
+            except Exception as e:  # noqa: BLE001
                 logging.error(f'Failed to publish to pubsub: {e}')
 
     return status, parsing_result, row_json
@@ -185,7 +178,8 @@ def process_rows(
 
 @functions_framework.http
 def etl_load(request: flask.Request):
-    """HTTP Cloud Function for ETL loading records from BQ to MySQL DB
+    """
+    HTTP Cloud Function for ETL loading records from BQ to MySQL DB
 
     This function accepts Pub/Sub push messages or can be called directly
     For direct call request_id of BQ record to load is required, e.g. payload:
@@ -211,13 +205,13 @@ def etl_load(request: flask.Request):
         The response text, or any set of values that can be turned into a
         Response object using `make_response`
         <https://flask.palletsprojects.com/en/1.1.x/api/#flask.make_response>.
+
     Note:
         For more information on how Flask integrates with Cloud
         Functions, see the `Writing HTTP functions` page.
         <https://cloud.google.com/functions/docs/writing/http#http_frameworks>
 
     """
-
     auth = request.authorization
     if not auth or not auth.token:
         return {'success': False, 'message': 'No auth token provided'}, 401
@@ -242,9 +236,7 @@ def etl_load(request: flask.Request):
 def process_request(
     request_id: str, delivery_attempt: int | None = None
 ) -> tuple[dict, int]:
-    """
-    Process request_id, delivery_attempt and return result
-    """
+    """Process request_id, delivery_attempt and return result"""
     # locate the request_id in bq
     query = f"""
         SELECT * FROM `{BIGQUERY_TABLE}` WHERE request_id = @request_id
@@ -299,13 +291,15 @@ def process_request(
 
 
 def extract_request_id(jbody: dict[str, Any]) -> tuple[int | None, str | None]:
-    """Unwrapp request id from the payload
+    """
+    Unwrapp request id from the payload
 
     Args:
         jbody (dict[str, Any]): Json body of payload
 
     Returns:
         str | None: ID of object to be loaded
+
     """
     if not jbody:
         return None, None
@@ -331,22 +325,24 @@ def extract_request_id(jbody: dict[str, Any]) -> tuple[int | None, str | None]:
         data_decoded = base64.b64decode(data)
         data_json = json.loads(data_decoded)
         request_id = data_json.get('request_id')
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except Exception as e:  # noqa: BLE001
         logging.error(f'Failed to extract request_id from the payload {e}')
 
     return delivery_attempt, request_id
 
 
-def get_parser_instance(
+def get_parser_instance(  # noqa: D417, PLR0911
     submitting_user: str, request_type: str | None, init_params: dict
 ) -> tuple[GenericParser | None, str | None]:
-    """Extract parser name from source_type
+    """
+    Extract parser name from source_type
 
     Args:
         parser_type (str | None): The name of the config.etl.accessors.name to match
 
     Returns:
         object | None: _description_
+
     """
     if not request_type:
         return None, f'No "type" was provided on the request from {submitting_user}'
@@ -394,7 +390,7 @@ def get_parser_instance(
 
     try:
         parser_obj = parser_class_(**(init_params or {}))
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except Exception as e:  # noqa: BLE001
         logging.error(f'Failed to create parser instance {e}')
         return None, f'Failed to create parser instance {e}'
 
@@ -402,7 +398,8 @@ def get_parser_instance(
 
 
 def prepare_parser_map() -> dict[str, type[GenericParser]]:
-    """Prepare parser map
+    """
+    Prepare parser map
     loop through metamist_parser entry points and create map of parsers
     """
     parser_map = {}

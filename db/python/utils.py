@@ -4,6 +4,7 @@ import os
 import re
 from typing import Any, TypeVar
 
+
 T = TypeVar('T')
 X = TypeVar('X')
 
@@ -14,7 +15,6 @@ USE_GCP_LOGGING = os.getenv('SM_ENABLE_GCP_LOGGING', '0').lower() in ('y', 'true
 
 RE_FILENAME_SPLITTER = re.compile('[,;]')
 
-# pylint: disable=invalid-name
 _logger = None
 
 
@@ -32,7 +32,7 @@ class NoOpAenter:
         pass
 
 
-class Forbidden(Exception):
+class Forbidden(Exception):  # noqa: N818
     """Forbidden action"""
 
 
@@ -84,8 +84,7 @@ def get_logger():
     Python logging module. By default this captures all logs
     at INFO level and higher
     """
-    # pylint: disable=invalid-name,global-statement
-    global _logger
+    global _logger  # noqa: PLW0603
     if _logger:
         return _logger
 
@@ -96,10 +95,9 @@ def get_logger():
     _logger.setLevel(level=LOGGING_LEVEL)
 
     if USE_GCP_LOGGING:
-        # pylint: disable=import-outside-toplevel,c-extension-no-member
-        import google.cloud.logging
+        import google.cloud.logging  # noqa: PLC0415
 
-        client = google.cloud.logging.Client()  # pylint: disable=no-member
+        client = google.cloud.logging.Client()
         client.get_default_handler()
         client.setup_logging()
 

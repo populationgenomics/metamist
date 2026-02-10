@@ -91,7 +91,7 @@ def create_and_validate_md5s_for_files_in_directory(
         if mode == 'create':
             if not md5_exists or force_recreate_existing:
                 print('Creating md5 for', filepath)
-                job = b.new_job(f'Create {os.path.basename(filepath)}.md5')
+                job = b.new_job(f'Create {os.path.basename(filepath)}.md5')  # noqa: PTH119
                 create_md5(job, filepath, billing_project, driver_image)
             else:
                 print(f'{filepath}.md5 already exists, skipping')
@@ -100,7 +100,7 @@ def create_and_validate_md5s_for_files_in_directory(
         if mode == 'validate':
             if md5_exists:
                 print('Validating md5 for', filepath)
-                job = b.new_job(f'Validate md5 checksum: {os.path.basename(filepath)}')
+                job = b.new_job(f'Validate md5 checksum: {os.path.basename(filepath)}')  # noqa: PTH119
                 validate_md5(job, filepath, billing_project, driver_image)
             else:
                 print(f'{filepath}.md5 not found, skipping validation')
@@ -164,5 +164,4 @@ def main(
 
 
 if __name__ == '__main__':
-    # pylint: disable=no-value-for-parameter
     main()
