@@ -24,7 +24,13 @@ class TestCohortBuilderBasic(DbIsolatedTest):
         super().setUp()
 
     @run_as_sync
-    async def mock_ccfc(self, project, body_create_cohort_from_criteria):
+    async def mock_ccfc(
+        self,
+        project,
+        body_create_cohort_from_criteria,
+        dry_run,
+        exclude_ineligible_sg_ids_internal,
+    ):
         """Mock by directly calling the API route"""
         self.assertEqual(project, self.project_name)
         return await api.routes.cohort.create_cohort_from_criteria(
@@ -33,7 +39,8 @@ class TestCohortBuilderBasic(DbIsolatedTest):
                 **body_create_cohort_from_criteria['cohort_criteria'].to_dict()
             ),
             self.connection,
-            body_create_cohort_from_criteria['dry_run'],
+            dry_run,
+            exclude_ineligible_sg_ids_internal,
         )
 
     @run_as_sync
@@ -57,13 +64,15 @@ class TestCohortBuilderBasic(DbIsolatedTest):
                 cohort_body_spec=metamist.models.CohortBody(
                     name='Empty cohort', description='No criteria'
                 ),
-                projects=[self.project_name],
-                sg_ids_internal=[],
-                excluded_sg_ids=[],
-                sg_technologies=[],
-                sg_platforms=[],
-                sg_types=[],
-                sample_types=[],
+                cohort_criteria_spec=metamist.models.CohortCriteria(
+                    projects=[self.project_name],
+                    sg_ids_internal=[],
+                    excluded_sgs_internal=[],
+                    sg_technology=[],
+                    sg_platform=[],
+                    sg_type=[],
+                    sample_type=[],
+                ),
                 dry_run=False,
             )
         mock.assert_called_once()
@@ -116,7 +125,13 @@ class TestCohortBuilderData(DbIsolatedTest):
         self.sgC = sequencing_group_id_format(self.sC.sequencing_groups[0].id)
 
     @run_as_sync
-    async def mock_ccfc(self, project, body_create_cohort_from_criteria):
+    async def mock_ccfc(
+        self,
+        project,
+        body_create_cohort_from_criteria,
+        dry_run,
+        exclude_ineligible_sg_ids_internal,
+    ):
         """Mock by directly calling the API route"""
         self.assertEqual(project, self.project_name)
         return await api.routes.cohort.create_cohort_from_criteria(
@@ -125,7 +140,8 @@ class TestCohortBuilderData(DbIsolatedTest):
                 **body_create_cohort_from_criteria['cohort_criteria'].to_dict()
             ),
             self.connection,
-            body_create_cohort_from_criteria['dry_run'],
+            dry_run,
+            exclude_ineligible_sg_ids_internal,
         )
 
     @run_as_sync
@@ -139,13 +155,15 @@ class TestCohortBuilderData(DbIsolatedTest):
             cohort_body_spec=metamist.models.CohortBody(
                 name='Test cohort', description='Project criteria'
             ),
-            projects=[self.project_name],
-            sg_ids_internal=[],
-            excluded_sg_ids=[],
-            sg_technologies=[],
-            sg_platforms=[],
-            sg_types=[],
-            sample_types=[],
+            cohort_criteria_spec=metamist.models.CohortCriteria(
+                projects=[self.project_name],
+                sg_ids_internal=[],
+                excluded_sgs_internal=[],
+                sg_technology=[],
+                sg_platform=[],
+                sg_type=[],
+                sample_type=[],
+            ),
             dry_run=False,
         )
         mock.assert_called_once()
@@ -166,13 +184,14 @@ class TestCohortBuilderData(DbIsolatedTest):
             cohort_body_spec=metamist.models.CohortBody(
                 name='Epic cohort', description='Every criterion'
             ),
-            projects=[self.project_name],
-            sg_ids_internal=[self.sgA],
-            excluded_sg_ids=[self.sgB],
-            sg_technologies=['short-read'],
-            sg_platforms=['illumina'],
-            sg_types=['genome'],
-            sample_types=['blood'],
+            cohort_criteria_spec=metamist.models.CohortCriteria(
+                projects=[self.project_name],
+                excluded_sgs_internal=[self.sgB, self.sgC],
+                sg_technology=['short-read'],
+                sg_platform=['illumina'],
+                sg_type=['genome'],
+                sample_type=['blood'],
+            ),
             dry_run=False,
         )
         mock.assert_called_once()
@@ -186,14 +205,14 @@ class TestCohortBuilderData(DbIsolatedTest):
         criteria = body['cohort_criteria']
         self.assertIsInstance(criteria, metamist.models.CohortCriteria)
         self.assertListEqual(criteria.projects, [self.project_name])
-        self.assertListEqual(criteria.sg_ids_internal, [self.sgA])
-        self.assertListEqual(criteria.excluded_sgs_internal, [self.sgB])
+        self.assertListEqual(criteria.excluded_sgs_internal, [self.sgB, self.sgC])
         self.assertListEqual(criteria.sg_technology, ['short-read'])
         self.assertListEqual(criteria.sg_platform, ['illumina'])
         self.assertListEqual(criteria.sg_type, ['genome'])
         self.assertListEqual(criteria.sample_type, ['blood'])
 
-        self.assertFalse(body['dry_run'])
+        self.assertFalse(mock.call_args.kwargs['dry_run'])
+        self.assertFalse(mock.call_args.kwargs['exclude_ineligible_sg_ids_internal'])
 
         self.assertIsInstance(result, NewCohort)
         self.assertListEqual(result.sequencing_group_ids, [self.sgA])

@@ -80,6 +80,7 @@ from models.utils.cohort_template_id_format import (
 from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
+    sequencing_group_id_format_list,
     sequencing_group_id_transform_to_raw,
 )
 
@@ -194,6 +195,42 @@ class GraphQLCohort:
         loader = info.context['loaders'][LoaderKeys.PROJECTS_FOR_IDS]
         project = await loader.load(root.project_id)
         return GraphQLProject.from_internal(project)
+
+
+@strawberry.type
+class CreatedGraphQLCohort:
+    """Custom Cohort GraphQL model for cohort creation"""
+
+    created_cohort: GraphQLCohort
+    excluded_ineligible_sg_ids_internal: list[str] | None = None  # returns only SG ids
+
+    @staticmethod
+    def from_internal(
+        internal: CohortInternal,
+        excluded_ineligible_sg_ids_internal: list[int] | None = None,
+    ) -> 'CreatedGraphQLCohort':
+        return CreatedGraphQLCohort(
+            created_cohort=GraphQLCohort.from_internal(internal),
+            excluded_ineligible_sg_ids_internal=(
+                sequencing_group_id_format_list(excluded_ineligible_sg_ids_internal)
+                if excluded_ineligible_sg_ids_internal
+                else None
+            ),
+        )
+
+    @staticmethod
+    def from_internal_to_dry_run(
+        graphql_cohort: GraphQLCohort,
+        excluded_ineligible_sg_ids_internal: list[int] | None = None,
+    ) -> 'CreatedGraphQLCohort':
+        return CreatedGraphQLCohort(
+            created_cohort=graphql_cohort,
+            excluded_ineligible_sg_ids_internal=(
+                sequencing_group_id_format_list(excluded_ineligible_sg_ids_internal)
+                if excluded_ineligible_sg_ids_internal
+                else None
+            ),
+        )
 
 
 # Create cohort template GraphQL model
