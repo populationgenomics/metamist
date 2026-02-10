@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 import google.cloud.bigquery as bq
 import pytz
@@ -9,7 +9,7 @@ from db.python.tables.bq.function_bq_filter import FunctionBQFilter
 from models.models import BillingColumn
 
 
-class BGFunFilterTestEnum(str, Enum):
+class BGFunFilterTestEnum(StrEnum):
     """Simple Enum classs"""
 
     ID = 'id'

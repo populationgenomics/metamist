@@ -110,7 +110,7 @@ class SampleUpsertInternal(SMBase):
     participant_id: int | None = None
     active: bool | None = None
 
-    nested_samples: list['SampleUpsertInternal'] | None = None
+    nested_samples: list[SampleUpsertInternal] | None = None
 
     sequencing_groups: list[SequencingGroupUpsertInternal] | None = None
     non_sequencing_assays: list[AssayUpsertInternal] | None = None
@@ -199,7 +199,7 @@ class SampleUpsert(SMBase):
     participant_id: int | OpenApiGenNoneType = None
     active: bool | OpenApiGenNoneType = None
 
-    nested_samples: list['SampleUpsert'] | None = None
+    nested_samples: list[SampleUpsert] | None = None
     sequencing_groups: list[SequencingGroupUpsert] | None = None
     non_sequencing_assays: list[AssayUpsert] | None = None
 

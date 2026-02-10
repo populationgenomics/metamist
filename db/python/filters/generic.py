@@ -1,14 +1,13 @@
 import dataclasses
-import re
 from collections.abc import Callable, Sequence
 from enum import Enum
-from typing import Any, Generic, TypeVar
+from string.templatelib import Template
+from typing import Any, TypeVar
+
+from psycopg import sql
 
 from db.python.utils import escape_like_term
 from models.base import SMBase
-
-
-NONFIELD_CHARS_REGEX = re.compile(r'[^a-zA-Z0-9_]')
 
 
 T = TypeVar('T')
@@ -39,7 +38,7 @@ def get_hashable_value(value):  # noqa: PLR0911
     return hash(value)
 
 
-class GenericFilter(SMBase, Generic[T]):
+class GenericFilter[T](SMBase):
     """
     Generic filter for eq, in_ (in) and nin (not in)
     """
@@ -101,128 +100,77 @@ class GenericFilter(SMBase, Generic[T]):
         """Override to ensure we can hash this object"""
         return hash(self.get_hashable_value())
 
-    @staticmethod
-    def generate_field_name(name):
-        """
-        Replace any non \\w characters with an underscore
-
-        >>> GenericFilter.generate_field_name('foo')
-        'foo'
-        >>> GenericFilter.generate_field_name('foo.bar')
-        'foo_bar'
-        >>> GenericFilter.generate_field_name('$foo bar:>baz')
-        '_foo_bar__baz'
-        """  # noqa: D301
-        return NONFIELD_CHARS_REGEX.sub('_', name)
-
-    def is_false(self) -> bool:
-        """
-        The filter will resolve to False (usually because the in_ is an empty list)
-        """
-        return self.in_ is not None and len(self.in_) == 0
-
     def to_sql(
-        self, column: str, column_name: str | None = None
-    ) -> tuple[str, dict[str, T | list[T]]]:
+        self, column: str, column_expression: Template | None = None
+    ) -> Template:
         """
         Convert to SQL, and avoid SQL injection
 
         Args:
             column (str): The expression, or column name that derives the values
-            column_name (str, optional): A column name to use in the field_override.
-                We'll replace any non-alphanumeric characters with an _.
-                (Defaults to None)
+            column_expression (Template, optional): A SQL expression as a str Template
+                to be used for the column. This can be used if you want to use a sql
+                function for the column
 
         Returns:
-            tuple[str, dict[str, T | list[T]]]: (condition, prepared_values)
+            Template
         """
-        conditionals = []
-        values: dict[str, T | list[T]] = {}
-        _column_name = column_name or column
+        filters: list[Template] = []
 
         if not isinstance(column, str):
-            raise ValueError(f'Column {_column_name!r} must be a string')
+            raise ValueError(f'Column {column!r} must be a string')
+
+        column_query = column_expression if column_expression else t'{column:i}'
+
         if self.eq is not None:
-            k = self.generate_field_name(_column_name + '_eq')
-            conditionals.append(f'{column} = :{k}')
-            values[k] = self._sql_value_prep(self.eq)
+            filters.append(t'{column_query:q} = {self.eq}')
         if self.neq is not None:
-            k = self.generate_field_name(_column_name + '_neq')
-            conditionals.append(f'{column} != :{k}')
-            values[k] = self._sql_value_prep(self.neq)
+            filters.append(t'{column_query:q} != {self.neq}')
         if self.in_ is not None:
-            if len(self.in_) == 0:
-                # in an empty list is always false
-                return 'FALSE', {}
             if not isinstance(self.in_, list):
                 raise ValueError('IN filter must be a list')
-            if len(self.in_) == 1:
-                k = self.generate_field_name(_column_name + '_in_eq')
-                conditionals.append(f'{column} = :{k}')
-                values[k] = self._sql_value_prep(self.in_[0])
-            else:
-                k = self.generate_field_name(_column_name + '_in')
-                conditionals.append(f'{column} IN :{k}')
-                values[k] = self._sql_value_prep(self.in_)
+
+            # in an empty list is always false
+            if len(self.in_) == 0:
+                return t'FALSE'
+
+            filters.append(t'{column_query:q} = ANY({self.in_})')
+
         if self.nin is not None and len(self.nin) > 0:
-            # not in an empty list is always true
             if not isinstance(self.nin, list):
                 raise ValueError('NIN filter must be a list')
-            k = self.generate_field_name(column + '_nin')
-            conditionals.append(f'{column} NOT IN :{k}')
-            values[k] = self._sql_value_prep(self.nin)
+
+            # Include NULLs here as the user would expect to recieve nulls in the
+            # results when they are trying to exclude certain values
+            filters.append(
+                t'({column_query:q} IS NULL OR NOT ({column_query:q} = ANY({self.nin})))'
+            )
         if self.gt is not None:
-            k = self.generate_field_name(column + '_gt')
-            conditionals.append(f'{column} > :{k}')
-            values[k] = self._sql_value_prep(self.gt)
+            filters.append(t'{column_query:q} > {self.gt}')
         if self.gte is not None:
-            k = self.generate_field_name(column + '_gte')
-            conditionals.append(f'{column} >= :{k}')
-            values[k] = self._sql_value_prep(self.gte)
+            filters.append(t'{column_query:q} >= {self.gte}')
         if self.lt is not None:
-            k = self.generate_field_name(column + '_lt')
-            conditionals.append(f'{column} < :{k}')
-            values[k] = self._sql_value_prep(self.lt)
+            filters.append(t'{column_query:q} < {self.lt}')
         if self.lte is not None:
-            k = self.generate_field_name(column + '_lte')
-            conditionals.append(f'{column} <= :{k}')
-            values[k] = self._sql_value_prep(self.lte)
+            filters.append(t'{column_query:q} <= {self.lte}')
         if self.contains is not None:
             search_term = escape_like_term(str(self.contains))
-            k = self.generate_field_name(column + '_contains')
-            conditionals.append(f'{column} LIKE :{k}')
-            values[k] = self._sql_value_prep(f'%{search_term}%')
+            filters.append(t"{column_query:q} LIKE '%' || {search_term} || '%'")
         if self.icontains is not None:
             search_term = escape_like_term(str(self.icontains))
-            k = self.generate_field_name(column + '_icontains')
-            conditionals.append(f'LOWER({column}) LIKE LOWER(:{k})')
-            values[k] = self._sql_value_prep(f'%{search_term}%')
+            filters.append(t"{column_query:q} ILIKE '%' || {search_term} || '%'")
         if self.startswith is not None:
             search_term = escape_like_term(str(self.startswith))
-            k = self.generate_field_name(column + '_startswith')
-            conditionals.append(f'{column} LIKE :{k}')
-            values[k] = self._sql_value_prep(escape_like_term(search_term) + '%')
+            filters.append(t"{column_query:q} LIKE {search_term} || '%'")
         if self.isnull is not None:
             if self.isnull:
-                conditionals.append(f'{column} IS NULL')
+                filters.append(t'{column_query:q} IS NULL')
             else:
-                conditionals.append(f'{column} IS NOT NULL')
+                filters.append(t'{column_query:q} IS NOT NULL')
 
-        return ' AND '.join(conditionals), values
+        return sql.SQL(' AND ').join(filters)
 
-    @staticmethod
-    def _sql_value_prep(value):
-        if isinstance(value, list):
-            return [GenericFilter._sql_value_prep(v) for v in value]
-        if isinstance(value, Enum):
-            return value.value
-        if isinstance(value, dict):
-            return {k: GenericFilter._sql_value_prep(v) for k, v in value.items()}
-
-        # nothing else to do at this itme
-        return value
-
-    def transform(self, func: Callable[[T], X]) -> 'GenericFilter[X]':
+    def transform(self, func: Callable[[T], X]) -> GenericFilter[X]:
         """
         Apply a function to each value in the filter
         """
@@ -258,21 +206,6 @@ class GenericFilterModel:
     def get_hashable_value(self):
         """Get value that we could run hash on"""
         return get_hashable_value((self.__class__.__name__, *dataclasses.astuple(self)))
-
-    def is_false(self) -> bool:
-        """
-        Returns False if any of the internal filters is FALSE
-        """
-        for field in dataclasses.fields(self):
-            value = getattr(self, field.name)
-            if isinstance(value, GenericFilter) and value.is_false():
-                return True
-
-            if isinstance(value, dict):  # noqa: SIM102
-                if any(f.is_false() for f in value.values()):
-                    return True
-
-        return False
 
     def __post_init__(self):
         for field in dataclasses.fields(self):
@@ -315,10 +248,8 @@ class GenericFilterModel:
         field_overrides: dict[str, str] | None = None,
         only: list[str] | None = None,
         exclude: list[str] | None = None,
-    ) -> tuple[str, dict[str, Any]]:
+    ) -> Template:
         """Convert the model to SQL, and avoid SQL injection"""
-        if self.is_false():
-            return 'FALSE', {}
 
         _foverrides = field_overrides or {}
 
@@ -332,7 +263,7 @@ class GenericFilterModel:
             )
 
         fields = dataclasses.fields(self)
-        conditionals, values = [], {}
+        filters: list[Template] = []
         for field in fields:
             if only and field.name not in only:
                 continue
@@ -342,54 +273,32 @@ class GenericFilterModel:
             fcolumn = _foverrides.get(field.name, field.name)
             if filter_ := getattr(self, field.name):
                 if isinstance(filter_, dict):
-                    meta_conditionals, meta_values = prepare_query_from_dict_field(
-                        filter_=filter_, field_name=field.name, column_name=fcolumn
+                    filters.append(
+                        prepare_query_from_dict_field(
+                            filter_=filter_, field_name=field.name, column_name=fcolumn
+                        )
                     )
-                    conditionals.extend(meta_conditionals)
-                    values.update(meta_values)
                 elif isinstance(filter_, GenericFilter):
-                    fconditionals, fvalues = filter_.to_sql(fcolumn)
-                    conditionals.append(fconditionals)
-                    values.update(fvalues)
-                elif not isinstance(field.type, (GenericFilter, dict)):
-                    values.update({fcolumn: filter_})
-                    conditionals.append(f'{fcolumn} = :{fcolumn}')
+                    filters.append(filter_.to_sql(fcolumn))
                 else:
                     raise ValueError(
                         f'Filter {field.name} must be a GenericFilter or dict[str, GenericFilter]'
                     )
 
-        if not conditionals:
-            return 'True', {}
-
-        return ' AND '.join(filter(None, conditionals)), values
+        return sql.SQL(' AND ').join(filters)
 
 
 def prepare_query_from_dict_field(
-    filter_, field_name, column_name
-) -> tuple[list[str], dict[str, Any]]:
+    filter_: dict[str, Any],  # noqa: ARG001
+    field_name: str,  # noqa: ARG001
+    column_name: str,  # noqa: ARG001
+) -> Template:
     """
     Prepare a SQL query from a dict field, which is a dict of GenericFilters.
     Usually this is a JSON field in the database that we want to query on.
+
     """
-    conditionals: list[str] = []
-    values: dict[str, Any] = {}
-    for key, value in filter_.items():
-        if not isinstance(value, GenericFilter):
-            raise ValueError(f'Filter {field_name} must be a GenericFilter')
-        if '"' in key:
-            raise ValueError('Meta key contains " character, which is not allowed')
-
-        # using JSON_UNQUOTE is important here as by default JSON_EXTRACT will return
-        # a quoted string which means that filters like in_ and startswith will not
-        # work as the returned value starts with a " character. Strangely `eq` queries
-        # were working fine as mariadb was casting the filter value to a JSON string
-        # before comparing.
-        fconditionals, fvalues = value.to_sql(
-            f"JSON_UNQUOTE(JSON_EXTRACT({column_name}, '$.{key}'))",
-            column_name=f'{column_name}_{key}',
-        )
-        conditionals.append(fconditionals)
-        values.update(fvalues)
-
-    return conditionals, values
+    # @TODO implement this, it's a bit tricky as postgres is much more strict with JSON
+    # types.
+    raise NotImplementedError('Querying JSON keys is not implemented at the moment')
+    return t'FALSE'

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
@@ -34,50 +36,50 @@ class AssayMutations:
         self,
         content: str,
         id: int,
-        info: Info[GraphQLContext, 'AssayMutations'],
-    ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
+        info: Info[GraphQLContext, AssayMutations],
+    ) -> Annotated[GraphQLComment, strawberry.lazy('api.graphql.schema')]:
         """Add a comment to a assay"""
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
-        connection = info.context['connection']
-        cl = CommentLayer(connection)
-        result = await cl.add_comment_to_entity(
-            entity=CommentEntityType.assay, entity_id=id, content=content
-        )
-        return GraphQLComment.from_internal(result)
+        async with info.context['get_connection']() as connection:
+            cl = CommentLayer(connection)
+            result = await cl.add_comment_to_entity(
+                entity=CommentEntityType.assay, entity_id=id, content=content
+            )
+            return GraphQLComment.from_internal(result)
 
     @strawberry.mutation
     async def create_assay(
         self, assay: AssayUpsertInput, info: Info
-    ) -> Annotated['GraphQLAssay', strawberry.lazy('api.graphql.schema')]:
+    ) -> Annotated[GraphQLAssay, strawberry.lazy('api.graphql.schema')]:
         """Create new assay, attached to a sample"""
         from api.graphql.schema import GraphQLAssay  # noqa: PLC0415
 
-        connection = info.context['connection']
-        alayer = AssayLayer(connection)
-        upserted = await alayer.upsert_assay(
-            AssayUpsert.from_dict(strawberry.asdict(assay)).to_internal()
-        )
-        created_assay = await alayer.get_assay_by_id(upserted.id)  # type: ignore [arg-type]
-        return GraphQLAssay.from_internal(created_assay)
+        async with info.context['get_connection']() as connection:
+            alayer = AssayLayer(connection)
+            upserted = await alayer.upsert_assay(
+                AssayUpsert.from_dict(strawberry.asdict(assay)).to_internal()
+            )
+            created_assay = await alayer.get_assay_by_id(upserted.id)  # type: ignore [arg-type]
+            return GraphQLAssay.from_internal(created_assay)
 
     @strawberry.mutation
     async def update_assay(
         self,
         assay: AssayUpsertInput,
-        info: Info,
-    ) -> Annotated['GraphQLAssay', strawberry.lazy('api.graphql.schema')]:
+        info: Info[GraphQLContext, AssayMutations],
+    ) -> Annotated[GraphQLAssay, strawberry.lazy('api.graphql.schema')]:
         """Update assay for ID"""
         from api.graphql.schema import GraphQLAssay  # noqa: PLC0415
 
         if not assay.id:
             raise ValueError('Assay must have an ID to update')
-        connection = info.context['connection']
-        alayer = AssayLayer(connection)
-        upserted = await alayer.upsert_assay(
-            AssayUpsert.from_dict(strawberry.asdict(assay)).to_internal()
-        )
-        updated_assay = await alayer.get_assay_by_id(upserted.id)  # type: ignore [arg-type]
+        async with info.context['get_connection']() as connection:
+            alayer = AssayLayer(connection)
+            upserted = await alayer.upsert_assay(
+                AssayUpsert.from_dict(strawberry.asdict(assay)).to_internal()
+            )
+            updated_assay = await alayer.get_assay_by_id(upserted.id)  # type: ignore [arg-type]
 
-        return GraphQLAssay.from_internal(updated_assay)
+            return GraphQLAssay.from_internal(updated_assay)

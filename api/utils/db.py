@@ -1,5 +1,7 @@
 import json
 import logging
+from collections.abc import AsyncGenerator, Callable
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from os import getenv
 from typing import Any
 
@@ -90,7 +92,7 @@ def dependable_get_project_db_connection(allowed_roles: set[ProjectMemberRole]):
         ar_guid: str = Depends(get_ar_guid),
         extra_values: dict[str, Any] | None = Depends(get_extra_audit_log_values),
         on_behalf_of: str | None = Depends(get_on_behalf_of),
-    ) -> Connection:
+    ) -> AsyncGenerator[Connection]:
         """FastAPI handler for getting connection WITH project"""
         meta = {'path': request.url.path}
         if request.client:
@@ -99,14 +101,20 @@ def dependable_get_project_db_connection(allowed_roles: set[ProjectMemberRole]):
         if extra_values:
             meta.update(extra_values)
 
-        return await SMConnections.get_connection_with_project(
-            project_name=project,
-            author=author,
-            allowed_roles=allowed_roles,
-            on_behalf_of=on_behalf_of,
-            ar_guid=ar_guid,
-            meta=meta,
-        )
+        pool = SMConnections.get_postgres_pool()
+
+        async with pool.connection() as connection:
+            conn = await SMConnections.get_connection_with_project(
+                pg_connection=connection,
+                project_name=project,
+                author=author,
+                allowed_roles=allowed_roles,
+                on_behalf_of=on_behalf_of,
+                ar_guid=ar_guid,
+                meta=meta,
+            )
+
+            yield conn
 
     return dependable_project_db_connection
 
@@ -126,9 +134,46 @@ async def dependable_get_connection(
     if extra_values:
         meta.update(extra_values)
 
-    return await SMConnections.get_connection_no_project(
-        author, ar_guid=ar_guid, meta=meta, on_behalf_of=on_behalf_of
-    )
+    pool = SMConnections.get_postgres_pool()
+
+    async with pool.connection() as connection:
+        yield await SMConnections.get_connection_no_project(
+            connection, author, ar_guid=ar_guid, meta=meta, on_behalf_of=on_behalf_of
+        )
+
+
+GetConnection = Callable[[], AbstractAsyncContextManager[Connection]]
+
+
+async def dependable_get_connection_getter(
+    request: Request,
+    author: str = Depends(authenticate),
+    ar_guid: str = Depends(get_ar_guid),
+    extra_values: dict[str, Any] | None = Depends(get_extra_audit_log_values),
+    on_behalf_of: str | None = Depends(get_on_behalf_of),
+) -> GetConnection:
+    """FastAPI handler for getting connection getter for connection withOUT project"""
+    meta = {'path': request.url.path}
+    if request.client:
+        meta['ip'] = request.client.host
+
+    if extra_values:
+        meta.update(extra_values)
+
+    pool = SMConnections.get_postgres_pool()
+
+    @asynccontextmanager
+    async def get_connection():
+        async with pool.connection() as connection:
+            yield await SMConnections.get_connection_no_project(
+                connection,
+                author,
+                ar_guid=ar_guid,
+                meta=meta,
+                on_behalf_of=on_behalf_of,
+            )
+
+    return get_connection
 
 
 async def dependable_get_bq_connection(author: str = Depends(authenticate)):
@@ -174,5 +219,6 @@ def get_project_db_connection(allowed_roles: set[ProjectMemberRole]):
 
 
 get_projectless_db_connection = Depends(dependable_get_connection)
+get_projectless_db_connection_getter = Depends(dependable_get_connection_getter)
 get_projectless_bq_connection = Depends(dependable_get_bq_connection)
 get_projectless_pubsub_connection = Depends(dependable_get_pubsub_connection)

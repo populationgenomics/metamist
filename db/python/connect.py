@@ -10,6 +10,7 @@ from collections.abc import Iterable
 
 from psycopg import AsyncConnection
 from psycopg.rows import DictRow, dict_row
+from psycopg.types.enum import EnumInfo, register_enum
 from psycopg_pool import AsyncConnectionPool
 
 from api.settings import DB_POOL_MAX_SIZE, DB_POOL_MIN_SIZE
@@ -20,12 +21,12 @@ from db.python.utils import (
     NotFoundError,
     ProjectDoesNotExist,
 )
+from models.enums.analysis import AnalysisStatus
 from models.models.project import Project, ProjectId, ProjectMemberRole
 
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
-
 
 MAIN_SCHEMA = 'main'
 HISTORY_SCHEMA = 'history'
@@ -36,7 +37,7 @@ class Connection:
 
     def __init__(
         self,
-        postgres_pool: AsyncConnectionPool[AsyncConnection[DictRow]],
+        pg_connection: AsyncConnection[DictRow],
         project: Project | None,
         project_id_map: dict[ProjectId, Project],
         project_name_map: dict[str, Project],
@@ -45,7 +46,7 @@ class Connection:
         ar_guid: str | None,
         meta: dict[str, str] | None = None,
     ):
-        self.__postgres_pool = postgres_pool
+        self.__pg_connection: AsyncConnection[DictRow] = pg_connection
         self.__project: Project | None = project
         self.__project_id_map = project_id_map
         self.__project_name_map = project_name_map
@@ -58,8 +59,9 @@ class Connection:
         self._audit_log_lock = asyncio.Lock()
 
     @property
-    def pool(self):
-        return self.__postgres_pool
+    def pg_connection(self):
+        """Public getter for private pg_connection class variable"""
+        return self.__pg_connection
 
     @property
     def project(self):
@@ -270,7 +272,7 @@ class CredentialedDatabaseConfiguration:
         self.password = password
 
     @staticmethod
-    def dev_config() -> 'CredentialedDatabaseConfiguration':
+    def dev_config() -> CredentialedDatabaseConfiguration:
         """Dev config for local database with name 'sm_dev'"""
         # consider pulling from env variables
         return CredentialedDatabaseConfiguration(
@@ -312,6 +314,24 @@ async def configure_pg_connection(connection: AsyncConnection):
     async with connection:
         await connection.set_autocommit(True)
         await connection.execute(f'SET search_path TO {MAIN_SCHEMA}, {HISTORY_SCHEMA};')
+
+        # register enums on the connection
+        project_member_role_info = await EnumInfo.fetch(
+            connection, 'project_member_role'
+        )
+        if project_member_role_info is None:
+            raise ValueError("Enum type 'project_member_role' not found in database")
+        register_enum(project_member_role_info, connection, ProjectMemberRole)
+
+        analysis_status_info = await EnumInfo.fetch(connection, 'analysis_status')
+        if analysis_status_info is None:
+            raise ValueError("Enum type 'analysis_status' not found in database")
+        register_enum(
+            analysis_status_info,
+            connection,
+            AnalysisStatus,
+            mapping={m: m.value for m in AnalysisStatus},
+        )
 
 
 class SMConnections:
@@ -360,6 +380,7 @@ class SMConnections:
     @staticmethod
     async def get_connection_with_project(
         *,
+        pg_connection: AsyncConnection[DictRow],
         author: str,
         project_name: str,
         allowed_roles: set[ProjectMemberRole],
@@ -373,7 +394,7 @@ class SMConnections:
 
         # Instantiate connection with some bits missing so that we can check access
         connection = Connection(
-            postgres_pool=SMConnections.get_postgres_pool(),
+            pg_connection=pg_connection,
             author=author,
             project=None,
             project_id_map={},
@@ -392,14 +413,18 @@ class SMConnections:
 
     @staticmethod
     async def get_connection_no_project(
-        author: str, ar_guid: str, meta: dict[str, str], on_behalf_of: str | None
+        pg_connection: AsyncConnection[DictRow],
+        author: str,
+        ar_guid: str,
+        meta: dict[str, str],
+        on_behalf_of: str | None,
     ):
         """Get a db connection from a project and user"""
         # maybe it makes sense to perform permission checks here too
         logger.debug(f'Authenticate no-project connection with {author!r}')
 
         connection = Connection(
-            postgres_pool=SMConnections.get_postgres_pool(),
+            pg_connection=pg_connection,
             author=author,
             project=None,
             on_behalf_of=on_behalf_of,
