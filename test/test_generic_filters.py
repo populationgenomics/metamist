@@ -66,7 +66,8 @@ async def test_data(
                 ('per%ce_nt', 175, false, '2024-03-01', 'completed', 'reader'),
                 ('contains_test', 125, true, '2024-01-10', 'in-progress', 'contributor'),
                 ('testprefix', 300, false, '2024-04-01', 'queued', 'writer'),
-                ('TestPrefix', 350, true, '2024-05-01', 'completed', 'reader')
+                ('TestPrefix', 350, true, '2024-05-01', 'completed', 'reader'),
+                (NULL, 999, NULL, NULL, NULL, NULL)
         """)
 
     return db_pool
@@ -189,8 +190,8 @@ class TestGenericFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        # Should match 200, 300, 350
-        assert len(results) == 3
+        # Should match 200, 300, 350, 999
+        assert len(results) == 4
         assert all(r['test_int'] > 175 for r in results)
 
     async def test_gte_single(
@@ -202,8 +203,8 @@ class TestGenericFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        # Should match 175, 200, 300, 350
-        assert len(results) == 4
+        # Should match 175, 200, 300, 350, 999
+        assert len(results) == 5
         assert all(r['test_int'] >= 175 for r in results)
 
     async def test_lt_single(
@@ -241,9 +242,34 @@ class TestGenericFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        # Should match 125, 175, 300, 350
-        assert len(results) == 4
+        # Should match 125, 175, 300, 350, 999
+        assert len(results) == 5
         assert all(r['test_int'] not in [100, 150, 200] for r in results)
+
+    async def test_not_in_includes_nulls(
+        self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]
+    ):
+        """Test that nulls are included in the result of not in query"""
+        filter_ = GenericFilterTest(
+            test_enum=GenericFilter(
+                nin=[AnalysisStatus.COMPLETED, AnalysisStatus.QUEUED]
+            )
+        )
+
+        async with test_data.connection() as conn:
+            results = await execute_filter(conn, filter_)
+
+        # Should match in progress and null
+        assert len(results) == 3
+        assert (
+            len([r for r in results if r['test_enum'] == AnalysisStatus.IN_PROGRESS])
+            == 2
+        )
+        assert len([r for r in results if r['test_enum'] is None]) == 1
+        assert all(
+            r['test_enum'] not in [AnalysisStatus.COMPLETED, AnalysisStatus.QUEUED]
+            for r in results
+        )
 
     async def test_neq(self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]):
         """Test that the 'neq' (not equal) operator works correctly"""
@@ -275,10 +301,6 @@ class TestGenericFilters:
         """Test that the 'isnull=True' operator works correctly"""
         # Insert a row with NULL test_string
         async with test_data.connection() as conn:
-            await conn.execute(
-                'INSERT INTO test_generic_filters (test_string, test_int) VALUES (NULL, 999)'
-            )
-
             filter_ = GenericFilterTest(test_string=GenericFilter(isnull=True))
             results = await execute_filter(conn, filter_)
 
@@ -292,10 +314,6 @@ class TestGenericFilters:
         """Test that the 'isnull=False' operator works correctly"""
         # Insert a row with NULL test_string
         async with test_data.connection() as conn:
-            await conn.execute(
-                'INSERT INTO test_generic_filters (test_string, test_int) VALUES (NULL, 999)'
-            )
-
             filter_ = GenericFilterTest(test_string=GenericFilter(isnull=False))
             results = await execute_filter(conn, filter_)
 
@@ -498,7 +516,7 @@ class TestGenericFilters:
             results = await execute_filter(conn, filter_)
 
         # Should exclude queued
-        assert len(results) == 4
+        assert len(results) == 5
         assert all(r['test_enum'] != 'queued' for r in results)
 
     # String enum filter tests

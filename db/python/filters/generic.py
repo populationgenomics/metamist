@@ -113,7 +113,7 @@ class GenericFilter[T](SMBase):
                 function for the column
 
         Returns:
-            tuple[str, dict[str, T | list[T]]]: (condition, prepared_values)
+            Template
         """
         filters: list[Template] = []
 
@@ -300,4 +300,5 @@ def prepare_query_from_dict_field(
     """
     # @TODO implement this, it's a bit tricky as postgres is much more strict with JSON
     # types.
+    raise NotImplementedError('Querying JSON keys is not implemented at the moment')
     return t'FALSE'
