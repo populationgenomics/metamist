@@ -28,10 +28,10 @@ class CommentMutations:
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
-        connection = info.context['connection']
-        comment_layer = CommentLayer(connection)
-        comment = await comment_layer.add_comment_to_thread(parent_id, content)
-        return GraphQLComment.from_internal(comment)
+        async with info.context['get_connection']() as connection:
+            comment_layer = CommentLayer(connection)
+            comment = await comment_layer.add_comment_to_thread(parent_id, content)
+            return GraphQLComment.from_internal(comment)
 
     @strawberry.mutation
     async def update_comment(
@@ -44,11 +44,11 @@ class CommentMutations:
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
-        connection = info.context['connection']
-        comment_layer = CommentLayer(connection)
-        comment = await comment_layer.update_comment(id, content)
+        async with info.context['get_connection']() as connection:
+            comment_layer = CommentLayer(connection)
+            comment = await comment_layer.update_comment(id, content)
 
-        return GraphQLComment.from_internal(comment)
+            return GraphQLComment.from_internal(comment)
 
     @strawberry.mutation
     async def delete_comment(
@@ -58,10 +58,10 @@ class CommentMutations:
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
-        connection = info.context['connection']
-        comment_layer = CommentLayer(connection)
-        comment = await comment_layer.delete_comment(id)
-        return GraphQLComment.from_internal(comment)
+        async with info.context['get_connection']() as connection:
+            comment_layer = CommentLayer(connection)
+            comment = await comment_layer.delete_comment(id)
+            return GraphQLComment.from_internal(comment)
 
     @strawberry.mutation
     async def restore_comment(
@@ -71,7 +71,7 @@ class CommentMutations:
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
-        connection = info.context['connection']
-        comment_layer = CommentLayer(connection)
-        comment = await comment_layer.restore_comment(id)
-        return GraphQLComment.from_internal(comment)
+        async with info.context['get_connection']() as connection:
+            comment_layer = CommentLayer(connection)
+            comment = await comment_layer.restore_comment(id)
+            return GraphQLComment.from_internal(comment)
