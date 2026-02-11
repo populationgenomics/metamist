@@ -63,7 +63,7 @@ class SequencingGroupTable(DbBase):
             'type': 'sg.type',
             'technology': 'sg.technology',
             'platform': 'sg.platform',
-            'active_only': 'sg.archived',
+            'active_only': 'NOT sg.archived',
             # this is on the inner query, so won't conflict with the provided alias
             'external_id': 'sgexid.external_id',
         }

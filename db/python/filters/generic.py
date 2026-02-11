@@ -120,9 +120,17 @@ class GenericFilter[T](SMBase):
         if not isinstance(column, str):
             raise ValueError(f'Column {column!r} must be a string')
 
-        column_query = column_expression if column_expression else t'{column:i}'
-        if column == 'sg.archived':
-            pass
+        if column:
+            keywords = [segment.split('.') for segment in column.split(' ')]
+            sql_segments = []
+            for key in keywords:
+                if len(key) > 1:
+                    sql_segments.append(sql.Identifier(*key))
+                else:
+                    sql_segments.append(sql.SQL(*key))
+            column = sql.SQL(' ').join(sql_segments)
+
+        column_query = column_expression if column_expression else t'{column:q}'
 
         if self.eq is not None:
             filters.append(t'{column_query:q} = {self.eq}')
