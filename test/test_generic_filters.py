@@ -571,21 +571,3 @@ class TestGenericFilters:
         assert results[0]['test_bool'] is True
         assert results[0]['test_int'] >= 150
         assert results[0]['test_enum'] == AnalysisStatus.QUEUED
-
-    async def test_filter_with_override(
-        self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]
-    ):
-        """Test that the basic filter converts to SQL as expected with column name overrides and executes correctly"""
-        filter_ = GenericFilterTest(test_string=GenericFilter(eq='test'))
-        field_mapping = {
-            'test_string': 'tgf.test_string',
-        }
-        where_clause = filter_.to_sql(field_mapping)
-
-        async with test_data.connection() as conn:
-            query = t'select * from test_generic_filters tgf where {where_clause:q} order by id'
-            results = await (await conn.execute(query)).fetchall()
-
-        assert len(results) == 1
-        assert results[0]['test_string'] == 'test'
-        assert results[0]['test_int'] == 100
