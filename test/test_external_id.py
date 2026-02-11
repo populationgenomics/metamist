@@ -309,7 +309,9 @@ class TestSample:
         )
 
     @pytest.mark.asyncio
-    async def insert(self, sample_id, org, external_id, connection_with_project: Connection):
+    async def insert(
+        self, sample_id, org, external_id, connection_with_project: Connection
+    ):
         """Directly insert into sample_external_id table"""
         query = """
         INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)

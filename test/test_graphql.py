@@ -98,7 +98,6 @@ query MyQuery($project: String!) {
 class TestGraphQL:
     """Test graphql functionality"""
 
-
     @pytest.fixture(autouse=True)
     async def set_up(self, connection_with_project: Connection) -> None:
         """Setup the tests"""
@@ -446,7 +445,9 @@ query MyQuery($project: String!) {
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['reader', 'writer'])
-    async def test_query_family_by_meta(self, connection_with_project: Connection, graphql_query: GraphQLQueryFunction):
+    async def test_query_family_by_meta(
+        self, connection_with_project: Connection, graphql_query: GraphQLQueryFunction
+    ):
         """Test querying families by meta field"""
         family_layer = FamilyLayer(connection_with_project)
 
@@ -482,10 +483,10 @@ query MyQuery($project: String!) {
         assert values
 
         families = values['project']['families']
-        assert 1 == len(families)
+        assert len(families) == 1
         assert fid1 == families[0]['id']
-        assert 'family_with_meta'== families[0]['externalId']
-        assert 'study_a' == families[0]['meta']['study']
+        assert families[0]['externalId'] == 'family_with_meta'
+        assert families[0]['meta']['study'] == 'study_a'
 
         # Filter by priority=low - should return only family 2
         values2 = await graphql_query(
@@ -494,7 +495,7 @@ query MyQuery($project: String!) {
         assert values2
 
         families2 = values2['project']['families']
-        assert 1 == len(families2)
+        assert len(families2) == 1
         assert fid2 == families2[0]['id']
 
         # Filter by non-existent meta - should return empty
@@ -503,7 +504,7 @@ query MyQuery($project: String!) {
         )
         assert values3
 
-        assert 0 == len(values3['project']['families'])
+        assert len(values3['project']['families']) == 0
 
     @pytest.mark.asyncio
     async def test_get_project_name_from_analysis(self):
