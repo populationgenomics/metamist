@@ -8,7 +8,6 @@ from psycopg import sql
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.filters.participant import ParticipantFilter
-from db.python.tables.base import DbBase
 from db.python.tables.meta_table import MetaTable
 from db.python.utils import NotFoundError, escape_like_term, to_db_json
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantInternal, ProjectId
@@ -39,15 +38,15 @@ class ParticipantTable:
 
     async def get_project_ids_for_participant_ids(self, participant_ids: list[int]):
         """Get project IDs for participant_ids (mostly for checking auth)"""
-        _query = """
+        _query = t"""
             SELECT project
             FROM participant
-            WHERE id in %(participant_ids)s
+            WHERE id in {participant_ids:l}
             GROUP BY project
         """
 
         conn = self.connection.pg_connection
-        cur = await conn.execute(_query, {'participant_ids': participant_ids})
+        cur = await conn.execute(_query)
         rows = await cur.fetchall()
 
         return set(r['project'] for r in rows)
@@ -233,7 +232,7 @@ class ParticipantTable:
             'p.meta',
             'p.project',
         ]
-        query, values = await self._construct_participant_query(
+        query = await self._construct_participant_query(
             filter_,
             keys=keys,
             skip=skip,
@@ -242,20 +241,20 @@ class ParticipantTable:
         )
 
         conn = self.connection.pg_connection
-        cur = await conn.execute(query, values)
-        rows = cur.fetchall()
+        cur = await conn.execute(query)
+        rows = await cur.fetchall()
 
         projects = set(r['project'] for r in rows)
         return projects, [ParticipantInternal.from_db(dict(r)) for r in rows]
 
     async def query_count(self, filter_: ParticipantFilter) -> int:
         """Query for participants count"""
-        query, values = await self._construct_participant_query(
+        query = await self._construct_participant_query(
             filter_, keys=['COUNT(*) as cnt'], group_result_by_id=False
         )
 
         conn = self.connection.pg_connection
-        cur = await conn.execute(query, values)
+        cur = await conn.execute(query)
         row = await cur.fetchone()
 
         if not row:
@@ -286,6 +285,7 @@ class ParticipantTable:
         )
         return particicpants
 
+    # TODO: cannot convert until MetaTable is converted
     async def export_participant_table(self, project: int):
         """Export a parquet table of participants, including external_ids and meta"""
         mt = MetaTable(
@@ -340,48 +340,38 @@ class ParticipantTable:
         audit_log_id = await self.connection.audit_log_id()
         conn = self.connection.pg_connection
 
-        _query = """
+        meta_literal = to_db_json(meta or {})
+        project_literal = project or self.connection.project_id
+
+        _query = t"""
             INSERT INTO participant
                 (reported_sex, reported_gender, karyotype, meta, audit_log_id, project)
             VALUES
-                (%(reported_sex)s, %(reported_gender)s, %(karyotype)s, %(meta)s, %(audit_log_id)s, %(project)s)
+                ({reported_sex:l}, {reported_gender:l}, {karyotype:l}, {meta_literal:l}, {audit_log_id:l}, {project_literal:l})
             RETURNING id
         """
 
-        cur = await conn.execute(
-            _query,
-            {
-                'reported_sex': reported_sex,
-                'reported_gender': reported_gender,
-                'karyotype': karyotype,
-                'meta': to_db_json(meta or {}),
-                'audit_log_id': audit_log_id,
-                'project': project or self.connection.project_id,
-            },
-        )
+        cur = await conn.execute(_query)
         row = await cur.fetchone()
         if not row:
             raise ValueError('Failed to create participant')
         new_id = row['id']
 
-        _eid_query = """
-            INSERT INTO participant_external_id (project, participant_id, name, external_id, audit_log_id)
-            VALUES (%(project)s, %(pid)s, %(name)s, %(external_id)s, %(audit_log_id)s)
-        """
-        _eid_values = [
-            {
-                'project': project or self.connection.project_id,
-                'pid': new_id,
-                'name': name.lower(),
-                'external_id': eid,
-                'audit_log_id': audit_log_id,
-            }
-            for name, eid in external_ids.items()
-            if eid is not None
-        ]
-
         cur = conn.cursor()
-        await cur.executemany(_eid_query, _eid_values)
+        async with cur.copy(
+            'COPY participant_external_id (project, participant_id, name, external_id, audit_log_id) FROM STDIN'
+        ) as copy:
+            for name, eid in external_ids.items():
+                if eid is not None:
+                    await copy.write_row(
+                        (
+                            project or self.connection.project_id,
+                            new_id,
+                            name.lower(),
+                            eid,
+                            audit_log_id,
+                        )
+                    )
 
         return new_id
 
@@ -398,37 +388,33 @@ class ParticipantTable:
         You can't update selective fields on selective samples, if you provide metas, this
         function will update EVERY participant with the provided meta values.
         """
+
         updaters = ['audit_log_id = :audit_log_id']
         audit_log_id = await self.connection.audit_log_id()
-        values: dict[str, list[Any]] = {
-            'pid': participant_ids,
-            'audit_log_id': [audit_log_id] * len(participant_ids),
-        }
-        if reported_sexes:
-            updaters.append('reported_sex = :reported_sex')
-            values['reported_sex'] = reported_sexes
-        if reported_genders:
-            updaters.append('reported_gender = :reported_gender')
-            values['reported_gender'] = reported_genders
-        if karyotypes:
-            updaters.append('karyotype = :karyotype')
-            values['karyotype'] = karyotypes
-        if metas:
-            updaters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta')
-            values['meta'] = metas
+        audit_log_id *= len(participant_ids)
 
-        keys = list(values.keys())
-        list_values = [
-            {k: item[idx] for k, item in values.items()}
-            for idx in range(len(values[keys[0]]))
-        ]
+        updates = [t'audit_log_id = {audit_log_id:l}']
 
-        updaters_str = ', '.join(updaters)
-        _query = f'UPDATE participant SET {updaters_str} WHERE id = :pid'
+        updates.append(t'reported_sex = {reported_sexes:l}' if reported_sexes else t'')
+        updates.append(
+            t'reported_gender = {reported_genders:l}' if reported_genders else t''
+        )
+        updates.append(t'karyotype = {karyotypes:l}' if karyotypes else t'')
+        updates.append(
+            t'meta = JSON_MERGE_PATCH(COALESCE(meta, "{{}}"), {metas:l})'
+            if metas
+            else t''
+        )
+
+        # Filter out empty updates and join the rest with commas
+        updates = [u for u in updates if u]
+        updaters_str = sql.SQL(', ').join(updaters)
+
+        _query = t'UPDATE participant SET {updaters_str} WHERE id = %s'
 
         conn = self.connection.pg_connection
         cur = conn.cursor()
-        await cur.executemany(_query, list_values)
+        await cur.executemany(_query, [(pid,) for pid in participant_ids])
 
     async def update_participant(
         self,
