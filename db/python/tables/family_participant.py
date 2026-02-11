@@ -131,7 +131,6 @@ class FamilyParticipantTable(DbBase):
 
         join_type = t'LEFT' if include_participants_not_in_families else t'INNER'
         query = (
-            t''
             t'SELECT '
             t'fp.family_id,'
             t'p.id as individual_id,'

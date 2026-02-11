@@ -124,24 +124,21 @@ class FamilyTable(DbBase):
 
         _query = (
             t'SELECT f.id, jsonb_object_agg(feid.name, feid.external_id) AS external_ids, '
-            t'f.description, f.coded_phenotype, f.meta, f.project, fp.participant_id)'
-            t'FROM family f INNER JOIN family_external_id feid ON f.id = feid.family_id'
-            t'INNER JOIN family_participant fp ON f.id = fp.family_id WHERE fp.participant_id = ANY({participant_ids})'
+            t'f.description, f.coded_phenotype, f.meta, f.project, fp.participant_id '
+            t'FROM family f INNER JOIN family_external_id feid ON f.id = feid.family_id '
+            t'INNER JOIN family_participant fp ON f.id = fp.family_id WHERE fp.participant_id = ANY({participant_ids}) '
             t'GROUP BY f.id, f.description, f.coded_phenotype, f.meta, f.project, fp.participant_id'
         )
 
         ret_map = defaultdict(list)
         projects: set[ProjectId] = set()
 
-        async with self.connection.pg_connection.cursor(
-            row_factory=class_row(FamilyInternal)
-        ) as curr:
-            await curr.execute(_query)
-            family_internal_list = await curr.fetchall()
+        rows = await (await self.connection.pg_connection.execute(_query)).fetchall()
 
-        for family_internal in family_internal_list:
-            projects.add(family_internal.project)
-            ret_map[family_internal.participant_id].append(family_internal)
+        for row in rows:
+            pid = row.pop('participant_id')
+            projects.add(row.get('project'))
+            ret_map[pid].append(FamilyInternal(**row))
 
         return projects, ret_map
 
@@ -156,7 +153,7 @@ class FamilyTable(DbBase):
         rows = await (
             await self.connection.pg_connection.execute(
                 t'SELECT project, family_id, external_id FROM '
-                t'family_external_id WHERE project = ANY({project_ids}) AND external_id ILIKE {search_pattern} LIMIT {limit})'
+                t'family_external_id WHERE project = ANY({project_ids}) AND external_id ILIKE {search_pattern} LIMIT {limit}'
             )
         ).fetchall()
 
@@ -171,7 +168,7 @@ class FamilyTable(DbBase):
 
         _query = (
             t'SELECT feid.external_id, fp.participant_id FROM family_participant fp '
-            t'INNER JOIN family_external_id feid ON fp.family_id = feid.family_id) '
+            t'INNER JOIN family_external_id feid ON fp.family_id = feid.family_id '
             t'WHERE fp.participant_id = ANY({participant_ids})'
         )
 
@@ -258,11 +255,7 @@ class FamilyTable(DbBase):
                 if len(updaters) > 1:
                     joined = sql.SQL(',').join(updaters)
                     await curr.execute(
-                        t"""
-                            UPDATE family
-                            SET {joined:q}
-                            WHERE id = {id_:s}
-                            """
+                        t'UPDATE family SET {joined:q} WHERE id = {id_:s}'
                     )
 
         return True
@@ -381,7 +374,7 @@ class FamilyTable(DbBase):
         project_param = project or self.project_id
         _query = (
             t'SELECT external_id, family_id AS id FROM family_external_id '
-            t'WHERE external_id = ANY ({family_ids}) AND project = {project_param}'
+            t'WHERE external_id = ANY({family_ids}) AND project = {project_param}'
         )
 
         results = await (await self.connection.pg_connection.execute(_query)).fetchall()
@@ -409,7 +402,10 @@ class FamilyTable(DbBase):
         if len(family_ids) == 0:
             return {}
 
-        _query = t'SELECT family_id, external_id FROM family_external_id WHERE family_id = ANY({family_ids}) AND name = {PRIMARY_EXTERNAL_ORG}'
+        _query = (
+            t'SELECT family_id, external_id FROM family_external_id '
+            t'WHERE family_id = ANY({family_ids}) AND name = {PRIMARY_EXTERNAL_ORG}'
+        )
         results = await (await self.connection.pg_connection.execute(_query)).fetchall()
 
         id_map = {r['family_id']: r['external_id'] for r in results}

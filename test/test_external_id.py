@@ -200,9 +200,11 @@ class TestParticipant:
         assert result[fid][0].external_ids == {PRIMARY_EXTERNAL_ORG: 'P20', 'd': 'D20'}
 
     @pytest.mark.asyncio
-    async def test_get_families_by_participants(self, connection: Connection):
+    async def test_get_families_by_participants(
+        self, connection_with_project: Connection
+    ):
         """Exercise FamilyLayer's get_families_by_participants() method"""
-        flayer = FamilyLayer(connection)
+        flayer = FamilyLayer(connection_with_project)
         fid = await flayer.create_family(
             external_ids={PRIMARY_EXTERNAL_ORG: 'Smith'},
             description='Blacksmiths',
