@@ -2,8 +2,10 @@ from collections import defaultdict
 from datetime import date
 from string.templatelib import Template
 from typing import Any
-
 from dateutil.relativedelta import relativedelta
+
+from psycopg import AsyncConnection, sql
+from psycopg.rows import DictRow
 
 from db.python.filters.generic import GenericFilter
 from db.python.filters.sequencing_group import SequencingGroupFilter
@@ -14,6 +16,26 @@ from models.models.sequencing_group import (
     SequencingGroupInternal,
     SequencingGroupInternalId,
 )
+
+def to_string(template):
+    if not isinstance(template, Template):
+        raise TypeError("t-string expected")
+    def convert(value, conversion):
+        func = {
+            "a": ascii, "r": repr, "s": str, "t": to_string
+        }.get(conversion, lambda x: x)
+        return func(value)
+    parts = []
+    for item in template:
+        if isinstance(item, str):
+            parts.append(item)
+        else:
+            value = format(
+                convert(item.value, item.conversion),
+                item.format_spec
+            )
+            parts.append(value)
+    return "".join(parts)
 
 
 class SequencingGroupTable(DbBase):
@@ -30,7 +52,7 @@ class SequencingGroupTable(DbBase):
         skip: int | None = None,
         limit: int | None = None,
         external_id_table_alias: str | None = None,
-    ) -> tuple[str, dict]:
+    ) -> Template:
         """
         Construct a query for sequencing_group
         """
@@ -41,7 +63,7 @@ class SequencingGroupTable(DbBase):
             'type': 'sg.type',
             'technology': 'sg.technology',
             'platform': 'sg.platform',
-            'active_only': 'NOT sg.archived',
+            'active_only': 'sg.archived',
             # this is on the inner query, so won't conflict with the provided alias
             'external_id': 'sgexid.external_id',
         }
@@ -51,12 +73,10 @@ class SequencingGroupTable(DbBase):
 
         # Base query
         _query.append(
-            t"""
-            SELECT DISTINCT sg.id
-            FROM sequencing_group AS sg
-            LEFT JOIN sample s ON s.id = sg.sample_id
-            LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id
-            """
+t"""SELECT DISTINCT sg.id
+FROM sequencing_group AS sg
+LEFT JOIN sample s ON s.id = sg.sample_id
+LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id"""
         )
 
         if filter_.sample:
@@ -82,10 +102,8 @@ class SequencingGroupTable(DbBase):
             }
             assay_where_template = filter_.assay.to_sql(a_overrides)
             _query.append(
-                t"""
-                INNER JOIN sequencing_group_assay sga ON sg.id = sga.sequencing_group_id'
-                INNER JOIN assay a ON sga.assay_id = a.id
-                """
+t"""INNER JOIN sequencing_group_assay sga ON sg.id = sga.sequencing_group_id'
+INNER JOIN assay a ON sga.assay_id = a.id"""
             )
 
             where_templates.append(assay_where_template)
@@ -95,14 +113,12 @@ class SequencingGroupTable(DbBase):
                 {'created_on': 'DATE(created_on)'}, only=['created_on']
             )
             _query.append(
-                t"""
-                INNER JOIN (
-                    SELECT id, TIMESTAMP(min(row_start)) AS created_on
-                    FROM sequencing_group FOR SYSTEM_TIME ALL
-                    GROUP BY id
-                    HAVING {created_on_condition:q}
-                ) AS sg_timequery ON sg.id = sg_timequery.id
-                """
+t"""INNER JOIN (
+    SELECT id, TIMESTAMP(min(row_start)) AS created_on
+    FROM sequencing_group FOR SYSTEM_TIME ALL
+    GROUP BY id
+    HAVING {created_on_condition:q}
+) AS sg_timequery ON sg.id = sg_timequery.id"""
             )
 
         if filter_.has_cram is not None or filter_.has_gvcf is not None:
@@ -110,26 +126,24 @@ class SequencingGroupTable(DbBase):
                 sql_overrides, only=['has_cram', 'has_gvcf']
             )
             _query.append(
-                f"""
-                INNER JOIN (
-                    SELECT
-                        sequencing_group_id,
-                        FIND_IN_SET('cram', GROUP_CONCAT(LOWER(anlysis_query.type))) > 0 AS has_cram,
-                        FIND_IN_SET('gvcf', GROUP_CONCAT(LOWER(anlysis_query.type))) > 0 AS has_gvcf
-                    FROM
-                        analysis_sequencing_group
-                        INNER JOIN (
-                            SELECT
-                                id, type
-                            FROM
-                                analysis
-                        ) AS anlysis_query ON analysis_sequencing_group.analysis_id = anlysis_query.id
-                    GROUP BY
-                        sequencing_group_id
-                    HAVING
-                        {cram_where_template:q}
-                ) AS sg_filequery ON sg.id = sg_filequery.sequencing_group_id
-                """
+f"""INNER JOIN (
+    SELECT
+        sequencing_group_id,
+        FIND_IN_SET('cram', GROUP_CONCAT(LOWER(anlysis_query.type))) > 0 AS has_cram,
+        FIND_IN_SET('gvcf', GROUP_CONCAT(LOWER(anlysis_query.type))) > 0 AS has_gvcf
+    FROM
+        analysis_sequencing_group
+        INNER JOIN (
+            SELECT
+                id, type
+            FROM
+                analysis
+        ) AS anlysis_query ON analysis_sequencing_group.analysis_id = anlysis_query.id
+    GROUP BY
+        sequencing_group_id
+    HAVING
+        {cram_where_template:q}
+) AS sg_filequery ON sg.id = sg_filequery.sequencing_group_id"""
             )
 
         # Add the rest of the filters
@@ -145,11 +159,8 @@ class SequencingGroupTable(DbBase):
         )
         where_templates.append(filter_template)
 
-        where = t'WHERE'
-        for i, tmp in enumerate(where_templates, 1):
-            where += tmp
-            if i != len(where_templates):
-                where += t' AND '
+        # where = t'WHERE ' + sql.SQL(' AND ').join(where_templates)
+        where = t'WHERE FALSE AND sg.archived != True'
 
         _query.append(where)
 
@@ -164,20 +175,20 @@ class SequencingGroupTable(DbBase):
             _query_str += q + t'\n'
         # _query_str = '\n'.join(q.strip() for q in _query)
 
-        ex_id_join = ''
+        ex_id_join = t''
         if external_id_table_alias:
-            ex_id_join = f'LEFT JOIN sequencing_group_external_id {external_id_table_alias} ON sg.id = {external_id_table_alias}.sequencing_group_id'
+            ex_id_join = t'LEFT JOIN sequencing_group_external_id {external_id_table_alias:i} ON sg.id = {external_id_table_alias:i}.sequencing_group_id'
 
-        _outer_query = t"""
-            SELECT {', '.join(keys)}
-            FROM sequencing_group sg
-            LEFT JOIN sample s ON s.id = sg.sample_id
-            {ex_id_join or ''}
-            INNER JOIN (
-                {_query_str:q}
-            ) AS sg_query ON sg.id = sg_query.id
-            GROUP BY sg.id
-        """
+        _outer_query = (
+t"""SELECT {', '.join(keys)}
+FROM sequencing_group sg
+LEFT JOIN sample s ON s.id = sg.sample_id
+{ex_id_join:q}
+INNER JOIN (
+    {_query_str:q}
+) AS sg_query ON sg.id = sg_query.id
+GROUP BY sg.id"""
+        )
 
         return _outer_query
 
@@ -206,7 +217,11 @@ class SequencingGroupTable(DbBase):
             skip=skip,
         )
 
-        rows = await self.connection.fetch_all(query)
+        conn: AsyncConnection[DictRow] = self.connection.pg_connection
+        async with conn.cursor() as curr:
+            await curr.execute(query)
+            rows = await curr.fetchall()
+
         sgs = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
         projects = set(sg.project for sg in sgs if sg.project)
         return projects, sgs
@@ -242,7 +257,7 @@ class SequencingGroupTable(DbBase):
         Get sequence groups by internal identifiers
         """
 
-        query = SequencingGroupFilter(id=GenericFilter(in_=ids), active_only=None)
+        query = SequencingGroupFilter(id=GenericFilter(in_=ids))
         projects, sgs = await self.query(query)
 
         return projects, sgs

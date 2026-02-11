@@ -121,6 +121,8 @@ class GenericFilter[T](SMBase):
             raise ValueError(f'Column {column!r} must be a string')
 
         column_query = column_expression if column_expression else t'{column:i}'
+        if column == 'sg.archived':
+            pass
 
         if self.eq is not None:
             filters.append(t'{column_query:q} = {self.eq}')
