@@ -1,7 +1,11 @@
 import json
 from collections import defaultdict
+from string.templatelib import Template
 from typing import Any
 
+from psycopg import sql
+
+from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.filters.participant import ParticipantFilter
 from db.python.tables.base import DbBase
@@ -10,10 +14,13 @@ from db.python.utils import NotFoundError, escape_like_term, to_db_json
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantInternal, ProjectId
 
 
-class ParticipantTable(DbBase):
+class ParticipantTable:
     """
     Capture Analysis table operations and queries
     """
+
+    def __init__(self, connection: Connection):
+        self.connection = connection
 
     keys_str = ', '.join(
         [
@@ -33,13 +40,16 @@ class ParticipantTable(DbBase):
     async def get_project_ids_for_participant_ids(self, participant_ids: list[int]):
         """Get project IDs for participant_ids (mostly for checking auth)"""
         _query = """
-        SELECT project
-        FROM participant
-        WHERE id in :participant_ids
-        GROUP BY project"""
-        rows = await self.connection.fetch_all(
-            _query, {'participant_ids': participant_ids}
-        )
+            SELECT project
+            FROM participant
+            WHERE id in %(participant_ids)s
+            GROUP BY project
+        """
+
+        conn = self.connection.pg_connection
+        cur = await conn.execute(_query, {'participant_ids': participant_ids})
+        rows = await cur.fetchall()
+
         return set(r['project'] for r in rows)
 
     @staticmethod
@@ -50,171 +60,154 @@ class ParticipantTable(DbBase):
         limit: int | None = None,
         participant_eid_table_alias: str | None = None,
         group_result_by_id: bool = True,
-    ) -> tuple[str, dict[str, Any]]:
+    ) -> Template:
         """Construct a participant query"""
-        needs_family = False
-        needs_family_eid = False
-        needs_participant_eid = True  # always join, query optimiser can figure it out
-        needs_sample = False
-        needs_sample_eid = False
-        needs_sequencing_group = False
-        needs_assay = False
+        # Collection of where conditions
+        wheres = []
 
-        _wheres, values = filter_.to_sql(
-            {
-                'project': 'pp.project',
-                'id': 'pp.id',
-                'meta': 'pp.meta',
-                'external_id': 'peid.external_id',
-            },
-            exclude=['family', 'sample', 'sequencing_group', 'assay'],
-        )
-        wheres = [_wheres]
-
-        if filter_.family:
-            needs_family = True
-            fwheres, fvalues = filter_.family.to_sql(
-                {
-                    'id': 'f.id',
-                    'meta': 'f.meta',
-                },
-                exclude=['external_id'],
-            )
-            values.update(fvalues)
-            if fwheres:
-                wheres.append(fwheres)
-
-            if filter_.family.external_id:
-                needs_family_eid = True
-                feid_wheres, feid_values = filter_.family.to_sql(
-                    {'external_id': 'feid.external_id'}, only=['external_id']
-                )
-                wheres.append(feid_wheres)
-                values.update(feid_values)
-
-        if filter_.sample:
-            needs_sample = True
-            swheres, svalues = filter_.sample.to_sql(
-                {
-                    'id': 's.id',
-                    'type': 's.type',
-                    'meta': 's.meta',
-                    'sample_root_id': 's.sample_root_id',
-                    'sample_parent_id': 's.sample_parent_id',
-                },
-                exclude=['external_id'],
-            )
-            if filter_.sample.external_id:
-                needs_sample_eid = True
-                seid_wheres, seid_values = filter_.sample.to_sql(
-                    {'external_id': 'seid.external_id'}, only=['external_id']
-                )
-
-                wheres.append(seid_wheres)
-                svalues.update(seid_values)
-
-            values.update(svalues)
-            if swheres:
-                wheres.append(swheres)
-
-        if filter_.sequencing_group:
-            needs_sample = True
-            needs_sequencing_group = True
-            swheres, svalues = filter_.sequencing_group.to_sql(
-                {
-                    'id': 'sg.id',
-                    'meta': 'sg.meta',
-                    'type': 'sg.type',
-                    'technology': 'sg.technology',
-                    'platform': 'sg.platform',
-                }
-            )
-            values.update(svalues)
-            if swheres:
-                wheres.append(swheres)
-
-        if filter_.assay:
-            # 2024-06-13 mfranklin
-            #   This is explicitly NOT searching assays through the active sequencing
-            #   group, so it could return a result here, but not in the web, as the web
-            #   doesn't show non-sequencing-assays as of writing
-            needs_sample = True
-            needs_assay = True
-
-            awheres, avalues = filter_.assay.to_sql(
-                {
-                    'id': 'a.id',
-                    'meta': 'a.meta',
-                    'type': 'a.type',
-                }
-            )
-            values.update(avalues)
-            if awheres:
-                wheres.append(awheres)
-
-        query_lines = [
-            'SELECT DISTINCT pp.id',
-            'FROM participant pp',
-        ]
-
-        if needs_participant_eid:
-            query_lines.append(
-                'INNER JOIN participant_external_id peid ON pp.id = peid.participant_id'
-            )
-
-        if needs_sample:
-            query_lines.append('INNER JOIN sample s ON s.participant_id = pp.id')
-        if needs_sample_eid:
-            query_lines.append(
-                'INNER JOIN sample_external_id seid ON seid.sample_id = s.id'
-            )
-        if needs_sequencing_group:
-            query_lines.append('INNER JOIN sequencing_group sg ON sg.sample_id = s.id')
-        if needs_assay:
-            # see above for a quick note in assays from participant query
-            query_lines.append('INNER JOIN assay a ON a.sample_id = s.id')
-        if needs_family:
-            query_lines.append(
-                'INNER JOIN family_participant fp ON fp.participant_id = pp.id\n'
-                'INNER JOIN family f ON f.id = fp.family_id'
-            )
-        if needs_family_eid:
-            query_lines.append(
-                'INNER JOIN family_external_id feid ON feid.family_id = f.id'
-            )
-
-        if wheres:
-            query_lines.append('WHERE \n' + ' AND '.join(wheres))
-
-        if limit or skip:
-            query_lines.append('ORDER BY pp.id')
-
-        if limit:
-            query_lines.append('LIMIT :limit')
-            values['limit'] = limit
-
-        if skip:
-            query_lines.append('OFFSET :offset')
-            values['offset'] = skip
-
-        query = '\n'.join('  ' + line.strip() for line in query_lines)
-        ex_table_join = ''
-        if participant_eid_table_alias:
-            ex_table_join = f"""
-            LEFT JOIN participant_external_id {participant_eid_table_alias}
-                ON p.id = {participant_eid_table_alias}.participant_id
-            """
-        outer_query = f"""
-            SELECT {', '.join(keys)}
-            FROM participant p
-            {ex_table_join}
-            INNER JOIN (
-            {query}
-            ) as inner_query ON inner_query.id = p.id
-            {'GROUP BY p.id' if group_result_by_id else ''}
+        # Query constructer
+        query_template = t"""
+            SELECT DISTINCT pp.id,
+            FROM participant pp
         """
 
-        return outer_query, values
+        # Join on the participant_external_id table
+        # always join, query optimiser can figure it out
+        # Start by getting the project name, id, meta and external_id
+        wheres.append(
+            filter_.to_sql(
+                {
+                    'project': 'pp.project',
+                    'id': 'pp.id',
+                    'meta': 'pp.meta',
+                    'external_id': 'peid.external_id',
+                },
+                exclude=['family', 'sample', 'sequencing_group', 'assay'],
+            )
+        )
+
+        query_template += (
+            t'INNER JOIN participant_external_id peid ON pp.id = peid.participant_id'
+        )
+
+        # Check filter for the sample table and sample_external_id table
+        if filter_.sample or filter_.sequencing_group or filter_.assay:
+            if not filter_.sample:
+                raise ValueError(
+                    'Sample, sequencing group, and assay filters require a sample filter'
+                )
+
+            wheres.append(
+                filter_.sample.to_sql(
+                    {
+                        'id': 's.id',
+                        'type': 's.type',
+                        'meta': 's.meta',
+                        'sample_root_id': 's.sample_root_id',
+                        'sample_parent_id': 's.sample_parent_id',
+                    },
+                    exclude=['external_id'],
+                )
+            )
+
+            query_template += t'INNER JOIN sample s ON s.participant_id = pp.id'
+
+            if filter_.sample.external_id:
+                wheres.append(
+                    filter_.sample.to_sql(
+                        {'external_id': 'seid.external_id'}, only=['external_id']
+                    )
+                )
+
+                query_template += (
+                    t'INNER JOIN sample_external_id seid ON seid.sample_id = s.id'
+                )
+
+        if filter_.sequencing_group:
+            wheres.append(
+                filter_.sequencing_group.to_sql(
+                    {
+                        'id': 'sg.id',
+                        'meta': 'sg.meta',
+                        'type': 'sg.type',
+                        'technology': 'sg.technology',
+                        'platform': 'sg.platform',
+                    }
+                )
+            )
+
+            query_template += t'INNER JOIN sequencing_group sg ON sg.sample_id = s.id'
+
+        if filter_.assay:
+            wheres.append(
+                filter_.assay.to_sql(
+                    {
+                        'id': 'a.id',
+                        'meta': 'a.meta',
+                        'type': 'a.type',
+                    }
+                )
+            )
+
+            query_template += t'INNER JOIN assay a ON a.sample_id = s.id'
+
+        if filter_.family:
+            wheres.append(
+                filter_.family.to_sql(
+                    {
+                        'id': 'f.id',
+                        'meta': 'f.meta',
+                    },
+                    exclude=['external_id'],
+                )
+            )
+
+            query_template += t"""
+                INNER JOIN family_participant fp ON fp.participant_id = pp.id
+                INNER JOIN family f ON f.id = fp.family_id
+            """
+
+            if filter_.family.external_id:
+                wheres.append(
+                    filter_.family.to_sql(
+                        {'external_id': 'feid.external_id'}, only=['external_id']
+                    )
+                )
+
+                query_template += t"""
+                    INNER JOIN family_external_id feid ON feid.family_id = f.id
+                """
+
+        # WHERE, ORDER BY, LIMIT, OFFSET
+        query_template += t'WHERE ' + sql.SQL(' AND ').join(wheres) if wheres else t''
+        query_template += t'ORDER BY pp.id' if (limit or skip) else t''
+        query_template += t'LIMIT {limit:l}' if limit else t''
+        query_template += t'OFFSET {skip:l}' if skip else t''
+
+        # External table join in order to ge the participant id aliases
+        ex_table_join = (
+            t"""
+            LEFT JOIN participant_external_id {participant_eid_table_alias:l}
+                ON p.id = {participant_eid_table_alias:l}.participant_id
+            """
+            if participant_eid_table_alias
+            else t''
+        )
+
+        # Turn the keys into sql identifiers and construct the group by if needed
+        keys_str = sql.SQL(', ').join(keys)
+        optional_group_by = sql.SQL('GROUP BY p.id') if group_result_by_id else t''
+
+        # Final query template
+        outer_query = t"""
+            SELECT {keys_str:i}
+            FROM participant p
+            {ex_table_join:q}
+            INNER JOIN ({query_template:q}) as inner_query ON inner_query.id = p.id
+            {optional_group_by:q}
+        """
+
+        return outer_query
 
     async def query(  # noqa: D417
         self,
@@ -247,7 +240,11 @@ class ParticipantTable(DbBase):
             limit=limit,
             participant_eid_table_alias='pexid',
         )
-        rows = await self.connection.fetch_all(query, values)
+
+        conn = self.connection.pg_connection
+        cur = await conn.execute(query, values)
+        rows = cur.fetchall()
+
         projects = set(r['project'] for r in rows)
         return projects, [ParticipantInternal.from_db(dict(r)) for r in rows]
 
@@ -256,7 +253,11 @@ class ParticipantTable(DbBase):
         query, values = await self._construct_participant_query(
             filter_, keys=['COUNT(*) as cnt'], group_result_by_id=False
         )
-        row = await self.connection.fetch_one(query, values)
+
+        conn = self.connection.pg_connection
+        cur = await conn.execute(query, values)
+        row = await cur.fetchone()
+
         if not row:
             return 0
         return row['cnt']
@@ -287,7 +288,9 @@ class ParticipantTable(DbBase):
 
     async def export_participant_table(self, project: int):
         """Export a parquet table of participants, including external_ids and meta"""
-        mt = MetaTable(self._connection)
+        mt = MetaTable(
+            self.connection
+        )  # we need this for the external_id_query function, but it also handles the parquet writing
         query = f"""
             SELECT
                 p.id,
@@ -323,28 +326,29 @@ class ParticipantTable(DbBase):
         reported_gender: str | None,
         karyotype: str | None,
         meta: dict | None,
-        project: ProjectId = None,
+        project: ProjectId | None = None,
     ) -> int:
         """
         Create a new sample, and add it to database
         """
-        if not (project or self.project_id):
+        if not (project or self.connection.project_id):
             raise ValueError('Must provide project to create participant')
 
         if not external_ids or external_ids.get(PRIMARY_EXTERNAL_ORG) is None:
             raise ValueError('Participant must have primary external_id')
 
-        audit_log_id = await self.audit_log_id()
+        audit_log_id = await self.connection.audit_log_id()
+        conn = self.connection.pg_connection
 
         _query = """
-INSERT INTO participant
-    (reported_sex, reported_gender, karyotype, meta, audit_log_id, project)
-VALUES
-    (:reported_sex, :reported_gender, :karyotype, :meta, :audit_log_id, :project)
-RETURNING id
+            INSERT INTO participant
+                (reported_sex, reported_gender, karyotype, meta, audit_log_id, project)
+            VALUES
+                (%(reported_sex)s, %(reported_gender)s, %(karyotype)s, %(meta)s, %(audit_log_id)s, %(project)s)
+            RETURNING id
         """
 
-        new_id = await self.connection.fetch_val(
+        cur = await conn.execute(
             _query,
             {
                 'reported_sex': reported_sex,
@@ -352,17 +356,21 @@ RETURNING id
                 'karyotype': karyotype,
                 'meta': to_db_json(meta or {}),
                 'audit_log_id': audit_log_id,
-                'project': project or self.project_id,
+                'project': project or self.connection.project_id,
             },
         )
+        row = await cur.fetchone()
+        if not row:
+            raise ValueError('Failed to create participant')
+        new_id = row['id']
 
         _eid_query = """
-        INSERT INTO participant_external_id (project, participant_id, name, external_id, audit_log_id)
-        VALUES (:project, :pid, :name, :external_id, :audit_log_id)
+            INSERT INTO participant_external_id (project, participant_id, name, external_id, audit_log_id)
+            VALUES (%(project)s, %(pid)s, %(name)s, %(external_id)s, %(audit_log_id)s)
         """
         _eid_values = [
             {
-                'project': project or self.project_id,
+                'project': project or self.connection.project_id,
                 'pid': new_id,
                 'name': name.lower(),
                 'external_id': eid,
@@ -371,7 +379,9 @@ RETURNING id
             for name, eid in external_ids.items()
             if eid is not None
         ]
-        await self.connection.execute_many(_eid_query, _eid_values)
+
+        cur = conn.cursor()
+        await cur.executemany(_eid_query, _eid_values)
 
         return new_id
 
@@ -389,7 +399,7 @@ RETURNING id
         function will update EVERY participant with the provided meta values.
         """
         updaters = ['audit_log_id = :audit_log_id']
-        audit_log_id = await self.audit_log_id()
+        audit_log_id = await self.connection.audit_log_id()
         values: dict[str, list[Any]] = {
             'pid': participant_ids,
             'audit_log_id': [audit_log_id] * len(participant_ids),
@@ -415,7 +425,10 @@ RETURNING id
 
         updaters_str = ', '.join(updaters)
         _query = f'UPDATE participant SET {updaters_str} WHERE id = :pid'
-        await self.connection.execute_many(_query, list_values)
+
+        conn = self.connection.pg_connection
+        cur = conn.cursor()
+        await cur.executemany(_query, list_values)
 
     async def update_participant(
         self,
@@ -429,7 +442,7 @@ RETURNING id
         """
         Update participant
         """
-        audit_log_id = await self.audit_log_id()
+        audit_log_id = await self.connection.audit_log_id()
         updaters = ['audit_log_id = :audit_log_id']
         fields = {'pid': participant_id, 'audit_log_id': audit_log_id}
 
