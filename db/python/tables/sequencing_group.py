@@ -159,8 +159,7 @@ f"""INNER JOIN (
         )
         where_templates.append(filter_template)
 
-        # where = t'WHERE ' + sql.SQL(' AND ').join(where_templates)
-        where = t'WHERE FALSE AND sg.archived != True'
+        where = t'WHERE ' + sql.SQL(' AND ').join(where_templates)
 
         _query.append(where)
 
@@ -170,10 +169,7 @@ f"""INNER JOIN (
         if skip:
             _query.append(t'OFFSET {skip}')
 
-        _query_str = t''
-        for q in _query:
-            _query_str += q + t'\n'
-        # _query_str = '\n'.join(q.strip() for q in _query)
+        _query_str = sql.SQL('\n').join(_query)
 
         ex_id_join = t''
         if external_id_table_alias:
