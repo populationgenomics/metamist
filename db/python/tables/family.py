@@ -148,7 +148,6 @@ class FamilyTable(DbBase):
         """
         Search by some term, return [ProjectId, FamilyId, ExternalId]
         """
-        # TODO piyumi: remove comment later-ILIKE for case insensitive matches (mariadb:11.7.2 default collation utf8mb4_uca1400_ai_ci)
         search_pattern = (escape_like_term(query) + '%',)
         rows = await (
             await self.connection.pg_connection.execute(
@@ -230,7 +229,7 @@ class FamilyTable(DbBase):
                 if to_update:
                     await curr.execute(t'SELECT project FROM family WHERE id = {id_}')
                     project = await curr.fetchone()
-                    # # TODO piyumi: remove comment later- ON CONFLICT set to primary key
+
                     _update_query = """
                             INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
                             VALUES (%(project)s, %(id)s, %(name)s, %(external_id)s, %(audit_log_id)s)

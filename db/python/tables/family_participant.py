@@ -100,7 +100,6 @@ class FamilyParticipantTable(DbBase):
                 if k not in ignore_keys_during_update
             )
 
-            # TODO:piyumi ON CONFLICT(participant_id) primary key
             _query = f"""
                     INSERT INTO family_participant
                         ({str_keys})
@@ -167,7 +166,7 @@ class FamilyParticipantTable(DbBase):
 
         _query = (
             t'SELECT p.project, p.id, fp.family_id FROM family_participant fp '
-            t'INNER JOIN participant p ON p.id = fp.participant_id) '
+            t'INNER JOIN participant p ON p.id = fp.participant_id '
             t'WHERE fp.participant_id = ANY({participant_ids})'
         )
 
