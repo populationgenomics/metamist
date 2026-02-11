@@ -231,18 +231,20 @@ GROUP BY sg.id"""
         self, sequencing_group_ids: list[int]
     ) -> set[ProjectId]:
         """Get project IDs for sampleIds (mostly for checking auth)"""
-        _query = """
+        _query = """\
             SELECT s.project FROM sequencing_group sg
             INNER JOIN sample s ON s.id = sg.sample_id
-            WHERE sg.id in :sequencing_group_ids
+            WHERE sg.id in (%(sequencing_group_ids)s)
             GROUP BY s.project
         """
         if len(sequencing_group_ids) == 0:
             raise ValueError('Received no sequence group IDs to get project ids for')
 
-        rows = await self.connection.fetch_all(
-            _query, {'sequencing_group_ids': sequencing_group_ids}
-        )
+        conn = self.connection.pg_connection
+        async with conn.cursor() as cur:
+            await cur.execute(_query, {'sequencing_group_ids': sequencing_group_ids})
+            rows = await cur.fetchall()
+
         projects = set(r['project'] for r in rows)
         if not projects:
             raise ValueError(
