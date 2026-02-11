@@ -1,8 +1,9 @@
 import dataclasses
 from collections import defaultdict
+from string.templatelib import Template
 from typing import Any
 
-from psycopg.rows import class_row
+from psycopg import sql
 
 from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
@@ -48,13 +49,13 @@ class FamilyParticipantTable(DbBase):
             'audit_log_id': await self.audit_log_id(),
         }
         keys = list(updater.keys())
-        str_keys = ', '.join(keys)
-        placeholder_keys = ', '.join(f'%({k})s' for k in keys)
+        cols = sql.SQL(', ').join(map(sql.Identifier, keys))
+        place_holders = sql.SQL(', ').join(map(sql.Placeholder, keys))
 
-        _query = f"""INSERT INTO family_participant ({str_keys}) VALUES ({placeholder_keys})"""
-
-        async with self.connection.pool.connection() as conn:
-            await conn.execute(_query, updater)
+        _query = sql.SQL('INSERT INTO family_participant ({}) VALUES ({})').format(
+            cols, place_holders
+        )
+        await self.connection.pg_connection.execute(_query, updater)
 
         return family_id, participant_id
 
@@ -109,8 +110,8 @@ class FamilyParticipantTable(DbBase):
                     DO UPDATE SET
                         {update_keys}
                     """
-            async with self.connection.pool.connection() as conn:
-                await conn.execute(_query, remapped_ds)
+            async with self.connection.pg_connection.cursor() as cur:
+                await cur.executemany(_query, remapped_ds)
 
         return True
 
@@ -123,36 +124,34 @@ class FamilyParticipantTable(DbBase):
         Query the family_participant table
         """
 
-        wheres, values = filter_.to_sql()  # TODO: fix this util function
-        if not wheres:
+        where_params: Template = filter_.to_sql()
+
+        if not where_params:
             raise ValueError('No filter provided')
 
-        join_type = 'LEFT' if include_participants_not_in_families else 'INNER'
-        query = f"""
-        SELECT
-            fp.family_id,
-            p.id as individual_id,
-            fp.paternal_participant_id as paternal_id,
-            fp.maternal_participant_id as maternal_id,
-            p.reported_sex as sex,
-            fp.affected,
-            fp.notes as notes,
-            p.project
-        FROM participant p
-        {join_type} JOIN family_participant fp on fp.participant_id = p.id
-        WHERE {wheres}
-        """
+        join_type = t'LEFT' if include_participants_not_in_families else t'INNER'
+        query = (
+            t''
+            t'SELECT '
+            t'fp.family_id,'
+            t'p.id as individual_id,'
+            t'fp.paternal_participant_id as paternal_id,'
+            t'fp.maternal_participant_id as maternal_id,'
+            t'p.reported_sex as sex,'
+            t'fp.affected,'
+            t'fp.notes as notes,'
+            t'p.project '
+            t'FROM participant p '
+            t'{join_type:q} JOIN family_participant fp on fp.participant_id = p.id '
+            t'WHERE {where_params:q}'
+        )
 
-        async with self.connection.pool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(PedRowInternal)) as curr:
-                await curr.execute(query, values)
-                ped_row_internal_list = await curr.fetchall()
-
+        rows = await (await self.connection.pg_connection.execute(query)).fetchall()
         projects: set[ProjectId] = set()
         pedrows: list[PedRowInternal] = []
-        for ped_row_internal in ped_row_internal_list:
-            projects.add(ped_row_internal.project)
-            pedrows.append(ped_row_internal)
+        for row in rows:
+            projects.add(row.pop('project'))
+            pedrows.append(PedRowInternal(**row))
 
         return projects, pedrows
 
@@ -172,8 +171,8 @@ class FamilyParticipantTable(DbBase):
             t'INNER JOIN participant p ON p.id = fp.participant_id) '
             t'WHERE fp.participant_id = ANY({participant_ids})'
         )
-        async with self.connection.pool.connection() as conn:
-            rows = await (await conn.execute(_query)).fetchall()
+
+        rows = await (await self.connection.pg_connection.execute(_query)).fetchall()
 
         projects = set(r['project'] for r in rows)
         conflicts: dict[int, list[int]] = {}
@@ -207,14 +206,11 @@ class FamilyParticipantTable(DbBase):
 
         _update_before_delete = (
             t'UPDATE family_participant SET audit_log_id = {audit_log_id} '
-            t'WHERE family_id = {family_id} AND participant_id = {participant_id})'
+            t'WHERE family_id = {family_id} AND participant_id = {participant_id}'
         )
+        await self.connection.pg_connection.execute(_update_before_delete)
 
-        _query = t'DELETE FROM family_participant WHERE participant_id = {participant_id} AND family_id = {family_id}'
-
-        async with self.connection.pool.connection() as conn:
-            await conn.execute(_update_before_delete)
-
-            await conn.execute(_query)
+        _delete_query = t'DELETE FROM family_participant WHERE participant_id = {participant_id} AND family_id = {family_id}'
+        await self.connection.pg_connection.execute(_delete_query)
 
         return True

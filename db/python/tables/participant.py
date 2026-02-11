@@ -35,11 +35,13 @@ class ParticipantTable(DbBase):
         _query = """
         SELECT project
         FROM participant
-        WHERE id in :participant_ids
+        WHERE id = ANY(%(participant_ids)s)
         GROUP BY project"""
-        rows = await self.connection.fetch_all(
-            _query, {'participant_ids': participant_ids}
-        )
+        rows = await (
+            await self.connection.pg_connection.execute(
+                _query, {'participant_ids': participant_ids}
+            )
+        ).fetchall()
         return set(r['project'] for r in rows)
 
     @staticmethod
@@ -522,22 +524,11 @@ RETURNING id
         if len(external_participant_ids) == 0:
             return {}
 
-        _query = """
-        SELECT external_id, participant_id AS id
-        FROM participant_external_id
-        WHERE external_id = ANY(%(external_ids)s) AND project = %(project)s
-        """
-
-        async with self.connection.pool.connection() as conn:
-            async with conn.cursor() as curr:
-                await curr.execute(
-                    _query,
-                    {
-                        'external_ids': external_participant_ids,
-                        'project': project,
-                    },
-                )
-                results = await curr.fetchall()
+        _query = (
+            t'SELECT external_id, participant_id AS id FROM participant_external_id '
+            t'WHERE external_id = ANY({external_participant_ids}) AND project = {project}'
+        )
+        results = await (await self.connection.pg_connection.execute(_query)).fetchall()
 
         id_map = {r['external_id']: r['id'] for r in results}
 
@@ -550,22 +541,13 @@ RETURNING id
         if len(internal_participant_ids) == 0:
             return {}
 
-        _query = """
-        SELECT participant_id AS id, external_id
-        FROM participant_external_id
-        WHERE participant_id = ANY(%(ids)s) AND name = %(PRIMARY_EXTERNAL_ORG)s
-        """
+        _query = (
+            t'SELECT participant_id AS id, external_id '
+            t'FROM participant_external_id) '
+            t'WHERE participant_id = ANY({internal_participant_ids}) AND name = {PRIMARY_EXTERNAL_ORG}'
+        )
 
-        async with self.connection.pool.connection() as conn:
-            async with conn.cursor() as curr:
-                await curr.execute(
-                    _query,
-                    {
-                        'ids': internal_participant_ids,
-                        'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG,
-                    },
-                )
-                results = await curr.fetchall()
+        results = await (await self.connection.pg_connection.execute(_query)).fetchall()
 
         id_map: dict[int, str] = {r['id']: r['external_id'] for r in results}
 

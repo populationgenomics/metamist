@@ -1,8 +1,7 @@
-from db.python.layers.family import FamilyLayer
 import pytest
 
 from db.python.connect import Connection
-
+from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantUpsertInternal
 
@@ -11,6 +10,7 @@ class TestPedigree:
     """Pedigree testing methods"""
 
     @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_import_get_pedigree(self, connection_with_project: Connection):
         """Test import + get pedigree"""
         fl = FamilyLayer(connection_with_project)
@@ -33,15 +33,15 @@ class TestPedigree:
 
         by_key = {r['individual_id']: r for r in pedigree_dicts}
 
-        assert 3 == len(pedigree_dicts)
+        assert len(pedigree_dicts) == 3
         father = by_key['EX01_father']
         mother = by_key['EX01_mother']
         subject = by_key['EX01_subject']
 
         assert father['paternal_id'] is None
         assert mother['paternal_id'] is None
-        assert 'EX01_father' == subject['paternal_id']
-        assert 'EX01_mother' == subject['maternal_id']
+        assert subject['paternal_id'] == 'EX01_father'
+        assert subject['maternal_id'] == 'EX01_mother'
 
     @pytest.mark.asyncio
     async def test_pedigree_without_family(self, connection_with_project: Connection):
@@ -70,6 +70,6 @@ class TestPedigree:
         )
 
         by_id = {r['individual_id']: r for r in rows}
-        assert 2 == len(rows)
-        assert 1 == by_id['EX01']['sex']
+        assert len(rows) == 2
+        assert by_id['EX01']['sex'] == 1
         assert by_id['EX02']['sex'] is None

@@ -1,8 +1,7 @@
-from db.python.layers.family import FamilyLayer
 import pytest
 
 from db.python.connect import Connection
-
+from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.search import SearchLayer
@@ -23,14 +22,12 @@ from models.models import (
 )
 from models.models.sample import sample_id_format
 from models.models.sequencing_group import sequencing_group_id_format
-from test.testbase import run_as_sync
 
 
 class TestSample:
     """Test sample class"""
 
     # tests run in 'sorted by ascii' order
-    @pytest.mark.asyncio
     @pytest.fixture(autouse=True)
     async def set_up(self, connection_with_project: Connection) -> None:
         self.schlay = SearchLayer(connection_with_project)
@@ -39,7 +36,7 @@ class TestSample:
         self.flayer = FamilyLayer(connection_with_project)
         self.sglayer = SequencingGroupLayer(connection_with_project)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_search_non_existent_sample_by_internal_id(self):
         """
         Search by CPG sample ID that doesn't exist
@@ -48,7 +45,7 @@ class TestSample:
         results = await self.schlay.search(query=cpg_id, project_ids=[self.project_id])
         self.assertEqual(0, len(results))
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_search_unavailable_sample_by_internal_id(self):
         """
         Search by CPG sample ID that you do not have access to
@@ -66,7 +63,7 @@ class TestSample:
         )
         self.assertEqual(1, len(results))
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_search_isolated_sample_by_id(self):
         """
         Search by valid CPG sample ID (special case)
@@ -88,7 +85,7 @@ class TestSample:
         assert isinstance(result_data, SampleSearchResponseData)
         self.assertListEqual(['EX001'], result_data.sample_external_ids)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_search_isolated_sequencing_group_by_id(self):
         """
         Search by valid CPG sequencing group ID (special case)
@@ -136,7 +133,7 @@ class TestSample:
         self.assertEqual(cpg_sg_id, result_data.id)
         self.assertEqual(cpg_sg_id, result_data.sg_external_id)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_search_isolated_sample_by_external_id(self):
         """
         Search by External sample ID with no participant / family,
@@ -163,7 +160,7 @@ class TestSample:
         self.assertListEqual([], result_data.participant_external_ids)
         self.assertListEqual([], result_data.family_external_ids)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_search_participant_isolated(self):
         """
         Search participant w/ no family by External ID
@@ -185,6 +182,7 @@ class TestSample:
         self.assertListEqual([], result_data.family_external_ids)
 
     @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_search_family(self, connection_with_project: Connection):
         """
         Search family by External ID
@@ -194,15 +192,15 @@ class TestSample:
         results = await self.schlay.search(
             query='FAMXX01', project_ids=[connection_with_project.project_id]
         )
-        assert 1 == len(results)
+        assert len(results) == 1
         result = results[0]
-        assert 'FAMXX01' == result.title
+        assert result.title == 'FAMXX01'
         result_data = result.data
         assert isinstance(result_data, FamilySearchResponseData)
         assert f_id == result_data.id
-        assert ['FAMXX01'] == result_data.family_external_ids
+        assert result_data.family_external_ids == ['FAMXX01']
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_search_mixed(self):
         """Create a number of resources, and search for all of them"""
         fptable = FamilyParticipantTable(self.connection)

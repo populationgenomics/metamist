@@ -623,7 +623,9 @@ class ParticipantLayer(BaseLayer):
     ) -> ParticipantUpsertInternal:
         """Create a single participant"""
         with_function = (
-            self.connection.connection.transaction if open_transaction else NoOpAenter
+            self.connection.pg_connection.transaction
+            if open_transaction
+            else NoOpAenter
         )
 
         async with with_function():
@@ -679,7 +681,9 @@ class ParticipantLayer(BaseLayer):
     ):
         """Batch upsert a list of participants with sequences"""
         with_function = (
-            self.connection.connection.transaction if open_transaction else NoOpAenter
+            self.connection.pg_connection.transaction
+            if open_transaction
+            else NoOpAenter
         )
 
         async with with_function():
@@ -995,7 +999,7 @@ class ParticipantLayer(BaseLayer):
         fp_row = await self.get_family_participant_data(
             family_id=old_family_id, participant_id=participant_id
         )
-        async with self.connection.connection.transaction():
+        async with self.connection.pg_connection.transaction():
             await self.remove_participant_from_family(
                 family_id=old_family_id, participant_id=participant_id
             )

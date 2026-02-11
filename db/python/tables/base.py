@@ -1,7 +1,4 @@
 from collections import defaultdict
-from contextlib import asynccontextmanager
-
-from psycopg import AsyncConnection
 
 from db.python.connect import Connection
 from db.python.utils import InternalError
@@ -70,15 +67,3 @@ class DbBase:
             by_id[id_value].append(AuditLogInternal.from_db(row))
 
         return by_id
-
-    # TODO:piyumi can we use contextvar for this purpose
-    @asynccontextmanager
-    async def _get_connection(self, conn: AsyncConnection = None):
-        """
-        Workaround to use pool or handle a connection coming from a transaction
-        """
-        if conn is not None:
-            yield conn
-        else:
-            async with self.connection.pool.connection() as conn:
-                yield conn
