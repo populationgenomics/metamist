@@ -224,9 +224,9 @@ class SampleLayer(BaseLayer):
         open_transaction: bool = True,
     ) -> SampleUpsertInternal:
         """Upsert a sample"""
-        with_function = (
-            self.connection.connection.transaction if open_transaction else NoOpAenter
-        )
+        conn = self.connection.pg_connection
+        transaction = conn.transaction if open_transaction else NoOpAenter
+
         if sample.id:
             pjcts = await self.st.get_project_ids_for_sample_ids([sample.id])
             self.connection.check_access_to_projects_for_ids(
@@ -240,7 +240,7 @@ class SampleLayer(BaseLayer):
             )
 
         # safely ignore nested samples here
-        async with with_function():
+        async with transaction():
             for r in self.unwrap_nested_samples([sample]):
                 s = r.sample
                 if not s.id:

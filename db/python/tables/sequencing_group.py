@@ -219,9 +219,9 @@ GROUP BY sg.id"""
         )
 
         conn: AsyncConnection[DictRow] = self.connection.pg_connection
-        async with conn.cursor() as curr:
-            await curr.execute(query)
-            rows = await curr.fetchall()
+        async with conn.cursor() as cur:
+            await cur.execute(query)
+            rows = await cur.fetchall()
 
         sgs = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
         projects = set(sg.project for sg in sgs if sg.project)

@@ -54,13 +54,6 @@ def get_sample_model():
 class TestSequencingGroup:
     """Test sequencing groups business logic"""
 
-    # @pytest.mark.asyncio
-    # async def setUp(self) -> None:
-    #     super().setUp()
-    #     self.sglayer = SequencingGroupLayer(self.connection)
-    #     self.slayer = SampleLayer(self.connection)
-    #     self.alayer = AnalysisLayer(self.connection)
-
     @pytest.mark.asyncio
     async def test_empty_query(
         self,
@@ -75,14 +68,13 @@ class TestSequencingGroup:
         assert len(sgs) == 0
 
     @pytest.mark.asyncio
-    @pytest.mark.skip
     async def test_insert_sequencing_group(
         self,
-        connection: Connection,
+        connection_with_project: Connection,
     ):
         """Test inserting and fetching a sequencing group"""
-        sg_layer = SequencingGroupLayer(connection)
-        sample_layer = SampleLayer(connection)
+        sg_layer = SequencingGroupLayer(connection_with_project)
+        sample_layer = SampleLayer(connection_with_project)
 
         sample_to_insert = get_sample_model()
         sample = await sample_layer.upsert_sample(sample_to_insert)
