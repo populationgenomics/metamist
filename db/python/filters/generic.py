@@ -120,7 +120,11 @@ class GenericFilter[T](SMBase):
         if not isinstance(column, str):
             raise ValueError(f'Column {column!r} must be a string')
 
-        column_query = column_expression if column_expression else t'{column:i}'
+        column_query = (
+            column_expression
+            if column_expression
+            else t'{sql.Identifier(*column.split(".")):i}'
+        )
 
         if self.eq is not None:
             filters.append(t'{column_query:q} = {self.eq}')
