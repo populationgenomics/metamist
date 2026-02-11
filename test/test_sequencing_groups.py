@@ -68,6 +68,7 @@ class TestSequencingGroup:
         assert len(sgs) == 0
 
     @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
     async def test_insert_sequencing_group(
         self,
         connection_with_project: Connection,
