@@ -73,7 +73,8 @@ class SequencingGroupTable(DbBase):
 
         # Base query
         _query.append(
-t"""SELECT DISTINCT sg.id
+t"""\
+SELECT DISTINCT sg.id
 FROM sequencing_group AS sg
 LEFT JOIN sample s ON s.id = sg.sample_id
 LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id"""
@@ -102,7 +103,8 @@ LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group
             }
             assay_where_template = filter_.assay.to_sql(a_overrides)
             _query.append(
-t"""INNER JOIN sequencing_group_assay sga ON sg.id = sga.sequencing_group_id'
+t"""\
+INNER JOIN sequencing_group_assay sga ON sg.id = sga.sequencing_group_id'
 INNER JOIN assay a ON sga.assay_id = a.id"""
             )
 
@@ -113,7 +115,8 @@ INNER JOIN assay a ON sga.assay_id = a.id"""
                 {'created_on': 'DATE(created_on)'}, only=['created_on']
             )
             _query.append(
-t"""INNER JOIN (
+t"""\
+INNER JOIN (
     SELECT id, TIMESTAMP(min(row_start)) AS created_on
     FROM sequencing_group FOR SYSTEM_TIME ALL
     GROUP BY id
@@ -126,7 +129,8 @@ t"""INNER JOIN (
                 sql_overrides, only=['has_cram', 'has_gvcf']
             )
             _query.append(
-f"""INNER JOIN (
+f"""\
+INNER JOIN (
     SELECT
         sequencing_group_id,
         FIND_IN_SET('cram', GROUP_CONCAT(LOWER(anlysis_query.type))) > 0 AS has_cram,
@@ -176,7 +180,8 @@ f"""INNER JOIN (
             ex_id_join = t'LEFT JOIN sequencing_group_external_id {external_id_table_alias:i} ON sg.id = {external_id_table_alias:i}.sequencing_group_id'
 
         _outer_query = (
-t"""SELECT {', '.join(keys)}
+t"""\
+SELECT {', '.join(keys)}
 FROM sequencing_group sg
 LEFT JOIN sample s ON s.id = sg.sample_id
 {ex_id_join:q}
