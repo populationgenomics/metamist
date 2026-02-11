@@ -1,7 +1,6 @@
 import json
 from collections import defaultdict
 from string.templatelib import Template
-from typing import Any
 
 from psycopg import sql
 
@@ -21,7 +20,7 @@ class ParticipantTable:
     def __init__(self, connection: Connection):
         self.connection = connection
 
-    keys_str = ', '.join(
+    keys_str = sql.SQL(', ').join(
         [
             'p.id',
             'JSON_OBJECTAGG(peid.name, peid.external_id) AS external_ids',
@@ -428,9 +427,9 @@ class ParticipantTable:
         """
         Update participant
         """
+        conn = self.connection.pg_connection
+
         audit_log_id = await self.connection.audit_log_id()
-        updaters = ['audit_log_id = :audit_log_id']
-        fields = {'pid': participant_id, 'audit_log_id': audit_log_id}
 
         if external_ids:
             to_delete = [k.lower() for k, v in external_ids.items() if v is None]
@@ -441,69 +440,68 @@ class ParticipantTable:
 
             if to_delete:
                 # Set audit_log_id to this transaction before deleting the rows
-                _audit_update_query = """
-                UPDATE participant_external_id
-                SET audit_log_id = :audit_log_id
-                WHERE participant_id = :pid AND name IN :names
+                _audit_update_query = t"""
+                    UPDATE participant_external_id
+                    SET audit_log_id = {audit_log_id:l}
+                    WHERE participant_id = {participant_id:l} AND name IN {to_delete:l}
                 """
-                await self.connection.execute(
-                    _audit_update_query,
-                    {
-                        'pid': participant_id,
-                        'names': to_delete,
-                        'audit_log_id': audit_log_id,
-                    },
-                )
+                await conn.execute(_audit_update_query)
 
-                _delete_query = """
-                DELETE FROM participant_external_id
-                WHERE participant_id = :pid AND name IN :names
+                _delete_query = t"""
+                    DELETE FROM participant_external_id
+                    WHERE participant_id = {participant_id:l} AND name IN {to_delete:l}
                 """
-                await self.connection.execute(
-                    _delete_query, {'pid': participant_id, 'names': to_delete}
-                )
+                await conn.execute(_delete_query)
 
             if to_update:
-                _query = 'SELECT project FROM participant WHERE id = :pid'
-                row = await self.connection.fetch_one(_query, {'pid': participant_id})
+                _query = (
+                    t'SELECT project FROM participant WHERE id = {participant_id:l}'
+                )
+                cur = await conn.execute(_query)
+                row = await cur.fetchone()
                 project = row['project']
 
-                _update_query = """
-                INSERT INTO participant_external_id (project, participant_id, name, external_id, audit_log_id)
-                VALUES (:project, :pid, :name, :external_id, :audit_log_id)
-                ON DUPLICATE KEY UPDATE external_id = :external_id, audit_log_id = :audit_log_id
-                """
-                _eid_values = [
-                    {
-                        'project': project,
-                        'pid': participant_id,
-                        'name': name,
-                        'external_id': eid,
-                        'audit_log_id': audit_log_id,
-                    }
-                    for name, eid in to_update.items()
-                ]
-                await self.connection.execute_many(_update_query, _eid_values)
+                # Batch update
+                cur = conn.cursor()
+                async with conn.cursor() as cur:
+                    await cur.executemany(
+                        t"""
+                            MERGE INTO participant_external_id AS target
+                            USING (VALUES ({project:l}, {participant_id:l}, %(name)s, %(external_id)s, {audit_log_id:l}))
+                                AS source (project, participant_id, name, external_id, audit_log_id)
+                            ON target.project = source.project
+                                AND target.participant_id = source.participant_id
+                            WHEN MATCHED THEN
+                                UPDATE SET name = source.name, external_id = source.external_id, audit_log_id = source.audit_log_id
+                            WHEN NOT MATCHED THEN
+                                INSERT (project, participant_id, name, external_id, audit_log_id)
+                                VALUES (source.project, source.participant_id, source.name, source.external_id, source.audit_log_id)
+                        """,
+                        list(to_update.items()),
+                    )
 
-        if reported_sex:
-            updaters.append('reported_sex = :reported_sex')
-            fields['reported_sex'] = reported_sex
+        updates = [t'audit_log_id = {audit_log_id:l}']
 
-        if reported_gender:
-            updaters.append('reported_gender = :reported_gender')
-            fields['reported_gender'] = reported_gender
+        updates.append(t'reported_sex = {reported_sex:l}' if reported_sex else t'')
+        updates.append(
+            t'reported_gender = {reported_gender:l}' if reported_gender else t''
+        )
+        updates.append(t'karyotype = {karyotype:l}' if karyotype else t'')
+        meta_literal = to_db_json(meta)
+        updates.append(
+            t'meta = JSON_MERGE_PATCH(COALESCE(meta, "{{}}"), {meta_literal:l})'
+            if meta
+            else t''
+        )
+        updates = [u for u in updates if u]
 
-        if karyotype:
-            updaters.append('karyotype = :karyotype')
-            fields['karyotype'] = karyotype
+        _query = (
+            t'UPDATE participant SET '
+            + sql.SQL(', ').join(updates)
+            + t' WHERE id = {participant_id:l}'
+        )
 
-        if meta:
-            updaters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
-            fields['meta'] = to_db_json(meta)
-
-        _query = f'UPDATE participant SET {", ".join(updaters)} WHERE id = :pid'
-        await self.connection.execute(_query, fields)
-
+        await conn.execute(_query)
         return True
 
     async def get_id_map_by_external_ids(
@@ -512,7 +510,7 @@ class ParticipantTable:
         project: ProjectId | None,
     ) -> dict[str, int]:
         """Get map of {external_id: internal_participant_id}"""
-        _project = project or self.project_id
+        _project = project or self.connection.project_id
         if not _project:
             raise ValueError(
                 'Must provide project to get participant id map by external'
@@ -521,18 +519,15 @@ class ParticipantTable:
         if len(external_participant_ids) == 0:
             return {}
 
-        _query = """
-        SELECT external_id, participant_id AS id
-        FROM participant_external_id
-        WHERE external_id IN :external_ids AND project = :project
+        _query = t"""
+            SELECT external_id, participant_id AS id
+            FROM participant_external_id
+            WHERE external_id IN {external_participant_ids:l} AND project = {project:l}
         """
-        results = await self.connection.fetch_all(
-            _query,
-            {
-                'external_ids': external_participant_ids,
-                'project': project,
-            },
-        )
+
+        conn = self.connection.pg_connection
+        cur = await conn.execute(_query)
+        results = await cur.fetchall()
         id_map = {r['external_id']: r['id'] for r in results}
 
         return id_map
@@ -544,18 +539,15 @@ class ParticipantTable:
         if len(internal_participant_ids) == 0:
             return {}
 
-        _query = """
-        SELECT participant_id AS id, external_id
-        FROM participant_external_id
-        WHERE participant_id IN :ids AND name = :PRIMARY_EXTERNAL_ORG
+        _query = t"""
+            SELECT participant_id AS id, external_id
+            FROM participant_external_id
+            WHERE participant_id IN {internal_participant_ids:l} AND name = {PRIMARY_EXTERNAL_ORG:l}
         """
-        results = await self.connection.fetch_all(
-            _query,
-            {
-                'ids': internal_participant_ids,
-                'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG,
-            },
-        )
+        conn = self.connection.pg_connection
+        cur = await conn.execute(_query)
+        results = await cur.fetchall()
+
         id_map: dict[int, str] = {r['id']: r['external_id'] for r in results}
 
         if not allow_missing and len(id_map) != len(internal_participant_ids):
@@ -576,15 +568,18 @@ class ParticipantTable:
         self, family_ids: list[int]
     ) -> tuple[set[ProjectId], dict[int, list[ParticipantInternal]]]:
         """Get list of participants keyed by families, duplicates results"""
-        _query = f"""
-            SELECT fp.family_id, {self.keys_str}
+        _query = t"""
+            SELECT fp.family_id, {self.keys_str:i}
             FROM participant p
             INNER JOIN family_participant fp ON fp.participant_id = p.id
             INNER JOIN participant_external_id peid ON p.id = peid.participant_id
-            WHERE fp.family_id IN :fids
+            WHERE fp.family_id IN {family_ids:l}
             GROUP BY p.id
         """
-        rows = await self.connection.fetch_all(_query, {'fids': family_ids})
+        conn = self.connection.pg_connection
+        cur = await conn.execute(_query)
+        rows = await cur.fetchall()
+
         retmap = defaultdict(list)
         projects: set[ProjectId] = set()
         for row in rows:
@@ -599,22 +594,25 @@ class ParticipantTable:
         self, internal_to_external_id: dict[int, str]
     ):
         """Update many participant primary external_ids through the {internal: external} map"""
-        _query = """
-        UPDATE participant_external_id
-        SET external_id = :external_id, audit_log_id = :audit_log_id
-        WHERE participant_id = :participant_id AND name = :PRIMARY_EXTERNAL_ORG
+        audit_log_id = await self.connection.audit_log_id()
+
+        _query = t"""
+            UPDATE participant_external_id
+            SET external_id = %(external_id)s, audit_log_id = {audit_log_id:l}
+            WHERE participant_id = %(participant_id)s
+            AND name = {PRIMARY_EXTERNAL_ORG:l}
         """
-        audit_log_id = await self.audit_log_id()
-        mapped_values = [
-            {
-                'participant_id': k,
-                'external_id': v,
-                'audit_log_id': audit_log_id,
-                'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG,
-            }
-            for k, v in internal_to_external_id.items()
-        ]
-        await self.connection.execute_many(_query, mapped_values)
+
+        conn = self.connection.pg_connection
+        async with conn.cursor() as cur:
+            await cur.executemany(
+                _query,
+                [
+                    (external_id, participant_id)
+                    for participant_id, external_id in internal_to_external_id.items()
+                ],
+            )
+
         return True
 
     async def get_external_ids_by_participant(
@@ -626,13 +624,16 @@ class ParticipantTable:
         if not participant_ids:
             return {}
 
-        _query = """
-        SELECT participant_id AS id, JSON_ARRAYAGG(external_id) AS external_ids_list
-        FROM participant_external_id
-        WHERE participant_id IN :pids
-        GROUP BY participant_id
+        _query = t"""
+            SELECT participant_id AS id, JSON_ARRAYAGG(external_id) AS external_ids_list
+            FROM participant_external_id
+            WHERE participant_id IN {participant_ids:l}
+            GROUP BY participant_id
         """
-        rows = await self.connection.fetch_all(_query, {'pids': participant_ids})
+
+        conn = self.connection.pg_connection
+        cur = await conn.execute(_query)
+        rows = await cur.fetchall()
         return {r['id']: json.loads(r['external_ids_list']) for r in rows}
 
     async def get_external_participant_id_to_internal_sequencing_group_id_map(
@@ -645,22 +646,26 @@ class ParticipantTable:
         Return a list not dictionary, because dict could lose
         participants with multiple sequencing groups.
         """
-        wheres = ['p.project = :project']
-        values: dict[str, Any] = {'project': project}
-        if sequencing_type:
-            wheres.append('sg.type = :sequencing_type')
-            values['sequencing_type'] = sequencing_type
+        wheres = [t'p.project = {project:l}']
+        wheres.append(t'sg.type = {sequencing_type:l}' if sequencing_type else t'')
 
-        _query = f"""
-SELECT peid.external_id, sg.id
-FROM participant p
-INNER JOIN participant_external_id peid ON p.id = peid.participant_id
-INNER JOIN sample s ON p.id = s.participant_id
-INNER JOIN sequencing_group sg ON sg.sample_id = s.id
-WHERE {' AND '.join(wheres)}
-"""
-        rows = await self.connection.fetch_all(_query, values)
-        return [(r[0], int(r[1])) for r in rows]
+        wheres = [w for w in wheres if w]
+        where_str = sql.SQL(' AND ').join(wheres) if wheres else t''
+
+        _query = t"""
+            SELECT peid.external_id as eid, sg.id as sgid
+            FROM participant p
+            INNER JOIN participant_external_id peid ON p.id = peid.participant_id
+            INNER JOIN sample s ON p.id = s.participant_id
+            INNER JOIN sequencing_group sg ON sg.sample_id = s.id
+            WHERE {where_str:q}
+        """
+
+        conn = self.connection.pg_connection
+        cur = await conn.execute(_query)
+        rows = await cur.fetchall()
+
+        return [(r['eid'], int(r['sgid'])) for r in rows]
 
     async def search(
         self, query, project_ids: list[ProjectId], limit: int = 5
@@ -668,18 +673,16 @@ WHERE {' AND '.join(wheres)}
         """
         Search by some term, return [ProjectId, ParticipantId, ExternalId]
         """
-        _query = """
-        SELECT project, participant_id AS id, external_id
-        FROM participant_external_id
-        WHERE project in :project_ids AND external_id LIKE :search_pattern
-        LIMIT :limit
+
+        search_literal = escape_like_term(query) + '%'
+        _query = t"""
+            SELECT project, participant_id AS id, external_id
+            FROM participant_external_id
+            WHERE project in {project_ids:l} AND external_id LIKE {search_literal:l}
+            LIMIT {limit:l}
         """
-        rows = await self.connection.fetch_all(
-            _query,
-            {
-                'project_ids': project_ids,
-                'search_pattern': escape_like_term(query) + '%',
-                'limit': limit,
-            },
-        )
+        conn = self.connection.pg_connection
+        cur = await conn.execute(_query)
+        rows = await cur.fetchall()
+
         return [(r['project'], r['id'], r['external_id']) for r in rows]

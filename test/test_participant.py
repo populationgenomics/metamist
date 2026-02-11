@@ -57,10 +57,11 @@ class TestParticipant:
     """Test participant related functionality"""
 
     @pytest.mark.asyncio
-    async def test_query_by_ids(self, connection: Connection):
+    @pytest.mark.project_roles(['reader', 'writer'])
+    async def test_query_by_ids(self, connection_with_project: Connection):
         """Test query"""
 
-        player = ParticipantLayer(connection)
+        player = ParticipantLayer(connection_with_project)
 
         p = await player.upsert_participant(get_participant_to_insert())
 
@@ -73,7 +74,8 @@ class TestParticipant:
         assert len(ps) == 0
 
     @pytest.mark.asyncio
-    async def test_query_by_exids(self, connection: Connection):
+    @pytest.mark.project_roles(['reader', 'writer'])
+    async def test_query_by_exids(self, connection_with_project: Connection):
         """Test query"""
 
         p = get_participant_to_insert()
@@ -82,7 +84,7 @@ class TestParticipant:
             'external_org': 'ex01',
         }
 
-        player = ParticipantLayer(connection)
+        player = ParticipantLayer(connection_with_project)
 
         p = await player.upsert_participant(p)
 
@@ -103,6 +105,7 @@ class TestParticipant:
         assert len(ps) == 0
 
     @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_graphql_query_by_id(
         self, connection_with_project: Connection, graphql_query: GraphQLQueryFunction
     ):
@@ -128,10 +131,11 @@ class TestParticipant:
         assert len(resp['project']['participants']) == 1
 
     @pytest.mark.asyncio
-    async def test_query_by_sample(self, connection: Connection):
+    @pytest.mark.project_roles(['reader', 'writer'])
+    async def test_query_by_sample(self, connection_with_project: Connection):
         """Test query"""
 
-        player = ParticipantLayer(connection)
+        player = ParticipantLayer(connection_with_project)
 
         p = await player.upsert_participant(get_participant_to_insert())
 
@@ -156,6 +160,7 @@ class TestParticipant:
         assert len(ps) == 0
 
     @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_query_with_offset(self, connection_with_project: Connection):
         """Test query providing an offset and a limit"""
 
@@ -184,8 +189,9 @@ class TestParticipant:
         assert participants[0].id == p2.id
 
     @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_upsert_participant_with_phenotypes(
-        self, connection: Connection, graphql_query: GraphQLQueryFunction
+        self, connection_with_project: Connection, graphql_query: GraphQLQueryFunction
     ):
         """Test upserting participant with phenotypes"""
 
@@ -193,7 +199,7 @@ class TestParticipant:
             'phenotype1': 'value1',
             'phenotype2': {'number': 123},
         }
-        player = ParticipantLayer(connection)
+        player = ParticipantLayer(connection_with_project)
 
         p = await player.upsert_participant(
             ParticipantUpsertInternal(
@@ -221,8 +227,9 @@ class TestParticipant:
         assert resp_participant['phenotypes'] == phenotypes
 
     @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_upsert_participant_with_phenotypes_twice(
-        self, connection: Connection, graphql_query: GraphQLQueryFunction
+        self, connection_with_project: Connection, graphql_query: GraphQLQueryFunction
     ):
         """Test upserting and then updating participant with phenotypes"""
 
@@ -237,7 +244,7 @@ class TestParticipant:
             'phenotype3': {'number': 678},
         }
 
-        player = ParticipantLayer(connection)
+        player = ParticipantLayer(connection_with_project)
 
         p1 = await player.upsert_participant(
             ParticipantUpsertInternal(
@@ -277,6 +284,7 @@ class TestParticipant:
         assert resp_participant['phenotypes'] == phenotypes2
 
     @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_graphql_upsert_participant_with_phenotypes(
         self, connection_with_project: Connection, graphql_query: GraphQLQueryFunction
     ):

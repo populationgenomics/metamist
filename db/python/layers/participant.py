@@ -357,7 +357,8 @@ class ParticipantLayer(BaseLayer):
             # if there are no participants to add, skip the next step
             return '0 participants updated'
 
-        async with self.connection.connection.transaction():
+        conn = self.connection.pg_connection
+        async with conn.transaction():
             sample_ids_to_update = {
                 external_sample_map_with_no_pid[external_id]: pid
                 for external_id, pid in unlinked_participants.items()
@@ -407,7 +408,8 @@ class ParticipantLayer(BaseLayer):
         # currently only does the seqr metadata template
 
         # filter to non-comment rows
-        async with self.connection.connection.transaction():
+        conn = self.connection.pg_connection
+        async with conn.transaction():
             ppttable = ParticipantPhenotypeTable(self.connection)
 
             self._validate_individual_metadata_headers(headers)
@@ -596,7 +598,7 @@ class ParticipantLayer(BaseLayer):
         return id_map
 
     async def get_external_participant_id_to_internal_sequencing_group_id_map(
-        self, project: int, sequencing_type: str = None
+        self, project: int, sequencing_type: str | None = None
     ) -> list[tuple[str, int]]:
         """
         Get a map of {external_participant_id} -> {internal_sequencing_group_id}
@@ -618,13 +620,19 @@ class ParticipantLayer(BaseLayer):
     async def upsert_participant(
         self,
         participant: ParticipantUpsertInternal,
-        project: ProjectId = None,
+        project: ProjectId | None = None,
         open_transaction=True,
     ) -> ParticipantUpsertInternal:
         """Create a single participant"""
         with_function = (
-            self.connection.connection.transaction if open_transaction else NoOpAenter
+            self.connection.pg_connection.transaction
+            if open_transaction
+            else NoOpAenter
         )
+
+        project = project or self.connection.project_id
+        if not project:
+            raise ValueError('Project must be specified for upserting participant')
 
         async with with_function():
             if participant.id:
@@ -679,7 +687,9 @@ class ParticipantLayer(BaseLayer):
     ):
         """Batch upsert a list of participants with sequences"""
         with_function = (
-            self.connection.connection.transaction if open_transaction else NoOpAenter
+            self.connection.pg_connection.transaction
+            if open_transaction
+            else NoOpAenter
         )
 
         async with with_function():
@@ -995,7 +1005,7 @@ class ParticipantLayer(BaseLayer):
         fp_row = await self.get_family_participant_data(
             family_id=old_family_id, participant_id=participant_id
         )
-        async with self.connection.connection.transaction():
+        async with self.connection.pg_connection.transaction():
             await self.remove_participant_from_family(
                 family_id=old_family_id, participant_id=participant_id
             )
