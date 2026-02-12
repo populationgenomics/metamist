@@ -181,7 +181,7 @@ GROUP BY sg.id"""
         keys = [
             'sg.id',
             's.project',
-            'JSON_OBJECTAGG(sgexid.name, sgexid.external_id) as external_ids',
+            'jsonb_object_agg(sgexid.name, sgexid.external_id) as external_ids',
             'sg.sample_id',
             'sg.type',
             'sg.technology',
@@ -357,7 +357,7 @@ GROUP BY sg.id"""
         keys = [
             'sg.id',
             's.project',
-            'JSON_OBJECTAGG(sgexid.name, sgexid.external_id) as external_ids',
+            'jsonb_object_agg(sgexid.name, sgexid.external_id) as external_ids',
             'sg.sample_id',
             'sg.type',
             'sg.technology',
@@ -374,7 +374,10 @@ GROUP BY sg.id"""
         WHERE asg.analysis_id = ANY(%(aids)s)
         GROUP BY sg.id, asg.analysis_id
         """
-        rows = await self.connection.fetch_all(_query, {'aids': analysis_ids})
+        conn = self.connection.pg_connection
+        async with conn.cursor() as cur:
+            await cur.execute(_query, {'aids': analysis_ids})
+            rows = await cur.fetchall()
 
         mapped_analysis_to_sequencing_group_id: dict[int, list[int]] = defaultdict(list)
         sg_map: dict[int, SequencingGroupInternal] = {}
@@ -416,35 +419,38 @@ GROUP BY sg.id"""
         SELECT id
         FROM sequencing_group
         WHERE
-            sample_id = :sample_id
-            AND type = :type
-            AND technology = :technology
-            AND platform = :platform
+            sample_id = %(sample_id)s
+            AND type = %(type)s
+            AND technology = %(technology)s
+            AND platform = %(platform)s
             AND NOT archived
         """
-        existing_sg_ids = await self.connection.fetch_all(
+        conn = self.connection.pg_connection
+
+        result_cur = await conn.execute(
             get_existing_query,
             {
                 'sample_id': sample_id,
                 'type': type_.lower(),
                 'technology': technology.lower(),
                 'platform': platform.lower(),
-            },
+            }
         )
+        existing_sg_ids = await result_cur.fetchall()
 
-        _query = """
+        _sq_insert_query = """
         INSERT INTO sequencing_group
             (sample_id, type, technology, platform, meta, audit_log_id, archived)
         VALUES
-            (:sample_id, :type, :technology, :platform, :meta, :audit_log_id, false)
+            (%(sample_id)s, %(type)s, %(technology)s, %(platform)s, %(meta)s, %(audit_log_id)s, false)
         RETURNING id;
         """
 
-        _seqg_linker_query = """
+        _sg_assay_linker = """
         INSERT INTO sequencing_group_assay
             (sequencing_group_id, assay_id, audit_log_id)
         VALUES
-            (:seqgroup, :assayid, :audit_log_id)
+            (%(seqgroup)s, %(assayid)s, %(audit_log_id)s)
         """
 
         values = {
@@ -459,28 +465,29 @@ GROUP BY sg.id"""
         if bad_keys:
             raise ValueError(f'Must provide values for {", ".join(bad_keys)}')
 
-        with_function = self.connection.transaction if open_transaction else NoOpAenter
+        with_function = conn.transaction if open_transaction else NoOpAenter
 
         async with with_function():
             if existing_sg_ids:
                 await self.archive_sequencing_groups([s['id'] for s in existing_sg_ids])
 
-            id_of_seq_group = await self.connection.fetch_val(
-                _query,
+            result_cur = await conn.execute(
+                _sq_insert_query,
                 {**values, 'audit_log_id': await self.audit_log_id()},
             )
+            id_of_seq_group = await result_cur.fetchone()
+
             if assay_ids:
                 assay_id_insert_values = [
                     {
-                        'seqgroup': id_of_seq_group,
+                        'seqgroup': id_of_seq_group['id'],
                         'assayid': s,
                         'audit_log_id': await self.audit_log_id(),
                     }
                     for s in assay_ids
                 ]
-                await self.connection.execute_many(
-                    _seqg_linker_query, assay_id_insert_values
-                )
+
+                await conn.executemany(_sg_assay_linker, assay_id_insert_values)
 
             return id_of_seq_group
 
