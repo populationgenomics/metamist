@@ -6,7 +6,7 @@ from unittest import mock
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers import AnalysisLayer, SampleLayer, SequencingGroupLayer
-from db.python.tables.sequencing_group import SequencingGroupFilter
+from db.python.tables.sequencing_group import SequencingGroupFilter, SequencingGroupTable
 from models.enums.analysis import AnalysisStatus
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
@@ -53,6 +53,17 @@ def get_sample_model():
 
 class TestSequencingGroup:
     """Test sequencing groups business logic"""
+
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_debug(
+        self,
+        connection_with_project: Connection,
+    ):
+        sg_table = SequencingGroupTable(connection_with_project)
+        await sg_table.get_assay_ids_by_sequencing_group_ids([1, 2, 3])
+
+        assert False
 
     @pytest.mark.asyncio
     async def test_empty_query(

@@ -17,26 +17,6 @@ from models.models.sequencing_group import (
     SequencingGroupInternalId,
 )
 
-def to_string(template):
-    if not isinstance(template, Template):
-        raise TypeError("t-string expected")
-    def convert(value, conversion):
-        func = {
-            "a": ascii, "r": repr, "s": str, "t": to_string
-        }.get(conversion, lambda x: x)
-        return func(value)
-    parts = []
-    for item in template:
-        if isinstance(item, str):
-            parts.append(item)
-        else:
-            value = format(
-                convert(item.value, item.conversion),
-                item.format_spec
-            )
-            parts.append(value)
-    return "".join(parts)
-
 
 class SequencingGroupTable(DbBase):
     """
@@ -248,9 +228,13 @@ GROUP BY sg.id"""
         _query = """
             SELECT sga.sequencing_group_id, sga.assay_id
             FROM sequencing_group_assay sga
-            WHERE sga.sequencing_group_id IN :sgids
+            WHERE sga.sequencing_group_id = ANY(%(sgids)s)
         """
-        rows = await self.connection.fetch_all(_query, {'sgids': ids})
+        conn = self.connection.pg_connection
+        async with conn.cursor() as cur:
+            await cur.execute(_query, {'sgids': ids})
+            rows = await cur.fetchall()
+
         sequencing_groups: dict[int, list[int]] = defaultdict(list)
         for row in rows:
             sequencing_groups[row['sequencing_group_id']].append(row['assay_id'])

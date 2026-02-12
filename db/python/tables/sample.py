@@ -148,12 +148,11 @@ class SampleTable(DbBase):
         if not sample_ids:
             return set()
 
-        ids_values = sql.SQL(', ').join(sample_ids)
-        _query = t'SELECT DISTINCT project FROM sample WHERE id in ({ids_values:q})'
+        _query = 'SELECT DISTINCT project FROM sample WHERE id = ANY(%(sample_ids)s)'
 
         conn = self.connection.pg_connection
         async with conn.cursor() as cur:
-            await cur.execute(_query)
+            await cur.execute(_query, {'sample_ids': sample_ids})
             rows = await cur.fetchall()
 
         return set(r['project'] for r in rows)
