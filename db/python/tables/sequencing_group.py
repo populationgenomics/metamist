@@ -303,10 +303,19 @@ GROUP BY sg.id"""
         if len(sequencing_group_ids) == 0:
             return {}
         _query = """\
-        SELECT id, min(row_start)
-        FROM sequencing_group FOR SYSTEM_TIME ALL
-        WHERE id = ANY(%(sgids)s)
-        GROUP BY id"""
+            SELECT id, MIN(lower(sys_period)) as min_row_start
+            FROM (
+                SELECT id, sys_period
+                FROM sequencing_group
+                WHERE id = ANY(%(sgids)s)
+                
+                UNION ALL
+                
+                SELECT id, sys_period  
+                FROM sequencing_group_history
+                WHERE id = ANY(%(sgids)s)
+            ) AS all_versions
+            GROUP BY id"""
         conn = self.connection.pg_connection
         async with conn.cursor() as cur:
             await cur.execute(_query, {'sgids': sequencing_group_ids})
@@ -327,7 +336,7 @@ GROUP BY sg.id"""
         SELECT sg.id, min(s.row_start)
         FROM sequencing_group sg
         INNER JOIN sample FOR SYSTEM_TIME ALL s ON s.id = sg.sample_id
-        WHERE sg.id in :sgids
+        WHERE sg.id in %(sgids)
         GROUP BY sg.id
         """
         rows = await self.connection.fetch_all(_query, {'sgids': sequencing_group_ids})
