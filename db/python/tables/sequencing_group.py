@@ -225,7 +225,7 @@ GROUP BY sg.id"""
         """
         Get sequence IDs in a sequencing_group
         """
-        _query = """
+        _query = """\
             SELECT sga.sequencing_group_id, sga.assay_id
             FROM sequencing_group_assay sga
             WHERE sga.sequencing_group_id = ANY(%(sgids)s)
@@ -247,13 +247,17 @@ GROUP BY sg.id"""
         """
         Get all sequencing group IDs by sample IDs by type
         """
-        _query = """
+        _query = """\
         SELECT s.id as sid, sg.id as sgid, sg.type as sgtype
         FROM sample s
         INNER JOIN sequencing_group sg ON s.id = sg.sample_id
-        WHERE project = :project
+        WHERE project = %(project)s
         """
-        rows = await self.connection.fetch_all(_query, {'project': self.project_id})
+        conn = self.connection.pg_connection
+        async with conn.cursor() as cur:
+            await cur.execute(_query, {'project': self.project_id})
+            rows = await cur.fetchall()
+        
         sequencing_group_ids_by_sample_ids_by_type: dict[int, dict[str, list[int]]] = (
             defaultdict(lambda: defaultdict(list))
         )
@@ -272,18 +276,18 @@ GROUP BY sg.id"""
         Get participant IDs for a specific sequence type.
         Particularly useful for seqr like cases
         """
-        _query = """
+        _query = """\
         SELECT s.project as project, sg.id as sid, s.participant_id as pid
         FROM sequencing_group sg
         INNER JOIN sample s ON sg.sample_id = s.id
-        WHERE sg.type = :seqtype AND project = :project
+        WHERE sg.type = %(seqtype)s AND project = %(project)s
         """
-
-        rows = list(
-            await self.connection.fetch_all(
+        conn = self.connection.pg_connection
+        async with conn.cursor() as cur:
+            await cur.execute(
                 _query, {'seqtype': sequencing_type, 'project': self.project_id}
             )
-        )
+            rows = list(await cur.fetchall())
 
         projects = set(r['project'] for r in rows)
         participant_id_to_sids: dict[int, list[int]] = defaultdict(list)
@@ -298,12 +302,16 @@ GROUP BY sg.id"""
         """Get a map of {internal_sample_id: date_created} for list of sample_ids"""
         if len(sequencing_group_ids) == 0:
             return {}
-        _query = """
+        _query = """\
         SELECT id, min(row_start)
         FROM sequencing_group FOR SYSTEM_TIME ALL
-        WHERE id in :sgids
+        WHERE id = ANY(%(sgids)s)
         GROUP BY id"""
-        rows = await self.connection.fetch_all(_query, {'sgids': sequencing_group_ids})
+        conn = self.connection.pg_connection
+        async with conn.cursor() as cur:
+            await cur.execute(_query, {'sgids': sequencing_group_ids})
+            rows = await cur.fetchall()
+
         return {r[0]: r[1].date() for r in rows}
 
     async def get_samples_create_date_from_sgs(
