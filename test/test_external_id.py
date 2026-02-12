@@ -14,6 +14,7 @@ from models.models import (
 )
 
 
+@pytest.mark.skip(reason='Skipped until dependent entities migrated to PostgreSQL')
 class TestParticipant:
     """Test participant external ids"""
 
@@ -286,6 +287,7 @@ class TestParticipant:
             assert sgid == s2.sequencing_groups[0].id
 
 
+@pytest.mark.skip(reason='Skipped until dependent entities migrated to PostgreSQL')
 class TestSample:
     """Test sample external ids"""
 

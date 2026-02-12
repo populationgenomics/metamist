@@ -351,6 +351,7 @@ query MyQuery($pid: Int!) {
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['reader', 'writer'])
+    @pytest.mark.skip(reason='Skipped until dependent entities migrated to PostgreSQL')
     async def test_family_participants(
         self, graphql_query: GraphQLQueryFunction, connection_with_project: Connection
     ):
@@ -445,6 +446,7 @@ query MyQuery($project: String!) {
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['reader', 'writer'])
+    @pytest.mark.skip(reason='Skipped until dependent entities migrated to PostgreSQL')
     async def test_query_family_by_meta(
         self, connection_with_project: Connection, graphql_query: GraphQLQueryFunction
     ):

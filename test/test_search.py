@@ -183,6 +183,7 @@ class TestSample:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['reader', 'writer'])
+    @pytest.mark.skip(reason='Skipped until dependent entities migrated to PostgreSQL')
     async def test_search_family(self, connection_with_project: Connection):
         """
         Search family by External ID

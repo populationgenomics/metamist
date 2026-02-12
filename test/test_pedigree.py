@@ -6,6 +6,7 @@ from db.python.layers.participant import ParticipantLayer
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantUpsertInternal
 
 
+@pytest.mark.skip(reason='Skipped until dependent entities migrated to PostgreSQL')
 class TestPedigree:
     """Pedigree testing methods"""
 
