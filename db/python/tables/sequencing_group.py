@@ -332,14 +332,22 @@ GROUP BY sg.id"""
         if len(sequencing_group_ids) == 0:
             return {}
 
-        _query = """
-        SELECT sg.id, min(s.row_start)
+        _query = """\
+        SELECT sg.id, MIN(lower(s.sys_period))
         FROM sequencing_group sg
-        INNER JOIN sample FOR SYSTEM_TIME ALL s ON s.id = sg.sample_id
-        WHERE sg.id in %(sgids)
+        INNER JOIN (
+            SELECT id, sys_period FROM sample
+            UNION ALL
+            SELECT id, sys_period FROM sample_history
+        ) s ON s.id = sg.sample_id
+        WHERE sg.id = ANY(%(sgids)s)
         GROUP BY sg.id
         """
-        rows = await self.connection.fetch_all(_query, {'sgids': sequencing_group_ids})
+        conn = self.connection.pg_connection
+        async with conn.cursor() as cur:
+            await cur.execute(_query, {'sgids': sequencing_group_ids})
+            rows = await cur.fetchall()
+
         return {r[0]: r[1].date() for r in rows}
 
     async def get_sequencing_groups_by_analysis_ids(
@@ -357,13 +365,13 @@ GROUP BY sg.id"""
             'sg.meta',
             'sg.archived',
         ]
-        _query = f"""
+        _query = f"""\
         SELECT {', '.join(keys)}, asg.analysis_id
         FROM analysis_sequencing_group asg
         INNER JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
         INNER JOIN sample s ON s.id = sg.sample_id
         LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id
-        WHERE asg.analysis_id IN :aids
+        WHERE asg.analysis_id = ANY(%(aids)s)
         GROUP BY sg.id, asg.analysis_id
         """
         rows = await self.connection.fetch_all(_query, {'aids': analysis_ids})
