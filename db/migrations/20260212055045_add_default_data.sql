@@ -1,5 +1,6 @@
 -- migrate:up
 
+<<<<<<< HEAD
 INSERT INTO assay_type (id, name) VALUES ('sequencing', 'sequencing'); 
 INSERT INTO sample_type (id, name) VALUES ('blood', 'blood'); 
 INSERT INTO sample_type (id, name) VALUES ('saliva', 'saliva'); 
@@ -8,6 +9,16 @@ INSERT INTO sequencing_type (id, name) VALUES ('exome', 'exome');
 INSERT INTO sequencing_type (id, name) VALUES ('transcriptome', 'transcriptome'); 
 INSERT INTO sequencing_type (id, name) VALUES ('mtseq', 'mtseq'); 
 INSERT INTO sequencing_type (id, name) VALUES ('chip', 'chip'); 
+=======
+INSERT INTO assay_type (id, name) VALUES ('sequencing', 'sequencing');
+INSERT INTO sample_type (id, name) VALUES ('blood', 'blood');
+INSERT INTO sample_type (id, name) VALUES ('saliva', 'saliva'); 
+INSERT INTO sequencing_type (id, name) VALUES ('genome', 'genome');
+INSERT INTO sequencing_type (id, name) VALUES ('exome', 'exome');
+INSERT INTO sequencing_type (id, name) VALUES ('transcriptome', 'transcriptome');
+INSERT INTO sequencing_type (id, name) VALUES ('mtseq', 'mtseq');
+INSERT INTO sequencing_type (id, name) VALUES ('chip', 'chip');
+>>>>>>> postgres-migration
 INSERT INTO sequencing_technology (id, name) VALUES ('short-read', 'short-read');
 INSERT INTO sequencing_technology (id, name) VALUES ('long-read', 'long-read');
 INSERT INTO sequencing_technology (id, name) VALUES ('single-cell-rna-seq', 'single-cell-rna-seq');
@@ -21,7 +32,11 @@ INSERT INTO analysis_type (id, name) VALUES ('gvcf', 'gvcf');
 INSERT INTO analysis_type (id, name) VALUES ('cram', 'cram');
 INSERT INTO analysis_type (id, name) VALUES ('custom', 'custom');
 INSERT INTO analysis_type (id, name) VALUES ('es-index', 'es-index');
+<<<<<<< HEAD
 INSERT INTO analysis_type (id, name) VALUES ('sv', 'sv'); 
+=======
+INSERT INTO analysis_type (id, name) VALUES ('sv', 'sv');
+>>>>>>> postgres-migration
 INSERT INTO analysis_type (id, name) VALUES ('web', 'web');
 INSERT INTO analysis_type (id, name) VALUES ('analysis-runner', 'analysis-runner');
 
