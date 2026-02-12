@@ -1,6 +1,9 @@
 from typing import Any
 
 import pytest
+from psycopg import AsyncConnection
+from psycopg.rows import DictRow
+from psycopg_pool import AsyncConnectionPool
 
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
@@ -23,33 +26,45 @@ def get_participant_to_insert(id_suffix='1'):
         reported_gender='FEMALE',
         karyotype='XX',
         samples=[
-            SampleUpsertInternal(
-                external_ids={PRIMARY_EXTERNAL_ORG: 'S0' + id_suffix},
-                type='blood',
-                meta={'smeta': 'svalue'},
-                sequencing_groups=[
-                    SequencingGroupUpsertInternal(
-                        external_ids={'default': 'SG0' + id_suffix},
-                        type='genome',
-                        technology='short-read',
-                        platform='illumina',
-                        meta={'sgmeta': 'sgvalue'},
-                        assays=[
-                            AssayUpsertInternal(
-                                type='sequencing',
-                                external_ids={'default': 'A0' + id_suffix},
-                                meta={
-                                    'ameta': 'avalue',
-                                    'sequencing_type': 'genome',
-                                    'sequencing_platform': 'illumina',
-                                    'sequencing_technology': 'short-read',
-                                },
-                            )
-                        ],
-                    )
-                ],
-            )
+            # SampleUpsertInternal(
+            #     external_ids={PRIMARY_EXTERNAL_ORG: 'S0' + id_suffix},
+            #     type='blood',
+            #     meta={'smeta': 'svalue'},
+            #     sequencing_groups=[
+            #         SequencingGroupUpsertInternal(
+            #             external_ids={'default': 'SG0' + id_suffix},
+            #             type='genome',
+            #             technology='short-read',
+            #             platform='illumina',
+            #             meta={'sgmeta': 'sgvalue'},
+            #             assays=[
+            #                 AssayUpsertInternal(
+            #                     type='sequencing',
+            #                     external_ids={'default': 'A0' + id_suffix},
+            #                     meta={
+            #                         'ameta': 'avalue',
+            #                         'sequencing_type': 'genome',
+            #                         'sequencing_platform': 'illumina',
+            #                         'sequencing_technology': 'short-read',
+            #                     },
+            #                 )
+            #             ],
+            #         )
+            #     ],
+            # )
         ],
+    )
+
+
+def get_participant_to_insert_no_samples(id_suffix='1'):
+    """Helper function to create a participant object for insertion into the database"""
+    return ParticipantUpsertInternal(
+        external_ids={PRIMARY_EXTERNAL_ORG: 'P0_NO_SAMP' + id_suffix},
+        meta={'pmeta': 'pvaluelow', 'extra': 'extravalue'},
+        reported_sex=1,
+        reported_gender='MALE',
+        karyotype='XY',
+        samples=[],
     )
 
 
@@ -63,7 +78,7 @@ class TestParticipant:
 
         player = ParticipantLayer(connection_with_project)
 
-        p = await player.upsert_participant(get_participant_to_insert())
+        p = await player.upsert_participant(get_participant_to_insert_no_samples())
 
         ps = await player.query(ParticipantFilter(id=GenericFilter(eq=p.id)))
 

@@ -12,6 +12,24 @@ from db.python.utils import NotFoundError, escape_like_term, to_db_json
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantInternal, ProjectId
 
 
+def to_string(template):
+    if not isinstance(template, Template):
+        raise TypeError('t-string expected')
+
+    def convert(value, conversion):
+        func = {'a': ascii, 'r': repr, 's': str}.get(conversion, lambda x: x)
+        return func(value)
+
+    parts = []
+    for item in template:
+        if isinstance(item, str):
+            parts.append(item)
+        else:
+            value = format(convert(item.value, item.conversion), item.format_spec)
+            parts.append(value)
+    return ''.join(parts)
+
+
 class ParticipantTable:
     """
     Capture Analysis table operations and queries
@@ -198,7 +216,7 @@ class ParticipantTable:
 
         # Final query template
         outer_query = t"""
-            SELECT {keys_str:i}
+            SELECT {keys_str:q}
             FROM participant p
             {ex_table_join:q}
             INNER JOIN ({query_template:q}) as inner_query ON inner_query.id = p.id
