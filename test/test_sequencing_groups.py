@@ -6,6 +6,7 @@ from unittest import mock
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers import AnalysisLayer, SampleLayer, SequencingGroupLayer
+from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import SequencingGroupFilter, SequencingGroupTable
 from models.enums.analysis import AnalysisStatus
 from models.models import (
@@ -60,8 +61,23 @@ class TestSequencingGroup:
         self,
         connection_with_project: Connection,
     ):
+        s_table = SampleTable(connection_with_project)
         sg_table = SequencingGroupTable(connection_with_project)
-        await sg_table.get_assay_ids_by_sequencing_group_ids([1, 2, 3])
+
+        sample_id = await s_table.insert_sample(
+            {PRIMARY_EXTERNAL_ORG: 'Test01'},
+            'blood',
+            True,
+            None, None, None, None
+        )
+
+        await sg_table.create_sequencing_group(
+            sample_id,
+            'genome',
+            'short-read',
+            'illumina',
+            []
+        )
 
         assert False
 

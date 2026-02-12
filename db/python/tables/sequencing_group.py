@@ -287,7 +287,7 @@ GROUP BY sg.id"""
             await cur.execute(
                 _query, {'seqtype': sequencing_type, 'project': self.project_id}
             )
-            rows = list(await cur.fetchall())
+            rows = await cur.fetchall()
 
         projects = set(r['project'] for r in rows)
         participant_id_to_sids: dict[int, list[int]] = defaultdict(list)

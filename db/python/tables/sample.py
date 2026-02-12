@@ -307,13 +307,13 @@ class SampleTable(DbBase):
             'sample_root_id': sample_root_id,
             'project': project or self.project_id,
         }
-        key_string = sql.SQL(', ').join([sql.Identifier(k) for k in kv_pairs.keys()])
-        value_string = sql.SQL(', ').join([v for v in kv_pairs.values()])
+        key_placeholder = sql.SQL(', ').join([sql.Identifier(k) for k in kv_pairs.keys()])
+        value_placeholder = sql.SQL(', ').join([v for v in kv_pairs.values()])
 
         _query = t"""\
         INSERT INTO sample
-            ({key_string:q})
-        VALUES ({value_string:q}) RETURNING id;
+            ({key_placeholder:q})
+        VALUES ({value_placeholder:q}) RETURNING id;
         """
         
         async with conn.cursor() as cur:
