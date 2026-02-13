@@ -5,6 +5,7 @@ from typing import Any
 from dateutil.relativedelta import relativedelta
 
 from psycopg import AsyncConnection, sql
+from psycopg.pq import TransactionStatus
 from psycopg.rows import DictRow
 
 from db.python.filters.generic import GenericFilter
@@ -53,11 +54,11 @@ class SequencingGroupTable(DbBase):
 
         # Base query
         _query.append(
-t"""\
-SELECT DISTINCT sg.id
-FROM sequencing_group AS sg
-LEFT JOIN sample s ON s.id = sg.sample_id
-LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id"""
+            t"""\
+            SELECT DISTINCT sg.id
+            FROM sequencing_group AS sg
+            LEFT JOIN sample s ON s.id = sg.sample_id
+            LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id"""
         )
 
         if filter_.sample:
@@ -83,9 +84,9 @@ LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group
             }
             assay_where_template = filter_.assay.to_sql(a_overrides)
             _query.append(
-t"""\
-INNER JOIN sequencing_group_assay sga ON sg.id = sga.sequencing_group_id'
-INNER JOIN assay a ON sga.assay_id = a.id"""
+                t"""\
+                INNER JOIN sequencing_group_assay sga ON sg.id = sga.sequencing_group_id'
+                INNER JOIN assay a ON sga.assay_id = a.id"""
             )
 
             where_templates.append(assay_where_template)
@@ -95,13 +96,13 @@ INNER JOIN assay a ON sga.assay_id = a.id"""
                 {'created_on': 'DATE(created_on)'}, only=['created_on']
             )
             _query.append(
-t"""\
-INNER JOIN (
-    SELECT id, TIMESTAMP(min(row_start)) AS created_on
-    FROM sequencing_group FOR SYSTEM_TIME ALL
-    GROUP BY id
-    HAVING {created_on_condition:q}
-) AS sg_timequery ON sg.id = sg_timequery.id"""
+                t"""\
+                INNER JOIN (
+                    SELECT id, TIMESTAMP(min(row_start)) AS created_on
+                    FROM sequencing_group FOR SYSTEM_TIME ALL
+                    GROUP BY id
+                    HAVING {created_on_condition:q}
+                ) AS sg_timequery ON sg.id = sg_timequery.id"""
             )
 
         if filter_.has_cram is not None or filter_.has_gvcf is not None:
@@ -109,25 +110,25 @@ INNER JOIN (
                 sql_overrides, only=['has_cram', 'has_gvcf']
             )
             _query.append(
-f"""\
-INNER JOIN (
-    SELECT
-        sequencing_group_id,
-        FIND_IN_SET('cram', GROUP_CONCAT(LOWER(anlysis_query.type))) > 0 AS has_cram,
-        FIND_IN_SET('gvcf', GROUP_CONCAT(LOWER(anlysis_query.type))) > 0 AS has_gvcf
-    FROM
-        analysis_sequencing_group
-        INNER JOIN (
-            SELECT
-                id, type
-            FROM
-                analysis
-        ) AS anlysis_query ON analysis_sequencing_group.analysis_id = anlysis_query.id
-    GROUP BY
-        sequencing_group_id
-    HAVING
-        {cram_where_template:q}
-) AS sg_filequery ON sg.id = sg_filequery.sequencing_group_id"""
+                f"""\
+                INNER JOIN (
+                    SELECT
+                        sequencing_group_id,
+                        FIND_IN_SET('cram', GROUP_CONCAT(LOWER(anlysis_query.type))) > 0 AS has_cram,
+                        FIND_IN_SET('gvcf', GROUP_CONCAT(LOWER(anlysis_query.type))) > 0 AS has_gvcf
+                    FROM
+                        analysis_sequencing_group
+                        INNER JOIN (
+                            SELECT
+                                id, type
+                            FROM
+                                analysis
+                        ) AS anlysis_query ON analysis_sequencing_group.analysis_id = anlysis_query.id
+                    GROUP BY
+                        sequencing_group_id
+                    HAVING
+                        {cram_where_template:q}
+                ) AS sg_filequery ON sg.id = sg_filequery.sequencing_group_id"""
             )
 
         # Add the rest of the filters
@@ -160,15 +161,15 @@ INNER JOIN (
             ex_id_join = t'LEFT JOIN sequencing_group_external_id {external_id_table_alias:i} ON sg.id = {external_id_table_alias:i}.sequencing_group_id'
 
         _outer_query = (
-t"""\
-SELECT {', '.join(keys)}
-FROM sequencing_group sg
-LEFT JOIN sample s ON s.id = sg.sample_id
-{ex_id_join:q}
-INNER JOIN (
-    {_query_str:q}
-) AS sg_query ON sg.id = sg_query.id
-GROUP BY sg.id"""
+            t"""\
+            SELECT {', '.join(keys)}
+            FROM sequencing_group sg
+            LEFT JOIN sample s ON s.id = sg.sample_id
+            {ex_id_join:q}
+            INNER JOIN (
+                {_query_str:q}
+            ) AS sg_query ON sg.id = sg_query.id
+            GROUP BY sg.id"""
         )
 
         return _outer_query
@@ -225,15 +226,13 @@ GROUP BY sg.id"""
         """
         Get sequence IDs in a sequencing_group
         """
-        _query = """\
+        _query = t"""\
             SELECT sga.sequencing_group_id, sga.assay_id
             FROM sequencing_group_assay sga
-            WHERE sga.sequencing_group_id = ANY(%(sgids)s)
+            WHERE sga.sequencing_group_id = ANY({ids})
         """
-        conn = self.connection.pg_connection
-        async with conn.cursor() as cur:
-            await cur.execute(_query, {'sgids': ids})
-            rows = await cur.fetchall()
+        cur = await self.connection.pg_connection.execute(_query)
+        rows = await cur.fetchall()
 
         sequencing_groups: dict[int, list[int]] = defaultdict(list)
         for row in rows:
@@ -247,16 +246,14 @@ GROUP BY sg.id"""
         """
         Get all sequencing group IDs by sample IDs by type
         """
-        _query = """\
+        _query = t"""\
         SELECT s.id as sid, sg.id as sgid, sg.type as sgtype
         FROM sample s
         INNER JOIN sequencing_group sg ON s.id = sg.sample_id
-        WHERE project = %(project)s
+        WHERE project = {self.project_id}
         """
-        conn = self.connection.pg_connection
-        async with conn.cursor() as cur:
-            await cur.execute(_query, {'project': self.project_id})
-            rows = await cur.fetchall()
+        cur = await self.connection.pg_connection.execute(_query)
+        rows = await cur.fetchall()
         
         sequencing_group_ids_by_sample_ids_by_type: dict[int, dict[str, list[int]]] = (
             defaultdict(lambda: defaultdict(list))
@@ -276,18 +273,14 @@ GROUP BY sg.id"""
         Get participant IDs for a specific sequence type.
         Particularly useful for seqr like cases
         """
-        _query = """\
+        _query = t"""\
         SELECT s.project as project, sg.id as sid, s.participant_id as pid
         FROM sequencing_group sg
         INNER JOIN sample s ON sg.sample_id = s.id
-        WHERE sg.type = %(seqtype)s AND project = %(project)s
+        WHERE sg.type = {sequencing_type} AND project = {self.project_id}
         """
-        conn = self.connection.pg_connection
-        async with conn.cursor() as cur:
-            await cur.execute(
-                _query, {'seqtype': sequencing_type, 'project': self.project_id}
-            )
-            rows = await cur.fetchall()
+        cur = self.connection.pg_connection.execute(_query)
+        rows = await cur.fetchall()
 
         projects = set(r['project'] for r in rows)
         participant_id_to_sids: dict[int, list[int]] = defaultdict(list)
@@ -302,26 +295,25 @@ GROUP BY sg.id"""
         """Get a map of {internal_sample_id: date_created} for list of sample_ids"""
         if len(sequencing_group_ids) == 0:
             return {}
-        _query = """\
+        
+        _query = t"""\
             SELECT id, MIN(lower(sys_period)) as min_row_start
             FROM (
                 SELECT id, sys_period
                 FROM sequencing_group
-                WHERE id = ANY(%(sgids)s)
+                WHERE id = ANY({sequencing_group_ids})
                 
                 UNION ALL
                 
                 SELECT id, sys_period  
                 FROM sequencing_group_history
-                WHERE id = ANY(%(sgids)s)
+                WHERE id = ANY({sequencing_group_ids})
             ) AS all_versions
             GROUP BY id"""
-        conn = self.connection.pg_connection
-        async with conn.cursor() as cur:
-            await cur.execute(_query, {'sgids': sequencing_group_ids})
-            rows = await cur.fetchall()
+        cur = await self.connection.pg_connection.execute(_query)
+        rows = await cur.fetchall()
 
-        return {r[0]: r[1].date() for r in rows}
+        return {r['id']: r['min_row_start'].date() for r in rows}
 
     async def get_samples_create_date_from_sgs(
         self, sequencing_group_ids: list[int]
@@ -332,23 +324,21 @@ GROUP BY sg.id"""
         if len(sequencing_group_ids) == 0:
             return {}
 
-        _query = """\
-        SELECT sg.id, MIN(lower(s.sys_period))
+        _query = t"""\
+        SELECT sg.id, MIN(lower(s.sys_period)) as min_row_start
         FROM sequencing_group sg
         INNER JOIN (
             SELECT id, sys_period FROM sample
             UNION ALL
             SELECT id, sys_period FROM sample_history
         ) s ON s.id = sg.sample_id
-        WHERE sg.id = ANY(%(sgids)s)
+        WHERE sg.id = ANY({sequencing_group_ids})
         GROUP BY sg.id
         """
-        conn = self.connection.pg_connection
-        async with conn.cursor() as cur:
-            await cur.execute(_query, {'sgids': sequencing_group_ids})
-            rows = await cur.fetchall()
+        cur = await self.connection.pg_connection.execute(_query)
+        rows = await cur.fetchall()
 
-        return {r[0]: r[1].date() for r in rows}
+        return {r['id']: r['min_row_start'].date() for r in rows}
 
     async def get_sequencing_groups_by_analysis_ids(
         self, analysis_ids: list[int]
@@ -365,32 +355,29 @@ GROUP BY sg.id"""
             'sg.meta',
             'sg.archived',
         ]
-        _query = f"""\
-        SELECT {', '.join(keys)}, asg.analysis_id
+        _query = t"""\
+        SELECT {sql.SQL(', ').join(keys):q}, asg.analysis_id
         FROM analysis_sequencing_group asg
         INNER JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
         INNER JOIN sample s ON s.id = sg.sample_id
         LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id
-        WHERE asg.analysis_id = ANY(%(aids)s)
+        WHERE asg.analysis_id = ANY({analysis_ids})
         GROUP BY sg.id, asg.analysis_id
         """
-        conn = self.connection.pg_connection
-        async with conn.cursor() as cur:
-            await cur.execute(_query, {'aids': analysis_ids})
-            rows = await cur.fetchall()
+        cur = await self.connection.pg_connection.execute(_query)
+        rows = await cur.fetchall()
 
         mapped_analysis_to_sequencing_group_id: dict[int, list[int]] = defaultdict(list)
         sg_map: dict[int, SequencingGroupInternal] = {}
         projects: set[int] = set()
-        for rrow in rows:
-            drow = dict(rrow)
-            sid = drow['id']
-            analysis_id = drow.pop('analysis_id')
+        for row in rows:
+            sid = row['id']
+            analysis_id = row.pop('analysis_id')
             mapped_analysis_to_sequencing_group_id[analysis_id].append(sid)
-            projects.add(drow['project'])
+            projects.add(row['project'])
 
             if sid not in sg_map:
-                sg_map[sid] = SequencingGroupInternal.from_db(**drow)
+                sg_map[sid] = SequencingGroupInternal.from_db(**row)
 
         analysis_map: dict[int, list[SequencingGroupInternal]] = {
             analysis_id: [sg_map.get(sgid) for sgid in sgids]
@@ -407,51 +394,12 @@ GROUP BY sg.id"""
         platform: str,
         assay_ids: list[int],
         meta: dict | None = None,
-        open_transaction=True,
     ) -> int:
         """Create sequence group"""
         assert sample_id is not None
         assert type_ is not None
         assert technology is not None
         assert platform is not None
-
-        get_existing_query = """
-        SELECT id
-        FROM sequencing_group
-        WHERE
-            sample_id = %(sample_id)s
-            AND type = %(type)s
-            AND technology = %(technology)s
-            AND platform = %(platform)s
-            AND NOT archived
-        """
-        conn = self.connection.pg_connection
-
-        result_cur = await conn.execute(
-            get_existing_query,
-            {
-                'sample_id': sample_id,
-                'type': type_.lower(),
-                'technology': technology.lower(),
-                'platform': platform.lower(),
-            }
-        )
-        existing_sg_ids = await result_cur.fetchall()
-
-        _sq_insert_query = """
-        INSERT INTO sequencing_group
-            (sample_id, type, technology, platform, meta, audit_log_id, archived)
-        VALUES
-            (%(sample_id)s, %(type)s, %(technology)s, %(platform)s, %(meta)s, %(audit_log_id)s, false)
-        RETURNING id;
-        """
-
-        _sg_assay_linker = """
-        INSERT INTO sequencing_group_assay
-            (sequencing_group_id, assay_id, audit_log_id)
-        VALUES
-            (%(seqgroup)s, %(assayid)s, %(audit_log_id)s)
-        """
 
         values = {
             'sample_id': sample_id,
@@ -465,22 +413,51 @@ GROUP BY sg.id"""
         if bad_keys:
             raise ValueError(f'Must provide values for {", ".join(bad_keys)}')
 
-        with_function = conn.transaction if open_transaction else NoOpAenter
+        get_existing_query = t"""\
+        SELECT id
+        FROM sequencing_group
+        WHERE
+            sample_id = {sample_id}
+            AND type = {values['type']}
+            AND technology = {values['technology']}
+            AND platform = {values['platform']}
+            AND NOT archived
+        """
+        conn = self.connection.pg_connection
+
+        cur = await conn.execute(get_existing_query)
+        existing_sg_ids = await cur.fetchall()
+
+        audit_log_id = await self.audit_log_id()
+        _sq_insert_query = t"""\
+        INSERT INTO sequencing_group
+            (sample_id, type, technology, platform, meta, audit_log_id, archived)
+        VALUES
+            ({sample_id}, {values['type']}, {values['technology']}, {values['platform']}, {values['meta']}, {audit_log_id}, false)
+        RETURNING id;
+        """
+
+        _sg_assay_linker = """
+        INSERT INTO sequencing_group_assay
+            (sequencing_group_id, assay_id, audit_log_id)
+        VALUES
+            (%(seqgroup)s, %(assayid)s, %(audit_log_id)s)
+        """
+
+        in_transaction = conn.info.transaction_status == TransactionStatus.INTRANS
+        with_function = conn.transaction if not in_transaction else NoOpAenter
 
         async with with_function():
             if existing_sg_ids:
                 await self.archive_sequencing_groups([s['id'] for s in existing_sg_ids])
 
-            result_cur = await conn.execute(
-                _sq_insert_query,
-                {**values, 'audit_log_id': await self.audit_log_id()},
-            )
-            id_of_seq_group = await result_cur.fetchone()
+            cur = await conn.execute(_sq_insert_query)
+            new_sg_id = await cur.fetchone()
 
             if assay_ids:
                 assay_id_insert_values = [
                     {
-                        'seqgroup': id_of_seq_group['id'],
+                        'seqgroup': new_sg_id['id'],
                         'assayid': s,
                         'audit_log_id': await self.audit_log_id(),
                     }
@@ -489,7 +466,7 @@ GROUP BY sg.id"""
 
                 await conn.executemany(_sg_assay_linker, assay_id_insert_values)
 
-            return id_of_seq_group
+            return new_sg_id
 
     async def update_sequencing_group(
         self, sequencing_group_id: int, meta: dict, platform: str
@@ -497,7 +474,7 @@ GROUP BY sg.id"""
         """
         Update meta / platform on sequencing_group
         """
-        updaters = ['audit_log_id = :audit_log_id']
+        updaters = ['audit_log_id = %(audit_log_id)s']
         values: dict[str, Any] = {
             'seqgid': sequencing_group_id,
             'audit_log_id': await self.audit_log_id(),
@@ -505,49 +482,53 @@ GROUP BY sg.id"""
 
         if meta:
             values['meta'] = to_db_json(meta)
-            updaters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
+            updaters.append('meta = json_merge_patch(COALESCE(meta, "{}"), %(meta)s)')
 
         if platform:
-            updaters.append('platform = :platform')
+            updaters.append('platform = %(platform)s')
             values['platform'] = platform
 
-        _query = f"""
+        _query = f"""\
         UPDATE sequencing_group
         SET {', '.join(updaters)}
-        WHERE id = :seqgid
+        WHERE id = %(seqgid)s
         """
 
-        await self.connection.execute(_query, values)
+        conn = self.connection.pg_connection
+        await conn.execute(_query, values)
 
     async def archive_sequencing_groups(self, sequencing_group_ids: list[int]):
         """
         Archive sequence group by setting archive flag to TRUE
         """
-        _query = """
+        _query = """\
         UPDATE sequencing_group
-        SET archived = 1, audit_log_id = :audit_log_id
-        WHERE id IN :sequencing_group_ids;
+        SET archived = true, audit_log_id = %(audit_log_id)s
+        WHERE id = ANY(%(sequencing_group_ids)s);
         """
         # do this so we can reuse the sequencing_group_ids
-        _external_id_query = """
+        _external_id_query = """\
         UPDATE sequencing_group_external_id
-        SET nullIfInactive = NULL, audit_log_id = :audit_log_id
-        WHERE sequencing_group_id IN :sequencing_group_ids;
+        SET null_if_archived = NULL, audit_log_id = %(audit_log_id)s
+        WHERE sequencing_group_id = ANY(%(sequencing_group_ids)s);
         """
-        await self.connection.execute(
-            _query,
-            {
-                'sequencing_group_ids': sequencing_group_ids,
-                'audit_log_id': await self.audit_log_id(),
-            },
-        )
-        await self.connection.execute(
-            _external_id_query,
-            {
-                'sequencing_group_ids': sequencing_group_ids,
-                'audit_log_id': await self.audit_log_id(),
-            },
-        )
+
+        conn = self.connection.pg_connection
+        async with conn.transaction():
+            await conn.execute(
+                _query,
+                {
+                    'sequencing_group_ids': sequencing_group_ids,
+                    'audit_log_id': await self.audit_log_id(),
+                },
+            )
+            await conn.execute(
+                _external_id_query,
+                {
+                    'sequencing_group_ids': sequencing_group_ids,
+                    'audit_log_id': await self.audit_log_id(),
+                },
+            )
 
     async def get_type_numbers_for_project(self, project) -> dict[str, int]:
         """
