@@ -348,7 +348,7 @@ class AssayTable(DbBase):
         self,
         assay_id: int,
         *,
-        external_ids: dict[str, str] | None = None,
+        external_ids: dict[str, str | None] | None = None,
         meta: dict[str, Any] | None = None,
         assay_type: str | None = None,
         sample_id: int | None = None,
@@ -391,7 +391,7 @@ class AssayTable(DbBase):
                         'server error.'
                     )
 
-                to_delete = {k.lower() for k, v in external_ids.items() if v is None}
+                to_delete = [k.lower() for k, v in external_ids.items() if v is None]
                 to_update = {
                     k.lower(): v for k, v in external_ids.items() if v is not None
                 }
@@ -400,9 +400,9 @@ class AssayTable(DbBase):
                     _assay_eid_update_before_delete = t"""
                     UPDATE assay_external_id
                     SET audit_log_id = {audit_log_id}
-                    WHERE assay_id = {assay_id} AND name = ANY({list(to_delete)})
+                    WHERE assay_id = {assay_id} AND name = ANY({to_delete})
                     """
-                    _delete_query = t'DELETE FROM assay_external_id WHERE assay_id = {assay_id} AND name = ANY({list(to_delete)})'
+                    _delete_query = t'DELETE FROM assay_external_id WHERE assay_id = {assay_id} AND name = ANY({to_delete})'
                     await conn.execute(_assay_eid_update_before_delete)
                     await conn.execute(_delete_query)
                 if to_update:
