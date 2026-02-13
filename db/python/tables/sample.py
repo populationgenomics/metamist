@@ -143,11 +143,12 @@ class SampleTable(DbBase):
 
     async def get_project_ids_for_sample_ids(self, sample_ids: list[int]) -> set[int]:
         """Get project IDs for sampleIds (mostly for checking auth)"""
-        _query = 'SELECT DISTINCT project FROM sample WHERE id in :sample_ids'
         if not sample_ids:
             return set()
+        _query = t'SELECT DISTINCT project FROM sample WHERE id = ANY({sample_ids})'
+        acur = await self.connection.pg_connection.execute(_query)
+        rows = await acur.fetchall()
 
-        rows = await self.connection.fetch_all(_query, {'sample_ids': sample_ids})
         return set(r['project'] for r in rows)
 
     async def query(
