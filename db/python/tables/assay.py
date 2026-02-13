@@ -76,7 +76,7 @@ class AssayTable(DbBase):
         _query = t"""
             SELECT
                 a.id, a.meta, s.project, a.type, a.sample_id,
-                coalesce(json_object_agg(aeid.name, aeid.external_id) FILTER (WHERE aeid.name IS NOT NULL), '{{}}'::json) as external_ids
+                coalesce(jsonb_object_agg(aeid.name, aeid.external_id) FILTER (WHERE aeid.name IS NOT NULL), '{{}}'::jsonb) as external_ids
             FROM assay a
             LEFT JOIN sample s ON s.id = a.sample_id
             LEFT JOIN assay_external_id aeid ON aeid.assay_id = a.id
