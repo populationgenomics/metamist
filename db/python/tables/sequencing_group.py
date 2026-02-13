@@ -466,7 +466,7 @@ class SequencingGroupTable(DbBase):
 
                 await conn.executemany(_sg_assay_linker, assay_id_insert_values)
 
-            return new_sg_id
+            return new_sg_id['id']
 
     async def update_sequencing_group(
         self, sequencing_group_id: int, meta: dict, platform: str
@@ -474,61 +474,47 @@ class SequencingGroupTable(DbBase):
         """
         Update meta / platform on sequencing_group
         """
-        updaters = ['audit_log_id = %(audit_log_id)s']
-        values: dict[str, Any] = {
-            'seqgid': sequencing_group_id,
-            'audit_log_id': await self.audit_log_id(),
-        }
+        audit_log_id = await self.audit_log_id()
+
+        updaters = [t'audit_log_id = {audit_log_id}']
 
         if meta:
-            values['meta'] = to_db_json(meta)
-            updaters.append('meta = json_merge_patch(COALESCE(meta, "{}"), %(meta)s)')
+            updaters.append(t'meta = json_merge_patch(COALESCE(meta, \'{{}}\'::jsonb), {to_db_json(meta)})')
 
         if platform:
-            updaters.append('platform = %(platform)s')
-            values['platform'] = platform
+            updaters.append(t'platform = {platform}')
 
-        _query = f"""\
+        _query = t"""\
         UPDATE sequencing_group
-        SET {', '.join(updaters)}
-        WHERE id = %(seqgid)s
+        SET {sql.SQL(', ').join(updaters):q}
+        WHERE id = {sequencing_group_id}
         """
 
         conn = self.connection.pg_connection
-        await conn.execute(_query, values)
+        await conn.execute(_query)
 
     async def archive_sequencing_groups(self, sequencing_group_ids: list[int]):
         """
         Archive sequence group by setting archive flag to TRUE
         """
-        _query = """\
+        audit_log_id = await self.audit_log_id()
+
+        _query = t"""\
         UPDATE sequencing_group
-        SET archived = true, audit_log_id = %(audit_log_id)s
-        WHERE id = ANY(%(sequencing_group_ids)s);
+        SET archived = true, audit_log_id = {audit_log_id}
+        WHERE id = ANY({sequencing_group_ids});
         """
         # do this so we can reuse the sequencing_group_ids
-        _external_id_query = """\
+        _external_id_query = t"""\
         UPDATE sequencing_group_external_id
-        SET null_if_archived = NULL, audit_log_id = %(audit_log_id)s
-        WHERE sequencing_group_id = ANY(%(sequencing_group_ids)s);
+        SET null_if_archived = NULL, audit_log_id = {audit_log_id}
+        WHERE sequencing_group_id = ANY({sequencing_group_ids});
         """
 
         conn = self.connection.pg_connection
         async with conn.transaction():
-            await conn.execute(
-                _query,
-                {
-                    'sequencing_group_ids': sequencing_group_ids,
-                    'audit_log_id': await self.audit_log_id(),
-                },
-            )
-            await conn.execute(
-                _external_id_query,
-                {
-                    'sequencing_group_ids': sequencing_group_ids,
-                    'audit_log_id': await self.audit_log_id(),
-                },
-            )
+            await conn.execute(_query)
+            await conn.execute(_external_id_query)
 
     async def get_type_numbers_for_project(self, project) -> dict[str, int]:
         """
