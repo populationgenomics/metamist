@@ -2,6 +2,8 @@ import json
 from collections import defaultdict
 from typing import Any
 
+from psycopg.types.json import Jsonb
+
 from db.python.tables.base import DbBase
 
 
@@ -37,11 +39,21 @@ class ParticipantPhenotypeTable(DbBase):
         """
 
         audit_log_id = await self.audit_log_id()
-        formatted_rows = [(r[0], r[1], json.dumps(r[2]), audit_log_id) for r in rows]
 
         conn = self.connection.pg_connection
         async with conn.cursor() as cur:
-            return await cur.executemany(_query, formatted_rows)
+            return await cur.executemany(
+                _query,
+                [
+                    {
+                        'participant_id': r[0],
+                        'description': r[1],
+                        'value': Jsonb(r[2]),
+                        'audit_log_id': audit_log_id,
+                    }
+                    for r in rows
+                ],
+            )
 
     async def get_key_value_rows_for_participant_ids(
         self, participant_ids: list[int]
@@ -54,14 +66,14 @@ class ParticipantPhenotypeTable(DbBase):
         if len(participant_ids) == 0:
             return {}
 
-        _query = t"""
+        _query = """
             SELECT participant_id, description, value
             FROM participant_phenotypes
-            WHERE participant_id in ({participant_ids:l}) AND value IS NOT NULL
+            WHERE participant_id = ANY(%(participant_ids)s) AND value IS NOT NULL
         """
 
         conn = self.connection.pg_connection
-        cur = await conn.execute(_query)
+        cur = await conn.execute(_query, {'participant_ids': participant_ids})
         rows = await cur.fetchall()
 
         formed_key_value_pairs: dict[int, dict[str, Any]] = defaultdict(dict)
@@ -69,7 +81,7 @@ class ParticipantPhenotypeTable(DbBase):
             pid = row['participant_id']
             key = row['description']
             value = row['value']
-            formed_key_value_pairs[pid][key] = json.loads(value)
+            formed_key_value_pairs[pid][key] = value
 
         return formed_key_value_pairs
 
@@ -81,15 +93,15 @@ class ParticipantPhenotypeTable(DbBase):
         for individual level metadata template,
         for all participants in project
         """
-        _query = t"""
+        _query = """
             SELECT pp.participant_id, pp.description, pp.value
             FROM participant_phenotypes pp
             INNER JOIN participant p ON p.id = pp.participant_id
-            WHERE p.project = {project:l} AND pp.value IS NOT NULL
+            WHERE p.project = %(project)s AND pp.value IS NOT NULL
         """
 
         conn = self.connection.pg_connection
-        cur = await conn.execute(_query)
+        cur = await conn.execute(_query, {'project': project})
         rows = await cur.fetchall()
 
         formed_key_value_pairs: dict[int, dict[str, Any]] = defaultdict(dict)

@@ -630,10 +630,6 @@ class ParticipantLayer(BaseLayer):
             else NoOpAenter
         )
 
-        project = project or self.connection.project_id
-        if not project:
-            raise ValueError('Project must be specified for upserting participant')
-
         async with with_function():
             if participant.id:
                 project_ids = await self.pttable.get_project_ids_for_participant_ids(
@@ -683,6 +679,7 @@ class ParticipantLayer(BaseLayer):
     async def upsert_participants(
         self,
         participants: list[ParticipantUpsertInternal],
+        project: ProjectId | None = None,
         open_transaction=True,
     ):
         """Batch upsert a list of participants with sequences"""
@@ -695,7 +692,7 @@ class ParticipantLayer(BaseLayer):
         async with with_function():
             # Create or update participants
             for p in participants:
-                await self.upsert_participant(p, open_transaction=False)
+                await self.upsert_participant(p, project, open_transaction=False)
 
         # Format and return response
         return participants

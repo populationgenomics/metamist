@@ -138,12 +138,13 @@ class TestParticipant:
                 }
             }
         """
-        resp = await graphql_query(
-            q, {'projectName': connection_with_project.project, 'pid': p.id}
-        )
+        project_name = str(connection_with_project.project.name)
+        resp = await graphql_query(q, {'projectName': project_name, 'pid': p.id})
         assert resp is not None
+        assert resp['data'] is not None
+        assert resp['data']['project'] is not None
 
-        assert len(resp['project']['participants']) == 1
+        assert len(resp['data']['project']['participants']) == 1
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['reader', 'writer'])
@@ -234,11 +235,12 @@ class TestParticipant:
         }"""
 
         resp = await graphql_query(q, {'pid': p.id})
+        assert resp is not None
+        assert resp['data'] is not None
 
-        resp_participant = resp['participant']
+        resp_participant = resp['data']['participant']
 
         assert resp_participant['id'] == p.id
-
         assert resp_participant['phenotypes'] == phenotypes
 
     @pytest.mark.asyncio
@@ -292,7 +294,10 @@ class TestParticipant:
 
         resp = await graphql_query(q, {'pid': p1.id})
 
-        resp_participant = resp['participant']
+        assert resp is not None
+        assert resp['data'] is not None
+
+        resp_participant = resp['data']['participant']
 
         assert resp_participant['id'] == p2.id
 
@@ -304,7 +309,7 @@ class TestParticipant:
         self, connection_with_project: Connection, graphql_query: GraphQLQueryFunction
     ):
         """Test upserting and then updating participant with phenotypes, via graphql"""
-        project_name = connection_with_project.project
+        project_name = str(connection_with_project.project.name)
 
         phenotypes1: dict[str, Any] = {
             'phenotype1': 'value1',
@@ -341,7 +346,10 @@ class TestParticipant:
             },
         )
 
-        p1 = p1_resp['participant']['upsertParticipants'][0]
+        assert p1_resp is not None
+        assert p1_resp['data'] is not None
+
+        p1 = p1_resp['data']['participant']['upsertParticipants'][0]
 
         p1_resp = await graphql_query(
             mutation,
@@ -356,7 +364,7 @@ class TestParticipant:
             },
         )
 
-        p2 = p1_resp['participant']['upsertParticipants'][0]
+        p2 = p1_resp['data']['participant']['upsertParticipants'][0]
 
         # ensure second upsert didn't create a new participant
         assert p1['id'] == p2['id']
@@ -371,8 +379,10 @@ class TestParticipant:
 
         resp = await graphql_query(q, {'pid': p1['id']})
 
-        resp_participant = resp['participant']
+        assert resp is not None
+        assert resp['data'] is not None
+
+        resp_participant = resp['data']['participant']
 
         assert resp_participant['id'] == p2['id']
-
         assert resp_participant['phenotypes'] == phenotypes2

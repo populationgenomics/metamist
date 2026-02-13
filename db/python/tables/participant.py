@@ -12,24 +12,6 @@ from db.python.utils import NotFoundError, escape_like_term, to_db_json
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantInternal, ProjectId
 
 
-def to_string(template):
-    if not isinstance(template, Template):
-        raise TypeError('t-string expected')
-
-    def convert(value, conversion):
-        func = {'a': ascii, 'r': repr, 's': str}.get(conversion, lambda x: x)
-        return func(value)
-
-    parts = []
-    for item in template:
-        if isinstance(item, str):
-            parts.append(item)
-        else:
-            value = format(convert(item.value, item.conversion), item.format_spec)
-            parts.append(value)
-    return ''.join(parts)
-
-
 class ParticipantTable:
     """
     Capture Analysis table operations and queries
@@ -38,32 +20,30 @@ class ParticipantTable:
     def __init__(self, connection: Connection):
         self.connection = connection
 
-    keys_str = sql.SQL(', ').join(
-        [
-            'p.id',
-            'JSON_OBJECTAGG(peid.name, peid.external_id) AS external_ids',
-            'p.reported_sex',
-            'p.reported_gender',
-            'p.karyotype',
-            'p.meta',
-            'p.project',
-            'p.audit_log_id',
-        ]
-    )
+    keys = [
+        'p.id',
+        sql.SQL('JSON_OBJECTAGG(peid.name, peid.external_id) AS external_ids'),
+        'p.reported_sex',
+        'p.reported_gender',
+        'p.karyotype',
+        'p.meta',
+        'p.project',
+        'p.audit_log_id',
+    ]
 
     table_name = 'participant'
 
     async def get_project_ids_for_participant_ids(self, participant_ids: list[int]):
         """Get project IDs for participant_ids (mostly for checking auth)"""
-        _query = t"""
+        _query = """
             SELECT project
             FROM participant
-            WHERE id in {participant_ids:l}
+            WHERE id = ANY(%(participant_ids)s)
             GROUP BY project
         """
 
         conn = self.connection.pg_connection
-        cur = await conn.execute(_query)
+        cur = await conn.execute(_query, {'participant_ids': participant_ids})
         rows = await cur.fetchall()
 
         return set(r['project'] for r in rows)
@@ -71,19 +51,22 @@ class ParticipantTable:
     @staticmethod
     async def _construct_participant_query(  # noqa: C901, PLR0912, RUF100
         filter_: ParticipantFilter,
-        keys: list[str],
+        keys: list[str | sql.Composable],
         skip: int | None = None,
         limit: int | None = None,
         participant_eid_table_alias: str | None = None,
         group_result_by_id: bool = True,
     ) -> Template:
         """Construct a participant query"""
+        if not keys:
+            raise ValueError('Must provide keys to construct participant query')
+
         # Collection of where conditions
         wheres = []
 
         # Query constructer
         query_template = t"""
-            SELECT DISTINCT pp.id,
+            SELECT DISTINCT pp.id
             FROM participant pp
         """
 
@@ -103,7 +86,7 @@ class ParticipantTable:
         )
 
         query_template += (
-            t'INNER JOIN participant_external_id peid ON pp.id = peid.participant_id'
+            t' INNER JOIN participant_external_id peid ON pp.id = peid.participant_id'
         )
 
         # Check filter for the sample table and sample_external_id table
@@ -126,7 +109,7 @@ class ParticipantTable:
                 )
             )
 
-            query_template += t'INNER JOIN sample s ON s.participant_id = pp.id'
+            query_template += t' INNER JOIN sample s ON s.participant_id = pp.id'
 
             if filter_.sample.external_id:
                 wheres.append(
@@ -136,7 +119,7 @@ class ParticipantTable:
                 )
 
                 query_template += (
-                    t'INNER JOIN sample_external_id seid ON seid.sample_id = s.id'
+                    t' INNER JOIN sample_external_id seid ON seid.sample_id = s.id'
                 )
 
         if filter_.sequencing_group:
@@ -152,7 +135,7 @@ class ParticipantTable:
                 )
             )
 
-            query_template += t'INNER JOIN sequencing_group sg ON sg.sample_id = s.id'
+            query_template += t' INNER JOIN sequencing_group sg ON sg.sample_id = s.id'
 
         if filter_.assay:
             wheres.append(
@@ -165,7 +148,7 @@ class ParticipantTable:
                 )
             )
 
-            query_template += t'INNER JOIN assay a ON a.sample_id = s.id'
+            query_template += t' INNER JOIN assay a ON a.sample_id = s.id'
 
         if filter_.family:
             wheres.append(
@@ -195,28 +178,34 @@ class ParticipantTable:
                 """
 
         # WHERE, ORDER BY, LIMIT, OFFSET
-        query_template += t'WHERE ' + sql.SQL(' AND ').join(wheres) if wheres else t''
-        query_template += t'ORDER BY pp.id' if (limit or skip) else t''
-        query_template += t'LIMIT {limit:l}' if limit else t''
-        query_template += t'OFFSET {skip:l}' if skip else t''
+        query_template += t' WHERE ' + sql.SQL(' AND ').join(wheres) if wheres else t''
+        query_template += t' ORDER BY pp.id' if (limit or skip) else t''
+        query_template += t' LIMIT {limit:l}' if limit else t''
+        query_template += t' OFFSET {skip:l}' if skip else t''
 
         # External table join in order to ge the participant id aliases
         ex_table_join = (
             t"""
-            LEFT JOIN participant_external_id {participant_eid_table_alias:l}
-                ON p.id = {participant_eid_table_alias:l}.participant_id
+            LEFT JOIN participant_external_id {participant_eid_table_alias:i}
+                ON p.id = {participant_eid_table_alias:i}.participant_id
             """
             if participant_eid_table_alias
             else t''
         )
 
-        # Turn the keys into sql identifiers and construct the group by if needed
-        keys_str = sql.SQL(', ').join(keys)
+        def format_key(key: str | sql.SQL) -> sql.Composable:
+            if isinstance(key, str):
+                return sql.Identifier(*key.split('.'))
+            return key
+
+        # Turn the keys into sql and construct the group by if needed
+        formatted_keys = [format_key(k) for k in keys]
+        keys_sql = sql.SQL(', ').join(formatted_keys)
         optional_group_by = sql.SQL('GROUP BY p.id') if group_result_by_id else t''
 
         # Final query template
         outer_query = t"""
-            SELECT {keys_str:q}
+            SELECT {keys_sql:q}
             FROM participant p
             {ex_table_join:q}
             INNER JOIN ({query_template:q}) as inner_query ON inner_query.id = p.id
@@ -242,7 +231,7 @@ class ParticipantTable:
         """
         keys = [
             'p.id',
-            'JSON_OBJECTAGG(pexid.name, pexid.external_id) as external_ids',
+            sql.SQL('JSON_OBJECT_AGG(peid.name, peid.external_id) AS external_ids'),
             'p.reported_sex',
             'p.reported_gender',
             'p.karyotype',
@@ -254,7 +243,7 @@ class ParticipantTable:
             keys=keys,
             skip=skip,
             limit=limit,
-            participant_eid_table_alias='pexid',
+            participant_eid_table_alias='peid',
         )
 
         conn = self.connection.pg_connection
@@ -348,8 +337,6 @@ class ParticipantTable:
         """
         Create a new sample, and add it to database
         """
-        if not (project or self.connection.project_id):
-            raise ValueError('Must provide project to create participant')
 
         if not external_ids or external_ids.get(PRIMARY_EXTERNAL_ORG) is None:
             raise ValueError('Participant must have primary external_id')
@@ -359,6 +346,9 @@ class ParticipantTable:
 
         meta_literal = to_db_json(meta or {})
         project_literal = project or self.connection.project_id
+
+        if not project_literal:
+            raise ValueError('Project must be specified to create participant')
 
         _query = t"""
             INSERT INTO participant
@@ -498,28 +488,26 @@ class ParticipantTable:
                         list(to_update.items()),
                     )
 
-        updates = [t'audit_log_id = {audit_log_id:l}']
+        updates: list[Template | None] = [t'audit_log_id = {audit_log_id:l}']
 
-        updates.append(t'reported_sex = {reported_sex:l}' if reported_sex else t'')
+        updates.append(t'reported_sex = {reported_sex:l}' if reported_sex else None)
         updates.append(
-            t'reported_gender = {reported_gender:l}' if reported_gender else t''
+            t'reported_gender = {reported_gender:l}' if reported_gender else None
         )
-        updates.append(t'karyotype = {karyotype:l}' if karyotype else t'')
+        updates.append(t'karyotype = {karyotype:l}' if karyotype else None)
         meta_literal = to_db_json(meta)
         updates.append(
             t'meta = JSON_MERGE_PATCH(COALESCE(meta, "{{}}"), {meta_literal:l})'
             if meta
-            else t''
-        )
-        updates = [u for u in updates if u]
-
-        _query = (
-            t'UPDATE participant SET '
-            + sql.SQL(', ').join(updates)
-            + t' WHERE id = {participant_id:l}'
+            else None
         )
 
-        await conn.execute(_query)
+        updates = [u for u in updates if u is not None]
+        updates_str = sql.SQL(', ').join(updates)
+
+        _query = t'UPDATE participant SET {updates_str:q} WHERE id = {participant_id:l}'
+
+        cur = await conn.execute(_query)
         return True
 
     async def get_id_map_by_external_ids(
