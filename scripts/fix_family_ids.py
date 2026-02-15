@@ -21,7 +21,7 @@ def main(family_id_json: str, project: str, force=False):
     if family_id_json.startswith('{'):
         fid_map = json.loads(family_id_json)
     else:
-        with open(family_id_json) as f:
+        with open(family_id_json) as f:  # noqa: PTH123
             fid_map = json.load(f)
 
     fapi = FamilyApi()
@@ -57,4 +57,4 @@ def main(family_id_json: str, project: str, force=False):
 
 
 if __name__ == '__main__':
-    main()  # pylint: disable=no-value-for-parameter
+    main()

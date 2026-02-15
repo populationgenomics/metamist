@@ -30,6 +30,7 @@ from models.models.project import (
 )
 from models.models.sequencing_group import SequencingGroupInternalId
 
+
 ES_ANALYSIS_OBJ_INTRO_DATE = datetime.date(2022, 6, 21)
 
 logger = get_logger()
@@ -248,7 +249,7 @@ class AnalysisLayer(BaseLayer):
         # 2: progressively sum up the sizes, prepping for step 3
 
         by_date_totals: list[tuple[datetime.date, dict[str, int]]] = []
-        sorted_days = list(sorted(by_project_delta.items(), key=lambda el: el[0]))
+        sorted_days = sorted(by_project_delta.items(), key=lambda el: el[0])
         for dt, project_map in sorted_days:
             if len(by_date_totals) == 0:
                 by_date_totals.append((dt, project_map))
@@ -563,6 +564,7 @@ class AnalysisLayer(BaseLayer):
             cohort_ids=analysis.cohort_ids,
             meta=analysis.meta,
             active=analysis.active,
+            timestamp_completed=analysis.timestamp_completed,
             project=project,
         )
 

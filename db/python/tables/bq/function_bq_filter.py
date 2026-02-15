@@ -65,10 +65,8 @@ class FunctionBQFilter:
 
             # format as FUN(column_name, @param) = @value
             conditionals.append(
-                (
-                    f'{self.func_name}({column_name.value},@{key}) = '
-                    f'{FunctionBQFilter._sql_cond_prep(val, param_value)}'
-                )
+                f'{self.func_name}({column_name.value},@{key}) = '
+                f'{FunctionBQFilter._sql_cond_prep(val, param_value)}'
             )
 
         if func_operator and func_operator == 'OR':
@@ -95,7 +93,7 @@ class FunctionBQFilter:
 
     @staticmethod
     def _sql_value_prep(key: str, value: Any) -> bigquery.ScalarQueryParameter:
-        """ """
+        """ """  # noqa: D419
         if isinstance(value, Enum):
             return FunctionBQFilter._sql_value_prep(key, value.value)
         if isinstance(value, int):

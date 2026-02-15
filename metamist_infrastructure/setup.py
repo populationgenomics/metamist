@@ -7,9 +7,10 @@ We won't list any dependencies here, but it does require pulumi-gcp
 
 from setuptools import setup
 
+
 PKG = 'metamist_infrastructure'
 
-with open('README.md', encoding='utf-8') as f:
+with open('README.md', encoding='utf-8') as f:  # noqa: PTH123
     readme = f.read()
 
 setup(

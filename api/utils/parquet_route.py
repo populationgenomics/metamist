@@ -1,7 +1,8 @@
 import os
+from collections.abc import Awaitable, Callable
 from functools import wraps
 from io import BytesIO
-from typing import Awaitable, Callable, ParamSpec
+from typing import ParamSpec
 
 from fastapi import APIRouter, Response
 from fastapi.responses import JSONResponse
@@ -45,7 +46,7 @@ def parquet_table_route(router: APIRouter, path: str, operation_id: str):
                     content={'error': 'Table empty or not found'},
                 )
 
-            filename = os.path.basename(path)
+            filename = os.path.basename(path)  # noqa: PTH119
 
             headers = {'Content-Disposition': f'attachment; filename="{filename}"'}
 

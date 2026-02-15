@@ -1,5 +1,3 @@
-# pylint: disable=too-many-arguments
-
 from fastapi import APIRouter
 
 from api.utils.db import (
@@ -14,6 +12,7 @@ from models.base import SMBase
 from models.models.assay import AssayUpsert
 from models.models.project import ReadAccessRoles
 from models.utils.sample_id_format import sample_id_transform_to_raw_list
+
 
 router = APIRouter(prefix='/assay', tags=['assay'])
 

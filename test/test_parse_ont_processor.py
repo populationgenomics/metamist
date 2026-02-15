@@ -1,9 +1,9 @@
 import unittest
 from io import StringIO
-from test.testbase import run_as_sync
 from unittest.mock import patch
 
 from scripts.process_ont_products import OntProductParser
+from test.testbase import run_as_sync
 
 
 class TestOntSampleSheetParser(unittest.TestCase):

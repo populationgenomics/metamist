@@ -1,4 +1,3 @@
-# pylint: disable=redefined-builtin, import-outside-toplevel
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
@@ -13,6 +12,7 @@ from models.models.comment import CommentEntityType
 from models.models.project import FullWriteAccessRoles
 from models.models.sequencing_group import SequencingGroupUpsertInternal
 from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
+
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLComment, GraphQLSequencingGroup
@@ -54,7 +54,7 @@ class SequencingGroupMutations:
     ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
         """Add a comment to a sequencing group"""
         # Import needed here to avoid circular import
-        from api.graphql.schema import GraphQLComment
+        from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
         connection = info.context['connection']
         cl = CommentLayer(connection)
@@ -73,7 +73,7 @@ class SequencingGroupMutations:
         info: Info,
     ) -> Annotated['GraphQLSequencingGroup', strawberry.lazy('api.graphql.schema')]:
         """Update the meta fields of a sequencing group"""
-        from api.graphql.schema import GraphQLSequencingGroup
+        from api.graphql.schema import GraphQLSequencingGroup  # noqa: PLC0415
 
         connection: Connection = info.context['connection']
 
@@ -108,7 +108,7 @@ class SequencingGroupMutations:
         Annotated['GraphQLSequencingGroup', strawberry.lazy('api.graphql.schema')]
     ]:
         """Archive a list of sequencing groups"""
-        from api.graphql.schema import GraphQLSequencingGroup
+        from api.graphql.schema import GraphQLSequencingGroup  # noqa: PLC0415
 
         connection: Connection = info.context['connection']
 

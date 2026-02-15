@@ -1,23 +1,24 @@
 """Data models for the audit module."""
 
 from .entities import (
-    Participant,
-    Sample,
-    Assay,
     Analysis,
-    SequencingGroup,
+    Assay,
     AuditReportEntry,
     AuditResult,
-    ReviewResult,
     DeletionResult,
+    Participant,
+    ReviewResult,
+    Sample,
+    SequencingGroup,
 )
 from .value_objects import (
-    FileType,
-    FileMetadata,
-    ExternalIds,
     AuditConfig,
+    ExternalIds,
+    FileMetadata,
+    FileType,
     MovedFile,
 )
+
 
 __all__ = [
     # Entities

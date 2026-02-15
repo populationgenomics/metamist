@@ -1,5 +1,3 @@
-# pylint: disable=redefined-builtin, import-outside-toplevel
-
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
@@ -13,6 +11,7 @@ from db.python.layers.participant import ParticipantLayer
 from models.models.comment import CommentEntityType
 from models.models.participant import ParticipantUpsert
 from models.models.project import FullWriteAccessRoles
+
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLComment, GraphQLParticipant
@@ -59,7 +58,7 @@ class ParticipantMutations:
     ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
         """Add a comment to a participant"""
         # Import needed here to avoid circular import
-        from api.graphql.schema import GraphQLComment
+        from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
         connection = info.context['connection']
         cl = CommentLayer(connection)
@@ -76,7 +75,7 @@ class ParticipantMutations:
         info: Info,
     ) -> Annotated['GraphQLParticipant', strawberry.lazy('api.graphql.schema')]:
         """Update Participant Data"""
-        from api.graphql.schema import GraphQLParticipant
+        from api.graphql.schema import GraphQLParticipant  # noqa: PLC0415
 
         connection = info.context['connection']
         player = ParticipantLayer(connection)
@@ -101,7 +100,7 @@ class ParticipantMutations:
         Upserts a list of participants with samples and sequences
         Returns the list of internal sample IDs
         """
-        from api.graphql.schema import GraphQLParticipant
+        from api.graphql.schema import GraphQLParticipant  # noqa: PLC0415
 
         connection: Connection = info.context['connection']
         connection.check_access_to_projects_for_names([project], FullWriteAccessRoles)

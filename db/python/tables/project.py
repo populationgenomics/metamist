@@ -1,5 +1,4 @@
-# pylint: disable=global-statement
-from typing import TYPE_CHECKING, Any, Tuple
+from typing import TYPE_CHECKING, Any
 
 from databases import Database
 
@@ -9,6 +8,7 @@ from models.models.project import (
     ProjectMemberUpdate,
     project_member_role_names,
 )
+
 
 # Avoid circular import for type definition
 if TYPE_CHECKING:
@@ -345,7 +345,7 @@ DELETE FROM analysis WHERE project = :project;
                 {'project_id': project.id},
             )
 
-            audit_log_id_map: dict[Tuple[str, str], int | None] = {
+            audit_log_id_map: dict[tuple[str, str], int | None] = {
                 (r['member'], r['role']): r['audit_log_id'] for r in existing_rows
             }
 

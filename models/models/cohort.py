@@ -189,6 +189,9 @@ class NewCohort(SMBase):
     dry_run: bool = False
     cohort_id: str
     sequencing_group_ids: list[str]
+    excluded_ineligible_sg_ids_internal: list[str] | None = (
+        None  # will be returned conditionally
+    )
 
 
 class NewCohortInternal(SMBase):
@@ -197,6 +200,7 @@ class NewCohortInternal(SMBase):
     dry_run: bool = False
     cohort_id: int | None
     sequencing_group_ids: list[int] | None = None
+    excluded_ineligible_sg_ids_internal: list[int] | None = None
 
     def to_external(self) -> NewCohort:
         """
@@ -213,5 +217,12 @@ class NewCohortInternal(SMBase):
                 sequencing_group_id_format_list(self.sequencing_group_ids)
                 if self.sequencing_group_ids
                 else []
+            ),
+            excluded_ineligible_sg_ids_internal=(
+                sequencing_group_id_format_list(
+                    self.excluded_ineligible_sg_ids_internal
+                )
+                if self.excluded_ineligible_sg_ids_internal
+                else None
             ),
         )

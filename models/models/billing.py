@@ -1,6 +1,8 @@
 import datetime
 from enum import Enum
+
 from pydantic import Field
+
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
 from models.base import SMBase

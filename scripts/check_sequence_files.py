@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# pylint: disable=W0703
 """
 Find sequencing files that exist in the bucket, but are not ingested.
 This pairs well will the cleanup_fastqs.py script.
@@ -9,11 +8,12 @@ import asyncio
 import logging
 import os
 from collections import defaultdict
-from typing import Any, Dict, List, Set
+from typing import Any
 
 from google.cloud import storage
 
 from metamist.apis import AssayApi, ProjectApi, SampleApi, WebApi
+
 
 # Global vars
 logger = logging.getLogger(__file__)
@@ -31,7 +31,7 @@ def get_bucket_name_from_path(path_input):
     """
     >>> get_bucket_name_from_path('gs://my-bucket/path')
     'my-bucket'
-    """
+    """  # noqa: D402
 
     path = str(path_input)
 
@@ -41,7 +41,7 @@ def get_bucket_name_from_path(path_input):
     return path[len('gs://') :].split('/', maxsplit=1)[0]
 
 
-def get_filenames_from_sequences(sequences: List[Dict[str, Any]]) -> Set[str]:
+def get_filenames_from_sequences(sequences: list[dict[str, Any]]) -> set[str]:
     """
     Convert sm formated files to list of gs:// filenames
     """
@@ -79,7 +79,7 @@ async def get_all_sequence_files(cpg_project):
     try:
         assays = await assay_api.get_assays_by_criteria_async(projects=[cpg_project])
         return assays
-    except Exception as err:
+    except Exception as err:  # noqa: BLE001
         logging.error(f'{cpg_project} :: Cannot get sequences {err}')
 
     return []
@@ -110,7 +110,7 @@ async def get_sm_sequences():
     sequences = sum(sequences, [])
 
     sequence_filenames = get_filenames_from_sequences(sequences)
-    filenames_by_buckets: Dict[str, Set[str]] = defaultdict(set)
+    filenames_by_buckets: dict[str, set[str]] = defaultdict(set)
 
     for file in sequence_filenames:
         bucket = get_bucket_name_from_path(file)
@@ -127,7 +127,7 @@ async def get_sm_sequences():
     if missing:
         logging.error(f'Missing files {len(missing)}')
 
-        with open('missing_sequence_files.txt', 'w') as fout:
+        with open('missing_sequence_files.txt', 'w') as fout:  # noqa: PTH123
             fout.write('\n'.join(sorted(missing.values())))
 
     return sequences, missing
@@ -136,7 +136,7 @@ async def get_sm_sequences():
 EXTENSIONS = ['.fastq.gz', '.fastq', '.bam', '.cram', '.fq', 'fq.gz']
 
 
-def check_missing_file_names(bucket_name: str, filenames: Set[str]) -> Dict[str, str]:
+def check_missing_file_names(bucket_name: str, filenames: set[str]) -> dict[str, str]:
     """
     Find set of missing files compared to list of filenames in a bucket
     """
@@ -154,9 +154,9 @@ def check_missing_file_names(bucket_name: str, filenames: Set[str]) -> Dict[str,
         bl = blob.name.lower()
         if not any(bl.endswith(ext) for ext in EXTENSIONS):
             continue
-        files_in_bucket[os.path.basename(blob.name)] = f'gs://{bucket_name}/{blob.name}'
+        files_in_bucket[os.path.basename(blob.name)] = f'gs://{bucket_name}/{blob.name}'  # noqa: PTH119
 
-    fns = set(os.path.basename(f) for f in filenames)
+    fns = set(os.path.basename(f) for f in filenames)  # noqa: PTH119
     files_not_in_sm = set(files_in_bucket.keys()) - fns
     if files_not_in_sm:
         logging.error(
@@ -172,5 +172,4 @@ def main():
 
 
 if __name__ == '__main__':
-    # pylint: disable=no-value-for-parameter
     main()

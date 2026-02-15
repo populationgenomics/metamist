@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# pylint: disable=logging-not-lazy,subprocess-popen-preexec-fn,consider-using-with
 import json
 import logging
 import os
@@ -13,6 +12,7 @@ from functools import lru_cache
 from api.server import _VERSION, app
 from api.utils.openapi import get_openapi_3_0_schema
 
+
 OPENAPI_COMMAND = os.getenv('OPENAPI_COMMAND', 'openapi-generator-cli').split(' ')
 MODULE_NAME = 'metamist'
 MODULE_REL_PATH = 'packages/metamist/src/metamist'
@@ -22,8 +22,8 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = 'web/src/static'
-OUTPUT_DOCS_DIR = os.path.join(STATIC_DIR, 'sm_docs')
-MODULE_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), MODULE_REL_PATH)
+OUTPUT_DOCS_DIR = os.path.join(STATIC_DIR, 'sm_docs')  # noqa: PTH118
+MODULE_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), MODULE_REL_PATH)  # noqa: PTH100, PTH118, PTH120
 
 
 def _get_openapi_version():
@@ -69,7 +69,7 @@ def check_openapi_version():
 
     version = version_match.group()
     major = version.split('.')[0]
-    if int(major) != 5:
+    if int(major) != 5:  # noqa: PLR2004
         raise ValueError(
             f'openapi-generator must be version 5.x.x, received: {version}'
         )
@@ -88,7 +88,7 @@ def generate_api_and_copy(
     """
     Use OpenApiGenerator to generate the installable API
     """
-    with open('deploy/python/version.txt', encoding='utf-8') as f:
+    with open('deploy/python/version.txt', encoding='utf-8') as f:  # noqa: PTH123
         version = f.read().strip()
 
     # write to temporary file with extension .json
@@ -125,7 +125,7 @@ def generate_api_and_copy(
 
             except subprocess.CalledProcessError as e:
                 logger.warning(
-                    f'openapi generation failed, trying {i-1} more times: {e}'
+                    f'openapi generation failed, trying {i - 1} more times: {e}'
                 )
                 time.sleep(2)
 
@@ -145,7 +145,7 @@ def generate_schema_file():
     command = ['strawberry', 'export-schema', 'api.graphql.schema:schema']
     schema = subprocess.check_output(command).decode()
 
-    with open(os.path.join(MODULE_DIR, 'graphql/schema.graphql'), 'w+') as f:
+    with open(os.path.join(MODULE_DIR, 'graphql/schema.graphql'), 'w+') as f:  # noqa: PTH118, PTH123
         f.write(schema)
 
 
@@ -163,33 +163,33 @@ def copy_typescript_files_from(tmpdir):
     dir_to_copy_to = 'web/src/sm-api/'  # should be relative to this script
     dir_to_copy_from = tmpdir
 
-    if not os.path.exists(dir_to_copy_to):
-        os.makedirs(dir_to_copy_to)
-    if not os.path.exists(dir_to_copy_from):
+    if not os.path.exists(dir_to_copy_to):  # noqa: PTH110
+        os.makedirs(dir_to_copy_to)  # noqa: PTH103
+    if not os.path.exists(dir_to_copy_from):  # noqa: PTH110
         raise FileNotFoundError(
             f"Directory to copy from doesn't exist ({dir_to_copy_from})"
         )
 
     # remove everything from dir_to_copy_to except those in files_to_ignore
     logger.info('Removing files from dest directory ' + dir_to_copy_to)
-    for file_to_remove in os.listdir(dir_to_copy_to):
+    for file_to_remove in os.listdir(dir_to_copy_to):  # noqa: PTH208
         if file_to_remove in files_to_ignore:
             continue
-        path_to_remove = os.path.join(dir_to_copy_to, file_to_remove)
-        if os.path.isdir(path_to_remove):
+        path_to_remove = os.path.join(dir_to_copy_to, file_to_remove)  # noqa: PTH118
+        if os.path.isdir(path_to_remove):  # noqa: PTH112
             shutil.rmtree(path_to_remove)
         else:
-            os.remove(path_to_remove)
+            os.remove(path_to_remove)  # noqa: PTH107
 
-    files_to_copy = os.listdir(dir_to_copy_from)
+    files_to_copy = os.listdir(dir_to_copy_from)  # noqa: PTH208
     logger.info(f'Copying {len(files_to_copy)} files / directories to {dir_to_copy_to}')
     for file_to_copy in files_to_copy:
         if file_to_copy in files_to_ignore:
             continue
 
-        path_to_copy = os.path.join(dir_to_copy_from, file_to_copy)
-        output_path = os.path.join(dir_to_copy_to, file_to_copy)
-        if os.path.isdir(path_to_copy):
+        path_to_copy = os.path.join(dir_to_copy_from, file_to_copy)  # noqa: PTH118
+        output_path = os.path.join(dir_to_copy_to, file_to_copy)  # noqa: PTH118
+        if os.path.isdir(path_to_copy):  # noqa: PTH112
             shutil.copytree(path_to_copy, output_path)
         else:
             shutil.copy(path_to_copy, output_path)
@@ -208,49 +208,50 @@ def copy_python_files_from(tmpdir):
     files_to_ignore = {'README.md', 'parser', 'graphql', 'audit'}
 
     dir_to_copy_to = MODULE_DIR  # should be relative to this script
-    dir_to_copy_from = os.path.join(tmpdir, MODULE_NAME)
+    dir_to_copy_from = os.path.join(tmpdir, MODULE_NAME)  # noqa: PTH118
 
-    if not os.path.exists(dir_to_copy_to):
+    if not os.path.exists(dir_to_copy_to):  # noqa: PTH110
         raise FileNotFoundError(
             f"Directory to copy to doesn't exist ({dir_to_copy_to})"
         )
-    if not os.path.exists(dir_to_copy_from):
+    if not os.path.exists(dir_to_copy_from):  # noqa: PTH110
         raise FileNotFoundError(
             f"Directory to copy from doesn't exist ({dir_to_copy_from})"
         )
 
     # remove everything from dir_to_copy_to except those in files_to_ignore
     logger.info('Removing files from dest directory ' + dir_to_copy_to)
-    for file_to_remove in os.listdir(dir_to_copy_to):
+    for file_to_remove in os.listdir(dir_to_copy_to):  # noqa: PTH208
         if file_to_remove in files_to_ignore:
             continue
-        path_to_remove = os.path.join(dir_to_copy_to, file_to_remove)
-        if os.path.isdir(path_to_remove):
+        path_to_remove = os.path.join(dir_to_copy_to, file_to_remove)  # noqa: PTH118
+        if os.path.isdir(path_to_remove):  # noqa: PTH112
             shutil.rmtree(path_to_remove)
         else:
-            os.remove(path_to_remove)
+            os.remove(path_to_remove)  # noqa: PTH107
 
-    files_to_copy = os.listdir(dir_to_copy_from)
+    files_to_copy = os.listdir(dir_to_copy_from)  # noqa: PTH208
     logger.info(f'Copying {len(files_to_copy)} files / directories to {dir_to_copy_to}')
     for file_to_copy in files_to_copy:
         if file_to_copy in files_to_ignore:
             continue
 
-        path_to_copy = os.path.join(dir_to_copy_from, file_to_copy)
-        output_path = os.path.join(dir_to_copy_to, file_to_copy)
-        if os.path.isdir(path_to_copy):
+        path_to_copy = os.path.join(dir_to_copy_from, file_to_copy)  # noqa: PTH118
+        output_path = os.path.join(dir_to_copy_to, file_to_copy)  # noqa: PTH118
+        if os.path.isdir(path_to_copy):  # noqa: PTH112
             shutil.copytree(path_to_copy, output_path)
         else:
             shutil.copy(path_to_copy, output_path)
 
-    docs_dir = os.path.join(tmpdir, 'docs')
-    if os.path.exists(OUTPUT_DOCS_DIR):
+    docs_dir = os.path.join(tmpdir, 'docs')  # noqa: PTH118
+    if os.path.exists(OUTPUT_DOCS_DIR):  # noqa: PTH110
         shutil.rmtree(OUTPUT_DOCS_DIR)
-    if not os.path.exists(STATIC_DIR):
-        os.makedirs(STATIC_DIR)
+    if not os.path.exists(STATIC_DIR):  # noqa: PTH110
+        os.makedirs(STATIC_DIR)  # noqa: PTH103
     shutil.copytree(docs_dir, OUTPUT_DOCS_DIR)
     shutil.copy(
-        os.path.join(tmpdir, 'README.md'), os.path.join(OUTPUT_DOCS_DIR, 'README.md')
+        os.path.join(tmpdir, 'README.md'),  # noqa: PTH118
+        os.path.join(OUTPUT_DOCS_DIR, 'README.md'),  # noqa: PTH118
     )
 
 
@@ -285,20 +286,24 @@ def main():
     # Copy resources and README
     shutil.copy(
         './resources/muck-the-duck.svg',
-        os.path.join('web/src', 'muck-the-duck.svg'),
+        os.path.join('web/src', 'muck-the-duck.svg'),  # noqa: PTH118
     )
     shutil.copy(
         'README.md',
-        os.path.join(OUTPUT_DOCS_DIR, 'index.md'),
+        os.path.join(OUTPUT_DOCS_DIR, 'index.md'),  # noqa: PTH118
     )
 
     shutil.copy(
         'LICENSE',
-        os.path.join(MODULE_PARENT_REL_PATH, 'LICENSE'),  # copy before packaging
+        os.path.join(  # noqa: PTH118
+            MODULE_PARENT_REL_PATH, 'LICENSE'
+        ),  # copy before packaging
     )
     shutil.copy(
         'README.md',
-        os.path.join(MODULE_PARENT_REL_PATH, 'README.md'),  # copy before packaging
+        os.path.join(  # noqa: PTH118
+            MODULE_PARENT_REL_PATH, 'README.md'
+        ),  # copy before packaging
     )
 
 

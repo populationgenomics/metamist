@@ -24,15 +24,16 @@ from api.utils.openapi import get_openapi_schema_func
 from db.python.connect import SMConnections
 from db.python.utils import get_logger
 
+
 # This tag is automatically updated by bump-my-version
-_VERSION = '7.13.4'
+_VERSION = '7.14.0'
 
 
 logger = get_logger()
 
-STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'public')
+STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'public')  # noqa: PTH118, PTH120
 
-static_dir_exists = os.path.exists(STATIC_DIR)
+static_dir_exists = os.path.exists(STATIC_DIR)  # noqa: PTH110
 
 
 @asynccontextmanager
@@ -75,17 +76,17 @@ if PROFILE_REQUESTS:
         )
 
         if 'json' in PROFILE_REQUESTS_OUTPUT:
-            os.makedirs('profiles', exist_ok=True)
+            os.makedirs('profiles', exist_ok=True)  # noqa: PTH103
             json = profiler.output(renderer=SpeedscopeRenderer())
 
-            with open(f'profiles/{timestamp}.json', 'w') as file:
+            with open(f'profiles/{timestamp}.json', 'w') as file:  # noqa: PTH123
                 file.write(json)
                 file.close()
 
         if 'html' in PROFILE_REQUESTS_OUTPUT:
-            os.makedirs('profiles', exist_ok=True)
+            os.makedirs('profiles', exist_ok=True)  # noqa: PTH103
             html = profiler.output_html()
-            with open(f'profiles/{timestamp}.html', 'w') as file:
+            with open(f'profiles/{timestamp}.html', 'w') as file:  # noqa: PTH123
                 file.write(html)
                 file.close()
 
@@ -113,7 +114,7 @@ class SPAStaticFiles(StaticFiles):
         (to make single-page-app work correctly)
         """
         response = await super().get_response(path, scope)
-        if response.status_code == 404 and not path.startswith('api'):
+        if response.status_code == 404 and not path.startswith('api'):  # noqa: PLR2004
             # server index.html if can't find existing resource
             response = await super().get_response('index.html', scope)
         return response

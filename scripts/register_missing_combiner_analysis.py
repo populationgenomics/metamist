@@ -1,4 +1,5 @@
-"""Register a missing combiner analysis in Metamist
+"""
+Register a missing combiner analysis in Metamist
 
 Ad-hoc script to register a missing combiner analysis in Metamist.
 Is supremely inflexible since there is a short timeframe for combining previous
@@ -15,7 +16,8 @@ from metamist.models import Analysis, AnalysisStatus
 
 
 def get_sg_ids(vds: str) -> list[str]:
-    """Gets all sequencing group IDs from a VDS
+    """
+    Gets all sequencing group IDs from a VDS
 
     Args:
         vds (str): The VDS to extract the sequencing group IDs from
@@ -27,7 +29,8 @@ def get_sg_ids(vds: str) -> list[str]:
 
 
 def main(vds: str):
-    """Create and register a missing combiner analysis
+    """
+    Create and register a missing combiner analysis
 
     Args:
         vds (str): The existing VDS that needs to be registered

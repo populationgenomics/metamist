@@ -1,15 +1,16 @@
 """Business logic services."""
 
-from .file_matcher import (
-    FileMatcher,
-    ChecksumMatcher,
-    FilenameSizeMatcher,
-    CompositeFileMatcher,
-    FileMatchingService,
-)
 from .audit_analyzer import AuditAnalyzer
-from .reporter import Reporter
 from .audit_logging import BucketAuditLogger
+from .file_matcher import (
+    ChecksumMatcher,
+    CompositeFileMatcher,
+    FileMatcher,
+    FileMatchingService,
+    FilenameSizeMatcher,
+)
+from .reporter import Reporter
+
 
 __all__ = [
     # File matching

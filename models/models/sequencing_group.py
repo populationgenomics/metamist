@@ -8,6 +8,7 @@ from models.utils.sequencing_group_id_format import (
     sequencing_group_id_transform_to_raw,
 )
 
+
 SequencingGroupInternalId = int
 SequencingGroupExternalId = str
 

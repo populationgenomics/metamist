@@ -2,21 +2,21 @@
 Contains fixtured data for the audit unit tests
 """
 
+from cpg_utils import to_path
 from metamist.audit.models import (
-    SequencingGroup,
     Analysis,
-    Sample,
-    Participant,
     ExternalIds,
     FileMetadata,
+    Participant,
+    Sample,
+    SequencingGroup,
 )
 
 from test.data.audit_fixtures.read_files import (
-    ASSAYS,
     ASSAY_WITH_SECONDARY_FILE_GQL_DICT,
+    ASSAYS,
 )
 
-from cpg_utils import to_path
 
 ENUMS_QUERY_RESULT = {
     'enum': {

@@ -1,7 +1,8 @@
 """Data access repositories."""
 
-from .metamist_data_access import MetamistDataAccess
 from .gcs_data_access import GCSDataAccess
+from .metamist_data_access import MetamistDataAccess
+
 
 __all__ = [
     'MetamistDataAccess',

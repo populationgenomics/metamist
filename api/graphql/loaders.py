@@ -1,4 +1,3 @@
-# pylint: disable=no-value-for-parameter,redefined-builtin
 # ^ Do this because of the loader decorator
 import copy
 import dataclasses
@@ -60,6 +59,7 @@ class LoaderKeys(enum.Enum):
     AUDIT_LOGS_BY_IDS = 'audit_logs_by_ids'
     AUDIT_LOGS_BY_ANALYSIS_IDS = 'audit_logs_by_analysis_ids'
 
+    ANALYSES_FOR_PROJECTS = 'analyses_for_projects'
     ANALYSES_FOR_SEQUENCING_GROUPS = 'analyses_for_sequencing_groups'
 
     ASSAYS_FOR_IDS = 'assays_for_ids'
@@ -309,7 +309,7 @@ async def load_sequencing_group_counts_by_month(
     sgt = SequencingGroupTable(connection)
     counts_by_month = await sgt.get_sequencing_group_counts_by_month(ids)
 
-    return [counts_by_month[id] for id in ids]
+    return [counts_by_month[id] for id in ids]  # noqa: A001
 
 
 @connected_data_loader(LoaderKeys.SAMPLES_FOR_IDS)
@@ -459,6 +459,27 @@ async def load_participants_for_projects(
 
 
 @connected_data_loader_with_params(
+    LoaderKeys.ANALYSES_FOR_PROJECTS, default_factory=list
+)
+async def load_analyses_for_projects(
+    ids: list[int],
+    filter_: AnalysisFilter,
+    connection: Connection,
+) -> dict[int, list[AnalysisInternal]]:
+    """
+    Data loader for loading analyses from projects.
+    """
+    alayer = AnalysisLayer(connection)
+    filter_.project = GenericFilter(in_=ids)
+    analyses = await alayer.query(filter_)
+    by_project_id: dict[int, list[AnalysisInternal]] = defaultdict(list)
+    for a in analyses:
+        by_project_id[a.project].append(a)
+
+    return by_project_id
+
+
+@connected_data_loader_with_params(
     LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS, default_factory=list
 )
 async def load_analyses_for_sequencing_groups(
@@ -524,7 +545,8 @@ async def load_family_participants_for_families(
 async def load_family_participants_for_participants(
     participant_ids: list[int], connection: Connection
 ) -> list[list[PedRowInternal]]:
-    """data loader for family participants for participants
+    """
+    data loader for family participants for participants
 
     Args:
         participant_ids (list[int]): list of internal participant ids
@@ -635,7 +657,7 @@ class GraphQLContext(TypedDict):
 
 
 async def get_context(
-    request: Request,  # pylint: disable=unused-argument
+    request: Request,  # noqa: ARG001
     connection: Connection = get_projectless_db_connection,
 ) -> GraphQLContext:
     """Get loaders / cache context for strawberyy GraphQL"""

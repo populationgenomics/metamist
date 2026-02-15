@@ -1,6 +1,4 @@
-# pylint: disable=invalid-overridden-method
 import os
-from test.testbase import DbIsolatedTest, run_as_sync
 from typing import Any
 
 from testcontainers.core.container import DockerContainer
@@ -18,19 +16,18 @@ from models.models import (
     SequencingGroupUpsertInternal,
 )
 from models.models.analysis import AnalysisInternal
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 class TestOutputFiles(DbIsolatedTest):
     """Test sample class"""
-
-    # pylint: disable=too-many-instance-attributes
 
     @run_as_sync
     async def setUp(self) -> None:
         # don't need to await because it's tagged @run_as_sync
         super().setUp()
 
-        absolute_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+        absolute_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')  # noqa: PTH100, PTH118, PTH120
         gcs = (
             DockerContainer('fsouza/fake-gcs-server')
             .with_bind_ports(4443, 4443)
@@ -122,7 +119,8 @@ class TestOutputFiles(DbIsolatedTest):
 
     @run_as_sync
     async def test_output_str(self):
-        """Test how the output(s) behave when you create an analysis by passing in
+        """
+        Test how the output(s) behave when you create an analysis by passing in
         just the `output` field
         """
 
@@ -147,7 +145,8 @@ class TestOutputFiles(DbIsolatedTest):
 
     @run_as_sync
     async def test_gs_output_path(self):
-        """Test how the output(s) behave when you create an analysis by passing in
+        """
+        Test how the output(s) behave when you create an analysis by passing in
         just the `output` field
         """
         output_path = 'gs://fakegcs/file1.txt'
@@ -185,7 +184,8 @@ class TestOutputFiles(DbIsolatedTest):
 
     @run_as_sync
     async def test_create_with_str_on_outputs(self):
-        """This should test creating an Analysis by passing a string to the outputs field.
+        """
+        This should test creating an Analysis by passing a string to the outputs field.
         The test should fail as we don't want to be passing string to this field.
         """
 
