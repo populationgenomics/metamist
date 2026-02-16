@@ -5,7 +5,7 @@ from unittest import mock
 
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
-from db.python.layers import AnalysisLayer, SampleLayer, SequencingGroupLayer
+from db.python.layers import AnalysisLayer, SequencingGroupLayer
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import SequencingGroupFilter, SequencingGroupTable
 from models.enums.analysis import AnalysisStatus
@@ -13,12 +13,17 @@ from models.models import (
     PRIMARY_EXTERNAL_ORG,
     AnalysisInternal,
     AssayUpsertInternal,
-    SampleUpsertInternal,
     SequencingGroupUpsertInternal,
 )
+from test.conftest import GraphQLQueryFunction
 
 @pytest.fixture
 async def test_sample(connection_with_project: Connection) -> int:
+    """
+    Create a sample directly in the database for testing sequencing groups.
+    This is a temporary fixture until sample layer is migrated.
+    @TODO replace this when ready
+    """
     project_id = connection_with_project.project_id
 
     conn = connection_with_project.pg_connection
@@ -54,8 +59,8 @@ async def test_sample(connection_with_project: Connection) -> int:
 @pytest.fixture
 def sequencing_group_model(test_sample: int) -> SequencingGroupUpsertInternal:
     """
-    Get sample model with sequencing-groups, return in a function
-    to protect against any mutation to this model
+    Fixture that provides a SequencingGroupUpsertInternal for 
+    a simple sequencing group to be upserted into the database.
     """
     return SequencingGroupUpsertInternal(
         type='genome',
@@ -91,45 +96,6 @@ def mock_date(monkeypatch):
 
 class TestSequencingGroup:
     """Test sequencing groups business logic"""
-
-    @pytest.mark.asyncio
-    @pytest.mark.project_roles(['writer'])
-    async def test_debug(
-        self,
-        connection_with_project: Connection,
-    ):
-        s_table = SampleTable(connection_with_project)
-        sg_table = SequencingGroupTable(connection_with_project)
-
-        sample_id = await s_table.insert_sample(
-            {PRIMARY_EXTERNAL_ORG: 'Test01'},
-            'blood',
-            True,
-            None, None, None, None
-        )
-
-        id1 = await sg_table.create_sequencing_group(
-            sample_id,
-            'genome',
-            'short-read',
-            'illumina',
-            []
-        )
-
-        id2 = await sg_table.create_sequencing_group(
-            sample_id,
-            'exome',
-            'short-read',
-            'illumina',
-            []
-        )
-
-        await sg_table.update_sequencing_group(id1, {'test_key': 'test_val'}, 'illumina')
-
-        p, sg = await sg_table.get_sequencing_groups_by_ids([id2, id1])
-        print(sg)
-
-        assert False
 
     @pytest.mark.asyncio
     async def test_empty_query(
@@ -234,9 +200,9 @@ class TestSequencingGroup:
 
         updated_sg = await sg_layer.upsert_sequencing_groups([new_upsert])
 
-        old_sg = await sg_layer.query(SequencingGroupFilter(id=GenericFilter(eq=initial_sg[0].id), active_only=None))
+        old_sg = await sg_layer.get_sequencing_group_by_id(initial_sg[0].id, active_only=False)
         # now check the existing sequencing group was archived
-        assert old_sg[0].archived == True
+        assert old_sg.archived == True
 
         # check that the "active" sequencing group is the new one
         active_sgs = await sg_layer.query(
@@ -253,7 +219,7 @@ class TestSequencingGroup:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    @pytest.mark.skip(reason='Querying JSON keys is not yet implemented') #TODO: Implement this test when querying JSON keys is implemented
+    @pytest.mark.skip(reason='Querying JSON keys is not yet implemented') # TODO: Implement this test when querying JSON keys is implemented
     async def test_query_with_assay_metadata(
         self,
         connection_with_project: Connection,
@@ -359,7 +325,7 @@ class TestSequencingGroup:
         assert len(sgs) == 0
 
     @pytest.mark.asyncio
-    @pytest.mark.skip
+    @pytest.mark.skip(reason="Analysis migration has not been completed") # TODO Revisit this test once analysis queries are migrated
     async def test_query_finds_sgs_which_have_cram_analysis(self):
         """Test querying for sequencing groups which have a cram or gvcf analysis"""
         sample_to_insert = get_sample_model()
@@ -443,46 +409,56 @@ class TestSequencingGroup:
         self.assertEqual(sgs[0].id, sample.sequencing_groups[0].id)
 
     @pytest.mark.asyncio
-    @pytest.mark.skip
-    async def test_archiving_sequencing_groups(self):
+    @pytest.mark.project_roles(['writer'])
+    async def test_archiving_sequencing_groups(
+        self,
+        connection_with_project: Connection,
+        sequencing_group_model: SequencingGroupUpsertInternal,
+        graphql_query: GraphQLQueryFunction
+    ):
         """Check that sequencing groups can be archived from graphql"""
-        sample_model = SampleUpsertInternal(
-            meta={},
-            external_ids={PRIMARY_EXTERNAL_ORG: 'EXID1'},
-            type='blood',
-            sequencing_groups=[
-                SequencingGroupUpsertInternal(
-                    type='genome',
-                    technology='short-read',
-                    platform='illumina',
-                    meta={},
-                    assays=[],
-                ),
-                SequencingGroupUpsertInternal(
-                    type='genome',
-                    technology='short-read',
-                    platform='illumina',
-                    meta={},
-                    assays=[],
-                ),
-                SequencingGroupUpsertInternal(
-                    type='exome',
-                    technology='short-read',
-                    platform='illumina',
-                    meta={},
-                    assays=[],
-                ),
-            ],
-        )
+        sg_layer = SequencingGroupLayer(connection_with_project)
+        sgs_to_insert = [sequencing_group_model]
 
-        sample = await self.slayer.upsert_sample(sample_model)
-        assert sample.sequencing_groups
-        sg1 = sample.sequencing_groups[0].to_external().id
-        sg2 = sample.sequencing_groups[1].to_external().id
+        sgs_to_insert.append(SequencingGroupUpsertInternal(
+            sample_id=sequencing_group_model.sample_id,
+            type='genome',
+            technology='long-read',
+            platform='illumina',
+            meta={'meta-1': 'test-1'},
+            assays=[],
+        ))
+        sgs_to_insert.append(SequencingGroupUpsertInternal(
+            sample_id=sequencing_group_model.sample_id,
+            type='exome',
+            technology='short-read',
+            platform='illumina',
+            meta={'meta-2': 'test-2'},
+            assays=[],
+        ))
+        sgs_to_insert.append(SequencingGroupUpsertInternal(
+            sample_id=sequencing_group_model.sample_id,
+            type='exome',
+            technology='long-read',
+            platform='illumina',
+            meta={'meta-3': 'test-3'},
+            assays=[],
+        ))
+
+        sgs = await sg_layer.upsert_sequencing_groups(sgs_to_insert)
+        assert sgs
+        sg1 = sgs[0].to_external().id
+        sg2 = sgs[1].to_external().id
 
         assert sg1, sg2
 
-        archive_result = await self.run_graphql_query_async(
+        # Check that the sequencing groups aren't initially archived
+        sgs_from_db = await sg_layer.get_sequencing_groups_by_ids([sgs[0].id, sgs[1].id])
+        assert sgs_from_db[0].archived == False
+        assert sgs_from_db[1].archived == False
+
+        # Archive the sequencing groups
+        archive_result = await graphql_query(
             """
             mutation ArchiveSeqGroups($ids: [String!]!) {
                 sequencingGroup {
@@ -496,13 +472,13 @@ class TestSequencingGroup:
             {'ids': [sg1, sg2]},
         )
 
-        archived_sgs = archive_result['sequencingGroup']['archiveSequencingGroups']
+        archived_sgs = archive_result['data']['sequencingGroup']['archiveSequencingGroups']
 
-        self.assertEqual(len(archived_sgs), 2)
-        self.assertEqual(archived_sgs[0]['id'], sg1)
-        self.assertEqual(archived_sgs[0]['archived'], True)
-        self.assertEqual(archived_sgs[1]['id'], sg2)
-        self.assertEqual(archived_sgs[1]['archived'], True)
+        assert len(archived_sgs) == 2
+        assert archived_sgs[0]['id'] == sg1
+        assert archived_sgs[0]['archived'] == True
+        assert archived_sgs[1]['id'] == sg2
+        assert archived_sgs[1]['archived'] == True
 
     @pytest.mark.asyncio
     @pytest.mark.skip

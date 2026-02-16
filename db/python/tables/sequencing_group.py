@@ -211,13 +211,13 @@ class SequencingGroupTable(DbBase):
         return projects, sgs
 
     async def get_sequencing_groups_by_ids(
-        self, ids: list[int]
+        self, ids: list[int], active_only=True
     ) -> tuple[set[ProjectId], list[SequencingGroupInternal]]:
         """
         Get sequence groups by internal identifiers
         """
-
-        query = SequencingGroupFilter(id=GenericFilter(in_=ids))
+        filter_active = GenericFilter(eq=True) if active_only else None
+        query = SequencingGroupFilter(id=GenericFilter(in_=ids), active_only=filter_active)
         projects, sgs = await self.query(query)
 
         return projects, sgs
@@ -514,7 +514,10 @@ class SequencingGroupTable(DbBase):
         """
 
         conn = self.connection.pg_connection
-        async with conn.transaction():
+        in_transaction = conn.info.transaction_status == TransactionStatus.INTRANS
+        with_function = conn.transaction if not in_transaction else NoOpAenter
+
+        async with with_function():
             await conn.execute(_query)
             await conn.execute(_external_id_query)
 
