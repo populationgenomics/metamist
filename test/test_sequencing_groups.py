@@ -191,61 +191,56 @@ class TestSequencingGroup:
         sequencing_group_model: SequencingGroupUpsertInternal,
     ):
         """Test creating a sequencing-group, and test the old one is archived"""
-        sample = await SampleLayer(connection_with_project).upsert_sample(get_sample_model())
+        sample_id = sequencing_group_model.sample_id
+        sg_layer = SequencingGroupLayer(connection_with_project)
+        # Create the initial SG
+        initial_sg = await sg_layer.upsert_sequencing_groups([sequencing_group_model])
 
-        # self.sglayer.get_sequencing_groups_by_ids()
-
-        new_upsert = SampleUpsertInternal(
-            id=sample.id,
-            sequencing_groups=[
-                SequencingGroupUpsertInternal(
-                    type='genome',
-                    technology='short-read',
-                    platform='ILLUMINA',
+        new_upsert = SequencingGroupUpsertInternal(
+            sample_id=initial_sg[0].sample_id,
+            type='genome',
+            technology='short-read',
+            platform='ILLUMINA',
+            meta={
+                'meta-key': 'meta-value',
+            },
+            external_ids={},
+            assays=[
+                # include an empty assay with ID to ensure it gets added to the sg
+                AssayUpsertInternal(
+                    id=initial_sg[0].assays[0].id,
+                ),
+                # new assay to trigger deprecation
+                AssayUpsertInternal(
+                    type='sequencing',
+                    external_ids={'second-key': 'second-sequencing-object'},
                     meta={
-                        'meta-key': 'meta-value',
+                        'sequencing_type': 'genome',
+                        'sequencing_platform': 'short-read',
+                        'sequencing_technology': 'illumina',
                     },
-                    external_ids={},
-                    assays=[
-                        # include an empty assay with ID to ensure it gets added to the sg
-                        AssayUpsertInternal(
-                            id=sample.sequencing_groups[0].assays[0].id,
-                        ),
-                        # new assay to trigger deprecation
-                        AssayUpsertInternal(
-                            type='sequencing',
-                            external_ids={'second-key': 'second-sequencing-object'},
-                            meta={
-                                'sequencing_type': 'genome',
-                                'sequencing_platform': 'short-read',
-                                'sequencing_technology': 'illumina',
-                            },
-                        ),
-                    ],
-                )
+                ),
             ],
         )
 
-        updated_sample = await self.slayer.upsert_sample(new_upsert)
+        updated_sg = await sg_layer.upsert_sequencing_groups([new_upsert])
 
-        old_sg = await self.sglayer.get_sequencing_group_by_id(
-            sample.sequencing_groups[0].id
-        )
+        old_sg = await sg_layer.query(SequencingGroupFilter(id=GenericFilter(eq=initial_sg[0].id), active_only=None))
         # now check the existing sequencing group was archived
-        self.assertTrue(old_sg.archived)
+        assert old_sg[0].archived == True
 
         # check that the "active" sequencing group is the new one
-        active_sgs = await self.sglayer.query(
+        active_sgs = await sg_layer.query(
             SequencingGroupFilter(
                 sample=SequencingGroupFilter.SequencingGroupSampleFilter(
-                    id=GenericFilter(eq=sample.id)
+                    id=GenericFilter(eq=sample_id)
                 )
             )
         )
 
-        self.assertTrue(all(not sg.archived for sg in active_sgs))
-        self.assertEqual(len(active_sgs), 1)
-        self.assertEqual(updated_sample.sequencing_groups[0].id, active_sgs[0].id)
+        assert all(not sg.archived for sg in active_sgs)
+        assert len(active_sgs) == 1
+        assert updated_sg[0].id == active_sgs[0].id
 
     @pytest.mark.asyncio
     @pytest.mark.skip

@@ -332,7 +332,7 @@ class SequencingGroupLayer(BaseLayer):
                     continue
 
                 # if we need to insert any assays, then the group will have to change
-                if any(not sq.id for sq in sg.assays):
+                if any(not assay.id for assay in sg.assays):
                     to_replace.append(sg)
                     continue
 
