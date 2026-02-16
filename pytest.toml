@@ -7,7 +7,8 @@ python_files = [
     "test_project_graphql.py",
     "test_json_merge_patch.py",
     "test_project_groups.py",
-    "test_generic_filters.py"
+    "test_generic_filters.py",
+    "test_assay.py"
 ]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
