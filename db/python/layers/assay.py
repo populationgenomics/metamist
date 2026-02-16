@@ -1,9 +1,6 @@
-from psycopg.pq import TransactionStatus
-
 from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.assay import AssayFilter, AssayTable
 from db.python.tables.sample import SampleTable
-from db.python.utils import NoOpAenter
 from models.models.assay import AssayInternal, AssayUpsertInternal
 from models.models.project import (
     FullWriteAccessRoles,
@@ -132,12 +129,7 @@ class AssayLayer(BaseLayer):
             project_ids, allowed_roles=FullWriteAccessRoles
         )
 
-        conn = self.connection.pg_connection
-        in_transaction = conn.info.transaction_status == TransactionStatus.INTRANS
-
-        with_function = conn.transaction if not in_transaction else NoOpAenter
-
-        async with with_function():
+        async with self.connection.transaction():
             for a in assays:
                 await self.upsert_assay(a)
 
