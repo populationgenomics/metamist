@@ -3,8 +3,6 @@ from collections import defaultdict
 from enum import Enum
 from typing import Any
 
-from psycopg.pq import TransactionStatus
-
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers.base import BaseLayer

@@ -224,7 +224,7 @@ class FamilyTable(DbBase):
                 project = await cur.fetchone()
 
                 _update_query = """INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
-                VALUES (%(project)s, %(id)s, %(name)s, %(external_id)s, %(audit_log_id)s) 
+                VALUES (%(project)s, %(id)s, %(name)s, %(external_id)s, %(audit_log_id)s)
                 ON CONFLICT (family_id, name)
                 DO UPDATE SET
                 external_id = EXCLUDED.external_id,

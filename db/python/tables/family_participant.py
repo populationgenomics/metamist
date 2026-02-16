@@ -1,8 +1,6 @@
 import dataclasses
 from string.templatelib import Template
 
-from psycopg.sql import Composed
-
 from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
 from models.models.family import PedRowInternal
