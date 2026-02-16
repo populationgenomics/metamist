@@ -146,10 +146,10 @@ class TestSequencingGroup:
         sg_layer = SequencingGroupLayer(connection_with_project)
 
         sg_upsert = await sg_layer.upsert_sequencing_groups([sequencing_group_model])
-        sg_id = sg[0].id
+        sg_id = sg_upsert[0].id
         sg = await sg_layer.get_sequencing_group_by_id(sg_id)
 
-        inserted_sg = sample_upsert_model.sequencing_groups[0]
+        inserted_sg = sg_upsert[0]
         assert inserted_sg.id == sg_id
         assert inserted_sg.type == sg.type
         assert inserted_sg.technology == sg.technology
@@ -157,32 +157,41 @@ class TestSequencingGroup:
         assert inserted_sg.meta == sg.meta
 
     @pytest.mark.asyncio
-    @pytest.mark.skip
-    async def test_update_sequencing_group(self):
+    @pytest.mark.project_roles(['writer'])
+    async def test_update_sequencing_group(
+        self,
+        connection_with_project: Connection,
+        sequencing_group_model: SequencingGroupUpsertInternal,
+    ):
         """Test updating metadata on a sequencing group"""
-        sample = await self.slayer.upsert_sample(get_sample_model())
+        sg_layer = SequencingGroupLayer(connection_with_project)
+        # Create the initial SG
+        initial_sg = await sg_layer.upsert_sequencing_groups([sequencing_group_model])
 
-        upsert_sg = SequencingGroupUpsertInternal(
-            id=sample.sequencing_groups[0].id,
+        # Create an updated model for upsert
+        upsert_sg_model = SequencingGroupUpsertInternal(
+            id=initial_sg[0].id,
             meta={'another-meta': 'field'},
         )
-        # Check that id is being returned when seqg created
-        sg_return = await self.sglayer.upsert_sequencing_groups([upsert_sg])
-        self.assertEqual(sg_return[0].id, upsert_sg.id)
 
-        sg = await self.sglayer.get_sequencing_group_by_id(
-            sample.sequencing_groups[0].id
-        )
+        # Check that id is being returned when sg created
+        new_sg = await sg_layer.upsert_sequencing_groups([upsert_sg_model])
+        assert new_sg[0].id == upsert_sg_model.id
 
-        self.assertDictEqual(
-            {'another-meta': 'field', 'meta-key': 'meta-value'}, sg.meta
-        )
+        # Check that the update was mdae to the db
+        sg_from_db = await sg_layer.get_sequencing_group_by_id(initial_sg[0].id)
+
+        assert {'another-meta': 'field', 'meta-key': 'meta-value'} == sg_from_db.meta
 
     @pytest.mark.asyncio
-    @pytest.mark.skip
-    async def test_auto_deprecation_of_old_sequencing_group(self):
+    @pytest.mark.project_roles(['writer'])
+    async def test_auto_deprecation_of_old_sequencing_group(
+        self,
+        connection_with_project: Connection,
+        sequencing_group_model: SequencingGroupUpsertInternal,
+    ):
         """Test creating a sequencing-group, and test the old one is archived"""
-        sample = await self.slayer.upsert_sample(get_sample_model())
+        sample = await SampleLayer(connection_with_project).upsert_sample(get_sample_model())
 
         # self.sglayer.get_sequencing_groups_by_ids()
 
