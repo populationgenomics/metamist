@@ -1,19 +1,13 @@
 from typing import Any
 
 import pytest
-from psycopg import AsyncConnection
-from psycopg.rows import DictRow
-from psycopg_pool import AsyncConnectionPool
 
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers.participant import ParticipantLayer
 from db.python.tables.participant import ParticipantFilter
 from models.base import PRIMARY_EXTERNAL_ORG
-from models.models.assay import AssayUpsertInternal
 from models.models.participant import ParticipantUpsertInternal
-from models.models.sample import SampleUpsertInternal
-from models.models.sequencing_group import SequencingGroupUpsertInternal
 from test.conftest import GraphQLQueryFunction
 
 

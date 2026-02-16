@@ -66,14 +66,14 @@ class ParticipantPhenotypeTable(DbBase):
         if len(participant_ids) == 0:
             return {}
 
-        _query = """
+        _query = t"""
             SELECT participant_id, description, value
             FROM participant_phenotypes
-            WHERE participant_id = ANY(%(participant_ids)s) AND value IS NOT NULL
+            WHERE participant_id = ANY({participant_ids}) AND value IS NOT NULL
         """
 
         conn = self.connection.pg_connection
-        cur = await conn.execute(_query, {'participant_ids': participant_ids})
+        cur = await conn.execute(_query)
         rows = await cur.fetchall()
 
         formed_key_value_pairs: dict[int, dict[str, Any]] = defaultdict(dict)
@@ -93,15 +93,15 @@ class ParticipantPhenotypeTable(DbBase):
         for individual level metadata template,
         for all participants in project
         """
-        _query = """
+        _query = t"""
             SELECT pp.participant_id, pp.description, pp.value
             FROM participant_phenotypes pp
             INNER JOIN participant p ON p.id = pp.participant_id
-            WHERE p.project = %(project)s AND pp.value IS NOT NULL
+            WHERE p.project = {project} AND pp.value IS NOT NULL
         """
 
         conn = self.connection.pg_connection
-        cur = await conn.execute(_query, {'project': project})
+        cur = await conn.execute(_query)
         rows = await cur.fetchall()
 
         formed_key_value_pairs: dict[int, dict[str, Any]] = defaultdict(dict)
