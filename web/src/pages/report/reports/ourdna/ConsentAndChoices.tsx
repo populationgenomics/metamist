@@ -95,7 +95,7 @@ export default function ConsentAndChoices({ project }: { project: string }) {
     `
 
     /* roughly calculate height so that selecting lots of ancestries doesn't squish things */
-    const itemHeight = selectedAncestries.length * CHOICES.length * 10 + CHOICES.length * 50
+    const itemHeight = selectedAncestries.length * CHOICES.length * 15 + CHOICES.length * 50
 
     return (
         <Report>
