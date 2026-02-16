@@ -66,17 +66,17 @@ def sequencing_group_model(test_sample: int) -> SequencingGroupUpsertInternal:
         },
         sample_id=test_sample,
         external_ids={'ext': 'some-ext-id'},
-        # assays=[
-        #     AssayUpsertInternal(
-        #         type='sequencing',
-        #         external_ids={},
-        #         meta={
-        #             'sequencing_type': 'genome',
-        #             'sequencing_platform': 'short-read',
-        #             'sequencing_technology': 'illumina',
-        #         },
-        #     )
-        # ],
+        assays=[
+            AssayUpsertInternal(
+                type='sequencing',
+                external_ids={},
+                meta={
+                    'sequencing_type': 'genome',
+                    'sequencing_platform': 'short-read',
+                    'sequencing_technology': 'illumina',
+                },
+            )
+        ],
     )
 
 

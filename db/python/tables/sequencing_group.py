@@ -459,8 +459,8 @@ class SequencingGroupTable(DbBase):
                     }
                     for s in assay_ids
                 ]
-
-                await conn.executemany(_sg_assay_linker, assay_id_insert_values)
+                async with conn.cursor() as cur:
+                    await cur.executemany(_sg_assay_linker, assay_id_insert_values)
 
             return new_sg_id['id']
 

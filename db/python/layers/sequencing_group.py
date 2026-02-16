@@ -300,7 +300,7 @@ class SequencingGroupLayer(BaseLayer):
         if not isinstance(sequencing_groups, list):
             raise ValueError('Sequencing groups is not a list')
         # first determine if any groups have different sequences
-        slayer = AssayLayer(self.connection)
+        assay_layer = AssayLayer(self.connection)
         assays = []
         for sg in sequencing_groups:
             for assay in sg.assays or []:
@@ -312,20 +312,20 @@ class SequencingGroupLayer(BaseLayer):
                     'Upserting sequencing-groups with assays requires a sample_id to be set for every sequencing-group'
                 )
 
-            await slayer.upsert_assays(assays, open_transaction=False)
+            await assay_layer.upsert_assays(assays)
 
         to_insert = [sg for sg in sequencing_groups if not sg.id]
         to_update = []
         to_replace: list[SequencingGroupUpsertInternal] = []
 
-        sequencing_groups_that_exist = [sg for sg in sequencing_groups if sg.id]
-        if sequencing_groups_that_exist:
-            seq_group_ids = [sg.id for sg in sequencing_groups_that_exist if sg.id]
+        existing_sgs = [sg for sg in sequencing_groups if sg.id]
+        if existing_sgs:
+            seq_group_ids = [sg.id for sg in existing_sgs if sg.id]
             sequence_to_group = await self.seqgt.get_assay_ids_by_sequencing_group_ids(
                 seq_group_ids
             )
 
-            for sg in sequencing_groups_that_exist:
+            for sg in existing_sgs:
                 if not sg.assays:
                     # treat it as an update
                     to_update.append(sg)
