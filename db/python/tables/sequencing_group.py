@@ -496,16 +496,22 @@ class SequencingGroupTable(DbBase):
         """
         _query = t"""
         WITH sg AS (
-            SELECT id, sample_id, type, technology, min(row_start) as sg_first_date
-            FROM sequencing_group FOR SYSTEM_TIME ALL
-            GROUP BY id
+            SELECT id, sample_id, type, technology, MIN(LOWER(sys_period)) as sg_first_date
+            FROM (
+                SELECT id, sample_id, type, technology, sys_period
+                FROM sequencing_group
+                UNION ALL
+                SELECT id, sample_id, type, technology, sys_period
+                FROM sequencing_group_history
+            )
+            GROUP BY id, sample_id, type, technology
         )
-        SELECT project, sg.type, sg.technology, CONVERT(sg_first_date, DATE) as sg_date, COUNT(sg.id) as num_sg
+        SELECT project, sg.type, sg.technology, sg_first_date as sg_date, COUNT(sg.id) as num_sg
         FROM sample INNER JOIN sg ON sample.id = sg.sample_id
         WHERE project = ANY({project_ids})
         GROUP BY project, sg_date, sg.type, sg.technology
         """
-        cur = await self.connection.pg_connection.execute
+        cur = await self.connection.pg_connection.execute(_query)
         rows = await cur.fetchall()
 
         if not rows:

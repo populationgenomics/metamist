@@ -479,18 +479,17 @@ class TestSequencingGroup:
         assert archived_sgs[1]['archived'] == True
 
     @pytest.mark.asyncio
-    @pytest.mark.skip
-    async def test_history_no_sum(self):
+    async def test_history_no_sum(self, connection: Connection):
         """Test the trivial case where there are no sequencing groups."""
-
+        sg_layer = SequencingGroupLayer(connection)
         # Set up mocking for rows returned from the table query.
         with mock.patch(
-            'db.python.connect.databases.Database.fetch_all', return_value=[]
+            'psycopg.cursor_async.AsyncCursor.fetchall', return_value=[]
         ):
-            sg_table = self.sglayer.seqgt
+            sg_table = sg_layer.seqgt
             result = await sg_table.get_sequencing_group_counts_by_month([])
 
-        self.assertDictEqual(result, {})
+        assert result == {}
 
     @pytest.mark.asyncio
     @pytest.mark.skip
