@@ -95,7 +95,7 @@ export default function ConsentAndChoices({ project }: { project: string }) {
     `
 
     /* roughly calculate height so that selecting lots of ancestries doesn't squish things */
-    const itemHeight = selectedAncestries.length * CHOICES.length * 10 + CHOICES.length * 50
+    const itemHeight = selectedAncestries.length * CHOICES.length * 15 + CHOICES.length * 50
 
     return (
         <Report>
@@ -184,6 +184,7 @@ export default function ConsentAndChoices({ project }: { project: string }) {
                                     round(count(*) / nullif(sum(count(*)) over (partition by question, ancestry), 0) * 100, 2) as percent
                                 from answers_unpivoted
                                 group by 1,2,3
+                                order by 1,2,3
                             `,
                         },
                     ]}
