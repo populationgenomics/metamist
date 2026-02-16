@@ -1,6 +1,8 @@
 import dataclasses
 from string.templatelib import Template
 
+from psycopg.sql import Composed
+
 from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
 from models.models.family import PedRowInternal
@@ -39,7 +41,7 @@ class FamilyParticipantTable(DbBase):
 
         _query = t"""INSERT INTO family_participant (family_id, participant_id, paternal_participant_id,
         maternal_participant_id, affected, notes, audit_log_id)
-        VALUES ({family_id, participant_id, paternal_id, maternal_id, affected, notes, audit_log_id})"""
+        VALUES ({family_id}, {participant_id}, {paternal_id}, {maternal_id}, {affected}, {notes}, {audit_log_id})"""
 
         await self.connection.pg_connection.execute(_query)
         return family_id, participant_id
@@ -76,7 +78,7 @@ class FamilyParticipantTable(DbBase):
         _query = """
         INSERT INTO family_participant (family_id, participant_id, paternal_participant_id, maternal_participant_id, affected, notes, audit_log_id)
         VALUES
-        (%(family_id)s, %(participant_id)s, %(paternal_participant_id)s,%(maternal_participant_id)s,%(affected)s, %(notes)s, %(audit_log_id)s))
+        (%(family_id)s, %(participant_id)s, %(paternal_participant_id)s, %(maternal_participant_id)s, %(affected)s, %(notes)s, %(audit_log_id)s)
         ON CONFLICT(participant_id)
         DO UPDATE SET
             family_id=EXCLUDED.family_id,
@@ -101,8 +103,7 @@ class FamilyParticipantTable(DbBase):
         """
 
         where_params: Template = filter_.to_sql()
-
-        if not where_params:
+        if not list(where_params):
             raise ValueError('No filter provided')
 
         join_type = t'LEFT' if include_participants_not_in_families else t'INNER'

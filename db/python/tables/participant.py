@@ -517,7 +517,7 @@ RETURNING id
         if len(external_participant_ids) == 0:
             return {}
 
-        _query = t""""SELECT external_id, participant_id AS id FROM participant_external_id
+        _query = t"""SELECT external_id, participant_id AS id FROM participant_external_id
         WHERE external_id = ANY({external_participant_ids}) AND project = {project}"""
 
         results = await (await self.connection.pg_connection.execute(_query)).fetchall()
