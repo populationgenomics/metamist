@@ -32,12 +32,7 @@ class ParticipantTable(DbBase):
 
     async def get_project_ids_for_participant_ids(self, participant_ids: list[int]):
         """Get project IDs for participant_ids (mostly for checking auth)"""
-        _query = (
-            t'SELECT project '
-            t'FROM participant) '
-            t'WHERE id = ANY({participant_ids}) '
-            t'GROUP BY project'
-        )
+        _query = t'SELECT project FROM participant WHERE id = ANY({participant_ids}) GROUP BY project'
 
         rows = await (await self.connection.pg_connection.execute(_query)).fetchall()
         return set(r['project'] for r in rows)

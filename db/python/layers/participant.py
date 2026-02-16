@@ -3,6 +3,8 @@ from collections import defaultdict
 from enum import Enum
 from typing import Any
 
+from psycopg.pq import TransactionStatus
+
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers.base import BaseLayer
@@ -616,16 +618,12 @@ class ParticipantLayer(BaseLayer):
     # region UPSERTS / UPDATES
 
     async def upsert_participant(
-        self,
-        participant: ParticipantUpsertInternal,
-        project: ProjectId = None,
-        open_transaction=True,
+        self, participant: ParticipantUpsertInternal, project: ProjectId = None
     ) -> ParticipantUpsertInternal:
         """Create a single participant"""
+        in_transaction = self.info.transaction_status == TransactionStatus.INTRANS
         with_function = (
-            self.connection.pg_connection.transaction
-            if open_transaction
-            else NoOpAenter
+            self.connection.pg_connection.transaction if in_transaction else NoOpAenter
         )
 
         async with with_function():
@@ -689,7 +687,7 @@ class ParticipantLayer(BaseLayer):
         async with with_function():
             # Create or update participants
             for p in participants:
-                await self.upsert_participant(p, open_transaction=False)
+                await self.upsert_participant(p)
 
         # Format and return response
         return participants

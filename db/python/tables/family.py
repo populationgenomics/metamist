@@ -102,19 +102,14 @@ class FamilyTable(DbBase):
         async with self.connection.pg_connection.cursor(
             row_factory=class_row(FamilyInternal)
         ) as cur:
-            await cur.execute(
-                t'{joined_query:q} WHERE {where_params:q} GROUP BY f.id, f.description, f.coded_phenotype, f.meta, f.project'
-            )
+            await cur.execute(t'{joined_query:q} WHERE {where_params:q} GROUP BY f.id')
             family_internal_list = await cur.fetchall()
 
-        seen = set()
         families = []
         projects: set[ProjectId] = set()
         for family_internal in family_internal_list:
-            if family_internal.id not in seen:
-                projects.add(family_internal.project)
-                families.append(family_internal)
-                seen.add(family_internal.id)
+            projects.add(family_internal.project)
+            families.append(family_internal)
 
         return projects, families
 
@@ -132,7 +127,7 @@ class FamilyTable(DbBase):
         INNER JOIN family_external_id feid ON f.id = feid.family_id
         INNER JOIN family_participant fp ON f.id = fp.family_id
         WHERE fp.participant_id = ANY({participant_ids})
-        GROUP BY f.id, f.description, f.coded_phenotype, f.meta, f.project, fp.participant_id'
+        GROUP BY f.id, f.description, f.coded_phenotype, f.meta, f.project, fp.participant_id
         """
 
         ret_map = defaultdict(list)
@@ -157,7 +152,7 @@ class FamilyTable(DbBase):
         rows = await (
             await self.connection.pg_connection.execute(t"""
             SELECT project, family_id, external_id FROM family_external_id
-            WHERE project = ANY({project_ids}) AND external_id ILIKE {search_pattern} LIMIT {limit}'
+            WHERE project = ANY({project_ids}) AND external_id ILIKE {search_pattern} LIMIT {limit}
             """)
         ).fetchall()
 
