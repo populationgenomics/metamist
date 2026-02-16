@@ -184,6 +184,7 @@ export default function ConsentAndChoices({ project }: { project: string }) {
                                     round(count(*) / nullif(sum(count(*)) over (partition by question, ancestry), 0) * 100, 2) as percent
                                 from answers_unpivoted
                                 group by 1,2,3
+                                order by 1,2,3
                             `,
                         },
                     ]}
