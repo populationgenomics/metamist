@@ -16,39 +16,67 @@ from models.models import (
     SampleUpsertInternal,
     SequencingGroupUpsertInternal,
 )
-# from test.testbase import DbIsolatedTest, run_as_sync
 
+@pytest.fixture
+async def test_sample(connection_with_project: Connection) -> int:
+    project_id = connection_with_project.project_id
 
-def get_sample_model():
+    conn = connection_with_project.pg_connection
+    # Create audit_log entry first
+    create_audit_log = t"""\
+        INSERT INTO audit_log (author, auth_project)
+        VALUES ('test', {project_id})
+        RETURNING id"""
+    cur = await conn.execute(create_audit_log)
+    row = await cur.fetchone()
+    assert row is not None
+    audit_log_id = row['id']
+
+    insert_sample = t"""\
+        INSERT INTO sample 
+            (project, meta, type, active, author, audit_log_id)
+        VALUES ({project_id}, '{{"meta_key": "meta_value"}}', 'blood', true, 'test_aurthor', {audit_log_id})
+        RETURNING id;"""
+    
+    cur = await conn.execute(insert_sample)
+    row = await cur.fetchone()
+    assert row is not None
+    sample_id = row['id']
+
+    insert_external_id = t"""\
+        INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
+        VALUES ({project_id}, {sample_id}, 'default', 'TESTING001', {audit_log_id})
+        """
+    await conn.execute(insert_external_id)
+
+    return sample_id
+
+@pytest.fixture
+def sequencing_group_model(test_sample: int) -> SequencingGroupUpsertInternal:
     """
     Get sample model with sequencing-groups, return in a function
     to protect against any mutation to this model
     """
-    return SampleUpsertInternal(
-        meta={},
-        external_ids={PRIMARY_EXTERNAL_ORG: 'EX_ID'},
-        sequencing_groups=[
-            SequencingGroupUpsertInternal(
-                type='genome',
-                technology='short-read',
-                platform='ILLUMINA',
-                meta={
-                    'meta-key': 'meta-value',
-                },
-                external_ids={'ext': 'some-ext-id'},
-                assays=[
-                    AssayUpsertInternal(
-                        type='sequencing',
-                        external_ids={},
-                        meta={
-                            'sequencing_type': 'genome',
-                            'sequencing_platform': 'short-read',
-                            'sequencing_technology': 'illumina',
-                        },
-                    )
-                ],
-            )
-        ],
+    return SequencingGroupUpsertInternal(
+        type='genome',
+        technology='short-read',
+        platform='ILLUMINA',
+        meta={
+            'meta-key': 'meta-value',
+        },
+        sample_id=test_sample,
+        external_ids={'ext': 'some-ext-id'},
+        # assays=[
+        #     AssayUpsertInternal(
+        #         type='sequencing',
+        #         external_ids={},
+        #         meta={
+        #             'sequencing_type': 'genome',
+        #             'sequencing_platform': 'short-read',
+        #             'sequencing_technology': 'illumina',
+        #         },
+        #     )
+        # ],
     )
 
 
@@ -71,13 +99,26 @@ class TestSequencingGroup:
             None, None, None, None
         )
 
-        await sg_table.create_sequencing_group(
+        id1 = await sg_table.create_sequencing_group(
             sample_id,
             'genome',
             'short-read',
             'illumina',
             []
         )
+
+        id2 = await sg_table.create_sequencing_group(
+            sample_id,
+            'exome',
+            'short-read',
+            'illumina',
+            []
+        )
+
+        await sg_table.update_sequencing_group(id1, {'test_key': 'test_val'}, 'illumina')
+
+        p, sg = await sg_table.get_sequencing_groups_by_ids([id2, id1])
+        print(sg)
 
         assert False
 
@@ -99,17 +140,16 @@ class TestSequencingGroup:
     async def test_insert_sequencing_group(
         self,
         connection_with_project: Connection,
+        sequencing_group_model: SequencingGroupUpsertInternal,
     ):
         """Test inserting and fetching a sequencing group"""
         sg_layer = SequencingGroupLayer(connection_with_project)
-        sample_layer = SampleLayer(connection_with_project)
 
-        sample_to_insert = get_sample_model()
-        sample = await sample_layer.upsert_sample(sample_to_insert)
-        sg_id = sample.sequencing_groups[0].id
+        sg_upsert = await sg_layer.upsert_sequencing_groups([sequencing_group_model])
+        sg_id = sg[0].id
         sg = await sg_layer.get_sequencing_group_by_id(sg_id)
 
-        inserted_sg = sample_to_insert.sequencing_groups[0]
+        inserted_sg = sample_upsert_model.sequencing_groups[0]
         assert inserted_sg.id == sg_id
         assert inserted_sg.type == sg.type
         assert inserted_sg.technology == sg.technology

@@ -355,7 +355,6 @@ class SequencingGroupLayer(BaseLayer):
                 platform=sg.platform,
                 meta=sg.meta,
                 assay_ids=assay_ids,
-                open_transaction=False,
             )
 
         for sg in to_update:
@@ -367,7 +366,6 @@ class SequencingGroupLayer(BaseLayer):
             await self.recreate_sequencing_group_with_new_assays(
                 sequencing_group_id=int(sg.id),
                 assays=[s.id for s in sg.assays],
-                open_transaction=False,
                 meta=sg.meta,
             )
 

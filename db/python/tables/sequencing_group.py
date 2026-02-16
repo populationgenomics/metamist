@@ -29,7 +29,7 @@ class SequencingGroupTable(DbBase):
     @staticmethod
     def construct_query(
         filter_: SequencingGroupFilter,
-        keys: list[str],
+        columns: list[sql.Composable],
         skip: int | None = None,
         limit: int | None = None,
         external_id_table_alias: str | None = None,
@@ -160,17 +160,15 @@ class SequencingGroupTable(DbBase):
         if external_id_table_alias:
             ex_id_join = t'LEFT JOIN sequencing_group_external_id {external_id_table_alias:i} ON sg.id = {external_id_table_alias:i}.sequencing_group_id'
 
-        _outer_query = (
-            t"""\
-            SELECT {', '.join(keys)}
+        _outer_query = t"""\
+            SELECT {sql.SQL(', ').join(columns):q}
             FROM sequencing_group sg
             LEFT JOIN sample s ON s.id = sg.sample_id
             {ex_id_join:q}
             INNER JOIN (
                 {_query_str:q}
             ) AS sg_query ON sg.id = sg_query.id
-            GROUP BY sg.id"""
-        )
+            GROUP BY s.id, sg.id"""
 
         return _outer_query
 
@@ -179,30 +177,28 @@ class SequencingGroupTable(DbBase):
     ) -> tuple[set[ProjectId], list[SequencingGroupInternal]]:
         """Query samples"""
 
-        keys = [
-            'sg.id',
-            's.project',
-            'jsonb_object_agg(sgexid.name, sgexid.external_id) as external_ids',
-            'sg.sample_id',
-            'sg.type',
-            'sg.technology',
-            'sg.platform',
-            'sg.meta',
-            'sg.archived',
+        select_keys = [
+            sql.Identifier('sg', 'id'),
+            sql.Identifier('s', 'project'),
+            # sql.SQL('jsonb_object_agg("sgexid"."name", "sgexid"."external_id") as external_ids'),
+            sql.Identifier('sg', 'sample_id'),
+            sql.Identifier('sg', 'type'),
+            sql.Identifier('sg', 'technology'),
+            sql.Identifier('sg', 'platform'),
+            sql.Identifier('sg', 'meta'),
+            sql.Identifier('sg', 'archived'),
         ]
 
         query = SequencingGroupTable.construct_query(
             filter_,
-            keys=keys,
+            columns=select_keys,
             external_id_table_alias='sgexid',
             limit=limit,
             skip=skip,
         )
 
-        conn: AsyncConnection[DictRow] = self.connection.pg_connection
-        async with conn.cursor() as cur:
-            await cur.execute(query)
-            rows = await cur.fetchall()
+        cur = await self.connection.pg_connection.execute(query)
+        rows = await cur.fetchall()
 
         sgs = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
         projects = set(sg.project for sg in sgs if sg.project)
@@ -521,14 +517,15 @@ class SequencingGroupTable(DbBase):
         Get number of sequencing groups for each type for a project
         Useful for the web layer
         """
-        _query = """
-SELECT sg.type, COUNT(*) as n
-FROM sequencing_group sg
-INNER JOIN sample s ON s.id = sg.sample_id
-WHERE s.project = :project AND NOT sg.archived
-GROUP BY sg.type
+        _query = t"""\
+            SELECT sg.type, COUNT(*) as n
+            FROM sequencing_group sg
+            INNER JOIN sample s ON s.id = sg.sample_id
+            WHERE s.project = {project} AND NOT sg.archived
+            GROUP BY sg.type
         """
-        rows = await self.connection.fetch_all(_query, {'project': project})
+        cur = await self.connection.pg_connection.execute(_query)
+        rows = await cur.fetchall()
         return {r['type']: r['n'] for r in rows}
 
     async def get_sequencing_group_counts_by_month(
@@ -537,7 +534,7 @@ GROUP BY sg.type
         """
         Returns the history of the number of each sequencing groups of each type for a list of projects.
         """
-        _query = f"""
+        _query = t"""
         WITH sg AS (
             SELECT id, sample_id, type, technology, min(row_start) as sg_first_date
             FROM sequencing_group FOR SYSTEM_TIME ALL
@@ -545,12 +542,11 @@ GROUP BY sg.type
         )
         SELECT project, sg.type, sg.technology, CONVERT(sg_first_date, DATE) as sg_date, COUNT(sg.id) as num_sg
         FROM sample INNER JOIN sg ON sample.id = sg.sample_id
-        WHERE project in :project_ids
+        WHERE project = ANY({project_ids})
         GROUP BY project, sg_date, sg.type, sg.technology
         """
-        values = {'project_ids': project_ids}
-
-        rows = await self.connection.fetch_all(_query, values)
+        cur = await self.connection.pg_connection.execute
+        rows = await cur.fetchall()
 
         if not rows:
             return defaultdict(dict)
