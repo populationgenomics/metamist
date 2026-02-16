@@ -147,13 +147,9 @@ class SampleTable(DbBase):
         """Get project IDs for sampleIds (mostly for checking auth)"""
         if not sample_ids:
             return set()
-
-        _query = 'SELECT DISTINCT project FROM sample WHERE id = ANY(%(sample_ids)s)'
-
-        conn = self.connection.pg_connection
-        async with conn.cursor() as cur:
-            await cur.execute(_query, {'sample_ids': sample_ids})
-            rows = await cur.fetchall()
+        _query = t'SELECT DISTINCT project FROM sample WHERE id = ANY({sample_ids})'
+        acur = await self.connection.pg_connection.execute(_query)
+        rows = await acur.fetchall()
 
         return set(r['project'] for r in rows)
 
