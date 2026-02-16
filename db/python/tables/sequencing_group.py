@@ -93,13 +93,19 @@ class SequencingGroupTable(DbBase):
 
         if filter_.created_on is not None:
             created_on_condition = filter_.to_sql(
-                {'created_on': 'DATE(created_on)'}, only=['created_on']
+                {'created_on': 'MIN(LOWER(sys_period))::date'}, only=['created_on']
             )
             _query.append(
                 t"""\
                 INNER JOIN (
-                    SELECT id, TIMESTAMP(min(row_start)) AS created_on
-                    FROM sequencing_group FOR SYSTEM_TIME ALL
+                    SELECT id, MIN(LOWER(sys_period)) AS created_on
+                    FROM (
+                        SELECT id, sys_period
+                        FROM sequencing_group
+                        UNION ALL
+                        SELECT id, sys_period
+                        FROM sequencing_group_history
+                    )
                     GROUP BY id
                     HAVING {created_on_condition:q}
                 ) AS sg_timequery ON sg.id = sg_timequery.id"""

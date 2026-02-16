@@ -1,6 +1,6 @@
 import pytest
 
-from datetime import date, datetime
+from datetime import date
 from unittest import mock
 
 from db.python.connect import Connection
@@ -78,6 +78,15 @@ def sequencing_group_model(test_sample: int) -> SequencingGroupUpsertInternal:
             )
         ],
     )
+
+@pytest.fixture
+def mock_date(monkeypatch):
+    def _mock_date(module: str, _date: date):
+        mock_date = mock.Mock(wraps=date)
+        mock_date.today.return_value = _date
+        monkeypatch.setattr(module, mock_date)
+        return mock_date
+    return _mock_date
 
 
 class TestSequencingGroup:
@@ -243,14 +252,21 @@ class TestSequencingGroup:
         assert updated_sg[0].id == active_sgs[0].id
 
     @pytest.mark.asyncio
-    @pytest.mark.skip
-    async def test_query_with_assay_metadata(self):
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.skip(reason='Querying JSON keys is not yet implemented') #TODO: Implement this test when querying JSON keys is implemented
+    async def test_query_with_assay_metadata(
+        self,
+        connection_with_project: Connection,
+        sequencing_group_model: SequencingGroupUpsertInternal,
+    ):
         """Test searching with an assay metadata filter"""
-        sample_to_insert = get_sample_model()
+        sg_layer = SequencingGroupLayer(connection_with_project)
+        sgs_to_insert = [sequencing_group_model]
 
         # Add extra sequencing group
-        sample_to_insert.sequencing_groups.append(
+        sgs_to_insert.append(
             SequencingGroupUpsertInternal(
+                sample_id=sequencing_group_model.sample_id,
                 type='exome',
                 technology='short-read',
                 platform='ILLUMINA',
@@ -273,67 +289,74 @@ class TestSequencingGroup:
         )
 
         # Create in database
-        sample = await self.slayer.upsert_sample(sample_to_insert)
+        inital_sgs = await sg_layer.upsert_sequencing_groups(sgs_to_insert)
 
         # Query for genome assay metadata
-        sgs = await self.sglayer.query(
+        sgs = await sg_layer.query(
             SequencingGroupFilter(
                 assay=SequencingGroupFilter.SequencingGroupAssayFilter(
                     meta={'sequencing_type': GenericFilter(eq='genome')}
                 )
             )
         )
-        self.assertEqual(len(sgs), 1)
-        self.assertEqual(sgs[0].id, sample.sequencing_groups[0].id)
+        assert len(sgs) == 1
+        assert sgs[0].id == inital_sgs[0].id
 
         # Query for exome assay metadata
-        sgs = await self.sglayer.query(
+        sgs = await sg_layer.query(
             SequencingGroupFilter(
                 assay=SequencingGroupFilter.SequencingGroupAssayFilter(
                     meta={'sequencing_type': GenericFilter(eq='exome')}
                 )
             )
         )
-        self.assertEqual(len(sgs), 1)
-        self.assertEqual(sgs[0].id, sample.sequencing_groups[1].id)
+        assert len(sgs) == 1
+        assert sgs[0].id == inital_sgs[1].id
 
     @pytest.mark.asyncio
-    @pytest.mark.skip
-    async def test_query_with_creation_date(self):
+    @pytest.mark.project_roles(['writer'])
+    async def test_query_with_creation_date(
+        self,
+        connection_with_project: Connection,
+        sequencing_group_model: SequencingGroupUpsertInternal,
+    ):
         """Test fetching using a creation date filter"""
-        sample_to_insert = get_sample_model()
-        await self.slayer.upsert_sample(sample_to_insert)
+        # today = date(year=2026, month=1, day=1)
+        # mock_date('db.python.tables.sequencing_group.date', today)
+        sg_layer = SequencingGroupLayer(connection_with_project)
+
+        await sg_layer.upsert_sequencing_groups([sequencing_group_model])
 
         # There's a race condition here -- don't run this near UTC midnight!
-        today = datetime.utcnow().date()
+        today = date.today()
 
         # Query for sequencing group with creation date before today
-        sgs = await self.sglayer.query(
+        sgs = await sg_layer.query(
             SequencingGroupFilter(created_on=GenericFilter(lt=today))
         )
-        self.assertEqual(len(sgs), 0)
+        assert len(sgs) == 0
 
         # Query for sequencing group with creation date today
-        sgs = await self.sglayer.query(
+        sgs = await sg_layer.query(
             SequencingGroupFilter(created_on=GenericFilter(eq=today))
         )
-        self.assertEqual(len(sgs), 1)
+        assert len(sgs) == 1
 
-        sgs = await self.sglayer.query(
+        sgs = await sg_layer.query(
             SequencingGroupFilter(created_on=GenericFilter(lte=today))
         )
-        self.assertEqual(len(sgs), 1)
+        assert len(sgs) == 1
 
-        sgs = await self.sglayer.query(
+        sgs = await sg_layer.query(
             SequencingGroupFilter(created_on=GenericFilter(gte=today))
         )
-        self.assertEqual(len(sgs), 1)
+        assert len(sgs) == 1
 
         # Query for sequencing group with creation date today
-        sgs = await self.sglayer.query(
+        sgs = await sg_layer.query(
             SequencingGroupFilter(created_on=GenericFilter(gt=today))
         )
-        self.assertEqual(len(sgs), 0)
+        assert len(sgs) == 0
 
     @pytest.mark.asyncio
     @pytest.mark.skip
