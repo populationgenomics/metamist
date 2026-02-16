@@ -621,12 +621,8 @@ class ParticipantLayer(BaseLayer):
         self, participant: ParticipantUpsertInternal, project: ProjectId = None
     ) -> ParticipantUpsertInternal:
         """Create a single participant"""
-        in_transaction = self.info.transaction_status == TransactionStatus.INTRANS
-        with_function = (
-            self.connection.pg_connection.transaction if in_transaction else NoOpAenter
-        )
 
-        async with with_function():
+        async with self.connection.transaction():
             if participant.id:
                 project_ids = await self.pttable.get_project_ids_for_participant_ids(
                     [participant.id]
