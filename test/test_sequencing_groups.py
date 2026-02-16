@@ -287,8 +287,6 @@ class TestSequencingGroup:
         sequencing_group_model: SequencingGroupUpsertInternal,
     ):
         """Test fetching using a creation date filter"""
-        # today = date(year=2026, month=1, day=1)
-        # mock_date('db.python.tables.sequencing_group.date', today)
         sg_layer = SequencingGroupLayer(connection_with_project)
 
         await sg_layer.upsert_sequencing_groups([sequencing_group_model])

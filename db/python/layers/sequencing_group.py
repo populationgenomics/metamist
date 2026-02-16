@@ -111,17 +111,6 @@ class SequencingGroupLayer(BaseLayer):
 
         return sequencing_groups
 
-    async def get_sequencing_groups_create_date(
-        self, sequencing_group_ids: list[int]
-    ) -> dict[int, date]:
-        """
-        Get a map of {internal_sample_id: date_created} for list of sequencing_groups
-        """
-        if len(sequencing_group_ids) == 0:
-            return {}
-
-        return await self.seqgt.get_sequencing_groups_create_date(sequencing_group_ids)
-
     async def get_samples_create_date_from_sgs(
         self, sequencing_group_ids: list[int]
     ) -> dict[SequencingGroupInternalId, date]:
@@ -139,105 +128,11 @@ class SequencingGroupLayer(BaseLayer):
         """
         return await self.seqgt.get_all_sequencing_group_ids_by_sample_ids_by_type()
 
-    async def get_participant_ids_sequencing_group_ids_for_sequencing_type(
-        self, sequencing_type: str
-    ) -> dict[int, list[int]]:
-        """
-        Get list of partiicpant IDs for a specific sequence type,
-        useful for synchronisation seqr projects
-        """
-        (
-            projects,
-            pids,
-        ) = await self.seqgt.get_participant_ids_and_sequencing_group_ids_for_sequencing_type(
-            sequencing_type
-        )
-        if not pids:
-            return {}
-
-        self.connection.check_access_to_projects_for_ids(
-            projects, allowed_roles=ReadAccessRoles
-        )
-
-        return pids
-
     async def get_type_numbers_for_project(self, project: ProjectId) -> dict[str, int]:
         """Get sequencing type numbers (of groups) for a project"""
         return await self.seqgt.get_type_numbers_for_project(project)
 
     # region CREATE / MUTATE
-
-    async def create_sequencing_group_from_assays(
-        self, assay_ids: list[int], meta: dict
-    ) -> SequencingGroupInternal:
-        """
-        Create a sequencing group from a list of assays,
-        return an exception if they're not of the same type
-        """
-        if not assay_ids:
-            raise ValueError('Requires assays to create SequencingGroup')
-
-        # let's check the sequences first
-        slayer = AssayTable(self.connection)
-        projects, assays = await slayer.query(
-            AssayFilter(id=GenericFilter(in_=assay_ids))
-        )
-
-        if len(assay_ids) != len(assays):
-            missing_seq_ids = set(assay_ids) - set(s.id for s in assays)
-            raise NotFoundError(f'Some assays were not found: {missing_seq_ids}')
-
-        if not projects:
-            raise ValueError('Sequences were not attached to any project')
-
-        assay_types = set(a.type for a in assays)
-        if not len(assay_types) == 1 and 'sequencing' in assay_types:
-            raise ValueError(
-                f'Assays must be all of type "sequencing", got: {assay_types}'
-            )
-
-        sample_ids = set(s.sample_id for s in assays)
-        sequencing_types = set(s.meta.get('sequencing_type') for s in assays)
-        sequencing_technologies = set(
-            s.meta.get('sequencing_technology') for s in assays
-        )
-        sequencing_platforms = set(s.meta.get('sequencing_platform') for s in assays)
-
-        attributes_to_check = {
-            'type': sequencing_types,
-            'meta.technology': sequencing_technologies,
-            'meta.platform': sequencing_platforms,
-            'meta.sample_id': sample_ids,
-        }
-
-        for attribute, values in attributes_to_check.items():
-            if len(values) > 1:
-                raise ValueError(
-                    f'Cannot create sequencing group from sequences with different {attribute!r}: {values!r}'
-                )
-            first_value = next(iter(values))
-            if first_value is None:
-                raise ValueError(
-                    f'Cannot create sequencing group from sequences with missing {attribute!r}'
-                )
-
-        sequencing_group_id = await self.seqgt.create_sequencing_group(
-            sample_id=next(iter(sample_ids)),
-            type_=next(iter(sequencing_types)),
-            technology=next(iter(sequencing_technologies)),
-            platform=next(iter(sequencing_platforms)),
-            assay_ids=assay_ids,
-            meta=meta,
-        )
-        return SequencingGroupInternal(
-            id=sequencing_group_id,
-            type=next(iter(sequencing_types)),
-            technology=next(iter(sequencing_technologies)),
-            platform=next(iter(sequencing_platforms)),
-            sample_id=next(iter(sample_ids)),
-            meta=meta,
-            assays=assays,
-        )
 
     async def recreate_sequencing_group_with_new_assays(
         self,
