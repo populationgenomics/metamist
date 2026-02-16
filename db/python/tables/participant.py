@@ -522,10 +522,9 @@ RETURNING id
         if len(external_participant_ids) == 0:
             return {}
 
-        _query = (
-            t'SELECT external_id, participant_id AS id FROM participant_external_id '
-            t'WHERE external_id = ANY({external_participant_ids}) AND project = {project}'
-        )
+        _query = t""""SELECT external_id, participant_id AS id FROM participant_external_id
+        WHERE external_id = ANY({external_participant_ids}) AND project = {project}"""
+
         results = await (await self.connection.pg_connection.execute(_query)).fetchall()
 
         id_map = {r['external_id']: r['id'] for r in results}
@@ -539,11 +538,9 @@ RETURNING id
         if len(internal_participant_ids) == 0:
             return {}
 
-        _query = (
-            t'SELECT participant_id AS id, external_id '
-            t'FROM participant_external_id '
-            t'WHERE participant_id=ANY({internal_participant_ids}) AND name={PRIMARY_EXTERNAL_ORG}'
-        )
+        _query = t"""SELECT participant_id AS id, external_id FROM participant_external_id
+        WHERE participant_id=ANY({internal_participant_ids}) AND name={PRIMARY_EXTERNAL_ORG}
+        """
 
         results = await (await self.connection.pg_connection.execute(_query)).fetchall()
 

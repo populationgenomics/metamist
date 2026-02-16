@@ -1,9 +1,5 @@
 import dataclasses
-from collections import defaultdict
 from string.templatelib import Template
-from typing import Any
-
-from psycopg import sql
 
 from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
@@ -39,24 +35,13 @@ class FamilyParticipantTable(DbBase):
         """
         Create a new sample, and add it to database
         """
-        updater = {
-            'family_id': family_id,
-            'participant_id': participant_id,
-            'paternal_participant_id': paternal_id,
-            'maternal_participant_id': maternal_id,
-            'affected': affected,
-            'notes': notes,
-            'audit_log_id': await self.audit_log_id(),
-        }
-        keys = list(updater.keys())
-        cols = sql.SQL(', ').join(map(sql.Identifier, keys))
-        place_holders = sql.SQL(', ').join(map(sql.Placeholder, keys))
+        audit_log_id = await self.audit_log_id()
 
-        _query = sql.SQL('INSERT INTO family_participant ({}) VALUES ({})').format(
-            cols, place_holders
-        )
-        await self.connection.pg_connection.execute(_query, updater)
+        _query = t"""INSERT INTO family_participant (family_id, participant_id, paternal_participant_id,
+        maternal_participant_id, affected, notes, audit_log_id)
+        VALUES ({family_id, participant_id, paternal_id, maternal_id, affected, notes, audit_log_id})"""
 
+        await self.connection.pg_connection.execute(_query)
         return family_id, participant_id
 
     async def create_rows(
@@ -73,44 +58,36 @@ class FamilyParticipantTable(DbBase):
         - notes
         - author
         """
-        ignore_keys_during_update = {'participant_id'}
-
-        remapped_ds_by_keys: dict[tuple, list[dict]] = defaultdict(list)
-        # this now works when only a portion of the keys are specified
+        upsert_values = []
         for row in rows:
-            d: dict[str, Any] = {
-                'family_id': row.family_id,
-                'participant_id': row.individual_id,
-                'paternal_participant_id': row.paternal_id,
-                'maternal_participant_id': row.maternal_id,
-                'affected': row.affected,
-                'notes': row.notes,
-                # sex is NOT inserted here
-                'audit_log_id': await self.audit_log_id(),
-            }
-
-            remapped_ds_by_keys[tuple(sorted(d.keys()))].append(d)
-
-        for d_keys, remapped_ds in remapped_ds_by_keys.items():
-            str_keys = ', '.join(d_keys)
-            placeholder_keys = ', '.join(f'%({k})s' for k in d_keys)
-            update_keys = ', '.join(
-                f'{k}=EXCLUDED.{k}'
-                for k in d_keys
-                if k not in ignore_keys_during_update
+            upsert_values.append(
+                {
+                    'family_id': row.family_id,
+                    'participant_id': row.individual_id,
+                    'paternal_participant_id': row.paternal_id,
+                    'maternal_participant_id': row.maternal_id,
+                    'affected': row.affected,
+                    'notes': row.notes,
+                    # sex is NOT inserted here
+                    'audit_log_id': await self.audit_log_id(),
+                }
             )
 
-            _query = f"""
-                    INSERT INTO family_participant
-                        ({str_keys})
-                    VALUES
-                        ({placeholder_keys})
-                    ON CONFLICT(participant_id)
-                    DO UPDATE SET
-                        {update_keys}
-                    """
-            async with self.connection.pg_connection.cursor() as cur:
-                await cur.executemany(_query, remapped_ds)
+        _query = """
+        INSERT INTO family_participant (family_id, participant_id, paternal_participant_id, maternal_participant_id, affected, notes, audit_log_id)
+        VALUES
+        (%(family_id)s, %(participant_id)s, %(paternal_participant_id)s,%(maternal_participant_id)s,%(affected)s, %(notes)s, %(audit_log_id)s))
+        ON CONFLICT(participant_id)
+        DO UPDATE SET
+            family_id=EXCLUDED.family_id,
+            paternal_participant_id=EXCLUDED.paternal_participant_id,
+            maternal_participant_id=EXCLUDED.maternal_participant_id,
+            affected=EXCLUDED.affected,
+            notes=EXCLUDED.notes,
+            audit_log_id=EXCLUDED.audit_log_id
+        """
+        async with self.connection.pg_connection.cursor() as cur:
+            await cur.executemany(_query, upsert_values)
 
         return True
 
@@ -129,20 +106,14 @@ class FamilyParticipantTable(DbBase):
             raise ValueError('No filter provided')
 
         join_type = t'LEFT' if include_participants_not_in_families else t'INNER'
-        query = (
-            t'SELECT '
-            t'fp.family_id,'
-            t'p.id as individual_id,'
-            t'fp.paternal_participant_id as paternal_id,'
-            t'fp.maternal_participant_id as maternal_id,'
-            t'p.reported_sex as sex,'
-            t'fp.affected,'
-            t'fp.notes as notes,'
-            t'p.project '
-            t'FROM participant p '
-            t'{join_type:q} JOIN family_participant fp on fp.participant_id = p.id '
-            t'WHERE {where_params:q}'
-        )
+        query = t"""
+            SELECT fp.family_id, p.id as individual_id, fp.paternal_participant_id as paternal_id,
+            fp.maternal_participant_id as maternal_id, p.reported_sex as sex, fp.affected,
+            fp.notes as notes, p.project FROM participant p
+            {join_type:q}
+            JOIN family_participant fp on fp.participant_id = p.id
+            WHERE {where_params:q}
+        """
 
         rows = await (await self.connection.pg_connection.execute(query)).fetchall()
         projects: set[ProjectId] = set()
@@ -164,11 +135,11 @@ class FamilyParticipantTable(DbBase):
         if len(participant_ids) == 0:
             return set(), {}
 
-        _query = (
-            t'SELECT p.project, p.id, fp.family_id FROM family_participant fp '
-            t'INNER JOIN participant p ON p.id = fp.participant_id '
-            t'WHERE fp.participant_id = ANY({participant_ids})'
-        )
+        _query = t"""
+            SELECT p.project, p.id, fp.family_id FROM family_participant fp
+            INNER JOIN participant p ON p.id = fp.participant_id
+            WHERE fp.participant_id = ANY({participant_ids})
+        """
 
         rows = await (await self.connection.pg_connection.execute(_query)).fetchall()
 
@@ -202,13 +173,14 @@ class FamilyParticipantTable(DbBase):
 
         audit_log_id = await self.audit_log_id()
 
-        _update_before_delete = (
-            t'UPDATE family_participant SET audit_log_id = {audit_log_id} '
-            t'WHERE family_id = {family_id} AND participant_id = {participant_id}'
-        )
-        await self.connection.pg_connection.execute(_update_before_delete)
-
+        _update_before_delete = t"""
+        UPDATE family_participant SET audit_log_id = {audit_log_id}
+        WHERE family_id = {family_id} AND participant_id = {participant_id}
+        """
         _delete_query = t'DELETE FROM family_participant WHERE participant_id = {participant_id} AND family_id = {family_id}'
-        await self.connection.pg_connection.execute(_delete_query)
+
+        async with self.connection.pg_connection.transaction():
+            await self.connection.pg_connection.execute(_update_before_delete)
+            await self.connection.pg_connection.execute(_delete_query)
 
         return True
