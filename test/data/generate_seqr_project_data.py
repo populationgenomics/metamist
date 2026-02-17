@@ -167,7 +167,7 @@ def generate_pedigree_rows(num_families=1):  # noqa: D417
             )
             continue
 
-        if num_individuals_in_family == 2:  # Duo  # noqa: PLR2004
+        if num_individuals_in_family == 2:  # Duo
             parent_id = generate_random_id(used_ids)
             parent_sex = random.choice([1, 2])
             parent_affected = random.choices([0, 1, 2], weights=[0.05, 0.8, 0.15], k=1)[

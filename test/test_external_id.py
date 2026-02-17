@@ -533,7 +533,7 @@ class TestFamily:
         assert result == {}
 
     @pytest.mark.asyncio
-    async def test_import_families(self, connection_with_project: Connection):
+    async def test_import_families(self):
         """Exercise import_families() method"""
         await self.flayer.import_families(
             ['familyid', 'description', 'phenotype'],
