@@ -53,6 +53,7 @@ dev = [
     "pulumi-gcp>=9.13.0",
     "pulumi-docker>=4.11.0",
     "pygithub>=2.8.1",
+    "pyright>=1.1.408",
 ]
 
 [tool.uv]
@@ -80,4 +81,22 @@ omit = [
     "packages/metamist/src/metamist/model/*",
     "packages/metamist/src/metamist/models/*",
     "packages/metamist/src/metamist/*.py",
+]
+
+[tool.pyright]
+include = ["api", "db", "etl", "models", "test", "packages"]
+exclude = [
+    "packages/metamist/src/metamist/api/*",
+    "packages/metamist/src/metamist/apis/*",
+    "packages/metamist/src/metamist/model/*",
+    "packages/metamist/src/metamist/models/*",
+    "packages/metamist/src/metamist/*.py",
+]
+
+pythonVersion = "3.14"
+pythonPlatform = "Linux"
+
+executionEnvironments = [
+    # Check the metamist API with earlier Pythons
+    { root = "packages/metamist", pythonVersion = "3.10" },
 ]
