@@ -530,13 +530,8 @@ class TestSequencingGroup:
     @pytest.mark.asyncio
     async def test_history_no_sum(self, connection: Connection):
         """Test the trivial case where there are no sequencing groups."""
-        sg_layer = SequencingGroupLayer(connection)
-        # Set up mocking for rows returned from the table query.
-        with mock.patch(
-            'psycopg.cursor_async.AsyncCursor.fetchall', return_value=[]
-        ):
-            sg_table = sg_layer.seqgt
-            result = await sg_table.get_sequencing_group_counts_by_month([])
+        sg_table = SequencingGroupTable(connection)
+        result = await sg_table.get_sequencing_group_counts_by_month([])
 
         assert result == {}
 
@@ -619,70 +614,80 @@ class TestSequencingGroup:
         )
 
     @pytest.mark.asyncio
-    @pytest.mark.skip
-    @mock.patch('db.python.tables.sequencing_group.date', wraps=date)
-    async def test_history_partial_sum(self, mock_date):
+    async def test_history_partial_sum(
+        self,
+        connection_with_project: Connection,
+        test_sample: int,
+        mock_date
+    ):
         """Test the case where less types are present initially and more are added over time."""
         # Mock today's date.
-        mock_date.today.return_value = date(year=2025, month=12, day=31)
+        mock_date('db.python.tables.sequencing_group.date', date(year=2025, month=12, day=31))
 
         # Set up mocking for rows returned from the table query.
-        rows_mock = [
+        test_data = [
             {
-                'project': 0,
+                'sample_id': test_sample,
                 'type': 'genome',
                 'technology': 'short-read',
-                'sg_date': date(2025, 10, 1),
-                'num_sg': 2,
+                'sg_date': date(2025, 10, 1).isoformat(),
             },
             {
-                'project': 0,
+                'sample_id': test_sample,
                 'type': 'genome',
                 'technology': 'long-read',
-                'sg_date': date(2025, 11, 1),
-                'num_sg': 3,
+                'sg_date': date(2025, 11, 1).isoformat(),
             },
             {
-                'project': 0,
+                'sample_id': test_sample,
                 'type': 'chip',
                 'technology': 'short-read',
-                'sg_date': date(2025, 10, 1),
-                'num_sg': 4,
+                'sg_date': date(2025, 10, 1).isoformat(),
             },
             {
-                'project': 0,
+                'sample_id': test_sample,
                 'type': 'chip',
                 'technology': 'long-read',
-                'sg_date': date(2025, 11, 1),
-                'num_sg': 5,
+                'sg_date': date(2025, 11, 1).isoformat(),
             },
         ]
-        with mock.patch(
-            'db.python.connect.databases.Database.fetch_all', return_value=rows_mock
-        ):
-            sg_table = self.sglayer.seqgt
-            result = await sg_table.get_sequencing_group_counts_by_month([0])
 
-        self.assertDictEqual(
-            result,
-            {
-                0: {
-                    date(2025, 10, 1): {
-                        'genome|||short-read': 2,
-                        'chip|||short-read': 4,
-                    },
-                    date(2025, 11, 1): {
-                        'genome|||short-read': 2,
-                        'genome|||long-read': 3,
-                        'chip|||short-read': 4,
-                        'chip|||long-read': 5,
-                    },
-                    date(2025, 12, 1): {
-                        'genome|||short-read': 2,
-                        'genome|||long-read': 3,
-                        'chip|||short-read': 4,
-                        'chip|||long-read': 5,
-                    },
-                }
-            },
-        )
+        test_data_query = """\
+            INSERT INTO sequencing_group
+                (sample_id, type, technology, archived, sys_period)
+            VALUES
+                (%(sample_id)s, %(type)s, %(technology)s, false, tstzrange(%(sg_date)s, null))
+        """
+        conn = connection_with_project.pg_connection
+        async with conn.transaction():
+            async with conn.cursor() as cur:
+                # Disable the trigger so that the sys_period isn't overwritten
+                await cur.execute('ALTER TABLE main.sequencing_group DISABLE TRIGGER versioning_trigger')
+                await cur.executemany(test_data_query, test_data)
+                await cur.execute('ALTER TABLE main.sequencing_group ENABLE TRIGGER versioning_trigger')
+
+        sg_table = SequencingGroupTable(connection_with_project)
+        result = await sg_table.get_sequencing_group_counts_by_month([test_sample])
+
+        expected_output = {
+            test_sample: {
+                date(2025, 10, 1): {
+                    'genome|||short-read': 1,
+                    'chip|||short-read': 1,
+                },
+                date(2025, 11, 1): {
+                    'genome|||short-read': 1,
+                    'genome|||long-read': 1,
+                    'chip|||short-read': 1,
+                    'chip|||long-read': 1,
+                },
+                date(2025, 12, 1): {
+                    'genome|||short-read': 1,
+                    'genome|||long-read': 1,
+                    'chip|||short-read': 1,
+                    'chip|||long-read': 1,
+                },
+            }
+        }
+
+        assert result == expected_output
