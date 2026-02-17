@@ -412,9 +412,7 @@ class ParticipantTable:
         async with with_function():
             if external_ids:
                 to_delete = [k.lower() for k, v in external_ids.items() if v is None]
-                to_update = {
-                    k.lower(): v for k, v in external_ids.items() if v is not None
-                }
+                any_to_update = any(v is not None for v in external_ids.values())
 
                 if PRIMARY_EXTERNAL_ORG in to_delete:
                     raise ValueError("Can't remove participant's primary external_id")
@@ -434,7 +432,7 @@ class ParticipantTable:
                     """
                     await conn.execute(_delete_query)
 
-                if to_update:
+                if any_to_update:
                     _query = (
                         t'SELECT project FROM participant WHERE id = {participant_id}'
                     )
@@ -442,13 +440,25 @@ class ParticipantTable:
                     row = await cur.fetchone()
                     project = row['project']
 
+                    to_update = [
+                        {
+                            'name': k.lower(),
+                            'external_id': v,
+                            'audit_log_id': audit_log_id,
+                            'project': project,
+                            'participant_id': participant_id,
+                        }
+                        for k, v in external_ids.items()
+                        if v is not None
+                    ]
+
                     # Batch update
                     cur = conn.cursor()
                     async with conn.cursor() as cur:
                         await cur.executemany(
-                            t"""
+                            """
                                 MERGE INTO participant_external_id AS target
-                                USING (VALUES ({project}, {participant_id}, %(name)s, %(external_id)s, {audit_log_id}))
+                                USING (VALUES (%(project)s, %(participant_id)s, %(name)s, %(external_id)s, %(audit_log_id)s))
                                     AS source (project, participant_id, name, external_id, audit_log_id)
                                 ON target.project = source.project
                                     AND target.participant_id = source.participant_id
@@ -458,7 +468,7 @@ class ParticipantTable:
                                     INSERT (project, participant_id, name, external_id, audit_log_id)
                                     VALUES (source.project, source.participant_id, source.name, source.external_id, source.audit_log_id)
                             """,
-                            list(to_update.items()),
+                            to_update,
                         )
 
             updates: list[Template | None] = [t'audit_log_id = {audit_log_id}']
