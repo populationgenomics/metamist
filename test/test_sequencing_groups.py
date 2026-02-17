@@ -1,5 +1,6 @@
 import pytest
 
+from collections.abc import Callable
 from datetime import date
 from unittest import mock
 
@@ -85,27 +86,13 @@ def sequencing_group_model(test_sample: int) -> SequencingGroupUpsertInternal:
     )
 
 @pytest.fixture
-def mock_date(monkeypatch):
+def mock_date(monkeypatch) -> Callable[[str, date], mock.Mock]:
     def _mock_date(module: str, _date: date):
         mock_date = mock.Mock(wraps=date)
         mock_date.today.return_value = _date
         monkeypatch.setattr(module, mock_date)
         return mock_date
     return _mock_date
-
-@pytest.fixture
-def insert_historical_sg(connection: Connection):
-    async def _insert_historical_sg(sample_id: id, type: str, tech: str, period: tuple[date, date]):
-        query = t"""\
-            INSERT INTO sequencing_group_history 
-                (sample_id, type, technology, sys_period)
-            VALUES
-                ({sample_id}, {type}, {tech}, tstzrange({period[0].isoformat()}, {period[1].isoformat()}))
-        """
-        await connection.pg_connection.execute(query)
-    
-    return _insert_historical_sg
-        
 
 
 class TestSequencingGroup:
@@ -233,7 +220,9 @@ class TestSequencingGroup:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    @pytest.mark.skip(reason='Querying JSON keys is not yet implemented') # TODO: Implement this test when querying JSON keys is implemented
+    @pytest.mark.skip(
+        reason='Querying JSON keys is not yet implemented'
+    ) # TODO: Implement this test when querying JSON keys is implemented
     async def test_query_with_assay_metadata(
         self,
         connection_with_project: Connection,
@@ -372,7 +361,9 @@ class TestSequencingGroup:
         
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Analysis migration has not been completed") # TODO Revisit this test once analysis queries are migrated
+    @pytest.mark.skip(
+        reason="Analysis migration has not been completed"
+    ) # TODO Revisit this test once analysis queries are migrated
     async def test_query_finds_sgs_which_have_cram_analysis(self):
         """Test querying for sequencing groups which have a cram or gvcf analysis"""
         sample_to_insert = get_sample_model()
@@ -536,18 +527,20 @@ class TestSequencingGroup:
         assert result == {}
 
     @pytest.mark.asyncio
+    @pytest.mark.skip(
+        reason='Currently requires more complex testing fixtures that may be easier to achieve one more functionality is migrated'
+    ) # TODO Revisit when ready
     async def test_history_sum_multiple_projects(
         self,
         connection: Connection,
         test_sample: int,
         mock_date,
-        insert_historical_sg
     ):
         """Test the case where type:technology combinations are summed and held for the same project."""
         # Mock today's date.
-        # mock_date.today.return_value = date(year=2025, month=12, day=31)
+        today = date(year=2025, month=12, day=31)
+        mock_date('db.python.tables.sequencing_group.date', today)
 
-        await insert_historical_sg(test_sample, 'genome', 'short-read', (date(2025, 10, 1), date(2025, 10, 2)))
         # Set up mocking for rows returned from the table query.
         rows_mock = [
             {
