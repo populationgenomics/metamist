@@ -15,7 +15,6 @@ from psycopg_pool import AsyncConnectionPool
 
 from api.settings import DB_POOL_MAX_SIZE, DB_POOL_MIN_SIZE
 from db.python.tables.project import ProjectPermissionsTable
-from api.settings import DB_POOL_MAX_SIZE, DB_POOL_MIN_SIZE
 from db.python.utils import (
     InternalError,
     NoProjectAccess,
