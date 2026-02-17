@@ -14,7 +14,6 @@ def main(ped_file_path: str, project: str):
 
     fapi = FamilyApi()
 
-    # pylint: disable=no-member
     with AnyPath(ped_file_path).open() as ped_file:
         fapi.import_pedigree(
             file=ped_file,
@@ -25,5 +24,4 @@ def main(ped_file_path: str, project: str):
 
 
 if __name__ == '__main__':
-    # pylint: disable=no-value-for-parameter
     main()

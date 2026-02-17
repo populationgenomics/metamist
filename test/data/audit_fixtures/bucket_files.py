@@ -2,11 +2,10 @@
 Simulated bucket files for testing the audit module.
 """
 
+from cpg_utils import to_path
 from metamist.audit.models import (
     FileMetadata,
 )
-
-from cpg_utils import to_path
 
 
 MAIN_BUCKET_FILES = [

@@ -5,23 +5,23 @@ from datetime import datetime
 from io import StringIO
 
 from cpg_utils import Path, to_path
-
-from .audit_logging import BucketAuditLogger
 from metamist.audit.data_access import GCSDataAccess
 from metamist.audit.models import (
-    AuditResult,
-    ReviewResult,
-    DeletionResult,
-    AuditReportEntry,
-    SequencingGroup,
     AuditConfig,
+    AuditReportEntry,
+    AuditResult,
+    DeletionResult,
+    ReviewResult,
+    SequencingGroup,
 )
+
+from .audit_logging import BucketAuditLogger
 
 
 class Reporter:
     """Service for generating and writing audit reports."""
 
-    def __init__(
+    def __init__(  # noqa: D417
         self,
         gcs_data: GCSDataAccess,
         audit_logs: BucketAuditLogger,
@@ -125,15 +125,15 @@ class Reporter:
 
         lines = [
             f'Dataset: {config.dataset}',
-            f"Sequencing Types: {', '.join(sorted(config.sequencing_types))}",
-            f"Sequencing Technologies: {', '.join(sorted(config.sequencing_technologies))}",
-            f"Sequencing Platforms: {', '.join(sorted(config.sequencing_platforms))}",
-            f"File Types: {', '.join(sorted(ft.name for ft in config.file_types))}",
-            f"Analysis Types: {', '.join(sorted(config.analysis_types))}",
+            f'Sequencing Types: {", ".join(sorted(config.sequencing_types))}',
+            f'Sequencing Technologies: {", ".join(sorted(config.sequencing_technologies))}',
+            f'Sequencing Platforms: {", ".join(sorted(config.sequencing_platforms))}',
+            f'File Types: {", ".join(sorted(ft.name for ft in config.file_types))}',
+            f'Analysis Types: {", ".join(sorted(config.analysis_types))}',
         ]
         if config.excluded_prefixes:
             lines.append(
-                f"Excluded Prefixes: {', '.join(sorted(config.excluded_prefixes))}"
+                f'Excluded Prefixes: {", ".join(sorted(config.excluded_prefixes))}'
             )
         lines.append('')
 
@@ -227,7 +227,7 @@ class Reporter:
             report_name='FILES REVIEWED',
         )
 
-    def write_deleted_files_report(
+    def write_deleted_files_report(  # noqa: D417
         self, deletion_result: DeletionResult, dry_run: bool
     ) -> Path:
         """
@@ -364,7 +364,7 @@ class Reporter:
                     return False
             return True
 
-        def evaluate_filter_expression(expr: str, row: dict) -> bool:
+        def evaluate_filter_expression(expr: str, row: dict) -> bool:  # noqa: PLR0911
             """Evaluate a single filter expression against a row."""
             # Recursive cases first
             if ' or ' in expr:

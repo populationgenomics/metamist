@@ -13,7 +13,7 @@ import {
 import * as Plot from '@observablehq/plot'
 import { useState } from 'react'
 import Report from '../../components/Report'
-import { ReportItemPlot } from '../../components/ReportItem'
+import { ReportItemPlot, ReportItemTable } from '../../components/ReportItem'
 import ReportRow from '../../components/ReportRow'
 import { useProjectDbQuery } from '../../data/projectDatabase'
 
@@ -56,6 +56,46 @@ export default function ConsentAndChoices({ project }: { project: string }) {
         ancestryTableQuery?.status === 'success' && ancestryTableQuery?.data
             ? ancestryTableQuery.data.toArray().map((row) => row.ancestry)
             : []
+
+    const answersQuery = `
+        with answers as (
+            select
+            participant_id,
+            unnest(meta_ancestry_participant_ancestry) as ancestry,
+            meta_consent_blood_consent as "Blood consent",
+            meta_consent_informed_consent as "Informed consent",
+            meta_choice_receive_genetic_info as "Receive genetic info",
+            meta_choice_family_receive_genetic_info as "Family receive genetic info",
+            meta_choice_recontact as "Recontact for future research",
+            meta_choice_general_updates as "Receive general updates",
+            meta_choice_data_linkage as "Data linkage",
+            meta_have_donated_either_blood_or_plasma "Have previously donated blood or plasma",
+            meta_choice_use_of_cells_in_future_research_consent "Use of cells in future research consent",
+            CASE
+                WHEN
+                    meta_choice_use_of_cells_in_future_research_understanding @> ['used_by_approved_researchers','grown_indefinitely']
+                    or meta_choice_use_of_cells_in_future_research_understanding @> ['grown_indefinitely_and_used_by_approved_researchers']
+                THEN 'yes'
+                WHEN len(meta_choice_use_of_cells_in_future_research_understanding) = 1 THEN 'partial'
+                WHEN external_id_sano is not null  THEN 'n/a' -- Sano participants weren't asked this question
+                ELSE 'no'
+            END as  "Use of cells in future research understanding"
+        from participant
+        ${onlySamples ? 'where exists (select 1 from sample where sample.participant_id = participant.participant_id)' : ''}
+        ), unpivoted as (
+            UNPIVOT answers
+            ON COLUMNS(* EXCLUDE (ancestry, participant_id))
+            INTO NAME question VALUE answer
+        ) select
+            ${ancestryBreakdown ? 'ancestry' : "'All' as ancestry"},
+            question,
+            answer
+        from unpivoted
+        where ancestry in (${selectedAncestries.map((a) => `'${a}'`).join(', ')})
+    `
+
+    /* roughly calculate height so that selecting lots of ancestries doesn't squish things */
+    const itemHeight = selectedAncestries.length * CHOICES.length * 15 + CHOICES.length * 50
 
     return (
         <Report>
@@ -119,14 +159,41 @@ export default function ConsentAndChoices({ project }: { project: string }) {
                     </FormControl>
                 </Box>
             </ReportRow>
+
             <ReportRow>
-                <ReportItemPlot
-                    height={
-                        /* roughly calculate height so that selecting lots of ancestries doesn't squish things */
-                        selectedAncestries.length * CHOICES.length * 10 + CHOICES.length * 50
-                    }
+                <ReportItemTable
+                    height={itemHeight}
                     flexGrow={1}
-                    title={'Participant Choices'}
+                    flexBasis={400}
+                    title="Participant Choices Table"
+                    project={project}
+                    showToolbar={true}
+                    query={[
+                        {
+                            name: 'answers_unpivoted',
+                            query: answersQuery,
+                        },
+                        {
+                            name: 'result',
+                            query: `
+                                select
+                                    question,
+                                    ancestry,
+                                    answer,
+                                    count(*) as responses,
+                                    round(count(*) / nullif(sum(count(*)) over (partition by question, ancestry), 0) * 100, 2) as percent
+                                from answers_unpivoted
+                                group by 1,2,3
+                                order by 1,2,3
+                            `,
+                        },
+                    ]}
+                />
+                <ReportItemPlot
+                    height={itemHeight}
+                    flexGrow={1}
+                    flexBasis={640}
+                    title={'Participant Choices Chart'}
                     description={`
                         Breakdown of participant choices. N/A choices for cell use understanding are
                         sano participants who were not asked this question, partial values for cell
@@ -134,42 +201,7 @@ export default function ConsentAndChoices({ project }: { project: string }) {
                         of participants when viewing percentages, and the absolute count when not.
                     `}
                     project={project}
-                    query={`
-                        with answers as (
-                            select
-                            participant_id,
-                            unnest(meta_ancestry_participant_ancestry) as ancestry,
-                            meta_consent_blood_consent as "Blood consent",
-                            meta_consent_informed_consent as "Informed consent",
-                            meta_choice_receive_genetic_info as "Receive genetic info",
-                            meta_choice_family_receive_genetic_info as "Family receive genetic info",
-                            meta_choice_recontact as "Recontact for future research",
-                            meta_choice_general_updates as "Receive general updates",
-                            meta_choice_data_linkage as "Data linkage",
-                            meta_have_donated_either_blood_or_plasma "Have previously donated blood or plasma",
-                            meta_choice_use_of_cells_in_future_research_consent "Use of cells in future research consent",
-                            CASE
-                                WHEN
-                                    meta_choice_use_of_cells_in_future_research_understanding @> ['used_by_approved_researchers','grown_indefinitely']
-                                    or meta_choice_use_of_cells_in_future_research_understanding @> ['grown_indefinitely_and_used_by_approved_researchers']
-                                THEN 'yes'
-                                WHEN len(meta_choice_use_of_cells_in_future_research_understanding) = 1 THEN 'partial'
-                                WHEN external_id_sano is not null  THEN 'n/a' -- Sano participants weren't asked this question
-                                ELSE 'no'
-                            END as  "Use of cells in future research understanding"
-                        from participant
-                        ${onlySamples ? 'where exists (select 1 from sample where sample.participant_id = participant.participant_id)' : ''}
-                        ), unpivoted as (
-                            UNPIVOT answers
-                            ON COLUMNS(* EXCLUDE (ancestry, participant_id))
-                            INTO NAME question VALUE answer
-                        ) select
-                            ${ancestryBreakdown ? 'ancestry' : "'All' as ancestry"},
-                            question,
-                            answer
-                        from unpivoted
-                        where ancestry in (${selectedAncestries.map((a) => `'${a}'`).join(', ')})
-                    `}
+                    query={answersQuery}
                     plot={(data) => ({
                         marginLeft: 70,
                         marginRight: 120,

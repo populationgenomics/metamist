@@ -18,7 +18,7 @@ class TestFamilyImportEndpoint(DbIsolatedTest):
         Test importing families from a file where the file is empty.
         """
         with TemporaryFile(prefix='test', suffix='.tsv') as f:
-            emptyTestFile = UploadFile(f)
+            emptyTestFile = UploadFile(f)  # noqa: N806
 
             # Test has_header = true
             with self.assertRaises(HTTPException) as context:
@@ -56,7 +56,7 @@ class TestFamilyImportEndpoint(DbIsolatedTest):
         with TemporaryFile(mode='wb+', prefix='test', suffix='.tsv') as f:
             f.write(b'Some\ttest\theader\twithout\tdata\n')
             f.seek(0)
-            headerOnlyFile = UploadFile(f)
+            headerOnlyFile = UploadFile(f)  # noqa: N806
 
             # Test has_header = true
             response = await family.import_families(
@@ -84,14 +84,14 @@ class TestFamilyImportEndpoint(DbIsolatedTest):
             ['Jones', 'From Wales', 'sings well'],
             ['Taylor', 'Post Norman', 'sews'],
         ]
-        fileContent = '\n'.join(['\t'.join(row) for row in data]).encode(
+        fileContent = '\n'.join(['\t'.join(row) for row in data]).encode(  # noqa: N806
             encoding='utf-8-sig'
         )
 
         with TemporaryFile(mode='wb+', prefix='test', suffix='.tsv') as f:
             f.write(fileContent)
             f.seek(0)
-            testFile = UploadFile(f)
+            testFile = UploadFile(f)  # noqa: N806
 
             # Test has_header = true
             response = await family.import_families(
@@ -123,14 +123,14 @@ class TestFamilyImportEndpoint(DbIsolatedTest):
             ['Jones', 'From Wales', 'sings well', ''],
             ['Taylor', 'Post Norman', 'sews', '{"key3": "value3"}'],
         ]
-        fileContent = '\n'.join(['\t'.join(row) for row in data]).encode(
+        fileContent = '\n'.join(['\t'.join(row) for row in data]).encode(  # noqa: N806
             encoding='utf-8-sig'
         )
 
         with TemporaryFile(mode='wb+', prefix='test', suffix='.tsv') as f:
             f.write(fileContent)
             f.seek(0)
-            testFile = UploadFile(f)
+            testFile = UploadFile(f)  # noqa: N806
 
             # Test has_header = true
             response = await family.import_families(
@@ -173,14 +173,14 @@ class TestFamilyImportEndpoint(DbIsolatedTest):
             ['familyid', 'description', 'phenotype', 'meta'],
             ['Smith', 'Blacksmiths', 'burnt', '{"key1": "...'],
         ]
-        fileContent = '\n'.join(['\t'.join(row) for row in data]).encode(
+        fileContent = '\n'.join(['\t'.join(row) for row in data]).encode(  # noqa: N806
             encoding='utf-8-sig'
         )
 
         with TemporaryFile(mode='wb+', prefix='test', suffix='.tsv') as f:
             f.write(fileContent)
             f.seek(0)
-            testFile = UploadFile(f)
+            testFile = UploadFile(f)  # noqa: N806
 
             # expect to raise ValueError due to invalid JSON in meta
             with self.assertRaises(ValueError):

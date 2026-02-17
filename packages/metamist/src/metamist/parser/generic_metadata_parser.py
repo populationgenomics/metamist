@@ -1,4 +1,3 @@
-# pylint: disable=R0904,too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument,too-many-arguments,unused-import,too-many-lines
 import asyncio
 import logging
 import re
@@ -8,7 +7,7 @@ from typing import Any
 
 import click
 
-from metamist.parser.generic_parser import (  # noqa
+from metamist.parser.generic_parser import (
     DefaultSequencing,
     GenericParser,
     GroupedRow,
@@ -19,6 +18,7 @@ from metamist.parser.generic_parser import (  # noqa
     SingleRow,
     run_as_sync,
 )
+
 
 __DOC = """
 Parse CSV / TSV manifest of arbitrary format.
@@ -75,7 +75,7 @@ RE_FILENAME_SPLITTER = re.compile('[,;]')
 class GenericMetadataParser(GenericParser):
     """Parser for GenericMetadataParser"""
 
-    def __init__(
+    def __init__(  # noqa: D417, PLR0913
         self,
         project: str,
         search_locations: list[str],
@@ -273,7 +273,7 @@ class GenericMetadataParser(GenericParser):
         """Get internal cpg id from a row using get_sample_id and an api call"""
         return row.get(self.cpg_id_column, None)
 
-    def get_sample_type(self, row: GroupedRow) -> str:
+    def get_sample_type(self, row: GroupedRow) -> str:  # noqa: ARG002
         """Get sample type from row"""
         if self.default_sample_type:
             return self.default_sample_type
@@ -362,8 +362,9 @@ class GenericMetadataParser(GenericParser):
         value = int(value) if value else None
         return value
 
-    def get_assay_id(self, row: GroupedRow) -> dict[str, str] | None:
-        """Get external assay ID from row. Needs to be implemented per parser.
+    def get_assay_id(self, row: GroupedRow) -> dict[str, str] | None:  # noqa: ARG002
+        """
+        Get external assay ID from row. Needs to be implemented per parser.
         NOTE: To be re-thought after assay group changes are applied"""
         return None
 
@@ -669,7 +670,9 @@ class GenericMetadataParser(GenericParser):
         return filenames
 
     async def get_read_filenames(
-        self, sample_id: str | None, row: SingleRow
+        self,
+        sample_id: str | None,  # noqa: ARG002
+        row: SingleRow,
     ) -> list[str]:
         """Get paths to reads from a row"""
         if not self.reads_column or self.reads_column not in row:
@@ -678,7 +681,10 @@ class GenericMetadataParser(GenericParser):
         return self.process_filename_value(row[self.reads_column])
 
     async def get_checksums_from_row(
-        self, sample_id: str | None, row: SingleRow, read_filenames: list[str]
+        self,
+        sample_id: str | None,  # noqa: ARG002
+        row: SingleRow,
+        read_filenames: list[str],  # noqa: ARG002
     ) -> list[str | None] | None:
         """
         Get checksums for some row, you must either return:
@@ -692,7 +698,7 @@ class GenericMetadataParser(GenericParser):
 
         return self.process_filename_value(row[self.checksum_column])
 
-    async def get_gvcf_filenames(self, sample_id: str, row: GroupedRow) -> list[str]:
+    async def get_gvcf_filenames(self, sample_id: str, row: GroupedRow) -> list[str]:  # noqa: ARG002
         """Get paths to gvcfs from a row"""
         if not self.gvcf_column:
             return []
@@ -1066,7 +1072,7 @@ class GenericMetadataParser(GenericParser):
 )
 @click.argument('manifests', nargs=-1)
 @run_as_sync
-async def main(
+async def main(  # noqa: PLR0913
     manifests,
     project,
     search_path: list[str],
@@ -1139,5 +1145,4 @@ async def main(
 
 
 if __name__ == '__main__':
-    # pylint: disable=no-value-for-parameter
     main()

@@ -1,7 +1,8 @@
 import asyncio
 from collections import defaultdict
+from collections.abc import Iterable
 from datetime import date
-from typing import Any, Iterable
+from typing import Any
 
 from dateutil.relativedelta import relativedelta
 
@@ -283,7 +284,7 @@ class SampleTable(DbBase):
         """
         Create a new sample, and add it to database
         """
-        if not external_ids or external_ids.get(PRIMARY_EXTERNAL_ORG, None) is None:
+        if not external_ids or external_ids.get(PRIMARY_EXTERNAL_ORG) is None:
             raise ValueError('Sample must have primary external_id')
 
         audit_log_id = await self.audit_log_id()
@@ -440,7 +441,7 @@ class SampleTable(DbBase):
             self.get_sample_by_id(id_merge),
         )
 
-        def list_merge(l1: Any, l2: Any) -> list:
+        def list_merge(l1: Any, l2: Any) -> list:  # noqa: PLR0911
             if l1 is None:
                 return l2
             if l2 is None:
@@ -545,7 +546,7 @@ class SampleTable(DbBase):
         audit_log_id = await self.audit_log_id()
         values = [
             {'id': i, 'participant_id': pid, 'audit_log_id': audit_log_id}
-            for i, pid in zip(ids, participant_ids)
+            for i, pid in zip(ids, participant_ids, strict=False)
         ]
         await self.connection.execute_many(_query, values)
 
@@ -734,13 +735,13 @@ class SampleTable(DbBase):
             accumulated_sample_count[proj] = (
                 accumulated_sample_count.get(proj, 0) + r['count']
             )
-            result[proj][date.fromisoformat(f"{r['year']}-{r['month']:02d}-01")] = (
+            result[proj][date.fromisoformat(f'{r["year"]}-{r["month"]:02d}-01')] = (
                 accumulated_sample_count[proj]
             )
 
         # append all the months up to the current month
         this_month = date.today().replace(day=1)
-        for proj, month_counts in result.items():
+        for proj, month_counts in result.items():  # noqa: B007
             # in case there is no previous months available, then skip
             if not month_counts:
                 continue

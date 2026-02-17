@@ -1,4 +1,3 @@
-# pylint: disable=invalid-name,dangerous-default-value
 import codecs
 import csv
 import io
@@ -22,6 +21,7 @@ from db.python.tables.family import FamilyFilter
 from models.models.family import Family
 from models.models.project import FullWriteAccessRoles, ReadAccessRoles
 from models.utils.sample_id_format import sample_id_transform_to_raw_list
+
 
 router = APIRouter(prefix='/family', tags=['family'])
 

@@ -1,4 +1,3 @@
-# pylint: disable=too-many-instance-attributes
 import dataclasses
 import datetime
 from typing import Any
@@ -302,7 +301,7 @@ class CohortTable(DbBase):
 
         query = f"""
             UPDATE cohort
-            SET {', '.join(f"{k} = :{k}" for k, v in query_params.items() if v is not None)}
+            SET {', '.join(f'{k} = :{k}' for k, v in query_params.items() if v is not None)}
             WHERE id = :cohort_id
         """
         query_params['cohort_id'] = cohort_id
@@ -349,7 +348,7 @@ def _custom_matches_filter(
         return False
     if filter_.in_ is not None and status not in filter_.in_:
         return False
-    if filter_.nin is not None and status in filter_.nin:
+    if filter_.nin is not None and status in filter_.nin:  # noqa: SIM103
         return False
 
     return True

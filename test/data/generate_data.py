@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# pylint: disable=too-many-locals,unsubscriptable-object
 import argparse
 import asyncio
 import datetime
@@ -23,6 +22,7 @@ from metamist.model.analysis import Analysis
 from metamist.model.analysis_status import AnalysisStatus
 from metamist.models import AssayUpsert, SampleUpsert, SequencingGroupUpsert
 from metamist.parser.generic_parser import chunk
+
 
 PRIMARY_EXTERNAL_ORG = ''
 
@@ -94,12 +94,12 @@ async def main(
             ],
         )
 
-    with open(ped_path, encoding='utf-8') as f:
+    with open(ped_path, encoding='utf-8') as f:  # noqa: PTH123
         # skip the first line
         _ = f.readline()
         participant_eids = [line.split('\t')[1] for line in f]
 
-    with open(ped_path) as f:
+    with open(ped_path) as f:  # noqa: PTH123
         await FamilyApi().import_pedigree_async(
             project=project, file=f, has_header=True, create_missing_participants=True
         )
@@ -187,7 +187,7 @@ async def main(
                     )
 
     response = await sapi.upsert_samples_async(project, samples)
-    pprint(response)
+    pprint(response)  # noqa: T203
 
     sgid_response = await query_async(QUERY_SG_ID, {'project': project})
     sequencing_group_ids = [

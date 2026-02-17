@@ -1,4 +1,3 @@
-# pylint: disable=no-value-for-parameter,redefined-builtin
 # ^ Do this because of the loader decorator
 import copy
 import dataclasses
@@ -310,7 +309,7 @@ async def load_sequencing_group_counts_by_month(
     sgt = SequencingGroupTable(connection)
     counts_by_month = await sgt.get_sequencing_group_counts_by_month(ids)
 
-    return [counts_by_month[id] for id in ids]
+    return [counts_by_month[id] for id in ids]  # noqa: A001
 
 
 @connected_data_loader(LoaderKeys.SAMPLES_FOR_IDS)
@@ -546,7 +545,8 @@ async def load_family_participants_for_families(
 async def load_family_participants_for_participants(
     participant_ids: list[int], connection: Connection
 ) -> list[list[PedRowInternal]]:
-    """data loader for family participants for participants
+    """
+    data loader for family participants for participants
 
     Args:
         participant_ids (list[int]): list of internal participant ids
@@ -657,7 +657,7 @@ class GraphQLContext(TypedDict):
 
 
 async def get_context(
-    request: Request,  # pylint: disable=unused-argument
+    request: Request,  # noqa: ARG001
     connection: Connection = get_projectless_db_connection,
 ) -> GraphQLContext:
     """Get loaders / cache context for strawberyy GraphQL"""

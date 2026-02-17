@@ -15,6 +15,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 
+
 URL = 'https://metamist-extract.popgen.rocks'
 TYPE = 'NAME_OF_EXTERNAL_PARTY/v1'
 
@@ -43,7 +44,7 @@ def make_request(body: dict | list):
     session.mount('https://', HTTPAdapter(max_retries=retry_strategy))
 
     resp = session.post(
-        os.path.join(URL, TYPE),
+        os.path.join(URL, TYPE),  # noqa: PTH118
         json=body,
         headers={'Authorization': f'Bearer {auth_token}'},
         timeout=30,

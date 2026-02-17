@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument
 import logging
-from typing import List
 
 import click
 
@@ -11,6 +9,7 @@ from metamist.parser.generic_parser import (
     ParsedSample,
     ParsedSequencingGroup,
 )
+
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -39,7 +38,7 @@ class OntParser(GenericMetadataParser):
 
     def __init__(
         self,
-        search_locations: List[str],
+        search_locations: list[str],
         project: str,
         default_sample_type='blood',
         default_sequencing=DefaultSequencing(
@@ -90,7 +89,7 @@ class OntParser(GenericMetadataParser):
         return fns
 
     @staticmethod
-    def parse_fastqs_structure(fastqs) -> List[List[str]]:
+    def parse_fastqs_structure(fastqs) -> list[list[str]]:
         """
         In ONT, there is no pairs of fastqs as we don't
         have to read forwards and backwards :D
@@ -160,7 +159,7 @@ class OntParser(GenericMetadataParser):
 @run_as_sync
 async def main(
     manifests,
-    search_path: List[str],
+    search_path: list[str],
     project: str,
     default_sample_type='blood',
     default_sequencing_type='genome',
@@ -201,5 +200,4 @@ async def main(
 
 
 if __name__ == '__main__':
-    # pylint: disable=no-value-for-parameter
     main()

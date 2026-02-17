@@ -36,6 +36,6 @@ def luhn_compute(n: int, offset: int = 0):
     2
     """
     m = [int(d) for d in reversed(str(n))]
-    result = sum(m) + sum(d + (d >= 5) for d in m[::2])
+    result = sum(m) + sum(d + (d >= 5) for d in m[::2])  # noqa: PLR2004
     checksum = ((-result % 10) + offset) % 10
     return checksum

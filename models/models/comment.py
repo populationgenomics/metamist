@@ -4,6 +4,7 @@ from typing import Any
 
 from models.base import SMBase
 
+
 CommentStatus = StrEnum(
     'CommentStatus',
     ['active', 'deleted'],

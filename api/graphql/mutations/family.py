@@ -1,15 +1,14 @@
-# pylint: disable=redefined-builtin, import-outside-toplevel
-
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
-from strawberry.types import Info
 from strawberry.scalars import JSON
+from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
 from db.python.layers.comment import CommentLayer
 from db.python.layers.family import FamilyLayer
 from models.models.comment import CommentEntityType
+
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLComment, GraphQLFamily
@@ -39,7 +38,7 @@ class FamilyMutations:
     ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
         """Add a comment to a family"""
         # Import needed here to avoid circular import
-        from api.graphql.schema import GraphQLComment
+        from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
         connection = info.context['connection']
         cl = CommentLayer(connection)
@@ -55,7 +54,7 @@ class FamilyMutations:
         info: Info,
     ) -> Annotated['GraphQLFamily', strawberry.lazy('api.graphql.schema')]:
         """Update information for a single family"""
-        from api.graphql.schema import GraphQLFamily
+        from api.graphql.schema import GraphQLFamily  # noqa: PLC0415
 
         connection = info.context['connection']
         flayer = FamilyLayer(connection)

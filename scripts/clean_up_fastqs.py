@@ -196,4 +196,4 @@ This script cleans up the FASTQ sequences and metadata within GCS and Metamist.
 #
 #
 # if __name__ == '__main__':
-#     main()  # pylint: disable=E1120
+#     main()

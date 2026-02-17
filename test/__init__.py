@@ -1,5 +1,3 @@
-# pylint: disable=unused-argument
-
 """
 Includes unittest specific implementation to create a TestDatabaseContainer (singleton instance)
 before running any tests (and removed at the end).
@@ -14,17 +12,17 @@ import unittest
 from test.testdb_container import TestDatabaseContainer
 
 
-def startTestRun(self):
+def startTestRun(self):  # noqa: ARG001, N802
     """Called once before any tests are executed."""
     db_container = TestDatabaseContainer()
     db_container.start()
 
 
-def stopTestRun(self):
+def stopTestRun(self):  # noqa: ARG001, N802
     """Called once after all tests are executed."""
     db_container = TestDatabaseContainer()
     db_container.teardown()
 
 
-setattr(unittest.TestResult, 'startTestRun', startTestRun)
-setattr(unittest.TestResult, 'stopTestRun', stopTestRun)
+unittest.TestResult.startTestRun = startTestRun  # type: ignore [method-assign]
+unittest.TestResult.stopTestRun = stopTestRun  # type: ignore [method-assign]

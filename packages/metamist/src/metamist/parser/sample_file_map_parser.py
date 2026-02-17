@@ -6,6 +6,7 @@ import click
 from metamist.parser.generic_metadata_parser import GenericMetadataParser, run_as_sync
 from metamist.parser.generic_parser import DefaultSequencing, SingleRow
 
+
 PARTICIPANT_COL_NAME = 'individual_id'
 SAMPLE_ID_COL_NAME = 'sample_id'
 READS_COL_NAME = 'filenames'
@@ -114,7 +115,7 @@ logger.setLevel(logging.INFO)
 class SampleFileMapParser(GenericMetadataParser):
     """Parser for SampleFileMap"""
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(
         self,
         search_locations: list[str],
         project: str,
@@ -219,7 +220,7 @@ class SampleFileMapParser(GenericMetadataParser):
 @click.option('--verbose', '-v', is_flag=True, help='Verbose output')
 @click.argument('manifests', nargs=-1)
 @run_as_sync
-async def main(  # pylint: disable=too-many-arguments
+async def main(  # noqa: PLR0913
     manifests,
     search_path: list[str],
     project,
@@ -275,5 +276,4 @@ async def main(  # pylint: disable=too-many-arguments
 
 
 if __name__ == '__main__':
-    # pylint: disable=no-value-for-parameter
     main()

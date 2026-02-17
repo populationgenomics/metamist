@@ -2,7 +2,6 @@ import csv
 import logging
 from collections import defaultdict
 from io import StringIO
-from typing import Dict, List
 
 import click
 from google.cloud import storage
@@ -13,6 +12,7 @@ from metamist.models import (
     ParticipantUpsert,
     SampleUpsert,
 )
+
 
 SAMPLE_QUERY = gql(
     """
@@ -58,7 +58,7 @@ PARTICIPANT_QUERY = gql(
 papi = ParticipantApi()
 
 
-def map_sample_eid_to_sample_data(data: Dict[str, list]):
+def map_sample_eid_to_sample_data(data: dict[str, list]):
     """Map sample external ID to sample data"""
     return {sample['externalId']: sample for sample in data['sample']}
 
@@ -111,7 +111,7 @@ def main(
     sample_meta: str,
     sample_external_id_column: str,
     external_org_name: str | None = None,
-):  # pylint: disable=too-many-locals
+):
     """Upsert participants to metamist"""
     # Query metamist
     project = bucket.split('-')[1]  # project name derived from bucket name
@@ -135,7 +135,7 @@ def main(
     sample_data_list = list(csv.DictReader(sample_data_io, delimiter='\t'))
 
     # Count of samples for each participant
-    participant_sample_count: Dict[str, int] = defaultdict(int)
+    participant_sample_count: dict[str, int] = defaultdict(int)
     metadata_map = {}
     for meta_row in participant_data_list:
         metadata_map[meta_row['sampleID']] = meta_row
@@ -144,7 +144,7 @@ def main(
 
     # Map peid to a list of sample upsert objects
     participant_sex_map = {}
-    participant_sample_map: Dict[str, List[SampleUpsert]] = defaultdict(list)
+    participant_sample_map: dict[str, list[SampleUpsert]] = defaultdict(list)
 
     for name_row in sample_data_list:
         # Get the external ID
@@ -184,5 +184,4 @@ def main(
 
 
 if __name__ == '__main__':
-    # pylint: disable=no-value-for-parameter
     main()

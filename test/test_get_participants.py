@@ -1,7 +1,6 @@
-from test.testbase import DbIsolatedTest, run_as_sync
-
 from db.python.layers.participant import ParticipantLayer
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantUpsertInternal
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 class TestParticipant(DbIsolatedTest):

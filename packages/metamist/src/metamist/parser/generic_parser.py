@@ -1,4 +1,3 @@
-# pylint: disable=too-many-lines,too-many-instance-attributes,too-many-locals,unused-argument,assignment-from-none,invalid-name,ungrouped-imports
 import asyncio
 import csv
 import dataclasses
@@ -8,17 +7,13 @@ import os
 import re
 from abc import abstractmethod
 from collections import defaultdict
+from collections.abc import Coroutine, Hashable, Iterable, Iterator, Sequence
 from functools import wraps
 from io import StringIO
+from re import Match
 from typing import (
     Any,
-    Coroutine,
-    Hashable,
-    Iterable,
-    Iterator,
     Literal,
-    Match,
-    Sequence,
     TypeVar,
 )
 
@@ -36,6 +31,7 @@ from metamist.models import (
     SequencingGroupUpsert,
 )
 from metamist.parser.cloudhelper import CloudHelper, group_by
+
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__file__)
@@ -470,10 +466,10 @@ def run_as_sync(f):
     return wrapper
 
 
-class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too-many-arguments
+class GenericParser(CloudHelper):
     """Parser for ingesting rows of metadata"""
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(  # noqa: PLR0913
         self,
         path_prefix: str | None,
         search_paths: list[str],
@@ -530,7 +526,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
         - Includes gs://{bucket} if relevant
         - Includes path_prefix decided early on
         """
-        if filename.startswith('gs://') or filename.startswith('/'):
+        if filename.startswith('gs://') or filename.startswith('/'):  # noqa: PIE810
             return filename
 
         if not self.path_prefix:
@@ -542,7 +538,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
                 )
             return fn
 
-        return os.path.join(self.path_prefix or '', filename)
+        return os.path.join(self.path_prefix or '', filename)  # noqa: PTH118
 
     # endregion
 
@@ -568,7 +564,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
             dry_run=dry_run,
         )
 
-    async def parse_manifest(  # pylint: disable=too-many-branches
+    async def parse_manifest(
         self, file_pointer, delimiter=',', confirm=False, dry_run=False
     ) -> Any:
         """
@@ -606,7 +602,9 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
                     *[self.group_samples(p, p.rows) for p in pchunk]
                 )
 
-                for participant, psamples in zip(pchunk, samples_for_chunk):
+                for participant, psamples in zip(
+                    pchunk, samples_for_chunk, strict=False
+                ):
                     participant.samples = psamples
                     samples.extend(psamples)
 
@@ -621,7 +619,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
                 *map(self.get_sample_sequencing_groups, schunk)
             )
 
-            for sample, seqgroups in zip(schunk, seq_groups_for_chunk):
+            for sample, seqgroups in zip(schunk, seq_groups_for_chunk, strict=False):
                 sample.sequencing_groups = seqgroups
                 sequencing_groups.extend(seqgroups)
 
@@ -635,7 +633,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
             )
 
             for sequencing_group, chunked_assays, analyses in zip(
-                sgchunk, assays_for_chunk, analyses_for_chunk
+                sgchunk, assays_for_chunk, analyses_for_chunk, strict=False
             ):
                 if not chunked_assays:
                     # mark for removal
@@ -796,7 +794,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
                 details.append(sg_details)
 
         headers = ['Participant', 'Sample', 'Sequencing Type', 'Assays']
-        table = list(list(detail.values()) for detail in details)
+        table = list(list(detail.values()) for detail in details)  # noqa: C400
 
         print(tabulate(table, headers=headers, tablefmt='grid'))
 
@@ -1023,7 +1021,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
         Get primary external sample ID from row, used to group rows together
         """
 
-    def get_sample_external_ids(self, row: GroupedRow) -> dict[str, str]:
+    def get_sample_external_ids(self, row: GroupedRow) -> dict[str, str]:  # noqa: ARG002
         """
         Get a dictionary of {name: ex_id} from a list of rows
         You should NOT return the primary sample ID here anywhere
@@ -1032,7 +1030,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
         return {}
 
     # @abstractmethod
-    def get_assay_id(self, row: GroupedRow) -> dict[str, str] | None:
+    def get_assay_id(self, row: GroupedRow) -> dict[str, str] | None:  # noqa: ARG002
         """Get external sequence ID from row"""
         return None
 
@@ -1040,7 +1038,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
     def get_primary_participant_id(self, row: SingleRow) -> str | None:
         """Get external participant ID from row"""
 
-    def get_participant_external_ids(self, row: GroupedRow) -> dict[str, str]:
+    def get_participant_external_ids(self, row: GroupedRow) -> dict[str, str]:  # noqa: ARG002
         """
         Get a dictionary of {name: ex_id} from a list of rows
         You should NOT return the primary participant ID here anywhere
@@ -1048,19 +1046,19 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
 
         return {}
 
-    def get_reported_sex(self, row: GroupedRow) -> int | None:
+    def get_reported_sex(self, row: GroupedRow) -> int | None:  # noqa: ARG002
         """Get reported sex from grouped row"""
         return None
 
-    def get_reported_gender(self, row: GroupedRow) -> str | None:
+    def get_reported_gender(self, row: GroupedRow) -> str | None:  # noqa: ARG002
         """Get reported gender from grouped row"""
         return None
 
-    def get_karyotype(self, row: GroupedRow) -> str | None:
+    def get_karyotype(self, row: GroupedRow) -> str | None:  # noqa: ARG002
         """Get karyotype from grouped row"""
         return None
 
-    def has_participants(self, rows: list[SingleRow]) -> bool:
+    def has_participants(self, rows: list[SingleRow]) -> bool:  # noqa: ARG002
         """Returns True if the file has a Participants column"""
         return False
 
@@ -1094,7 +1092,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
 
         return participant_groups
 
-    async def get_participant_meta_from_group(self, rows: GroupedRow) -> dict:
+    async def get_participant_meta_from_group(self, rows: GroupedRow) -> dict:  # noqa: ARG002
         """From a list of rows, get any relevant participant meta"""
         return {}
 
@@ -1123,7 +1121,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
 
         return samples
 
-    async def get_sample_meta_from_group(self, rows: GroupedRow) -> dict:
+    async def get_sample_meta_from_group(self, rows: GroupedRow) -> dict:  # noqa: ARG002
         """From a list of rows, get any relevant sample meta"""
         return {}
 
@@ -1176,7 +1174,8 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
         return sequencing_groups
 
     async def get_sequencing_group_meta(
-        self, sequencing_group: ParsedSequencingGroup
+        self,
+        sequencing_group: ParsedSequencingGroup,  # noqa: ARG002
     ) -> dict:
         """
         From a list of rows, get any relevant sequencing group meta
@@ -1184,7 +1183,8 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
         return {}
 
     async def get_analyses_from_sequencing_group(
-        self, sequencing_group: ParsedSequencingGroup
+        self,
+        sequencing_group: ParsedSequencingGroup,  # noqa: ARG002
     ) -> list[ParsedAnalysis]:
         """
         An override that allows a subclass to return a list of analyses
@@ -1226,7 +1226,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
                     'sequencing_technology',
                     'sequencing_platform',
                 )
-                keys = [k for k in assay.meta.keys() if k not in keys_to_avoid]
+                keys = [k for k in assay.meta.keys() if k not in keys_to_avoid]  # noqa: SIM118
             else:
                 continue
             for key in keys:
@@ -1234,11 +1234,11 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
                     meta[key] = assay.meta[key]
         return meta
 
-    def get_sample_type(self, row: GroupedRow) -> str:
+    def get_sample_type(self, row: GroupedRow) -> str:  # noqa: ARG002
         """Get sample type from row"""
         return self.default_sample_type
 
-    def get_sequencing_group_id(self, row: SingleRow) -> str | None:
+    def get_sequencing_group_id(self, row: SingleRow) -> str | None:  # noqa: ARG002
         """
         External sequencing_group identifier. Odds are you don't want this.
             Unless you have a "library ID" or something similar"
@@ -1248,39 +1248,39 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
         """
         return None
 
-    def get_sequencing_type(self, row: SingleRow) -> str:
+    def get_sequencing_type(self, row: SingleRow) -> str:  # noqa: ARG002
         """Get sequence types from row"""
         return self.default_sequencing.seq_type
 
-    def get_sequencing_technology(self, row: SingleRow) -> str:
+    def get_sequencing_technology(self, row: SingleRow) -> str:  # noqa: ARG002
         """Get sequencing technology from row"""
         return self.default_sequencing.technology
 
-    def get_sequencing_platform(self, row: SingleRow) -> str | None:
+    def get_sequencing_platform(self, row: SingleRow) -> str | None:  # noqa: ARG002
         """Get sequencing platform from row"""
         return self.default_sequencing.platform
 
-    def get_sequencing_facility(self, row: SingleRow) -> str | None:
+    def get_sequencing_facility(self, row: SingleRow) -> str | None:  # noqa: ARG002
         """Get sequencing facility from row"""
         return self.default_sequencing.facility
 
-    def get_sequencing_library(self, row: SingleRow) -> str | None:
+    def get_sequencing_library(self, row: SingleRow) -> str | None:  # noqa: ARG002
         """Get library type from row"""
         return self.default_sequencing.library
 
-    def get_read_end_type(self, row: SingleRow) -> str | None:
+    def get_read_end_type(self, row: SingleRow) -> str | None:  # noqa: ARG002
         """Get read end type from row"""
         return self.default_read_end_type
 
-    def get_read_length(self, row: SingleRow) -> str | None:
+    def get_read_length(self, row: SingleRow) -> str | None:  # noqa: ARG002
         """Get read length from row"""
         return self.default_read_length
 
-    def get_analysis_type(self, sample_id: str, row: GroupedRow) -> str:
+    def get_analysis_type(self, sample_id: str, row: GroupedRow) -> str:  # noqa: ARG002
         """Get analysis type from row"""
         return str(self.default_analysis_type)
 
-    def get_analysis_status(self, sample_id: str, row: GroupedRow) -> AnalysisStatus:
+    def get_analysis_status(self, sample_id: str, row: GroupedRow) -> AnalysisStatus:  # noqa: ARG002
         """Get analysis status from row"""
         return AnalysisStatus(self.default_analysis_status)
 
@@ -1289,10 +1289,10 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
     ):
         """Pulls external sequence IDs from participant map"""
         external_sequence_ids: list[str] = []
-        for participant in participant_map:
+        for participant in participant_map:  # noqa: PLC0206
             for sample in participant_map[participant]:
                 for sequence in participant_map[participant][sample]:
-                    external_sequence_ids.append((sequence.get('Sequence ID')))
+                    external_sequence_ids.append(sequence.get('Sequence ID'))
 
         return external_sequence_ids
 
@@ -1300,7 +1300,8 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
     def get_existing_assays(
         assays: list[dict[str, Any]], external_sequence_ids: list[str]
     ):
-        """Accounts for external_sequence_ids when determining which assays
+        """
+        Accounts for external_sequence_ids when determining which assays
         need to be updated vs inserted"""
 
         existing_assays: list[dict[str, Any]] = []
@@ -1360,7 +1361,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
         2. parsed type (fastq, cram, bam)
         """
         _reads: list[str]
-        if not isinstance(reads, list):
+        if not isinstance(reads, list):  # noqa: SIM108
             _reads = [reads]
         else:
             _reads = reads
@@ -1373,7 +1374,9 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
                 'Expected length of reads to match length of provided checksums'
             )
 
-        read_to_checksum: dict[str, str | None] = dict(zip(_reads, checksums))
+        read_to_checksum: dict[str, str | None] = dict(
+            zip(_reads, checksums, strict=False)
+        )
 
         file_by_type: dict[SUPPORTED_FILE_TYPE, dict[str, list]] = defaultdict(
             lambda: defaultdict(list)
@@ -1536,7 +1539,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
         sorted_fastqs = sorted(fastqs)
 
         r_matches: dict[str, tuple[str, Match[str] | None]] = {
-            r: (os.path.basename(r), rmatch.search(os.path.basename(r)))
+            r: (os.path.basename(r), rmatch.search(os.path.basename(r)))  # noqa: PTH119
             for r in sorted_fastqs
         }
         no_r_match = [r for r, (_, matched) in r_matches.items() if matched is None]
@@ -1563,14 +1566,14 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
 
             fastq_groups[tuple(bits_to_group_on)].append(full_filename)
 
-        invalid_fastq_groups = [grp for grp in fastq_groups.values() if len(grp) != 2]
+        invalid_fastq_groups = [grp for grp in fastq_groups.values() if len(grp) != 2]  # noqa: PLR2004
         if invalid_fastq_groups:
             # TODO: implement handling for single-ended reads
             raise ValueError(f'Invalid fastq group {invalid_fastq_groups}')
 
         sorted_groups = sorted(
             (sorted(fastqgroup) for fastqgroup in fastq_groups.values()),
-            key=lambda el: os.path.basename(el[0]),
+            key=lambda el: os.path.basename(el[0]),  # noqa: PTH119
         )
 
         return sorted_groups
@@ -1600,7 +1603,7 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
 
         d = {
             'location': self.file_path(filename),
-            'basename': os.path.basename(filename),
+            'basename': os.path.basename(filename),  # noqa: PTH119
             'class': 'File',
             'checksum': _checksum,
             'size': file_size,
@@ -1646,7 +1649,6 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
         if relevant_delimiter:
             return relevant_delimiter
 
-        # pylint: disable=no-member
         with AnyPath(filename).open('r') as f:
             first_line = f.readline()
             delimiter = csv.Sniffer().sniff(first_line).delimiter
@@ -1660,7 +1662,8 @@ class GenericParser(CloudHelper):  # pylint: disable=too-many-public-methods,too
 
 
 def group_fastqs_by_common_filename_components(d: dict) -> dict:
-    """Groups key-value pairs by common prefix components and suffix components
+    """
+    Groups key-value pairs by common prefix components and suffix components
     Where the key is the fastq filename and the value is a tuple of the filename split at R1/R2/1/2
 
     Returns a dict with grouping term constructed from extracted prefix+suffix identifiers as key
@@ -1697,7 +1700,7 @@ def group_fastqs_by_common_filename_components(d: dict) -> dict:
     fastq_groups = defaultdict(list)
     for suffixes, matches in grouping.items():
         for match in matches:
-            common_components = os.path.basename(match[1][0]) + suffixes[1]
+            common_components = os.path.basename(match[1][0]) + suffixes[1]  # noqa: PTH119
             fastq_groups[common_components].append(match[0])
 
     return fastq_groups

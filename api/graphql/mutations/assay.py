@@ -1,5 +1,3 @@
-# pylint: disable=redefined-builtin, import-outside-toplevel
-
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
@@ -11,8 +9,9 @@ from db.python.layers.comment import CommentLayer
 from models.models.assay import AssayUpsert
 from models.models.comment import CommentEntityType
 
+
 if TYPE_CHECKING:
-    from api.graphql.schema import GraphQLComment, GraphQLAssay
+    from api.graphql.schema import GraphQLAssay, GraphQLComment
 
 
 @strawberry.input  # type: ignore [misc]
@@ -39,7 +38,7 @@ class AssayMutations:
     ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
         """Add a comment to a assay"""
         # Import needed here to avoid circular import
-        from api.graphql.schema import GraphQLComment
+        from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
         connection = info.context['connection']
         cl = CommentLayer(connection)
@@ -53,7 +52,7 @@ class AssayMutations:
         self, assay: AssayUpsertInput, info: Info
     ) -> Annotated['GraphQLAssay', strawberry.lazy('api.graphql.schema')]:
         """Create new assay, attached to a sample"""
-        from api.graphql.schema import GraphQLAssay
+        from api.graphql.schema import GraphQLAssay  # noqa: PLC0415
 
         connection = info.context['connection']
         alayer = AssayLayer(connection)
@@ -70,7 +69,7 @@ class AssayMutations:
         info: Info,
     ) -> Annotated['GraphQLAssay', strawberry.lazy('api.graphql.schema')]:
         """Update assay for ID"""
-        from api.graphql.schema import GraphQLAssay
+        from api.graphql.schema import GraphQLAssay  # noqa: PLC0415
 
         if not assay.id:
             raise ValueError('Assay must have an ID to update')

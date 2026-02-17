@@ -1,6 +1,6 @@
 import dataclasses
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 from db.python.filters import GenericFilter, GenericFilterModel, GenericMetaFilter
 from db.python.tables.base import DbBase
@@ -10,7 +10,8 @@ from models.models import PRIMARY_EXTERNAL_ORG, FamilyInternal, ProjectId
 
 @dataclasses.dataclass
 class FamilyFilter(GenericFilterModel):
-    """Filter mode for querying Families
+    """
+    Filter mode for querying Families
 
     Args:
         GenericFilterModel (_type_): _description_
@@ -32,7 +33,7 @@ class FamilyTable(DbBase):
 
     table_name = 'family'
 
-    async def get_projects_by_family_ids(self, family_ids: List[int]) -> Set[ProjectId]:
+    async def get_projects_by_family_ids(self, family_ids: list[int]) -> set[ProjectId]:
         """Get project IDs for sampleIds (mostly for checking auth)"""
         _query = """
             SELECT project FROM family
@@ -189,7 +190,7 @@ class FamilyTable(DbBase):
         """Update values for a family"""
         audit_log_id = await self.audit_log_id()
 
-        values: Dict[str, Any] = {'audit_log_id': audit_log_id}
+        values: dict[str, Any] = {'audit_log_id': audit_log_id}
         updaters = ['audit_log_id = :audit_log_id']
         if description:
             values['description'] = description
@@ -261,8 +262,8 @@ class FamilyTable(DbBase):
     async def create_family(
         self,
         external_ids: dict[str, str],
-        description: Optional[str],
-        coded_phenotype: Optional[str],
+        description: str | None,
+        coded_phenotype: str | None,
         meta: dict[str, Any] | None = None,
         project: ProjectId | None = None,
     ) -> int:
@@ -308,11 +309,11 @@ class FamilyTable(DbBase):
 
     async def insert_or_update_multiple_families(
         self,
-        external_ids: List[str],
-        descriptions: List[str],
-        coded_phenotypes: List[Optional[str]],
+        external_ids: list[str],
+        descriptions: list[str],
+        coded_phenotypes: list[str | None],
         project: ProjectId | None = None,
-        meta: List[dict[str, Any] | None] | None = None,
+        meta: list[dict[str, Any] | None] | None = None,
     ):
         """
         Upsert several families.
@@ -324,7 +325,7 @@ class FamilyTable(DbBase):
         meta_list = meta if meta is not None else [None] * len(external_ids)
 
         for eid, descr, cph, mt in zip(
-            external_ids, descriptions, coded_phenotypes, meta_list
+            external_ids, descriptions, coded_phenotypes, meta_list, strict=False
         ):
             existing_id = await self.connection.fetch_val(
                 """
@@ -384,8 +385,8 @@ class FamilyTable(DbBase):
         return True
 
     async def get_id_map_by_external_ids(
-        self, family_ids: List[str], allow_missing=False, project: Optional[int] = None
-    ) -> Dict:
+        self, family_ids: list[str], allow_missing=False, project: int | None = None
+    ) -> dict:
         """Get map of {external_id: internal_id} for a family"""
 
         if not family_ids:
@@ -415,7 +416,7 @@ class FamilyTable(DbBase):
         return id_map
 
     async def get_id_map_by_internal_ids(
-        self, family_ids: List[int], allow_missing=False
+        self, family_ids: list[int], allow_missing=False
     ):
         """Get map of {internal_id: primary_external_id} for a family"""
         if len(family_ids) == 0:

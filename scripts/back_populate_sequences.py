@@ -18,6 +18,7 @@ from metamist.apis import AssayApi
 from metamist.model.assay_query_criteria import AssayQueryCriteria
 from metamist.models import AssayUpsert
 
+
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
@@ -79,5 +80,4 @@ def main(project: str):
 
 
 if __name__ == '__main__':
-    # pylint: disable=no-value-for-parameter
     main()

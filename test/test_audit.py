@@ -1,49 +1,49 @@
-# noqa: B006 pylint: disable=C0302, E1101
-
-from datetime import datetime
 import unittest
 import unittest.mock
+from datetime import datetime
 from io import StringIO
+from types import SimpleNamespace
+
+from cpg_utils import to_path
 from metamist.audit.adapters import StorageClient
-from metamist.audit.cli.upload_bucket_audit import AuditOrchestrator
-from metamist.audit.cli.review_audit_results import review_rows
 from metamist.audit.cli.delete_from_audit_results import delete_files_from_report
-from metamist.audit.data_access import MetamistDataAccess, GCSDataAccess
+from metamist.audit.cli.review_audit_results import review_rows
+from metamist.audit.cli.upload_bucket_audit import AuditOrchestrator
+from metamist.audit.data_access import GCSDataAccess, MetamistDataAccess
+from metamist.audit.models import (
+    Analysis,
+    Assay,
+    AuditConfig,
+    AuditReportEntry,
+    AuditResult,
+    FileMetadata,
+    FileType,
+    SequencingGroup,
+)
 from metamist.audit.services import (
     AuditAnalyzer,
+    BucketAuditLogger,
     FileMatchingService,
     Reporter,
-    BucketAuditLogger,
 )
-from metamist.audit.models import (
-    SequencingGroup,
-    Assay,
-    Analysis,
-    AuditConfig,
-    FileType,
-    AuditResult,
-    AuditReportEntry,
-    FileMetadata,
-)
+
 from test.data.audit_fixtures.audit_test import (
+    ALL_SG_ANALYSES_RESPONSE,
+    ALL_SG_ASSAYS_RESPONSE,
+    ANALYSES,
     ANALYSES_WITH_MALFORMED_TIMESTAMPS_GQL_RESPONSE,
-    SG_ASSAYS_RESPONSE_WITH_SECONDARY_FILES,
     ENUMS_QUERY_RESULT,
     SEQUENCING_GROUPS,
+    SG_ASSAYS_RESPONSE_WITH_SECONDARY_FILES,
     SR_ILLUMINA_EXOME_SGS,
-    ANALYSES,
-    ALL_SG_ASSAYS_RESPONSE,
     SR_ILLUMINA_EXOME_SGS_ASSAYS_RESPONSE,
-    ALL_SG_ANALYSES_RESPONSE,
     SR_ILLUMINA_EXOME_SGS_CRAM_RESPONSE,
 )
-from test.data.audit_fixtures.bucket_files import UPLOAD_BUCKET_FILES, MAIN_BUCKET_FILES
+from test.data.audit_fixtures.bucket_files import MAIN_BUCKET_FILES, UPLOAD_BUCKET_FILES
 from test.testbase import run_as_sync
-from types import SimpleNamespace
-from cpg_utils import to_path
 
 
-class TestAudit(unittest.TestCase):  # pylint: disable=too-many-instance-attributes, too-many-public-methods
+class TestAudit(unittest.TestCase):
     """Test the audit module"""
 
     def setUp(self):
@@ -113,7 +113,7 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             sequencing_technologies=('short-read', 'long-read'),
             sequencing_platforms=('illumina', 'pacbio', 'ont'),
             analysis_types=('cram', 'vcf'),
-            file_types=tuple(list(FileType)),
+            file_types=tuple(list(FileType)),  # noqa: C414
         )
         result = await self.metamist_data_access.validate_metamist_enums(config=config)
         self.assertEqual(config, result)
@@ -135,7 +135,7 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
                     ),
                     sequencing_platforms=('illumina', 'pacbio', 'ont'),
                     analysis_types=('cram', 'vcf'),
-                    file_types=tuple(list(FileType)),
+                    file_types=tuple(list(FileType)),  # noqa: C414
                 )
             )
 
@@ -217,7 +217,9 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             },
             {  # Query 2 - a mutation query to create a new cohort
                 'cohort': {
-                    'createCohortFromCriteria': {'id': 'C01', 'name': 'Cohort 1'}
+                    'createCohortFromCriteria': {
+                        'createdCohort': {'id': 'C01', 'name': 'Cohort 1'}
+                    }
                 }
             },
         ]
@@ -500,7 +502,7 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
         self.file_matcher.find_original_analysis_files(analyses, MAIN_BUCKET_FILES)
 
         for analysis in analyses:
-            if analysis.id == 7:
+            if analysis.id == 7:  # noqa: PLR2004
                 self.assertIsNotNone(analysis.original_file)
 
     def test_find_uningested_files(self):
@@ -534,7 +536,7 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             sequencing_technologies=('short-read', 'long-read'),
             sequencing_platforms=('illumina', 'pacbio', 'ont'),
             analysis_types=('cram', 'vcf'),
-            file_types=tuple(list(FileType)),
+            file_types=tuple(list(FileType)),  # noqa: C414
             excluded_prefixes=('<EXCLUDED_PREFIX>',),
             results_folder='results_folder',
         )
@@ -572,7 +574,7 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             sequencing_technologies=('short-read', 'long-read'),
             sequencing_platforms=('illumina', 'pacbio', 'ont'),
             analysis_types=('cram', 'vcf'),
-            file_types=tuple(list(FileType)),
+            file_types=tuple(list(FileType)),  # noqa: C414
             excluded_prefixes=('<EXCLUDED_PREFIX>',),
         )
 
@@ -808,7 +810,7 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
             sequencing_technologies=('short-read', 'long-read'),
             sequencing_platforms=('illumina', 'pacbio', 'ont'),
             analysis_types=('cram', 'vcf'),
-            file_types=tuple(list(FileType)),
+            file_types=tuple(list(FileType)),  # noqa: C414
             excluded_prefixes=('<EXCLUDED_PREFIX>',),
         )
         with unittest.mock.patch.object(
@@ -1071,7 +1073,7 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
         # Mock to_path to return a mock object with exists() method
         mock_path = unittest.mock.MagicMock()
         mock_path.exists.return_value = True
-        with unittest.mock.patch(
+        with unittest.mock.patch(  # noqa: SIM117
             'metamist.audit.cli.delete_from_audit_results.to_path',
             return_value=mock_path,
         ):
