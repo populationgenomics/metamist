@@ -19,6 +19,7 @@ class CohortInternal(SMBase):
     template_id: int
     status: CohortStatus | None
 
+    #TODO piyumi: check to remove
     @staticmethod
     def from_db(d: dict, cohort_status: CohortStatus | None = None):
         """
@@ -95,6 +96,7 @@ class CohortTemplateInternal(SMBase):
 
     @staticmethod
     def from_db(d: dict):
+        # TODO piyumi: check to remove
         """
         Convert from db keys, mainly converting id to id_
         """
