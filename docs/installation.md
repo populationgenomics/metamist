@@ -51,6 +51,7 @@ docker run --name mariadb-p3307 -e MYSQL_ALLOW_EMPTY_PASSWORD=1 -p 3307:3306 -d 
 ```
 
 #### Note on OrbStack
+
 > If you do use OrbStack for the docker mariadb database, make sure that the following setting is enabled. OrbStack > Settings > System > Environment > Use admin privileges for enhanced features
 
 #### Setting up the database and permissions
