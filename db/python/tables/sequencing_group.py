@@ -206,7 +206,7 @@ class SequencingGroupTable(DbBase):
         cur = await self.connection.pg_connection.execute(query)
         rows = await cur.fetchall()
 
-        sgs = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
+        sgs = [SequencingGroupInternal(**r) for r in rows]
         projects = set(sg.project for sg in sgs if sg.project)
         return projects, sgs
 
@@ -330,7 +330,7 @@ class SequencingGroupTable(DbBase):
             projects.add(row['project'])
 
             if sid not in sg_map:
-                sg_map[sid] = SequencingGroupInternal.from_db(**row)
+                sg_map[sid] = SequencingGroupInternal(**row)
 
         analysis_map: dict[int, list[SequencingGroupInternal]] = {
             analysis_id: [sg_map.get(sgid) for sgid in sgids]
