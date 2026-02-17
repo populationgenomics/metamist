@@ -32,14 +32,9 @@ class ParticipantTable(DbBase):
 
     async def get_project_ids_for_participant_ids(self, participant_ids: list[int]):
         """Get project IDs for participant_ids (mostly for checking auth)"""
-        _query = """
-        SELECT project
-        FROM participant
-        WHERE id in :participant_ids
-        GROUP BY project"""
-        rows = await self.connection.fetch_all(
-            _query, {'participant_ids': participant_ids}
-        )
+        _query = t'SELECT project FROM participant WHERE id = ANY({participant_ids}) GROUP BY project'
+
+        rows = await (await self.connection.pg_connection.execute(_query)).fetchall()
         return set(r['project'] for r in rows)
 
     @staticmethod
@@ -522,18 +517,11 @@ RETURNING id
         if len(external_participant_ids) == 0:
             return {}
 
-        _query = """
-        SELECT external_id, participant_id AS id
-        FROM participant_external_id
-        WHERE external_id IN :external_ids AND project = :project
-        """
-        results = await self.connection.fetch_all(
-            _query,
-            {
-                'external_ids': external_participant_ids,
-                'project': project,
-            },
-        )
+        _query = t"""SELECT external_id, participant_id AS id FROM participant_external_id
+        WHERE external_id = ANY({external_participant_ids}) AND project = {project}"""
+
+        results = await (await self.connection.pg_connection.execute(_query)).fetchall()
+
         id_map = {r['external_id']: r['id'] for r in results}
 
         return id_map
@@ -545,18 +533,12 @@ RETURNING id
         if len(internal_participant_ids) == 0:
             return {}
 
-        _query = """
-        SELECT participant_id AS id, external_id
-        FROM participant_external_id
-        WHERE participant_id IN :ids AND name = :PRIMARY_EXTERNAL_ORG
+        _query = t"""SELECT participant_id AS id, external_id FROM participant_external_id
+        WHERE participant_id=ANY({internal_participant_ids}) AND name={PRIMARY_EXTERNAL_ORG}
         """
-        results = await self.connection.fetch_all(
-            _query,
-            {
-                'ids': internal_participant_ids,
-                'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG,
-            },
-        )
+
+        results = await (await self.connection.pg_connection.execute(_query)).fetchall()
+
         id_map: dict[int, str] = {r['id']: r['external_id'] for r in results}
 
         if not allow_missing and len(id_map) != len(internal_participant_ids):
