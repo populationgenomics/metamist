@@ -19,4 +19,4 @@ class AuditLogInternal(SMBase):
     on_behalf_of: str | None
     ar_guid: str | None
     comment: str | None
-    meta: dict | None
+    meta: dict | None = {}
