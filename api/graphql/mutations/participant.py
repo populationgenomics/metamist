@@ -113,7 +113,8 @@ class ParticipantMutations:
             )
             projects = list(projects)
 
-            assert len(projects) >= 1, 'Project not found or user does not have access'
+            if len(projects) < 1:
+                raise ValueError('Project not found or user does not have access')
             project_id = projects[0].id
 
             pt = ParticipantLayer(connection)

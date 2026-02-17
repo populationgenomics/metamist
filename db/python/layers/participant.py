@@ -3,6 +3,8 @@ from collections import defaultdict
 from enum import Enum
 from typing import Any
 
+from psycopg.pq import TransactionStatus
+
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers.base import BaseLayer
@@ -624,11 +626,9 @@ class ParticipantLayer(BaseLayer):
         open_transaction=True,
     ) -> ParticipantUpsertInternal:
         """Create a single participant"""
-        with_function = (
-            self.connection.pg_connection.transaction
-            if open_transaction
-            else NoOpAenter
-        )
+        conn = self.connection.pg_connection
+        in_transaction = conn.info.transaction_status == TransactionStatus.INTRANS
+        with_function = conn.transaction if not in_transaction else NoOpAenter
 
         async with with_function():
             if participant.id:
@@ -683,11 +683,9 @@ class ParticipantLayer(BaseLayer):
         open_transaction=True,
     ):
         """Batch upsert a list of participants with sequences"""
-        with_function = (
-            self.connection.pg_connection.transaction
-            if open_transaction
-            else NoOpAenter
-        )
+        conn = self.connection.pg_connection
+        in_transaction = conn.info.transaction_status == TransactionStatus.INTRANS
+        with_function = conn.transaction if not in_transaction else NoOpAenter
 
         async with with_function():
             # Create or update participants

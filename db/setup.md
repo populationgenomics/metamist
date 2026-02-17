@@ -1,5 +1,9 @@
 # Setup Postgres DB
 
+## Build and Run
+
+> docker compose up -d
+
 ## Build
 
 Build the database
@@ -9,7 +13,3 @@ Build the database
 
 Run detached (-d)
 > docker compose run -d postgres
-
-## Build and Run
-
-> docker compose up -d
