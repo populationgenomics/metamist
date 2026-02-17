@@ -93,6 +93,20 @@ def mock_date(monkeypatch):
         return mock_date
     return _mock_date
 
+@pytest.fixture
+def insert_historical_sg(connection: Connection):
+    async def _insert_historical_sg(sample_id: id, type: str, tech: str, period: tuple[date, date]):
+        query = t"""\
+            INSERT INTO sequencing_group_history 
+                (sample_id, type, technology, sys_period)
+            VALUES
+                ({sample_id}, {type}, {tech}, tstzrange({period[0].isoformat()}, {period[1].isoformat()}))
+        """
+        await connection.pg_connection.execute(query)
+    
+    return _insert_historical_sg
+        
+
 
 class TestSequencingGroup:
     """Test sequencing groups business logic"""
@@ -284,43 +298,78 @@ class TestSequencingGroup:
     async def test_query_with_creation_date(
         self,
         connection_with_project: Connection,
-        sequencing_group_model: SequencingGroupUpsertInternal,
+        test_sample: int,
     ):
         """Test fetching using a creation date filter"""
         sg_layer = SequencingGroupLayer(connection_with_project)
 
-        await sg_layer.upsert_sequencing_groups([sequencing_group_model])
+        # Insert a current sequencing group into the database with a pre-defined date that it is current from
+        current_date = date(2026, 1, 1)
+        current_query = t"""\
+            INSERT INTO sequencing_group
+                (sample_id, type, technology, archived, sys_period)
+            VALUES
+                ({test_sample}, 'genome', 'short-read', false, tstzrange({current_date.isoformat()}, null))
+        """
+        conn = connection_with_project.pg_connection
+        async with conn.transaction():
+            # Disable the trigger so that the sys_period isn't overwritten
+            await conn.execute('ALTER TABLE main.sequencing_group DISABLE TRIGGER versioning_trigger')
+            await conn.execute(current_query)
+            await conn.execute('ALTER TABLE main.sequencing_group ENABLE TRIGGER versioning_trigger')
 
-        # There's a race condition here -- don't run this near UTC midnight!
-        today = date.today()
-
-        # Query for sequencing group with creation date before today
+        # Query for sequencing group with creation date current_date
         sgs = await sg_layer.query(
-            SequencingGroupFilter(created_on=GenericFilter(lt=today))
+            SequencingGroupFilter(created_on=GenericFilter(eq=current_date))
+        )
+        assert len(sgs) == 1
+        sg_id = sgs[0].id
+
+        # Query for sequencing group with creation date before current_date
+        sgs = await sg_layer.query(
+            SequencingGroupFilter(created_on=GenericFilter(lt=current_date))
         )
         assert len(sgs) == 0
 
-        # Query for sequencing group with creation date today
+        # Query for sequencing group with creation date after current_date
         sgs = await sg_layer.query(
-            SequencingGroupFilter(created_on=GenericFilter(eq=today))
-        )
-        assert len(sgs) == 1
-
-        sgs = await sg_layer.query(
-            SequencingGroupFilter(created_on=GenericFilter(lte=today))
-        )
-        assert len(sgs) == 1
-
-        sgs = await sg_layer.query(
-            SequencingGroupFilter(created_on=GenericFilter(gte=today))
-        )
-        assert len(sgs) == 1
-
-        # Query for sequencing group with creation date today
-        sgs = await sg_layer.query(
-            SequencingGroupFilter(created_on=GenericFilter(gt=today))
+            SequencingGroupFilter(created_on=GenericFilter(gt=current_date))
         )
         assert len(sgs) == 0
+
+        # Insert a historical sequencing group into the history table with a pre-defined period for which it was current
+        historical_date = date(2025, 12, 1)
+        historical_query = t"""\
+            INSERT INTO sequencing_group_history
+                (id, sample_id, type, technology, archived, sys_period)
+            VALUES
+                (
+                    {sg_id}, {test_sample}, 'genome', 'short-read', false,
+                    tstzrange({historical_date.isoformat()}, {current_date.isoformat()})
+                )
+        """
+        await conn.execute(historical_query)
+
+        # Query for sequencing group with creation date historical_date
+        sgs = await sg_layer.query(
+            SequencingGroupFilter(created_on=GenericFilter(eq=historical_date))
+        )
+        assert len(sgs) == 1
+        sg_id = sgs[0].id
+
+        # Query for sequencing group with creation date before historical_date
+        sgs = await sg_layer.query(
+            SequencingGroupFilter(created_on=GenericFilter(lt=historical_date))
+        )
+        assert len(sgs) == 0
+
+        # Query for sequencing group with creation date after historical_date
+        sgs = await sg_layer.query(
+            SequencingGroupFilter(created_on=GenericFilter(gt=historical_date))
+        )
+        assert len(sgs) == 0
+
+        
 
     @pytest.mark.asyncio
     @pytest.mark.skip(reason="Analysis migration has not been completed") # TODO Revisit this test once analysis queries are migrated
@@ -492,13 +541,18 @@ class TestSequencingGroup:
         assert result == {}
 
     @pytest.mark.asyncio
-    @pytest.mark.skip
-    @mock.patch('db.python.tables.sequencing_group.date', wraps=date)
-    async def test_history_sum_multiple_projects(self, mock_date):
+    async def test_history_sum_multiple_projects(
+        self,
+        connection: Connection,
+        test_sample: int,
+        mock_date,
+        insert_historical_sg
+    ):
         """Test the case where type:technology combinations are summed and held for the same project."""
         # Mock today's date.
-        mock_date.today.return_value = date(year=2025, month=12, day=31)
+        # mock_date.today.return_value = date(year=2025, month=12, day=31)
 
+        await insert_historical_sg(test_sample, 'genome', 'short-read', (date(2025, 10, 1), date(2025, 10, 2)))
         # Set up mocking for rows returned from the table query.
         rows_mock = [
             {
