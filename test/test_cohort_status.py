@@ -384,7 +384,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
             query_cohort_filter_status_in,
             {'cohort_status_list': [ACTIVE]},
         )
-        self.assertTrue(len(query_cohort_status_in['cohorts']) == 2)  # noqa: PLR2004
+        self.assertTrue(len(query_cohort_status_in['cohorts']) == 2)
         for cohort in query_cohort_status_in['cohorts']:
             self.assertEqual(cohort['status'], ACTIVE)
 
