@@ -1,5 +1,7 @@
 from collections import defaultdict
 
+from psycopg import sql
+
 from db.python.connect import Connection
 from db.python.utils import InternalError
 from models.models.audit_log import AuditLogInternal
@@ -43,27 +45,30 @@ class DbBase:
         """
         Get all audit logs for values from a table
         """
-        _query = f"""
-        SELECT
-            t.{id_field} as table_id,
-            al.id as id,
-            al.author as author,
-            al.on_behalf_of as on_behalf_of,
-            al.timestamp as timestamp,
-            al.ar_guid as ar_guid,
-            al.comment as comment,
-            al.auth_project as auth_project,
-            al.meta as meta
-        FROM {table} FOR SYSTEM_TIME ALL t
-        INNER JOIN audit_log al
-        ON al.id = t.audit_log_id
-        WHERE t.{id_field} in :ids
-        """.strip()
-        rows = await self.connection.fetch_all(_query, {'ids': ids})
+        history_table = sql.Identifier(f'{table}_history')
+
+        new_query = t"""
+        WITH historical_rows AS (
+        SELECT {id_field:i}, audit_log_id
+        FROM {table:i}
+        WHERE {id_field:i} = ANY({ids:s})
+
+        UNION ALL
+
+        SELECT {id_field:i}, audit_log_id
+        FROM {history_table:i}
+        WHERE {id_field:i} = ANY({ids:s}))
+
+        SELECT hr.{id_field:i} as table_id, al.id as id, al.author as author, al.on_behalf_of as on_behalf_of,
+        al.timestamp as timestamp, al.ar_guid as ar_guid, al.comment as comment, al.auth_project as auth_project,
+        al.meta as meta FROM historical_rows hr
+        INNER JOIN audit_log al ON al.id = hr.audit_log_id
+        """
+
+        rows = await (await self.connection.pg_connection.execute(new_query)).fetchall()
         by_id = defaultdict(list)
         for r in rows:
-            row = dict(r)
-            id_value = row.pop('table_id')
-            by_id[id_value].append(AuditLogInternal.from_db(row))
+            id_value = r.pop('table_id')
+            by_id[id_value].append(AuditLogInternal(**r))
 
         return by_id
