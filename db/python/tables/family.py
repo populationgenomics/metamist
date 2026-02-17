@@ -1,10 +1,15 @@
 import dataclasses
 from collections import defaultdict
+from string.templatelib import Template
 from typing import Any
+
+from psycopg import sql
+from psycopg.rows import class_row, scalar_row
+from psycopg.types.json import Jsonb
 
 from db.python.filters import GenericFilter, GenericFilterModel, GenericMetaFilter
 from db.python.tables.base import DbBase
-from db.python.utils import NotFoundError, escape_like_term, to_db_json
+from db.python.utils import NotFoundError, escape_like_term
 from models.models import PRIMARY_EXTERNAL_ORG, FamilyInternal, ProjectId
 
 
@@ -35,15 +40,18 @@ class FamilyTable(DbBase):
 
     async def get_projects_by_family_ids(self, family_ids: list[int]) -> set[ProjectId]:
         """Get project IDs for sampleIds (mostly for checking auth)"""
-        _query = """
-            SELECT project FROM family
-            WHERE id in :family_ids
-            GROUP BY project
-        """
+
         if len(family_ids) == 0:
             raise ValueError('Received no family IDs to get project ids for')
-        rows = await self.connection.fetch_all(_query, {'family_ids': family_ids})
+
+        rows = await (
+            await self.connection.pg_connection.execute(
+                t'SELECT project FROM family WHERE id = ANY({family_ids}) GROUP BY project'
+            )
+        ).fetchall()
+
         projects = set(r['project'] for r in rows)
+
         if not projects:
             raise ValueError(
                 'No projects were found for given families, this is likely an error'
@@ -54,17 +62,18 @@ class FamilyTable(DbBase):
         self, filter_: FamilyFilter
     ) -> tuple[set[ProjectId], list[FamilyInternal]]:
         """Get all families for some project"""
-        _query = """
-            SELECT f.id, JSON_OBJECTAGG(feid.name, feid.external_id) AS external_ids,
-                   f.description, f.coded_phenotype, f.meta, f.project
-            FROM family f
-            INNER JOIN family_external_id feid ON f.id = feid.family_id
+
+        _query = [
+            t"""
+        SELECT f.id, jsonb_object_agg(feid.name, feid.external_id) AS external_ids,
+        f.description, f.coded_phenotype, f.meta, f.project FROM family f
+        INNER JOIN family_external_id feid ON f.id = feid.family_id
         """
+        ]
 
         if not filter_.project and not filter_.id:
             raise ValueError('Project or ID filter is required for family queries')
 
-        has_participant_join = False
         field_overrides = {
             'id': 'f.id',
             'external_id': 'feid.external_id',
@@ -76,38 +85,31 @@ class FamilyTable(DbBase):
         if filter_.participant_id:
             field_overrides['participant_id'] = 'fp.participant_id'
             has_participant_join = True
-            _query += """
-                JOIN family_participant fp ON f.id = fp.family_id
-            """
+            _query.append(t' JOIN family_participant fp ON f.id = fp.family_id ')
 
         if filter_.sample_id:
             field_overrides['sample_id'] = 's.id'
             if not has_participant_join:
-                _query += """
-                    JOIN family_participant fp ON f.id = fp.family_id
-                """
+                _query.append(t' JOIN family_participant fp ON f.id = fp.family_id ')
 
-            _query += """
-                INNER JOIN sample s ON fp.participant_id = s.participant_id
-            """
+            _query.append(
+                t' INNER JOIN sample s ON fp.participant_id = s.participant_id '
+            )
 
-        wheres, values = filter_.to_sql(field_overrides)
-        if wheres:
-            _query += f'WHERE {wheres}'
+        where_params: Template = filter_.to_sql(field_overrides)
+        joined_query = sql.SQL(' ').join(_query)
 
-        _query += """
-            GROUP BY f.id, f.description, f.coded_phenotype, f.meta, f.project
-        """
+        async with self.connection.pg_connection.cursor(
+            row_factory=class_row(FamilyInternal)
+        ) as cur:
+            await cur.execute(t'{joined_query:q} WHERE {where_params:q} GROUP BY f.id')
+            family_internal_list = await cur.fetchall()
 
-        rows = await self.connection.fetch_all(_query, values)
-        seen = set()
         families = []
         projects: set[ProjectId] = set()
-        for r in rows:
-            if r['id'] not in seen:
-                projects.add(r['project'])
-                families.append(FamilyInternal.from_db(dict(r)))
-                seen.add(r['id'])
+        for family_internal in family_internal_list:
+            projects.add(family_internal.project)
+            families.append(family_internal)
 
         return projects, families
 
@@ -118,22 +120,25 @@ class FamilyTable(DbBase):
         if not participant_ids:
             return set(), {}
 
-        _query = """
-            SELECT f.id, JSON_OBJECTAGG(feid.name, feid.external_id) AS external_ids,
-                   f.description, f.coded_phenotype, f.meta, f.project, fp.participant_id
-            FROM family f
-            INNER JOIN family_external_id feid ON f.id = feid.family_id
-            INNER JOIN family_participant fp ON f.id = fp.family_id
-            WHERE fp.participant_id in :pids
-            GROUP BY f.id, f.description, f.coded_phenotype, f.meta, f.project, fp.participant_id
+        _query = t"""
+        SELECT f.id, jsonb_object_agg(feid.name, feid.external_id) AS external_ids,
+        f.description, f.coded_phenotype, f.meta, f.project, fp.participant_id
+        FROM family f
+        INNER JOIN family_external_id feid ON f.id = feid.family_id
+        INNER JOIN family_participant fp ON f.id = fp.family_id
+        WHERE fp.participant_id = ANY({participant_ids})
+        GROUP BY f.id, f.description, f.coded_phenotype, f.meta, f.project, fp.participant_id
         """
+
         ret_map = defaultdict(list)
         projects: set[ProjectId] = set()
-        for row in await self.connection.fetch_all(_query, {'pids': participant_ids}):
-            drow = dict(row)
-            pid = drow.pop('participant_id')
-            projects.add(drow.get('project'))
-            ret_map[pid].append(FamilyInternal.from_db(drow))
+
+        rows = await (await self.connection.pg_connection.execute(_query)).fetchall()
+
+        for row in rows:
+            pid = row.pop('participant_id')
+            projects.add(row.get('project'))
+            ret_map[pid].append(FamilyInternal(**row))
 
         return projects, ret_map
 
@@ -143,20 +148,14 @@ class FamilyTable(DbBase):
         """
         Search by some term, return [ProjectId, FamilyId, ExternalId]
         """
-        _query = """
-        SELECT project, family_id, external_id
-        FROM family_external_id
-        WHERE project in :project_ids AND external_id LIKE :search_pattern
-        LIMIT :limit
-        """
-        rows = await self.connection.fetch_all(
-            _query,
-            {
-                'project_ids': project_ids,
-                'search_pattern': escape_like_term(query) + '%',
-                'limit': limit,
-            },
-        )
+        search_pattern = (escape_like_term(query) + '%',)
+        rows = await (
+            await self.connection.pg_connection.execute(t"""
+            SELECT project, family_id, external_id FROM family_external_id
+            WHERE project = ANY({project_ids}) AND external_id ILIKE {search_pattern} LIMIT {limit}
+            """)
+        ).fetchall()
+
         return [(r['project'], r['family_id'], r['external_id']) for r in rows]
 
     async def get_family_external_ids_by_participant_ids(
@@ -166,17 +165,17 @@ class FamilyTable(DbBase):
         if not participant_ids:
             return {}
 
-        _query = """
-        SELECT feid.external_id, fp.participant_id
-        FROM family_participant fp
+        _query = t"""
+        SELECT feid.external_id, fp.participant_id FROM family_participant fp
         INNER JOIN family_external_id feid ON fp.family_id = feid.family_id
-        WHERE fp.participant_id in :pids
+        WHERE fp.participant_id = ANY({participant_ids})
         """
-        rows = await self.connection.fetch_all(_query, {'pids': participant_ids})
+
+        rows = await (await self.connection.pg_connection.execute(_query)).fetchall()
+
         result = defaultdict(list)
         for r in rows:
             result[r['participant_id']].append(r['external_id'])
-
         return result
 
     async def update_family(
@@ -190,19 +189,19 @@ class FamilyTable(DbBase):
         """Update values for a family"""
         audit_log_id = await self.audit_log_id()
 
-        values: dict[str, Any] = {'audit_log_id': audit_log_id}
-        updaters = ['audit_log_id = :audit_log_id']
+        updaters = [t'audit_log_id = {audit_log_id}']
         if description:
-            values['description'] = description
-            updaters.append('description = :description')
+            updaters.append(t'description = {description}')
         if coded_phenotype:
-            values['coded_phenotype'] = coded_phenotype
-            updaters.append('coded_phenotype = :coded_phenotype')
+            updaters.append(t'coded_phenotype = {coded_phenotype}')
         if meta is not None:
-            values['meta'] = to_db_json(meta)
-            updaters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
+            meta_param = Jsonb(meta)
+            updaters.append(
+                t'meta = json_merge_patch(COALESCE(meta, {"{}"}::jsonb), {meta_param})'
+            )
 
-        async with self.connection.transaction():
+        conn = self.connection.pg_connection
+        async with conn.transaction(), conn.cursor(row_factory=scalar_row) as cur:
             if external_ids is None:
                 external_ids = {}
 
@@ -210,30 +209,27 @@ class FamilyTable(DbBase):
             to_update = {k.lower(): v for k, v in external_ids.items() if v is not None}
 
             if to_delete:
-                await self.connection.execute(
-                    """
-                    -- Set audit_log_id to this transaction before deleting the rows
-                    UPDATE family_external_id
-                    SET audit_log_id = :audit_log_id
-                    WHERE family_id = :id AND name IN :names;
+                # Set audit_log_id to this transaction before deleting the rows
+                await cur.execute(t"""
+                     UPDATE family_external_id SET audit_log_id = {audit_log_id}
+                     WHERE family_id = {id_} AND name = ANY({to_delete})
+                """)
 
-                    DELETE FROM family_external_id
-                    WHERE family_id = :id AND name in :names
-                    """,
-                    {'id': id_, 'names': to_delete, 'audit_log_id': audit_log_id},
+                await cur.execute(
+                    t'DELETE FROM family_external_id WHERE family_id = {id_} AND name = ANY({to_delete})'
                 )
 
             if to_update:
-                project = await self.connection.fetch_val(
-                    'SELECT project FROM family WHERE id = :id',
-                    {'id': id_},
-                )
+                await cur.execute(t'SELECT project FROM family WHERE id = {id_}')
+                project = await cur.fetchone()
 
-                _update_query = """
-                    INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
-                    VALUES (:project, :id, :name, :external_id, :audit_log_id)
-                    ON DUPLICATE KEY UPDATE external_id = :external_id, audit_log_id = :audit_log_id
-                    """
+                _update_query = """INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
+                VALUES (%(project)s, %(id)s, %(name)s, %(external_id)s, %(audit_log_id)s)
+                ON CONFLICT (family_id, name)
+                DO UPDATE SET
+                external_id = EXCLUDED.external_id,
+                audit_log_id = EXCLUDED.audit_log_id"""
+
                 _update_values = [
                     {
                         'project': project,
@@ -244,18 +240,12 @@ class FamilyTable(DbBase):
                     }
                     for name, eid in to_update.items()
                 ]
-                await self.connection.execute_many(_update_query, _update_values)
+                await cur.executemany(_update_query, _update_values)
 
             # Only update if more than just audit_log_id has changed
             if len(updaters) > 1:
-                await self.connection.execute(
-                    f"""
-                    UPDATE family
-                    SET {', '.join(updaters)}
-                    WHERE id = :id
-                    """,
-                    {**values, 'id': id_},
-                )
+                joined = sql.SQL(',').join(updaters)
+                await cur.execute(t'UPDATE family SET {joined:q} WHERE id = {id_:s}')
 
         return True
 
@@ -272,27 +262,23 @@ class FamilyTable(DbBase):
         """
         audit_log_id = await self.audit_log_id()
 
-        async with self.connection.transaction():
-            new_id = await self.connection.fetch_val(
-                """
-                INSERT INTO family (project, description, coded_phenotype, meta, audit_log_id)
-                VALUES (:project, :description, :coded_phenotype, :meta, :audit_log_id)
-                RETURNING id
-                """,
-                {
-                    'project': project or self.project_id,
-                    'description': description,
-                    'coded_phenotype': coded_phenotype,
-                    'meta': to_db_json(meta or {}),
-                    'audit_log_id': audit_log_id,
-                },
-            )
+        project_param = project or self.project_id
+        meta_param = Jsonb(meta or {})
 
-            await self.connection.execute_many(
+        conn = self.connection.pg_connection
+        async with conn.transaction(), conn.cursor(row_factory=scalar_row) as cur:
+            await cur.execute(t"""
+            INSERT INTO family (project, description, coded_phenotype, meta, audit_log_id)
+            VALUES ({project_param}, {description}, {coded_phenotype}, {meta_param}, {audit_log_id})
+            RETURNING id
+            """)
+            new_id = await cur.fetchone()
+
+            await cur.executemany(
                 """
-                INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
-                VALUES (:project, :family_id, :name, :external_id, :audit_log_id)
-                """,
+            INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
+            VALUES (%(project)s, %(family_id)s, %(name)s, %(external_id)s, %(audit_log_id)s)
+            """,
                 [
                     {
                         'project': project or self.project_id,
@@ -324,63 +310,40 @@ class FamilyTable(DbBase):
         # Default to list of None if meta not provided
         meta_list = meta if meta is not None else [None] * len(external_ids)
 
-        for eid, descr, cph, mt in zip(
-            external_ids, descriptions, coded_phenotypes, meta_list, strict=False
-        ):
-            existing_id = await self.connection.fetch_val(
-                """
-                SELECT family_id FROM family_external_id
-                WHERE project = :project AND external_id = :external_id
-                """,
-                {'project': project or self.project_id, 'external_id': eid},
-            )
+        # each query executes independently
+        project_param = project or self.project_id
 
-            if existing_id is None:
-                new_id = await self.connection.fetch_val(
-                    """
-                    INSERT INTO family (project, description, coded_phenotype, meta, audit_log_id)
-                    VALUES (:project, :description, :coded_phenotype, :meta, :audit_log_id)
-                    RETURNING id
-                    """,
-                    {
-                        'project': project or self.project_id,
-                        'description': descr,
-                        'coded_phenotype': cph,
-                        'meta': to_db_json(mt or {}),
-                        'audit_log_id': audit_log_id,
-                    },
+        conn = self.connection.pg_connection
+        async with conn.transaction(), conn.cursor(row_factory=scalar_row) as cur:
+            for eid, descr, cph, mt in zip(
+                external_ids,
+                descriptions,
+                coded_phenotypes,
+                meta_list,
+                strict=False,
+            ):
+                await cur.execute(
+                    t'SELECT family_id FROM family_external_id WHERE project = {project_param} AND external_id ={eid}'
                 )
-                await self.connection.execute(
-                    """
+                existing_id = await cur.fetchone()
+                meta_param = Jsonb(mt or {})
+                if existing_id is None:
+                    await cur.execute(t"""
+                        INSERT INTO family (project, description, coded_phenotype, meta, audit_log_id)
+                        VALUES ({project_param}, {descr}, {cph}, {meta_param}, {audit_log_id})
+                        RETURNING id
+                    """)
+                    new_id = await cur.fetchone()
+
+                    await cur.execute(t"""
                     INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
-                    VALUES (:project, :family_id, :name, :external_id, :audit_log_id)
-                    """,
-                    {
-                        'project': project or self.project_id,
-                        'family_id': new_id,
-                        'name': PRIMARY_EXTERNAL_ORG,
-                        'external_id': eid,
-                        'audit_log_id': audit_log_id,
-                    },
-                )
+                    VALUES ({project_param}, {new_id}, {PRIMARY_EXTERNAL_ORG}, {eid}, {audit_log_id})""")
 
-            else:
-                await self.connection.execute(
-                    """
-                    UPDATE family
-                    SET description = :description, coded_phenotype = :coded_phenotype,
-                        meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta),
-                        audit_log_id = :audit_log_id
-                    WHERE id = :id
-                    """,
-                    {
-                        'id': existing_id,
-                        'description': descr,
-                        'coded_phenotype': cph,
-                        'meta': to_db_json(mt or {}),
-                        'audit_log_id': audit_log_id,
-                    },
-                )
+                else:
+                    await cur.execute(t"""UPDATE family
+                    SET description = {descr}, coded_phenotype = {cph}, meta = json_merge_patch(COALESCE(meta, {'{}'}::jsonb), {meta_param}),
+                    audit_log_id = {audit_log_id} WHERE id = {existing_id}
+                    """)
 
         return True
 
@@ -392,13 +355,14 @@ class FamilyTable(DbBase):
         if not family_ids:
             return {}
 
-        results = await self.connection.fetch_all(
-            """
-            SELECT external_id, family_id AS id FROM family_external_id
-            WHERE external_id in :external_ids AND project = :project
-            """,
-            {'external_ids': family_ids, 'project': project or self.project_id},
-        )
+        project_param = project or self.project_id
+        _query = t"""
+        SELECT external_id, family_id AS id FROM family_external_id
+        WHERE external_id = ANY({family_ids}) AND project = {project_param}
+        """
+
+        results = await (await self.connection.pg_connection.execute(_query)).fetchall()
+
         id_map = {r['external_id']: r['id'] for r in results}
 
         if not allow_missing and len(id_map) != len(family_ids):
@@ -422,14 +386,11 @@ class FamilyTable(DbBase):
         if len(family_ids) == 0:
             return {}
 
-        results = await self.connection.fetch_all(
-            """
-            SELECT family_id, external_id
-            FROM family_external_id
-            WHERE family_id in :ids AND name = :PRIMARY_EXTERNAL_ORG
-            """,
-            {'ids': family_ids, 'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG},
-        )
+        _query = t"""SELECT family_id, external_id FROM family_external_id
+        WHERE family_id = ANY({family_ids}) AND name = {PRIMARY_EXTERNAL_ORG}"""
+
+        results = await (await self.connection.pg_connection.execute(_query)).fetchall()
+
         id_map = {r['family_id']: r['external_id'] for r in results}
         if not allow_missing and len(id_map) != len(family_ids):
             provided_internal_ids = set(family_ids)

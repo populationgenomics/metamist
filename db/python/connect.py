@@ -7,8 +7,10 @@ import json
 import logging
 import os
 from collections.abc import Iterable
+from contextlib import asynccontextmanager
 
 from psycopg import AsyncConnection
+from psycopg.pq import TransactionStatus
 from psycopg.rows import DictRow, dict_row
 from psycopg.types.enum import EnumInfo, register_enum
 from psycopg_pool import AsyncConnectionPool
@@ -17,6 +19,7 @@ from api.settings import DB_POOL_MAX_SIZE, DB_POOL_MIN_SIZE
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.utils import (
     InternalError,
+    NoOpAenter,
     NoProjectAccess,
     NotFoundError,
     ProjectDoesNotExist,
@@ -82,6 +85,24 @@ class Connection:
     def project_id(self):
         """Safely get the project id from the project model attached to the connection"""
         return self.project.id if self.project is not None else None
+
+    @asynccontextmanager
+    async def transaction(self):
+        """
+        Async context manager to open a transaction if there isn't already one open
+
+        This helps avoid us creating a bunch of savepoints with nested transactions.
+        We rarely, if ever, need to partially roll back a transaction so savepoints
+        are an unnecessary performance hit in most cases.
+
+        @see https://about.gitlab.com/blog/why-we-spent-the-last-month-eliminating-postgresql-subtransactions/
+        """
+        conn = self.pg_connection
+        in_transaction = conn.info.transaction_status == TransactionStatus.INTRANS
+
+        with_function = conn.transaction if not in_transaction else NoOpAenter
+        async with with_function():
+            yield
 
     def all_projects(self):
         """Return all projects that the current user has access to"""
@@ -276,11 +297,11 @@ class CredentialedDatabaseConfiguration:
         """Dev config for local database with name 'sm_dev'"""
         # consider pulling from env variables
         return CredentialedDatabaseConfiguration(
-            dbname=os.environ.get('SM_DEV_DB_NAME', 'sm_dev'),
-            username=os.environ.get('SM_DEV_DB_USER', 'root'),
-            password=os.environ.get('SM_DEV_DB_PASSWORD', ''),
-            host=os.environ.get('SM_DEV_DB_HOST', '127.0.0.1'),
-            port=os.environ.get('SM_DEV_DB_PORT', '3306'),
+            dbname=os.environ.get('SM_DEV_DB_NAME', 'metamist_db'),
+            username=os.environ.get('SM_DEV_DB_USER', 'metamist'),
+            password=os.environ.get('SM_DEV_DB_PASSWORD', 'metamist_password'),
+            host=os.environ.get('SM_DEV_DB_HOST', 'localhost'),
+            port=os.environ.get('SM_DEV_DB_PORT', '5432'),
         )
 
     def get_connection_string(self):

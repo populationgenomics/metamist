@@ -17,7 +17,6 @@ from testcontainers.mysql import MySqlContainer
 from api.graphql.loaders import get_context  # type: ignore
 from api.graphql.schema import schema  # type: ignore
 from db.python.connect import (
-    TABLES_ORDERED_BY_FK_DEPS,
     Connection,
     CredentialedDatabaseConfiguration,
     SMConnections,
@@ -367,7 +366,7 @@ class DbIsolatedTest(DbTest):
             'group',
             'project_member',
         }
-        for table in TABLES_ORDERED_BY_FK_DEPS:
+        for table in TABLES_ORDERED_BY_FK_DEPS:  # noqa: F821
             if table in ignore:
                 continue
             try:
