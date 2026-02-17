@@ -172,6 +172,9 @@ class GenericFilter[T](SMBase):
             else:
                 filters.append(t'{column_query:q} IS NOT NULL')
 
+        if len(filters) == 0:
+            return t''
+
         return sql.SQL(' AND ').join(filters)
 
     def transform(self, func: Callable[[T], X]) -> GenericFilter[X]:
@@ -252,7 +255,7 @@ class GenericFilterModel:
         field_overrides: dict[str, str] | None = None,
         only: list[str] | None = None,
         exclude: list[str] | None = None,
-    ) -> Template:
+    ) -> Template | None:
         """Convert the model to SQL, and avoid SQL injection"""
 
         _foverrides = field_overrides or {}
@@ -288,6 +291,9 @@ class GenericFilterModel:
                     raise ValueError(
                         f'Filter {field.name} must be a GenericFilter or dict[str, GenericFilter]'
                     )
+
+        if len(filters) == 0:
+            return None
 
         return sql.SQL(' AND ').join(filters)
 

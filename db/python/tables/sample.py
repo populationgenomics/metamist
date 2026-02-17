@@ -115,13 +115,14 @@ class SampleTable(DbBase):
             query_template += t'INNER JOIN assay a ON a.sample_id = ss.id'
 
         # WHERE
+        wheres = [w for w in wheres if w is not None]
         wheres_sql = sql.SQL(' AND ').join(wheres)
-        query_template += t'WHERE {wheres_sql:q}' if len(wheres) > 0 else t''
+        query_template += t' WHERE {wheres_sql:q}' if len(wheres) > 0 else t''
 
         # ORDER BY, LIMIT, OFFSET
-        query_template += t'ORDER BY pp.id' if limit or skip else t''
-        query_template += t'LIMIT {limit}' if limit else t''
-        query_template += t'OFFSET {skip}' if skip else t''
+        query_template += t' ORDER BY pp.id' if limit or skip else t''
+        query_template += t' LIMIT {limit}' if limit else t''
+        query_template += t' OFFSET {skip}' if skip else t''
 
         # INNER JOIN query with sample table to get the requested keys
         sample_eid_join = (
@@ -138,7 +139,7 @@ class SampleTable(DbBase):
             FROM sample s
             {sample_eid_join:q}
             INNER JOIN (
-            {sample_eid_join:q}
+                {query_template:q}
             ) as inner_query ON inner_query.id = s.id
             GROUP BY s.id
         """
@@ -317,16 +318,19 @@ class SampleTable(DbBase):
 
         id_of_new_sample = row['id']
 
-        _eid_query = t"""
+        _eid_query = """
             INSERT INTO sample_external_id (project, sample_id, name,
                 external_id, audit_log_id)
-            VALUES ({project}, {id_of_new_sample}, %(name)s,
-                %(external_id)s, {audit_log_id})
+            VALUES (%(project)s, %(id_of_new_sample)s, %(name)s,
+                %(external_id)s, %(audit_log_id)s)
         """
         _eid_values = [
             {
                 'name': name.lower(),
                 'external_id': eid,
+                'audit_log_id': audit_log_id,
+                'project': project_value,
+                'id_of_new_sample': id_of_new_sample,
             }
             for name, eid in external_ids.items()
             if eid is not None
@@ -393,15 +397,20 @@ class SampleTable(DbBase):
 
                 project = row['project']
 
-                _update_query = t"""
+                _update_query = """
                     INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
-                    VALUES ({project}, {id_}, %(name)s, %(external_id)s, {audit_log_id})
-                    ON DUPLICATE KEY UPDATE external_id = %(external_id)s, audit_log_id = {audit_log_id}
+                    VALUES (%(project)s, %(id)s, %(name)s, %(external_id)s, %(audit_log_id)s)
+                    ON CONFLICT (sample_id, name) DO UPDATE SET 
+                        external_id = EXCLUDED.external_id, 
+                        audit_log_id = EXCLUDED.audit_log_id
                 """
                 _eid_values = [
                     {
                         'name': name,
                         'external_id': eid,
+                        'project': project,
+                        'id': id_,
+                        'audit_log_id': audit_log_id,
                     }
                     for name, eid in to_update.items()
                 ]
@@ -533,14 +542,14 @@ class SampleTable(DbBase):
         """
 
         audit_log_id = await self.audit_log_id()
-        _query = t"""
+        _query = """
             UPDATE sample
-            SET participant_id = %(participant_id)s, audit_log_id = {audit_log_id}
+            SET participant_id = %(participant_id)s, audit_log_id = %(audit_log_id)s
             WHERE id = %(id)s
         """
 
         values = [
-            {'id': i, 'participant_id': pid}
+            {'id': i, 'participant_id': pid, 'audit_log_id': audit_log_id}
             for i, pid in zip(ids, participant_ids, strict=False)
         ]
 

@@ -94,7 +94,7 @@ class SampleLayer(BaseLayer):
     async def get_sample_id_map_by_external_ids(
         self,
         external_ids: list[str],
-        project: ProjectId = None,
+        project: ProjectId,
         allow_missing=False,
     ) -> dict[str, int]:
         """Get map of samples {(any) external_id: internal_id}"""
@@ -225,7 +225,9 @@ class SampleLayer(BaseLayer):
     ) -> SampleUpsertInternal:
         """Upsert a sample"""
         with_function = (
-            self.connection.connection.transaction if open_transaction else NoOpAenter
+            self.connection.pg_connection.transaction
+            if open_transaction
+            else NoOpAenter
         )
         if sample.id:
             pjcts = await self.st.get_project_ids_for_sample_ids([sample.id])
@@ -296,7 +298,9 @@ class SampleLayer(BaseLayer):
         seqglayer: SequencingGroupLayer = SequencingGroupLayer(self.connection)
 
         with_function = (
-            self.connection.connection.transaction if open_transaction else NoOpAenter
+            self.connection.pg_connection.transaction
+            if open_transaction
+            else NoOpAenter
         )
 
         sids = [s.id for s in samples if s.id]
