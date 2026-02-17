@@ -629,7 +629,7 @@ class ParticipantLayer(BaseLayer):
         in_transaction = conn.info.transaction_status == TransactionStatus.INTRANS
         with_function = conn.transaction if not in_transaction else NoOpAenter
 
-        async with with_function():
+        async with self.connection.transaction():
             if participant.id:
                 project_ids = await self.pttable.get_project_ids_for_participant_ids(
                     [participant.id]
@@ -688,7 +688,7 @@ class ParticipantLayer(BaseLayer):
         async with with_function():
             # Create or update participants
             for p in participants:
-                await self.upsert_participant(p, project, open_transaction=False)
+                await self.upsert_participant(p)
 
         # Format and return response
         return participants

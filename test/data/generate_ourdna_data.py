@@ -292,7 +292,7 @@ def create_participant():
         'weguide': f'weguide_{weguide_id}',
     }
 
-    if random.random() < 0.3:  # noqa: PLR2004
+    if random.random() < 0.3:
         external_ids['sano'] = f'sano_{str(uuid.uuid4())}'
 
     participant = ParticipantUpsert(

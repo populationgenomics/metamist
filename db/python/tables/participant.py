@@ -514,7 +514,7 @@ class ParticipantTable:
         _query = t"""
             SELECT external_id, participant_id AS id
             FROM participant_external_id
-            WHERE external_id IN {external_participant_ids} AND project = {project}
+            WHERE external_id = ANY({external_participant_ids}) AND project = {project}
         """
 
         conn = self.connection.pg_connection
@@ -534,7 +534,7 @@ class ParticipantTable:
         _query = t"""
             SELECT participant_id AS id, external_id
             FROM participant_external_id
-            WHERE participant_id IN {internal_participant_ids} AND name = {PRIMARY_EXTERNAL_ORG}
+            WHERE participant_id = ANY({internal_participant_ids}) AND name = {PRIMARY_EXTERNAL_ORG}
         """
         conn = self.connection.pg_connection
         cur = await conn.execute(_query)

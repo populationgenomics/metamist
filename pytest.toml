@@ -8,7 +8,9 @@ python_files = [
     "test_json_merge_patch.py",
     "test_project_groups.py",
     "test_generic_filters.py",
-    "test_participant.py"
+    "test_participant.py",
+    "test_assay.py",
+    "test_external_id.py"
 ]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

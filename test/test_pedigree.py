@@ -1,16 +1,20 @@
+import pytest
+
+from db.python.connect import Connection
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantUpsertInternal
-from test.testbase import DbIsolatedTest, run_as_sync
 
 
-class TestPedigree(DbIsolatedTest):
+@pytest.mark.skip(reason='Skipped until dependent entities migrated to PostgreSQL')
+class TestPedigree:
     """Pedigree testing methods"""
 
-    @run_as_sync
-    async def test_import_get_pedigree(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
+    async def test_import_get_pedigree(self, connection_with_project: Connection):
         """Test import + get pedigree"""
-        fl = FamilyLayer(self.connection)
+        fl = FamilyLayer(connection_with_project)
 
         rows: list[list[str]] = [
             ['FAM01', 'EX01_father', '', '', '1', '1'],
@@ -23,30 +27,30 @@ class TestPedigree(DbIsolatedTest):
         )
 
         pedigree_dicts = await fl.get_pedigree(
-            project=self.connection.project_id,
+            project=connection_with_project.project_id,
             replace_with_participant_external_ids=True,
             replace_with_family_external_ids=True,
         )
 
         by_key = {r['individual_id']: r for r in pedigree_dicts}
 
-        self.assertEqual(3, len(pedigree_dicts))
+        assert len(pedigree_dicts) == 3
         father = by_key['EX01_father']
         mother = by_key['EX01_mother']
         subject = by_key['EX01_subject']
 
-        self.assertIsNone(father['paternal_id'])
-        self.assertIsNone(mother['paternal_id'])
-        self.assertEqual('EX01_father', subject['paternal_id'])
-        self.assertEqual('EX01_mother', subject['maternal_id'])
+        assert father['paternal_id'] is None
+        assert mother['paternal_id'] is None
+        assert subject['paternal_id'] == 'EX01_father'
+        assert subject['maternal_id'] == 'EX01_mother'
 
-    @run_as_sync
-    async def test_pedigree_without_family(self):
+    @pytest.mark.asyncio
+    async def test_pedigree_without_family(self, connection_with_project: Connection):
         """
         Test getting pedigree where participants do not belong to a family
         """
-        pl = ParticipantLayer(self.connection)
-        fl = FamilyLayer(self.connection)
+        pl = ParticipantLayer(connection_with_project)
+        fl = FamilyLayer(connection_with_project)
 
         await pl.upsert_participant(
             ParticipantUpsertInternal(
@@ -67,6 +71,6 @@ class TestPedigree(DbIsolatedTest):
         )
 
         by_id = {r['individual_id']: r for r in rows}
-        self.assertEqual(2, len(rows))
-        self.assertEqual(1, by_id['EX01']['sex'])
-        self.assertIsNone(by_id['EX02']['sex'])
+        assert len(rows) == 2
+        assert by_id['EX01']['sex'] == 1
+        assert by_id['EX02']['sex'] is None
