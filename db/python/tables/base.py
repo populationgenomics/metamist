@@ -47,28 +47,33 @@ class DbBase:
         """
         history_table = sql.Identifier(f'{table}_history')
 
-        new_query = t"""
+        _query = t"""
         WITH historical_rows AS (
         SELECT {id_field:i}, audit_log_id
         FROM {table:i}
         WHERE {id_field:i} = ANY({ids:s})
-
         UNION ALL
-
         SELECT {id_field:i}, audit_log_id
         FROM {history_table:i}
-        WHERE {id_field:i} = ANY({ids:s}))
-
-        SELECT hr.{id_field:i} as table_id, al.id as id, al.author as author, al.on_behalf_of as on_behalf_of,
-        al.timestamp as timestamp, al.ar_guid as ar_guid, al.comment as comment, al.auth_project as auth_project,
-        al.meta as meta FROM historical_rows hr
+        WHERE {id_field:i} = ANY({ids:s})
+        )
+        SELECT
+            hr.{id_field:i} as table_id,
+            al.id as id, 
+            al.author as author,
+            al.on_behalf_of as on_behalf_of,
+            al.timestamp as timestamp,
+            al.ar_guid as ar_guid,
+            al.comment as comment,
+            al.auth_project as auth_project,
+            al.meta as meta FROM historical_rows hr
         INNER JOIN audit_log al ON al.id = hr.audit_log_id
         """
 
-        rows = await (await self.connection.pg_connection.execute(new_query)).fetchall()
+        rows = await (await self.connection.pg_connection.execute(_query)).fetchall()
         by_id = defaultdict(list)
-        for r in rows:
-            id_value = r.pop('table_id')
-            by_id[id_value].append(AuditLogInternal(**r))
+        for row in rows:
+            id_value = row.pop('table_id')
+            by_id[id_value].append(AuditLogInternal(**row))
 
         return by_id

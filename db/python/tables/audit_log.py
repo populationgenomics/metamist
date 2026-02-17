@@ -1,5 +1,6 @@
 from typing import Any
 
+from psycopg.rows import class_row
 from psycopg.types.json import Jsonb
 
 from db.python.tables.base import DbBase
@@ -24,7 +25,7 @@ class AuditLogTable(DbBase):
         if len(audit_log_ids) == 0:
             raise ValueError('Received no audit log IDs')
         rows = await (await self.connection.pg_connection.execute(_query)).fetchall()
-        return {r['project'] for r in rows}
+        return {r['auth_project'] for r in rows}
 
     async def get_audit_logs_for_ids(
         self, audit_log_ids: list[int]
@@ -39,7 +40,7 @@ class AuditLogTable(DbBase):
             raise ValueError('Received no audit log IDs')
 
         async with self.connection.pg_connection.cursor(
-            class_row=AuditLogInternal
+            row_factory=class_row(AuditLogInternal)
         ) as cur:
             audit_log_rows = await (await cur.execute(_query)).fetchall()
 
