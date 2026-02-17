@@ -623,7 +623,6 @@ class ParticipantLayer(BaseLayer):
         self,
         participant: ParticipantUpsertInternal,
         project: ProjectId | None = None,
-        open_transaction=True,
     ) -> ParticipantUpsertInternal:
         """Create a single participant"""
         conn = self.connection.pg_connection
@@ -680,7 +679,6 @@ class ParticipantLayer(BaseLayer):
         self,
         participants: list[ParticipantUpsertInternal],
         project: ProjectId | None = None,
-        open_transaction=True,
     ):
         """Batch upsert a list of participants with sequences"""
         conn = self.connection.pg_connection
