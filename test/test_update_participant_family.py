@@ -1,26 +1,27 @@
-from pymysql.err import IntegrityError
+import pytest
+from psycopg import IntegrityError
 
+from db.python.connect import Connection
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantUpsertInternal
-from test.testbase import DbIsolatedTest, run_as_sync
 
 
-class TestParticipantFamily(DbIsolatedTest):
+@pytest.mark.skip(reason='Skipped until dependent entities migrated to PostgreSQL')
+class TestParticipantFamily:
     """Test moving a participant from one family to another and then back"""
 
-    @run_as_sync
-    async def setUp(self) -> None:
-        super().setUp()
-
-        fl = FamilyLayer(self.connection)
+    @pytest.fixture(autouse=True)
+    @pytest.mark.project_roles(['reader', 'writer'])
+    async def set_up(self, connection_with_project: Connection) -> None:
+        fl = FamilyLayer(connection_with_project)
 
         self.fid_1 = await fl.create_family(external_ids={'forg': 'FAM01'})
         self.fid_2 = await fl.create_family(external_ids={'forg': 'FAM02'})
         # Also exercise update_family()
         await fl.update_family(self.fid_2, external_ids={'otherorg': 'OFAM02'})
 
-        pl = ParticipantLayer(self.connection)
+        pl = ParticipantLayer(connection_with_project)
         self.pid = (
             await pl.upsert_participant(
                 ParticipantUpsertInternal(
@@ -51,12 +52,15 @@ class TestParticipantFamily(DbIsolatedTest):
             affected=2,
         )
 
-    @run_as_sync
-    async def test_get_remove_add_family_participant_data(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
+    async def test_get_remove_add_family_participant_data(
+        self, connection_with_project: Connection
+    ):
         """
         Tests getting, removing, and adding a participants family data
         """
-        pl = ParticipantLayer(self.connection)
+        pl = ParticipantLayer(connection_with_project)
 
         fp_row = await pl.get_family_participant_data(
             family_id=self.fid_1, participant_id=self.pid
@@ -71,7 +75,7 @@ class TestParticipantFamily(DbIsolatedTest):
             'affected': 2,
             'notes': None,
         }
-        self.assertDictEqual(expected_fp_row, fp_row.to_dict())
+        assert expected_fp_row == fp_row.to_dict()
 
         await pl.remove_participant_from_family(
             family_id=self.fid_1, participant_id=self.pid
@@ -98,16 +102,17 @@ class TestParticipantFamily(DbIsolatedTest):
             'affected': 2,
             'notes': None,
         }
-        self.assertDictEqual(expected_updated_fp_row, updated_fp_row.to_dict())
+        assert expected_updated_fp_row == updated_fp_row.to_dict()
 
         await pl.remove_participant_from_family(
             family_id=self.fid_2, participant_id=self.pid
         )
 
-    @run_as_sync
-    async def test_update_participant_family(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
+    async def test_update_participant_family(self, connection_with_project: Connection):
         """Tests updating a participants family data"""
-        pl = ParticipantLayer(self.connection)
+        pl = ParticipantLayer(connection_with_project)
         await pl.update_participant_family(
             participant_id=self.pid, old_family_id=self.fid_1, new_family_id=self.fid_2
         )
@@ -125,16 +130,19 @@ class TestParticipantFamily(DbIsolatedTest):
             'affected': 2,
             'notes': None,
         }
-        self.assertDictEqual(expected_updated_fp_row, updated_fp_row.to_dict())
+        assert expected_updated_fp_row == updated_fp_row.to_dict()
 
         await pl.remove_participant_from_family(
             family_id=self.fid_2, participant_id=self.pid
         )
 
-    @run_as_sync
-    async def test_update_participant_to_nonexistent_family(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
+    async def test_update_participant_to_nonexistent_family(
+        self, connection_with_project: Connection
+    ):
         """Tests if error is raised and transaction rolled back for nonexistent new_family_id"""
-        pl = ParticipantLayer(self.connection)
+        pl = ParticipantLayer(connection_with_project)
 
         fp_row = await pl.get_family_participant_data(
             family_id=self.fid_1, participant_id=self.pid
@@ -148,9 +156,9 @@ class TestParticipantFamily(DbIsolatedTest):
             'affected': 2,
             'notes': None,
         }
-        self.assertDictEqual(expected_fp_row, fp_row.to_dict())
+        assert expected_fp_row == fp_row.to_dict()
 
-        with self.assertRaises(IntegrityError):
+        with pytest.raises(IntegrityError):
             await pl.update_participant_family(
                 participant_id=self.pid, old_family_id=self.fid_1, new_family_id=-99
             )
@@ -160,4 +168,4 @@ class TestParticipantFamily(DbIsolatedTest):
         )
 
         # Update transaction should rollback, so no change expected
-        self.assertDictEqual(expected_fp_row, rollback_fp_row.to_dict())
+        assert expected_fp_row == rollback_fp_row.to_dict()
