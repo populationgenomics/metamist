@@ -395,15 +395,15 @@ class SampleTable(DbBase):
                 except DatabaseError as e:
                     raise DatabaseError(
                         f'Error fetching project for sample {id_}: {str(e)}'
-                    )
+                    ) from e
 
                 project = row['project']
 
                 _update_query = """
                     INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
                     VALUES (%(project)s, %(id)s, %(name)s, %(external_id)s, %(audit_log_id)s)
-                    ON CONFLICT (sample_id, name) DO UPDATE SET 
-                        external_id = EXCLUDED.external_id, 
+                    ON CONFLICT (sample_id, name) DO UPDATE SET
+                        external_id = EXCLUDED.external_id,
                         audit_log_id = EXCLUDED.audit_log_id
                 """
                 _eid_values = [
