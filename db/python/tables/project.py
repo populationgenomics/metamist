@@ -6,7 +6,6 @@ from psycopg.rows import class_row
 from db.python.utils import Forbidden, get_logger
 from models.models.project import (
     Project,
-    ProjectMemberRole,
     ProjectMemberUpdate,
     project_member_role_names,
 )
