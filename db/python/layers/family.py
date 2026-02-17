@@ -12,7 +12,6 @@ from db.python.tables.family_participant import (
     FamilyParticipantTable,
 )
 from db.python.tables.participant import ParticipantTable
-from db.python.tables.sample import SampleTable
 from db.python.utils import NotFoundError
 from models.models import PRIMARY_EXTERNAL_ORG
 from models.models.family import FamilyInternal, PedRow, PedRowInternal
@@ -25,7 +24,6 @@ class FamilyLayer(BaseLayer):
 
     def __init__(self, connection: Connection):
         super().__init__(connection)
-        self.stable = SampleTable(connection)
         self.ftable = FamilyTable(connection)
         self.fptable = FamilyParticipantTable(self.connection)
 
@@ -268,7 +266,7 @@ class FamilyLayer(BaseLayer):
             )
         )
 
-        async with self.connection.connection.transaction():
+        async with self.connection.pg_connection.transaction():
             if create_missing_participants:
                 missing_participant_ids = set(external_participant_ids) - set(
                     external_participant_ids_map

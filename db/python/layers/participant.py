@@ -616,17 +616,11 @@ class ParticipantLayer(BaseLayer):
     # region UPSERTS / UPDATES
 
     async def upsert_participant(
-        self,
-        participant: ParticipantUpsertInternal,
-        project: ProjectId = None,
-        open_transaction=True,
+        self, participant: ParticipantUpsertInternal, project: ProjectId = None
     ) -> ParticipantUpsertInternal:
         """Create a single participant"""
-        with_function = (
-            self.connection.connection.transaction if open_transaction else NoOpAenter
-        )
 
-        async with with_function():
+        async with self.connection.transaction():
             if participant.id:
                 project_ids = await self.pttable.get_project_ids_for_participant_ids(
                     [participant.id]
@@ -679,13 +673,15 @@ class ParticipantLayer(BaseLayer):
     ):
         """Batch upsert a list of participants with sequences"""
         with_function = (
-            self.connection.connection.transaction if open_transaction else NoOpAenter
+            self.connection.pg_connection.transaction
+            if open_transaction
+            else NoOpAenter
         )
 
         async with with_function():
             # Create or update participants
             for p in participants:
-                await self.upsert_participant(p, open_transaction=False)
+                await self.upsert_participant(p)
 
         # Format and return response
         return participants
@@ -995,7 +991,7 @@ class ParticipantLayer(BaseLayer):
         fp_row = await self.get_family_participant_data(
             family_id=old_family_id, participant_id=participant_id
         )
-        async with self.connection.connection.transaction():
+        async with self.connection.pg_connection.transaction():
             await self.remove_participant_from_family(
                 family_id=old_family_id, participant_id=participant_id
             )
