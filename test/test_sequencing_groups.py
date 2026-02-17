@@ -622,29 +622,34 @@ class TestSequencingGroup:
     ):
         """Test the case where less types are present initially and more are added over time."""
         # Mock today's date.
-        mock_date('db.python.tables.sequencing_group.date', date(year=2025, month=12, day=31))
+        today = date(year=2025, month=12, day=31)
+        mock_date('db.python.tables.sequencing_group.date', today)
 
-        # Set up mocking for rows returned from the table query.
+        # Define some test data
         test_data = [
-            {
+            {   
+                'id': 1,
                 'sample_id': test_sample,
                 'type': 'genome',
                 'technology': 'short-read',
                 'sg_date': date(2025, 10, 1).isoformat(),
             },
             {
+                'id': 1,
                 'sample_id': test_sample,
                 'type': 'genome',
                 'technology': 'long-read',
                 'sg_date': date(2025, 11, 1).isoformat(),
             },
             {
+                'id': 1,
                 'sample_id': test_sample,
                 'type': 'chip',
                 'technology': 'short-read',
                 'sg_date': date(2025, 10, 1).isoformat(),
             },
             {
+                'id': 1,
                 'sample_id': test_sample,
                 'type': 'chip',
                 'technology': 'long-read',
@@ -652,12 +657,13 @@ class TestSequencingGroup:
             },
         ]
 
-        test_data_query = """\
-            INSERT INTO sequencing_group
-                (sample_id, type, technology, archived, sys_period)
+        test_data_query = f"""\
+            INSERT INTO sequencing_group_history
+                (id, sample_id, type, technology, archived, sys_period)
             VALUES
-                (%(sample_id)s, %(type)s, %(technology)s, false, tstzrange(%(sg_date)s, null))
-        """
+                (%(id)s, %(sample_id)s, %(type)s, %(technology)s, false, tstzrange(%(sg_date)s, '{today.isoformat()}'))"""
+        
+        # Insert the test data to the DB
         conn = connection_with_project.pg_connection
         async with conn.transaction():
             async with conn.cursor() as cur:
