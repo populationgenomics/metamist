@@ -153,7 +153,7 @@ class CohortTable(DbBase):
         Get a cohort template by ID
         """
         _query = t"""
-        SELECT id as id, name, description, criteria, project FROM cohort_template WHERE id = {template_id}
+        SELECT id, name, description, criteria, project FROM cohort_template WHERE id = {template_id}
         """
         template = await (
             await self.connection.pg_connection.execute(

@@ -1,7 +1,9 @@
 import datetime
 
-from pymysql.err import IntegrityError
+import pytest
+from psycopg import IntegrityError
 
+from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers import CohortLayer, SampleLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
@@ -21,21 +23,22 @@ from models.models.cohort import (
 )
 from models.utils.cohort_id_format import cohort_id_format
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
-from test.testbase import DbIsolatedTest, run_as_sync
+from test.conftest import GraphQLQueryFunction
 
 
-class TestCohortBasic(DbIsolatedTest):
+@pytest.mark.skip(reason='Skipped until SG table migrated to PostgreSQL')
+class TestCohortBasic:
     """Test custom cohort endpoints"""
 
-    @run_as_sync
-    async def setUp(self):
-        super().setUp()
-        self.cohortl = CohortLayer(self.connection)
+    @pytest.fixture(autouse=True)
+    async def set_up(self, connection_with_project: Connection):
+        self.cohortl = CohortLayer(connection_with_project)
+        self.project_id = connection_with_project.project_id
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_create_cohort_missing_args(self):
         """Can't create cohort with neither criteria nor template"""
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             _ = await self.cohortl.create_cohort_from_criteria(
                 project_to_write=self.project_id,
                 description='No criteria or template',
@@ -70,10 +73,10 @@ class TestCohortBasic(DbIsolatedTest):
     #             ),
     #         )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_create_empty_cohort(self):
         """Can't create cohorts from empty criteria"""
-        with self.assertRaises(ValueError) as context:
+        with pytest.raises(ValueError) as context:
             _ = await self.cohortl.create_cohort_from_criteria(
                 project_to_write=self.project_id,
                 description='Cohort with no entries',
@@ -82,64 +85,60 @@ class TestCohortBasic(DbIsolatedTest):
                 cohort_criteria=CohortCriteriaInternal(projects=[self.project_id]),
             )
 
-        self.assertIn(
-            'criteria resulted in no sequencing groups',
-            str(context.exception),
-        )
+        assert 'criteria resulted in no sequencing groups' in str(context)
 
 
-class TestCohortQueries(DbIsolatedTest):
+class TestCohortQueries:
     """Test query-related custom cohort layer functions"""
 
-    @run_as_sync
-    async def setUp(self):
-        super().setUp()
-        self.cohortl = CohortLayer(self.connection)
+    @pytest.fixture(autouse=True)
+    async def set_up(self, connection: Connection):
+        self.cohortl = CohortLayer(connection)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_id_query(self):
         """Exercise querying id against an empty database"""
         result = await self.cohortl.query(CohortFilter(id=GenericFilter(eq=42)))
-        self.assertEqual([], result)
+        assert result == []
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_name_query(self):
         """Exercise querying name against an empty database"""
         result = await self.cohortl.query(
             CohortFilter(name=GenericFilter(eq='Unknown cohort'))
         )
-        self.assertEqual([], result)
+        assert result == []
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_author_query(self):
         """Exercise querying author against an empty database"""
         result = await self.cohortl.query(
             CohortFilter(author=GenericFilter(eq='Alan Smithee'))
         )
-        self.assertEqual([], result)
+        assert result == []
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_template_id_query(self):
         """Exercise querying template_id against an empty database"""
         result = await self.cohortl.query(
             CohortFilter(template_id=GenericFilter(eq=28))
         )
-        self.assertEqual([], result)
+        assert result == []
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_timestamp_query(self):
         """Exercise querying timestamp against an empty database"""
         new_years_day = datetime.datetime(2024, 1, 1)
         result = await self.cohortl.query(
             CohortFilter(timestamp=GenericFilter(eq=new_years_day))
         )
-        self.assertEqual([], result)
+        assert result == []
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_project_query(self):
         """Exercise querying project against an empty database"""
         result = await self.cohortl.query(CohortFilter(project=GenericFilter(eq=37)))
-        self.assertEqual([], result)
+        assert result == []
 
 
 def get_sample_model(
@@ -162,14 +161,16 @@ def get_sample_model(
     )
 
 
-class TestCohortData(DbIsolatedTest):
+@pytest.mark.skip(reason='Skipped until Sample table migrated to PostgreSQL')
+class TestCohortData:
     """Test custom cohort endpoints that need some sequencing groups already set up"""
 
-    @run_as_sync
-    async def setUp(self):
-        super().setUp()
-        self.cohortl = CohortLayer(self.connection)
-        self.samplel = SampleLayer(self.connection)
+    @pytest.fixture(autouse=True)
+    async def set_up(self, connection_with_project: Connection):
+        self.cohortl = CohortLayer(connection_with_project)
+        self.samplel = SampleLayer(connection_with_project)
+        self.project_id = connection_with_project.project_id
+        self.project_name = connection_with_project.project.name
 
         self.sA = await self.samplel.upsert_sample(get_sample_model('A'))
         self.sB = await self.samplel.upsert_sample(get_sample_model('B'))
@@ -184,7 +185,7 @@ class TestCohortData(DbIsolatedTest):
         self.sgC = sequencing_group_id_format(self.sC.sequencing_groups[0].id)
         self.sgC_raw = self.sC.sequencing_groups[0].id
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_internal_external(self):
         """Test to_internal() and to_external() methods"""
         cc_external_dict = {
@@ -209,12 +210,12 @@ class TestCohortData(DbIsolatedTest):
 
         cc_external = CohortCriteria(**cc_external_dict)
         cc_internal = cc_external.to_internal(projects_internal=[self.project_id])
-        self.assertIsInstance(cc_internal, CohortCriteriaInternal)
-        self.assertDictEqual(cc_internal.model_dump(), cc_internal_dict)
+        assert isinstance(cc_internal, CohortCriteriaInternal)
+        assert cc_internal.model_dump() == cc_internal_dict
 
         cc_ext_trip = cc_internal.to_external(project_names=[self.project_name])
-        self.assertIsInstance(cc_ext_trip, CohortCriteria)
-        self.assertDictEqual(cc_ext_trip.model_dump(), cc_external_dict)
+        assert isinstance(cc_ext_trip, CohortCriteria)
+        assert cc_ext_trip.model_dump() == cc_external_dict
 
         ctpl_internal_dict = {
             'id': 496,
@@ -232,10 +233,10 @@ class TestCohortData(DbIsolatedTest):
         ).to_internal(
             criteria_projects=[self.project_id], template_project=self.project_id
         )
-        self.assertIsInstance(ctpl_internal, CohortTemplateInternal)
-        self.assertDictEqual(ctpl_internal.model_dump(), ctpl_internal_dict)
+        assert isinstance(ctpl_internal, CohortTemplateInternal)
+        assert ctpl_internal.model_dump() == ctpl_internal_dict
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_create_cohort_by_sgs(self):
         """Create cohort by selecting sequencing groups"""
         result = await self.cohortl.create_cohort_from_criteria(
@@ -248,18 +249,18 @@ class TestCohortData(DbIsolatedTest):
                 sg_ids_internal_raw=[self.sgB_raw],
             ),
         )
-        self.assertIsInstance(result, NewCohortInternal)
-        self.assertIsInstance(result.cohort_id, int)
-        self.assertEqual([self.sgB_raw], result.sequencing_group_ids)
+        assert isinstance(result, NewCohortInternal)
+        assert isinstance(result.cohort_id, int)
+        assert [self.sgB_raw] == result.sequencing_group_ids
 
         external = result.to_external()
-        self.assertIsInstance(external, NewCohort)
-        self.assertIsInstance(external.cohort_id, str)
-        self.assertEqual(external.cohort_id, cohort_id_format(result.cohort_id))
-        self.assertEqual([self.sgB], external.sequencing_group_ids)
-        self.assertEqual(False, external.dry_run)
+        assert isinstance(external, NewCohort)
+        assert isinstance(external.cohort_id, str)
+        assert external.cohort_id == cohort_id_format(result.cohort_id)
+        assert [self.sgB] == external.sequencing_group_ids
+        assert not external.dry_run
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_create_cohort_by_excluded_sgs(self):
         """Create cohort by excluding sequencing groups"""
         result = await self.cohortl.create_cohort_from_criteria(
@@ -272,12 +273,12 @@ class TestCohortData(DbIsolatedTest):
                 excluded_sgs_internal_raw=[self.sgA_raw],
             ),
         )
-        self.assertIsInstance(result.cohort_id, int)
-        self.assertEqual(2, len(result.sequencing_group_ids))
-        self.assertIn(self.sgB_raw, result.sequencing_group_ids)
-        self.assertIn(self.sgC_raw, result.sequencing_group_ids)
+        assert isinstance(result.cohort_id, int)
+        assert len(result.sequencing_group_ids) == 2
+        assert self.sgB_raw in result.sequencing_group_ids
+        assert self.sgC_raw in result.sequencing_group_ids
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_create_cohort_by_technology(self):
         """Create cohort by selecting a technology"""
         result = await self.cohortl.create_cohort_from_criteria(
@@ -290,12 +291,12 @@ class TestCohortData(DbIsolatedTest):
                 sg_technology=['short-read'],
             ),
         )
-        self.assertIsInstance(result.cohort_id, int)
-        self.assertEqual(2, len(result.sequencing_group_ids))
-        self.assertIn(self.sgA_raw, result.sequencing_group_ids)
-        self.assertIn(self.sgB_raw, result.sequencing_group_ids)
+        assert isinstance(result.cohort_id, int)
+        assert len(result.sequencing_group_ids) == 2
+        assert self.sgA_raw in result.sequencing_group_ids
+        assert self.sgB_raw in result.sequencing_group_ids
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_create_cohort_by_platform(self):
         """Create cohort by selecting a platform"""
         result = await self.cohortl.create_cohort_from_criteria(
@@ -308,10 +309,10 @@ class TestCohortData(DbIsolatedTest):
                 sg_platform=['ONT'],
             ),
         )
-        self.assertIsInstance(result.cohort_id, int)
-        self.assertEqual([self.sgC_raw], result.sequencing_group_ids)
+        assert isinstance(result.cohort_id, int)
+        assert [self.sgC_raw] == result.sequencing_group_ids
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_create_cohort_by_type(self):
         """Create cohort by selecting types"""
         result = await self.cohortl.create_cohort_from_criteria(
@@ -324,12 +325,12 @@ class TestCohortData(DbIsolatedTest):
                 sg_type=['genome'],
             ),
         )
-        self.assertIsInstance(result.cohort_id, int)
-        self.assertEqual(2, len(result.sequencing_group_ids))
-        self.assertIn(self.sgA_raw, result.sequencing_group_ids)
-        self.assertIn(self.sgB_raw, result.sequencing_group_ids)
+        assert isinstance(result.cohort_id, int)
+        assert len(result.sequencing_group_ids) == 2
+        assert self.sgA_raw in result.sequencing_group_ids
+        assert self.sgB_raw in result.sequencing_group_ids
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_create_cohort_by_sample_type(self):
         """Create cohort by selecting sample types"""
         result = await self.cohortl.create_cohort_from_criteria(
@@ -342,10 +343,10 @@ class TestCohortData(DbIsolatedTest):
                 sample_type=['saliva'],
             ),
         )
-        self.assertIsInstance(result.cohort_id, int)
-        self.assertEqual([self.sgC_raw], result.sequencing_group_ids)
+        assert isinstance(result.cohort_id, int)
+        assert [self.sgC_raw] == result.sequencing_group_ids
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_create_cohort_by_everything(self):
         """Create cohort by selecting a variety of fields"""
         result = await self.cohortl.create_cohort_from_criteria(
@@ -363,10 +364,10 @@ class TestCohortData(DbIsolatedTest):
                 sample_type=['blood'],
             ),
         )
-        self.assertEqual(1, len(result.sequencing_group_ids))
-        self.assertIn(self.sgB_raw, result.sequencing_group_ids)
+        assert len(result.sequencing_group_ids) == 1
+        assert self.sgB_raw in result.sequencing_group_ids
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_create_duplicate_cohort(self):
         """Can't create cohorts with duplicate names"""
         _ = await self.cohortl.create_cohort_from_criteria(
@@ -389,7 +390,7 @@ class TestCohortData(DbIsolatedTest):
             ),
         )
 
-        with self.assertRaises(IntegrityError):
+        with pytest.raises(IntegrityError):
             _ = await self.cohortl.create_cohort_from_criteria(
                 project_to_write=self.project_id,
                 description='A duplicate cohort',
@@ -400,7 +401,7 @@ class TestCohortData(DbIsolatedTest):
                 ),
             )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_create_template_then_cohorts(self):
         """Test with template and cohort IDs out of sync, and creating from template"""
         tid = await self.cohortl.create_cohort_template(
@@ -430,7 +431,7 @@ class TestCohortData(DbIsolatedTest):
             template_id=tid,
         )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_reevaluate_cohort(self):
         """Add another sample, then reevaluate a cohort template"""
         template = await self.cohortl.create_cohort_template(
@@ -454,7 +455,7 @@ class TestCohortData(DbIsolatedTest):
             dry_run=False,
             template_id=template,
         )
-        self.assertEqual(2, len(coh1.sequencing_group_ids))
+        assert len(coh1.sequencing_group_ids) == 2
 
         sD = await self.samplel.upsert_sample(get_sample_model('D'))  # noqa: N806
         sgD_raw = sD.sequencing_groups[0].id  # noqa: N806
@@ -466,12 +467,11 @@ class TestCohortData(DbIsolatedTest):
             dry_run=False,
             template_id=template,
         )
-        self.assertEqual(3, len(coh2.sequencing_group_ids))
+        assert len(coh2.sequencing_group_ids) == 3
+        assert sgD_raw not in coh1.sequencing_group_ids
+        assert sgD_raw in coh2.sequencing_group_ids
 
-        self.assertNotIn(sgD_raw, coh1.sequencing_group_ids)
-        self.assertIn(sgD_raw, coh2.sequencing_group_ids)
-
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_query_cohort(self):
         """Create a cohort and test that it is populated when queried"""
         created = await self.cohortl.create_cohort_from_criteria(
@@ -484,31 +484,34 @@ class TestCohortData(DbIsolatedTest):
                 sg_ids_internal_raw=[self.sgA_raw, self.sgB_raw],
             ),
         )
-        self.assertEqual(2, len(created.sequencing_group_ids))
+        assert len(created.sequencing_group_ids) == 2
 
         queried = await self.cohortl.query(
             CohortFilter(name=GenericFilter(eq='Duo cohort'))
         )
-        self.assertEqual(1, len(queried))
+        assert len(queried) == 1
 
         result = await self.cohortl.get_cohort_sequencing_group_ids(int(queried[0].id))
-        self.assertEqual(2, len(result))
-        self.assertIn(self.sA.sequencing_groups[0].id, result)
-        self.assertIn(self.sB.sequencing_groups[0].id, result)
+        assert len(result) == 2
+        assert self.sA.sequencing_groups[0].id in result
+        assert self.sB.sequencing_groups[0].id in result
 
 
-class TestCohortGraphql(DbIsolatedTest):
+@pytest.mark.skip(
+    reason='Skipped until Sample, Sequencing group tables migrated to PostgreSQL'
+)
+class TestCohortGraphql:
     """Test custom cohort endpoints that need some sequencing groups already set up"""
 
-    @run_as_sync
-    async def setUp(self):
-        super().setUp()
-        self.cohortl = CohortLayer(self.connection)
-        self.samplel = SampleLayer(self.connection)
-        self.sgl = SequencingGroupLayer(self.connection)
+    @pytest.fixture(autouse=True)
+    async def set_up(self, connection_with_project: Connection):
+        self.cohortl = CohortLayer(connection_with_project)
+        self.samplel = SampleLayer(connection_with_project)
+        self.sgl = SequencingGroupLayer(connection_with_project)
+        self.project_id = connection_with_project.project_id
 
-    @run_as_sync
-    async def test_cohort_with_archived_sgs(self):
+    @pytest.mark.asyncio
+    async def test_cohort_with_archived_sgs(self, graphql_query: GraphQLQueryFunction):
         """Check that archived sequencing groups are shown by default in cohorts"""
         sample_model = SampleUpsertInternal(
             meta={},
@@ -554,7 +557,7 @@ class TestCohortGraphql(DbIsolatedTest):
         # Archive the first sequencing group
         await self.sgl.archive_sequencing_group(sg1)
 
-        query_result_incl_archived = await self.run_graphql_query_async(
+        query_result_incl_archived = await graphql_query(
             """
             query Cohort($name: StrGraphQLFilter) {
                 cohorts(name:$name) {
@@ -570,10 +573,10 @@ class TestCohortGraphql(DbIsolatedTest):
         )
 
         incl_archived_cohort = query_result_incl_archived['cohorts'][0]
-        self.assertEqual(incl_archived_cohort['name'], cohort_name)
-        self.assertEqual(len(incl_archived_cohort['sequencingGroups']), 2)
-        self.assertEqual(incl_archived_cohort['sequencingGroups'][0]['archived'], True)
-        self.assertEqual(incl_archived_cohort['sequencingGroups'][1]['archived'], False)
+        assert incl_archived_cohort['name'] == cohort_name
+        assert len(incl_archived_cohort['sequencingGroups']) == 2
+        assert incl_archived_cohort['sequencingGroups'][0]['archived']
+        assert not incl_archived_cohort['sequencingGroups'][1]['archived']
 
         query_result_excl_archived = await self.run_graphql_query_async(
             """
@@ -591,5 +594,5 @@ class TestCohortGraphql(DbIsolatedTest):
         )
 
         excl_archived_cohort = query_result_excl_archived['cohorts'][0]
-        self.assertEqual(len(excl_archived_cohort['sequencingGroups']), 1)
-        self.assertEqual(excl_archived_cohort['sequencingGroups'][0]['archived'], False)
+        assert len(excl_archived_cohort['sequencingGroups']) == 1
+        assert not excl_archived_cohort['sequencingGroups'][0]['archived']

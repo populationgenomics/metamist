@@ -19,7 +19,7 @@ class CohortInternal(SMBase):
     template_id: int
     status: CohortStatus | None
 
-    #TODO piyumi: check to remove
+    # TODO piyumi: check to remove
     @staticmethod
     def from_db(d: dict, cohort_status: CohortStatus | None = None):
         """
