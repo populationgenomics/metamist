@@ -366,7 +366,7 @@ class DbIsolatedTest(DbTest):
             'group',
             'project_member',
         }
-        for table in TABLES_ORDERED_BY_FK_DEPS:
+        for table in TABLES_ORDERED_BY_FK_DEPS:  # noqa: F821
             if table in ignore:
                 continue
             try:

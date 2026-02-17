@@ -502,7 +502,7 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
         self.file_matcher.find_original_analysis_files(analyses, MAIN_BUCKET_FILES)
 
         for analysis in analyses:
-            if analysis.id == 7:  # noqa: PLR2004
+            if analysis.id == 7:
                 self.assertIsNotNone(analysis.original_file)
 
     def test_find_uningested_files(self):
