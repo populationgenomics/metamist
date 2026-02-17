@@ -44,18 +44,6 @@ class SequencingGroupInternal(SMBase):
 
     assays: list[AssayInternal] | None = None
 
-    @classmethod
-    def from_db(cls, **kwargs):
-        """From database model"""
-        meta = parse_sql_dict(kwargs.pop('meta'))
-
-        _archived = parse_sql_bool(kwargs.pop('archived', None))
-        external_ids = parse_sql_dict(kwargs.pop('external_ids', None)) or {}
-
-        return SequencingGroupInternal(
-            **kwargs, archived=_archived, meta=meta, external_ids=external_ids
-        )
-
     def to_external(self):
         """Convert to transport model"""
         return SequencingGroup(
