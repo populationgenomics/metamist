@@ -297,11 +297,11 @@ class CredentialedDatabaseConfiguration:
         """Dev config for local database with name 'sm_dev'"""
         # consider pulling from env variables
         return CredentialedDatabaseConfiguration(
-            dbname=os.environ.get('SM_DEV_DB_NAME', 'sm_dev'),
-            username=os.environ.get('SM_DEV_DB_USER', 'root'),
-            password=os.environ.get('SM_DEV_DB_PASSWORD', ''),
-            host=os.environ.get('SM_DEV_DB_HOST', '127.0.0.1'),
-            port=os.environ.get('SM_DEV_DB_PORT', '3306'),
+            dbname=os.environ.get('SM_DEV_DB_NAME', 'metamist_db'),
+            username=os.environ.get('SM_DEV_DB_USER', 'metamist'),
+            password=os.environ.get('SM_DEV_DB_PASSWORD', 'metamist_password'),
+            host=os.environ.get('SM_DEV_DB_HOST', 'localhost'),
+            port=os.environ.get('SM_DEV_DB_PORT', '5432'),
         )
 
     def get_connection_string(self):
