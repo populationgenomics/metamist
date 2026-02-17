@@ -1,17 +1,14 @@
 from collections import defaultdict
 from datetime import date
 from string.templatelib import Template
-from typing import Any
 from dateutil.relativedelta import relativedelta
 
-from psycopg import AsyncConnection, sql
-from psycopg.pq import TransactionStatus
-from psycopg.rows import DictRow
+from psycopg import sql
 
 from db.python.filters.generic import GenericFilter
 from db.python.filters.sequencing_group import SequencingGroupFilter
 from db.python.tables.base import DbBase
-from db.python.utils import NoOpAenter, to_db_json
+from db.python.utils import to_db_json
 from models.models.project import ProjectId
 from models.models.sequencing_group import (
     SequencingGroupInternal,
@@ -397,10 +394,7 @@ class SequencingGroupTable(DbBase):
             (%(seqgroup)s, %(assayid)s, %(audit_log_id)s)
         """
 
-        in_transaction = conn.info.transaction_status == TransactionStatus.INTRANS
-        with_function = conn.transaction if not in_transaction else NoOpAenter
-
-        async with with_function():
+        async with self.connection.transaction():
             if existing_sg_ids:
                 await self.archive_sequencing_groups([s['id'] for s in existing_sg_ids])
 
@@ -464,13 +458,9 @@ class SequencingGroupTable(DbBase):
         WHERE sequencing_group_id = ANY({sequencing_group_ids});
         """
 
-        conn = self.connection.pg_connection
-        in_transaction = conn.info.transaction_status == TransactionStatus.INTRANS
-        with_function = conn.transaction if not in_transaction else NoOpAenter
-
-        async with with_function():
-            await conn.execute(_query)
-            await conn.execute(_external_id_query)
+        async with self.connection.transaction():
+            await self.connection.pg_connection.execute(_query)
+            await self.connection.pg_connection.execute(_external_id_query)
 
     async def get_type_numbers_for_project(self, project) -> dict[str, int]:
         """
