@@ -6,8 +6,6 @@ from typing import Any
 
 from dateutil.relativedelta import relativedelta
 
-from psycopg import sql
-
 from db.python.filters import GenericFilter
 from db.python.filters.sample import SampleFilter
 from db.python.tables.base import DbBase
@@ -290,36 +288,35 @@ class SampleTable(DbBase):
         if not external_ids or external_ids.get(PRIMARY_EXTERNAL_ORG) is None:
             raise ValueError('Sample must have primary external_id')
 
-        conn = self.connection.pg_connection
-
         audit_log_id = await self.audit_log_id()
-        kv_pairs = {
-            'participant_id': participant_id,
-            'meta': to_db_json(meta or {}),
-            'type': sample_type,
-            'active': active,
-            'audit_log_id': audit_log_id,
-            'sample_parent_id': sample_parent_id,
-            'sample_root_id': sample_root_id,
-            'project': project or self.project_id,
-        }
-        key_placeholder = sql.SQL(', ').join([sql.Identifier(k) for k in kv_pairs.keys()])
-        value_placeholder = sql.SQL(', ').join([v for v in kv_pairs.values()])
+        kv_pairs = [
+            ('participant_id', participant_id),
+            ('meta', to_db_json(meta or {})),
+            ('type', sample_type),
+            ('active', active),
+            ('audit_log_id', audit_log_id),
+            ('sample_parent_id', sample_parent_id),
+            ('sample_root_id', sample_root_id),
+            ('project', project or self.project_id),
+        ]
 
-        _query = t"""\
+        keys = [k for k, _ in kv_pairs]
+        cs_keys = ', '.join(keys)
+        cs_id_keys = ', '.join(f':{k}' for k in keys)
+        _query = f"""\
         INSERT INTO sample
-            ({key_placeholder:q})
-        VALUES ({value_placeholder:q}) RETURNING id;
+            ({cs_keys})
+        VALUES ({cs_id_keys}) RETURNING id;
         """
-        
-        async with conn.cursor() as cur:
-            await cur.execute(_query)
-            id_of_new_sample = await cur.fetchone()
-        id_of_new_sample = id_of_new_sample['id']
+
+        id_of_new_sample = await self.connection.fetch_val(
+            _query,
+            dict(kv_pairs),
+        )
 
         _eid_query = """
         INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
-        VALUES (%(project)s, %(id)s, %(name)s, %(external_id)s, %(audit_log_id)s)
+        VALUES (:project, :id, :name, :external_id, :audit_log_id)
         """
         _eid_values = [
             {
@@ -332,8 +329,7 @@ class SampleTable(DbBase):
             for name, eid in external_ids.items()
             if eid is not None
         ]
-        async with conn.cursor() as cur:
-            await cur.executemany(_eid_query, _eid_values)
+        await self.connection.execute_many(_eid_query, _eid_values)
 
         return id_of_new_sample
 
