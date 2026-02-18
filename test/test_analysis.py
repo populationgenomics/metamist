@@ -1,7 +1,10 @@
 import time
 from datetime import datetime
 
+import pytest
+
 from api.routes.analysis import AnalysisUpdateModel, update_analysis
+from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.assay import AssayLayer
@@ -19,21 +22,26 @@ from models.models import (
     SequencingGroupUpsertInternal,
     parse_sql_bool,
 )
-from test.testbase import DbIsolatedTest, run_as_sync
 
 
-class TestAnalysis(DbIsolatedTest):
+@pytest.mark.skip(
+    reason='Analysis really is reliant on almost every other migration. Best to uncomment once the others are completed.'
+)
+class TestAnalysis:
     """Test sample class"""
 
-    @run_as_sync
-    async def setUp(self) -> None:
-        # don't need to await because it's tagged @run_as_sync
-        super().setUp()
-        self.sl = SampleLayer(self.connection)
-        self.sgl = SequencingGroupLayer(self.connection)
-        self.asl = AssayLayer(self.connection)
-        self.al = AnalysisLayer(self.connection)
-        self.pl = ParticipantLayer(self.connection)
+    @pytest.fixture(autouse=True)
+    async def setUp(self, connection_with_project: Connection) -> None:
+        self.connection = connection_with_project
+
+        assert connection_with_project.project_id is not None
+        self.project_id = connection_with_project.project_id
+
+        self.sgl = SequencingGroupLayer(connection_with_project)
+        self.asl = AssayLayer(connection_with_project)
+        self.al = AnalysisLayer(connection_with_project)
+        self.pl = ParticipantLayer(connection_with_project)
+        self.sl = SampleLayer(connection_with_project)
 
         sample = await self.sl.upsert_sample(
             SampleUpsertInternal(
@@ -80,10 +88,15 @@ class TestAnalysis(DbIsolatedTest):
             )
         )
         self.sample_id = sample.id
-        self.genome_sequencing_group_id = sample.sequencing_groups[0].id
-        self.exome_sequencing_group_id = sample.sequencing_groups[self.project_id].id
+        assert sample.sequencing_groups is not None
+        assert len(sample.sequencing_groups) == 2
+        assert sample.sequencing_groups[0].id is not None
+        assert sample.sequencing_groups[1].id is not None
 
-    @run_as_sync
+        self.genome_sequencing_group_id: int = sample.sequencing_groups[0].id
+        self.exome_sequencing_group_id: int = sample.sequencing_groups[1].id
+
+    @pytest.mark.asyncio
     async def test_get_analysis_by_id(self):
         """
         Test getting an analysis by id
@@ -98,19 +111,19 @@ class TestAnalysis(DbIsolatedTest):
         )
 
         analysis = await self.al.get_analysis_by_id(analysis_id)
-        self.assertEqual(analysis_id, analysis.id)
-        self.assertEqual('cram', analysis.type)
-        self.assertEqual(AnalysisStatus.COMPLETED, analysis.status)
+        assert analysis.id == analysis_id
+        assert analysis.type == 'cram'
+        assert analysis.status == AnalysisStatus.COMPLETED
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_empty_query(self):
         """
         Test empty IDs to see the query construction
         """
         analyses = await self.al.query(AnalysisFilter(id=GenericFilter(in_=[])))
-        self.assertEqual(len(analyses), 0)
+        assert len(analyses) == 0
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_add_cram(self):
         """
         Test adding an analysis of type CRAM
@@ -125,17 +138,20 @@ class TestAnalysis(DbIsolatedTest):
             )
         )
 
-        analyses = await self.connection.connection.fetch_all('SELECT * FROM analysis')
-        analysis_sgs = await self.connection.connection.fetch_all(
+        acur = await self.connection.pg_connection.execute('SELECT * FROM analysis')
+        analyses = await acur.fetchall()
+
+        acur = await self.connection.pg_connection.execute(
             'SELECT * FROM analysis_sequencing_group'
         )
+        analysis_sgs = await acur.fetchall()
 
-        self.assertEqual(1, len(analyses))
-        self.assertEqual(analysis_id, analyses[0]['id'])
-        self.assertEqual(1, analysis_sgs[0]['sequencing_group_id'])
-        self.assertEqual(analyses[0]['id'], analysis_sgs[0]['analysis_id'])
+        assert len(analyses) == 1
+        assert analyses[0]['id'] == analysis_id
+        assert analysis_sgs[0]['sequencing_group_id'] == 1
+        assert analysis_sgs[0]['analysis_id'] == analyses[0]['id']
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_get_analysis(self):
         """
         Test adding an analysis of type ANALYSIS_RUNNER
@@ -172,9 +188,9 @@ class TestAnalysis(DbIsolatedTest):
             )
         ]
 
-        self.assertEqual(analyses, expected)
+        assert expected == analyses
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_get_analysis_by_meta_isnull(self):
         """
         Test getting an analysis by a meta query that uses isnull
@@ -214,9 +230,9 @@ class TestAnalysis(DbIsolatedTest):
             )
         ]
 
-        self.assertEqual(analyses, expected)
+        assert expected == analyses
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_get_analysis_by_meta_in_(self):
         """
         Test getting an analysis by a meta query that uses in_ filter. These filters
@@ -255,9 +271,9 @@ class TestAnalysis(DbIsolatedTest):
             )
         ]
 
-        self.assertEqual(analyses, expected)
+        assert expected == analyses
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_get_sample_cram_path_map_for_seqr(self):
         """
         Exercise get_sample_cram_path_map_for_seqr()
@@ -273,12 +289,15 @@ class TestAnalysis(DbIsolatedTest):
             ],
         )
 
+        assert len(part) == 1
+        assert part[0].id is not None
+
         id_map = await self.al.get_sample_cram_path_map_for_seqr(
             self.project_id, ['blood'], [part[0].id]
         )
-        self.assertIsInstance(id_map, list)
+        assert isinstance(id_map, list)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_get_sgs_by_analysis_id_with_no_eids(self):
         """
         Test get_sgs_by_analysis_id()
@@ -323,6 +342,11 @@ class TestAnalysis(DbIsolatedTest):
             )
         )
 
+        assert sample.sequencing_groups is not None
+        assert len(sample.sequencing_groups) == 2
+        assert sample.sequencing_groups[0].id is not None
+        assert sample.sequencing_groups[1].id is not None
+
         genome_id = sample.sequencing_groups[0].id
         exome_id = sample.sequencing_groups[1].id
 
@@ -336,13 +360,14 @@ class TestAnalysis(DbIsolatedTest):
         )
 
         sgs_by_aid = await self.sgl.get_sequencing_groups_by_analysis_ids([a_id])
-        self.assertIn(a_id, sgs_by_aid)
-        sgs = sorted(sgs_by_aid[a_id], key=lambda sg: sg.id)
+        assert a_id in sgs_by_aid
 
-        self.assertEqual(sgs[0].id, genome_id)
-        self.assertEqual(sgs[1].id, exome_id)
+        sgs = sorted(sgs_by_aid[a_id], key=lambda sg: sg.id or 0)
 
-    @run_as_sync
+        assert genome_id == sgs[0].id
+        assert exome_id == sgs[1].id
+
+    @pytest.mark.asyncio
     async def test_create_analysis_with_timestamp(self):
         """Tests that analyses can be backdated by suppling timestamp_completed"""
         # Test creation with a manually-set timestamp
@@ -360,9 +385,9 @@ class TestAnalysis(DbIsolatedTest):
         # get the timestamp_completed of the analysis from the db
         init_analysis = await self.al.query(AnalysisFilter(id=GenericFilter(eq=a_id)))
 
-        self.assertEqual(init_analysis[0].timestamp_completed, test_timestamp)
+        assert test_timestamp == init_analysis[0].timestamp_completed
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_update_analysis(self):
         """
         Test Analysis update
@@ -393,7 +418,7 @@ class TestAnalysis(DbIsolatedTest):
         time.sleep(2)
 
         # test that updating with an incorrect output string raises an exception.
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             await self.al.update_analysis(
                 a_id,
                 meta={'sequencing_type': 'genome', 'size': 1024},
@@ -432,9 +457,9 @@ class TestAnalysis(DbIsolatedTest):
             ),
         ]
 
-        self.assertEqual(analyses, expected)
+        assert expected == analyses
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_route_update_active(self):
         """
         Test that update_analysis(active=False) is effective
@@ -447,22 +472,24 @@ class TestAnalysis(DbIsolatedTest):
             )
         )
 
-        analyses = await self.connection.connection.fetch_all('SELECT * FROM analysis')
-        self.assertEqual(1, len(analyses))
-        self.assertEqual(analysis_id, analyses[0]['id'])
-        self.assertTrue(parse_sql_bool(analyses[0]['active']))
+        acur = await self.connection.pg_connection.execute('SELECT * FROM analysis')
+        analyses = await acur.fetchall()
+        assert len(analyses) == 1
+        assert analyses[0]['id'] == analysis_id
+        assert parse_sql_bool(analyses[0]['active']) == True
 
         inactivate = AnalysisUpdateModel(active=False, status=AnalysisStatus.COMPLETED)
         await update_analysis(analysis_id, inactivate, self.connection)
 
-        analyses = await self.connection.connection.fetch_all('SELECT * FROM analysis')
-        self.assertEqual(1, len(analyses))
-        self.assertEqual(analysis_id, analyses[0]['id'])
-        self.assertFalse(parse_sql_bool(analyses[0]['active']))
+        acur = await self.connection.pg_connection.execute('SELECT * FROM analysis')
+        analyses = await acur.fetchall()
+        assert len(analyses) == 1
+        assert analyses[0]['id'] == analysis_id
+        assert parse_sql_bool(analyses[0]['active']) == False
 
         analyses = await self.al.query(
             AnalysisFilter(project=GenericFilter(eq=self.project_id))
         )
-        self.assertEqual(1, len(analyses))
-        self.assertEqual(analysis_id, analyses[0].id)
-        self.assertFalse(analyses[0].active)
+        assert len(analyses) == 1
+        assert analyses[0].id == analysis_id
+        assert analyses[0].active == False

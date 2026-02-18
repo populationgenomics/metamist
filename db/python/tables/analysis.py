@@ -1,11 +1,10 @@
 import dataclasses
 import datetime
 from collections import defaultdict
-from string.templatelib import Template
 from typing import Any
 
 from psycopg import sql
-from psycopg.pq import Jsonb
+from psycopg.types.json import Jsonb
 
 from db.python.filters import (
     GenericFilter,
