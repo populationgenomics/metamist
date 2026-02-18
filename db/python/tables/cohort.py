@@ -130,11 +130,7 @@ class CohortTable(DbBase):
         if not list(wheres_params):
             raise ValueError(f'Invalid filter: {filter_}')
 
-        _query = t"""
-        SELECT id, name, description, criteria, project
-        FROM cohort_template
-        WHERE {wheres_params:q}
-        """
+        _query = t'SELECT id, name, description, criteria, project FROM cohort_template WHERE {wheres_params:q}'
 
         rows = await (await self.connection.pg_connection.execute(_query)).fetchall()
         cohort_templates = []
@@ -207,10 +203,8 @@ class CohortTable(DbBase):
 
         # Use an atomic transaction for a multi-part insert query to prevent the database being
         # left in an incomplete state if the query fails part way through.
-        async with (
-            self.connection.pg_connection.transaction(),
-            self.connection.pg_connection.cursor(row_factory=scalar_row) as cur,
-        ):
+        conn = self.connection.pg_connection
+        async with conn.transaction(), conn.cursor(row_factory=scalar_row) as cur:
             cohort_id = await (await cur.execute(_query)).fetchone()
 
             await cur.executemany(
