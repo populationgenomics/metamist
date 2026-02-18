@@ -476,7 +476,7 @@ class TestAnalysis:
         analyses = await acur.fetchall()
         assert len(analyses) == 1
         assert analyses[0]['id'] == analysis_id
-        assert parse_sql_bool(analyses[0]['active']) == True
+        assert parse_sql_bool(analyses[0]['active'])
 
         inactivate = AnalysisUpdateModel(active=False, status=AnalysisStatus.COMPLETED)
         await update_analysis(analysis_id, inactivate, self.connection)
@@ -485,11 +485,11 @@ class TestAnalysis:
         analyses = await acur.fetchall()
         assert len(analyses) == 1
         assert analyses[0]['id'] == analysis_id
-        assert parse_sql_bool(analyses[0]['active']) == False
+        assert not parse_sql_bool(analyses[0]['active'])
 
         analyses = await self.al.query(
             AnalysisFilter(project=GenericFilter(eq=self.project_id))
         )
         assert len(analyses) == 1
         assert analyses[0].id == analysis_id
-        assert analyses[0].active == False
+        assert not analyses[0].active
