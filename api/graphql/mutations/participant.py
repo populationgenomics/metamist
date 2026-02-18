@@ -108,16 +108,22 @@ class ParticipantMutations:
         from api.graphql.schema import GraphQLParticipant  # noqa: PLC0415
 
         async with info.context['get_connection']() as connection:
-            connection.check_access_to_projects_for_names(
+            projects = connection.get_and_check_access_to_projects_for_names(
                 [project], FullWriteAccessRoles
             )
+            projects = list(projects)
+
+            if len(projects) < 1:
+                raise ValueError('Project not found or user does not have access')
+            project_id = projects[0].id
 
             pt = ParticipantLayer(connection)
             results = await pt.upsert_participants(
                 [
                     ParticipantUpsert.from_dict(strawberry.asdict(p)).to_internal()
                     for p in participants
-                ]
+                ],
+                project=project_id,
             )
             updated_participants = await pt.get_participants_by_ids(
                 [p.id for p in results]  # type: ignore [arg-type]
