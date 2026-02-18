@@ -2,14 +2,13 @@ from collections import defaultdict
 from string.templatelib import Template
 
 from psycopg import sql
-from psycopg.pq import TransactionStatus
 from psycopg.types.json import Jsonb
 
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.filters.participant import ParticipantFilter
 from db.python.tables.meta_table import MetaTable
-from db.python.utils import NoOpAenter, NotFoundError, escape_like_term
+from db.python.utils import NotFoundError, escape_like_term
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantInternal, ProjectId
 
 
