@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from io import BytesIO, StringIO
+from string.templatelib import Template
 from typing import Any
 
 # Unfortunately some of these libs have partially or completely missing
@@ -29,21 +30,20 @@ class MetaTable(DbBase):
         including replacing the primary external org with a sentinel value. This is
         required because duckdb doesn't support column names which are an empty string.
         """
-        return f"""
-            JSON_OBJECTAGG(
+        return t"""
+            JSON_OBJECT_AGG(
                 CASE
-                    WHEN {table_alias}.name = :primary_external_org
-                    THEN :primary_external_org_sentinel
-                    ELSE {table_alias}.name
+                    WHEN {table_alias:i}.name = {PRIMARY_EXTERNAL_ORG}
+                    THEN {EXTERNAL_ORG_SENTINEL}
+                    ELSE {table_alias:i}.name
                 END,
-                {table_alias}.external_id
-            ) AS external_ids
+                {table_alias:i}.external_id
+            )::text AS external_ids
         """
 
     async def entity_meta_table(
         self,
-        project: int,
-        query: str,
+        query: Template,
         row_getter: Callable[[Record], dict[str, Any]],
         has_external_ids: bool,
         has_meta: bool,
@@ -54,14 +54,9 @@ class MetaTable(DbBase):
         parquet file.
         """
 
-        rows = await self.connection.fetch_all(
-            query,
-            {
-                'project': project,
-                'primary_external_org': PRIMARY_EXTERNAL_ORG,
-                'primary_external_org_sentinel': EXTERNAL_ORG_SENTINEL,
-            },
-        )
+        acur = await self.connection.pg_connection.execute(query)
+
+        rows = await acur.fetchall()
 
         if len(rows) == 0:
             return None
@@ -99,7 +94,7 @@ class MetaTable(DbBase):
                     meta_rows_str,
                     map_inference_threshold=-1,
                     format='newline_delimited',
-                ).arrow(),
+                ).fetch_arrow_table(),
             )
             # Prefix all meta columns with `meta_` to avoid clashes with the main table
             meta_columns = """
@@ -116,7 +111,7 @@ class MetaTable(DbBase):
                 duck.read_json(
                     external_id_rows_str,
                     format='newline_delimited',
-                ).arrow(),
+                ).fetch_arrow_table(),
             )
 
             # call the primary external_id column `external_id` and prefix all other
@@ -139,8 +134,10 @@ class MetaTable(DbBase):
             {meta_join}
         """)
 
+        # Write to an in-memory parquet file
+        table = combined.fetch_arrow_table()
         buffer = BytesIO()
-        pq.write_table(combined.arrow(), buffer)
-
+        pq.write_table(table, buffer)
         duck.close()
+
         return buffer
