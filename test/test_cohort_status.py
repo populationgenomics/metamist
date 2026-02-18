@@ -396,6 +396,7 @@ class TestCohortStatusGraphQL:
             query_cohort_filter_status_in,
             {'cohort_status_list': [ACTIVE]},
         )
+
         assert len(query_cohort_status_in['cohorts']) == 2
         for cohort in query_cohort_status_in['cohorts']:
             assert cohort['status'] == ACTIVE
