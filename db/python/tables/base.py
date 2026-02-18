@@ -66,8 +66,7 @@ class DbBase:
             al.ar_guid as ar_guid,
             al.comment as comment,
             al.auth_project as auth_project,
-            al.meta as meta 
-        FROM historical_rows hr
+            al.meta as meta FROM historical_rows hr
         INNER JOIN audit_log al ON al.id = hr.audit_log_id
         """
 
