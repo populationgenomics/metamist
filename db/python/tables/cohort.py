@@ -207,23 +207,23 @@ class CohortTable(DbBase):
 
         # Use an atomic transaction for a multi-part insert query to prevent the database being
         # left in an incomplete state if the query fails part way through.
-        async with self.connection.pg_connection.transaction():
-            async with self.connection.pg_connection.cursor(
-                row_factory=scalar_row
-            ) as cur:
-                cohort_id = await (await cur.execute(_query)).fetchone()
+        async with (
+            self.connection.pg_connection.transaction(),
+            self.connection.pg_connection.cursor(row_factory=scalar_row) as cur,
+        ):
+            cohort_id = await (await cur.execute(_query)).fetchone()
 
-                await cur.executemany(
-                    _query_insert_many,
-                    [
-                        {
-                            'cohort_id': cohort_id,
-                            'sequencing_group_id': sg,
-                            'audit_log_id': audit_log_id,
-                        }
-                        for sg in sequencing_group_ids
-                    ],
-                )
+            await cur.executemany(
+                _query_insert_many,
+                [
+                    {
+                        'cohort_id': cohort_id,
+                        'sequencing_group_id': sg,
+                        'audit_log_id': audit_log_id,
+                    }
+                    for sg in sequencing_group_ids
+                ],
+            )
 
         return NewCohortInternal(
             dry_run=False,
