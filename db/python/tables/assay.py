@@ -5,11 +5,12 @@ from string.templatelib import Template
 from typing import Any, NamedTuple
 
 from psycopg import sql
+from psycopg.pq import TransactionStatus
 from psycopg.types.json import Jsonb
 
 from db.python.filters import GenericFilter, GenericFilterModel, GenericMetaFilter
 from db.python.tables.base import DbBase
-from db.python.utils import NotFoundError
+from db.python.utils import NoOpAenter, NotFoundError
 from models.models.assay import AssayId, AssayInternal
 from models.models.project import ProjectId
 from models.models.sequencing_group import SequencingGroupInternalId
@@ -293,8 +294,11 @@ class AssayTable(DbBase):
         """
 
         conn = self.connection.pg_connection
+        in_transaction = conn.info.transaction_status == TransactionStatus.INTRANS
 
-        async with self.connection.transaction():
+        with_function = conn.transaction if not in_transaction else NoOpAenter
+
+        async with with_function():
             cur = await conn.execute(
                 _query,
                 {
@@ -353,8 +357,10 @@ class AssayTable(DbBase):
         """Update an assay"""
 
         conn = self.connection.pg_connection
+        in_transaction = conn.info.transaction_status == TransactionStatus.INTRANS
+        with_function = conn.transaction if not in_transaction else NoOpAenter
 
-        async with self.connection.transaction():
+        async with with_function():
             audit_log_id = await self.audit_log_id()
 
             updaters: list[Template] = [t'audit_log_id = {audit_log_id}']
