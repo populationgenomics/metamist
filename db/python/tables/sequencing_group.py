@@ -208,12 +208,12 @@ class SequencingGroupTable(DbBase):
         return projects, sgs
 
     async def get_sequencing_groups_by_ids(
-        self, ids: list[int], active_only=True
+        self, ids: list[int], active_only: bool | None = None
     ) -> tuple[set[ProjectId], list[SequencingGroupInternal]]:
         """
         Get sequence groups by internal identifiers
         """
-        filter_active = GenericFilter(eq=True) if active_only else None
+        filter_active = GenericFilter(eq=active_only) if active_only is not None else None
         query = SequencingGroupFilter(id=GenericFilter(in_=ids), active_only=filter_active)
         projects, sgs = await self.query(query)
 
