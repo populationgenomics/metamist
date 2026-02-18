@@ -478,8 +478,6 @@ class CommentTable(DbBase):
 
         audit_log_id = await self.connection.audit_log_id()
 
-        audit_log_id = await self.connection.audit_log_id()
-
         async with (
             self.connection.transaction(),
             self.connection.pg_connection.cursor() as acur,
