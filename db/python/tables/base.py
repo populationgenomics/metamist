@@ -59,7 +59,7 @@ class DbBase:
         )
         SELECT
             hr.{id_field:i} as table_id,
-            al.id as id,
+            al.id as id, 
             al.author as author,
             al.on_behalf_of as on_behalf_of,
             al.timestamp as timestamp,
