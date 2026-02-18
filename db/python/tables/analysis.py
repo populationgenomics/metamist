@@ -1,7 +1,11 @@
 import dataclasses
 import datetime
 from collections import defaultdict
+from string.templatelib import Template
 from typing import Any
+
+from psycopg import sql
+from psycopg.pq import Jsonb
 
 from db.python.filters import (
     GenericFilter,
@@ -46,10 +50,11 @@ class AnalysisTable(DbBase):
         self, analysis_ids: list[int]
     ) -> set[ProjectId]:
         """Get project IDs for sampleIds (mostly for checking auth)"""
-        _query = (
-            'SELECT project FROM analysis WHERE id in :analysis_ids GROUP BY project'
-        )
-        rows = await self.connection.fetch_all(_query, {'analysis_ids': analysis_ids})
+        _query = t"""
+            SELECT project FROM analysis WHERE id = ANY({analysis_ids}) GROUP BY project
+        """
+        acur = await self.connection.pg_connection.execute(_query)
+        rows = await acur.fetchall()
         return set(r['project'] for r in rows)
 
     async def create_analysis(
@@ -65,36 +70,33 @@ class AnalysisTable(DbBase):
     ) -> int:
         """Create a new sample, and add it to database"""
         async with self.connection.transaction():
-            kv_pairs = [
-                ('type', analysis_type),
-                ('status', status.value),
-                ('meta', to_db_json(meta or {})),
-                ('audit_log_id', await self.audit_log_id()),
-                ('project', project or self.project_id),
-                ('active', active if active is not None else True),
-            ]
+            kv_pairs: dict[str, Any] = {
+                'type': analysis_type,
+                'status': status.value,
+                'meta': to_db_json(meta or {}),
+                'audit_log_id': await self.audit_log_id(),
+                'project': project or self.project_id,
+                'active': active if active is not None else True,
+            }
 
             if status == AnalysisStatus.COMPLETED:
-                kv_pairs.append(
-                    (
-                        'timestamp_completed',
-                        timestamp_completed or datetime.datetime.now(datetime.UTC),
-                    )
+                kv_pairs['timestamp_completed'] = (
+                    timestamp_completed or datetime.datetime.now(datetime.UTC)
                 )
 
-            kv_pairs = [(k, v) for k, v in kv_pairs if v is not None]
-            keys = [k for k, _ in kv_pairs]
-            cs_keys = ', '.join(keys)
-            cs_id_keys = ', '.join(f':{k}' for k in keys)
-            _query = f"""\
-INSERT INTO analysis
-    ({cs_keys})
-VALUES ({cs_id_keys}) RETURNING id;"""
+            filtered_pairs = {k: v for k, v in kv_pairs.items() if v is not None}
+            cs_keys = sql.SQL(', ').join(filtered_pairs.keys())
+            cs_values = sql.SQL(', ').join(t'{k}' for k in filtered_pairs)
 
-            id_of_new_analysis = await self.connection.fetch_val(
-                _query,
-                dict(kv_pairs),
-            )
+            _query = t"""
+                INSERT INTO analysis ({cs_keys})
+                VALUES ({cs_values})
+                RETURNING id
+            """
+
+            acur = await self.connection.pg_connection.execute(_query)
+            row = await acur.fetchone()
+            id_of_new_analysis = row['id']
 
             if sequencing_group_ids:
                 await self.add_sequencing_groups_to_analysis(
@@ -113,19 +115,20 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         _query = """
             INSERT INTO analysis_sequencing_group
                 (analysis_id, sequencing_group_id, audit_log_id)
-            VALUES (:aid, :sid, :audit_log_id)
+            VALUES (%(aid)s, %(sid)s, %(audit_log_id)s)
         """
 
         audit_log_id = await self.audit_log_id()
-        values = map(  # noqa: C417
-            lambda sid: {
+        values = [
+            {
                 'aid': analysis_id,
                 'sid': sid,
                 'audit_log_id': audit_log_id,
-            },
-            sequencing_group_ids,
-        )
-        await self.connection.execute_many(_query, list(values))
+            }
+            for sid in sequencing_group_ids
+        ]
+        async with self.connection.pg_connection.cursor() as acur:
+            await acur.executemany(_query, values)
 
     async def add_cohorts_to_analysis(self, analysis_id: int, cohort_ids: list[int]):
         """Add cohorts to an analysis (through the linked table)"""
@@ -136,72 +139,65 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         """
 
         audit_log_id = await self.audit_log_id()
-        values = map(  # noqa: C417
-            lambda cid: {
+        values = [
+            {
                 'aid': analysis_id,
                 'cid': cid,
                 'audit_log_id': audit_log_id,
-            },
-            cohort_ids,
-        )
-        await self.connection.execute_many(_query, list(values))
+            }
+            for cid in cohort_ids
+        ]
+        async with self.connection.pg_connection.cursor() as acur:
+            await acur.executemany(_query, values)
 
     async def find_sgs_in_joint_call_or_es_index_up_to_date(
         self, date: datetime.date
     ) -> set[int]:
         """Find all the sequencing groups that have been in a joint-call or es-index up to a date"""
-        _query = """
-        SELECT DISTINCT asg.sequencing_group_id
-        FROM analysis_sequencing_group asg
-        INNER JOIN analysis a ON asg.analysis_id = a.id
-        WHERE
-            a.type IN ('joint-calling', 'es-index')
-            AND a.timestamp_completed <= :date
+        _query = t"""
+            SELECT DISTINCT asg.sequencing_group_id
+            FROM analysis_sequencing_group asg
+            INNER JOIN analysis a ON asg.analysis_id = a.id
+            WHERE
+                a.type IN ('joint-calling', 'es-index')
+                AND a.timestamp_completed <= {date}
         """
 
-        results = await self.connection.fetch_all(_query, {'date': date})
+        acur = await self.connection.pg_connection.execute(_query)
+        results = await acur.fetchall()
         return {r['sequencing_group_id'] for r in results}
 
     async def update_analysis(
         self,
         analysis_id: int,
         status: AnalysisStatus | None = None,
-        meta: dict[str, Any] = None,
+        meta: dict[str, Any] | None = None,
         active: bool | None = None,
     ):
         """Update the status of an analysis, set timestamp_completed if relevant"""
-        fields: dict[str, Any] = {
-            'analysis_id': analysis_id,
-            'on_behalf_of': self.author,
-            'audit_log_id': await self.audit_log_id(),
-        }
+        audit_log_id = await self.audit_log_id()
         setters = [
-            'audit_log_id = :audit_log_id',
-            'on_behalf_of = :on_behalf_of',
+            t'audit_log_id = {audit_log_id}',
+            t'on_behalf_of = {self.author}',
         ]
-        if status:
-            setters.append('status = :status')
-            fields['status'] = status.value
 
-        if active is not None:
-            setters.append('active = :active')
-            fields['active'] = active
+        setters.append(t'status = {status.value}') if status else None
+        setters.append(t'active = {active}') if active is not None else None
 
         if status == AnalysisStatus.COMPLETED:
-            fields['timestamp_completed'] = datetime.datetime.utcnow()
-            # only set timestamp_completed if it's not already set
+            now = datetime.datetime.now(datetime.UTC)
             setters.append(
-                'timestamp_completed = CASE WHEN timestamp_completed IS NULL THEN :timestamp_completed ELSE timestamp_completed END',
+                t'timestamp_completed = CASE WHEN timestamp_completed IS NULL THEN {now} ELSE timestamp_completed END',
             )
 
         if meta is not None and len(meta) > 0:
-            fields['meta'] = to_db_json(meta)
-            setters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
+            meta = Jsonb(meta)
+            setters.append(t'meta = JSON_MERGE_PATCH(COALESCE(meta, "{{}}"), {meta})')
 
-        fields_str = ', '.join(setters)
-        _query = f'UPDATE analysis SET {fields_str} WHERE id = :analysis_id'
+        fields_str = sql.SQL(', ').join(setters)
+        _query = t'UPDATE analysis SET {fields_str} WHERE id = {analysis_id}'
 
-        await self.connection.execute(_query, fields)
+        await self.connection.pg_connection.execute(_query)
 
     async def query(self, filter_: AnalysisFilter) -> list[AnalysisInternal]:
         """Get analysis by various (AND'd) criteria"""
@@ -218,7 +214,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 'or project to filter on'
             )
 
-        where_str, values = filter_.to_sql(
+        where_conditions = filter_.to_sql(
             {
                 'id': 'a.id',
                 'sequencing_group_id': 'a_sg.sequencing_group_id',
@@ -232,7 +228,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             },
         )
 
-        _query = f"""
+        where_str = sql.SQL(' AND ').join(where_conditions)
+
+        _query = t"""
             SELECT
                 a.id,
                 a.type,
@@ -247,10 +245,11 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             FROM analysis a
             LEFT JOIN analysis_sequencing_group a_sg ON a.id = a_sg.analysis_id
             LEFT JOIN analysis_cohort a_c ON a.id = a_c.analysis_id
-            WHERE {where_str}
+            WHERE {where_str:q}
             GROUP BY a.id
         """
-        rows = await self.connection.fetch_all(_query, values)
+        acur = await self.connection.pg_connection.execute(_query)
+        rows = await acur.fetchall()
         result: list[AnalysisInternal] = []
 
         if not rows:
@@ -287,13 +286,14 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         self, analysis_ids: list[int]
     ) -> dict[int, dict[str, RecursiveDict]]:
         """Fetches all output files for a list of analysis IDs"""
-        _query = """
-        SELECT DISTINCT ao.analysis_id, f.*, ao.json_structure, ao.output
-        FROM analysis_outputs ao
-        LEFT JOIN output_file f ON ao.file_id = f.id
-        WHERE ao.analysis_id IN :analysis_ids
+        _query = t"""
+            SELECT DISTINCT ao.analysis_id, f.*, ao.json_structure, ao.output
+            FROM analysis_outputs ao
+            LEFT JOIN output_file f ON ao.file_id = f.id
+            WHERE ao.analysis_id = ANY({analysis_ids})
         """
-        rows = await self.connection.fetch_all(_query, {'analysis_ids': analysis_ids})
+        acur = await self.connection.pg_connection.execute(_query)
+        rows = await acur.fetchall()
 
         # Preparing to accumulate analysis files
         analysis_files: dict[
@@ -340,7 +340,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         self,
         project: ProjectId,
         analysis_type: str,
-        meta: dict[str, Any] = None,
+        meta: dict[str, Any] | None = None,
     ):
         """Find the most recent completed analysis for some analysis type"""
         values = {'project': project, 'type': analysis_type}
@@ -355,24 +355,27 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                     v = 'null'  # noqa: PLW2901
                 values[k_replacer] = v
 
-        _query = f"""
-SELECT a.id as id, a.type as type, a.status as status,
-        a_sg.sequencing_group_id as sequencing_group_id,
-        a.project as project, a.timestamp_completed as timestamp_completed,
-        a.meta as meta
-FROM analysis_sequencing_group a_sg
-INNER JOIN analysis a ON a_sg.analysis_id = a.id
-INNER JOIN sequencing_group sg ON a_sg.sequencing_group_id = sg.id
-WHERE a.id = (
-    SELECT id FROM analysis
-    WHERE active AND type = :type AND project = :project AND status = 'completed' AND timestamp_completed IS NOT NULL{meta_str}
-    ORDER BY timestamp_completed DESC
-    LIMIT 1
-)
-"""
-        rows = await self.connection.fetch_all(_query, values)
+        _query = t"""
+            SELECT a.id as id, a.type as type, a.status as status,
+                    a_sg.sequencing_group_id as sequencing_group_id,
+                    a.project as project, a.timestamp_completed as timestamp_completed,
+                    a.meta as meta
+            FROM analysis_sequencing_group a_sg
+            INNER JOIN analysis a ON a_sg.analysis_id = a.id
+            INNER JOIN sequencing_group sg ON a_sg.sequencing_group_id = sg.id
+            WHERE a.id = (
+                SELECT id FROM analysis
+                WHERE active AND type = {analysis_type} AND project = {project} AND status = 'completed' AND timestamp_completed IS NOT NULL {meta_str}
+                ORDER BY timestamp_completed DESC
+                LIMIT 1
+            )
+        """
+        acur = await self.connection.pg_connection.execute(_query)
+        rows = await acur.fetchall()
+
         if len(rows) == 0:
             raise NotFoundError(f"Couldn't find any analysis with type {analysis_type}")
+
         latest_analysis = rows[0]
         latest_analysis_data = dict(latest_analysis)
         analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(
@@ -388,6 +391,10 @@ WHERE a.id = (
 
         analysis = AnalysisInternal.from_db(**latest_analysis_data)
         # .from_db maps 'sequencing_group_id' -> sequencing_group_ids
+
+        if analysis.sequencing_group_ids is None:
+            analysis.sequencing_group_ids = []
+
         for row in rows[1:]:
             analysis.sequencing_group_ids.append(row['sequencing_group_id'])
 
@@ -397,43 +404,28 @@ WHERE a.id = (
         self, analysis_type: str, project: ProjectId
     ) -> list[int]:
         """Find all the samples in the sample_id list that a"""
-        _query = """
-SELECT sg.id FROM sequencing_group sg
-WHERE s.project = :project AND
-      id NOT IN (
-          SELECT a_sg.sequencing_group_id FROM analysis_sequencing_group a_sg
-          LEFT JOIN analysis a ON a_sg.analysis_id = a.id
-          WHERE a.type = :analysis_type AND a.active
-      )
-;"""
+        project_id = project or self.project_id
 
-        rows = await self.connection.fetch_all(
-            _query,
-            {
-                'analysis_type': analysis_type,
-                'project': project or self.project_id,
-            },
-        )
-        return [row[0] for row in rows]
+        _query = t"""
+            SELECT sg.id as id
+            FROM sequencing_group sg
+            WHERE sg.project = {project_id} AND
+                id NOT IN (
+                    SELECT a_sg.sequencing_group_id FROM analysis_sequencing_group a_sg
+                    LEFT JOIN analysis a ON a_sg.analysis_id = a.id
+                    WHERE a.type = {analysis_type} AND a.active
+                )
+        """
+
+        acur = await self.connection.pg_connection.execute(_query)
+        rows = await acur.fetchall()
+        return [row['id'] for row in rows]
 
     async def get_latest_complete_analysis_for_sequencing_group_ids_by_type(
         self, analysis_type: str, sequencing_group_ids: list[int]
     ) -> list[AnalysisInternal]:
         """Get the latest complete analysis for samples (one per sample)"""
-        _query = """
-SELECT
-    a.id AS id, a.type as type, a.status as status,
-    a.project as project, a_sg.sequencing_group_id,
-    a.timestamp_completed as timestamp_completed, a.meta as meta
-FROM analysis a
-LEFT JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
-WHERE
-    a.active AND
-    a.type = :type AND
-    a.timestamp_completed IS NOT NULL AND
-    a_sg.sequencing_group_id in :sequencing_group_ids
-ORDER BY a.timestamp_completed DESC
-        """
+
         expected_type = ('gvcf', 'cram', 'qc')
         if analysis_type not in expected_type:
             expected_types_str = ', '.join(a for a in expected_type)
@@ -441,16 +433,29 @@ ORDER BY a.timestamp_completed DESC
                 f'Received analysis type {analysis_type!r}", expected {expected_types_str!r}'
             )
 
-        values = {
-            'sequencing_group_ids': sequencing_group_ids,
-            'type': analysis_type,
-        }
-        rows = await self.connection.fetch_all(_query, values)
+        _query = t"""
+            SELECT
+                a.id AS id, a.type as type, a.status as status,
+                a.project as project, a_sg.sequencing_group_id,
+                a.timestamp_completed as timestamp_completed, a.meta as meta
+            FROM analysis a
+            LEFT JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
+            WHERE
+                a.active AND
+                a.type = {analysis_type} AND
+                a.timestamp_completed IS NOT NULL AND
+                a_sg.sequencing_group_id = ANY({sequencing_group_ids})
+            ORDER BY a.timestamp_completed DESC
+        """
+
+        acur = await self.connection.pg_connection.execute(_query)
+        rows = await acur.fetchall()
         seen_sequencing_group_ids = set()
         analyses: list[AnalysisInternal] = []
         analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(
             [r['id'] for r in rows]
         )
+
         for row in rows:
             if row['sequencing_group_id'] in seen_sequencing_group_ids:
                 continue
@@ -476,17 +481,20 @@ ORDER BY a.timestamp_completed DESC
         self, analysis_id: int
     ) -> tuple[ProjectId, AnalysisInternal]:
         """Get analysis object by analysis_id"""
-        _query = """
-SELECT
-    a.id as id, a.type as type, a.status as status,
-    a.project as project,
-    a_sg.sequencing_group_id as sequencing_group_id,
-    a.timestamp_completed as timestamp_completed, a.meta as meta, a.active as active
-FROM analysis a
-LEFT JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
-WHERE a.id = :analysis_id
-"""
-        rows = await self.connection.fetch_all(_query, {'analysis_id': analysis_id})
+        _query = t"""
+            SELECT
+                a.id as id, a.type as type, a.status as status,
+                a.project as project,
+                a_sg.sequencing_group_id as sequencing_group_id,
+                a.timestamp_completed as timestamp_completed, a.meta as meta, a.active as active
+            FROM analysis a
+            LEFT JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
+            WHERE a.id = {analysis_id}
+        """
+
+        acur = await self.connection.pg_connection.execute(_query)
+        rows = await acur.fetchall()
+
         if len(rows) == 0:
             raise NotFoundError(f"Couldn't find analysis with id = {analysis_id}")
 
@@ -504,6 +512,9 @@ WHERE a.id = :analysis_id
             analysis_data['outputs'] = analysis_output_for_id.get('outputs', {})
 
         analysis = AnalysisInternal.from_db(**analysis_data)
+        if analysis.sequencing_group_ids is None:
+            analysis.sequencing_group_ids = []
+
         for row in rows[1:]:
             analysis.sequencing_group_ids.append(row['sequencing_group_id'])
 
@@ -513,49 +524,41 @@ WHERE a.id = :analysis_id
         self,
         project: ProjectId,
         sequencing_types: list[str],
-        participant_ids: list[int] = None,
+        participant_ids: list[int] | None = None,
     ) -> list[dict[str, str]]:
         """Get (ext_sample_id, cram_path, internal_id) map"""
-        values: dict[str, Any] = {
-            'project': project,
-            'PRIMARY_EXTERNAL_ORG': PRIMARY_EXTERNAL_ORG,
-        }
         filters = [
-            'a.active',
-            'a.type = "cram"',
-            'a.status = "completed"',
-            'peid.project = :project',
-            'peid.name = :PRIMARY_EXTERNAL_ORG',
+            t'a.active',
+            t'a.type = "cram"',
+            t'a.status = "completed"',
+            t'peid.project = {project}',
+            t'peid.name = {PRIMARY_EXTERNAL_ORG}',
         ]
         if sequencing_types:
-            if len(sequencing_types) == 1:
-                seq_check = '= :seq_type'
-                values['seq_type'] = sequencing_types[0]
-            else:
-                seq_check = 'IN :seq_types'
-                values['seq_types'] = sequencing_types
-
-            filters.append('JSON_VALUE(a.meta, "$.sequencing_type") ' + seq_check)
+            filters.append(
+                t'JSON_VALUE(a.meta, "$.sequencing_type") = ANY({sequencing_types})'
+            )
 
         if participant_ids:
-            filters.append('peid.participant_id IN :pids')
-            values['pids'] = list(participant_ids)
+            filters.append(t'peid.participant_id = ANY({participant_ids})')
 
-        _query = f"""
-SELECT a.id, peid.external_id as participant_id, a.output as output, sg.id as sequencing_group_id
-FROM analysis a
-INNER JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
-INNER JOIN sequencing_group sg ON a_sg.sequencing_group_id = sg.id
-INNER JOIN sample s ON sg.sample_id = s.id
-INNER JOIN participant_external_id peid ON s.participant_id = peid.participant_id
-WHERE
-    {' AND '.join(filters)}
-ORDER BY a.timestamp_completed DESC;
-"""
+        where_str = sql.SQL(' AND ').join(filters)
 
-        rows = await self.connection.fetch_all(_query, values)
+        _query = t"""
+            SELECT a.id, peid.external_id as participant_id, a.output as output, sg.id as sequencing_group_id
+            FROM analysis a
+            INNER JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
+            INNER JOIN sequencing_group sg ON a_sg.sequencing_group_id = sg.id
+            INNER JOIN sample s ON sg.sample_id = s.id
+            INNER JOIN participant_external_id peid ON s.participant_id = peid.participant_id
+            WHERE {where_str:q}
+            ORDER BY a.timestamp_completed DESC;
+        """
+
+        acur = await self.connection.pg_connection.execute(_query)
+        rows = await acur.fetchall()
         results: list[dict] = []
-        if not rows:
+        if not rows or len(rows) == 0:
             return results
 
         analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(
@@ -583,20 +586,21 @@ ORDER BY a.timestamp_completed DESC;
     ) -> dict[str, int]:
         """Get number of crams, grouped by sequence type (one per sample per sequence type)"""
         # Only count crams for ACTIVE sequencing groups
-        _query = """
-SELECT sg.type as seq_type, COUNT(*) as number_of_crams
-FROM analysis a
-INNER JOIN analysis_sequencing_group asga ON a.id = asga.analysis_id
-INNER JOIN sequencing_group sg ON asga.sequencing_group_id = sg.id
-WHERE
-    a.project = :project
-    AND a.status = 'completed'
-    AND a.type = 'cram'
-    AND NOT sg.archived
-GROUP BY seq_type
+        _query = t"""
+            SELECT sg.type as seq_type, COUNT(*) as number_of_crams
+            FROM analysis a
+            INNER JOIN analysis_sequencing_group asga ON a.id = asga.analysis_id
+            INNER JOIN sequencing_group sg ON asga.sequencing_group_id = sg.id
+            WHERE
+                a.project = {project}
+                AND a.status = 'completed'
+                AND a.type = 'cram'
+                AND NOT sg.archived
+            GROUP BY seq_type
         """
 
-        rows = await self.connection.fetch_all(_query, {'project': project})
+        acur = await self.connection.pg_connection.execute(_query)
+        rows = await acur.fetchall()
 
         # do it like this until I select lowercase value w/ JSON_EXTRACT
         n_counts: dict[str, int] = defaultdict(int)
@@ -610,21 +614,22 @@ GROUP BY seq_type
         self, project: ProjectId
     ) -> dict[str, int]:
         """Get number of samples in seqr (in latest es-index), grouped by sequence type"""
-        _query = """
-SELECT sg.type as seq_type, COUNT(*) as n
-FROM analysis a
-INNER JOIN analysis_sequencing_group asga ON a.id = asga.analysis_id
-INNER JOIN sequencing_group sg ON asga.sequencing_group_id = sg.id
-INNER JOIN sample s on sg.sample_id = s.id
-WHERE
-    s.project = :project
-    AND a.status = 'completed'
-    AND a.type = 'es-index'
-    AND NOT sg.archived
-GROUP BY seq_type
+        _query = t"""
+            SELECT sg.type as seq_type, COUNT(*) as n
+            FROM analysis a
+            INNER JOIN analysis_sequencing_group asga ON a.id = asga.analysis_id
+            INNER JOIN sequencing_group sg ON asga.sequencing_group_id = sg.id
+            INNER JOIN sample s on sg.sample_id = s.id
+            WHERE
+                s.project = {project}
+                AND a.status = 'completed'
+                AND a.type = 'es-index'
+                AND NOT sg.archived
+            GROUP BY seq_type
         """
 
-        rows = await self.connection.fetch_all(_query, {'project': project})
+        acur = await self.connection.pg_connection.execute(_query)
+        rows = await acur.fetchall()
         return {r['seq_type']: r['n'] for r in rows}
 
     # endregion STATS
@@ -633,21 +638,22 @@ GROUP BY seq_type
         self, sg_ids: list[int]
     ) -> dict[int, datetime.date]:
         """Get all the sequencing groups that should be added to seqr joint calls"""
-        _query = """
-        SELECT
-            a_sg.sequencing_group_id as sg_id,
-            MIN(a.timestamp_completed) as timestamp_completed
-        FROM analysis a
-        INNER JOIN analysis_sequencing_group a_sg ON a.id = a_sg.analysis_id
-        WHERE
-            a.status = 'completed'
-            AND a.type = 'es-index'
-            AND a_sg.sequencing_group_id IN :sg_ids
-        GROUP BY a_sg.sequencing_group_id
+        _query = t"""
+            SELECT
+                a_sg.sequencing_group_id as sg_id,
+                MIN(a.timestamp_completed) as timestamp_completed::date
+            FROM analysis a
+            INNER JOIN analysis_sequencing_group a_sg ON a.id = a_sg.analysis_id
+            WHERE
+                a.status = 'completed'
+                AND a.type = 'es-index'
+                AND a_sg.sequencing_group_id = ANY({sg_ids})
+            GROUP BY a_sg.sequencing_group_id
         """
 
-        rows = await self.connection.fetch_all(_query, {'sg_ids': sg_ids})
-        return {r['sg_id']: r['timestamp_completed'].date() for r in rows}
+        acur = await self.connection.pg_connection.execute(_query)
+        rows = await acur.fetchall()
+        return {r['sg_id']: r['timestamp_completed'] for r in rows}
 
     async def get_audit_log_for_analysis_ids(
         self, analysis_ids: list[int]
