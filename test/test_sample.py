@@ -257,16 +257,16 @@ class TestSampleUnwrapping(unittest.TestCase):
         assert len(unwrapped) == 4
 
         first_row = unwrapped[0]
-        assert (first_row.root, first_row.parent, first_row.sample.id) == (
-            None,
-            None,
-            1,
-        )
+        assert first_row.root is None
+        assert first_row.parent is None
+        assert first_row.sample.id == 1
 
         last_row = unwrapped[-1]
         assert last_row.root is not None
         assert last_row.parent is not None
-        assert (last_row.root.id, last_row.parent.id, last_row.sample.id) == (1, 1, 4)
+        assert last_row.root.id == 1
+        assert last_row.parent.id == 1
+        assert last_row.sample.id == 4
 
     def test_nested_sample_unwrapping_many_layers(self):
         """
