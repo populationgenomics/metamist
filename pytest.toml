@@ -11,6 +11,7 @@ python_files = [
     "test_assay.py",
     "test_external_id.py",
     "test_analysis.py",
+    "test_meta_table.py"
 ]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
