@@ -226,8 +226,8 @@ class SampleTable(DbBase):
 
     async def export_sample_table(self, project: int):
         """Export the sample table, joined with external_ids"""
-        mt = MetaTable(self._connection)
-        query = f"""
+        mt = MetaTable(self.connection)
+        query = t"""
             SELECT
                 s.id,
                 s.participant_id,
@@ -235,17 +235,16 @@ class SampleTable(DbBase):
                 s.type,
                 s.sample_root_id,
                 s.sample_parent_id,
-                s.meta,
-                {mt.external_id_query('seid')}
+                s.meta::text as meta,
+                {mt.external_id_query('seid'):q}
             FROM sample s
             LEFT JOIN sample_external_id seid
             ON seid.sample_id = s.id
-            WHERE s.project = :project
+            WHERE s.project = {project}
             GROUP BY s.id
         """
 
         return await mt.entity_meta_table(
-            project=project,
             query=query,
             row_getter=lambda row: {
                 'sample_id': sample_id_format(row['id']),
