@@ -1,5 +1,3 @@
-from psycopg.pq import TransactionStatus
-
 from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.assay import AssayFilter, AssayTable
 from db.python.tables.sample import SampleTable
@@ -80,7 +78,9 @@ class AssayLayer(BaseLayer):
 
     # region UPSERTs
 
-    async def upsert_assay(self, assay: AssayUpsertInternal) -> AssayUpsertInternal:
+    async def upsert_assay(
+        self, assay: AssayUpsertInternal, open_transaction=True
+    ) -> AssayUpsertInternal:
         """Upsert a single assay"""
 
         if not assay.id:
@@ -100,6 +100,7 @@ class AssayLayer(BaseLayer):
                 assay_type=assay.type,
                 meta=assay.meta,
                 external_ids=assay.external_ids,
+                open_transaction=open_transaction,
             )
             assay.id = seq_id
         else:
@@ -116,15 +117,18 @@ class AssayLayer(BaseLayer):
                 assay_type=assay.type,
                 sample_id=assay.sample_id,
                 external_ids=assay.external_ids,
+                open_transaction=open_transaction,
             )
         return assay
 
     async def upsert_assays(
-        self, assays: list[AssayUpsertInternal]
+        self,
+        assays: list[AssayUpsertInternal],
+        open_transaction=True,
     ) -> list[AssayUpsertInternal]:
         """Upsert multiple sequences to the given sample (sid)"""
 
-        sample_ids = set(s.sample_id for s in assays if s.sample_id is not None)
+        sample_ids = set(s.sample_id for s in assays)
         st = SampleTable(self.connection)
         project_ids = await st.get_project_ids_for_sample_ids(list(sample_ids))
 
@@ -132,14 +136,12 @@ class AssayLayer(BaseLayer):
             project_ids, allowed_roles=FullWriteAccessRoles
         )
 
-        conn = self.connection.pg_connection
-        in_transaction = conn.info.transaction_status == TransactionStatus.INTRANS
-
-        with_function = conn.transaction if not in_transaction else NoOpAenter
-
+        with_function = (
+            self.connection.connection.transaction if open_transaction else NoOpAenter
+        )
         async with with_function():
             for a in assays:
-                await self.upsert_assay(a)
+                await self.upsert_assay(a, open_transaction=False)
 
         return assays
 

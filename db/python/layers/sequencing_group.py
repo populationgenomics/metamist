@@ -4,13 +4,13 @@ from db.python.connect import Connection
 from db.python.filters.generic import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer
-from db.python.tables.assay import AssayFilter, AssayTable
+from db.python.tables.assay import AssayFilter, AssayTable, NoOpAenter
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import (
     SequencingGroupFilter,
     SequencingGroupTable,
 )
-from db.python.utils import NoOpAenter, NotFoundError
+from db.python.utils import NotFoundError
 from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
 from models.models.sequencing_group import (
     SequencingGroupInternal,

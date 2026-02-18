@@ -2,7 +2,7 @@
 
 INSERT INTO assay_type (id, name) VALUES ('sequencing', 'sequencing');
 INSERT INTO sample_type (id, name) VALUES ('blood', 'blood');
-INSERT INTO sample_type (id, name) VALUES ('saliva', 'saliva');
+INSERT INTO sample_type (id, name) VALUES ('saliva', 'saliva'); 
 INSERT INTO sequencing_type (id, name) VALUES ('genome', 'genome');
 INSERT INTO sequencing_type (id, name) VALUES ('exome', 'exome');
 INSERT INTO sequencing_type (id, name) VALUES ('transcriptome', 'transcriptome');
