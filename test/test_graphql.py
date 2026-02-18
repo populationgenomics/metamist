@@ -1,10 +1,8 @@
-import pytest
 from graphql.error import GraphQLError, GraphQLSyntaxError
 
 from metamist.graphql import configure_sync_client, gql, validate
 
 import api.graphql.schema
-from db.python.connect import Connection
 from db.python.layers import AnalysisLayer, ParticipantLayer
 from db.python.layers.family import FamilyLayer
 from models.enums import AnalysisStatus
@@ -17,7 +15,7 @@ from models.models import (
     SequencingGroupUpsertInternal,
 )
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
-from test.conftest import GraphQLQueryFunction
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 default_assay_meta = {
@@ -95,14 +93,14 @@ query MyQuery($project: String!) {
 )
 
 
-class TestGraphQL:
+class TestGraphQL(DbIsolatedTest):
     """Test graphql functionality"""
 
-    @pytest.fixture(autouse=True)
-    async def set_up(self, connection_with_project: Connection) -> None:
+    @run_as_sync
+    async def setUp(self) -> None:
         """Setup the tests"""
-        self.player = ParticipantLayer(connection_with_project)
-        self.project_name = connection_with_project.project.name
+        super().setUp()
+        self.player = ParticipantLayer(self.connection)
 
     def test_validate_local_schema(self):
         """
@@ -148,7 +146,7 @@ class TestGraphQL:
         with self.assertRaises(GraphQLError):
             validate(query, use_local_schema=True)
 
-    @pytest.mark.asyncio
+    @run_as_sync
     async def test_basic_graphql_query(self):
         """Test getting the summary for a project"""
         p = (await self.player.upsert_participants([_get_single_participant_upsert()]))[
@@ -196,7 +194,7 @@ query MyQuery($project: String!) {
             p.samples[0].sequencing_groups[0].assays[0].id, assays[0]['id']
         )
 
-    @pytest.mark.asyncio
+    @run_as_sync
     async def test_query_sample_by_meta(self):
         """Test querying a participant"""
         await self.player.upsert_participant(
@@ -235,7 +233,7 @@ query MyQuery($project: String!) {
 
         self.assertEqual(0, len(values2['project']['participants'][0]['samples']))
 
-    @pytest.mark.asyncio
+    @run_as_sync
     async def test_sg_analyses_query(self):
         """Example graphql query of analyses from sequencing-group"""
         p = await self.player.upsert_participant(_get_single_participant_upsert())
@@ -276,7 +274,7 @@ query MyQuery($sg_id: String!, $project: String!) {
         self.assertIn('meta', analyses[0])
         self.assertIn('output', analyses[0])
 
-    @pytest.mark.asyncio
+    @run_as_sync
     async def test_project_analyses_query_with_meta(self):
         """Tests filtering analyses with the meta field when querying through a project"""
         alayer = AnalysisLayer(self.connection)
@@ -320,7 +318,7 @@ query MyQuery($project: String!) {{
         self.assertEqual(a_id, analysis_resp['id'])
         self.assertDictEqual(analysis_resp['meta'], {test_meta_key: test_meta_val})
 
-    @pytest.mark.asyncio
+    @run_as_sync
     async def test_participant_phenotypes(self):
         """
         Test getting participant phentypes in graphql
@@ -349,14 +347,10 @@ query MyQuery($pid: Int!) {
         self.assertIn('phenotypes', resp['participant'])
         self.assertDictEqual(phenotypes, resp['participant']['phenotypes'])
 
-    @pytest.mark.asyncio
-    @pytest.mark.project_roles(['reader', 'writer'])
-    @pytest.mark.skip(reason='Skipped until dependent entities migrated to PostgreSQL')
-    async def test_family_participants(
-        self, graphql_query: GraphQLQueryFunction, connection_with_project: Connection
-    ):
+    @run_as_sync
+    async def test_family_participants(self):
         """Test inserting + querying family participants from different directions"""
-        family_layer = FamilyLayer(connection_with_project)
+        family_layer = FamilyLayer(self.connection)
 
         family_eid = 'family1'
 
@@ -398,7 +392,7 @@ query MyQuery($project: String!) {
 }
 """
 
-        resp = await graphql_query(q, {'project': self.project_name})
+        resp = await self.run_graphql_query_async(q, {'project': self.project_name})
         assert resp is not None
 
         family_simple_obj = {'family': {'externalId': family_eid}}
@@ -407,51 +401,52 @@ query MyQuery($project: String!) {
         families = resp['project']['families']
 
         participants_by_eid = {p['externalId']: p for p in participants}
-        assert len(participants) == 3
+        self.assertEqual(3, len(participants))
 
-        assert {
-            'externalId': 'individual1',
-            'families': [{'externalId': family_eid}],
-            'familyParticipants': [
-                {'affected': 1, 'notes': 'note1', **family_simple_obj}
-            ],
-        } == participants_by_eid['individual1']
+        self.assertDictEqual(
+            {
+                'externalId': 'individual1',
+                'families': [{'externalId': family_eid}],
+                'familyParticipants': [
+                    {'affected': 1, 'notes': 'note1', **family_simple_obj}
+                ],
+            },
+            participants_by_eid['individual1'],
+        )
+        self.assertEqual(1, len(participants_by_eid['individual1']['families']))
 
-        assert len(participants_by_eid['individual1']['families']) == 1
-
-        assert len(families) == 1
-        assert family_eid == families[0]['externalId']
+        self.assertEqual(1, len(families))
+        self.assertEqual(family_eid, families[0]['externalId'])
 
         sorted_fps = sorted(
             families[0]['familyParticipants'],
             key=lambda x: x['participant']['externalId'],
         )
-        assert sorted_fps == [
-            {
-                'affected': 1,
-                'notes': 'note1',
-                'participant': {'externalId': 'individual1'},
-            },
-            {
-                'affected': 1,
-                'notes': 'note3',
-                'participant': {'externalId': 'maternal1'},
-            },
-            {
-                'affected': 0,
-                'notes': 'note2',
-                'participant': {'externalId': 'paternal1'},
-            },
-        ]
+        self.assertListEqual(
+            sorted_fps,
+            [
+                {
+                    'affected': 1,
+                    'notes': 'note1',
+                    'participant': {'externalId': 'individual1'},
+                },
+                {
+                    'affected': 1,
+                    'notes': 'note3',
+                    'participant': {'externalId': 'maternal1'},
+                },
+                {
+                    'affected': 0,
+                    'notes': 'note2',
+                    'participant': {'externalId': 'paternal1'},
+                },
+            ],
+        )
 
-    @pytest.mark.asyncio
-    @pytest.mark.project_roles(['reader', 'writer'])
-    @pytest.mark.skip(reason='Skipped until dependent entities migrated to PostgreSQL')
-    async def test_query_family_by_meta(
-        self, connection_with_project: Connection, graphql_query: GraphQLQueryFunction
-    ):
+    @run_as_sync
+    async def test_query_family_by_meta(self):
         """Test querying families by meta field"""
-        family_layer = FamilyLayer(connection_with_project)
+        family_layer = FamilyLayer(self.connection)
 
         # Create two families with different meta
         fid1 = await family_layer.create_family(
@@ -479,36 +474,36 @@ query MyQuery($project: String!) {
             }
         }"""
         # Filter by study=study_a - should return only family 1
-        values = await graphql_query(
+        values = await self.run_graphql_query_async(
             q, {'project': self.project_name, 'meta': {'study': 'study_a'}}
         )
         assert values
 
         families = values['project']['families']
-        assert len(families) == 1
-        assert fid1 == families[0]['id']
-        assert families[0]['externalId'] == 'family_with_meta'
-        assert families[0]['meta']['study'] == 'study_a'
+        self.assertEqual(1, len(families))
+        self.assertEqual(fid1, families[0]['id'])
+        self.assertEqual('family_with_meta', families[0]['externalId'])
+        self.assertEqual('study_a', families[0]['meta']['study'])
 
         # Filter by priority=low - should return only family 2
-        values2 = await graphql_query(
+        values2 = await self.run_graphql_query_async(
             q, {'project': self.project_name, 'meta': {'priority': 'low'}}
         )
         assert values2
 
         families2 = values2['project']['families']
-        assert len(families2) == 1
-        assert fid2 == families2[0]['id']
+        self.assertEqual(1, len(families2))
+        self.assertEqual(fid2, families2[0]['id'])
 
         # Filter by non-existent meta - should return empty
-        values3 = await graphql_query(
+        values3 = await self.run_graphql_query_async(
             q, {'project': self.project_name, 'meta': {'nonexistent': 'value'}}
         )
         assert values3
 
-        assert len(values3['project']['families']) == 0
+        self.assertEqual(0, len(values3['project']['families']))
 
-    @pytest.mark.asyncio
+    @run_as_sync
     async def test_get_project_name_from_analysis(self):
         """Test getting project name from analysis"""
         p = await self.player.upsert_participant(_get_single_participant_upsert())

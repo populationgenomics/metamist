@@ -1,7 +1,7 @@
 import logging
 from typing import Any
 
-from models.base import SMBase
+from models.base import SMBase, parse_sql_dict
 
 
 class FamilySimpleInternal(SMBase):
@@ -29,6 +29,13 @@ class FamilyInternal(SMBase):
     description: str | None = None
     coded_phenotype: str | None = None
     meta: dict[str, Any] | None = None
+
+    @staticmethod
+    def from_db(d):
+        """From DB fields"""
+        external_ids = parse_sql_dict(d.pop('external_ids', {}))
+        meta = parse_sql_dict(d.pop('meta', {}))
+        return FamilyInternal(**d, external_ids=external_ids, meta=meta)
 
     def to_external(self):
         """Convert to external model"""
