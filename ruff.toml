@@ -88,9 +88,6 @@ ignore = [
 
 [lint.per-file-ignores]
 "__init__.py" = ["F401"]
-"test/**/*.py" = [
-    "PLR2004" # Tests often have checks for length of lists where we don't want to define a constant
-]
 
 
 [lint.pylint]

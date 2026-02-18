@@ -1,3 +1,4 @@
+# ruff: noqa: PLR2004
 """Integration tests for GenericFilter against a real PostgreSQL database"""
 
 import dataclasses
