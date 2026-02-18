@@ -10,7 +10,8 @@ python_files = [
     "test_generic_filters.py",
     "test_sample.py",
     "test_assay.py",
-    "test_external_id.py"
+    "test_external_id.py",
+    "test_meta_table.py"
 ]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

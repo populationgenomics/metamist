@@ -153,8 +153,6 @@ class SampleTable(DbBase):
         if not sample_ids:
             return set()
         _query = t'SELECT DISTINCT project FROM sample WHERE id = ANY({sample_ids})'
-        acur = await self.connection.pg_connection.execute(_query)
-        rows = await acur.fetchall()
 
         cur = await self.connection.pg_connection.execute(_query)
         rows = await cur.fetchall()
@@ -251,12 +249,11 @@ class SampleTable(DbBase):
             FROM sample s
             LEFT JOIN sample_external_id seid
             ON seid.sample_id = s.id
-            WHERE s.project = :project
+            WHERE s.project = {project}
             GROUP BY s.id
         """
 
         return await mt.entity_meta_table(
-            project=project,
             query=query,
             row_getter=lambda row: {
                 'sample_id': sample_id_format(row['id']),
