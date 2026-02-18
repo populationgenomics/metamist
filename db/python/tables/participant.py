@@ -288,7 +288,6 @@ class ParticipantTable:
         )
         return particicpants
 
-    # TODO: cannot convert until MetaTable is converted
     async def export_participant_table(self, project: int):
         """Export a parquet table of participants, including external_ids and meta"""
         mt = MetaTable(self.connection)
@@ -342,11 +341,9 @@ class ParticipantTable:
         if not project_value:
             raise ValueError('Project must be specified to create participant')
 
-        conn = self.connection.pg_connection
-        in_transaction = conn.info.transaction_status == TransactionStatus.INTRANS
-        with_function = conn.transaction if not in_transaction else NoOpAenter
+        async with self.connection.transaction():
+            conn = self.connection.pg_connection
 
-        async with with_function():
             _query = t"""
                 INSERT INTO participant
                     (reported_sex, reported_gender, karyotype, meta, audit_log_id, project)
@@ -361,7 +358,7 @@ class ParticipantTable:
                 raise ValueError('Failed to create participant')
             new_id = row['id']
 
-            _query = """
+            _eid_query = """
                 INSERT INTO participant_external_id
                     (project, participant_id, name, external_id, audit_log_id)
                 VALUES
@@ -380,8 +377,8 @@ class ParticipantTable:
                 for name, external_id in external_ids.items()
             ]
 
-            async with conn.cursor() as cur:
-                await cur.executemany(_query, eid_values)
+            async with self.connection.pg_connection.cursor() as cur:
+                await cur.executemany(_eid_query, eid_values)
 
             return new_id
 
@@ -399,13 +396,10 @@ class ParticipantTable:
         """
         Update participant
         """
-        conn = self.connection.pg_connection
-        in_transaction = conn.info.transaction_status == TransactionStatus.INTRANS
-        with_function = conn.transaction if not in_transaction else NoOpAenter
-
         audit_log_id = await self.connection.audit_log_id()
+        conn = self.connection.pg_connection
 
-        async with with_function():
+        async with self.connection.transaction():
             if external_ids:
                 to_delete = [k.lower() for k, v in external_ids.items() if v is None]
                 any_to_update = any(v is not None for v in external_ids.values())

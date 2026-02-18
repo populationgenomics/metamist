@@ -681,11 +681,7 @@ class ParticipantLayer(BaseLayer):
         project: ProjectId | None = None,
     ):
         """Batch upsert a list of participants with sequences"""
-        conn = self.connection.pg_connection
-        in_transaction = conn.info.transaction_status == TransactionStatus.INTRANS
-        with_function = conn.transaction if not in_transaction else NoOpAenter
-
-        async with with_function():
+        async with self.connection.transaction():
             # Create or update participants
             for p in participants:
                 await self.upsert_participant(p, project=project)
