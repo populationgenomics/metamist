@@ -282,24 +282,23 @@ class ParticipantTable(DbBase):
 
     async def export_participant_table(self, project: int):
         """Export a parquet table of participants, including external_ids and meta"""
-        mt = MetaTable(self._connection)
-        query = f"""
+        mt = MetaTable(self.connection)
+        query = t"""
             SELECT
                 p.id,
                 p.reported_sex,
                 p.reported_gender,
                 p.karyotype,
-                p.meta,
-                {mt.external_id_query('peid')}
+                p.meta::text as meta,
+                {mt.external_id_query('peid'):q}
             FROM participant p
             LEFT JOIN participant_external_id peid
             ON peid.participant_id = p.id
-            WHERE p.project = :project
+            WHERE p.project = {project}
             GROUP BY p.id
         """
 
         return await mt.entity_meta_table(
-            project=project,
             query=query,
             row_getter=lambda row: {
                 'participant_id': row['id'],
