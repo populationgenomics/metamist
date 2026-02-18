@@ -1,4 +1,4 @@
-from models.base import SMBase, parse_sql_dict
+from models.base import SMBase
 from models.enums.cohort import CohortStatus, CohortUpdateStatus
 from models.models.project import ProjectId
 from models.utils.cohort_id_format import cohort_id_format
@@ -16,31 +16,8 @@ class CohortInternal(SMBase):
     author: str
     project: ProjectId
     description: str
-    template_id: int
+    template_id: int | None
     status: CohortStatus | None
-
-    # TODO piyumi: check to remove
-    @staticmethod
-    def from_db(d: dict, cohort_status: CohortStatus | None = None):
-        """
-        Convert from db keys, mainly converting id to id_
-        """
-        _id = d.pop('c_id', None)
-        project = d.pop('c_project', None)
-        description = d.pop('c_description', None)
-        name = d.pop('c_name', None)
-        author = d.pop('c_author', None)
-        template_id = d.pop('c_template_id', None)
-
-        return CohortInternal(
-            id=_id,
-            name=name,
-            author=author,
-            project=project,
-            description=description,
-            template_id=template_id,
-            status=cohort_status,
-        )
 
 
 class CohortUpdateBody(SMBase):
@@ -93,26 +70,6 @@ class CohortTemplateInternal(SMBase):
     description: str
     criteria: CohortCriteriaInternal
     project: ProjectId
-
-    @staticmethod
-    def from_db(d: dict):
-        # TODO piyumi: check to remove
-        """
-        Convert from db keys, mainly converting id to id_
-        """
-        _id = d.pop('id', None)
-        name = d.pop('name', None)
-        description = d.pop('description', None)
-        criteria = parse_sql_dict(d.pop('criteria', None)) or {}
-        project = d.pop('project', None)
-
-        return CohortTemplateInternal(
-            id=_id,
-            name=name,
-            description=description,
-            criteria=CohortCriteriaInternal(**criteria),
-            project=project,
-        )
 
 
 class CohortBody(SMBase):
