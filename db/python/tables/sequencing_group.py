@@ -9,7 +9,7 @@ from psycopg.rows import class_row
 from db.python.filters.generic import GenericFilter
 from db.python.filters.sequencing_group import SequencingGroupFilter
 from db.python.tables.base import DbBase
-from db.python.utils import to_db_json
+from db.python.utils import InternalError, to_db_json
 from models.models.project import ProjectId
 from models.models.sequencing_group import (
     SequencingGroupInternal,
@@ -391,6 +391,8 @@ class SequencingGroupTable(DbBase):
 
             cur = await conn.execute(_sq_insert_query)
             new_sg_id = await cur.fetchone()
+            if not new_sg_id:
+                raise InternalError('A new sequencing_group row was not created')
 
             if assay_ids:
                 assay_id_insert_values = [
