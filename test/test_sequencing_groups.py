@@ -361,90 +361,86 @@ class TestSequencingGroup:
         
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(
-        reason="Analysis migration has not been completed"
-    ) # TODO Revisit this test once analysis queries are migrated
-    async def test_query_finds_sgs_which_have_cram_analysis(self):
+    @pytest.mark.project_roles(['writer'])
+    async def test_query_finds_sgs_which_have_cram_analysis(
+        self,
+        connection_with_project: Connection,
+        test_sample: int
+    ):
         """Test querying for sequencing groups which have a cram or gvcf analysis"""
-        sample_to_insert = get_sample_model()
+        sg_layer = SequencingGroupLayer(connection_with_project)
 
-        # Add extra sequencing group
-        sample_to_insert.sequencing_groups.append(
-            SequencingGroupUpsertInternal(
-                type='exome',
-                technology='short-read',
-                platform='ILLUMINA',
-                meta={
-                    'meta-key': 'meta-value',
-                },
-                external_ids={},
-                assays=[
-                    AssayUpsertInternal(
-                        type='sequencing',
-                        external_ids={},
-                        meta={
-                            'sequencing_type': 'exome',
-                            'sequencing_platform': 'short-read',
-                            'sequencing_technology': 'illumina',
-                        },
-                    )
-                ],
-            )
-        )
 
-        # Create in database
-        sample = await self.slayer.upsert_sample(sample_to_insert)
+        test_sg_data = [
+            {   
+                'type': 'genome',
+                'technology': 'short-read'
+            },
+            {
+                'type': 'genome',
+                'technology': 'long-read'
+            }
+        ]
 
-        # Create analysis for cram and gvcf
-        await self.alayer.create_analysis(
-            AnalysisInternal(
-                type='cram',
-                status=AnalysisStatus.COMPLETED,
-                sequencing_group_ids=[sample.sequencing_groups[0].id],
-                meta={},
-            )
-        )
-        await self.alayer.create_analysis(
-            AnalysisInternal(
-                type='gvcf',
-                status=AnalysisStatus.COMPLETED,
-                sequencing_group_ids=[sample.sequencing_groups[1].id],
-                meta={},
-            )
-        )
+        # Firstly create two sequencing groups to attach analyses to
+        insert_sgs = f"""
+            INSERT INTO sequencing_group (sample_id, type, technology)
+            VALUES ({test_sample}, %(type)s, %(technology)s)
+            RETURNING id"""
+
+        async with connection_with_project.pg_connection.cursor() as cur:
+            await cur.executemany(insert_sgs, test_sg_data, returning=True)
+            sg_ids = [(await cur.fetchone())['id'] async for _ in cur.results()]
+
+        assert len(sg_ids) == 2
+
+        # Create a cram and gvcf analysis
+        insert_analyses = f"""
+            INSERT INTO analysis (type, project, status)
+            VALUES (%(type)s, {connection_with_project.project_id}, 'completed')
+            RETURNING id"""
+
+        async with connection_with_project.pg_connection.cursor() as cur:
+            await cur.execute(insert_analyses, {'type': 'cram'})
+            cram_id = (await cur.fetchone())['id']
+            await cur.execute(insert_analyses, {'type': 'gvcf'})
+            gvcf_id = (await cur.fetchone())['id']
+
+        # Attach the cram analysis to the first sg, gvcf analysis to the second sg
+        insert_analysis_sequencing_group = """
+            INSERT INTO analysis_sequencing_group (analysis_id, sequencing_group_id)
+            VALUES (%(analysis_id)s, %(sg_id)s)"""
+        
+        async with connection_with_project.pg_connection.cursor() as cur:
+            await cur.execute(insert_analysis_sequencing_group, {'analysis_id': cram_id, 'sg_id': sg_ids[0]})
+            await cur.execute(insert_analysis_sequencing_group, {'analysis_id': gvcf_id, 'sg_id': sg_ids[0]})
 
         # Query for cram analysis
-        sgs = await self.sglayer.query(SequencingGroupFilter(has_cram=True))
-        self.assertEqual(len(sgs), 1)
-        self.assertEqual(sgs[0].id, sample.sequencing_groups[0].id)
+        sgs = await sg_layer.query(SequencingGroupFilter(has_cram=True))
+        assert len(sgs) == 1
+        assert sgs[0].id == sg_ids[0]
 
         # Query for gvcf analysis
-        sgs = await self.sglayer.query(SequencingGroupFilter(has_gvcf=True))
-        self.assertEqual(len(sgs), 1)
-        self.assertEqual(sgs[0].id, sample.sequencing_groups[1].id)
+        sgs = await sg_layer.query(SequencingGroupFilter(has_gvcf=True))
+        assert len(sgs) == 1
+        assert sgs[0].id == sg_ids[1].id
 
         # Query for both cram AND gvcf analysis
-        sgs = await self.sglayer.query(
+        sgs = await sg_layer.query(
             SequencingGroupFilter(has_gvcf=True, has_cram=True)
         )
-        self.assertEqual(len(sgs), 0)
+        assert len(sgs) == 0
 
         # Add first SG to gvcf analysis
-        await self.alayer.create_analysis(
-            AnalysisInternal(
-                type='gvcf',
-                status=AnalysisStatus.COMPLETED,
-                sequencing_group_ids=[sample.sequencing_groups[0].id],
-                meta={},
-            )
-        )
+        async with connection_with_project.pg_connection.cursor() as cur:
+            await cur.execute(insert_analysis_sequencing_group, {'analysis_id': gvcf_id, 'sg_id': sg_ids[0]})
 
         # Query for both cram AND gvcf analysis now that first SG has gvcf analysis
-        sgs = await self.sglayer.query(
+        sgs = await sg_layer.query(
             SequencingGroupFilter(has_gvcf=True, has_cram=True)
         )
-        self.assertEqual(len(sgs), 1)
-        self.assertEqual(sgs[0].id, sample.sequencing_groups[0].id)
+        assert len(sgs) == 1
+        assert sgs[0].id == sg_ids[0]
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
