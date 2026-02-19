@@ -659,8 +659,13 @@ class SampleTable(DbBase):
         if len(sample_ids) == 0:
             return {}
         _query = t"""
-            SELECT id, min(row_start) as date_created
-            FROM sample FOR SYSTEM_TIME ALL
+            SELECT id, MIN(lower(s.sys_period)) as date_created
+            FROM sample
+            INNER JOIN (
+                SELECT id, sys_period FROM sample
+                UNION ALL
+                SELECT id, sys_period FROM sample_history
+            ) sample_hist ON sample.id = sample_hist.id
             WHERE id = ANY({sample_ids})
             GROUP BY id
         """
@@ -675,19 +680,35 @@ class SampleTable(DbBase):
         # see into one aggregate record. For now, leave the query as is, with external_ids unavailable.
         keys = [
             'id',
-            sql.SQL("""'{"(not available)": "(not available)"}' AS external_ids"""),
+            sql.SQL("'{}'::jsonb AS external_ids"),
             'participant_id',
             'meta',
-            sql.SQL('active+1 AS active'),
+            'active',
             'type',
             'project',
             'author',
             'sample_root_id',
             'sample_parent_id',
-            # 'audit_log_id',  # TODO SampleInternal does not allow an audit_log_id field
+            # 'audit_log_id',  Not in SampleInternal model
+            # 'sys_period',  Not in SampleInternal model
         ]
+
         keys_str = sql.SQL(', ').join(SampleTable.format_keys(keys))
-        _query = t'SELECT {keys_str:q} FROM sample FOR SYSTEM_TIME ALL WHERE id = {id_}'
+        _query = t"""
+            SELECT {keys_str:q}
+            FROM (
+                SELECT *
+                FROM sample
+                WHERE id = {id_}
+                
+                UNION ALL
+                
+                SELECT *
+                FROM history.sample_history
+                WHERE id = {id_}
+            )
+            ORDER BY lower(sys_period) DESC
+        """
 
         async with self.connection.pg_connection.cursor(
             row_factory=class_row(SampleInternal)
@@ -719,14 +740,19 @@ class SampleTable(DbBase):
         If project_ids is empty, return all projects
         """
 
-        where_str = t'WHERE project = ANY({project_ids})' if project_ids else ''
+        where_str = t'WHERE project = ANY({project_ids})' if project_ids else t''
 
         _query = t"""
         WITH t AS(
-            SELECT project, id, min(row_start) as sample_first_date
-            FROM sample FOR SYSTEM_TIME ALL
+            SELECT project, id, MIN(lower(s.sys_period)) as sample_first_date
+            FROM sample
+            INNER JOIN (
+                SELECT id, sys_period FROM sample
+                UNION ALL
+                SELECT id, sys_period FROM sample_history
+            ) sample_hist ON sample.id = sample_hist.id
             {where_str:q}
-            GROUP BY project, id
+            GROUP BY project,id
         )
         SELECT project,
         CAST(EXTRACT(YEAR FROM sample_first_date) AS INTEGER) AS year,

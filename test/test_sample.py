@@ -237,6 +237,42 @@ class TestSample:
         )
         assert len(post_delete_samples) == 0
 
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
+    async def test_get_history_of_sample(self, connection_with_project: Connection):
+        """Test getting the history of a sample"""
+        slayer = SampleLayer(connection_with_project)
+
+        s = await slayer.upsert_sample(
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
+                type='blood',
+                active=True,
+                meta={'meta': 'meta ;)'},
+            )
+        )
+
+        s = await slayer.upsert_sample(
+            SampleUpsertInternal(
+                id=s.id,
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
+                type='blood',
+                active=False,
+                meta={'meta': 'meta ;)', 'updated': 'yes'},
+            )
+        )
+
+        assert s.id is not None
+        history = await slayer.get_history_of_sample(s.id)
+
+        assert len(history) == 2
+        assert history[0].active is False
+        assert history[1].active is True
+        assert history[0].meta.get('updated') == 'yes'
+        assert history[0].meta.get('meta') == 'meta ;)'
+        assert history[1].meta.get('updated') is None
+        assert history[1].meta.get('meta') == 'meta ;)'
+
 
 class TestSampleUnwrapping(unittest.TestCase):
     """Test unwrapping nested samples into an ordered list of rows"""
