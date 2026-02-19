@@ -14,7 +14,7 @@ from db.python.filters import GenericFilter
 from db.python.filters.sample import SampleFilter
 from db.python.tables.base import DbBase
 from db.python.tables.meta_table import MetaTable
-from db.python.utils import NotFoundError, escape_like_term, to_db_json
+from db.python.utils import NotFoundError, escape_like_term
 from models.base import parse_sql_bool
 from models.models import PRIMARY_EXTERNAL_ORG, ProjectId
 from models.models.sample import SampleInternal, sample_id_format
@@ -700,9 +700,9 @@ class SampleTable(DbBase):
                 SELECT *
                 FROM sample
                 WHERE id = {id_}
-                
+
                 UNION ALL
-                
+
                 SELECT *
                 FROM history.sample_history
                 WHERE id = {id_}

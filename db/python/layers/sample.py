@@ -7,7 +7,7 @@ from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer, Connection
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.sample import SampleFilter, SampleTable
-from db.python.utils import NoOpAenter, NotFoundError
+from db.python.utils import NotFoundError
 from models.models.project import (
     FullWriteAccessRoles,
     ProjectId,
@@ -285,7 +285,6 @@ class SampleLayer(BaseLayer):
     async def upsert_samples(
         self,
         samples: list[SampleUpsertInternal],
-        open_transaction: bool = True,
         project: ProjectId = None,
     ) -> list[SampleUpsertInternal]:
         """Batch upsert a list of samples with sequences"""
