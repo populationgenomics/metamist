@@ -51,7 +51,7 @@ class SequencingGroupTable(DbBase):
 
         # Base query
         _query.append(
-            t"""\
+            t"""
             SELECT DISTINCT sg.id
             FROM sequencing_group AS sg
             LEFT JOIN sample s ON s.id = sg.sample_id
@@ -81,7 +81,7 @@ class SequencingGroupTable(DbBase):
             }
             assay_where_template = filter_.assay.to_sql(a_overrides)
             _query.append(
-                t"""\
+                t"""
                 INNER JOIN sequencing_group_assay sga ON sg.id = sga.sequencing_group_id'
                 INNER JOIN assay a ON sga.assay_id = a.id"""
             )
@@ -93,7 +93,7 @@ class SequencingGroupTable(DbBase):
                 {'created_on': 'MIN(LOWER(sys_period))::date'}, only=['created_on']
             )
             _query.append(
-                t"""\
+                t"""
                 INNER JOIN (
                     SELECT id, MIN(LOWER(sys_period)) AS created_on
                     FROM (
@@ -113,7 +113,7 @@ class SequencingGroupTable(DbBase):
                 sql_overrides, only=['has_cram', 'has_gvcf']
             )
             _query.append(
-                t"""\
+                t"""
                 INNER JOIN (
                     SELECT
                         sequencing_group_id,
@@ -163,7 +163,7 @@ class SequencingGroupTable(DbBase):
         if external_id_table_alias:
             ex_id_join = t'LEFT JOIN sequencing_group_external_id {external_id_table_alias:i} ON sg.id = {external_id_table_alias:i}.sequencing_group_id'
 
-        _outer_query = t"""\
+        _outer_query = t"""
             SELECT {sql.SQL(', ').join(columns):q}
             FROM sequencing_group sg
             LEFT JOIN sample s ON s.id = sg.sample_id
@@ -225,7 +225,7 @@ class SequencingGroupTable(DbBase):
         """
         Get sequence IDs in a sequencing_group
         """
-        _query = t"""\
+        _query = t"""
             SELECT sga.sequencing_group_id, sga.assay_id
             FROM sequencing_group_assay sga
             WHERE sga.sequencing_group_id = ANY({ids})
@@ -245,7 +245,7 @@ class SequencingGroupTable(DbBase):
         """
         Get all sequencing group IDs by sample IDs by type
         """
-        _query = t"""\
+        _query = t"""
         SELECT s.id as sid, sg.id as sgid, sg.type as sgtype
         FROM sample s
         INNER JOIN sequencing_group sg ON s.id = sg.sample_id
@@ -274,7 +274,7 @@ class SequencingGroupTable(DbBase):
         if len(sequencing_group_ids) == 0:
             return {}
 
-        _query = t"""\
+        _query = t"""
         SELECT sg.id, MIN(lower(s.sys_period)) as min_row_start
         FROM sequencing_group sg
         INNER JOIN (
@@ -305,7 +305,7 @@ class SequencingGroupTable(DbBase):
             'sg.meta',
             'sg.archived',
         ]
-        _query = t"""\
+        _query = t"""
         SELECT {sql.SQL(', ').join(keys):q}, asg.analysis_id
         FROM analysis_sequencing_group asg
         INNER JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
@@ -363,7 +363,7 @@ class SequencingGroupTable(DbBase):
         if bad_keys:
             raise ValueError(f'Must provide values for {", ".join(bad_keys)}')
 
-        get_existing_query = t"""\
+        get_existing_query = t"""
         SELECT id
         FROM sequencing_group
         WHERE
@@ -379,7 +379,7 @@ class SequencingGroupTable(DbBase):
         existing_sg_ids = await cur.fetchall()
 
         audit_log_id = await self.audit_log_id()
-        _sq_insert_query = t"""\
+        _sq_insert_query = t"""
         INSERT INTO sequencing_group
             (sample_id, type, technology, platform, meta, audit_log_id, archived)
         VALUES
@@ -431,7 +431,7 @@ class SequencingGroupTable(DbBase):
         if platform:
             updaters.append(t'platform = {platform}')
 
-        _query = t"""\
+        _query = t"""
         UPDATE sequencing_group
         SET {sql.SQL(', ').join(updaters):q}
         WHERE id = {sequencing_group_id}
@@ -446,13 +446,13 @@ class SequencingGroupTable(DbBase):
         """
         audit_log_id = await self.audit_log_id()
 
-        _query = t"""\
+        _query = t"""
         UPDATE sequencing_group
         SET archived = true, audit_log_id = {audit_log_id}
         WHERE id = ANY({sequencing_group_ids});
         """
         # do this so we can reuse the sequencing_group_ids
-        _external_id_query = t"""\
+        _external_id_query = t"""
         UPDATE sequencing_group_external_id
         SET null_if_archived = NULL, audit_log_id = {audit_log_id}
         WHERE sequencing_group_id = ANY({sequencing_group_ids});
@@ -467,7 +467,7 @@ class SequencingGroupTable(DbBase):
         Get number of sequencing groups for each type for a project
         Useful for the web layer
         """
-        _query = t"""\
+        _query = t"""
             SELECT sg.type, COUNT(*) as n
             FROM sequencing_group sg
             INNER JOIN sample s ON s.id = sg.sample_id

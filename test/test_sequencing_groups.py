@@ -29,7 +29,7 @@ async def test_sample(connection_with_project: Connection) -> int:
 
     conn = connection_with_project.pg_connection
     # Create audit_log entry first
-    create_audit_log = t"""\
+    create_audit_log = t"""
         INSERT INTO audit_log (author, auth_project)
         VALUES ('test', {project_id})
         RETURNING id"""
@@ -38,7 +38,7 @@ async def test_sample(connection_with_project: Connection) -> int:
     assert row is not None
     audit_log_id = row['id']
 
-    insert_sample = t"""\
+    insert_sample = t"""
         INSERT INTO sample 
             (project, meta, type, active, author, audit_log_id)
         VALUES ({project_id}, '{{"meta_key": "meta_value"}}', 'blood', true, 'test_aurthor', {audit_log_id})
@@ -49,7 +49,7 @@ async def test_sample(connection_with_project: Connection) -> int:
     assert row is not None
     sample_id = row['id']
 
-    insert_external_id = t"""\
+    insert_external_id = t"""
         INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
         VALUES ({project_id}, {sample_id}, 'default', 'TESTING001', {audit_log_id})
         """
@@ -294,7 +294,7 @@ class TestSequencingGroup:
 
         # Insert a current sequencing group into the database with a pre-defined date that it is current from
         current_date = date(2026, 1, 1)
-        current_query = t"""\
+        current_query = t"""
             INSERT INTO sequencing_group
                 (sample_id, type, technology, archived, sys_period)
             VALUES
@@ -328,7 +328,7 @@ class TestSequencingGroup:
 
         # Insert a historical sequencing group into the history table with a pre-defined period for which it was current
         historical_date = date(2025, 12, 1)
-        historical_query = t"""\
+        historical_query = t"""
             INSERT INTO sequencing_group_history
                 (id, sample_id, type, technology, archived, sys_period)
             VALUES
@@ -650,7 +650,7 @@ class TestSequencingGroup:
             },
         ]
 
-        test_data_query = f"""\
+        test_data_query = f"""
             INSERT INTO sequencing_group_history
                 (id, sample_id, type, technology, archived, sys_period)
             VALUES
