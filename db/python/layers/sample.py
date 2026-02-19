@@ -306,7 +306,6 @@ class SampleLayer(BaseLayer):
                     project=project,
                     process_sequencing_groups=False,
                     process_assays=False,
-                    open_transaction=False,
                 )
 
             # Upsert all sequencing_groups (in turn relevant assays)

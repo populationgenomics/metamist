@@ -273,6 +273,9 @@ class TestSample:
         assert history[1].meta.get('updated') is None
         assert history[1].meta.get('meta') == 'meta ;)'
 
+        assert history[0].external_ids == {}
+        assert history[1].external_ids == {}
+
 
 class TestSampleUnwrapping(unittest.TestCase):
     """Test unwrapping nested samples into an ordered list of rows"""
