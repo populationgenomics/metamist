@@ -291,12 +291,6 @@ class SampleLayer(BaseLayer):
         """Batch upsert a list of samples with sequences"""
         seqglayer: SequencingGroupLayer = SequencingGroupLayer(self.connection)
 
-        with_function = (
-            self.connection.pg_connection.transaction
-            if open_transaction
-            else NoOpAenter
-        )
-
         sids = [s.id for s in samples if s.id]
         if sids:
             pjcts = await self.st.get_project_ids_for_sample_ids(sids)
@@ -304,7 +298,7 @@ class SampleLayer(BaseLayer):
                 pjcts, allowed_roles=FullWriteAccessRoles
             )
 
-        async with with_function():
+        async with self.connection.transaction():
             # Create or update samples
             for sample in samples:
                 await self.upsert_sample(

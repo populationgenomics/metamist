@@ -7,6 +7,8 @@ from typing import Any
 
 from dateutil.relativedelta import relativedelta
 from psycopg import DatabaseError, sql
+from psycopg.rows import class_row
+from psycopg.types.json import Jsonb
 
 from db.python.filters import GenericFilter
 from db.python.filters.sample import SampleFilter
@@ -49,7 +51,7 @@ class SampleTable(DbBase):
             FROM sample ss
         """
 
-        wheres: list[Template] = []
+        wheres: list[Template | None] = []
 
         # Mandatory filters that apply to the sample table
         wheres.append(
@@ -82,22 +84,18 @@ class SampleTable(DbBase):
             )
 
         if filter_.sequencing_group or filter_.assay:
-            if not filter_.sequencing_group:
-                raise ValueError(
-                    'Assay filter provided without sequencing group filter, which is not supported'
+            if filter_.sequencing_group:
+                wheres.append(
+                    filter_.sequencing_group.to_sql(
+                        {
+                            'id': 'sg.id',
+                            'meta': 'sg.meta',
+                            'type': 'sg.type',
+                            'technology': 'sg.technology',
+                            'platform': 'sg.platform',
+                        }
+                    )
                 )
-
-            wheres.append(
-                filter_.sequencing_group.to_sql(
-                    {
-                        'id': 'sg.id',
-                        'meta': 'sg.meta',
-                        'type': 'sg.type',
-                        'technology': 'sg.technology',
-                        'platform': 'sg.platform',
-                    }
-                )
-            )
 
             query_template += t'INNER JOIN sequencing_group sg ON sg.sample_id = ss.id'
 
@@ -176,9 +174,13 @@ class SampleTable(DbBase):
         ]
 
         _query = self.construct_query(filter_, keys, sample_eid_table_alias='sexid')
-        cur = await self.connection.pg_connection.execute(_query)
-        rows = await cur.fetchall()
-        samples = [SampleInternal.from_db(dict(r)) for r in rows]
+
+        async with self.connection.pg_connection.cursor(
+            row_factory=class_row(SampleInternal)
+        ) as cur:
+            await cur.execute(_query)
+            samples = await cur.fetchall()
+
         projects = set(s.project for s in samples)
         return projects, samples
 
@@ -231,7 +233,6 @@ class SampleTable(DbBase):
         rows = await cur.fetchall()
         return {row['id']: row['project'] for row in rows}
 
-    # TODO: Confirm this works once the MetaTable is also ported
     async def export_sample_table(self, project: int):
         """Export the sample table, joined with external_ids"""
         mt = MetaTable(self.connection)
@@ -297,7 +298,7 @@ class SampleTable(DbBase):
             raise ValueError('Sample must have primary external_id')
 
         audit_log_id = await self.audit_log_id()
-        meta_value = to_db_json(meta or {})
+        meta_value = Jsonb(meta or {})
         project_value = project or self.project_id
 
         _query = t"""
@@ -308,37 +309,37 @@ class SampleTable(DbBase):
             RETURNING id;
         """
 
-        try:
+        async with self.connection.transaction():
             cur = await self.connection.pg_connection.execute(_query)
             row = await cur.fetchone()
-            assert row is not None and 'id' in row
-        except DatabaseError as e:
-            raise e
 
-        id_of_new_sample = row['id']
+            if row is None or 'id' not in row:
+                raise DatabaseError('Failed to insert sample, no ID returned')
 
-        _eid_query = """
-            INSERT INTO sample_external_id (project, sample_id, name,
-                external_id, audit_log_id)
-            VALUES (%(project)s, %(id_of_new_sample)s, %(name)s,
-                %(external_id)s, %(audit_log_id)s)
-        """
-        _eid_values = [
-            {
-                'name': name.lower(),
-                'external_id': eid,
-                'audit_log_id': audit_log_id,
-                'project': project_value,
-                'id_of_new_sample': id_of_new_sample,
-            }
-            for name, eid in external_ids.items()
-            if eid is not None
-        ]
+            id_of_new_sample = row['id']
 
-        async with self.connection.pg_connection.cursor() as cur:
-            await cur.executemany(_eid_query, _eid_values)
+            _eid_query = """
+                INSERT INTO sample_external_id (project, sample_id, name,
+                    external_id, audit_log_id)
+                VALUES (%(project)s, %(id_of_new_sample)s, %(name)s,
+                    %(external_id)s, %(audit_log_id)s)
+            """
+            _eid_values = [
+                {
+                    'name': name.lower(),
+                    'external_id': eid,
+                    'audit_log_id': audit_log_id,
+                    'project': project_value,
+                    'id_of_new_sample': id_of_new_sample,
+                }
+                for name, eid in external_ids.items()
+                if eid is not None
+            ]
 
-        return id_of_new_sample
+            async with self.connection.pg_connection.cursor() as cur:
+                await cur.executemany(_eid_query, _eid_values)
+
+            return id_of_new_sample
 
     async def update_sample(
         self,
@@ -385,14 +386,13 @@ class SampleTable(DbBase):
             if to_update:
                 _query = t'SELECT project FROM sample WHERE id = {id_}'
 
-                try:
-                    cur = await self.connection.pg_connection.execute(_query)
-                    row = await cur.fetchone()
-                    assert row is not None and 'project' in row
-                except DatabaseError as e:
-                    raise DatabaseError(
-                        f'Error fetching project for sample {id_}: {str(e)}'
-                    ) from e
+                cur = await self.connection.pg_connection.execute(_query)
+                row = await cur.fetchone()
+
+                if row is None or 'project' not in row:
+                    raise NotFoundError(
+                        f"Couldn't find sample with id {id_} to update external ids"
+                    )
 
                 project = row['project']
 
@@ -418,9 +418,10 @@ class SampleTable(DbBase):
                     await cur.executemany(_update_query, _eid_values)
 
         # Type, Active, Sample Parent ID, Sample Root ID
+        meta_value = Jsonb(meta or {})
         fields.append(t'type = {type_}') if type_ else None
         fields.append(
-            t'meta = JSON_MERGE_PATCH(COALESCE(meta, "{{}}"), {meta})'
+            t"meta = json_merge_patch(COALESCE(meta, '{{}}'::jsonb), {meta_value})"
         ) if meta else None
         fields.append(t'active = {active}') if active is not None else None
         fields.append(
@@ -486,10 +487,11 @@ class SampleTable(DbBase):
         queries = []
 
         # Query to update the kept sample with the merged meta and audit log id
+        meta_value = Jsonb(meta)
         queries.append(t"""
             UPDATE sample
             SET audit_log_id = {audit_log_id},
-                meta = {meta}
+                meta = {meta_value}
             WHERE id = {id_keep}
         """)
 
@@ -569,7 +571,7 @@ class SampleTable(DbBase):
             SELECT s.project, s.id, seid.external_id, s.participant_id
             FROM sample s
             INNER JOIN sample_external_id seid ON s.id = seid.sample_id
-            WHERE s.project IN ({project_ids}) AND seid.external_id LIKE {search_pattern}
+            WHERE s.project = ANY({project_ids}) AND seid.external_id ILIKE {search_pattern}
             LIMIT {limit}
         """
 
@@ -687,9 +689,11 @@ class SampleTable(DbBase):
         keys_str = sql.SQL(', ').join(SampleTable.format_keys(keys))
         _query = t'SELECT {keys_str:q} FROM sample FOR SYSTEM_TIME ALL WHERE id = {id_}'
 
-        cur = await self.connection.pg_connection.execute(_query)
-        rows = await cur.fetchall()
-        samples = [SampleInternal.from_db(dict(d)) for d in rows]
+        async with self.connection.pg_connection.cursor(
+            row_factory=class_row(SampleInternal)
+        ) as cur:
+            await cur.execute(_query)
+            samples = await cur.fetchall()
 
         return samples
 

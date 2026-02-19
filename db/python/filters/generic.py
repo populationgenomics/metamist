@@ -6,6 +6,7 @@ from typing import Any, TypeVar
 
 from psycopg import sql
 
+from db.python import filters
 from db.python.utils import escape_like_term
 from models.base import SMBase
 
@@ -292,6 +293,7 @@ class GenericFilterModel:
                         f'Filter {field.name} must be a GenericFilter or dict[str, GenericFilter]'
                     )
 
+        filters = [f for f in filters if f is not None]
         if len(filters) == 0:
             return None
 
