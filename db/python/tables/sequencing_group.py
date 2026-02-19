@@ -46,11 +46,11 @@ class SequencingGroupTable(DbBase):
             'external_id': 'sgexid.external_id',
         }
 
-        _query: list[Template] = []
+        base_query_components: list[Template] = []
         where_templates: list[Template] = []
 
         # Base query
-        _query.append(
+        base_query_components.append(
             t"""
             SELECT DISTINCT sg.id
             FROM sequencing_group AS sg
@@ -68,7 +68,7 @@ class SequencingGroupTable(DbBase):
                 }
             )
             if filter_.sample.external_id:
-                _query.append(t'LEFT JOIN sample_external_id sexid ON s.id = sexid.sample_id')
+                base_query_components.append(t'LEFT JOIN sample_external_id sexid ON s.id = sexid.sample_id')
 
             where_templates.append(sample_where_template)
 
@@ -80,7 +80,7 @@ class SequencingGroupTable(DbBase):
                 'external_id': 'aexid.external_id',
             }
             assay_where_template = filter_.assay.to_sql(a_overrides)
-            _query.append(
+            base_query_components.append(
                 t"""
                 INNER JOIN sequencing_group_assay sga ON sg.id = sga.sequencing_group_id'
                 INNER JOIN assay a ON sga.assay_id = a.id"""
@@ -92,7 +92,7 @@ class SequencingGroupTable(DbBase):
             created_on_condition = filter_.to_sql(
                 {'created_on': 'MIN(LOWER(sys_period))::date'}, only=['created_on']
             )
-            _query.append(
+            base_query_components.append(
                 t"""
                 INNER JOIN (
                     SELECT id, MIN(LOWER(sys_period)) AS created_on
@@ -112,7 +112,7 @@ class SequencingGroupTable(DbBase):
             cram_where_template = filter_.to_sql(
                 sql_overrides, only=['has_cram', 'has_gvcf']
             )
-            _query.append(
+            base_query_components.append(
                 t"""
                 INNER JOIN (
                     SELECT
@@ -149,31 +149,31 @@ class SequencingGroupTable(DbBase):
 
         where = t'WHERE ' + sql.SQL(' AND ').join(where_templates)
 
-        _query.append(where)
+        base_query_components.append(where)
 
         if limit:
-            _query.append(t'LIMIT {limit}')
+            base_query_components.append(t'LIMIT {limit}')
 
         if skip:
-            _query.append(t'OFFSET {skip}')
+            base_query_components.append(t'OFFSET {skip}')
 
-        _query_str = sql.SQL('\n').join(_query)
+        base_query = sql.SQL('\n').join(base_query_components)
 
         ex_id_join = t''
         if external_id_table_alias:
             ex_id_join = t'LEFT JOIN sequencing_group_external_id {external_id_table_alias:i} ON sg.id = {external_id_table_alias:i}.sequencing_group_id'
 
-        _outer_query = t"""
+        outer_query = t"""
             SELECT {sql.SQL(', ').join(columns):q}
             FROM sequencing_group sg
             LEFT JOIN sample s ON s.id = sg.sample_id
             {ex_id_join:q}
             INNER JOIN (
-                {_query_str:q}
+                {base_query:q}
             ) AS sg_query ON sg.id = sg_query.id
             GROUP BY s.id, sg.id"""
 
-        return _outer_query
+        return outer_query
 
     async def query(
         self, filter_: SequencingGroupFilter, limit: int | None = None, skip: int = 0
@@ -183,7 +183,7 @@ class SequencingGroupTable(DbBase):
         select_keys = [
             sql.Identifier('sg', 'id'),
             sql.Identifier('s', 'project'),
-            # sql.SQL('jsonb_object_agg("sgexid"."name", "sgexid"."external_id") as external_ids'),
+            sql.SQL('coalesce(jsonb_object_agg(sgexid.name, sgexid.external_id) FILTER (WHERE sgexid.name IS NOT NULL), \'{}\'::jsonb) AS external_ids'),
             sql.Identifier('sg', 'sample_id'),
             sql.Identifier('sg', 'type'),
             sql.Identifier('sg', 'technology'),
