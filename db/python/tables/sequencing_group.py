@@ -477,7 +477,7 @@ class SequencingGroupTable(DbBase):
         """
         _query = t"""
         WITH sg AS (
-            SELECT id, sample_id, type, technology, MIN(LOWER(sys_period)) as sg_first_date
+            SELECT id, sample_id, type, technology, MIN(LOWER(sys_period))::date as sg_first_date
             FROM (
                 SELECT id, sample_id, type, technology, sys_period
                 FROM sequencing_group
@@ -504,7 +504,7 @@ class SequencingGroupTable(DbBase):
         )
         for row in rows:
             project = row['project']
-            month_created: date = row['sg_date'].date().replace(day=1)
+            month_created: date = row['sg_date'].replace(day=1)
             sg_type = row['type']
             sg_tech = row['technology']
             num_sg = row['num_sg']
