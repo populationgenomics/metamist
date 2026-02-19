@@ -113,7 +113,7 @@ class SequencingGroupTable(DbBase):
                 sql_overrides, only=['has_cram', 'has_gvcf']
             )
             _query.append(
-                f"""\
+                t"""\
                 INNER JOIN (
                     SELECT
                         sequencing_group_id,

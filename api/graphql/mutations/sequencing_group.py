@@ -120,5 +120,5 @@ class SequencingGroupMutations:
             ]
             await slayer.archive_sequencing_groups(raw_ids)
 
-            updated_sgs = await slayer.get_sequencing_groups_by_ids(raw_ids, active_only=False)
+            updated_sgs = await slayer.get_sequencing_groups_by_ids(raw_ids)
             return [GraphQLSequencingGroup.from_internal(sg) for sg in updated_sgs]

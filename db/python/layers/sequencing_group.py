@@ -43,10 +43,13 @@ class SequencingGroupLayer(BaseLayer):
     async def get_sequencing_groups_by_ids(
         self, 
         sequencing_group_ids: list[int], 
-        active_only=True
+        active_only: bool | None = None
     ) -> list[SequencingGroupInternal]:
         """
-        Get sequence groups by internal IDs
+        Get sequence groups by internal IDs.
+        - active_only=True  -> return only matching non-archived sequencing groups
+        - active_only=False -> return only matching archived sequencing groups
+        - active_only=None  -> return all matching sequencing groups
         """
         if not sequencing_group_ids:
             return []
