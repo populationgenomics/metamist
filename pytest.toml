@@ -11,6 +11,7 @@ python_files = [
     "test_participant.py",
     "test_assay.py",
     "test_external_id.py",
+    "test_comment.py",
     "test_meta_table.py",
     "test_analysis_runner.py"
 ]

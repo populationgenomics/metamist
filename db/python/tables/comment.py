@@ -1,4 +1,7 @@
 from itertools import groupby
+from string.templatelib import Template
+
+from psycopg import sql
 
 from db.python.tables.base import DbBase
 from db.python.utils import InternalError, NotFoundError
@@ -63,34 +66,34 @@ from models.models.comment import (
 # a special case where samples can have subsamples, we want to include those comments
 # in the related comments
 
-comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
+comment_queries: dict[CommentEntityType, dict[CommentEntityType, Template]] = {
     CommentEntityType.project: {
-        CommentEntityType.project: """
+        CommentEntityType.project: t"""
             JOIN entity_ids ON project_comment.project_id = entity_ids.id
         """,
-        CommentEntityType.sample: """
+        CommentEntityType.sample: t"""
             JOIN sample
             ON sample.id = sample_comment.sample_id
             JOIN entity_ids ON sample.project = entity_ids.id
         """,
-        CommentEntityType.assay: """
+        CommentEntityType.assay: t"""
             JOIN assay
             ON assay.id = assay_comment.assay_id
             JOIN sample
             ON sample.id = assay.sample_id
             JOIN entity_ids ON sample.project = entity_ids.id
         """,
-        CommentEntityType.participant: """
+        CommentEntityType.participant: t"""
             JOIN participant
             ON participant.id = participant_comment.participant_id
             JOIN entity_ids ON participant.project = entity_ids.id
         """,
-        CommentEntityType.family: """
+        CommentEntityType.family: t"""
             JOIN family
             ON family.id = family_comment.family_id
             JOIN entity_ids ON family.project = entity_ids.id
         """,
-        CommentEntityType.sequencing_group: """
+        CommentEntityType.sequencing_group: t"""
             JOIN sequencing_group
             ON sequencing_group.id = sequencing_group_comment.sequencing_group_id
             JOIN sample
@@ -99,7 +102,7 @@ comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
         """,
     },
     CommentEntityType.sample: {
-        CommentEntityType.sample: """
+        CommentEntityType.sample: t"""
             JOIN sample s
             ON s.id = sample_comment.sample_id
 
@@ -120,39 +123,39 @@ comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
             OR entity_ids.sample_root_id = s.id
 
         """,
-        CommentEntityType.assay: """
+        CommentEntityType.assay: t"""
             JOIN assay
             ON assay.id = assay_comment.assay_id
             JOIN entity_ids ON assay.sample_id = entity_ids.id
         """,
-        CommentEntityType.participant: """
+        CommentEntityType.participant: t"""
             JOIN sample
             ON sample.participant_id = participant_comment.participant_id
             JOIN entity_ids ON sample.id = entity_ids.id
         """,
-        CommentEntityType.family: """
+        CommentEntityType.family: t"""
             JOIN family_participant
             ON family_participant.family_id = family_comment.family_id
             JOIN sample
             ON sample.participant_id = family_participant.participant_id
             JOIN entity_ids ON sample.id = entity_ids.id
         """,
-        CommentEntityType.sequencing_group: """
+        CommentEntityType.sequencing_group: t"""
             JOIN sequencing_group
             ON sequencing_group.id = sequencing_group_comment.sequencing_group_id
             JOIN entity_ids ON sequencing_group.sample_id = entity_ids.id
         """,
     },
     CommentEntityType.assay: {
-        CommentEntityType.assay: """
+        CommentEntityType.assay: t"""
             JOIN entity_ids ON assay_comment.assay_id = entity_ids.id
         """,
-        CommentEntityType.sample: """
+        CommentEntityType.sample: t"""
             JOIN assay
             ON assay.sample_id = sample_comment.sample_id
             JOIN entity_ids ON assay.id = entity_ids.id
         """,
-        CommentEntityType.family: """
+        CommentEntityType.family: t"""
             JOIN family_participant
             ON family_participant.family_id = family_comment.family_id
             JOIN sample
@@ -161,41 +164,41 @@ comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
             ON assay.sample_id = sample.id
             JOIN entity_ids ON assay.id = entity_ids.id
         """,
-        CommentEntityType.participant: """
+        CommentEntityType.participant: t"""
             JOIN sample
             ON sample.participant_id = participant_comment.participant_id
             JOIN assay
             ON assay.sample_id = sample.id
             JOIN entity_ids ON assay.id = entity_ids.id
         """,
-        CommentEntityType.sequencing_group: """
+        CommentEntityType.sequencing_group: t"""
             JOIN sequencing_group_assay
             ON sequencing_group_assay.sequencing_group_id = sequencing_group_comment.sequencing_group_id
             JOIN entity_ids ON sequencing_group_assay.assay_id = entity_ids.id
         """,
     },
     CommentEntityType.participant: {
-        CommentEntityType.participant: """
+        CommentEntityType.participant: t"""
             JOIN entity_ids ON participant_comment.participant_id = entity_ids.id
         """,
-        CommentEntityType.assay: """
+        CommentEntityType.assay: t"""
             JOIN assay
             ON assay.id = assay_comment.assay_id
             JOIN sample
             ON sample.id = assay.sample_id
             JOIN entity_ids ON sample.participant_id = entity_ids.id
         """,
-        CommentEntityType.sample: """
+        CommentEntityType.sample: t"""
             JOIN sample
             ON sample.id = sample_comment.sample_id
             JOIN entity_ids ON sample.participant_id = entity_ids.id
         """,
-        CommentEntityType.family: """
+        CommentEntityType.family: t"""
             JOIN family_participant
             ON family_participant.family_id = family_comment.family_id
             JOIN entity_ids ON family_participant.participant_id = entity_ids.id
         """,
-        CommentEntityType.sequencing_group: """
+        CommentEntityType.sequencing_group: t"""
             JOIN sequencing_group
             ON sequencing_group.id = sequencing_group_comment.sequencing_group_id
             JOIN sample
@@ -204,10 +207,10 @@ comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
         """,
     },
     CommentEntityType.family: {
-        CommentEntityType.family: """
+        CommentEntityType.family: t"""
             JOIN entity_ids ON family_comment.family_id = entity_ids.id
         """,
-        CommentEntityType.assay: """
+        CommentEntityType.assay: t"""
             JOIN assay
             ON assay.id = assay_comment.assay_id
             JOIN sample
@@ -216,19 +219,19 @@ comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
             ON family_participant.participant_id = sample.participant_id
             JOIN entity_ids ON family_participant.family_id = entity_ids.id
         """,
-        CommentEntityType.sample: """
+        CommentEntityType.sample: t"""
             JOIN sample
             ON sample.id = sample_comment.sample_id
             JOIN family_participant
             ON family_participant.participant_id = sample.participant_id
             JOIN entity_ids ON family_participant.family_id = entity_ids.id
         """,
-        CommentEntityType.participant: """
+        CommentEntityType.participant: t"""
             JOIN family_participant
             ON family_participant.participant_id = participant_comment.participant_id
             JOIN entity_ids ON family_participant.family_id = entity_ids.id
         """,
-        CommentEntityType.sequencing_group: """
+        CommentEntityType.sequencing_group: t"""
             JOIN sequencing_group
             ON sequencing_group.id = sequencing_group_comment.sequencing_group_id
             JOIN sample
@@ -239,17 +242,17 @@ comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
         """,
     },
     CommentEntityType.sequencing_group: {
-        CommentEntityType.sequencing_group: """
+        CommentEntityType.sequencing_group: t"""
             JOIN entity_ids ON sequencing_group_comment.sequencing_group_id = entity_ids.id
         """,
-        CommentEntityType.participant: """
+        CommentEntityType.participant: t"""
             JOIN sample
             ON sample.participant_id = participant_comment.participant_id
             JOIN sequencing_group
             ON sequencing_group.sample_id = sample.id
             JOIN entity_ids ON sequencing_group.id = entity_ids.id
         """,
-        CommentEntityType.family: """
+        CommentEntityType.family: t"""
             JOIN family_participant
             ON family_participant.family_id = family_comment.family_id
             JOIN sample
@@ -258,12 +261,12 @@ comment_queries: dict[CommentEntityType, dict[CommentEntityType, str]] = {
             ON sequencing_group.sample_id = sample.id
             JOIN entity_ids ON sequencing_group.id = entity_ids.id
         """,
-        CommentEntityType.assay: """
+        CommentEntityType.assay: t"""
             JOIN sequencing_group_assay
             ON sequencing_group_assay.assay_id = assay_comment.assay_id
             JOIN entity_ids ON sequencing_group_assay.sequencing_group_id = entity_ids.id
         """,
-        CommentEntityType.sample: """
+        CommentEntityType.sample: t"""
             JOIN sequencing_group
             ON sequencing_group.sample_id = sample_comment.sample_id
             JOIN entity_ids ON sequencing_group.id = entity_ids.id
@@ -297,31 +300,37 @@ class CommentTable(DbBase):
         # whereas comment_entity_id is the id of the entity that the comment
         # is attached to, they can be different because comments related to the
         # requested entity can be returned as well as those attached directly
-        combined_comment_query = '\nUNION\n'.join(
+        combined_comment_query = sql.SQL('\nUNION\n').join(
             [
-                f"""(
+                t"""(
                     SELECT
                         entity_ids.id as requested_entity_id,
-                        {comment_entity}_comment.comment_id,
-                        '{comment_entity}' AS comment_entity_type,
-                        {comment_entity}_comment.{comment_entity}_id AS comment_entity_id
-                    FROM {comment_entity}_comment
-                    {comment_query}
+                        {(comment_entity + '_comment'):i}.comment_id,
+                        {comment_entity} AS comment_entity_type,
+                        {(comment_entity + '_comment'):i}.{(comment_entity + '_id'):i} AS comment_entity_id
+                    FROM {(comment_entity + '_comment'):i}
+                    {comment_query:q}
                 )"""
                 for comment_entity, comment_query in queries_for_entity.items()
                 if comment_entity == entity or include_related_comments
             ]
         )
 
-        query = f"""
+        where_cond = (
+            t'WHERE c.comment_id = {comment_id} or c.parent_id = {comment_id}'
+            if comment_id
+            else t''
+        )
+
+        query = t"""
             WITH entity_ids as (
-                SELECT id from {entity}
-                WHERE id in :entity_ids
+                SELECT id from {entity:i}
+                WHERE id =  ANY({entity_ids})
             ),
             top_level_comment_list AS (
-                {combined_comment_query}
+                {combined_comment_query:q}
             ) SELECT
-                c.id as comment_id,
+                c.comment_id,
                 c.parent_id,
                 c.content,
                 c.status,
@@ -330,20 +339,39 @@ class CommentTable(DbBase):
                 tc.comment_entity_id,
                 al.timestamp,
                 al.author
-			FROM comment FOR SYSTEM_TIME ALL AS c
+            FROM (
+                SELECT
+                    id as comment_id,
+                    parent_id,
+                    content,
+                    status,
+                    audit_log_id
+                FROM comment
+
+                UNION ALL
+
+                SELECT
+                    id as comment_id,
+                    parent_id,
+                    content,
+                    status,
+                    audit_log_id
+                from history.comment_history
+            ) AS c
             JOIN top_level_comment_list tc
-            ON c.id = tc.comment_id OR c.parent_id = tc.comment_id
+            ON c.comment_id = tc.comment_id OR c.parent_id = tc.comment_id
             LEFT JOIN audit_log al
             ON al.id = c.audit_log_id
-            {'WHERE c.id = :comment_id or c.parent_id = :comment_id' if comment_id else ''}
-            ORDER BY c.id, al.timestamp
+            {where_cond:q}
+            ORDER BY c.comment_id, al.timestamp
         """
         values: dict[str, int | list[int]] = {'entity_ids': entity_ids}
 
         if comment_id:
             values['comment_id'] = comment_id
 
-        comment_versions = await self.connection.fetch_all(query, values)
+        acur = await self.connection.pg_connection.execute(query)
+        comment_versions = await acur.fetchall()
 
         # Group comments by their ids so that versions get included within a comment
         comment_map: dict[int, CommentInternal] = {
@@ -399,13 +427,13 @@ class CommentTable(DbBase):
         # so we build a query to union together results from all the comment join
         # tables.
 
-        join_table_query = '\nUNION\n'.join(
+        join_table_query = sql.SQL('\nUNION\n').join(
             [
-                f"""(
+                t"""(
                 SELECT
-                    {entity_type}_id as entity_id,
-                    '{entity_type}' as entity_type
-                FROM {entity_type}_comment ec
+                    {(entity_type + '_id'):i} as entity_id,
+                    {entity_type} as entity_type
+                FROM {(entity_type + '_comment'):i} ec
                 JOIN root_comment rc
                 ON rc.comment_id = ec.comment_id
             )"""
@@ -415,15 +443,16 @@ class CommentTable(DbBase):
 
         # Only root comments are attached to entities, so if the comment has a parent
         # ID we need to use that to find the entity type rather than the comment id
-        query = f"""
+        query = t"""
             WITH root_comment as (
                 SELECT COALESCE(parent_id, id) as comment_id
                 FROM comment
-                WHERE id = :comment_id
-            ) {join_table_query}
+                WHERE id = {comment_id}
+            ) {join_table_query:q}
         """
 
-        rows = await self.connection.fetch_all(query, {'comment_id': comment_id})
+        acur = await self.connection.pg_connection.execute(query)
+        rows = await acur.fetchall()
 
         if len(rows) == 0:
             raise NotFoundError(f'Comment with id {comment_id} was not found')
@@ -447,55 +476,46 @@ class CommentTable(DbBase):
         join_table = f'{entity}_comment'
         join_column = f'{entity}_id'
 
-        comment_insert = """
-            INSERT INTO comment (content, status, audit_log_id)
-            VALUES (:content, 'active', :audit_log_id) RETURNING id;
-        """
+        audit_log_id = await self.connection.audit_log_id()
 
-        join_insert = f"""
-            INSERT INTO {join_table} (comment_id, {join_column}, audit_log_id)
-            VALUES (:comment_id, :entity_id, :audit_log_id);
-        """
+        async with (
+            self.connection.transaction(),
+            self.connection.pg_connection.cursor() as acur,
+        ):
+            comment_insert = t"""
+                INSERT INTO comment (content, status, audit_log_id)
+                VALUES ({content}, 'active', {audit_log_id}) RETURNING id;
+            """
 
-        async with self.connection.transaction():
-            audit_log_id = await self._connection.audit_log_id()
+            new_comment = await (await acur.execute(comment_insert)).fetchone()
+            if new_comment is None:
+                raise InternalError('Comment creation failed')
 
-            comment_id = await self.connection.fetch_val(
-                comment_insert,
-                {
-                    'content': content,
-                    'audit_log_id': audit_log_id,
-                },
-            )
+            comment_id = new_comment['id']
 
-            await self.connection.execute(
-                join_insert,
-                {
-                    'comment_id': comment_id,
-                    'entity_id': entity_id,
-                    'audit_log_id': audit_log_id,
-                },
-            )
+            join_insert = t"""
+                INSERT INTO {join_table:i} (comment_id, {join_column:i}, audit_log_id)
+                VALUES ({comment_id}, {entity_id}, {audit_log_id});
+            """
+
+            await acur.execute(join_insert)
 
             return await self.get_comment_by_id(comment_id)
 
     async def add_comment_to_thread(self, content: str, parent_id: int):
         """Add a comment a child comment to a parent comment's thread"""
-        audit_log_id = await self._connection.audit_log_id()
+        audit_log_id = await self.connection.audit_log_id()
 
-        comment_insert = """
+        comment_insert = t"""
             INSERT INTO comment (parent_id, content, status, audit_log_id)
-            VALUES (:parent_id, :content, 'active', :audit_log_id) RETURNING id;
+            VALUES ({parent_id}, {content}, 'active', {audit_log_id}) RETURNING id;
         """
 
-        comment_id = await self.connection.fetch_val(
-            comment_insert,
-            {
-                'content': content,
-                'parent_id': parent_id,
-                'audit_log_id': audit_log_id,
-            },
-        )
+        acur = await self.connection.pg_connection.execute(comment_insert)
+        row = await acur.fetchone()
+        if row is None:
+            raise InternalError('Comment creation failed')
+        comment_id = row['id']
 
         return await self.get_comment_by_id(comment_id)
 
@@ -517,36 +537,28 @@ class CommentTable(DbBase):
         if no_update or not comment_changed:
             return current_comment
 
-        audit_log_id = await self._connection.audit_log_id()
+        audit_log_id = await self.connection.audit_log_id()
 
         # Construct the query string and values, excluding any updates that are
         # unchanged or don't have a value set. The query string would be invalid
         # if both content and status were not set or unchanged, but the checks
         # above avoid getting this far if that is the case.
-        updates = [
+        updates: list[tuple[str, str | None, bool]] = [
             ('content', content, content_changed),
             ('status', status, status_changed),
         ]
 
-        update_q = ', '.join(
-            [f'{k} = :{k}' for k, v, changed in updates if v is not None and changed]
+        update_q = sql.SQL(', ').join(
+            [t'{k:i} = {v}' for k, v, changed in updates if v is not None and changed]
         )
-        update_v = {k: v for k, v, changed in updates if v is not None and changed}
 
-        comment_update = f"""
+        comment_update = t"""
             UPDATE comment
-            SET {update_q},
-                audit_log_id = :audit_log_id
-            WHERE id = :comment_id
+            SET {update_q:q},
+                audit_log_id = {audit_log_id}
+            WHERE id = {comment_id}
         """
 
-        await self.connection.execute(
-            comment_update,
-            {
-                'comment_id': comment_id,
-                'audit_log_id': audit_log_id,
-            }
-            | update_v,
-        )
+        await self.connection.pg_connection.execute(comment_update)
 
         return await self.get_comment_by_id(comment_id)
