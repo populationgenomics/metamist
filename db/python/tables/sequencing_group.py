@@ -26,7 +26,7 @@ class SequencingGroupTable(DbBase):
 
     @staticmethod
     def construct_query(
-        filter_: SequencingGroupFilter,
+        sg_filter: SequencingGroupFilter,
         skip: int | None = None,
         limit: int | None = None
     ) -> Template:
@@ -57,8 +57,8 @@ class SequencingGroupTable(DbBase):
             LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id"""
         )
 
-        if filter_.sample:
-            sample_where_template = filter_.sample.to_sql(
+        if sg_filter.sample:
+            sample_where_template = sg_filter.sample.to_sql(
                 {
                     'id': 's.id',
                     'meta': 's.meta',
@@ -66,19 +66,19 @@ class SequencingGroupTable(DbBase):
                     'external_id': 'sexid.external_id',
                 }
             )
-            if filter_.sample.external_id:
+            if sg_filter.sample.external_id:
                 base_query_components.append(t'LEFT JOIN sample_external_id sexid ON s.id = sexid.sample_id')
 
             where_templates.append(sample_where_template)
 
-        if filter_.assay is not None:
+        if sg_filter.assay is not None:
             a_overrides = {
                 'id': 'a.id',
                 'meta': 'a.meta',
                 'type': 'a.type',
                 'external_id': 'aexid.external_id',
             }
-            assay_where_template = filter_.assay.to_sql(a_overrides)
+            assay_where_template = sg_filter.assay.to_sql(a_overrides)
             base_query_components.append(
                 t"""
                 INNER JOIN sequencing_group_assay sga ON sg.id = sga.sequencing_group_id'
@@ -87,8 +87,8 @@ class SequencingGroupTable(DbBase):
 
             where_templates.append(assay_where_template)
 
-        if filter_.created_on is not None:
-            created_on_condition = filter_.to_sql(
+        if sg_filter.created_on is not None:
+            created_on_condition = sg_filter.to_sql(
                 {'created_on': t'MIN(LOWER(sys_period))::date'}, only=['created_on']
             )
             base_query_components.append(
@@ -107,8 +107,8 @@ class SequencingGroupTable(DbBase):
                 ) AS sg_timequery ON sg.id = sg_timequery.id"""
             )
 
-        if filter_.has_cram is not None or filter_.has_gvcf is not None:
-            cram_where_template = filter_.to_sql(
+        if sg_filter.has_cram is not None or sg_filter.has_gvcf is not None:
+            cram_where_template = sg_filter.to_sql(
                 sql_overrides, only=['has_cram', 'has_gvcf']
             )
             base_query_components.append(
@@ -134,7 +134,7 @@ class SequencingGroupTable(DbBase):
             )
 
         # Add the rest of the filters
-        filter_template = filter_.to_sql(
+        remaining_filters = sg_filter.to_sql(
             sql_overrides,
             exclude=[
                 'assay',
@@ -144,7 +144,7 @@ class SequencingGroupTable(DbBase):
                 'sample',
             ],
         )
-        where_templates.append(filter_template)
+        where_templates.append(remaining_filters)
 
         where = t'WHERE ' + sql.SQL(' AND ').join(where_templates)
 
