@@ -12,6 +12,11 @@ from models.models.analysis_runner import AnalysisRunnerInternal
 class TestAnalysisRunner:
     """Test sample class"""
 
+    @pytest.fixture(autouse=True)
+    async def set_up(self, connection_with_project: Connection) -> None:
+        self.al = AnalysisRunnerLayer(connection_with_project)
+        self.project_id = connection_with_project.project_id
+
     def get_test_analysis(self, ar_guid_param: str) -> AnalysisRunnerInternal:
         return AnalysisRunnerInternal(
             ar_guid=ar_guid_param,
@@ -32,11 +37,6 @@ class TestAnalysisRunner:
             batch_url='batch_url',
             meta={'meta': 'meta'},
         )
-
-    @pytest.fixture(autouse=True)
-    async def set_up(self, connection_with_project: Connection) -> None:
-        self.al = AnalysisRunnerLayer(connection_with_project)
-        self.project_id = connection_with_project.project_id
 
     @pytest.mark.asyncio
     async def test_insert(self) -> None:
