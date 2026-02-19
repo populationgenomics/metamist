@@ -48,10 +48,13 @@ class AnalysisRunnerTable(DbBase):
         WHERE {where_params:q}
     """
         rows = await (await self.connection.pg_connection.execute(_query)).fetchall()
-        return [
-            AnalysisRunnerInternal(**{**row, 'meta': row.get('meta') or {}})
-            for row in rows
-        ]
+
+        analysis_runner_internal_list = []
+        for row in rows:
+            row['meta'] = row.get('meta') or {}
+            analysis_runner_internal_list.append(AnalysisRunnerInternal(**row))
+
+        return analysis_runner_internal_list
 
     async def insert_analysis_runner_entry(
         self, analysis_runner: AnalysisRunnerInternal
