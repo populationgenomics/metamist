@@ -66,12 +66,19 @@ class AnalysisRunnerTable(DbBase):
         meta_param = Jsonb(analysis_runner.meta)
 
         _query = t"""
-        INSERT INTO analysis_runner (project, ar_guid, timestamp, access_level, repository, commit, script,
-        description, driver_image, config_path, cwd, environment, hail_version, batch_url, submitting_user, meta, output_path, audit_log_id)
-        VALUES ({self.project_id}, {analysis_runner.ar_guid}, {datetime.datetime.now()}, {analysis_runner.access_level}, {analysis_runner.repository},
-        {analysis_runner.commit}, {analysis_runner.script}, {analysis_runner.description}, {analysis_runner.driver_image}, {analysis_runner.config_path},
-        {analysis_runner.cwd}, {analysis_runner.environment}, {analysis_runner.hail_version}, {analysis_runner.batch_url}, {analysis_runner.submitting_user},
-        {meta_param}, {analysis_runner.output_path}, {audit_log_id})
+        INSERT INTO analysis_runner (project, ar_guid, timestamp, access_level,
+        repository, commit, script, description,
+        driver_image, config_path, cwd, environment,
+        hail_version, batch_url, submitting_user, meta,
+        output_path, audit_log_id
+        )
+        VALUES (
+        {self.project_id}, {analysis_runner.ar_guid}, {datetime.datetime.now()}, {analysis_runner.access_level},
+        {analysis_runner.repository}, {analysis_runner.commit}, {analysis_runner.script}, {analysis_runner.description},
+        {analysis_runner.driver_image}, {analysis_runner.config_path}, {analysis_runner.cwd}, {analysis_runner.environment},
+        {analysis_runner.hail_version}, {analysis_runner.batch_url}, {analysis_runner.submitting_user}, {meta_param},
+        {analysis_runner.output_path}, {audit_log_id}
+        )
         """
 
         await self.connection.pg_connection.execute(_query)
