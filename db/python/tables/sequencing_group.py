@@ -40,7 +40,7 @@ class SequencingGroupTable(DbBase):
             'type': 'sg.type',
             'technology': 'sg.technology',
             'platform': 'sg.platform',
-            'active_only': 'NOT sg.archived',
+            'active_only': t'NOT sg.archived',
             # this is on the inner query, so won't conflict with the provided alias
             'external_id': 'sgexid.external_id',
         }
@@ -89,7 +89,7 @@ class SequencingGroupTable(DbBase):
 
         if filter_.created_on is not None:
             created_on_condition = filter_.to_sql(
-                {'created_on': 'MIN(LOWER(sys_period))::date'}, only=['created_on']
+                {'created_on': t'MIN(LOWER(sys_period))::date'}, only=['created_on']
             )
             base_query_components.append(
                 t"""

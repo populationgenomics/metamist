@@ -101,36 +101,28 @@ class GenericFilter[T](SMBase):
         return hash(self.get_hashable_value())
 
     def to_sql(
-        self, column: str, column_expression: Template | None = None
+        self, column: str | Template
     ) -> Template:
         """
-        Convert to SQL, and avoid SQL injection
+        Convert to SQL, and avoid SQL injection.
+
+        **Note**:
+            If column contains an expression, it _must_ be of type Template.
+            If column is a column name, it should be of type str.
 
         Args:
-            column (str): The expression, or column name that derives the values
-            column_expression (Template, optional): A SQL expression as a str Template
-                to be used for the column. This can be used if you want to use a sql
-                function for the column
+            column (str | Template): The expression, or column name that derives the values.
 
         Returns:
             Template
         """
         filters: list[Template] = []
 
-        if not isinstance(column, str):
-            raise ValueError(f'Column {column!r} must be a string')
-
-        if column:
-            keywords = [segment.split('.') for segment in column.split(' ')]
-            sql_segments = []
-            for key in keywords:
-                if len(key) > 1:
-                    sql_segments.append(sql.Identifier(*key))
-                else:
-                    sql_segments.append(sql.SQL(*key))
-            column = sql.SQL(' ').join(sql_segments)
-
-        column_query = column_expression if column_expression else t'{column:q}'
+        column_query = (
+            column
+            if isinstance(column, Template)
+            else t'{sql.Identifier(*column.split(".")):i}'
+        )
 
         if self.eq is not None:
             filters.append(t'{column_query:q} = {self.eq}')
