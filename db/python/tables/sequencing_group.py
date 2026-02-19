@@ -330,22 +330,22 @@ class SequencingGroupTable(DbBase):
         meta: dict | None = None,
     ) -> int:
         """Create sequence group"""
-        assert sample_id is not None
-        assert type_ is not None
-        assert technology is not None
-        assert platform is not None
-
         values = {
             'sample_id': sample_id,
-            'type': type_.lower(),
-            'technology': technology.lower(),
-            'platform': platform.lower(),
+            'type': type_,
+            'technology': technology,
+            'platform': platform,
             'meta': to_db_json(meta or {}),
         }
         # check if any values are None and raise an exception if so
         bad_keys = [k for k, v in values.items() if v is None]
         if bad_keys:
             raise ValueError(f'Must provide values for {", ".join(bad_keys)}')
+
+        # Ensure that capitalisation is consistent
+        values['type'] = values['type'].lower()
+        values['technology'] = values['technology'].lower()
+        values['platform'] = values['platform'].lower()
 
         get_existing_query = t"""
         SELECT id

@@ -109,7 +109,7 @@ class TestGenericFilters:
         """Test that overriding a field with an expression that modifies the field will execute correctly"""
         filter_ = GenericFilterTest(test_int=GenericFilter(eq=300), test_bool=GenericFilter(eq=True))
         field_mapping = {
-            'test_bool': 'NOT test_bool'
+            'test_bool': t'NOT test_bool'
         }
 
         async with test_data.connection() as conn:
