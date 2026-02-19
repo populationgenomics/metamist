@@ -4,6 +4,7 @@ from string.templatelib import Template
 from dateutil.relativedelta import relativedelta
 
 from psycopg import sql
+from psycopg.rows import class_row
 
 from db.python.filters.generic import GenericFilter
 from db.python.filters.sequencing_group import SequencingGroupFilter
@@ -188,13 +189,15 @@ class SequencingGroupTable(DbBase):
             limit=limit,
             skip=skip,
         )
-
-        cur = await self.connection.pg_connection.execute(query)
-        rows = await cur.fetchall()
-
-        sgs = [SequencingGroupInternal(**r) for r in rows]
-        projects = set(sg.project for sg in sgs if sg.project)
-        return projects, sgs
+    
+        async with self.connection.pg_connection.cursor(
+            row_factory=class_row(SequencingGroupInternal)
+        ) as cur:
+            await cur.execute(query)
+            sgs_internal = await cur.fetchall()
+        
+        projects = set(sg.project for sg in sgs_internal if sg.project)
+        return projects, sgs_internal
 
     async def get_sequencing_groups_by_ids(
             self, ids: list[int]
