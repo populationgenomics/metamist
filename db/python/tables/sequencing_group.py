@@ -26,10 +26,8 @@ class SequencingGroupTable(DbBase):
     @staticmethod
     def construct_query(
         filter_: SequencingGroupFilter,
-        columns: list[sql.Composable],
         skip: int | None = None,
-        limit: int | None = None,
-        external_id_table_alias: str | None = None,
+        limit: int | None = None
     ) -> Template:
         """
         Construct a query for sequencing_group
@@ -159,15 +157,20 @@ class SequencingGroupTable(DbBase):
 
         base_query = sql.SQL('\n').join(base_query_components)
 
-        ex_id_join = t''
-        if external_id_table_alias:
-            ex_id_join = t'LEFT JOIN sequencing_group_external_id {external_id_table_alias:i} ON sg.id = {external_id_table_alias:i}.sequencing_group_id'
-
         outer_query = t"""
-            SELECT {sql.SQL(', ').join(columns):q}
+            SELECT
+                sg.id,
+                s.project,
+                coalesce(jsonb_object_agg(sgexid.name, sgexid.external_id) FILTER (WHERE sgexid.name IS NOT NULL), '{{}}'::jsonb) AS external_ids,
+                sg.sample_id,
+                sg.type,
+                sg.technology,
+                sg.platform,
+                sg.meta,
+                sg.archived
             FROM sequencing_group sg
             LEFT JOIN sample s ON s.id = sg.sample_id
-            {ex_id_join:q}
+            LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id
             INNER JOIN (
                 {base_query:q}
             ) AS sg_query ON sg.id = sg_query.id
@@ -180,22 +183,8 @@ class SequencingGroupTable(DbBase):
     ) -> tuple[set[ProjectId], list[SequencingGroupInternal]]:
         """Query samples"""
 
-        select_keys = [
-            sql.Identifier('sg', 'id'),
-            sql.Identifier('s', 'project'),
-            sql.SQL('coalesce(jsonb_object_agg(sgexid.name, sgexid.external_id) FILTER (WHERE sgexid.name IS NOT NULL), \'{}\'::jsonb) AS external_ids'),
-            sql.Identifier('sg', 'sample_id'),
-            sql.Identifier('sg', 'type'),
-            sql.Identifier('sg', 'technology'),
-            sql.Identifier('sg', 'platform'),
-            sql.Identifier('sg', 'meta'),
-            sql.Identifier('sg', 'archived'),
-        ]
-
         query = SequencingGroupTable.construct_query(
             filter_,
-            columns=select_keys,
-            external_id_table_alias='sgexid',
             limit=limit,
             skip=skip,
         )
