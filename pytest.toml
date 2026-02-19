@@ -9,6 +9,7 @@ python_files = [
     "test_project_groups.py",
     "test_generic_filters.py",
     "test_sample.py",
+    "test_participant.py",
     "test_assay.py",
     "test_external_id.py",
     "test_meta_table.py"
