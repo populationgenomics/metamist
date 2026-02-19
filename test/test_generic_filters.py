@@ -23,6 +23,7 @@ class GenericFilterTest(GenericFilterModel):
     test_date: GenericFilter[date] | None = None
     test_enum: GenericFilter[AnalysisStatus] | None = None
     test_str_enum: GenericFilter[ProjectMemberRole] | None = None
+    test_dict: dict[str, GenericFilter[str]] | None = None
 
 
 @pytest.fixture
@@ -38,7 +39,8 @@ async def test_table(db_pool: AsyncConnectionPool[AsyncConnection[DictRow]]):
                 test_bool BOOLEAN,
                 test_date DATE,
                 test_enum main.analysis_status,
-                test_str_enum main.project_member_role
+                test_str_enum main.project_member_role,
+                test_dict JSONB
             )
         """)
 
@@ -57,16 +59,17 @@ async def test_data(
     async with db_pool.connection() as conn:
         # Insert test data
         await conn.execute("""
-            INSERT INTO test_generic_filters (test_string, test_int, test_bool, test_date, test_enum, test_str_enum)
+            INSERT INTO test_generic_filters (test_string, test_int, test_bool, test_date, test_enum, test_str_enum, test_dict)
             VALUES
-                ('test', 100, true, '2024-01-01', 'queued', 'reader'),
-                ('Test', 200, false, '2024-02-01', 'in-progress', 'contributor'),
-                ('another', 150, true, '2024-01-15', 'queued', 'writer'),
-                ('per%ce_nt', 175, false, '2024-03-01', 'completed', 'reader'),
-                ('contains_test', 125, true, '2024-01-10', 'in-progress', 'contributor'),
-                ('testprefix', 300, false, '2024-04-01', 'queued', 'writer'),
-                ('TestPrefix', 350, true, '2024-05-01', 'completed', 'reader'),
-                (NULL, 999, NULL, NULL, NULL, NULL)
+                ('test', 100, true, '2024-01-01', 'queued', 'reader', '{"metastr": "test", "metaint": 100}'),
+                ('Test', 200, false, '2024-02-01', 'in-progress', 'contributor', '{"metastr": "Test", "metaint": 200}'),
+                ('another', 150, true, '2024-01-15', 'queued', 'writer', '{"metastr": "another", "metaint": 150}'),
+                ('per%ce_nt', 175, false, '2024-03-01', 'completed', 'reader', '{"metastr": "per%ce_nt", "metaint": 175}'),
+                ('contains_test', 125, true, '2024-01-10', 'in-progress', 'contributor', '{"metastr": "contains_test", "metaint": 125}'),
+                ('testprefix', 300, false, '2024-04-01', 'queued', 'writer', '{"metastr": "testprefix", "metaint": 300}'),
+                ('TestPrefix', 350, true, '2024-05-01', 'completed', 'reader', '{"metastr": "TestPrefix", "metaint": 350}'),
+                ('Empty Meta', 404, false, '2024-06-01', NULL, NULL, '{}'),
+                (NULL, 999, NULL, NULL, NULL, NULL, NULL)
         """)
 
     return db_pool
@@ -189,8 +192,8 @@ class TestGenericFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        # Should match 200, 300, 350, 999
-        assert len(results) == 4
+        # Should match 200, 300, 350, 404, 999
+        assert len(results) == 5
         assert all(r['test_int'] > 175 for r in results)
 
     async def test_gte_single(
@@ -202,8 +205,8 @@ class TestGenericFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        # Should match 175, 200, 300, 350, 999
-        assert len(results) == 5
+        # Should match 175, 200, 300, 350, 404, 999
+        assert len(results) == 6
         assert all(r['test_int'] >= 175 for r in results)
 
     async def test_lt_single(
@@ -241,8 +244,8 @@ class TestGenericFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        # Should match 125, 175, 300, 350, 999
-        assert len(results) == 5
+        # Should match 125, 175, 300, 350, 404, 999
+        assert len(results) == 6
         assert all(r['test_int'] not in [100, 150, 200] for r in results)
 
     async def test_not_in_includes_nulls(
@@ -259,7 +262,7 @@ class TestGenericFilters:
             results = await execute_filter(conn, filter_)
 
         # Should match in progress and null
-        assert len(results) == 3
+        assert len(results) == 4
         assert (
             len([r for r in results if r['test_enum'] == AnalysisStatus.IN_PROGRESS])
             == 2
@@ -278,7 +281,7 @@ class TestGenericFilters:
             results = await execute_filter(conn, filter_)
 
         # Should exclude only 'test'
-        assert len(results) == 6
+        assert len(results) == 7
         assert all(r['test_string'] != 'test' for r in results)
 
     async def test_startswith(
@@ -317,7 +320,7 @@ class TestGenericFilters:
             results = await execute_filter(conn, filter_)
 
         # Should match all rows except the NULL one
-        assert len(results) == 7
+        assert len(results) == 8
         assert all(r['test_string'] is not None for r in results)
 
     async def test_multiple_conditions(
@@ -359,8 +362,8 @@ class TestGenericFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        # Should match rows 2, 4, 6
-        assert len(results) == 3
+        # Should match rows 2, 4, 6, 8
+        assert len(results) == 4
         assert all(r['test_bool'] is False for r in results)
 
     async def test_bool_neq(
@@ -372,7 +375,7 @@ class TestGenericFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        assert len(results) == 3
+        assert len(results) == 4
         assert all(r['test_bool'] is False for r in results)
 
     # Date filter tests
@@ -397,8 +400,8 @@ class TestGenericFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        # Should match dates after 2024-02-01: 2024-03-01, 2024-04-01, 2024-05-01
-        assert len(results) == 3
+        # Should match dates after 2024-02-01: 2024-03-01, 2024-04-01, 2024-05-01, 2024-06-01
+        assert len(results) == 4
         assert all(r['test_date'] > date(2024, 2, 1) for r in results)
 
     async def test_date_gte(
@@ -411,7 +414,7 @@ class TestGenericFilters:
             results = await execute_filter(conn, filter_)
 
         # Should match dates >= 2024-02-01
-        assert len(results) == 4
+        assert len(results) == 5
         assert all(r['test_date'] >= date(2024, 2, 1) for r in results)
 
     async def test_date_lt(
@@ -515,7 +518,7 @@ class TestGenericFilters:
             results = await execute_filter(conn, filter_)
 
         # Should exclude queued
-        assert len(results) == 5
+        assert len(results) == 6
         assert all(r['test_enum'] != 'queued' for r in results)
 
     # String enum filter tests
@@ -588,3 +591,16 @@ class TestGenericFilters:
         assert len(results) == 1
         assert results[0]['test_string'] == 'test'
         assert results[0]['test_int'] == 100
+
+    async def test_filter_dict_field(
+        self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]
+    ):
+        """Test that a dict field with GenericFilter values works correctly"""
+        filter_ = GenericFilterTest(test_string={'contains': 'test'})
+
+        async with test_data.connection() as conn:
+            results = await execute_filter(conn, filter_)
+
+        # Should match 'Test' and 'TestPrefix' (case-sensitive contains and startswith)
+        assert len(results) == 2
+        assert {r['test_string'] for r in results} == {'Test', 'TestPrefix'}
