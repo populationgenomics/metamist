@@ -1,9 +1,11 @@
 import dataclasses
 import datetime
+from string.templatelib import Template
+
+from psycopg.types.json import Jsonb
 
 from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
-from db.python.utils import to_db_json
 from models.models.analysis_runner import AnalysisRunnerInternal
 from models.models.project import ProjectId
 
@@ -25,8 +27,6 @@ class AnalysisRunnerTable(DbBase):
     Capture Analysis table operations and queries
     """
 
-    table_name = 'analysis_runner'
-
     async def query(
         self, filter_: AnalysisRunnerFilter
     ) -> list[AnalysisRunnerInternal]:
@@ -34,18 +34,24 @@ class AnalysisRunnerTable(DbBase):
         Get analysis runner logs
         """
 
-        where_str, values = filter_.to_sql()
+        where_params: Template = filter_.to_sql()
 
-        _query = f"""
-SELECT
-    project, ar_guid, timestamp, access_level, repository, commit, script,
-    description, driver_image, config_path, cwd, environment,
-    hail_version, batch_url, submitting_user, meta, output_path, audit_log_id
-FROM analysis_runner
-WHERE {where_str}
+        if not list(where_params):
+            raise ValueError(f'Invalid filter: {filter_}')
+
+        _query = t"""
+        SELECT
+            project, ar_guid, timestamp, access_level, repository, commit, script,
+            description, driver_image, config_path, cwd, environment,
+            hail_version, batch_url, submitting_user, meta, output_path, audit_log_id
+        FROM analysis_runner
+        WHERE {where_params:q}
     """
-        rows = await self.connection.fetch_all(_query, values)
-        return [AnalysisRunnerInternal.from_db(**dict(row)) for row in rows]
+        rows = await (await self.connection.pg_connection.execute(_query)).fetchall()
+        return [
+            AnalysisRunnerInternal(**{**row, 'meta': row.get('meta') or {}})
+            for row in rows
+        ]
 
     async def insert_analysis_runner_entry(
         self, analysis_runner: AnalysisRunnerInternal
@@ -53,40 +59,17 @@ WHERE {where_str}
         """
         Insert analysis runner log
         """
+        audit_log_id = await self.audit_log_id()
+        meta_param = Jsonb(analysis_runner.meta)
 
-        _query = """
-INSERT INTO analysis_runner (
-    project, ar_guid, timestamp, access_level, repository, commit, script,
-    description, driver_image, config_path, cwd, environment,
-    hail_version, batch_url, submitting_user, meta, output_path, audit_log_id
-)
-VALUES (
-    :project, :ar_guid, :timestamp, :access_level, :repository, :commit, :script,
-    :description, :driver_image, :config_path, :cwd, :environment,
-    :hail_version, :batch_url, :submitting_user, :meta, :output_path, :audit_log_id
-)
-"""
-        values = {
-            'ar_guid': analysis_runner.ar_guid,
-            'timestamp': datetime.datetime.now(),
-            'access_level': analysis_runner.access_level,
-            'repository': analysis_runner.repository,
-            'commit': analysis_runner.commit,
-            'script': analysis_runner.script,
-            'description': analysis_runner.description,
-            'driver_image': analysis_runner.driver_image,
-            'config_path': analysis_runner.config_path,
-            'cwd': analysis_runner.cwd,
-            'environment': analysis_runner.environment,
-            'hail_version': analysis_runner.hail_version,
-            'batch_url': analysis_runner.batch_url,
-            'submitting_user': analysis_runner.submitting_user,
-            'meta': to_db_json(analysis_runner.meta),
-            'output_path': analysis_runner.output_path,
-            'audit_log_id': await self.audit_log_id(),
-            'project': self.project_id,
-        }
+        _query = t"""
+        INSERT INTO analysis_runner (project, ar_guid, timestamp, access_level, repository, commit, script,
+        description, driver_image, config_path, cwd, environment, hail_version, batch_url, submitting_user, meta, output_path, audit_log_id)
+        VALUES ({self.project_id}, {analysis_runner.ar_guid}, {datetime.datetime.now()}, {analysis_runner.access_level}, {analysis_runner.repository},
+        {analysis_runner.commit}, {analysis_runner.script}, {analysis_runner.description}, {analysis_runner.driver_image}, {analysis_runner.config_path},
+        {analysis_runner.cwd}, {analysis_runner.environment}, {analysis_runner.hail_version}, {analysis_runner.batch_url}, {analysis_runner.submitting_user},
+        {meta_param}, {analysis_runner.output_path}, {audit_log_id})
+        """
 
-        await self.connection.execute(_query, values)
-
+        await self.connection.pg_connection.execute(_query)
         return analysis_runner.ar_guid
