@@ -12,16 +12,9 @@ from models.models.analysis_runner import AnalysisRunnerInternal
 class TestAnalysisRunner:
     """Test sample class"""
 
-    @pytest.fixture(autouse=True)
-    async def set_up(self, connection_with_project: Connection) -> None:
-        self.al = AnalysisRunnerLayer(connection_with_project)
-        self.project_id = connection_with_project.project_id
-
-    @pytest.mark.asyncio
-    async def test_insert(self) -> None:
-        """Test insert"""
-        analysis = AnalysisRunnerInternal(
-            ar_guid='<ar-guid>',
+    def get_test_analysis(self, ar_guid_param: str) -> AnalysisRunnerInternal:
+        return AnalysisRunnerInternal(
+            ar_guid=ar_guid_param,
             project=self.project_id,
             output_path='output_path',
             timestamp=datetime.datetime(2024, 1, 1),
@@ -39,6 +32,16 @@ class TestAnalysisRunner:
             batch_url='batch_url',
             meta={'meta': 'meta'},
         )
+
+    @pytest.fixture(autouse=True)
+    async def set_up(self, connection_with_project: Connection) -> None:
+        self.al = AnalysisRunnerLayer(connection_with_project)
+        self.project_id = connection_with_project.project_id
+
+    @pytest.mark.asyncio
+    async def test_insert(self) -> None:
+        """Test insert"""
+        analysis = self.get_test_analysis('<ar-guid>')
         await self.al.insert_analysis_runner_entry(analysis)
 
         db_ars = await self.al.query(
@@ -73,28 +76,8 @@ class TestAnalysisRunner:
         """
         Query all the Filter fields to check they work correctly
         """
-        analyses = [
-            AnalysisRunnerInternal(
-                ar_guid=f'<ar-guid-{i + 1}>',
-                project=self.project_id,
-                output_path='output_path',
-                timestamp=datetime.datetime(2024, 1, 1),
-                access_level='test',
-                repository='repository',
-                config_path='config_path',
-                environment='gcp',
-                submitting_user='submitting_user',
-                commit='commit',
-                script='script',
-                description='description',
-                hail_version='1.0',
-                cwd='cwd',
-                driver_image='driver_image',
-                batch_url='batch_url',
-                meta={'meta': 'meta'},
-            )
-            for i in range(3)
-        ]
+        analyses = [self.get_test_analysis(f'<ar-guid-{i + 1}>') for i in range(3)]
+
         for analysis in analyses:
             await self.al.insert_analysis_runner_entry(analysis)
 
@@ -128,25 +111,7 @@ class TestAnalysisRunner:
         Test that the query throws an error if the filters are empty
         """
 
-        analysis = AnalysisRunnerInternal(
-            ar_guid='<ar-guid>',
-            project=self.project_id,
-            output_path='output_path',
-            timestamp=datetime.datetime(2024, 1, 1),
-            access_level='test',
-            repository='repository',
-            config_path='config_path',
-            environment='gcp',
-            submitting_user='submitting_user',
-            commit='commit',
-            script='script',
-            description='description',
-            hail_version='1.0',
-            cwd='cwd',
-            driver_image='driver_image',
-            batch_url='batch_url',
-            meta={'meta': 'meta'},
-        )
+        analysis = self.get_test_analysis('<ar-guid>')
         await self.al.insert_analysis_runner_entry(analysis)
 
         with pytest.raises(ValueError):
