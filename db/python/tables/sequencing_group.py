@@ -286,19 +286,18 @@ class SequencingGroupTable(DbBase):
         self, analysis_ids: list[int]
     ) -> tuple[set[ProjectId], dict[int, list[SequencingGroupInternal]]]:
         """Get map of samples by analysis_ids"""
-        keys = [
-            'sg.id',
-            's.project',
-            'jsonb_object_agg(sgexid.name, sgexid.external_id) as external_ids',
-            'sg.sample_id',
-            'sg.type',
-            'sg.technology',
-            'sg.platform',
-            'sg.meta',
-            'sg.archived',
-        ]
         _query = t"""
-        SELECT {sql.SQL(', ').join(keys):q}, asg.analysis_id
+        SELECT
+            sg.id,
+            s.project,
+            coalesce(jsonb_object_agg(sgexid.name, sgexid.external_id) FILTER (WHERE sgexid.name IS NOT NULL), '{{}}'::jsonb) AS external_ids,
+            sg.sample_id,
+            sg.type,
+            sg.technology,
+            sg.platform,
+            sg.meta,
+            sg.archived,
+            asg.analysis_id
         FROM analysis_sequencing_group asg
         INNER JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
         INNER JOIN sample s ON s.id = sg.sample_id
