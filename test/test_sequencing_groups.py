@@ -384,8 +384,8 @@ class TestSequencingGroup:
 
         # Firstly create two sequencing groups to attach analyses to
         insert_sgs = f"""
-            INSERT INTO sequencing_group (sample_id, type, technology)
-            VALUES ({test_sample}, %(type)s, %(technology)s)
+            INSERT INTO sequencing_group (sample_id, type, technology, archived)
+            VALUES ({test_sample}, %(type)s, %(technology)s, false)
             RETURNING id"""
 
         async with connection_with_project.pg_connection.cursor() as cur:
@@ -413,7 +413,7 @@ class TestSequencingGroup:
         
         async with connection_with_project.pg_connection.cursor() as cur:
             await cur.execute(insert_analysis_sequencing_group, {'analysis_id': cram_id, 'sg_id': sg_ids[0]})
-            await cur.execute(insert_analysis_sequencing_group, {'analysis_id': gvcf_id, 'sg_id': sg_ids[0]})
+            await cur.execute(insert_analysis_sequencing_group, {'analysis_id': gvcf_id, 'sg_id': sg_ids[1]})
 
         # Query for cram analysis
         sgs = await sg_layer.query(SequencingGroupFilter(has_cram=True))
@@ -423,7 +423,7 @@ class TestSequencingGroup:
         # Query for gvcf analysis
         sgs = await sg_layer.query(SequencingGroupFilter(has_gvcf=True))
         assert len(sgs) == 1
-        assert sgs[0].id == sg_ids[1].id
+        assert sgs[0].id == sg_ids[1]
 
         # Query for both cram AND gvcf analysis
         sgs = await sg_layer.query(

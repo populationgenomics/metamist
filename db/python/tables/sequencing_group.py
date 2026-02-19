@@ -41,6 +41,7 @@ class SequencingGroupTable(DbBase):
             'technology': 'sg.technology',
             'platform': 'sg.platform',
             'active_only': t'NOT sg.archived',
+            'has_cram': t'has_cram',
             # this is on the inner query, so won't conflict with the provided alias
             'external_id': 'sgexid.external_id',
         }
@@ -58,7 +59,7 @@ class SequencingGroupTable(DbBase):
         )
 
         if sg_filter.sample:
-            sample_where_template = sg_filter.sample.to_sql(
+            sample_where_condition = sg_filter.sample.to_sql(
                 {
                     'id': 's.id',
                     'meta': 's.meta',
@@ -69,7 +70,7 @@ class SequencingGroupTable(DbBase):
             if sg_filter.sample.external_id:
                 base_query_components.append(t'LEFT JOIN sample_external_id sexid ON s.id = sexid.sample_id')
 
-            where_templates.append(sample_where_template)
+            where_templates.append(sample_where_condition)
 
         if sg_filter.assay is not None:
             a_overrides = {
@@ -78,14 +79,14 @@ class SequencingGroupTable(DbBase):
                 'type': 'a.type',
                 'external_id': 'aexid.external_id',
             }
-            assay_where_template = sg_filter.assay.to_sql(a_overrides)
+            assay_where_condition = sg_filter.assay.to_sql(a_overrides)
             base_query_components.append(
                 t"""
                 INNER JOIN sequencing_group_assay sga ON sg.id = sga.sequencing_group_id'
                 INNER JOIN assay a ON sga.assay_id = a.id"""
             )
 
-            where_templates.append(assay_where_template)
+            where_templates.append(assay_where_condition)
 
         if sg_filter.created_on is not None:
             created_on_condition = sg_filter.to_sql(
@@ -108,30 +109,22 @@ class SequencingGroupTable(DbBase):
             )
 
         if sg_filter.has_cram is not None or sg_filter.has_gvcf is not None:
-            cram_where_template = sg_filter.to_sql(
+            cram_where_condition = sg_filter.to_sql(
                 sql_overrides, only=['has_cram', 'has_gvcf']
             )
             base_query_components.append(
                 t"""
                 INNER JOIN (
-                    SELECT
-                        sequencing_group_id,
-                        FIND_IN_SET('cram', GROUP_CONCAT(LOWER(anlysis_query.type))) > 0 AS has_cram,
-                        FIND_IN_SET('gvcf', GROUP_CONCAT(LOWER(anlysis_query.type))) > 0 AS has_gvcf
-                    FROM
-                        analysis_sequencing_group
-                        INNER JOIN (
-                            SELECT
-                                id, type
-                            FROM
-                                analysis
-                        ) AS anlysis_query ON analysis_sequencing_group.analysis_id = anlysis_query.id
-                    GROUP BY
-                        sequencing_group_id
-                    HAVING
-                        {cram_where_template:q}
+                    SELECT 
+                        asg.sequencing_group_id,
+                        bool_or(a.type = 'cram') AS has_cram,
+                        bool_or(a.type = 'gvcf') AS has_gvcf
+                    FROM 
+                        analysis_sequencing_group asg JOIN analysis a ON a.id = asg.analysis_id
+                    GROUP BY asg.sequencing_group_id
                 ) AS sg_filequery ON sg.id = sg_filequery.sequencing_group_id"""
             )
+            where_templates.append(cram_where_condition)
 
         # Add the rest of the filters
         remaining_filters = sg_filter.to_sql(
