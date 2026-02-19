@@ -135,7 +135,7 @@ class CohortTable(DbBase):
         rows = await (await self.connection.pg_connection.execute(_query)).fetchall()
         cohort_templates = []
         for row in rows:
-            row['criteria'] = row['criteria'] if row.get('criteria') else {}
+            row['criteria'] = row.get('criteria') or {}
             cohort_templates.append(CohortTemplateInternal(**row))
 
         projects = {c.project for c in cohort_templates}
@@ -149,7 +149,8 @@ class CohortTable(DbBase):
         row = await (await self.connection.pg_connection.execute(_query)).fetchone()
         if not row:
             raise NotFoundError(f'Cohort template with ID {template_id} not found')
-        row['criteria'] = row['criteria'] if row.get('criteria') else {}
+
+        row['criteria'] = row.get('criteria') or {}
         return CohortTemplateInternal(**row)
 
     async def create_cohort_template(
