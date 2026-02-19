@@ -170,7 +170,7 @@ class CohortTable(DbBase):
         INSERT INTO cohort_template (name, description, criteria, project, audit_log_id)
         VALUES ({name}, {description}, {criteria_param}, {project}, {audit_log_id}) RETURNING id;
         """
-        print(sql.as_string(_query))
+
         async with self.connection.pg_connection.cursor(row_factory=scalar_row) as cur:
             cohort_template_id = await (await cur.execute(_query)).fetchone()
 
