@@ -29,35 +29,25 @@ class SequencingGroupLayer(BaseLayer):
         self.sampt: SampleTable = SampleTable(connection)
 
     async def get_sequencing_group_by_id(
-        self, 
-        sequencing_group_id: int, 
-        active_only=True
+        self, sequencing_group_id: int
     ) -> SequencingGroupInternal:
         """
         Get sequencing group by internal ID
         """
-        groups = await self.get_sequencing_groups_by_ids([sequencing_group_id], active_only)
+        groups = await self.get_sequencing_groups_by_ids([sequencing_group_id])
 
         return groups[0]
 
     async def get_sequencing_groups_by_ids(
-        self, 
-        sequencing_group_ids: list[int], 
-        active_only: bool | None = None
+        self, sequencing_group_ids: list[int]
     ) -> list[SequencingGroupInternal]:
         """
-        Get sequence groups by internal IDs.
-        - active_only=True  -> return only matching non-archived sequencing groups
-        - active_only=False -> return only matching archived sequencing groups
-        - active_only=None  -> return all matching sequencing groups
+        Get sequence groups by internal IDs
         """
         if not sequencing_group_ids:
             return []
 
-        projects, groups = await self.seqgt.get_sequencing_groups_by_ids(
-            sequencing_group_ids,
-            active_only
-        )
+        projects, groups = await self.seqgt.get_sequencing_groups_by_ids(sequencing_group_ids)
 
         if not groups:
             return []

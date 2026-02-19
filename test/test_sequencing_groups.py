@@ -201,7 +201,7 @@ class TestSequencingGroup:
 
         updated_sg = await sg_layer.upsert_sequencing_groups([new_upsert])
 
-        old_sg = await sg_layer.get_sequencing_group_by_id(initial_sg[0].id, active_only=False)
+        old_sg = await sg_layer.get_sequencing_group_by_id(initial_sg[0].id)
         # now check the existing sequencing group was archived
         assert old_sg.archived == True
 
