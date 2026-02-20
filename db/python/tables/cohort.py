@@ -3,7 +3,7 @@ import datetime
 from string.templatelib import Template
 
 from psycopg import sql
-from psycopg.rows import scalar_row
+from psycopg.rows import class_row, scalar_row
 from psycopg.types.json import Jsonb
 
 from db.python.filters import GenericFilter, GenericFilterModel
@@ -70,7 +70,7 @@ class CohortTable(DbBase):
                 'project': 'c.project',
             }
         )
-        if not list(where_params):
+        if where_params is None:
             raise ValueError(f'Invalid filter: {filter_}')
         _query = t"""
         SELECT
@@ -132,11 +132,10 @@ class CohortTable(DbBase):
 
         _query = t'SELECT id, name, description, criteria, project FROM cohort_template WHERE {wheres_params:q}'
 
-        rows = await (await self.connection.pg_connection.execute(_query)).fetchall()
-        cohort_templates = []
-        for row in rows:
-            row['criteria'] = row.get('criteria') or {}
-            cohort_templates.append(CohortTemplateInternal(**row))
+        async with self.connection.pg_connection.cursor(
+            row_factory=class_row(CohortTemplateInternal)
+        ) as cursor:
+            cohort_templates = await (await cursor.execute(_query)).fetchall()
 
         projects = {c.project for c in cohort_templates}
         return projects, cohort_templates
