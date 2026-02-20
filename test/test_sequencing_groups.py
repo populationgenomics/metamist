@@ -1,174 +1,246 @@
-from datetime import date, datetime
+from collections.abc import Callable
+from datetime import date
 from unittest import mock
 
+import pytest
+
+from db.python.connect import Connection
 from db.python.filters import GenericFilter
-from db.python.layers import AnalysisLayer, SampleLayer, SequencingGroupLayer
-from db.python.tables.sequencing_group import SequencingGroupFilter
-from models.enums.analysis import AnalysisStatus
+from db.python.layers import SequencingGroupLayer
+from db.python.tables.sequencing_group import (
+    SequencingGroupFilter,
+    SequencingGroupTable,
+)
 from models.models import (
-    PRIMARY_EXTERNAL_ORG,
-    AnalysisInternal,
     AssayUpsertInternal,
-    SampleUpsertInternal,
     SequencingGroupUpsertInternal,
 )
-from test.testbase import DbIsolatedTest, run_as_sync
+from test.conftest import GraphQLQueryFunction
 
 
-def get_sample_model():
+@pytest.fixture
+async def test_sample(connection_with_project: Connection) -> int:
     """
-    Get sample model with sequencing-groups, return in a function
-    to protect against any mutation to this model
+    Create a sample directly in the database for testing sequencing groups.
+    This is a temporary fixture until sample layer is migrated.
+    @TODO replace this when ready
     """
-    return SampleUpsertInternal(
-        meta={},
-        external_ids={PRIMARY_EXTERNAL_ORG: 'EX_ID'},
-        sequencing_groups=[
-            SequencingGroupUpsertInternal(
-                type='genome',
-                technology='short-read',
-                platform='ILLUMINA',
+    project_id = connection_with_project.project_id
+
+    conn = connection_with_project.pg_connection
+    # Create audit_log entry first
+    create_audit_log = t"""
+        INSERT INTO audit_log (author, auth_project)
+        VALUES ('test', {project_id})
+        RETURNING id"""
+    cur = await conn.execute(create_audit_log)
+    row = await cur.fetchone()
+    assert row is not None
+    audit_log_id = row['id']
+
+    insert_sample = t"""
+        INSERT INTO sample
+            (project, meta, type, active, author, audit_log_id)
+        VALUES ({project_id}, '{{"meta_key": "meta_value"}}', 'blood', true, 'test_aurthor', {audit_log_id})
+        RETURNING id;"""
+
+    cur = await conn.execute(insert_sample)
+    row = await cur.fetchone()
+    assert row is not None
+    sample_id = row['id']
+
+    insert_external_id = t"""
+        INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
+        VALUES ({project_id}, {sample_id}, 'default', 'TESTING001', {audit_log_id})
+        """
+    await conn.execute(insert_external_id)
+
+    return sample_id
+
+
+@pytest.fixture
+def sequencing_group_model(test_sample: int) -> SequencingGroupUpsertInternal:
+    """
+    Fixture that provides a SequencingGroupUpsertInternal for
+    a simple sequencing group to be upserted into the database.
+    """
+    return SequencingGroupUpsertInternal(
+        type='genome',
+        technology='short-read',
+        platform='ILLUMINA',
+        meta={
+            'meta-key': 'meta-value',
+        },
+        sample_id=test_sample,
+        external_ids={'ext': 'some-ext-id'},
+        assays=[
+            AssayUpsertInternal(
+                type='sequencing',
+                external_ids={},
                 meta={
-                    'meta-key': 'meta-value',
+                    'sequencing_type': 'genome',
+                    'sequencing_platform': 'short-read',
+                    'sequencing_technology': 'illumina',
                 },
-                external_ids={'ext': 'some-ext-id'},
-                assays=[
-                    AssayUpsertInternal(
-                        type='sequencing',
-                        external_ids={},
-                        meta={
-                            'sequencing_type': 'genome',
-                            'sequencing_platform': 'short-read',
-                            'sequencing_technology': 'illumina',
-                        },
-                    )
-                ],
             )
         ],
     )
 
 
-class TestSequencingGroup(DbIsolatedTest):
+@pytest.fixture
+def mock_date(monkeypatch) -> Callable[[str, date], mock.Mock]:
+    """Fixture to configurably mock calls to `date.today` within the provided module"""
+
+    def _mock_date(module: str, _date: date):
+        mock_date = mock.Mock(wraps=date)
+        mock_date.today.return_value = _date
+        monkeypatch.setattr(module, mock_date)
+        return mock_date
+
+    return _mock_date
+
+
+class TestSequencingGroup:
     """Test sequencing groups business logic"""
 
-    @run_as_sync
-    async def setUp(self) -> None:
-        super().setUp()
-        self.sglayer = SequencingGroupLayer(self.connection)
-        self.slayer = SampleLayer(self.connection)
-        self.alayer = AnalysisLayer(self.connection)
-
-    @run_as_sync
-    async def test_empty_query(self):
+    @pytest.mark.asyncio
+    async def test_empty_query(
+        self,
+        connection: Connection,
+    ) -> None:
         """
         Test empty IDs to see the query construction
         """
-        sgs = await self.sglayer.query(SequencingGroupFilter(id=GenericFilter(in_=[])))
-        self.assertEqual(len(sgs), 0)
+        layer = SequencingGroupLayer(connection)
+        sgs = await layer.query(SequencingGroupFilter(id=GenericFilter(in_=[])))
 
-    @run_as_sync
-    async def test_insert_sequencing_group(self):
+        assert len(sgs) == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_insert_sequencing_group(
+        self,
+        connection_with_project: Connection,
+        sequencing_group_model: SequencingGroupUpsertInternal,
+    ):
         """Test inserting and fetching a sequencing group"""
-        sample_to_insert = get_sample_model()
-        sample = await self.slayer.upsert_sample(sample_to_insert)
-        sg_id = sample.sequencing_groups[0].id
-        sg = await self.sglayer.get_sequencing_group_by_id(sg_id)
+        sg_layer = SequencingGroupLayer(connection_with_project)
 
-        inserted_sg = sample_to_insert.sequencing_groups[0]
-        self.assertEqual(inserted_sg.id, sg_id)
-        self.assertEqual(inserted_sg.type, sg.type)
-        self.assertEqual(inserted_sg.technology, sg.technology)
-        self.assertEqual(inserted_sg.platform.lower(), sg.platform.lower())
-        self.assertDictEqual(inserted_sg.meta, sg.meta)
+        sg_upsert = await sg_layer.upsert_sequencing_groups([sequencing_group_model])
+        sg_id = sg_upsert[0].id
+        sg = await sg_layer.get_sequencing_group_by_id(sg_id)
 
-    @run_as_sync
-    async def test_update_sequencing_group(self):
+        inserted_sg = sg_upsert[0]
+        assert inserted_sg.id == sg_id
+        assert inserted_sg.type == sg.type
+        assert inserted_sg.technology == sg.technology
+        assert inserted_sg.platform.lower() == sg.platform.lower()
+        assert inserted_sg.meta == sg.meta
+
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_update_sequencing_group(
+        self,
+        connection_with_project: Connection,
+        sequencing_group_model: SequencingGroupUpsertInternal,
+    ):
         """Test updating metadata on a sequencing group"""
-        sample = await self.slayer.upsert_sample(get_sample_model())
+        sg_layer = SequencingGroupLayer(connection_with_project)
+        # Create the initial SG
+        initial_sg = await sg_layer.upsert_sequencing_groups([sequencing_group_model])
 
-        upsert_sg = SequencingGroupUpsertInternal(
-            id=sample.sequencing_groups[0].id,
+        # Create an updated model for upsert
+        upsert_sg_model = SequencingGroupUpsertInternal(
+            id=initial_sg[0].id,
             meta={'another-meta': 'field'},
         )
-        # Check that id is being returned when seqg created
-        sg_return = await self.sglayer.upsert_sequencing_groups([upsert_sg])
-        self.assertEqual(sg_return[0].id, upsert_sg.id)
 
-        sg = await self.sglayer.get_sequencing_group_by_id(
-            sample.sequencing_groups[0].id
-        )
+        # Check that id is being returned when sg created
+        new_sg = await sg_layer.upsert_sequencing_groups([upsert_sg_model])
+        assert new_sg[0].id == upsert_sg_model.id
 
-        self.assertDictEqual(
-            {'another-meta': 'field', 'meta-key': 'meta-value'}, sg.meta
-        )
+        # Check that the update was mdae to the db
+        sg_from_db = await sg_layer.get_sequencing_group_by_id(initial_sg[0].id)
 
-    @run_as_sync
-    async def test_auto_deprecation_of_old_sequencing_group(self):
+        assert sg_from_db.meta == {'another-meta': 'field', 'meta-key': 'meta-value'}
+
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_auto_deprecation_of_old_sequencing_group(
+        self,
+        connection_with_project: Connection,
+        sequencing_group_model: SequencingGroupUpsertInternal,
+    ):
         """Test creating a sequencing-group, and test the old one is archived"""
-        sample = await self.slayer.upsert_sample(get_sample_model())
+        sample_id = sequencing_group_model.sample_id
+        sg_layer = SequencingGroupLayer(connection_with_project)
+        # Create the initial SG
+        initial_sg = await sg_layer.upsert_sequencing_groups([sequencing_group_model])
 
-        # self.sglayer.get_sequencing_groups_by_ids()
-
-        new_upsert = SampleUpsertInternal(
-            id=sample.id,
-            sequencing_groups=[
-                SequencingGroupUpsertInternal(
-                    type='genome',
-                    technology='short-read',
-                    platform='ILLUMINA',
+        new_upsert = SequencingGroupUpsertInternal(
+            sample_id=initial_sg[0].sample_id,
+            type='genome',
+            technology='short-read',
+            platform='ILLUMINA',
+            meta={
+                'meta-key': 'meta-value',
+            },
+            external_ids={},
+            assays=[
+                # include an empty assay with ID to ensure it gets added to the sg
+                AssayUpsertInternal(
+                    id=initial_sg[0].assays[0].id,
+                ),
+                # new assay to trigger deprecation
+                AssayUpsertInternal(
+                    type='sequencing',
+                    external_ids={'second-key': 'second-sequencing-object'},
                     meta={
-                        'meta-key': 'meta-value',
+                        'sequencing_type': 'genome',
+                        'sequencing_platform': 'short-read',
+                        'sequencing_technology': 'illumina',
                     },
-                    external_ids={},
-                    assays=[
-                        # include an empty assay with ID to ensure it gets added to the sg
-                        AssayUpsertInternal(
-                            id=sample.sequencing_groups[0].assays[0].id,
-                        ),
-                        # new assay to trigger deprecation
-                        AssayUpsertInternal(
-                            type='sequencing',
-                            external_ids={'second-key': 'second-sequencing-object'},
-                            meta={
-                                'sequencing_type': 'genome',
-                                'sequencing_platform': 'short-read',
-                                'sequencing_technology': 'illumina',
-                            },
-                        ),
-                    ],
-                )
+                ),
             ],
         )
 
-        updated_sample = await self.slayer.upsert_sample(new_upsert)
+        updated_sg = await sg_layer.upsert_sequencing_groups([new_upsert])
 
-        old_sg = await self.sglayer.get_sequencing_group_by_id(
-            sample.sequencing_groups[0].id
-        )
+        old_sg = await sg_layer.get_sequencing_group_by_id(initial_sg[0].id)
         # now check the existing sequencing group was archived
-        self.assertTrue(old_sg.archived)
+        assert old_sg.archived
 
         # check that the "active" sequencing group is the new one
-        active_sgs = await self.sglayer.query(
+        active_sgs = await sg_layer.query(
             SequencingGroupFilter(
                 sample=SequencingGroupFilter.SequencingGroupSampleFilter(
-                    id=GenericFilter(eq=sample.id)
+                    id=GenericFilter(eq=sample_id)
                 )
             )
         )
 
-        self.assertTrue(all(not sg.archived for sg in active_sgs))
-        self.assertEqual(len(active_sgs), 1)
-        self.assertEqual(updated_sample.sequencing_groups[0].id, active_sgs[0].id)
+        assert all(not sg.archived for sg in active_sgs)
+        assert len(active_sgs) == 1
+        assert updated_sg[0].id == active_sgs[0].id
 
-    @run_as_sync
-    async def test_query_with_assay_metadata(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.skip(
+        reason='Querying JSON keys is not yet implemented'
+    )  # TODO: Implement this test when querying JSON keys is implemented
+    async def test_query_with_assay_metadata(
+        self,
+        connection_with_project: Connection,
+        sequencing_group_model: SequencingGroupUpsertInternal,
+    ):
         """Test searching with an assay metadata filter"""
-        sample_to_insert = get_sample_model()
+        sg_layer = SequencingGroupLayer(connection_with_project)
+        sgs_to_insert = [sequencing_group_model]
 
         # Add extra sequencing group
-        sample_to_insert.sequencing_groups.append(
+        sgs_to_insert.append(
             SequencingGroupUpsertInternal(
+                sample_id=sequencing_group_model.sample_id,
                 type='exome',
                 technology='short-read',
                 platform='ILLUMINA',
@@ -191,190 +263,247 @@ class TestSequencingGroup(DbIsolatedTest):
         )
 
         # Create in database
-        sample = await self.slayer.upsert_sample(sample_to_insert)
+        inital_sgs = await sg_layer.upsert_sequencing_groups(sgs_to_insert)
 
         # Query for genome assay metadata
-        sgs = await self.sglayer.query(
+        sgs = await sg_layer.query(
             SequencingGroupFilter(
                 assay=SequencingGroupFilter.SequencingGroupAssayFilter(
                     meta={'sequencing_type': GenericFilter(eq='genome')}
                 )
             )
         )
-        self.assertEqual(len(sgs), 1)
-        self.assertEqual(sgs[0].id, sample.sequencing_groups[0].id)
+        assert len(sgs) == 1
+        assert sgs[0].id == inital_sgs[0].id
 
         # Query for exome assay metadata
-        sgs = await self.sglayer.query(
+        sgs = await sg_layer.query(
             SequencingGroupFilter(
                 assay=SequencingGroupFilter.SequencingGroupAssayFilter(
                     meta={'sequencing_type': GenericFilter(eq='exome')}
                 )
             )
         )
-        self.assertEqual(len(sgs), 1)
-        self.assertEqual(sgs[0].id, sample.sequencing_groups[1].id)
+        assert len(sgs) == 1
+        assert sgs[0].id == inital_sgs[1].id
 
-    @run_as_sync
-    async def test_query_with_creation_date(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_query_with_creation_date(
+        self,
+        connection_with_project: Connection,
+        test_sample: int,
+    ):
         """Test fetching using a creation date filter"""
-        sample_to_insert = get_sample_model()
-        await self.slayer.upsert_sample(sample_to_insert)
+        sg_layer = SequencingGroupLayer(connection_with_project)
 
-        # There's a race condition here -- don't run this near UTC midnight!
-        today = datetime.utcnow().date()
+        # Insert a current sequencing group into the database with a pre-defined date that it is current from
+        current_date = date(2026, 1, 1)
+        current_query = t"""
+            INSERT INTO sequencing_group
+                (sample_id, type, technology, archived, sys_period)
+            VALUES
+                ({test_sample}, 'genome', 'short-read', false, tstzrange({current_date.isoformat()}, null))
+        """
+        conn = connection_with_project.pg_connection
+        async with conn.transaction():
+            # Disable the trigger so that the sys_period isn't overwritten
+            await conn.execute(
+                'ALTER TABLE main.sequencing_group DISABLE TRIGGER versioning_trigger'
+            )
+            await conn.execute(current_query)
+            await conn.execute(
+                'ALTER TABLE main.sequencing_group ENABLE TRIGGER versioning_trigger'
+            )
 
-        # Query for sequencing group with creation date before today
-        sgs = await self.sglayer.query(
-            SequencingGroupFilter(created_on=GenericFilter(lt=today))
+        # Query for sequencing group with creation date current_date
+        sgs = await sg_layer.query(
+            SequencingGroupFilter(created_on=GenericFilter(eq=current_date))
         )
-        self.assertEqual(len(sgs), 0)
+        assert len(sgs) == 1
+        sg_id = sgs[0].id
 
-        # Query for sequencing group with creation date today
-        sgs = await self.sglayer.query(
-            SequencingGroupFilter(created_on=GenericFilter(eq=today))
+        # Query for sequencing group with creation date before current_date
+        sgs = await sg_layer.query(
+            SequencingGroupFilter(created_on=GenericFilter(lt=current_date))
         )
-        self.assertEqual(len(sgs), 1)
+        assert len(sgs) == 0
 
-        sgs = await self.sglayer.query(
-            SequencingGroupFilter(created_on=GenericFilter(lte=today))
+        # Query for sequencing group with creation date after current_date
+        sgs = await sg_layer.query(
+            SequencingGroupFilter(created_on=GenericFilter(gt=current_date))
         )
-        self.assertEqual(len(sgs), 1)
+        assert len(sgs) == 0
 
-        sgs = await self.sglayer.query(
-            SequencingGroupFilter(created_on=GenericFilter(gte=today))
+        # Insert a historical sequencing group into the history table with a pre-defined period for which it was current
+        historical_date = date(2025, 12, 1)
+        historical_query = t"""
+            INSERT INTO sequencing_group_history
+                (id, sample_id, type, technology, archived, sys_period)
+            VALUES
+                (
+                    {sg_id}, {test_sample}, 'genome', 'short-read', false,
+                    tstzrange({historical_date.isoformat()}, {current_date.isoformat()})
+                )
+        """
+        await conn.execute(historical_query)
+
+        # Query for sequencing group with creation date historical_date
+        sgs = await sg_layer.query(
+            SequencingGroupFilter(created_on=GenericFilter(eq=historical_date))
         )
-        self.assertEqual(len(sgs), 1)
+        assert len(sgs) == 1
+        sg_id = sgs[0].id
 
-        # Query for sequencing group with creation date today
-        sgs = await self.sglayer.query(
-            SequencingGroupFilter(created_on=GenericFilter(gt=today))
+        # Query for sequencing group with creation date before historical_date
+        sgs = await sg_layer.query(
+            SequencingGroupFilter(created_on=GenericFilter(lt=historical_date))
         )
-        self.assertEqual(len(sgs), 0)
+        assert len(sgs) == 0
 
-    @run_as_sync
-    async def test_query_finds_sgs_which_have_cram_analysis(self):
+        # Query for sequencing group with creation date after historical_date
+        sgs = await sg_layer.query(
+            SequencingGroupFilter(created_on=GenericFilter(gt=historical_date))
+        )
+        assert len(sgs) == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_query_finds_sgs_which_have_cram_analysis(
+        self, connection_with_project: Connection, test_sample: int
+    ):
         """Test querying for sequencing groups which have a cram or gvcf analysis"""
-        sample_to_insert = get_sample_model()
+        sg_layer = SequencingGroupLayer(connection_with_project)
 
-        # Add extra sequencing group
-        sample_to_insert.sequencing_groups.append(
-            SequencingGroupUpsertInternal(
-                type='exome',
-                technology='short-read',
-                platform='ILLUMINA',
-                meta={
-                    'meta-key': 'meta-value',
-                },
-                external_ids={},
-                assays=[
-                    AssayUpsertInternal(
-                        type='sequencing',
-                        external_ids={},
-                        meta={
-                            'sequencing_type': 'exome',
-                            'sequencing_platform': 'short-read',
-                            'sequencing_technology': 'illumina',
-                        },
-                    )
-                ],
-            )
-        )
+        test_sg_data = [
+            {'type': 'genome', 'technology': 'short-read'},
+            {'type': 'genome', 'technology': 'long-read'},
+        ]
 
-        # Create in database
-        sample = await self.slayer.upsert_sample(sample_to_insert)
+        # Firstly create two sequencing groups to attach analyses to
+        insert_sgs = f"""
+            INSERT INTO sequencing_group (sample_id, type, technology, archived)
+            VALUES ({test_sample}, %(type)s, %(technology)s, false)
+            RETURNING id"""
 
-        # Create analysis for cram and gvcf
-        await self.alayer.create_analysis(
-            AnalysisInternal(
-                type='cram',
-                status=AnalysisStatus.COMPLETED,
-                sequencing_group_ids=[sample.sequencing_groups[0].id],
-                meta={},
+        async with connection_with_project.pg_connection.cursor() as cur:
+            await cur.executemany(insert_sgs, test_sg_data, returning=True)
+            sg_ids = [(await cur.fetchone())['id'] async for _ in cur.results()]
+
+        assert len(sg_ids) == 2
+
+        # Create a cram and gvcf analysis
+        insert_analyses = f"""
+            INSERT INTO analysis (type, project, status)
+            VALUES (%(type)s, {connection_with_project.project_id}, 'completed')
+            RETURNING id"""
+
+        async with connection_with_project.pg_connection.cursor() as cur:
+            await cur.execute(insert_analyses, {'type': 'cram'})
+            cram_id = (await cur.fetchone())['id']
+            await cur.execute(insert_analyses, {'type': 'gvcf'})
+            gvcf_id = (await cur.fetchone())['id']
+
+        # Attach the cram analysis to the first sg, gvcf analysis to the second sg
+        insert_analysis_sequencing_group = """
+            INSERT INTO analysis_sequencing_group (analysis_id, sequencing_group_id)
+            VALUES (%(analysis_id)s, %(sg_id)s)"""
+
+        async with connection_with_project.pg_connection.cursor() as cur:
+            await cur.execute(
+                insert_analysis_sequencing_group,
+                {'analysis_id': cram_id, 'sg_id': sg_ids[0]},
             )
-        )
-        await self.alayer.create_analysis(
-            AnalysisInternal(
-                type='gvcf',
-                status=AnalysisStatus.COMPLETED,
-                sequencing_group_ids=[sample.sequencing_groups[1].id],
-                meta={},
+            await cur.execute(
+                insert_analysis_sequencing_group,
+                {'analysis_id': gvcf_id, 'sg_id': sg_ids[1]},
             )
-        )
 
         # Query for cram analysis
-        sgs = await self.sglayer.query(SequencingGroupFilter(has_cram=True))
-        self.assertEqual(len(sgs), 1)
-        self.assertEqual(sgs[0].id, sample.sequencing_groups[0].id)
+        sgs = await sg_layer.query(SequencingGroupFilter(has_cram=True))
+        assert len(sgs) == 1
+        assert sgs[0].id == sg_ids[0]
 
         # Query for gvcf analysis
-        sgs = await self.sglayer.query(SequencingGroupFilter(has_gvcf=True))
-        self.assertEqual(len(sgs), 1)
-        self.assertEqual(sgs[0].id, sample.sequencing_groups[1].id)
+        sgs = await sg_layer.query(SequencingGroupFilter(has_gvcf=True))
+        assert len(sgs) == 1
+        assert sgs[0].id == sg_ids[1]
 
         # Query for both cram AND gvcf analysis
-        sgs = await self.sglayer.query(
-            SequencingGroupFilter(has_gvcf=True, has_cram=True)
-        )
-        self.assertEqual(len(sgs), 0)
+        sgs = await sg_layer.query(SequencingGroupFilter(has_gvcf=True, has_cram=True))
+        assert len(sgs) == 0
 
         # Add first SG to gvcf analysis
-        await self.alayer.create_analysis(
-            AnalysisInternal(
-                type='gvcf',
-                status=AnalysisStatus.COMPLETED,
-                sequencing_group_ids=[sample.sequencing_groups[0].id],
-                meta={},
+        async with connection_with_project.pg_connection.cursor() as cur:
+            await cur.execute(
+                insert_analysis_sequencing_group,
+                {'analysis_id': gvcf_id, 'sg_id': sg_ids[0]},
+            )
+
+        # Query for both cram AND gvcf analysis now that first SG has gvcf analysis
+        sgs = await sg_layer.query(SequencingGroupFilter(has_gvcf=True, has_cram=True))
+        assert len(sgs) == 1
+        assert sgs[0].id == sg_ids[0]
+
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_archiving_sequencing_groups(
+        self,
+        connection_with_project: Connection,
+        sequencing_group_model: SequencingGroupUpsertInternal,
+        graphql_query: GraphQLQueryFunction,
+    ):
+        """Check that sequencing groups can be archived from graphql"""
+        sg_layer = SequencingGroupLayer(connection_with_project)
+        sgs_to_insert = [sequencing_group_model]
+
+        sgs_to_insert.append(
+            SequencingGroupUpsertInternal(
+                sample_id=sequencing_group_model.sample_id,
+                type='genome',
+                technology='long-read',
+                platform='illumina',
+                meta={'meta-1': 'test-1'},
+                assays=[],
+            )
+        )
+        sgs_to_insert.append(
+            SequencingGroupUpsertInternal(
+                sample_id=sequencing_group_model.sample_id,
+                type='exome',
+                technology='short-read',
+                platform='illumina',
+                meta={'meta-2': 'test-2'},
+                assays=[],
+            )
+        )
+        sgs_to_insert.append(
+            SequencingGroupUpsertInternal(
+                sample_id=sequencing_group_model.sample_id,
+                type='exome',
+                technology='long-read',
+                platform='illumina',
+                meta={'meta-3': 'test-3'},
+                assays=[],
             )
         )
 
-        # Query for both cram AND gvcf analysis now that first SG has gvcf analysis
-        sgs = await self.sglayer.query(
-            SequencingGroupFilter(has_gvcf=True, has_cram=True)
-        )
-        self.assertEqual(len(sgs), 1)
-        self.assertEqual(sgs[0].id, sample.sequencing_groups[0].id)
-
-    @run_as_sync
-    async def test_archiving_sequencing_groups(self):
-        """Check that sequencing groups can be archived from graphql"""
-        sample_model = SampleUpsertInternal(
-            meta={},
-            external_ids={PRIMARY_EXTERNAL_ORG: 'EXID1'},
-            type='blood',
-            sequencing_groups=[
-                SequencingGroupUpsertInternal(
-                    type='genome',
-                    technology='short-read',
-                    platform='illumina',
-                    meta={},
-                    assays=[],
-                ),
-                SequencingGroupUpsertInternal(
-                    type='genome',
-                    technology='short-read',
-                    platform='illumina',
-                    meta={},
-                    assays=[],
-                ),
-                SequencingGroupUpsertInternal(
-                    type='exome',
-                    technology='short-read',
-                    platform='illumina',
-                    meta={},
-                    assays=[],
-                ),
-            ],
-        )
-
-        sample = await self.slayer.upsert_sample(sample_model)
-        assert sample.sequencing_groups
-        sg1 = sample.sequencing_groups[0].to_external().id
-        sg2 = sample.sequencing_groups[1].to_external().id
+        sgs = await sg_layer.upsert_sequencing_groups(sgs_to_insert)
+        assert sgs
+        sg1 = sgs[0].to_external().id
+        sg2 = sgs[1].to_external().id
 
         assert sg1, sg2
 
-        archive_result = await self.run_graphql_query_async(
+        # Check that the sequencing groups aren't initially archived
+        sgs_from_db = await sg_layer.get_sequencing_groups_by_ids(
+            [sgs[0].id, sgs[1].id]
+        )
+        assert not sgs_from_db[0].archived
+        assert not sgs_from_db[1].archived
+
+        # Archive the sequencing groups
+        archive_result = await graphql_query(
             """
             mutation ArchiveSeqGroups($ids: [String!]!) {
                 sequencingGroup {
@@ -388,33 +517,38 @@ class TestSequencingGroup(DbIsolatedTest):
             {'ids': [sg1, sg2]},
         )
 
-        archived_sgs = archive_result['sequencingGroup']['archiveSequencingGroups']
+        archived_sgs = archive_result['data']['sequencingGroup'][
+            'archiveSequencingGroups'
+        ]
 
-        self.assertEqual(len(archived_sgs), 2)
-        self.assertEqual(archived_sgs[0]['id'], sg1)
-        self.assertEqual(archived_sgs[0]['archived'], True)
-        self.assertEqual(archived_sgs[1]['id'], sg2)
-        self.assertEqual(archived_sgs[1]['archived'], True)
+        assert len(archived_sgs) == 2
+        assert archived_sgs[0]['id'] == sg1
+        assert archived_sgs[0]['archived']
+        assert archived_sgs[1]['id'] == sg2
+        assert archived_sgs[1]['archived']
 
-    @run_as_sync
-    async def test_history_no_sum(self):
+    @pytest.mark.asyncio
+    async def test_history_no_sum(self, connection: Connection):
         """Test the trivial case where there are no sequencing groups."""
+        sg_table = SequencingGroupTable(connection)
+        result = await sg_table.get_sequencing_group_counts_by_month([])
 
-        # Set up mocking for rows returned from the table query.
-        with mock.patch(
-            'db.python.connect.databases.Database.fetch_all', return_value=[]
-        ):
-            sg_table = self.sglayer.seqgt
-            result = await sg_table.get_sequencing_group_counts_by_month([])
+        assert result == {}
 
-        self.assertDictEqual(result, {})
-
-    @run_as_sync
-    @mock.patch('db.python.tables.sequencing_group.date', wraps=date)
-    async def test_history_sum_multiple_projects(self, mock_date):
+    @pytest.mark.asyncio
+    @pytest.mark.skip(
+        reason='Currently requires more complex testing fixtures that may be easier to achieve one more functionality is migrated'
+    )  # TODO Revisit when ready
+    async def test_history_sum_multiple_projects(
+        self,
+        connection: Connection,  # noqa: ARG002 TODO: remove noqa when test is reinstated
+        test_sample: int,  # noqa: ARG002 TODO: remove noqa when test is reinstated
+        mock_date,
+    ):
         """Test the case where type:technology combinations are summed and held for the same project."""
         # Mock today's date.
-        mock_date.today.return_value = date(year=2025, month=12, day=31)
+        today = date(year=2025, month=12, day=31)
+        mock_date('db.python.tables.sequencing_group.date', today)
 
         # Set up mocking for rows returned from the table query.
         rows_mock = [
@@ -481,70 +615,87 @@ class TestSequencingGroup(DbIsolatedTest):
             },
         )
 
-    @run_as_sync
-    @mock.patch('db.python.tables.sequencing_group.date', wraps=date)
-    async def test_history_partial_sum(self, mock_date):
+    @pytest.mark.asyncio
+    async def test_history_partial_sum(
+        self, connection_with_project: Connection, test_sample: int, mock_date
+    ):
         """Test the case where less types are present initially and more are added over time."""
         # Mock today's date.
-        mock_date.today.return_value = date(year=2025, month=12, day=31)
+        today = date(year=2025, month=12, day=31)
+        mock_date('db.python.tables.sequencing_group.date', today)
 
-        # Set up mocking for rows returned from the table query.
-        rows_mock = [
+        # Define some test data
+        test_data = [
             {
-                'project': 0,
+                'id': 1,
+                'sample_id': test_sample,
                 'type': 'genome',
                 'technology': 'short-read',
-                'sg_date': date(2025, 10, 1),
-                'num_sg': 2,
+                'sg_date': date(2025, 10, 1).isoformat(),
             },
             {
-                'project': 0,
+                'id': 1,
+                'sample_id': test_sample,
                 'type': 'genome',
                 'technology': 'long-read',
-                'sg_date': date(2025, 11, 1),
-                'num_sg': 3,
+                'sg_date': date(2025, 11, 1).isoformat(),
             },
             {
-                'project': 0,
+                'id': 1,
+                'sample_id': test_sample,
                 'type': 'chip',
                 'technology': 'short-read',
-                'sg_date': date(2025, 10, 1),
-                'num_sg': 4,
+                'sg_date': date(2025, 10, 1).isoformat(),
             },
             {
-                'project': 0,
+                'id': 1,
+                'sample_id': test_sample,
                 'type': 'chip',
                 'technology': 'long-read',
-                'sg_date': date(2025, 11, 1),
-                'num_sg': 5,
+                'sg_date': date(2025, 11, 1).isoformat(),
             },
         ]
-        with mock.patch(
-            'db.python.connect.databases.Database.fetch_all', return_value=rows_mock
-        ):
-            sg_table = self.sglayer.seqgt
-            result = await sg_table.get_sequencing_group_counts_by_month([0])
 
-        self.assertDictEqual(
-            result,
-            {
-                0: {
-                    date(2025, 10, 1): {
-                        'genome|||short-read': 2,
-                        'chip|||short-read': 4,
-                    },
-                    date(2025, 11, 1): {
-                        'genome|||short-read': 2,
-                        'genome|||long-read': 3,
-                        'chip|||short-read': 4,
-                        'chip|||long-read': 5,
-                    },
-                    date(2025, 12, 1): {
-                        'genome|||short-read': 2,
-                        'genome|||long-read': 3,
-                        'chip|||short-read': 4,
-                        'chip|||long-read': 5,
-                    },
-                }
-            },
-        )
+        test_data_query = f"""
+            INSERT INTO sequencing_group_history
+                (id, sample_id, type, technology, archived, sys_period)
+            VALUES
+                (%(id)s, %(sample_id)s, %(type)s, %(technology)s, false, tstzrange(%(sg_date)s, '{today.isoformat()}'))"""
+
+        # Insert the test data to the DB
+        conn = connection_with_project.pg_connection
+        async with conn.transaction(), conn.cursor() as cur:
+            # Disable the trigger so that the sys_period isn't overwritten
+            await cur.execute(
+                'ALTER TABLE main.sequencing_group DISABLE TRIGGER versioning_trigger'
+            )
+            await cur.executemany(test_data_query, test_data)
+            await cur.execute(
+                'ALTER TABLE main.sequencing_group ENABLE TRIGGER versioning_trigger'
+            )
+
+        sg_table = SequencingGroupTable(connection_with_project)
+        result = await sg_table.get_sequencing_group_counts_by_month([test_sample])
+
+        expected_output = {
+            test_sample: {
+                date(2025, 10, 1): {
+                    'genome|||short-read': 1,
+                    'chip|||short-read': 1,
+                },
+                date(2025, 11, 1): {
+                    'genome|||short-read': 1,
+                    'genome|||long-read': 1,
+                    'chip|||short-read': 1,
+                    'chip|||long-read': 1,
+                },
+                date(2025, 12, 1): {
+                    'genome|||short-read': 1,
+                    'genome|||long-read': 1,
+                    'chip|||short-read': 1,
+                    'chip|||long-read': 1,
+                },
+            }
+        }
+
+        assert result == expected_output

@@ -16,13 +16,13 @@ from gql.transport.aiohttp import log as aiohttp_logger
 from gql.transport.exceptions import TransportServerError
 from gql.transport.requests import RequestsHTTPTransport
 from gql.transport.requests import log as requests_logger
-
-# this does not import itself, it imports the module
-from graphql import DocumentNode  # type: ignore
 from requests.exceptions import HTTPError
 
 import metamist.configuration
 from cpg_utils.cloud import get_google_identity_token
+
+# this does not import itself, it imports the module
+from graphql import DocumentNode  # type: ignore
 
 
 _sync_client: Client | None = None
