@@ -116,7 +116,7 @@ class GenericFilter[T](SMBase):
         Returns:
             Template
         """
-        filters: list[Template] = []
+        filters: list[Template | None] = []
 
         column_query = (
             column
@@ -170,7 +170,11 @@ class GenericFilter[T](SMBase):
             else:
                 filters.append(t'{column_query:q} IS NOT NULL')
 
-        return sql.SQL(' AND ').join(filters)
+        filters_rm_none: list[Template] = [f for f in filters if f is not None]
+        if len(filters_rm_none) == 0:
+            return None
+
+        return sql.SQL(' AND ').join(filters_rm_none)
 
     def transform(self, func: Callable[[T], X]) -> GenericFilter[X]:
         """
@@ -250,7 +254,7 @@ class GenericFilterModel:
         field_overrides: dict[str, str] | None = None,
         only: list[str] | None = None,
         exclude: list[str] | None = None,
-    ) -> Template:
+    ) -> Template | None:
         """Convert the model to SQL, and avoid SQL injection"""
 
         _foverrides = field_overrides or {}
@@ -265,7 +269,7 @@ class GenericFilterModel:
             )
 
         fields = dataclasses.fields(self)
-        filters: list[Template] = []
+        filters: list[Template | None] = []
         for field in fields:
             if only and field.name not in only:
                 continue
@@ -287,7 +291,11 @@ class GenericFilterModel:
                         f'Filter {field.name} must be a GenericFilter or dict[str, GenericFilter]'
                     )
 
-        return sql.SQL(' AND ').join(filters)
+        filters_rm_none: list[Template] = [f for f in filters if f is not None]
+        if len(filters_rm_none) == 0:
+            return None
+
+        return sql.SQL(' AND ').join(filters_rm_none)
 
 
 def prepare_query_from_dict_field(
