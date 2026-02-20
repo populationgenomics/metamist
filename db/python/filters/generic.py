@@ -5,6 +5,7 @@ from string.templatelib import Template
 from typing import Any, TypeVar
 
 from psycopg import sql
+from typing_extensions import get_args, get_origin
 
 from db.python.utils import escape_like_term
 from models.base import SMBase
@@ -129,7 +130,7 @@ class GenericFilter[T](SMBase):
         if self.eq is not None:
             filters.append(t'{column_query:q} = {self.eq}')
         if self.neq is not None:
-            filters.append(t'{column_query:q} != {self.neq}')
+            filters.append(t'{column_query:q} IS DISTINCT FROM {self.neq}')
         if self.in_ is not None:
             if not isinstance(self.in_, list):
                 raise ValueError('IN filter must be a list')
@@ -283,7 +284,7 @@ class GenericFilterModel:
                 if isinstance(filter_, dict):
                     filters.append(
                         prepare_query_from_dict_field(
-                            filter_=filter_, field_name=field.name, column_name=fcolumn
+                            filter_=filter_, column_name=fcolumn
                         )
                     )
                 elif isinstance(filter_, GenericFilter):
@@ -300,17 +301,98 @@ class GenericFilterModel:
         return sql.SQL(' AND ').join(filters_rm_none)
 
 
+def infer_type_from_filter(value: GenericFilter) -> str:
+    """
+    Infer the SQL cast type from actual values in the filter
+
+    In order for these values to work you could just check the
+    type of the first non-None value, but to be thorough we will enforce
+    that all values in the filter (excluding isnull) are of the same type.
+
+    This does require trust in the user to apply an appropriate filter
+    for the column key value type e.g. for the json column "meta" and a row value {'favnum': int}
+    We hope that a filter would be appropriately applied like
+    meta={'favnum': GenericFilter(eq=5)} <- we'll infer the type as integer from the value 5
+    and not
+    meta={'favnum': GenericFilter(eq='five')} <- we'll infer the type as text
+
+    If the casting of any value fails, the database will raise an error.
+    """
+    # Collect all non-None comparison values
+    sample_values: list[Any] = []
+    for k, v in value.__dict__.items():
+        if k == 'isnull' or v is None:
+            continue
+        if isinstance(v, list):
+            sample_values.extend(v)
+        else:
+            sample_values.append(v)
+
+    # Infer type non-None values
+    cast_types = set()
+    for v in sample_values:
+        if isinstance(v, bool):
+            cast_types.add('boolean')
+        elif isinstance(v, int):
+            cast_types.add('integer')
+        elif isinstance(v, float):
+            cast_types.add('numeric')
+        else:
+            cast_types.add('string')
+
+    if len(cast_types) > 1:
+        raise ValueError(
+            f'Mixed types in filter values: {cast_types}. All values in a filter must be of the same type.'
+        )
+
+    return cast_types.pop() if cast_types else 'string'
+
+
 def prepare_query_from_dict_field(
-    filter_: dict[str, Any],  # noqa: ARG001
-    field_name: str,  # noqa: ARG001
-    column_name: str,  # noqa: ARG001
-) -> Template:
+    filter_: dict[str, Any], column_name: str
+) -> Template | None:
     """
     Prepare a SQL query from a dict field, which is a dict of GenericFilters.
     Usually this is a JSON field in the database that we want to query on.
-
     """
-    # @TODO implement this, it's a bit tricky as postgres is much more strict with JSON
-    # types.
-    raise NotImplementedError('Querying JSON keys is not implemented at the moment')
-    return t'FALSE'
+    wheres: list[Template | None] = []
+
+    for key, field_filter in filter_.items():
+        if '"' in key:
+            raise ValueError('Meta key contains " character, which is not allowed')
+
+        # Build JSON extraction expression as a Template
+        # Creates: ("column_name" ->> 'key')::type for typed casts
+        # or just "column_name" ->> 'key' for text
+        json_expr: Template
+        col_parts = column_name.split('.')
+        cast_type: str = infer_type_from_filter(field_filter)
+        if cast_type != 'string':
+            # Cast the JSON text extraction to the appropriate type
+            # Use sql.SQL for the cast type to avoid treating it as an identifier
+            json_expr = (
+                t'({sql.Identifier(*col_parts):i} ->> {key})::{sql.SQL(cast_type):q}'
+            )
+        else:
+            # No cast needed for string type, just extract the text
+            json_expr = t'{sql.Identifier(*col_parts):i} ->> {key}'
+
+        # Construct sql where clause for this key and filter
+        where_filter = field_filter.to_sql(
+            column=f'{column_name}_{key}',
+            column_expression=json_expr,
+        )
+
+        # If we are using an exclusion filter (nin, neq)
+        # we also include rows where the key doesn't exist or the json
+        # value is null. The exception is if isnull=False
+        if key in ('nin', 'neq') and not field_filter.isnull:
+            where_filter = t'({where_filter} OR {json_expr} IS NULL)'
+
+        wheres.append(where_filter)
+
+    wheres_rm_none: list[Template] = [f for f in wheres if f is not None]
+    if len(wheres_rm_none) == 0:
+        return None
+
+    return sql.SQL(' AND ').join(wheres_rm_none)
