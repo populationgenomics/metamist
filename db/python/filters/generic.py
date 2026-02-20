@@ -5,7 +5,6 @@ from string.templatelib import Template
 from typing import Any, TypeVar
 
 from psycopg import sql
-from typing_extensions import get_args, get_origin
 
 from db.python.utils import escape_like_term
 from models.base import SMBase

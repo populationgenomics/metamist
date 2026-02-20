@@ -1051,3 +1051,17 @@ class TestGenericFilters:
         assert len(results) == 1
         assert results[0]['test_dict']['metastr'] == 'Test'
         assert results[0]['test_dict']['metaint'] == 200
+
+    async def test_dict_in_and_isnull_true(
+        self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]
+    ):
+        """Test that dict field with 'in' operator and isnull=True works correctly"""
+        filter_ = GenericFilterTest(
+            test_dict={'metastr': GenericFilter(in_=['test', 'another'], isnull=True)}
+        )
+
+        async with test_data.connection() as conn:
+            results = await execute_filter(conn, filter_)
+
+        # Any inclusion filter and isnull=True should reutrn nothing
+        assert len(results) == 0
