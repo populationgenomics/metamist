@@ -2,6 +2,7 @@ import dataclasses
 import datetime
 from string.templatelib import Template
 
+from psycopg.rows import class_row
 from psycopg.types.json import Jsonb
 
 from db.python.filters import GenericFilter, GenericFilterModel
@@ -43,16 +44,14 @@ class AnalysisRunnerTable(DbBase):
         SELECT
             project, ar_guid, timestamp, access_level, repository, commit, script,
             description, driver_image, config_path, cwd, environment,
-            hail_version, batch_url, submitting_user, meta, output_path, audit_log_id
+            hail_version, batch_url, submitting_user, COALESCE(meta, {'{}'}::jsonb) as meta, output_path, audit_log_id
         FROM analysis_runner
         WHERE {where_params:q}
-    """
-        rows = await (await self.connection.pg_connection.execute(_query)).fetchall()
-
-        analysis_runner_internal_list = []
-        for row in rows:
-            row['meta'] = row.get('meta') or {}
-            analysis_runner_internal_list.append(AnalysisRunnerInternal(**row))
+        """
+        async with self.connection.pg_connection.cursor(
+            row_factory=class_row(AnalysisRunnerInternal)
+        ) as cur:
+            analysis_runner_internal_list = await (await cur.execute(_query)).fetchall()
 
         return analysis_runner_internal_list
 
