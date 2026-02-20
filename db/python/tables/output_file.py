@@ -66,8 +66,6 @@ class OutputFileTable(DbBase):
         """
         Create a new file, and add it to database
         """
-        # file_obj = AnyPath(path, client=GSClient(storage_client=client))
-
         if not path:
             raise ValueError('Invalid cloud file path')
 
@@ -83,37 +81,35 @@ class OutputFileTable(DbBase):
         if not file_obj or not file_obj.valid:
             return None
 
-        kv_pairs = [
-            ('path', path),
-            ('basename', file_obj.basename),
-            ('dirname', file_obj.dirname),
-            ('nameroot', file_obj.nameroot),
-            ('nameext', file_obj.nameext),
-            ('file_checksum', file_obj.file_checksum),
-            ('size', file_obj.size),
-            ('valid', file_obj.valid),
-            ('parent_id', parent_id),
-        ]
-
-        kv_pairs = [(k, v) for k, v in kv_pairs if v is not None]
-        keys = [k for k, _ in kv_pairs]
-        cs_keys = ', '.join(keys)
-        cs_id_keys = ', '.join(f':{k}' for k in keys)
-        non_pk_keys = [k for k in keys if k != 'path']
-        update_clause = ', '.join([f'{k} = VALUES({k})' for k in non_pk_keys])
-
-        _query = dedent(
-            f"""
-            INSERT INTO output_file ({cs_keys}) VALUES ({cs_id_keys})
-            ON DUPLICATE KEY UPDATE {update_clause} RETURNING id
+        create_update_file = t"""
+            INSERT INTO output_file 
+                (path, basename, dirname, nameroot, nameext, file_checksum, size, valid, parent_id) 
+            VALUES
+                ({path},
+                {file_obj.basename}, 
+                {file_obj.dirname}, 
+                {file_obj.nameroot}, 
+                {file_obj.nameext}, 
+                {file_obj.file_checksum},
+                {file_obj.size},
+                {file_obj.valid},
+                {parent_id})
+            ON DUPLICATE KEY UPDATE 
+                basename = VALUES(basename),
+                dirname = VALUES(dirname),
+                nameroot = VALUES(nameroot),
+                nameext = VALUES(nameext),
+                file_checksum = VALUES(file_checksum),
+                size = VALUES(size),
+                valid = VALUES(valid),
+                parent_id = VALUES(parent_id)
+            RETURNING id
             """
-        )
-        id_of_new_file = await self.connection.fetch_val(
-            _query,
-            dict(kv_pairs),
-        )
 
-        return id_of_new_file
+        cur = await self.connection.pg_connection.execute(create_update_file)
+        id_of_new_file = await cur.fetchone()
+
+        return id_of_new_file['id']
 
     async def add_output_file_to_analysis(
         self,
@@ -127,22 +123,12 @@ class OutputFileTable(DbBase):
         # The IGNORE is to avoid duplicate entries if the same file is added multiple times
         # and we used this over ON DUPLICATE because there are reported deadlocks with that
         # syntax in high concurrency situations?
-        _query = dedent(
-            """
+        add_analysis_output = t"""
             INSERT IGNORE INTO analysis_outputs
                 (analysis_id, file_id, json_structure, output)
-            VALUES (:analysis_id, :file_id, :json_structure, :output)
-        """
-        )
-        await self.connection.execute(
-            _query,
-            {
-                'analysis_id': analysis_id,
-                'file_id': file_id,
-                'json_structure': json_structure,
-                'output': output,
-            },
-        )
+            VALUES ({analysis_id}, {file_id}, {json_structure}, {output})"""
+
+        await self.connection.pg_connection.execute(add_analysis_output)
 
     async def create_or_update_analysis_output_files_from_output(
         self,
