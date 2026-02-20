@@ -134,8 +134,8 @@ class CohortTable(DbBase):
 
         async with self.connection.pg_connection.cursor(
             row_factory=class_row(CohortTemplateInternal)
-        ) as cursor:
-            cohort_templates = await (await cursor.execute(_query)).fetchall()
+        ) as cur:
+            cohort_templates = await (await cur.execute(_query)).fetchall()
 
         projects = {c.project for c in cohort_templates}
         return projects, cohort_templates
