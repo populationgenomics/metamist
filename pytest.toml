@@ -25,7 +25,8 @@ python_files = [
     "test_update_participant_family.py",
     "test_pedigree.py",
     "test_search.py",
-    "test_graphql.py"
+    "test_graphql.py",
+    "test_analysis_output_files.py"
 ]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
