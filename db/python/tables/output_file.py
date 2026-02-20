@@ -1,5 +1,4 @@
 import logging
-from textwrap import dedent
 from urllib.parse import urlparse
 
 from fastapi.concurrency import run_in_threadpool
@@ -83,19 +82,19 @@ class OutputFileTable(DbBase):
             return None
 
         create_update_file = t"""
-            INSERT INTO output_file 
-                (path, basename, dirname, nameroot, nameext, file_checksum, size, valid, parent_id) 
+            INSERT INTO output_file
+                (path, basename, dirname, nameroot, nameext, file_checksum, size, valid, parent_id)
             VALUES
                 ({path},
-                {file_obj.basename}, 
-                {file_obj.dirname}, 
-                {file_obj.nameroot}, 
-                {file_obj.nameext}, 
+                {file_obj.basename},
+                {file_obj.dirname},
+                {file_obj.nameroot},
+                {file_obj.nameext},
                 {file_obj.file_checksum},
                 {file_obj.size},
                 {file_obj.valid},
                 {parent_id})
-            ON DUPLICATE KEY UPDATE 
+            ON DUPLICATE KEY UPDATE
                 basename = VALUES(basename),
                 dirname = VALUES(dirname),
                 nameroot = VALUES(nameroot),
@@ -201,10 +200,6 @@ class OutputFileTable(DbBase):
                 DELETE FROM analysis_outputs
                 WHERE analysis_id = {analysis_id}"""
 
-            query_params: dict[str, int | list[int] | list[str]] = {
-                'analysis_id': analysis_id
-            }
-
             # Add the OR condition to include file_ids or outputs
             conditions = []
 
@@ -216,11 +211,13 @@ class OutputFileTable(DbBase):
             # Add output condition if outputs is not empty
             if outputs:
                 # Add outputs to query parameters
-                conditions.append(t'output IS NOT NULL AND output NOT IN {outputs}')  
+                conditions.append(t'output IS NOT NULL AND output NOT IN {outputs}')
 
             # Join the conditions with OR since either can be valid
             if conditions:
-                update_analysis_outputs += t' AND ({sql.SQL(" OR ").join(conditions):q})'
+                update_analysis_outputs += (
+                    t' AND ({sql.SQL(" OR ").join(conditions):q})'
+                )
 
             # Execute the query only if either file_ids or outputs were provided
             await self.connection.execute(update_analysis_outputs)
