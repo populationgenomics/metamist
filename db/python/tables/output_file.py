@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 
 from fastapi.concurrency import run_in_threadpool
 from google.cloud.storage import Blob
+from psycopg import sql
 
 from db.python.tables.base import DbBase
 from models.models.output_file import OutputFileInternal, RecursiveDict
@@ -195,13 +196,10 @@ class OutputFileTable(DbBase):
                 # If both file_ids and outputs are empty, don't execute the query
                 pass
 
-            _update_query = dedent(
-                # Delete analysis outputs not in the current set of file_ids or outputs
-                """
+            # Delete analysis outputs not in the current set of file_ids or outputs
+            update_analysis_outputs = t"""
                 DELETE FROM analysis_outputs
-                WHERE analysis_id = :analysis_id
-                """
-            )
+                WHERE analysis_id = {analysis_id}"""
 
             query_params: dict[str, int | list[int] | list[str]] = {
                 'analysis_id': analysis_id
@@ -212,20 +210,20 @@ class OutputFileTable(DbBase):
 
             # Add file_id condition if file_ids is not empty
             if file_ids:
-                conditions.append('file_id IS NOT NULL AND file_id NOT IN :file_ids')
-                query_params['file_ids'] = file_ids  # Add file_ids to query parameters
+                # Add file_ids to query parameters
+                conditions.append(t'file_id IS NOT NULL AND file_id NOT IN {file_ids}')
 
             # Add output condition if outputs is not empty
             if outputs:
-                conditions.append('output IS NOT NULL AND output NOT IN :outputs')
-                query_params['outputs'] = outputs  # Add outputs to query parameters
+                # Add outputs to query parameters
+                conditions.append(t'output IS NOT NULL AND output NOT IN {outputs}')  
 
             # Join the conditions with OR since either can be valid
             if conditions:
-                _update_query += ' AND (' + ' OR '.join(conditions) + ')'
+                update_analysis_outputs += t' AND ({sql.SQL(" OR ").join(conditions):q})'
 
             # Execute the query only if either file_ids or outputs were provided
-            await self.connection.execute(_update_query, query_params)
+            await self.connection.execute(update_analysis_outputs)
 
     async def find_files_from_dict(
         self,
