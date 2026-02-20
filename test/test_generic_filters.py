@@ -103,6 +103,22 @@ class TestGenericFilters:
         assert results[0]['test_string'] == 'test'
         assert results[0]['test_int'] == 100
 
+    async def test_override_with_expression(
+        self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]
+    ):
+        """Test that overriding a field with an expression that modifies the field will execute correctly"""
+        filter_ = GenericFilterTest(
+            test_int=GenericFilter(eq=300), test_bool=GenericFilter(eq=True)
+        )
+        field_mapping = {'test_bool': t'NOT test_bool'}
+
+        async with test_data.connection() as conn:
+            results = await execute_filter(conn, filter_, field_mapping)
+
+        assert len(results) == 1
+        assert results[0]['test_string'] == 'testprefix'
+        assert results[0]['test_int'] == 300
+
     async def test_contains_case_sensitive(
         self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]
     ):

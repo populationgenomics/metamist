@@ -1,6 +1,6 @@
 from typing import Any
 
-from models.base import OpenApiGenNoneType, SMBase, parse_sql_bool, parse_sql_dict
+from models.base import OpenApiGenNoneType, SMBase
 from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
 from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
 from models.utils.sequencing_group_id_format import (
@@ -43,18 +43,6 @@ class SequencingGroupInternal(SMBase):
     project: int | None = None
 
     assays: list[AssayInternal] | None = None
-
-    @classmethod
-    def from_db(cls, **kwargs):
-        """From database model"""
-        meta = parse_sql_dict(kwargs.pop('meta'))
-
-        _archived = parse_sql_bool(kwargs.pop('archived', None))
-        external_ids = parse_sql_dict(kwargs.pop('external_ids', None)) or {}
-
-        return SequencingGroupInternal(
-            **kwargs, archived=_archived, meta=meta, external_ids=external_ids
-        )
 
     def to_external(self):
         """Convert to transport model"""
