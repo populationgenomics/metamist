@@ -1,6 +1,6 @@
 from typing import Any
 
-from models.base import OpenApiGenNoneType, SMBase, parse_sql_bool, parse_sql_dict
+from models.base import OpenApiGenNoneType, SMBase
 from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
 from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
 from models.utils.sequencing_group_id_format import (

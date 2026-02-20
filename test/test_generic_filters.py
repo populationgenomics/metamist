@@ -107,10 +107,10 @@ class TestGenericFilters:
         self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]
     ):
         """Test that overriding a field with an expression that modifies the field will execute correctly"""
-        filter_ = GenericFilterTest(test_int=GenericFilter(eq=300), test_bool=GenericFilter(eq=True))
-        field_mapping = {
-            'test_bool': t'NOT test_bool'
-        }
+        filter_ = GenericFilterTest(
+            test_int=GenericFilter(eq=300), test_bool=GenericFilter(eq=True)
+        )
+        field_mapping = {'test_bool': t'NOT test_bool'}
 
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_, field_mapping)

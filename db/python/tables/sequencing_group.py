@@ -1,8 +1,8 @@
 from collections import defaultdict
 from datetime import date
 from string.templatelib import Template
-from dateutil.relativedelta import relativedelta
 
+from dateutil.relativedelta import relativedelta
 from psycopg import sql
 from psycopg.rows import class_row
 
@@ -28,7 +28,7 @@ class SequencingGroupTable(DbBase):
     def construct_query(
         sg_filter: SequencingGroupFilter,
         skip: int | None = None,
-        limit: int | None = None
+        limit: int | None = None,
     ) -> Template:
         """
         Construct a query for sequencing_group
@@ -68,7 +68,9 @@ class SequencingGroupTable(DbBase):
                 }
             )
             if sg_filter.sample.external_id:
-                base_query_components.append(t'LEFT JOIN sample_external_id sexid ON s.id = sexid.sample_id')
+                base_query_components.append(
+                    t'LEFT JOIN sample_external_id sexid ON s.id = sexid.sample_id'
+                )
 
             where_templates.append(sample_where_condition)
 
@@ -115,11 +117,11 @@ class SequencingGroupTable(DbBase):
             base_query_components.append(
                 t"""
                 INNER JOIN (
-                    SELECT 
+                    SELECT
                         asg.sequencing_group_id,
                         bool_or(a.type = 'cram') AS has_cram,
                         bool_or(a.type = 'gvcf') AS has_gvcf
-                    FROM 
+                    FROM
                         analysis_sequencing_group asg JOIN analysis a ON a.id = asg.analysis_id
                     GROUP BY asg.sequencing_group_id
                 ) AS sg_filequery ON sg.id = sg_filequery.sequencing_group_id"""
@@ -182,18 +184,18 @@ class SequencingGroupTable(DbBase):
             limit=limit,
             skip=skip,
         )
-    
+
         async with self.connection.pg_connection.cursor(
             row_factory=class_row(SequencingGroupInternal)
         ) as cur:
             await cur.execute(query)
             sgs_internal = await cur.fetchall()
-        
+
         projects = set(sg.project for sg in sgs_internal if sg.project)
         return projects, sgs_internal
 
     async def get_sequencing_groups_by_ids(
-            self, ids: list[int]
+        self, ids: list[int]
     ) -> tuple[set[ProjectId], list[SequencingGroupInternal]]:
         """
         Get sequence groups by internal identifiers
@@ -238,7 +240,7 @@ class SequencingGroupTable(DbBase):
         """
         cur = await self.connection.pg_connection.execute(_query)
         rows = await cur.fetchall()
-        
+
         sequencing_group_ids_by_sample_ids_by_type: dict[int, dict[str, list[int]]] = (
             defaultdict(lambda: defaultdict(list))
         )
@@ -412,7 +414,9 @@ class SequencingGroupTable(DbBase):
         updaters = [t'audit_log_id = {audit_log_id}']
 
         if meta:
-            updaters.append(t'meta = json_merge_patch(COALESCE(meta, \'{{}}\'::jsonb), {to_db_json(meta)})')
+            updaters.append(
+                t"meta = json_merge_patch(COALESCE(meta, '{{}}'::jsonb), {to_db_json(meta)})"
+            )
 
         if platform:
             updaters.append(t'platform = {platform}')

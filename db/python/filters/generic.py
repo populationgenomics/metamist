@@ -100,9 +100,7 @@ class GenericFilter[T](SMBase):
         """Override to ensure we can hash this object"""
         return hash(self.get_hashable_value())
 
-    def to_sql(
-        self, column: str | Template
-    ) -> Template:
+    def to_sql(self, column: str | Template) -> Template:
         """
         Convert to SQL, and avoid SQL injection.
 
