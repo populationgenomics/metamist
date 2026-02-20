@@ -100,29 +100,25 @@ class GenericFilter[T](SMBase):
         """Override to ensure we can hash this object"""
         return hash(self.get_hashable_value())
 
-    def to_sql(
-        self, column: str, column_expression: Template | None = None
-    ) -> Template:
+    def to_sql(self, column: str | Template) -> Template:
         """
-        Convert to SQL, and avoid SQL injection
+        Convert to SQL, and avoid SQL injection.
+
+        **Note**:
+            If column contains an expression, it _must_ be of type Template.
+            If column is a column name, it should be of type str.
 
         Args:
-            column (str): The expression, or column name that derives the values
-            column_expression (Template, optional): A SQL expression as a str Template
-                to be used for the column. This can be used if you want to use a sql
-                function for the column
+            column (str | Template): The expression, or column name that derives the values.
 
         Returns:
             Template
         """
-        filters: list[Template] = []
-
-        if not isinstance(column, str):
-            raise ValueError(f'Column {column!r} must be a string')
+        filters: list[Template | None] = []
 
         column_query = (
-            column_expression
-            if column_expression
+            column
+            if isinstance(column, Template)
             else t'{sql.Identifier(*column.split(".")):i}'
         )
 
@@ -172,7 +168,11 @@ class GenericFilter[T](SMBase):
             else:
                 filters.append(t'{column_query:q} IS NOT NULL')
 
-        return sql.SQL(' AND ').join(filters)
+        filters_rm_none: list[Template] = [f for f in filters if f is not None]
+        if len(filters_rm_none) == 0:
+            return None
+
+        return sql.SQL(' AND ').join(filters_rm_none)
 
     def transform(self, func: Callable[[T], X]) -> GenericFilter[X]:
         """
@@ -252,7 +252,7 @@ class GenericFilterModel:
         field_overrides: dict[str, str] | None = None,
         only: list[str] | None = None,
         exclude: list[str] | None = None,
-    ) -> Template:
+    ) -> Template | None:
         """Convert the model to SQL, and avoid SQL injection"""
 
         _foverrides = field_overrides or {}
@@ -267,7 +267,7 @@ class GenericFilterModel:
             )
 
         fields = dataclasses.fields(self)
-        filters: list[Template] = []
+        filters: list[Template | None] = []
         for field in fields:
             if only and field.name not in only:
                 continue
@@ -289,7 +289,11 @@ class GenericFilterModel:
                         f'Filter {field.name} must be a GenericFilter or dict[str, GenericFilter]'
                     )
 
-        return sql.SQL(' AND ').join(filters)
+        filters_rm_none: list[Template] = [f for f in filters if f is not None]
+        if len(filters_rm_none) == 0:
+            return None
+
+        return sql.SQL(' AND ').join(filters_rm_none)
 
 
 def prepare_query_from_dict_field(

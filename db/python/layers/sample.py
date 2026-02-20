@@ -7,7 +7,7 @@ from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer, Connection
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.sample import SampleFilter, SampleTable
-from db.python.utils import NoOpAenter, NotFoundError
+from db.python.utils import NotFoundError
 from models.models.project import (
     FullWriteAccessRoles,
     ProjectId,
@@ -94,7 +94,7 @@ class SampleLayer(BaseLayer):
     async def get_sample_id_map_by_external_ids(
         self,
         external_ids: list[str],
-        project: ProjectId = None,
+        project: ProjectId,
         allow_missing=False,
     ) -> dict[str, int]:
         """Get map of samples {(any) external_id: internal_id}"""
@@ -221,12 +221,8 @@ class SampleLayer(BaseLayer):
         project: ProjectId | None = None,
         process_sequencing_groups: bool = True,
         process_assays: bool = True,
-        open_transaction: bool = True,
     ) -> SampleUpsertInternal:
         """Upsert a sample"""
-        with_function = (
-            self.connection.connection.transaction if open_transaction else NoOpAenter
-        )
         if sample.id:
             pjcts = await self.st.get_project_ids_for_sample_ids([sample.id])
             self.connection.check_access_to_projects_for_ids(
@@ -240,7 +236,7 @@ class SampleLayer(BaseLayer):
             )
 
         # safely ignore nested samples here
-        async with with_function():
+        async with self.connection.transaction():
             for r in self.unwrap_nested_samples([sample]):
                 s = r.sample
                 if not s.id:
@@ -289,15 +285,10 @@ class SampleLayer(BaseLayer):
     async def upsert_samples(
         self,
         samples: list[SampleUpsertInternal],
-        open_transaction: bool = True,
         project: ProjectId = None,
     ) -> list[SampleUpsertInternal]:
         """Batch upsert a list of samples with sequences"""
         seqglayer: SequencingGroupLayer = SequencingGroupLayer(self.connection)
-
-        with_function = (
-            self.connection.connection.transaction if open_transaction else NoOpAenter
-        )
 
         sids = [s.id for s in samples if s.id]
         if sids:
@@ -306,7 +297,7 @@ class SampleLayer(BaseLayer):
                 pjcts, allowed_roles=FullWriteAccessRoles
             )
 
-        async with with_function():
+        async with self.connection.transaction():
             # Create or update samples
             for sample in samples:
                 await self.upsert_sample(
@@ -314,7 +305,6 @@ class SampleLayer(BaseLayer):
                     project=project,
                     process_sequencing_groups=False,
                     process_assays=False,
-                    open_transaction=False,
                 )
 
             # Upsert all sequencing_groups (in turn relevant assays)
