@@ -13,7 +13,8 @@ python_files = [
     "test_assay.py",
     "test_external_id.py",
     "test_comment.py",
-    "test_meta_table.py"
+    "test_meta_table.py",
+    "test_analysis_output_files.py"
 ]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

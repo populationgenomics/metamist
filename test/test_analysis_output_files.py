@@ -1,6 +1,8 @@
 import os
+from collections.abc import Generator
 from typing import Any
 
+import pytest
 from testcontainers.core.container import DockerContainer
 
 from db.python.layers.analysis import AnalysisLayer
@@ -16,35 +18,31 @@ from models.models import (
     SequencingGroupUpsertInternal,
 )
 from models.models.analysis import AnalysisInternal
-from test.testbase import DbIsolatedTest, run_as_sync
 
 
-class TestOutputFiles(DbIsolatedTest):
+@pytest.fixture()
+def fake_gcs() -> Generator[DockerContainer]:
+    absolute_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')  # noqa: PTH100, PTH118, PTH120
+    gcs = (
+        DockerContainer('fsouza/fake-gcs-server')
+        .with_bind_ports(4443, 4443)
+        .with_volume_mapping(
+            absolute_path,
+            '/data',
+        )
+        .with_command('-scheme http')
+    )
+    gcs.start()
+    
+    yield gcs
+
+    gcs.stop()
+
+class TestOutputFiles:
     """Test sample class"""
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def setUp(self) -> None:
-        # don't need to await because it's tagged @run_as_sync
-        super().setUp()
-
-        absolute_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')  # noqa: PTH100, PTH118, PTH120
-        gcs = (
-            DockerContainer('fsouza/fake-gcs-server')
-            .with_bind_ports(4443, 4443)
-            .with_volume_mapping(
-                absolute_path,
-                '/data',
-            )
-            .with_command('-scheme http')
-        )
-        gcs.start()
-        self.gcs = gcs
-
-        self.sl = SampleLayer(self.connection)
-        self.sgl = SequencingGroupLayer(self.connection)
-        self.asl = AssayLayer(self.connection)
-        self.al = AnalysisLayer(self.connection)
-
         sample = await self.sl.upsert_sample(
             SampleUpsertInternal(
                 external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
@@ -94,31 +92,25 @@ class TestOutputFiles(DbIsolatedTest):
         self.genome_sequencing_group_id = sample.sequencing_groups[0].id
         self.exome_sequencing_group_id = sample.sequencing_groups[self.project_id].id
 
-    def tearDown(self) -> None:
-        if self.gcs:
-            self.gcs.stop()
-        return super().tearDown()
 
     def check_outputs_fields(self, outputs: dict, output_file_data: dict):
         """Check the fields of the output file"""
         if outputs:
-            self.assertEqual(outputs['path'], output_file_data['path'])
-            self.assertEqual(outputs['basename'], output_file_data['basename'])
-            self.assertEqual(outputs['dirname'], output_file_data['dirname'])
-            self.assertEqual(outputs['nameroot'], output_file_data['nameroot'])
-            self.assertEqual(outputs['nameext'], output_file_data['nameext'])
-            self.assertEqual(
-                outputs['file_checksum'], output_file_data['file_checksum']
-            )
-            self.assertEqual(outputs['size'], output_file_data['size'])
-            self.assertEqual(outputs['valid'], output_file_data['valid'])
-            self.assertEqual(
-                len(outputs['secondary_files']),
-                len(output_file_data['secondary_files']),
-            )
+            assert outputs['path'] == output_file_data['path']
+            assert outputs['basename'] == output_file_data['basename']
+            assert outputs['dirname'] == output_file_data['dirname']
+            assert outputs['nameroot'] == output_file_data['nameroot']
+            assert outputs['nameext'] == output_file_data['nameext']
+            assert outputs['file_checksum'] == output_file_data['file_checksum']
+            assert outputs['size'] == output_file_data['size']
+            assert outputs['valid'] == output_file_data['valid']
+            assert len(outputs['secondary_files']) == len(output_file_data['secondary_files'])
 
-    @run_as_sync
-    async def test_output_str(self):
+    @pytest.mark.asyncio
+    async def test_output_str(
+        self,
+        fake_gcs: DockerContainer
+    ):
         """
         Test how the output(s) behave when you create an analysis by passing in
         just the `output` field
@@ -140,10 +132,10 @@ class TestOutputFiles(DbIsolatedTest):
         # Query the analysis object
         analysis = await self.al.get_analysis_by_id(analysis_id)
         assert analysis
-        self.assertEqual(analysis.output, output_path)
-        self.assertEqual(analysis.outputs, output_path)
+        assert analysis.output == output_path
+        assert analysis.outputs == output_path
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_gs_output_path(self):
         """
         Test how the output(s) behave when you create an analysis by passing in
@@ -179,10 +171,10 @@ class TestOutputFiles(DbIsolatedTest):
         assert isinstance(analysis.output, str)
         assert isinstance(analysis.outputs, dict)
 
-        self.assertEqual(analysis.output, output_path)
+        assert analysis.output == output_path
         self.check_outputs_fields(analysis.outputs, output_file_data)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_create_with_str_on_outputs(self):
         """
         This should test creating an Analysis by passing a string to the outputs field.
@@ -218,10 +210,10 @@ class TestOutputFiles(DbIsolatedTest):
         assert isinstance(analysis.output, str)
         assert isinstance(analysis.outputs, dict)
 
-        self.assertEqual(analysis.output, output_path)
+        assert analysis.output == output_path
         self.check_outputs_fields(analysis.outputs, output_file_data)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_dict_with_outputs(self):
         """Should test creating Analysis object with a dictionary as the outputs field"""
 
@@ -291,11 +283,11 @@ class TestOutputFiles(DbIsolatedTest):
         assert isinstance(analysis.output, str)
         assert isinstance(analysis.outputs, dict)
 
-        self.assertEqual(analysis.output, '')
-        self.assertIn('cram', analysis.outputs)
-        self.assertIn('secondary_files', analysis.outputs['cram'])
-        self.assertIn('meta', analysis.outputs['cram']['secondary_files'])
-        self.assertIn('ext', analysis.outputs['cram']['secondary_files'])
+        assert analysis.output == ''
+        assert 'cram' in analysis.outputs
+        assert 'secondary_files' in analysis.outputs['cram']
+        assert 'meta' in analysis.outputs['cram']['secondary_files']
+        assert 'ext' in analysis.outputs['cram']['secondary_files']
 
         # Check for each field against the output file data and also check each secondary file
         self.check_outputs_fields(analysis.outputs['cram'], output_file_data['cram'])
@@ -308,7 +300,7 @@ class TestOutputFiles(DbIsolatedTest):
             output_file_data['cram']['secondary_files']['ext'],  # type: ignore [index]
         )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_outputs_contains_protocol(self):
         """Tests validation of the outputs field so that file paths contain a protocol prefix"""
 
@@ -353,7 +345,7 @@ class TestOutputFiles(DbIsolatedTest):
         )
 
         # Check the case of a file path being incorrectly formatted.
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             await self.al.create_analysis(
                 AnalysisInternal(
                     type='cram',
@@ -365,12 +357,12 @@ class TestOutputFiles(DbIsolatedTest):
             )
 
         # Check the case of updating an Analysis with a file path being incorrectly formatted.
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             await self.al.update_analysis(
                 analysis_id=analysis_id, outputs=outputs_invalid
             )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_project_deletion(self):
         """Test ProjectPermissionsTable.delete_project_data's effect on analysis outputs and files"""
 
@@ -394,12 +386,12 @@ class TestOutputFiles(DbIsolatedTest):
             )
         )
 
-        self.assertEqual(await self.row_count('analysis_outputs'), 3)
-        self.assertEqual(await self.row_count('output_file'), 3)
+        assert (await self.row_count('analysis_outputs')) == 3
+        assert (await self.row_count('output_file')) == 3
 
         pttable = ProjectPermissionsTable(self.connection)
         project = self.project_id_map[self.project_id]
-        self.assertTrue(await pttable.delete_project_data(project))
+        assert (await pttable.delete_project_data(project)) == True
 
-        self.assertEqual(await self.row_count('analysis_outputs'), 0)
-        self.assertEqual(await self.row_count('output_file'), 0)
+        assert (await self.row_count('analysis_outputs')) == 0
+        assert (await self.row_count('output_file')) == 0
