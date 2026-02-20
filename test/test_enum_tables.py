@@ -33,8 +33,12 @@ class TestEnumTable:
         await connection.pg_connection.execute(
             t'INSERT INTO {table_name:i} (id, name, audit_log_id) VALUES ({assay_type_id}, {assay_type_name}, {audit_type_id})'
         )
+        get_vals: list[str] = await assay_type_table.get()
+        assert assay_type_name in get_vals
 
         # reset entry name
         await assay_type_table.insert(assay_type_id)
         get_vals: list[str] = await assay_type_table.get()
+
         assert assay_type_name not in get_vals
+        assert assay_type_id in get_vals
