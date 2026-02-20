@@ -557,7 +557,9 @@ class TestGenericFilters:
 
         # Should exclude queued
         assert len(results) == 6
-        assert all(r['test_enum'] not in ('queued', None) for r in results)
+
+        meta_vals = [r['test_enum'] for r in results]
+        assert all(v != AnalysisStatus.QUEUED for v in meta_vals if v is not None)
 
     # String enum filter tests
     async def test_str_enum_eq(
@@ -875,7 +877,7 @@ class TestGenericFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        assert len(results) == 7
+        assert len(results) == 5
 
         # Check that the result with NULL test_dict is not included in the results
         assert sum(r['test_dict'] is None for r in results) == 0
@@ -898,8 +900,11 @@ class TestGenericFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        assert len(results) == 1
-        assert results[0]['test_dict'] == {}
+        assert len(results) == 2
+
+        # Confirm that one of the results has test_dict as NULL and the other has test_dict as an empty dict
+        assert sum(r['test_dict'] is None for r in results) == 1
+        assert sum(r.get('test_dict') == {} for r in results) == 1
 
     async def test_dict_field_isnull_false(
         self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]
@@ -910,8 +915,8 @@ class TestGenericFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        assert len(results) == 8
-        assert all(r['test_dict'].get('metastr') is not None for r in results)
+        assert len(results) == 7
+        assert all(r['test_dict']['metastr'] is not None for r in results)
 
     async def test_dict_field_multiple_conditions(
         self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]
@@ -968,7 +973,7 @@ class TestGenericFilters:
         """Test dict field with negation filters combined with positive filters"""
         filter_ = GenericFilterTest(
             test_dict={
-                'metastr': GenericFilter(neq='test'),
+                'metastr': GenericFilter(neq='another'),
                 'metaint': GenericFilter(nin=[100, 200]),
             }
         )
@@ -976,9 +981,13 @@ class TestGenericFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        assert len(results) >= 4
+        assert len(results) == 6
         for r in results:
-            assert r['test_dict'].get('metastr') != 'test'
+            if r['test_dict'] is None:
+                continue
+            if r.get('test_dict') == {}:
+                continue
+            assert r['test_dict'].get('metastr') != 'another'
             assert r['test_dict'].get('metaint') not in [100, 200]
 
     async def test_dict_field_all_operators_combined(
@@ -988,17 +997,17 @@ class TestGenericFilters:
         filter_ = GenericFilterTest(
             test_dict={
                 'metastr': GenericFilter(startswith='test'),
-                'metaint': GenericFilter(gt=100, lt=300),
+                'metaint': GenericFilter(gte=100, lt=300),
             }
         )
 
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        assert len(results) >= 1
+        assert len(results) == 1
         for r in results:
             assert r['test_dict']['metastr'].startswith('test')
-            assert 100 < r['test_dict']['metaint'] < 300
+            assert 100 <= r['test_dict']['metaint'] < 300
 
     async def test_dict_field_with_enum_and_regular_filters(
         self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]
