@@ -65,10 +65,7 @@ class EnumTable(DbBase):
         _query = t"""
             INSERT INTO {self._get_table_name():i} (id, name, audit_log_id)
             VALUES ({name_param}, {name_param}, {audit_log_id})
-            ON CONFLICT (id)
-            DO UPDATE SET
-            name = EXCLUDED.name,
-            audit_log_id = EXCLUDED.audit_log_id
+            ON CONFLICT (id) DO NOTHING
         """
 
         await self.connection.pg_connection.execute(_query)

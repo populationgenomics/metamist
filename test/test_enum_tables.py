@@ -20,25 +20,15 @@ class TestEnumTable:
 
     @pytest.mark.asyncio
     async def test_update_existing_enum(self, connection: Connection):
-        """Test insert new enum and retrieving existing enums"""
+        """Test re-inserting an existing enum do nothing"""
 
         assay_type_table = AssayTypeTable(connection)
-        table_name = assay_type_table.get_table_name()
+        assay_type = 'gvcf'
 
-        assay_type_id = 'gvcf'
-        assay_type_name = 'gvcf_1'
-        audit_type_id = await connection.audit_log_id()
-
-        # inject an enum entry id != name
-        await connection.pg_connection.execute(
-            t'INSERT INTO {table_name:i} (id, name, audit_log_id) VALUES ({assay_type_id}, {assay_type_name}, {audit_type_id})'
-        )
+        await assay_type_table.insert(assay_type)
         get_vals: list[str] = await assay_type_table.get()
-        assert assay_type_name in get_vals
+        assert assay_type in get_vals
 
-        # reset entry name
-        await assay_type_table.insert(assay_type_id)
+        await assay_type_table.insert(assay_type)
         get_vals: list[str] = await assay_type_table.get()
-
-        assert assay_type_name not in get_vals
-        assert assay_type_id in get_vals
+        assert assay_type in get_vals
