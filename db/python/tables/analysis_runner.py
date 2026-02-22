@@ -37,7 +37,7 @@ class AnalysisRunnerTable(DbBase):
 
         where_params: Template = filter_.to_sql()
 
-        if not list(where_params):
+        if where_params is None:
             raise ValueError(f'Invalid filter: {filter_}')
 
         _query = t"""
