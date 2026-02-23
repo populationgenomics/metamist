@@ -99,6 +99,7 @@ class TestOutputFiles:
     """Test sample class"""
 
     @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
     async def test_output_str(
         self, connection_with_project: Connection, fake_sequencing_group: int
     ):
@@ -128,6 +129,7 @@ class TestOutputFiles:
         assert analysis.outputs == output_path
 
     @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
     async def test_gs_output_path(
         self, connection_with_project: Connection, fake_sequencing_group: int
     ):
@@ -171,6 +173,7 @@ class TestOutputFiles:
         check_outputs_fields(analysis.outputs, output_file_data)
 
     @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
     async def test_create_with_str_on_outputs(
         self, connection_with_project: Connection, fake_sequencing_group: int
     ):
@@ -213,6 +216,7 @@ class TestOutputFiles:
         check_outputs_fields(analysis.outputs, output_file_data)
 
     @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
     async def test_dict_with_outputs(
         self, connection_with_project: Connection, fake_sequencing_group: int
     ):
@@ -303,6 +307,7 @@ class TestOutputFiles:
         )
 
     @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
     async def test_outputs_contains_protocol(
         self, connection_with_project: Connection, fake_sequencing_group: int
     ):
@@ -368,6 +373,7 @@ class TestOutputFiles:
             )
 
     @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
     async def test_project_deletion(
         self, connection_with_project: Connection, fake_sequencing_group: int
     ):
