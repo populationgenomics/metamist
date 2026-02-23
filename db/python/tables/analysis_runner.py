@@ -1,6 +1,5 @@
 import dataclasses
 import datetime
-from string.templatelib import Template
 
 from psycopg.rows import class_row
 from psycopg.types.json import Jsonb
@@ -35,7 +34,7 @@ class AnalysisRunnerTable(DbBase):
         Get analysis runner logs
         """
 
-        where_params: Template = filter_.to_sql()
+        where_params = filter_.to_sql()
         wheres_query = t'WHERE {where_params:q}' if where_params is not None else t''
 
         _query = t"""
