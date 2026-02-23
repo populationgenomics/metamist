@@ -386,7 +386,7 @@ class TestOutputFiles:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    @pytest.mark.project_name(['project-test'])
+    @pytest.mark.project_name('project-test')
     async def test_project_deletion(
         self, connection_with_project: Connection, fake_sequencing_group: int
     ):
