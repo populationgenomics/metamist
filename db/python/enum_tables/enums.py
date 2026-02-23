@@ -48,8 +48,9 @@ class EnumTable(DbBase):
         """
         Get all sequencing types
         """
-        _query = f'SELECT DISTINCT name FROM {self._get_table_name()}'
-        rows = await self.connection.fetch_all(_query)
+        _query = t'SELECT DISTINCT name FROM {self._get_table_name():i}'
+        cursor = await self.connection.pg_connection.execute(_query)
+        rows = await cursor.fetchall()
         nrows = [r['name'] for r in rows]
 
         return nrows
@@ -58,15 +59,16 @@ class EnumTable(DbBase):
         """
         Insert a new type
         """
-        _query = f"""
-            INSERT INTO {self._get_table_name()} (id, name, audit_log_id)
-            VALUES (:name, :name, :audit_log_id)
-            ON DUPLICATE KEY UPDATE name = :name, audit_log_id = :audit_log_id
+        name_param = value.lower()
+        audit_log_id = await self.audit_log_id()
+
+        _query = t"""
+            INSERT INTO {self._get_table_name():i} (id, name, audit_log_id)
+            VALUES ({name_param}, {name_param}, {audit_log_id})
+            ON CONFLICT (id) DO NOTHING
         """
 
-        await self.connection.execute(
-            _query, {'name': value.lower(), 'audit_log_id': await self.audit_log_id()}
-        )
+        await self.connection.pg_connection.execute(_query)
         # clear the cache so results are up-to-date
         self.get.cache_clear()
         return value

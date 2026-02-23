@@ -7,6 +7,7 @@ python_files = [
     "test_project_graphql.py",
     "test_json_merge_patch.py",
     "test_project_groups.py",
+    "test_sequencing_groups.py",
     "test_generic_filters.py",
     "test_sample.py",
     "test_participant.py",
@@ -14,7 +15,8 @@ python_files = [
     "test_external_id.py",
     "test_comment.py",
     "test_meta_table.py",
-    "test_analysis_output_files.py"
+    "test_analysis_output_files.py",
+    "test_enum_tables.py"
 ]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
