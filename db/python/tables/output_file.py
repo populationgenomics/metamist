@@ -126,7 +126,7 @@ class OutputFileTable(DbBase):
         add_analysis_output = t"""
             INSERT INTO analysis_outputs
                 (analysis_id, file_id, json_structure, output)
-            VALUES 
+            VALUES
                 ({analysis_id}, {file_id}, {json_structure}, {output})
             ON CONFLICT DO NOTHING"""
 

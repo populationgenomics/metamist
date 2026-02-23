@@ -20,6 +20,7 @@ from models.models import (
 )
 from models.models.analysis import AnalysisInternal
 
+
 def custom_get_gcs_client():
     """Create the custom client instance with the desired configuration"""
     return Client(
@@ -28,10 +29,13 @@ def custom_get_gcs_client():
         client_options={'api_endpoint': 'http://localhost:4443'},
     )
 
+
 @pytest.fixture(autouse=True)
 def fake_gcs(monkeypatch) -> Generator[DockerContainer]:
     """Provides a mocked Google Cloud storage bucket for testing"""
-    monkeypatch.setattr('models.models.output_file.get_gcs_client', custom_get_gcs_client)
+    monkeypatch.setattr(
+        'models.models.output_file.get_gcs_client', custom_get_gcs_client
+    )
 
     absolute_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')  # noqa: PTH100, PTH118, PTH120
     gcs = (
@@ -143,7 +147,7 @@ class TestOutputFiles:
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
     async def test_gs_output_path(
-        self, connection_with_project: Connection, fake_sequencing_group: int, fake_gcs
+        self, connection_with_project: Connection, fake_sequencing_group: int
     ):
         """
         Test how the output(s) behave when you create an analysis by passing in
